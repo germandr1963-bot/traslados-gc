@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traslados GC — Traslados de larga distancia en Gran Canaria</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilos.css">
+<style>
+.hero {
+  min-height: 520px;
+  background-color: var(--charcoal);
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  flex-direction: column;
+  color: var(--texto-claro);
+  padding: 24px 24px 60px;
+}
+.hero::before {
+  content: "";
+}
+.hero-overlay {
+  position: relative;
+  background: rgba(28,24,21,0.55);
+  border-radius: 16px;
+  padding: 36px 32px;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+.nav-superior {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 900px;
+  margin: 0 auto 28px;
+  width: 100%;
+}
+.nav-links {
+  font-size: 13px;
+  opacity: 0.7;
+}
+.titulo-hero {
+  font-size: clamp(28px, 5vw, 46px);
+  line-height: 1.1;
+  margin-bottom: 12px;
+}
+.titulo-hero .acento {
+  color: var(--terracota);
+}
+.subtitulo-hero {
+  font-size: 15px;
+  opacity: 0.85;
+  max-width: 420px;
+  margin-bottom: 26px;
+}
+.panel-busqueda {
+  background: var(--piedra);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.fila-busqueda {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+#resultado-precio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--texto-muted);
+  min-height: 26px;
+}
+.precio-grande {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--texto-oscuro);
+}
+.badge-fijo {
+  background: var(--oro);
+  color: var(--oro-texto);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 10px;
+}
+.seccion {
+  max-width: 900px;
+  margin: 50px auto;
+  padding: 0 24px;
+}
+.seccion h2 {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-weight: 500;
+  font-size: 24px;
+  margin-bottom: 16px;
+  color: var(--texto-oscuro);
+}
+.tres-columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+footer {
+  text-align: center;
+  padding: 30px;
+  color: var(--texto-muted);
+  font-size: 13px;
+}
+</style>
+</head>
+<body>
+
+<div class="hero" id="hero">
+  <div class="nav-superior">
+    <span class="titular" style="font-size:18px;">Traslados · GC</span>
+    <span class="nav-links">Rutas&nbsp;&nbsp;&nbsp;Flota&nbsp;&nbsp;&nbsp;Contacto</span>
+  </div>
+
+  <div class="hero-overlay">
+    <div class="titulo-hero titular">Cruza la isla<br>como se <span class="acento">merece</span></div>
+    <p class="subtitulo-hero">Traslados de larga distancia en Gran Canaria. Precio fijo por ruta, chofer confirmado antes de salir.</p>
+
+    <div class="panel-busqueda">
+      <div class="fila-busqueda">
+        <div>
+          <label class="etiqueta">Desde</label>
+          <select id="desde" class="campo"><option value="">Cargando...</option></select>
+        </div>
+        <div>
+          <label class="etiqueta">Hasta</label>
+          <select id="hasta" class="campo"><option value="">Cargando...</option></select>
+        </div>
+        <div>
+          <label class="etiqueta">Categoría</label>
+          <select id="categoria" class="campo"><option value="">Cargando...</option></select>
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button id="ver-precio" class="boton-primario" style="width:100%;height:40px;">Ver precio</button>
+        </div>
+      </div>
+      <div id="resultado-precio">Elige una ruta y categoría para ver el precio</div>
+    </div>
+  </div>
+</div>
+
+<div class="seccion">
+  <h2>Cómo funciona</h2>
+  <div class="tres-columnas">
+    <div class="tarjeta">
+      <strong>1. Reserva</strong>
+      <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);">Eliges tu ruta, la categoría de vehículo y la fecha. Ves el precio fijo antes de confirmar.</p>
+    </div>
+    <div class="tarjeta">
+      <strong>2. Confirmación</strong>
+      <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);">Un chofer acepta tu viaje y te lo confirmamos antes de que salgas de casa.</p>
+    </div>
+    <div class="tarjeta">
+      <strong>3. Viaje</strong>
+      <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);">Coordinamos los detalles finales por WhatsApp. Tu chofer ya sabe dónde y cuándo recogerte.</p>
+    </div>
+  </div>
+</div>
+
+<footer>Traslados · GC — Gran Canaria</footer>
+
+<script>
+var rutasDisponibles = [];
+
+function cargarFondo() {
+  var img = new Image();
+  img.onload = function () {
+    document.getElementById('hero').style.backgroundImage = "url('/fondo-activo')";
+  };
+  img.onerror = function () {};
+  img.src = '/fondo-activo';
+}
+
+function poblarSelect(select, valores) {
+  select.innerHTML = '<option value="">Selecciona</option>';
+  valores.forEach(function (v) {
+    var opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v;
+    select.appendChild(opt);
+  });
+}
+
+function cargarRutas() {
+  fetch('/api/rutas').then(function (r) { return r.json(); }).then(function (rutas) {
+    rutasDisponibles = rutas;
+    var origenes = Array.from(new Set(rutas.map(function (r) { return r.origen; })));
+    var destinos = Array.from(new Set(rutas.map(function (r) { return r.destino; })));
+    poblarSelect(document.getElementById('desde'), origenes);
+    poblarSelect(document.getElementById('hasta'), destinos);
+    if (rutas.length === 0) {
+      document.getElementById('resultado-precio').textContent = 'Aún no hay rutas cargadas';
+    }
+  });
+}
+
+function cargarCategorias() {
+  fetch('/api/categorias').then(function (r) { return r.json(); }).then(function (categorias) {
+    var select = document.getElementById('categoria');
+    select.innerHTML = '<option value="">Selecciona</option>';
+    categorias.forEach(function (c) {
+      var opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.nombre + ' (' + c.capacidad_pasajeros + ' pax)';
+      select.appendChild(opt);
+    });
+  });
+}
+
+function verPrecio() {
+  var desde = document.getElementById('desde').value;
+  var hasta = document.getElementById('hasta').value;
+  var categoriaId = document.getElementById('categoria').value;
+  var resultado = document.getElementById('resultado-precio');
+
+  if (!desde || !hasta || !categoriaId) {
+    resultado.textContent = 'Elige una ruta y categoría para ver el precio';
+    return;
+  }
+
+  var ruta = rutasDisponibles.find(function (r) { return r.origen === desde && r.destino === hasta; });
+
+  if (!ruta) {
+    resultado.textContent = 'Ruta a consultar';
+    return;
+  }
+
+  fetch('/api/precio?ruta_id=' + ruta.id + '&categoria_id=' + categoriaId)
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.a_consultar) {
+        resultado.textContent = 'Precio a consultar';
+      } else {
+        resultado.innerHTML = '<span class="precio precio-grande">' + data.precio.toFixed(0) + ' €</span><span class="badge-fijo">precio fijo</span>';
+      }
+    });
+}
+
+document.getElementById('ver-precio').addEventListener('click', verPrecio);
+cargarFondo();
+cargarRutas();
+cargarCategorias();
+</script>
+
+</body>
+</html>

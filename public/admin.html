@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Traslados GC</title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilos.css">
+<style>
+.login-pantalla {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-caja {
+  width: 320px;
+}
+.login-caja .titular {
+  font-size: 20px;
+  display: block;
+  margin-bottom: 18px;
+}
+.login-caja .campo {
+  margin-bottom: 12px;
+}
+.grid-fondos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.tarjeta-fondo {
+  border: 1px solid var(--gris-borde);
+  border-radius: 12px;
+  padding: 8px;
+}
+.tarjeta-fondo .miniatura {
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--gris-fondo);
+  display: block;
+}
+.tarjeta-fondo .fila-acciones {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.tarjeta-fondo .nombre-fondo {
+  font-size: 12px;
+  color: var(--texto-muted);
+}
+.badge-activo {
+  background: var(--verde-ok-fondo);
+  color: var(--verde-ok);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.eliminar-fondo {
+  color: var(--rojo-error);
+  background: none;
+  border: none;
+  font-size: 11px;
+}
+.fila-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.fila-form > div {
+  min-width: 140px;
+}
+table.tabla-precios {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.tabla-precios th, table.tabla-precios td {
+  border: 1px solid var(--gris-borde);
+  padding: 6px 8px;
+  text-align: center;
+}
+table.tabla-precios th:first-child, table.tabla-precios td:first-child {
+  text-align: left;
+}
+table.tabla-precios input {
+  width: 70px;
+  height: 30px;
+  border-radius: 4px;
+  border: 1px solid var(--piedra-borde);
+  text-align: center;
+}
+</style>
+</head>
+<body>
+
+<div id="pantalla-login" class="login-pantalla">
+  <div class="login-caja tarjeta">
+    <span class="titular">Traslados · GC</span>
+    <input type="text" id="login-usuario" class="campo" placeholder="Usuario">
+    <input type="password" id="login-password" class="campo" placeholder="Contraseña">
+    <button id="login-boton" class="boton-primario" style="width:100%;">Entrar</button>
+    <div id="login-error" style="margin-top:10px;"></div>
+  </div>
+</div>
+
+<div id="pantalla-admin" class="admin-shell oculto">
+  <div class="admin-menu">
+    <span class="marca">Traslados · GC</span>
+    <button class="item-menu activo" data-seccion="fondos">Fondos de portada</button>
+    <button class="item-menu" data-seccion="categorias">Categorías</button>
+    <button class="item-menu" data-seccion="precios">Rutas y precios</button>
+    <button id="boton-salir" style="margin-top:30px;opacity:0.5;">Cerrar sesión</button>
+  </div>
+
+  <div class="admin-contenido">
+
+    <div id="seccion-fondos">
+      <h1>Fondos de portada</h1>
+      <p class="subtitulo">Tamaño recomendado 1920 × 1080 px · jpg, png o webp · máx. 1 MB. Solo uno puede estar activo a la vez.</p>
+      <div id="grid-fondos" class="grid-fondos"></div>
+      <div id="form-subir-fondo" class="tarjeta" style="max-width:420px;">
+        <p style="font-size:13px;margin-bottom:10px;" id="espacios-restantes"></p>
+        <div style="margin-bottom:10px;">
+          <label class="etiqueta">Nombre del fondo</label>
+          <input type="text" id="nombre-fondo" class="campo" placeholder="Ej. Atardecer en Maspalomas">
+        </div>
+        <div style="margin-bottom:10px;">
+          <label class="etiqueta">Imagen</label>
+          <input type="file" id="archivo-fondo" accept="image/jpeg,image/png,image/webp">
+        </div>
+        <button id="boton-subir-fondo" class="boton-primario">Subir fondo</button>
+        <div id="mensaje-fondo" style="margin-top:10px;"></div>
+      </div>
+    </div>
+
+    <div id="seccion-categorias" class="oculto">
+      <h1>Categorías de vehículo</h1>
+      <p class="subtitulo">Estas categorías son las que el cliente puede elegir al reservar.</p>
+      <div class="fila-form">
+        <div>
+          <label class="etiqueta">Nombre</label>
+          <input type="text" id="cat-nombre" class="campo" placeholder="Ej. Confort">
+        </div>
+        <div>
+          <label class="etiqueta">Pasajeros</label>
+          <input type="number" id="cat-pasajeros" class="campo" value="4" min="1">
+        </div>
+        <div>
+          <label class="etiqueta">Maletas</label>
+          <input type="number" id="cat-maletas" class="campo" value="2" min="0">
+        </div>
+        <button id="boton-add-categoria" class="boton-primario">Añadir categoría</button>
+      </div>
+      <table class="tabla-admin">
+        <thead><tr><th>Nombre</th><th>Pasajeros</th><th>Maletas</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="tabla-categorias"></tbody>
+      </table>
+    </div>
+
+    <div id="seccion-precios" class="oculto">
+      <h1>Rutas y precios</h1>
+      <p class="subtitulo">El precio se define por cada combinación de ruta y categoría de vehículo.</p>
+      <div class="fila-form">
+        <div>
+          <label class="etiqueta">Desde</label>
+          <input type="text" id="ruta-origen" class="campo" placeholder="Ej. Las Palmas de GC">
+        </div>
+        <div>
+          <label class="etiqueta">Hasta</label>
+          <input type="text" id="ruta-destino" class="campo" placeholder="Ej. Maspalomas">
+        </div>
+        <button id="boton-add-ruta" class="boton-primario">Añadir ruta</button>
+      </div>
+      <div id="tabla-precios-contenedor" style="overflow-x:auto;"></div>
+      <button id="boton-guardar-precios" class="boton-primario" style="margin-top:16px;">Guardar precios</button>
+      <div id="mensaje-precios" style="margin-top:10px;"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function mostrarAdmin() {
+  document.getElementById('pantalla-login').classList.add('oculto');
+  document.getElementById('pantalla-admin').classList.remove('oculto');
+  cargarFondos();
+  cargarCategorias();
+  cargarPreciosGrid();
+}
+
+function comprobarSesion() {
+  fetch('/admin/sesion').then(function (r) { return r.json(); }).then(function (d) {
+    if (d.autenticado) {
+      mostrarAdmin();
+    }
+  });
+}
+
+document.getElementById('login-boton').addEventListener('click', function () {
+  var usuario = document.getElementById('login-usuario').value;
+  var password = document.getElementById('login-password').value;
+  fetch('/admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ usuario: usuario, password: password })
+  }).then(function (r) { return r.json().then(function (d) { return { status: r.status, datos: d }; }); })
+    .then(function (res) {
+      if (res.status === 200) {
+        mostrarAdmin();
+      } else {
+        document.getElementById('login-error').innerHTML = '<div class="aviso-error">' + res.datos.error + '</div>';
+      }
+    });
+});
+
+document.getElementById('boton-salir').addEventListener('click', function () {
+  fetch('/admin/logout', { method: 'POST' }).then(function () {
+    location.reload();
+  });
+});
+
+document.querySelectorAll('.item-menu').forEach(function (boton) {
+  boton.addEventListener('click', function () {
+    document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
+    boton.classList.add('activo');
+    ['fondos', 'categorias', 'precios'].forEach(function (s) {
+      document.getElementById('seccion-' + s).classList.add('oculto');
+    });
+    document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
+  });
+});
+
+function cargarFondos() {
+  fetch('/admin/fondos').then(function (r) { return r.json(); }).then(function (fondos) {
+    var grid = document.getElementById('grid-fondos');
+    grid.innerHTML = '';
+    fondos.forEach(function (f) {
+      var tarjeta = document.createElement('div');
+      tarjeta.className = 'tarjeta-fondo';
+      tarjeta.innerHTML =
+        '<img class="miniatura" src="/admin/fondos/' + f.id + '/imagen">' +
+        '<div class="fila-acciones">' +
+          '<span class="nombre-fondo">' + f.nombre + '</span>' +
+          (f.activo
+            ? '<span class="badge-activo">Activo</span>'
+            : '<button class="boton-secundario" style="padding:4px 10px;font-size:11px;" onclick="activarFondo(' + f.id + ')">Usar este</button>') +
+        '</div>' +
+        '<div style="text-align:right;margin-top:4px;"><button class="eliminar-fondo" onclick="eliminarFondo(' + f.id + ')">Eliminar</button></div>';
+      grid.appendChild(tarjeta);
+    });
+    var restantes = 5 - fondos.length;
+    document.getElementById('espacios-restantes').textContent = restantes > 0
+      ? 'Quedan ' + restantes + ' de 5 espacios libres'
+      : 'Ya hay 5 fondos guardados. Elimina uno para poder subir otro.';
+    document.getElementById('boton-subir-fondo').disabled = restantes <= 0;
+  });
+}
+
+function activarFondo(id) {
+  fetch('/admin/fondos/' + id + '/activar', { method: 'POST' }).then(function () {
+    cargarFondos();
+  });
+}
+
+function eliminarFondo(id) {
+  fetch('/admin/fondos/' + id, { method: 'DELETE' }).then(function () {
+    cargarFondos();
+  });
+}
+
+document.getElementById('boton-subir-fondo').addEventListener('click', function () {
+  var nombre = document.getElementById('nombre-fondo').value;
+  var archivo = document.getElementById('archivo-fondo').files[0];
+  var mensaje = document.getElementById('mensaje-fondo');
+  if (!archivo) {
+    mensaje.innerHTML = '<div class="aviso-error">Elige una imagen primero</div>';
+    return;
+  }
+  var datos = new FormData();
+  datos.append('nombre', nombre || 'Fondo sin nombre');
+  datos.append('imagen', archivo);
+  fetch('/admin/fondos', { method: 'POST', body: datos })
+    .then(function (r) { return r.json().then(function (d) { return { status: r.status, datos: d }; }); })
+    .then(function (res) {
+      if (res.status === 200) {
+        mensaje.innerHTML = '<div class="aviso-ok">Fondo subido</div>';
+        document.getElementById('nombre-fondo').value = '';
+        document.getElementById('archivo-fondo').value = '';
+        cargarFondos();
+      } else {
+        mensaje.innerHTML = '<div class="aviso-error">' + res.datos.error + '</div>';
+      }
+    });
+});
+
+function cargarCategorias() {
+  fetch('/admin/categorias').then(function (r) { return r.json(); }).then(function (categorias) {
+    var cuerpo = document.getElementById('tabla-categorias');
+    cuerpo.innerHTML = '';
+    categorias.forEach(function (c) {
+      var fila = document.createElement('tr');
+      fila.innerHTML =
+        '<td>' + c.nombre + '</td>' +
+        '<td>' + c.capacidad_pasajeros + '</td>' +
+        '<td>' + c.capacidad_maletas + '</td>' +
+        '<td>' + (c.activa ? 'Activa' : 'Inactiva') + '</td>' +
+        '<td><button class="boton-secundario" style="padding:4px 10px;font-size:11px;" onclick="cambiarEstadoCategoria(' + c.id + ',' + (!c.activa) + ')">' + (c.activa ? 'Desactivar' : 'Activar') + '</button></td>';
+      cuerpo.appendChild(fila);
+    });
+  });
+}
+
+function cambiarEstadoCategoria(id, nuevoEstado) {
+  fetch('/admin/categorias/' + id + '/estado', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activa: nuevoEstado })
+  }).then(function () {
+    cargarCategorias();
+    cargarPreciosGrid();
+  });
+}
+
+document.getElementById('boton-add-categoria').addEventListener('click', function () {
+  var nombre = document.getElementById('cat-nombre').value;
+  var pasajeros = document.getElementById('cat-pasajeros').value;
+  var maletas = document.getElementById('cat-maletas').value;
+  if (!nombre) { return; }
+  fetch('/admin/categorias', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre: nombre, capacidad_pasajeros: pasajeros, capacidad_maletas: maletas })
+  }).then(function () {
+    document.getElementById('cat-nombre').value = '';
+    cargarCategorias();
+    cargarPreciosGrid();
+  });
+});
+
+document.getElementById('boton-add-ruta').addEventListener('click', function () {
+  var origen = document.getElementById('ruta-origen').value;
+  var destino = document.getElementById('ruta-destino').value;
+  if (!origen || !destino) { return; }
+  fetch('/admin/rutas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ origen: origen, destino: destino })
+  }).then(function () {
+    document.getElementById('ruta-origen').value = '';
+    document.getElementById('ruta-destino').value = '';
+    cargarPreciosGrid();
+  });
+});
+
+var precioGridDatos = null;
+
+function cargarPreciosGrid() {
+  fetch('/admin/precios-grid').then(function (r) { return r.json(); }).then(function (datos) {
+    precioGridDatos = datos;
+    var contenedor = document.getElementById('tabla-precios-contenedor');
+    if (datos.rutas.length === 0 || datos.categorias.length === 0) {
+      contenedor.innerHTML = '<p style="font-size:13px;color:var(--texto-muted);">Añade al menos una ruta y una categoría activa para fijar precios.</p>';
+      return;
+    }
+    var mapaPrecios = {};
+    datos.precios.forEach(function (p) {
+      mapaPrecios[p.ruta_id + '-' + p.categoria_id] = p.precio;
+    });
+    var html = '<table class="tabla-precios"><thead><tr><th>Ruta</th>';
+    datos.categorias.forEach(function (c) {
+      html += '<th>' + c.nombre + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+    datos.rutas.forEach(function (r) {
+      html += '<tr><td>' + r.origen + ' → ' + r.destino + '</td>';
+      datos.categorias.forEach(function (c) {
+        var clave = r.id + '-' + c.id;
+        var valor = mapaPrecios[clave] !== undefined ? mapaPrecios[clave] : '';
+        html += '<td><input type="number" step="0.01" min="0" data-ruta="' + r.id + '" data-categoria="' + c.id + '" value="' + valor + '"></td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    contenedor.innerHTML = html;
+  });
+}
+
+document.getElementById('boton-guardar-precios').addEventListener('click', function () {
+  var inputs = document.querySelectorAll('#tabla-precios-contenedor input');
+  var cambios = [];
+  inputs.forEach(function (input) {
+    if (input.value !== '') {
+      cambios.push({
+        ruta_id: Number(input.dataset.ruta),
+        categoria_id: Number(input.dataset.categoria),
+        precio: Number(input.value)
+      });
+    }
+  });
+  fetch('/admin/precios-grid', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cambios: cambios })
+  }).then(function () {
+    document.getElementById('mensaje-precios').innerHTML = '<div class="aviso-ok">Precios guardados</div>';
+  });
+});
+
+comprobarSesion();
+</script>
+
+</body>
+</html>
