@@ -91,14 +91,14 @@ async function initSchema() {
     );
   `);
 
-  const totalAdmins = await pool.query('SELECT COUNT(*)::int AS total FROM admins');
-  if (totalAdmins.rows[0].total === 0 && process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
+  if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
     await pool.query(
-      'INSERT INTO admins (usuario, password_hash) VALUES ($1, $2)',
+      `INSERT INTO admins (usuario, password_hash) VALUES ($1, $2)
+       ON CONFLICT (usuario) DO UPDATE SET password_hash = $2`,
       [process.env.ADMIN_USUARIO, hash]
     );
-    console.log('Admin inicial creado: ' + process.env.ADMIN_USUARIO);
+    console.log('Admin sincronizado: ' + process.env.ADMIN_USUARIO);
   }
 }
 
