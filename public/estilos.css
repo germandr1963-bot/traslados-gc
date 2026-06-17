@@ -120,6 +120,37 @@ input, select, button {
   margin-bottom: 6px;
 }
 
+.boton-peligro {
+  background: transparent;
+  color: var(--rojo-error);
+  border: 1px solid var(--rojo-error);
+  border-radius: 6px;
+  padding: 9px 16px;
+  font-size: 14px;
+}
+
+.boton-peligro:hover {
+  background: var(--rojo-error-fondo);
+}
+
+.insignia {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.insignia-ok {
+  background: var(--verde-ok-fondo);
+  color: var(--verde-ok);
+}
+
+.insignia-no {
+  background: var(--gris-borde);
+  color: var(--texto-muted);
+}
+
 table.tabla-admin {
   width: 100%;
   border-collapse: collapse;

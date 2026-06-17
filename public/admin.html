@@ -143,27 +143,17 @@ table.tabla-precios input {
     </div>
 
     <div id="seccion-categorias" class="oculto">
-      <h1>Categorías de vehículo</h1>
-      <p class="subtitulo">Estas categorías son las que el cliente puede elegir al reservar.</p>
-      <div class="fila-form">
-        <div>
-          <label class="etiqueta">Nombre</label>
-          <input type="text" id="cat-nombre" class="campo" placeholder="Ej. Confort">
-        </div>
-        <div>
-          <label class="etiqueta">Pasajeros</label>
-          <input type="number" id="cat-pasajeros" class="campo" value="4" min="1">
-        </div>
-        <div>
-          <label class="etiqueta">Maletas</label>
-          <input type="number" id="cat-maletas" class="campo" value="2" min="0">
-        </div>
-        <button id="boton-add-categoria" class="boton-primario">Añadir categoría</button>
-      </div>
+      <h1>Categorías de vehículos</h1>
+      <p class="subtitulo">Activa = existe en el sistema (se ofrece a los choferes en el alta). Disponible = se ofrece HOY al cliente en el selector de vehículo.</p>
       <table class="tabla-admin">
-        <thead><tr><th>Nombre</th><th>Pasajeros</th><th>Maletas</th><th>Estado</th><th></th></tr></thead>
+        <thead>
+          <tr><th>Categoría</th><th>Pasajeros</th><th>Maletas</th><th>Sillas bebé (máx.)</th><th>Bajada (diurna / nocturna)</th><th>Foto</th><th>Activa</th><th>Disponible</th><th>Acción</th></tr>
+        </thead>
         <tbody id="tabla-categorias"></tbody>
       </table>
+      <button id="boton-nueva-categoria" class="boton-primario" style="margin-top:14px;">➕ Crear categoría nueva</button>
+
+      <div class="tarjeta oculto" id="editor-categoria" style="margin-top:16px;max-width:520px;"></div>
     </div>
 
     <div id="seccion-precios" class="oculto">
@@ -302,49 +292,198 @@ document.getElementById('boton-subir-fondo').addEventListener('click', function 
     });
 });
 
+let categoriasCache = [];
+
+function escapar(texto) {
+  var div = document.createElement('div');
+  div.textContent = (texto === null || texto === undefined) ? '' : texto;
+  return div.innerHTML;
+}
+
 function cargarCategorias() {
   fetch('/admin/categorias').then(function (r) { return r.json(); }).then(function (categorias) {
-    var cuerpo = document.getElementById('tabla-categorias');
-    cuerpo.innerHTML = '';
-    categorias.forEach(function (c) {
-      var fila = document.createElement('tr');
-      fila.innerHTML =
-        '<td>' + c.nombre + '</td>' +
-        '<td>' + c.capacidad_pasajeros + '</td>' +
-        '<td>' + c.capacidad_maletas + '</td>' +
-        '<td>' + (c.activa ? 'Activa' : 'Inactiva') + '</td>' +
-        '<td><button class="boton-secundario" style="padding:4px 10px;font-size:11px;" onclick="cambiarEstadoCategoria(' + c.id + ',' + (!c.activa) + ')">' + (c.activa ? 'Desactivar' : 'Activar') + '</button></td>';
-      cuerpo.appendChild(fila);
+    categoriasCache = categorias;
+    document.getElementById('tabla-categorias').innerHTML = categorias.map(function (cat) {
+      return '<tr>' +
+        '<td><strong>' + escapar(cat.nombre) + '</strong></td>' +
+        '<td>' + cat.capacidad_pasajeros + '</td>' +
+        '<td>' + escapar(cat.capacidad_maletas) + '</td>' +
+        '<td>' + cat.limite_sillas + '</td>' +
+        '<td>' + Number(cat.bajada_diurna).toFixed(2) + ' € / ' + Number(cat.bajada_nocturna).toFixed(2) + ' €</td>' +
+        '<td>' +
+          (cat.tiene_foto ? '✅' : '—') +
+          '<button class="boton-secundario" style="margin-top:4px;padding:6px 10px;font-size:0.8rem;display:block" onclick="elegirFotoCategoria(' + cat.id + ')">📷 ' + (cat.tiene_foto ? 'Cambiar' : 'Subir') + '</button>' +
+        '</td>' +
+        '<td>' +
+          '<span class="insignia ' + (cat.activa ? 'insignia-ok' : 'insignia-no') + '">' + (cat.activa ? 'ACTIVA' : 'inactiva') + '</span><br>' +
+          '<button class="' + (cat.activa ? 'boton-peligro' : 'boton-secundario') + '" style="margin-top:4px;padding:6px 12px;font-size:0.8rem" onclick="alternarActiva(' + cat.id + ',' + (!cat.activa) + ')">' + (cat.activa ? 'Desactivar' : 'Activar') + '</button>' +
+        '</td>' +
+        '<td>' +
+          '<span class="insignia ' + (cat.disponible ? 'insignia-ok' : 'insignia-no') + '">' + (cat.disponible ? 'DISPONIBLE' : 'no disponible') + '</span><br>' +
+          '<button class="' + (cat.disponible ? 'boton-peligro' : 'boton-secundario') + '" style="margin-top:4px;padding:6px 12px;font-size:0.8rem" onclick="alternarDisponible(' + cat.id + ',' + (!cat.disponible) + ')">' + (cat.disponible ? 'Quitar de hoy' : 'Ofrecer hoy') + '</button>' +
+        '</td>' +
+        '<td>' +
+          '<button class="boton-secundario" style="padding:6px 12px;font-size:0.82rem;display:block;margin-bottom:4px" onclick="editarCategoria(' + cat.id + ')">✏️ Editar</button>' +
+          '<button class="boton-peligro" style="padding:6px 12px;font-size:0.82rem" onclick="eliminarCategoria(' + cat.id + ')">🗑️ Eliminar</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  });
+}
+
+function formularioCategoria(cat) {
+  return '' +
+    '<label class="etiqueta">Nombre</label>' +
+    '<input class="campo" id="cat-nombre" type="text" value="' + escapar(cat.nombre || '') + '" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Pasajeros (capacidad)</label>' +
+    '<input class="campo" id="cat-pasajeros" type="number" min="1" max="12" value="' + (cat.capacidad_pasajeros || 4) + '" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Maletas (texto libre, ej.: "3 grandes")</label>' +
+    '<input class="campo" id="cat-maletas" type="text" value="' + escapar(cat.capacidad_maletas || '') + '" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Sillas de bebé (máximo)</label>' +
+    '<input class="campo" id="cat-sillas" type="number" min="0" max="6" value="' + (cat.limite_sillas || 0) + '" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Descripción</label>' +
+    '<input class="campo" id="cat-descripcion" type="text" value="' + escapar(cat.descripcion || '') + '" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Bajada de bandera diurna (€, 6:00-22:00)</label>' +
+    '<input class="campo" id="cat-bajada-diurna" type="number" step="0.01" min="0" value="' + Number(cat.bajada_diurna || 0).toFixed(2) + '" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Bajada de bandera nocturna (€, 22:00-6:00)</label>' +
+    '<input class="campo" id="cat-bajada-nocturna" type="number" step="0.01" min="0" value="' + Number(cat.bajada_nocturna || 0).toFixed(2) + '" style="margin-bottom:10px">';
+}
+
+function editarCategoria(id) {
+  var cat = categoriasCache.find(function (x) { return x.id === id; });
+  if (!cat) { return; }
+  var editor = document.getElementById('editor-categoria');
+  editor.classList.remove('oculto');
+  editor.innerHTML = '<h2 style="margin-top:0">✏️ Editar categoría</h2>' + formularioCategoria(cat) +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="boton-primario" onclick="guardarCategoria(' + cat.id + ')">💾 Guardar cambios</button>' +
+      '<button class="boton-secundario" onclick="document.getElementById(\'editor-categoria\').classList.add(\'oculto\')">Cancelar</button>' +
+    '</div>';
+  editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function nuevaCategoria() {
+  var editor = document.getElementById('editor-categoria');
+  editor.classList.remove('oculto');
+  editor.innerHTML = '<h2 style="margin-top:0">➕ Nueva categoría</h2>' + formularioCategoria({}) +
+    '<p class="subtitulo" style="margin:8px 0">Nace inactiva y no disponible; actívala desde la tabla cuando esté lista.</p>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="boton-primario" onclick="guardarCategoria(null)">💾 Crear categoría</button>' +
+      '<button class="boton-secundario" onclick="document.getElementById(\'editor-categoria\').classList.add(\'oculto\')">Cancelar</button>' +
+    '</div>';
+  editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+document.getElementById('boton-nueva-categoria').addEventListener('click', nuevaCategoria);
+
+function guardarCategoria(id) {
+  var datos = {
+    nombre: document.getElementById('cat-nombre').value,
+    capacidad_pasajeros: document.getElementById('cat-pasajeros').value,
+    capacidad_maletas: document.getElementById('cat-maletas').value,
+    limite_sillas: document.getElementById('cat-sillas').value,
+    descripcion: document.getElementById('cat-descripcion').value,
+    bajada_diurna: document.getElementById('cat-bajada-diurna').value,
+    bajada_nocturna: document.getElementById('cat-bajada-nocturna').value
+  };
+  var url = id ? '/admin/categorias/' + id + '/editar' : '/admin/categorias';
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      document.getElementById('editor-categoria').classList.add('oculto');
+      cargarCategorias();
+      cargarPreciosGrid();
+    } else {
+      alert(respuesta.error);
+    }
+  });
+}
+
+function eliminarCategoria(id) {
+  var cat = categoriasCache.find(function (x) { return x.id === id; });
+  if (!confirm('¿Eliminar la categoría "' + (cat ? cat.nombre : '') + '"? También se borrarán los precios guardados para ella. Esta acción no se puede deshacer.')) { return; }
+  fetch('/admin/categorias/' + id + '/eliminar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (respuesta) {
+      if (respuesta.ok) {
+        cargarCategorias();
+        cargarPreciosGrid();
+      } else {
+        alert(respuesta.error);
+      }
     });
-  });
 }
 
-function cambiarEstadoCategoria(id, nuevoEstado) {
-  fetch('/admin/categorias/' + id + '/estado', {
+function alternarActiva(id, activa) {
+  fetch('/admin/categorias/' + id + '/activa', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ activa: nuevoEstado })
+    body: JSON.stringify({ activa: activa })
   }).then(function () {
     cargarCategorias();
     cargarPreciosGrid();
   });
 }
 
-document.getElementById('boton-add-categoria').addEventListener('click', function () {
-  var nombre = document.getElementById('cat-nombre').value;
-  var pasajeros = document.getElementById('cat-pasajeros').value;
-  var maletas = document.getElementById('cat-maletas').value;
-  if (!nombre) { return; }
-  fetch('/admin/categorias', {
+function alternarDisponible(id, disponible) {
+  fetch('/admin/categorias/' + id + '/disponible', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nombre: nombre, capacidad_pasajeros: pasajeros, capacidad_maletas: maletas })
+    body: JSON.stringify({ disponible: disponible })
   }).then(function () {
-    document.getElementById('cat-nombre').value = '';
     cargarCategorias();
-    cargarPreciosGrid();
   });
-});
+}
+
+function elegirFotoCategoria(id) {
+  var entrada = document.createElement('input');
+  entrada.type = 'file';
+  entrada.accept = 'image/*';
+  entrada.onchange = function () {
+    var archivo = entrada.files && entrada.files[0];
+    if (!archivo) { return; }
+    var lector = new FileReader();
+    lector.onload = function (evento) {
+      var imagen = new Image();
+      imagen.onload = function () {
+        var continuar = function () {
+          var escala = Math.min(1, 600 / imagen.width);
+          var lienzo = document.createElement('canvas');
+          lienzo.width = Math.round(imagen.width * escala);
+          lienzo.height = Math.round(imagen.height * escala);
+          var contexto = lienzo.getContext('2d');
+          contexto.fillStyle = '#ffffff';
+          contexto.fillRect(0, 0, lienzo.width, lienzo.height);
+          contexto.drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+          fetch('/admin/categorias/' + id + '/foto', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ foto: lienzo.toDataURL('image/jpeg', 0.8) })
+          }).then(function (r) { return r.json(); }).then(function (respuesta) {
+            if (respuesta.ok) {
+              alert('Foto de la categoría guardada. 📷');
+              cargarCategorias();
+            } else {
+              alert(respuesta.error || 'No se pudo guardar la foto (¿demasiado grande?).');
+            }
+          });
+        };
+        if (imagen.decode) {
+          imagen.decode().then(continuar).catch(continuar);
+        } else {
+          continuar();
+        }
+      };
+      imagen.src = evento.target.result;
+    };
+    lector.readAsDataURL(archivo);
+  };
+  entrada.click();
+}
+
 
 document.getElementById('boton-add-ruta').addEventListener('click', function () {
   var origen = document.getElementById('ruta-origen').value;
