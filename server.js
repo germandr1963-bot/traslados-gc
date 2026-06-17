@@ -32,7 +32,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
-  store: new pgSession({ pool: pool, tableName: 'session' }),
+  store: new pgSession({ pool: pool, tableName: 'session', createTableIfMissing: true }),
   secret: process.env.SESSION_SECRET || 'cambia-este-secreto',
   resave: false,
   saveUninitialized: false,
