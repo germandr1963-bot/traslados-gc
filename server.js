@@ -132,6 +132,83 @@ async function initSchema() {
     );
   `);
 
+  // Catálogo de marcas y modelos de vehículo (crece según se van dando de
+  // alta conductores; arranca con las marcas más habituales en Canarias).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS marcas_vehiculos (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT UNIQUE NOT NULL
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS modelos_vehiculos (
+      id SERIAL PRIMARY KEY,
+      marca_id INT REFERENCES marcas_vehiculos(id),
+      nombre TEXT NOT NULL,
+      UNIQUE (marca_id, nombre)
+    );
+  `);
+  const marcasSemilla = {
+    'Toyota': ['Prius', 'Corolla', 'Camry', 'RAV4'],
+    'Skoda': ['Octavia', 'Superb'],
+    'Mercedes-Benz': ['Clase C', 'Clase E', 'Vito'],
+    'Volkswagen': ['Passat', 'Touran', 'Caddy'],
+    'Seat': ['León', 'Alhambra', 'Ateca'],
+    'Ford': ['Mondeo', 'Galaxy', 'Tourneo'],
+    'Peugeot': ['508', '5008', 'Rifter'],
+    'Citroën': ['C5 X', 'Berlingo'],
+    'Hyundai': ['Ioniq', 'Tucson'],
+    'Kia': ['Niro', 'Ceed'],
+    'Renault': ['Talisman', 'Espace'],
+    'Dacia': ['Lodgy', 'Jogger'],
+    'Tesla': ['Model 3', 'Model Y']
+  };
+  for (const [marca, modelos] of Object.entries(marcasSemilla)) {
+    const m = await pool.query(
+      `INSERT INTO marcas_vehiculos (nombre) VALUES ($1) ON CONFLICT (nombre) DO UPDATE SET nombre = $1 RETURNING id`,
+      [marca]
+    );
+    for (const modelo of modelos) {
+      await pool.query(
+        `INSERT INTO modelos_vehiculos (marca_id, nombre) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [m.rows[0].id, modelo]
+      );
+    }
+  }
+
+  // Conductores. estado: pendiente | aprobado | suspendido · tipo: flota
+  // (vehículo propio de la empresa) | externo (conductor independiente).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS conductores (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      telefono TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      documento TEXT,
+      direccion TEXT,
+      cp TEXT,
+      municipio TEXT,
+      municipio_licencia TEXT,
+      numero_licencia TEXT,
+      central_flota TEXT,
+      categoria_id INT REFERENCES categorias_vehiculos(id),
+      vehiculo_marca TEXT,
+      vehiculo_modelo TEXT,
+      matricula TEXT,
+      numero_taxi TEXT,
+      plazas INT DEFAULT 4,
+      isla TEXT DEFAULT 'Gran Canaria',
+      tipo TEXT DEFAULT 'externo',
+      estado TEXT DEFAULT 'pendiente',
+      foto TEXT,
+      foto_estado TEXT DEFAULT 'sin_foto',
+      foto_motivo TEXT,
+      permite_contacto BOOLEAN DEFAULT TRUE,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
     await pool.query(
@@ -141,6 +218,54 @@ async function initSchema() {
     );
     console.log('Admin sincronizado: ' + process.env.ADMIN_USUARIO);
   }
+}
+
+// Resuelve la marca y el modelo de un conductor: por id si ya existen en el
+// catálogo, o creándolos a partir de un nombre nuevo (el catálogo crece solo).
+async function resolverVehiculo(marca_id, marca_nueva, modelo_id, modelo_nuevo) {
+  let marcaId = parseInt(marca_id, 10) || null;
+  let marcaNombre = null;
+
+  if (!marcaId && marca_nueva && marca_nueva.trim()) {
+    const nombre = marca_nueva.trim();
+    const existente = await pool.query(
+      'SELECT id, nombre FROM marcas_vehiculos WHERE LOWER(nombre) = LOWER($1)', [nombre]
+    );
+    if (existente.rows.length) {
+      marcaId = existente.rows[0].id; marcaNombre = existente.rows[0].nombre;
+    } else {
+      const insertada = await pool.query(
+        'INSERT INTO marcas_vehiculos (nombre) VALUES ($1) RETURNING id, nombre', [nombre]
+      );
+      marcaId = insertada.rows[0].id; marcaNombre = insertada.rows[0].nombre;
+    }
+  } else if (marcaId) {
+    const fila = await pool.query('SELECT nombre FROM marcas_vehiculos WHERE id = $1', [marcaId]);
+    marcaNombre = fila.rows.length ? fila.rows[0].nombre : null;
+  }
+  if (!marcaId || !marcaNombre) return null;
+
+  let modeloNombre = null;
+  const modeloId = parseInt(modelo_id, 10) || null;
+  if (modeloId) {
+    const fila = await pool.query(
+      'SELECT nombre FROM modelos_vehiculos WHERE id = $1 AND marca_id = $2', [modeloId, marcaId]
+    );
+    modeloNombre = fila.rows.length ? fila.rows[0].nombre : null;
+  } else if (modelo_nuevo && modelo_nuevo.trim()) {
+    const nombre = modelo_nuevo.trim();
+    const existente = await pool.query(
+      'SELECT nombre FROM modelos_vehiculos WHERE marca_id = $1 AND LOWER(nombre) = LOWER($2)',
+      [marcaId, nombre]
+    );
+    if (existente.rows.length) modeloNombre = existente.rows[0].nombre;
+    else {
+      await pool.query('INSERT INTO modelos_vehiculos (marca_id, nombre) VALUES ($1, $2)', [marcaId, nombre]);
+      modeloNombre = nombre;
+    }
+  }
+  if (!modeloNombre) return null;
+  return { marcaNombre, modeloNombre };
 }
 
 app.post('/admin/login', asyncHandler(async (req, res) => {
@@ -356,6 +481,195 @@ app.post('/admin/categorias/:id/activa', requireAdmin, asyncHandler(async (req, 
 // "Disponible": las categorías que se ofrecen HOY al cliente en el selector
 app.post('/admin/categorias/:id/disponible', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('UPDATE categorias_vehiculos SET disponible = $1 WHERE id = $2', [!!req.body.disponible, req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Catálogo para el formulario de alta de conductor: categorías activas
+// (las que se ofrecen a los choferes en el alta, no solo las de hoy) y
+// el árbol de marcas con sus modelos.
+app.get('/admin/catalogo-vehiculos', requireAdmin, asyncHandler(async (req, res) => {
+  const categorias = await pool.query(
+    `SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre`
+  );
+  const marcas = await pool.query(`SELECT id, nombre FROM marcas_vehiculos ORDER BY nombre`);
+  const modelos = await pool.query(`SELECT id, marca_id, nombre FROM modelos_vehiculos ORDER BY nombre`);
+  res.json({
+    categorias: categorias.rows,
+    marcas: marcas.rows.map(function (m) {
+      return { id: m.id, nombre: m.nombre, modelos: modelos.rows.filter(function (mo) { return mo.marca_id === m.id; }) };
+    })
+  });
+}));
+
+app.get('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT c.id, c.nombre, c.email, c.telefono, c.vehiculo_marca, c.vehiculo_modelo, c.matricula,
+            c.numero_taxi, c.plazas, c.isla, c.tipo, c.estado, c.foto_estado, c.permite_contacto, c.creado_en,
+            cat.nombre AS categoria
+     FROM conductores c
+     LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
+     ORDER BY c.creado_en DESC`
+  );
+  res.json(result.rows);
+}));
+
+// Crear conductor desde el panel: nace ya aprobado (lo da de alta el admin a mano).
+app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
+  const d = req.body;
+  if (!d.nombre || !d.email || !d.telefono || !d.password || d.password.length < 6) {
+    return res.status(400).json({ error: 'Nombre, email, teléfono y contraseña (mínimo 6 caracteres) son obligatorios.' });
+  }
+  if (!d.documento || !d.direccion || !d.cp || !d.municipio) {
+    return res.status(400).json({ error: 'Faltan datos personales: documento, dirección, CP y municipio.' });
+  }
+  if (!d.municipio_licencia || !d.numero_licencia) {
+    return res.status(400).json({ error: 'Faltan los datos de la licencia.' });
+  }
+  const categoriaId = parseInt(d.categoria_id, 10);
+  const categoria = await pool.query('SELECT id FROM categorias_vehiculos WHERE id = $1 AND activa = TRUE', [categoriaId]);
+  if (categoria.rows.length === 0) {
+    return res.status(400).json({ error: 'Elige una categoría de vehículo válida.' });
+  }
+  const vehiculo = await resolverVehiculo(d.marca_id, d.marca_nueva, d.modelo_id, d.modelo_nuevo);
+  if (!vehiculo) {
+    return res.status(400).json({ error: 'Indica la marca y el modelo del vehículo.' });
+  }
+  if (!d.matricula) {
+    return res.status(400).json({ error: 'Falta la matrícula.' });
+  }
+  const hash = await bcrypt.hash(d.password, 10);
+  const foto = d.foto || null;
+  const fotoEstado = foto ? 'aprobada' : 'sin_foto';
+  try {
+    const result = await pool.query(
+      `INSERT INTO conductores
+        (nombre, email, telefono, password_hash, documento, direccion, cp, municipio,
+         municipio_licencia, numero_licencia, central_flota,
+         categoria_id, vehiculo_marca, vehiculo_modelo, matricula, numero_taxi, plazas, isla,
+         foto, foto_estado, estado)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'aprobado')
+       RETURNING id`,
+      [
+        d.nombre.trim(), d.email.toLowerCase().trim(), d.telefono.trim(), hash,
+        d.documento.trim().toUpperCase(), d.direccion.trim(), d.cp.trim(), d.municipio.trim(),
+        d.municipio_licencia.trim(), d.numero_licencia.trim(), (d.central_flota || '').trim(),
+        categoriaId, vehiculo.marcaNombre, vehiculo.modeloNombre,
+        d.matricula.trim().toUpperCase(), (d.numero_taxi || '').trim(), parseInt(d.plazas, 10) || 4,
+        d.isla || 'Gran Canaria', foto, fotoEstado
+      ]
+    );
+    res.json({ ok: true, id: result.rows[0].id });
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ error: 'Ese email ya está registrado.' });
+    throw err;
+  }
+}));
+
+app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req, res) => {
+  const estado = req.body.estado;
+  if (!['pendiente', 'aprobado', 'suspendido'].includes(estado)) {
+    return res.status(400).json({ error: 'Estado no válido.' });
+  }
+  await pool.query('UPDATE conductores SET estado = $1 WHERE id = $2', [estado, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/conductores/:id/tipo', requireAdmin, asyncHandler(async (req, res) => {
+  const tipo = req.body.tipo;
+  if (!['flota', 'externo'].includes(tipo)) {
+    return res.status(400).json({ error: 'Tipo no válido.' });
+  }
+  await pool.query('UPDATE conductores SET tipo = $1 WHERE id = $2', [tipo, req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Eliminar un conductor. A diferencia de taxi guanche, aquí no hay tabla de
+// viajes todavía, así que no hace falta desligar nada antes de borrar.
+app.post('/admin/conductores/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM conductores WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Expediente completo (ficha) de un conductor
+app.get('/admin/conductores/:id/ficha', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT c.id, c.nombre, c.email, c.telefono, c.documento, c.direccion, c.cp, c.municipio,
+            c.municipio_licencia, c.numero_licencia, c.central_flota,
+            c.vehiculo_marca, c.vehiculo_modelo, c.matricula, c.numero_taxi, c.plazas, c.isla,
+            c.tipo, c.estado, c.foto, c.foto_estado, c.foto_motivo, c.creado_en,
+            cat.nombre AS categoria
+     FROM conductores c
+     LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
+     WHERE c.id = $1`,
+    [req.params.id]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Conductor no encontrado.' });
+  res.json(result.rows[0]);
+}));
+
+// Guardar cambios desde la ficha (todos los campos editables salvo foto/estado/tipo, que tienen su propio botón)
+app.post('/admin/conductores/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
+  const camposPermitidos = ['nombre', 'telefono', 'email', 'documento', 'direccion', 'cp', 'municipio',
+    'municipio_licencia', 'numero_licencia', 'central_flota',
+    'vehiculo_marca', 'vehiculo_modelo', 'matricula', 'numero_taxi', 'plazas', 'isla'];
+  const cambios = [];
+  const valores = [];
+  for (const campo of camposPermitidos) {
+    if (req.body[campo] !== undefined) {
+      let valor = String(req.body[campo]).trim();
+      if (campo === 'email') valor = valor.toLowerCase();
+      if (campo === 'matricula' || campo === 'documento') valor = valor.toUpperCase();
+      if (campo === 'plazas') valor = parseInt(valor, 10) || 4;
+      if ((campo === 'nombre' || campo === 'email') && !valor) {
+        return res.status(400).json({ error: 'El nombre y el email no pueden quedar vacíos.' });
+      }
+      valores.push(valor);
+      cambios.push(`${campo} = $${valores.length}`);
+    }
+  }
+  if (!cambios.length) return res.status(400).json({ error: 'No hay cambios que guardar.' });
+  valores.push(req.params.id);
+  try {
+    await pool.query(`UPDATE conductores SET ${cambios.join(', ')} WHERE id = $${valores.length}`, valores);
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ error: 'Ese email ya lo usa otro conductor.' });
+    throw err;
+  }
+}));
+
+// Aprobar o rechazar la foto de carné
+app.post('/admin/conductores/:id/foto', requireAdmin, asyncHandler(async (req, res) => {
+  const { accion, motivo } = req.body;
+  if (accion === 'aprobar') {
+    await pool.query(`UPDATE conductores SET foto_estado = 'aprobada', foto_motivo = NULL WHERE id = $1`, [req.params.id]);
+  } else if (accion === 'rechazar') {
+    await pool.query(
+      `UPDATE conductores SET foto_estado = 'rechazada', foto_motivo = $1 WHERE id = $2`,
+      [(motivo || 'La foto no cumple los requisitos.').slice(0, 200), req.params.id]
+    );
+  } else {
+    return res.status(400).json({ error: 'Acción no válida.' });
+  }
+  res.json({ ok: true });
+}));
+
+// Corrección rápida del nombre (errores de escritura), sin abrir la ficha completa
+app.post('/admin/conductores/:id/nombre', requireAdmin, asyncHandler(async (req, res) => {
+  const nombre = (req.body.nombre || '').trim();
+  if (!nombre) return res.status(400).json({ error: 'El nombre no puede quedar vacío.' });
+  await pool.query('UPDATE conductores SET nombre = $1 WHERE id = $2', [nombre, req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Botón "Contactar al conductor": uno o todos a la vez
+app.post('/admin/conductores/:id/contacto', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE conductores SET permite_contacto = $1 WHERE id = $2', [!!req.body.permite, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/conductores-contacto-global', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE conductores SET permite_contacto = $1', [!!req.body.permite]);
   res.json({ ok: true });
 }));
 
