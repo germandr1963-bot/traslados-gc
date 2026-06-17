@@ -166,6 +166,16 @@ input, select, button {
   border-color: var(--gris-borde);
 }
 
+.insignia-pendiente {
+  color: #8a6d1c;
+  border-color: #D9A441;
+}
+
+.insignia-suspendido {
+  color: #C0392B;
+  border-color: #C0392B;
+}
+
 table.tabla-admin {
   width: 100%;
   border-collapse: collapse;

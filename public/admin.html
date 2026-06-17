@@ -117,6 +117,7 @@ table.tabla-precios input {
     <span class="marca">Traslados · GC</span>
     <button class="item-menu activo" data-seccion="fondos">Fondos de portada</button>
     <button class="item-menu" data-seccion="categorias">Categorías</button>
+    <button class="item-menu" data-seccion="conductores">Conductores</button>
     <button class="item-menu" data-seccion="precios">Rutas y precios</button>
     <button id="boton-salir" style="margin-top:30px;opacity:0.5;">Cerrar sesión</button>
   </div>
@@ -156,6 +157,20 @@ table.tabla-precios input {
       <div class="tarjeta oculto" id="editor-categoria" style="margin-top:16px;max-width:520px;"></div>
     </div>
 
+    <div id="seccion-conductores" class="oculto">
+      <h1>Conductores</h1>
+      <p class="subtitulo">Alta y gestión de la flota de conductores. La categoría se elige entre las activas; la marca y el modelo se guardan en un catálogo propio que crece según se van añadiendo conductores.</p>
+      <table class="tabla-admin">
+        <thead>
+          <tr><th>Nombre</th><th>Contacto</th><th>Vehículo</th><th>Categoría</th><th>Isla</th><th>Foto</th><th>Tipo</th><th>Estado</th><th>Acciones</th></tr>
+        </thead>
+        <tbody id="tabla-conductores"></tbody>
+      </table>
+      <button id="boton-nuevo-conductor" class="boton-primario" style="margin-top:14px;">➕ Dar de alta un conductor</button>
+
+      <div class="tarjeta oculto" id="editor-conductor" style="margin-top:16px;max-width:640px;"></div>
+    </div>
+
     <div id="seccion-precios" class="oculto">
       <h1>Rutas y precios</h1>
       <p class="subtitulo">El precio se define por cada combinación de ruta y categoría de vehículo.</p>
@@ -184,6 +199,7 @@ function mostrarAdmin() {
   document.getElementById('pantalla-admin').classList.remove('oculto');
   cargarFondos();
   cargarCategorias();
+  cargarConductores();
   cargarPreciosGrid();
 }
 
@@ -222,7 +238,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'precios'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'precios'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
@@ -482,6 +498,233 @@ function elegirFotoCategoria(id) {
     lector.readAsDataURL(archivo);
   };
   entrada.click();
+}
+
+var conductoresCache = [];
+var catalogoConductorCache = null;
+var fotoConductorNueva = null;
+
+var ETIQUETAS_FOTO_CONDUCTOR = {
+  sin_foto: '<span style="color:#5a6c79">Sin foto</span>',
+  pendiente: '<span class="insignia insignia-pendiente">FOTO PENDIENTE</span>',
+  aprobada: '<span class="insignia insignia-ok">FOTO OK</span>',
+  rechazada: '<span class="insignia insignia-suspendido">RECHAZADA</span>'
+};
+
+function cargarConductores() {
+  fetch('/admin/conductores').then(function (r) { return r.json(); }).then(function (conductores) {
+    conductoresCache = conductores;
+    var cuerpo = document.getElementById('tabla-conductores');
+    if (conductores.length === 0) {
+      cuerpo.innerHTML = '<tr><td colspan="9">Todavía no hay conductores dados de alta.</td></tr>';
+      return;
+    }
+    cuerpo.innerHTML = conductores.map(function (c) {
+      return '<tr>' +
+        '<td><strong>' + escapar(c.nombre) + '</strong></td>' +
+        '<td>' + escapar(c.email) + '<br>' + escapar(c.telefono) + '</td>' +
+        '<td>' + escapar(c.vehiculo_marca) + ' ' + escapar(c.vehiculo_modelo) + '<br>' + escapar(c.matricula) + ' · ' + c.plazas + ' plazas' + (c.numero_taxi ? ' · Nº ' + escapar(c.numero_taxi) : '') + '</td>' +
+        '<td>' + escapar(c.categoria || '—') + '</td>' +
+        '<td>' + escapar(c.isla) + '</td>' +
+        '<td>' + ETIQUETAS_FOTO_CONDUCTOR[c.foto_estado || 'sin_foto'] + '</td>' +
+        '<td>' +
+          '<select class="campo" style="height:34px" onchange="cambiarTipoConductor(' + c.id + ', this.value)">' +
+            '<option value="externo"' + (c.tipo === 'externo' ? ' selected' : '') + '>Externo</option>' +
+            '<option value="flota"' + (c.tipo === 'flota' ? ' selected' : '') + '>Flota propia</option>' +
+          '</select>' +
+        '</td>' +
+        '<td>' +
+          '<span class="insignia ' + (c.estado === 'aprobado' ? 'insignia-ok' : (c.estado === 'suspendido' ? 'insignia-suspendido' : 'insignia-pendiente')) + '">' + c.estado.toUpperCase() + '</span><br>' +
+          (c.estado !== 'aprobado' ? '<button class="boton-costa" style="margin-top:4px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'aprobado\')">Aprobar</button>' : '') +
+          (c.estado !== 'suspendido' ? '<button class="boton-peligro" style="margin-top:4px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'suspendido\')">Suspender</button>' : '') +
+        '</td>' +
+        '<td><button class="boton-peligro" style="padding:6px 12px;font-size:0.82rem" onclick="eliminarConductor(' + c.id + ')">🗑️ Eliminar</button></td>' +
+      '</tr>';
+    }).join('');
+  });
+}
+
+function cambiarEstadoConductor(id, estado) {
+  fetch('/admin/conductores/' + id + '/estado', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ estado: estado })
+  }).then(function () { cargarConductores(); });
+}
+
+function cambiarTipoConductor(id, tipo) {
+  fetch('/admin/conductores/' + id + '/tipo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tipo: tipo })
+  });
+}
+
+function eliminarConductor(id) {
+  var c = conductoresCache.find(function (x) { return x.id === id; });
+  if (!confirm('¿Eliminar al conductor "' + (c ? c.nombre : '') + '"? Esta acción no se puede deshacer.')) { return; }
+  fetch('/admin/conductores/' + id + '/eliminar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (respuesta) {
+      if (respuesta.ok) { cargarConductores(); } else { alert(respuesta.error); }
+    });
+}
+
+function formularioConductor() {
+  var opcionesCategoria = catalogoConductorCache.categorias.map(function (cat) {
+    return '<option value="' + cat.id + '">' + escapar(cat.nombre) + '</option>';
+  }).join('');
+  var opcionesMarca = catalogoConductorCache.marcas.map(function (m) {
+    return '<option value="' + m.id + '">' + escapar(m.nombre) + '</option>';
+  }).join('');
+  return '' +
+    '<label class="etiqueta">Nombre completo</label><input class="campo" id="ac-nombre" type="text" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Email (será su usuario)</label><input class="campo" id="ac-email" type="email" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Teléfono</label><input class="campo" id="ac-telefono" type="tel" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Contraseña provisional (mínimo 6 caracteres)</label><input class="campo" id="ac-password" type="text" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Documento de identidad (DNI/NIE)</label><input class="campo" id="ac-documento" type="text" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Dirección</label><input class="campo" id="ac-direccion" type="text" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Código postal</label><input class="campo" id="ac-cp" type="text" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Municipio de residencia</label><input class="campo" id="ac-municipio" type="text" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Municipio de la licencia</label><input class="campo" id="ac-municipio-licencia" type="text" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Número de licencia</label><input class="campo" id="ac-numero-licencia" type="text" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Central de flota (opcional)</label><input class="campo" id="ac-central" type="text" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Categoría del vehículo</label><select class="campo" id="ac-categoria" style="margin-bottom:10px">' + opcionesCategoria + '</select>' +
+    '<label class="etiqueta">Marca</label>' +
+    '<select class="campo" id="ac-marca" onchange="cargarModelosConductor()" style="margin-bottom:10px"><option value="">Selecciona marca…</option>' + opcionesMarca + '<option value="__nueva">➕ Otra marca</option></select>' +
+    '<div id="ac-marca-nueva-caja" class="oculto"><label class="etiqueta">Nueva marca</label><input class="campo" id="ac-marca-nueva" type="text" style="margin-bottom:10px"></div>' +
+    '<label class="etiqueta">Modelo</label>' +
+    '<select class="campo" id="ac-modelo" style="margin-bottom:10px"><option value="">Selecciona modelo…</option><option value="__nuevo">➕ Otro modelo</option></select>' +
+    '<div id="ac-modelo-nuevo-caja" class="oculto"><label class="etiqueta">Nuevo modelo</label><input class="campo" id="ac-modelo-nuevo" type="text" style="margin-bottom:10px"></div>' +
+    '<label class="etiqueta">Matrícula</label><input class="campo" id="ac-matricula" type="text" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Número de taxi (opcional)</label><input class="campo" id="ac-numero-taxi" type="text" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Plazas</label><input class="campo" id="ac-plazas" type="number" min="1" max="12" value="4" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Isla</label><select class="campo" id="ac-isla" style="margin-bottom:10px">' +
+      '<option>Gran Canaria</option><option>Tenerife</option><option>Lanzarote</option>' +
+      '<option>Fuerteventura</option><option>La Palma</option><option>La Gomera</option><option>El Hierro</option>' +
+    '</select>' +
+    '<label class="etiqueta">Foto del conductor (opcional, queda aprobada al subirla aquí)</label>' +
+    '<input class="campo" type="file" id="ac-foto-input" accept="image/*" onchange="previsualizarFotoConductor()" style="margin-bottom:10px">' +
+    '<img id="ac-foto-preview" style="max-width:160px;border-radius:8px;margin-bottom:10px;display:none">';
+}
+
+function mostrarFormularioConductor() {
+  var editor = document.getElementById('editor-conductor');
+  function pintar() {
+    fotoConductorNueva = null;
+    editor.classList.remove('oculto');
+    editor.innerHTML = '<h2 style="margin-top:0">➕ Dar de alta un conductor</h2>' +
+      '<p class="subtitulo" style="margin:0 0 12px">Pasa por la oficina con su documentación. La foto se sube desde aquí y queda aprobada directamente.</p>' +
+      formularioConductor() +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">' +
+        '<button class="boton-primario" onclick="guardarConductor()">💾 Crear conductor</button>' +
+        '<button class="boton-secundario" onclick="document.getElementById(\'editor-conductor\').classList.add(\'oculto\')">Cancelar</button>' +
+      '</div>' +
+      '<div id="ac-mensaje" style="margin-top:10px;"></div>';
+    editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  if (catalogoConductorCache) { pintar(); return; }
+  fetch('/admin/catalogo-vehiculos').then(function (r) { return r.json(); }).then(function (datos) {
+    catalogoConductorCache = datos;
+    pintar();
+  });
+}
+
+document.getElementById('boton-nuevo-conductor').addEventListener('click', mostrarFormularioConductor);
+
+function cargarModelosConductor() {
+  var marcaSelect = document.getElementById('ac-marca');
+  var marcaId = parseInt(marcaSelect.value, 10);
+  var esNueva = marcaSelect.value === '__nueva';
+  document.getElementById('ac-marca-nueva-caja').classList.toggle('oculto', !esNueva);
+  var selModelo = document.getElementById('ac-modelo');
+  selModelo.innerHTML = '<option value="">Selecciona modelo…</option><option value="__nuevo">➕ Otro modelo</option>';
+  document.getElementById('ac-modelo-nuevo-caja').classList.add('oculto');
+  if (!catalogoConductorCache || !marcaId) { return; }
+  var marca = catalogoConductorCache.marcas.find(function (m) { return m.id === marcaId; });
+  if (!marca) { return; }
+  marca.modelos.forEach(function (mo) {
+    var opt = document.createElement('option');
+    opt.value = mo.id;
+    opt.textContent = mo.nombre;
+    selModelo.insertBefore(opt, selModelo.lastElementChild);
+  });
+}
+
+document.addEventListener('change', function (e) {
+  if (e.target.id === 'ac-modelo') {
+    document.getElementById('ac-modelo-nuevo-caja').classList.toggle('oculto', e.target.value !== '__nuevo');
+  }
+});
+
+function previsualizarFotoConductor() {
+  var archivo = document.getElementById('ac-foto-input').files[0];
+  if (!archivo) { return; }
+  var lector = new FileReader();
+  lector.onload = function (evento) {
+    var imagen = new Image();
+    imagen.onload = function () {
+      var continuar = function () {
+        var escala = Math.min(1, 500 / imagen.width);
+        var lienzo = document.createElement('canvas');
+        lienzo.width = Math.round(imagen.width * escala);
+        lienzo.height = Math.round(imagen.height * escala);
+        var contexto = lienzo.getContext('2d');
+        contexto.fillStyle = '#ffffff';
+        contexto.fillRect(0, 0, lienzo.width, lienzo.height);
+        contexto.drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+        fotoConductorNueva = lienzo.toDataURL('image/jpeg', 0.82);
+        var preview = document.getElementById('ac-foto-preview');
+        preview.src = fotoConductorNueva;
+        preview.style.display = 'block';
+      };
+      if (imagen.decode) { imagen.decode().then(continuar).catch(continuar); } else { continuar(); }
+    };
+    imagen.src = evento.target.result;
+  };
+  lector.readAsDataURL(archivo);
+}
+
+function guardarConductor() {
+  var marcaVal = document.getElementById('ac-marca').value;
+  var modeloVal = document.getElementById('ac-modelo').value;
+  var datos = {
+    nombre: document.getElementById('ac-nombre').value,
+    email: document.getElementById('ac-email').value,
+    telefono: document.getElementById('ac-telefono').value,
+    password: document.getElementById('ac-password').value,
+    documento: document.getElementById('ac-documento').value,
+    direccion: document.getElementById('ac-direccion').value,
+    cp: document.getElementById('ac-cp').value,
+    municipio: document.getElementById('ac-municipio').value,
+    municipio_licencia: document.getElementById('ac-municipio-licencia').value,
+    numero_licencia: document.getElementById('ac-numero-licencia').value,
+    central_flota: document.getElementById('ac-central').value,
+    categoria_id: document.getElementById('ac-categoria').value,
+    marca_id: marcaVal === '__nueva' ? '' : marcaVal,
+    marca_nueva: marcaVal === '__nueva' ? document.getElementById('ac-marca-nueva').value : '',
+    modelo_id: modeloVal === '__nuevo' ? '' : modeloVal,
+    modelo_nuevo: modeloVal === '__nuevo' ? document.getElementById('ac-modelo-nuevo').value : '',
+    matricula: document.getElementById('ac-matricula').value,
+    numero_taxi: document.getElementById('ac-numero-taxi').value,
+    plazas: document.getElementById('ac-plazas').value,
+    isla: document.getElementById('ac-isla').value,
+    foto: fotoConductorNueva
+  };
+  var msg = document.getElementById('ac-mensaje');
+  fetch('/admin/conductores', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Conductor creado y aprobado.</div>';
+      cargarConductores();
+      setTimeout(function () { document.getElementById('editor-conductor').classList.add('oculto'); }, 1200);
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + respuesta.error + '</div>';
+    }
+  });
 }
 
 
