@@ -160,15 +160,20 @@ table.tabla-precios input {
     <div id="seccion-conductores" class="oculto">
       <h1>Conductores</h1>
       <p class="subtitulo">Alta y gestión de la flota de conductores. La categoría se elige entre las activas; la marca y el modelo se guardan en un catálogo propio que crece según se van añadiendo conductores.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="boton-costa" onclick="contactoGlobalConductores(true)">💬 Permitir contacto a TODOS</button>
+        <button class="boton-peligro" onclick="contactoGlobalConductores(false)">🔇 Quitar contacto a TODOS</button>
+      </div>
       <table class="tabla-admin">
         <thead>
-          <tr><th>Nombre</th><th>Contacto</th><th>Vehículo</th><th>Categoría</th><th>Isla</th><th>Foto</th><th>Tipo</th><th>Estado</th><th>Acciones</th></tr>
+          <tr><th>Nombre</th><th>Contacto</th><th>Vehículo</th><th>Categoría</th><th>Isla</th><th>Foto</th><th>💬</th><th>Tipo</th><th>Estado</th><th>Acciones</th></tr>
         </thead>
         <tbody id="tabla-conductores"></tbody>
       </table>
       <button id="boton-nuevo-conductor" class="boton-primario" style="margin-top:14px;">➕ Dar de alta un conductor</button>
 
       <div class="tarjeta oculto" id="editor-conductor" style="margin-top:16px;max-width:640px;"></div>
+      <div class="tarjeta oculto" id="ficha-conductor" style="margin-top:16px;"></div>
     </div>
 
     <div id="seccion-precios" class="oculto">
@@ -527,6 +532,7 @@ function cargarConductores() {
         '<td>' + escapar(c.categoria || '—') + '</td>' +
         '<td>' + escapar(c.isla) + '</td>' +
         '<td>' + ETIQUETAS_FOTO_CONDUCTOR[c.foto_estado || 'sin_foto'] + '</td>' +
+        '<td><input type="checkbox" ' + (c.permite_contacto !== false ? 'checked' : '') + ' onchange="cambiarContactoConductor(' + c.id + ', this.checked)"></td>' +
         '<td>' +
           '<select class="campo" style="height:34px" onchange="cambiarTipoConductor(' + c.id + ', this.value)">' +
             '<option value="externo"' + (c.tipo === 'externo' ? ' selected' : '') + '>Externo</option>' +
@@ -538,7 +544,11 @@ function cargarConductores() {
           (c.estado !== 'aprobado' ? '<button class="boton-costa" style="margin-top:4px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'aprobado\')">Aprobar</button>' : '') +
           (c.estado !== 'suspendido' ? '<button class="boton-peligro" style="margin-top:4px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'suspendido\')">Suspender</button>' : '') +
         '</td>' +
-        '<td><button class="boton-peligro" style="padding:6px 12px;font-size:0.82rem" onclick="eliminarConductor(' + c.id + ')">🗑️ Eliminar</button></td>' +
+        '<td>' +
+          '<button class="boton-costa" style="padding:6px 12px;font-size:0.82rem;margin-right:6px" onclick="verFichaConductor(' + c.id + ')">📋 Ficha</button>' +
+          '<button class="boton-secundario" style="padding:6px 10px;font-size:0.82rem;margin-right:6px" onclick="editarNombreConductor(' + c.id + ', \'' + escapar(c.nombre).replace(/'/g, "\\'") + '\')">✏️</button>' +
+          '<button class="boton-peligro" style="padding:6px 12px;font-size:0.82rem" onclick="eliminarConductor(' + c.id + ')">🗑️</button>' +
+        '</td>' +
       '</tr>';
     }).join('');
   });
@@ -568,6 +578,116 @@ function eliminarConductor(id) {
     .then(function (respuesta) {
       if (respuesta.ok) { cargarConductores(); } else { alert(respuesta.error); }
     });
+}
+
+function cambiarContactoConductor(id, permite) {
+  fetch('/admin/conductores/' + id + '/contacto', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ permite: permite })
+  });
+}
+
+function contactoGlobalConductores(permite) {
+  if (!confirm(permite
+    ? '¿Activar el botón de contacto para TODOS los conductores?'
+    : '¿Quitar el botón de contacto a TODOS los conductores?')) { return; }
+  fetch('/admin/conductores-contacto-global', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ permite: permite })
+  }).then(function () { cargarConductores(); });
+}
+
+function editarNombreConductor(id, actual) {
+  var nombre = prompt('Nombre correcto del conductor:', actual);
+  if (nombre === null || !nombre.trim()) { return; }
+  fetch('/admin/conductores/' + id + '/nombre', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre: nombre })
+  }).then(function () { cargarConductores(); });
+}
+
+function campoFicha(etiqueta, idCampo, valor) {
+  return '<label class="etiqueta" style="margin-top:8px">' + etiqueta + '</label>' +
+    '<input class="campo" id="f-' + idCampo + '" type="text" value="' + escapar(valor == null ? '' : String(valor)) + '" style="margin-bottom:8px">';
+}
+
+function verFichaConductor(id) {
+  fetch('/admin/conductores/' + id + '/ficha').then(function (r) { return r.json(); }).then(function (c) {
+    var ficha = document.getElementById('ficha-conductor');
+    ficha.classList.remove('oculto');
+    ficha.innerHTML = '' +
+      '<h2 style="margin-top:0">📋 Expediente: ' + escapar(c.nombre) + ' <span style="font-size:0.8rem;color:#5a6c79;font-weight:400">(modifica lo que necesites y pulsa Guardar)</span></h2>' +
+      (c.foto ? '<img src="' + c.foto + '" alt="Foto" style="width:100px;height:100px;object-fit:cover;border-radius:50%;float:right;margin-left:12px;border:2px solid var(--gris-borde)">' : '') +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 16px">' +
+        campoFicha('Nombre completo', 'nombre', c.nombre) +
+        campoFicha('Documento (DNI/NIE)', 'documento', c.documento) +
+        campoFicha('Teléfono', 'telefono', c.telefono) +
+        campoFicha('Email', 'email', c.email) +
+        campoFicha('Dirección', 'direccion', c.direccion) +
+        campoFicha('Código postal', 'cp', c.cp) +
+        campoFicha('Municipio', 'municipio', c.municipio) +
+        campoFicha('Municipio de la licencia', 'municipio_licencia', c.municipio_licencia) +
+        campoFicha('Nº de licencia', 'numero_licencia', c.numero_licencia) +
+        campoFicha('Central de flota', 'central_flota', c.central_flota) +
+        campoFicha('Marca del vehículo', 'vehiculo_marca', c.vehiculo_marca) +
+        campoFicha('Modelo', 'vehiculo_modelo', c.vehiculo_modelo) +
+        campoFicha('Matrícula', 'matricula', c.matricula) +
+        campoFicha('Nº de taxi', 'numero_taxi', c.numero_taxi) +
+        campoFicha('Plazas', 'plazas', c.plazas) +
+        campoFicha('Isla', 'isla', c.isla) +
+      '</div>' +
+      '<p style="margin-top:4px;font-size:13px">' +
+        '<strong>Categoría:</strong> ' + escapar(c.categoria || '—') + ' · ' +
+        '<strong>Foto de carné:</strong> ' + ETIQUETAS_FOTO_CONDUCTOR[c.foto_estado || 'sin_foto'] +
+        (c.foto_motivo ? '<br><em>Motivo del rechazo: ' + escapar(c.foto_motivo) + '</em>' : '') +
+      '</p>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+        '<button class="boton-primario" onclick="guardarFichaConductor(' + c.id + ')">💾 Guardar cambios</button>' +
+        ((c.foto_estado === 'pendiente' || c.foto_estado === 'rechazada') ? '<button class="boton-costa" onclick="decidirFotoConductor(' + c.id + ', \'aprobar\')">✅ Aprobar foto</button>' : '') +
+        ((c.foto_estado === 'pendiente' || c.foto_estado === 'aprobada') ? '<button class="boton-peligro" onclick="decidirFotoConductor(' + c.id + ', \'rechazar\')">❌ Rechazar foto</button>' : '') +
+        '<button class="boton-secundario" onclick="document.getElementById(\'ficha-conductor\').classList.add(\'oculto\')">Cerrar ficha</button>' +
+      '</div>';
+    ficha.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+}
+
+function guardarFichaConductor(id) {
+  var campos = ['nombre', 'documento', 'telefono', 'email', 'direccion', 'cp', 'municipio', 'municipio_licencia',
+    'numero_licencia', 'central_flota', 'vehiculo_marca', 'vehiculo_modelo', 'matricula', 'numero_taxi', 'plazas', 'isla'];
+  var datos = {};
+  campos.forEach(function (campo) { datos[campo] = document.getElementById('f-' + campo).value; });
+  fetch('/admin/conductores/' + id + '/editar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      alert('Ficha guardada. ✓');
+      cargarConductores();
+      verFichaConductor(id);
+    } else {
+      alert(respuesta.error);
+    }
+  });
+}
+
+function decidirFotoConductor(id, accion) {
+  var motivo = null;
+  if (accion === 'rechazar') {
+    motivo = prompt('Motivo del rechazo (el conductor lo verá):', 'La foto no es clara o no es de tipo carné.');
+    if (motivo === null) { return; }
+  }
+  fetch('/admin/conductores/' + id + '/foto', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accion: accion, motivo: motivo })
+  }).then(function () {
+    cargarConductores();
+    verFichaConductor(id);
+  });
 }
 
 function formularioConductor() {
