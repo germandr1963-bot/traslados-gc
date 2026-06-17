@@ -166,7 +166,7 @@ table.tabla-precios input {
       </div>
       <table class="tabla-admin">
         <thead>
-          <tr><th>Nombre</th><th>Contacto</th><th>Vehículo</th><th>Categoría</th><th>Isla</th><th>Foto</th><th>💬</th><th>Tipo</th><th>Estado</th><th>Acciones</th></tr>
+          <tr><th>Nombre</th><th>Contacto</th><th>Vehículo</th><th>Categoría</th><th>Isla</th><th>Foto</th><th style="min-width:150px">💬 Botón contacto</th><th style="min-width:130px">Tipo</th><th>Estado</th><th>Acciones</th></tr>
         </thead>
         <tbody id="tabla-conductores"></tbody>
       </table>
@@ -540,14 +540,14 @@ function cargarConductores() {
           '</select>' +
         '</td>' +
         '<td>' +
-          '<span class="insignia ' + (c.estado === 'aprobado' ? 'insignia-ok' : (c.estado === 'suspendido' ? 'insignia-suspendido' : 'insignia-pendiente')) + '">' + c.estado.toUpperCase() + '</span><br>' +
-          (c.estado !== 'aprobado' ? '<button class="boton-costa" style="margin-top:4px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'aprobado\')">Aprobar</button>' : '') +
-          (c.estado !== 'suspendido' ? '<button class="boton-peligro" style="margin-top:4px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'suspendido\')">Suspender</button>' : '') +
+          '<span class="insignia ' + (c.estado === 'aprobado' ? 'insignia-ok' : (c.estado === 'suspendido' ? 'insignia-suspendido' : 'insignia-pendiente')) + '">' + c.estado.toUpperCase() + '</span>' +
         '</td>' +
         '<td>' +
-          '<button class="boton-costa" style="padding:6px 12px;font-size:0.82rem;margin-right:6px" onclick="verFichaConductor(' + c.id + ')">📋 Ficha</button>' +
-          '<button class="boton-secundario" style="padding:6px 10px;font-size:0.82rem;margin-right:6px" onclick="editarNombreConductor(' + c.id + ', \'' + escapar(c.nombre).replace(/'/g, "\\'") + '\')">✏️</button>' +
-          '<button class="boton-peligro" style="padding:6px 12px;font-size:0.82rem" onclick="eliminarConductor(' + c.id + ')">🗑️</button>' +
+          '<button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;margin-right:4px" onclick="verFichaConductor(' + c.id + ')">📋 Ficha</button>' +
+          '<button class="boton-secundario" style="padding:6px 10px;font-size:0.8rem;margin-right:4px" onclick="editarNombreConductor(' + c.id + ', \'' + escapar(c.nombre).replace(/'/g, "\\'") + '\')">✏️</button>' +
+          '<button class="boton-peligro" style="padding:6px 10px;font-size:0.8rem" onclick="eliminarConductor(' + c.id + ')">🗑️</button><br>' +
+          (c.estado !== 'aprobado' ? '<button class="boton-costa" style="margin-top:6px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'aprobado\')">Aprobar</button>' : '') +
+          (c.estado !== 'suspendido' ? '<button class="boton-peligro" style="margin-top:6px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'suspendido\')">Suspender</button>' : '') +
         '</td>' +
       '</tr>';
     }).join('');
