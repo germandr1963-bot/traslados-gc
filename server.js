@@ -104,6 +104,13 @@ async function initSchema() {
   await pool.query(`ALTER TABLE categorias_vehiculos ALTER COLUMN capacidad_maletas SET DEFAULT '2';`);
   await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS descripcion TEXT;`);
   await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS limite_sillas INT DEFAULT 0;`);
+  // "disponible" nace en TRUE para que las categorías que ya tenías sigan
+  // viéndose en la web sin tocar nada; las que se creen nuevas desde el
+  // panel, como en taxi guanche, nacerán en FALSE hasta que se activen.
+  await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS disponible BOOLEAN DEFAULT TRUE;`);
+  await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS bajada_diurna NUMERIC(10,2) DEFAULT 0;`);
+  await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS bajada_nocturna NUMERIC(10,2) DEFAULT 0;`);
+  await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS foto TEXT;`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rutas (
@@ -166,7 +173,7 @@ app.get('/admin/sesion', (req, res) => {
 
 app.get('/api/categorias', asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre'
+    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas FROM categorias_vehiculos WHERE disponible = TRUE ORDER BY orden, nombre'
   );
   res.json(result.rows);
 }));
@@ -268,26 +275,87 @@ app.delete('/admin/fondos/:id', requireAdmin, asyncHandler(async (req, res) => {
 
 app.get('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas, activa, orden FROM categorias_vehiculos ORDER BY orden, nombre'
+    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas, descripcion,
+            activa, disponible, bajada_diurna, bajada_nocturna, orden,
+            (foto IS NOT NULL) AS tiene_foto
+     FROM categorias_vehiculos ORDER BY orden, nombre`
   );
   res.json(result.rows);
 }));
 
+// Crear una categoría de vehículo nueva (nace inactiva y no disponible)
 app.post('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
-  const { nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas } = req.body;
+  const d = req.body;
+  const nombre = (d.nombre || '').trim();
   if (!nombre) {
-    return res.status(400).json({ error: 'Falta el nombre' });
+    return res.status(400).json({ error: 'La categoría necesita un nombre.' });
   }
-  const result = await pool.query(
-    'INSERT INTO categorias_vehiculos (nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-    [nombre, capacidad_pasajeros || 4, capacidad_maletas || '2', descripcion || null, limite_sillas || 0]
-  );
-  res.json({ ok: true, id: result.rows[0].id });
+  try {
+    await pool.query(
+      `INSERT INTO categorias_vehiculos
+         (nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas, descripcion,
+          bajada_diurna, bajada_nocturna, activa, disponible)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, FALSE)`,
+      [nombre, parseInt(d.capacidad_pasajeros, 10) || 4, (d.capacidad_maletas || '').trim() || '—',
+       parseInt(d.limite_sillas, 10) || 0, (d.descripcion || '').trim(),
+       parseFloat(d.bajada_diurna) || 0, parseFloat(d.bajada_nocturna) || 0]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ error: 'Ya existe una categoría con ese nombre.' });
+    throw err;
+  }
 }));
 
-app.post('/admin/categorias/:id/estado', requireAdmin, asyncHandler(async (req, res) => {
-  const { activa } = req.body;
-  await pool.query('UPDATE categorias_vehiculos SET activa = $1 WHERE id = $2', [!!activa, req.params.id]);
+// Editar una categoría existente (todos sus datos, salvo activa/disponible/foto, que tienen su propio botón)
+app.post('/admin/categorias/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
+  const d = req.body;
+  const nombre = (d.nombre || '').trim();
+  if (!nombre) {
+    return res.status(400).json({ error: 'La categoría necesita un nombre.' });
+  }
+  try {
+    await pool.query(
+      `UPDATE categorias_vehiculos
+       SET nombre = $1, capacidad_pasajeros = $2, capacidad_maletas = $3, limite_sillas = $4, descripcion = $5,
+           bajada_diurna = $6, bajada_nocturna = $7
+       WHERE id = $8`,
+      [nombre, parseInt(d.capacidad_pasajeros, 10) || 4, (d.capacidad_maletas || '').trim() || '—',
+       parseInt(d.limite_sillas, 10) || 0, (d.descripcion || '').trim(),
+       parseFloat(d.bajada_diurna) || 0, parseFloat(d.bajada_nocturna) || 0, req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ error: 'Ya existe una categoría con ese nombre.' });
+    throw err;
+  }
+}));
+
+// Eliminar una categoría. Ojo: al borrarla, también se borran sus precios
+// guardados (la base de datos lo hace sola, en cascada).
+app.post('/admin/categorias/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Foto de una categoría (la sube el admin, comprimida desde el navegador)
+app.post('/admin/categorias/:id/foto', requireAdmin, asyncHandler(async (req, res) => {
+  const { foto } = req.body;
+  if (!foto || !foto.startsWith('data:image/') || foto.length > 700000) {
+    return res.status(400).json({ error: 'La imagen no es válida o pesa demasiado.' });
+  }
+  await pool.query('UPDATE categorias_vehiculos SET foto = $1 WHERE id = $2', [foto, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/categorias/:id/activa', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE categorias_vehiculos SET activa = $1 WHERE id = $2', [!!req.body.activa, req.params.id]);
+  res.json({ ok: true });
+}));
+
+// "Disponible": las categorías que se ofrecen HOY al cliente en el selector
+app.post('/admin/categorias/:id/disponible', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE categorias_vehiculos SET disponible = $1 WHERE id = $2', [!!req.body.disponible, req.params.id]);
   res.json({ ok: true });
 }));
 
