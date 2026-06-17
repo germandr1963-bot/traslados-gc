@@ -157,6 +157,11 @@ table.tabla-admin {
   font-size: 13px;
 }
 
+table.tabla-admin th,
+table.tabla-admin td {
+  white-space: nowrap;
+}
+
 table.tabla-admin th {
   text-align: left;
   color: var(--texto-muted);

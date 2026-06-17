@@ -145,12 +145,14 @@ table.tabla-precios input {
     <div id="seccion-categorias" class="oculto">
       <h1>Categorías de vehículos</h1>
       <p class="subtitulo">Activa = existe en el sistema (se ofrece a los choferes en el alta). Disponible = se ofrece HOY al cliente en el selector de vehículo.</p>
+      <div style="overflow-x:auto;">
       <table class="tabla-admin">
         <thead>
           <tr><th>Categoría</th><th>Pasajeros</th><th>Maletas</th><th>Sillas bebé (máx.)</th><th>Bajada (diurna / nocturna)</th><th>Foto</th><th>Activa</th><th>Disponible</th><th>Acción</th></tr>
         </thead>
         <tbody id="tabla-categorias"></tbody>
       </table>
+      </div>
       <button id="boton-nueva-categoria" class="boton-primario" style="margin-top:14px;">➕ Crear categoría nueva</button>
 
       <div class="tarjeta oculto" id="editor-categoria" style="margin-top:16px;max-width:520px;"></div>
