@@ -95,6 +95,16 @@ async function initSchema() {
     );
   `);
 
+  // Capacidad de maletas en texto libre (ej. "3 grandes"), igual que en
+  // taxi guanche, en vez de solo un número. Más descripción y límite de
+  // sillas infantiles por categoría. Estos ALTER son seguros de repetir
+  // en cada arranque: si ya están aplicados, no hacen nada.
+  await pool.query(`ALTER TABLE categorias_vehiculos ALTER COLUMN capacidad_maletas DROP DEFAULT;`);
+  await pool.query(`ALTER TABLE categorias_vehiculos ALTER COLUMN capacidad_maletas TYPE TEXT USING capacidad_maletas::TEXT;`);
+  await pool.query(`ALTER TABLE categorias_vehiculos ALTER COLUMN capacidad_maletas SET DEFAULT '2';`);
+  await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS descripcion TEXT;`);
+  await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS limite_sillas INT DEFAULT 0;`);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rutas (
       id SERIAL PRIMARY KEY,
@@ -156,7 +166,7 @@ app.get('/admin/sesion', (req, res) => {
 
 app.get('/api/categorias', asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre'
+    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre'
   );
   res.json(result.rows);
 }));
@@ -258,19 +268,19 @@ app.delete('/admin/fondos/:id', requireAdmin, asyncHandler(async (req, res) => {
 
 app.get('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, activa, orden FROM categorias_vehiculos ORDER BY orden, nombre'
+    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas, activa, orden FROM categorias_vehiculos ORDER BY orden, nombre'
   );
   res.json(result.rows);
 }));
 
 app.post('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
-  const { nombre, capacidad_pasajeros, capacidad_maletas } = req.body;
+  const { nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas } = req.body;
   if (!nombre) {
     return res.status(400).json({ error: 'Falta el nombre' });
   }
   const result = await pool.query(
-    'INSERT INTO categorias_vehiculos (nombre, capacidad_pasajeros, capacidad_maletas) VALUES ($1, $2, $3) RETURNING id',
-    [nombre, capacidad_pasajeros || 4, capacidad_maletas || 2]
+    'INSERT INTO categorias_vehiculos (nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+    [nombre, capacidad_pasajeros || 4, capacidad_maletas || '2', descripcion || null, limite_sillas || 0]
   );
   res.json({ ok: true, id: result.rows[0].id });
 }));
