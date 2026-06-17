@@ -121,16 +121,29 @@ input, select, button {
 }
 
 .boton-peligro {
-  background: transparent;
-  color: var(--rojo-error);
-  border: 1px solid var(--rojo-error);
+  background: #fff;
+  color: #C0392B;
+  border: 1px solid #C0392B;
   border-radius: 6px;
   padding: 9px 16px;
   font-size: 14px;
 }
 
 .boton-peligro:hover {
-  background: var(--rojo-error-fondo);
+  background: #FBEAE7;
+}
+
+.boton-costa {
+  background: #fff;
+  color: #10808F;
+  border: 1px solid #10808F;
+  border-radius: 6px;
+  padding: 9px 16px;
+  font-size: 14px;
+}
+
+.boton-costa:hover {
+  background: #EAF6F7;
 }
 
 .insignia {
@@ -139,16 +152,18 @@ input, select, button {
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
+  background: #fff;
+  border: 1px solid;
 }
 
 .insignia-ok {
-  background: var(--verde-ok-fondo);
-  color: var(--verde-ok);
+  color: #1E8E5A;
+  border-color: #1E8E5A;
 }
 
 .insignia-no {
-  background: var(--gris-borde);
-  color: var(--texto-muted);
+  color: #5a6c79;
+  border-color: var(--gris-borde);
 }
 
 table.tabla-admin {
@@ -217,7 +232,7 @@ table.tabla-admin td {
 .admin-contenido {
   flex: 1;
   padding: 32px 40px;
-  max-width: 980px;
+  max-width: 1320px;
 }
 
 .admin-contenido h1 {
