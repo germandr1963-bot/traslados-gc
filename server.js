@@ -14,6 +14,14 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+// Si una conexión guardada en el pool se queda muerta (por ejemplo, porque
+// Neon "duerme" la base de datos por inactividad), esto evita que todo el
+// servidor se caiga. El pool simplemente descarta esa conexión y abre una
+// nueva la próxima vez que haga falta.
+pool.on('error', function (err) {
+  console.error('Error inesperado en una conexión inactiva del pool:', err.message);
+});
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 1024 * 1024 }
@@ -36,6 +44,22 @@ function requireAdmin(req, res, next) {
     return next();
   }
   return res.status(401).json({ error: 'No autorizado' });
+}
+
+// Envuelve cada ruta que habla con la base de datos: si algo falla (por
+// ejemplo, una consulta justo cuando la conexión se estaba reconectando),
+// se devuelve un error claro al navegador en vez de dejarlo colgado o
+// romper el servidor entero. El error real se imprime en los registros de
+// Render para poder diagnosticarlo.
+function asyncHandler(fn) {
+  return function (req, res, next) {
+    Promise.resolve(fn(req, res, next)).catch(function (err) {
+      console.error('Error en ' + req.method + ' ' + req.originalUrl + ':', err.message);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Error temporal del servidor. Intenta de nuevo en unos segundos.' });
+      }
+    });
+  };
 }
 
 async function initSchema() {
@@ -102,7 +126,7 @@ async function initSchema() {
   }
 }
 
-app.post('/admin/login', async (req, res) => {
+app.post('/admin/login', asyncHandler(async (req, res) => {
   const { usuario, password } = req.body;
   if (!usuario || !password) {
     return res.status(400).json({ error: 'Faltan datos' });
@@ -118,7 +142,7 @@ app.post('/admin/login', async (req, res) => {
   }
   req.session.adminId = admin.id;
   res.json({ ok: true });
-});
+}));
 
 app.post('/admin/logout', (req, res) => {
   req.session.destroy(() => {
@@ -130,21 +154,21 @@ app.get('/admin/sesion', (req, res) => {
   res.json({ autenticado: !!(req.session && req.session.adminId) });
 });
 
-app.get('/api/categorias', async (req, res) => {
+app.get('/api/categorias', asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre'
   );
   res.json(result.rows);
-});
+}));
 
-app.get('/api/rutas', async (req, res) => {
+app.get('/api/rutas', asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, origen, destino FROM rutas WHERE activa = TRUE ORDER BY origen, destino'
   );
   res.json(result.rows);
-});
+}));
 
-app.get('/api/precio', async (req, res) => {
+app.get('/api/precio', asyncHandler(async (req, res) => {
   const { ruta_id, categoria_id } = req.query;
   if (!ruta_id || !categoria_id) {
     return res.status(400).json({ error: 'Faltan parametros' });
@@ -157,9 +181,9 @@ app.get('/api/precio', async (req, res) => {
     return res.json({ a_consultar: true });
   }
   res.json({ precio: Number(result.rows[0].precio), a_consultar: false });
-});
+}));
 
-app.get('/fondo-activo', async (req, res) => {
+app.get('/fondo-activo', asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT imagen, tipo_mime FROM fondos_portada WHERE activo = TRUE LIMIT 1'
   );
@@ -169,16 +193,16 @@ app.get('/fondo-activo', async (req, res) => {
   res.set('Content-Type', result.rows[0].tipo_mime);
   res.set('Cache-Control', 'public, max-age=3600');
   res.send(result.rows[0].imagen);
-});
+}));
 
-app.get('/admin/fondos', requireAdmin, async (req, res) => {
+app.get('/admin/fondos', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, nombre, tipo_mime, activo FROM fondos_portada ORDER BY id'
   );
   res.json(result.rows);
-});
+}));
 
-app.get('/admin/fondos/:id/imagen', requireAdmin, async (req, res) => {
+app.get('/admin/fondos/:id/imagen', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT imagen, tipo_mime FROM fondos_portada WHERE id = $1',
     [req.params.id]
@@ -188,9 +212,9 @@ app.get('/admin/fondos/:id/imagen', requireAdmin, async (req, res) => {
   }
   res.set('Content-Type', result.rows[0].tipo_mime);
   res.send(result.rows[0].imagen);
-});
+}));
 
-app.post('/admin/fondos', requireAdmin, upload.single('imagen'), async (req, res) => {
+app.post('/admin/fondos', requireAdmin, upload.single('imagen'), asyncHandler(async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Falta la imagen' });
   }
@@ -208,9 +232,9 @@ app.post('/admin/fondos', requireAdmin, upload.single('imagen'), async (req, res
     [nombre, req.file.buffer, req.file.mimetype]
   );
   res.json({ ok: true, id: result.rows[0].id });
-});
+}));
 
-app.post('/admin/fondos/:id/activar', requireAdmin, async (req, res) => {
+app.post('/admin/fondos/:id/activar', requireAdmin, asyncHandler(async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -220,25 +244,26 @@ app.post('/admin/fondos/:id/activar', requireAdmin, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     await client.query('ROLLBACK');
+    console.error('No se pudo activar el fondo:', err.message);
     res.status(500).json({ error: 'No se pudo activar el fondo' });
   } finally {
     client.release();
   }
-});
+}));
 
-app.delete('/admin/fondos/:id', requireAdmin, async (req, res) => {
+app.delete('/admin/fondos/:id', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM fondos_portada WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
-});
+}));
 
-app.get('/admin/categorias', requireAdmin, async (req, res) => {
+app.get('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, activa, orden FROM categorias_vehiculos ORDER BY orden, nombre'
   );
   res.json(result.rows);
-});
+}));
 
-app.post('/admin/categorias', requireAdmin, async (req, res) => {
+app.post('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   const { nombre, capacidad_pasajeros, capacidad_maletas } = req.body;
   if (!nombre) {
     return res.status(400).json({ error: 'Falta el nombre' });
@@ -248,20 +273,20 @@ app.post('/admin/categorias', requireAdmin, async (req, res) => {
     [nombre, capacidad_pasajeros || 4, capacidad_maletas || 2]
   );
   res.json({ ok: true, id: result.rows[0].id });
-});
+}));
 
-app.post('/admin/categorias/:id/estado', requireAdmin, async (req, res) => {
+app.post('/admin/categorias/:id/estado', requireAdmin, asyncHandler(async (req, res) => {
   const { activa } = req.body;
   await pool.query('UPDATE categorias_vehiculos SET activa = $1 WHERE id = $2', [!!activa, req.params.id]);
   res.json({ ok: true });
-});
+}));
 
-app.get('/admin/rutas', requireAdmin, async (req, res) => {
+app.get('/admin/rutas', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT id, origen, destino, activa FROM rutas ORDER BY origen, destino');
   res.json(result.rows);
-});
+}));
 
-app.post('/admin/rutas', requireAdmin, async (req, res) => {
+app.post('/admin/rutas', requireAdmin, asyncHandler(async (req, res) => {
   const { origen, destino } = req.body;
   if (!origen || !destino) {
     return res.status(400).json({ error: 'Falta origen o destino' });
@@ -271,9 +296,9 @@ app.post('/admin/rutas', requireAdmin, async (req, res) => {
     [origen, destino]
   );
   res.json({ ok: true, id: result.rows[0].id });
-});
+}));
 
-app.get('/admin/precios-grid', requireAdmin, async (req, res) => {
+app.get('/admin/precios-grid', requireAdmin, asyncHandler(async (req, res) => {
   const rutas = await pool.query('SELECT id, origen, destino FROM rutas WHERE activa = TRUE ORDER BY origen, destino');
   const categorias = await pool.query('SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
   const precios = await pool.query('SELECT ruta_id, categoria_id, precio FROM rutas_precios');
@@ -284,9 +309,9 @@ app.get('/admin/precios-grid', requireAdmin, async (req, res) => {
       return { ruta_id: p.ruta_id, categoria_id: p.categoria_id, precio: Number(p.precio) };
     })
   });
-});
+}));
 
-app.post('/admin/precios-grid', requireAdmin, async (req, res) => {
+app.post('/admin/precios-grid', requireAdmin, asyncHandler(async (req, res) => {
   const cambios = req.body.cambios;
   if (!Array.isArray(cambios)) {
     return res.status(400).json({ error: 'Formato incorrecto' });
@@ -300,7 +325,7 @@ app.post('/admin/precios-grid', requireAdmin, async (req, res) => {
     );
   }
   res.json({ ok: true });
-});
+}));
 
 initSchema()
   .then(function () {
