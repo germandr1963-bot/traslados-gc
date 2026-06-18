@@ -5,9 +5,14 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
+const ExcelJS = require('exceljs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Motor de plantillas EJS para las páginas de ruta renderizadas en servidor
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -24,7 +29,7 @@ pool.on('error', function (err) {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 1024 * 1024 }
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB para permitir Excel de traducciones
 });
 
 app.use(express.json());
@@ -39,6 +44,25 @@ app.use(session({
   cookie: { maxAge: 1000 * 60 * 60 * 8 }
 }));
 
+// ─── Idiomas y secciones ────────────────────────────────────────────────────
+const IDIOMAS_PERMITIDOS = ['es', 'en', 'de', 'sv', 'no', 'nl', 'it', 'fr'];
+
+// Palabra "traslado" en cada idioma — forma parte de la URL pública
+const SECCIONES_TRASLADO = {
+  es: 'traslado',
+  en: 'transfer',
+  de: 'transfer',
+  sv: 'transfer',
+  no: 'transfer',
+  nl: 'transfer',
+  it: 'trasferimento',
+  fr: 'transfert'
+};
+
+// URL base del sitio — se usa para construir canonical y hreflang
+const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+
+// ─── Helpers generales ───────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
   if (req.session && req.session.adminId) {
     return next();
@@ -62,6 +86,38 @@ function asyncHandler(fn) {
   };
 }
 
+// ─── Helpers SEO ─────────────────────────────────────────────────────────────
+
+// Convierte "Las Palmas de Gran Canaria" + "Maspalomas"
+// en "las-palmas-de-gran-canaria-a-maspalomas"
+function generarSlug(origen, destino) {
+  function slugify(texto) {
+    return String(texto)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // quita tildes
+      .replace(/[^a-z0-9\s]/g, '')
+      .trim()
+      .replace(/\s+/g, '-');
+  }
+  return slugify(origen) + '-a-' + slugify(destino);
+}
+
+// Crea las 8 fichas SEO (una por idioma) para una ruta nueva.
+// Si ya existen, no hace nada (ON CONFLICT DO NOTHING).
+async function crearFichasSEOSiFaltan(rutaId, origen, destino) {
+  const slug = generarSlug(origen, destino);
+  for (const lang of IDIOMAS_PERMITIDOS) {
+    await pool.query(
+      `INSERT INTO route_seo_settings (route_id, lang_code, slug_url)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (route_id, lang_code) DO NOTHING`,
+      [rutaId, lang, slug]
+    );
+  }
+}
+
+// ─── Esquema de base de datos ─────────────────────────────────────────────────
 async function initSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS admins (
@@ -95,18 +151,11 @@ async function initSchema() {
     );
   `);
 
-  // Capacidad de maletas en texto libre (ej. "3 grandes"), igual que en
-  // taxi guanche, en vez de solo un número. Más descripción y límite de
-  // sillas infantiles por categoría. Estos ALTER son seguros de repetir
-  // en cada arranque: si ya están aplicados, no hacen nada.
   await pool.query(`ALTER TABLE categorias_vehiculos ALTER COLUMN capacidad_maletas DROP DEFAULT;`);
   await pool.query(`ALTER TABLE categorias_vehiculos ALTER COLUMN capacidad_maletas TYPE TEXT USING capacidad_maletas::TEXT;`);
   await pool.query(`ALTER TABLE categorias_vehiculos ALTER COLUMN capacidad_maletas SET DEFAULT '2';`);
   await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS descripcion TEXT;`);
   await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS limite_sillas INT DEFAULT 0;`);
-  // "disponible" nace en TRUE para que las categorías que ya tenías sigan
-  // viéndose en la web sin tocar nada; las que se creen nuevas desde el
-  // panel, como en taxi guanche, nacerán en FALSE hasta que se activen.
   await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS disponible BOOLEAN DEFAULT TRUE;`);
   await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS bajada_diurna NUMERIC(10,2) DEFAULT 0;`);
   await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS bajada_nocturna NUMERIC(10,2) DEFAULT 0;`);
@@ -132,8 +181,6 @@ async function initSchema() {
     );
   `);
 
-  // Catálogo de marcas y modelos de vehículo (crece según se van dando de
-  // alta conductores; arranca con las marcas más habituales en Canarias).
   await pool.query(`
     CREATE TABLE IF NOT EXISTS marcas_vehiculos (
       id SERIAL PRIMARY KEY,
@@ -176,8 +223,6 @@ async function initSchema() {
     }
   }
 
-  // Conductores. estado: pendiente | aprobado | suspendido · tipo: flota
-  // (vehículo propio de la empresa) | externo (conductor independiente).
   await pool.query(`
     CREATE TABLE IF NOT EXISTS conductores (
       id SERIAL PRIMARY KEY,
@@ -207,6 +252,12 @@ async function initSchema() {
       permite_contacto BOOLEAN DEFAULT TRUE,
       creado_en TIMESTAMP DEFAULT NOW()
     );
+  `);
+
+  // Columna activo en route_seo_settings: controla si la página
+  // de esa ruta en ese idioma está visible en internet o no.
+  await pool.query(`
+    ALTER TABLE route_seo_settings ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT FALSE;
   `);
 
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
@@ -268,6 +319,7 @@ async function resolverVehiculo(marca_id, marca_nueva, modelo_id, modelo_nuevo) 
   return { marcaNombre, modeloNombre };
 }
 
+// ─── Rutas de autenticación ───────────────────────────────────────────────────
 app.post('/admin/login', asyncHandler(async (req, res) => {
   const { usuario, password } = req.body;
   if (!usuario || !password) {
@@ -296,6 +348,7 @@ app.get('/admin/sesion', (req, res) => {
   res.json({ autenticado: !!(req.session && req.session.adminId) });
 });
 
+// ─── API pública ──────────────────────────────────────────────────────────────
 app.get('/api/categorias', asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas FROM categorias_vehiculos WHERE disponible = TRUE ORDER BY orden, nombre'
@@ -337,6 +390,7 @@ app.get('/fondo-activo', asyncHandler(async (req, res) => {
   res.send(result.rows[0].imagen);
 }));
 
+// ─── Admin: fondos de portada ─────────────────────────────────────────────────
 app.get('/admin/fondos', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, nombre, tipo_mime, activo FROM fondos_portada ORDER BY id'
@@ -398,6 +452,7 @@ app.delete('/admin/fondos/:id', requireAdmin, asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ─── Admin: categorías de vehículo ───────────────────────────────────────────
 app.get('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas, descripcion,
@@ -408,7 +463,6 @@ app.get('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
-// Crear una categoría de vehículo nueva (nace inactiva y no disponible)
 app.post('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   const d = req.body;
   const nombre = (d.nombre || '').trim();
@@ -432,7 +486,6 @@ app.post('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   }
 }));
 
-// Editar una categoría existente (todos sus datos, salvo activa/disponible/foto, que tienen su propio botón)
 app.post('/admin/categorias/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
   const d = req.body;
   const nombre = (d.nombre || '').trim();
@@ -456,14 +509,11 @@ app.post('/admin/categorias/:id/editar', requireAdmin, asyncHandler(async (req, 
   }
 }));
 
-// Eliminar una categoría. Ojo: al borrarla, también se borran sus precios
-// guardados (la base de datos lo hace sola, en cascada).
 app.post('/admin/categorias/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
 
-// Foto de una categoría (la sube el admin, comprimida desde el navegador)
 app.post('/admin/categorias/:id/foto', requireAdmin, asyncHandler(async (req, res) => {
   const { foto } = req.body;
   if (!foto || !foto.startsWith('data:image/') || foto.length > 700000) {
@@ -478,15 +528,11 @@ app.post('/admin/categorias/:id/activa', requireAdmin, asyncHandler(async (req, 
   res.json({ ok: true });
 }));
 
-// "Disponible": las categorías que se ofrecen HOY al cliente en el selector
 app.post('/admin/categorias/:id/disponible', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('UPDATE categorias_vehiculos SET disponible = $1 WHERE id = $2', [!!req.body.disponible, req.params.id]);
   res.json({ ok: true });
 }));
 
-// Catálogo para el formulario de alta de conductor: categorías activas
-// (las que se ofrecen a los choferes en el alta, no solo las de hoy) y
-// el árbol de marcas con sus modelos.
 app.get('/admin/catalogo-vehiculos', requireAdmin, asyncHandler(async (req, res) => {
   const categorias = await pool.query(
     `SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre`
@@ -501,6 +547,7 @@ app.get('/admin/catalogo-vehiculos', requireAdmin, asyncHandler(async (req, res)
   });
 }));
 
+// ─── Admin: conductores ───────────────────────────────────────────────────────
 app.get('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT c.id, c.nombre, c.email, c.telefono, c.vehiculo_marca, c.vehiculo_modelo, c.matricula,
@@ -513,7 +560,6 @@ app.get('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
-// Crear conductor desde el panel: nace ya aprobado (lo da de alta el admin a mano).
 app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   const d = req.body;
   if (!d.nombre || !d.email || !d.telefono || !d.password || d.password.length < 6) {
@@ -583,14 +629,11 @@ app.post('/admin/conductores/:id/tipo', requireAdmin, asyncHandler(async (req, r
   res.json({ ok: true });
 }));
 
-// Eliminar un conductor. A diferencia de taxi guanche, aquí no hay tabla de
-// viajes todavía, así que no hace falta desligar nada antes de borrar.
 app.post('/admin/conductores/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM conductores WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
 
-// Expediente completo (ficha) de un conductor
 app.get('/admin/conductores/:id/ficha', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT c.id, c.nombre, c.email, c.telefono, c.documento, c.direccion, c.cp, c.municipio,
@@ -607,7 +650,6 @@ app.get('/admin/conductores/:id/ficha', requireAdmin, asyncHandler(async (req, r
   res.json(result.rows[0]);
 }));
 
-// Guardar cambios desde la ficha (todos los campos editables salvo foto/estado/tipo, que tienen su propio botón)
 app.post('/admin/conductores/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
   const camposPermitidos = ['nombre', 'telefono', 'email', 'documento', 'direccion', 'cp', 'municipio',
     'municipio_licencia', 'numero_licencia', 'central_flota',
@@ -638,7 +680,6 @@ app.post('/admin/conductores/:id/editar', requireAdmin, asyncHandler(async (req,
   }
 }));
 
-// Aprobar o rechazar la foto de carné
 app.post('/admin/conductores/:id/foto', requireAdmin, asyncHandler(async (req, res) => {
   const { accion, motivo } = req.body;
   if (accion === 'aprobar') {
@@ -654,7 +695,6 @@ app.post('/admin/conductores/:id/foto', requireAdmin, asyncHandler(async (req, r
   res.json({ ok: true });
 }));
 
-// Corrección rápida del nombre (errores de escritura), sin abrir la ficha completa
 app.post('/admin/conductores/:id/nombre', requireAdmin, asyncHandler(async (req, res) => {
   const nombre = (req.body.nombre || '').trim();
   if (!nombre) return res.status(400).json({ error: 'El nombre no puede quedar vacío.' });
@@ -662,7 +702,6 @@ app.post('/admin/conductores/:id/nombre', requireAdmin, asyncHandler(async (req,
   res.json({ ok: true });
 }));
 
-// Botón "Contactar al conductor": uno o todos a la vez
 app.post('/admin/conductores/:id/contacto', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('UPDATE conductores SET permite_contacto = $1 WHERE id = $2', [!!req.body.permite, req.params.id]);
   res.json({ ok: true });
@@ -673,11 +712,13 @@ app.post('/admin/conductores-contacto-global', requireAdmin, asyncHandler(async 
   res.json({ ok: true });
 }));
 
+// ─── Admin: rutas y precios ───────────────────────────────────────────────────
 app.get('/admin/rutas', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT id, origen, destino, activa FROM rutas ORDER BY origen, destino');
   res.json(result.rows);
 }));
 
+// Al crear una ruta, se generan automáticamente las 8 fichas SEO (una por idioma)
 app.post('/admin/rutas', requireAdmin, asyncHandler(async (req, res) => {
   const { origen, destino } = req.body;
   if (!origen || !destino) {
@@ -687,7 +728,9 @@ app.post('/admin/rutas', requireAdmin, asyncHandler(async (req, res) => {
     'INSERT INTO rutas (origen, destino) VALUES ($1, $2) RETURNING id',
     [origen, destino]
   );
-  res.json({ ok: true, id: result.rows[0].id });
+  const rutaId = result.rows[0].id;
+  await crearFichasSEOSiFaltan(rutaId, origen, destino);
+  res.json({ ok: true, id: rutaId });
 }));
 
 app.get('/admin/precios-grid', requireAdmin, asyncHandler(async (req, res) => {
@@ -719,6 +762,241 @@ app.post('/admin/precios-grid', requireAdmin, asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ─── Admin: SEO ───────────────────────────────────────────────────────────────
+
+// Lista todas las rutas con el estado SEO de cada idioma.
+// Si alguna ruta todavía no tiene fichas SEO, las crea automáticamente.
+app.get('/admin/seo/rutas', requireAdmin, asyncHandler(async (req, res) => {
+  const rutas = await pool.query('SELECT id, origen, destino FROM rutas ORDER BY origen, destino');
+
+  for (const ruta of rutas.rows) {
+    await crearFichasSEOSiFaltan(ruta.id, ruta.origen, ruta.destino);
+  }
+
+  const seoData = await pool.query(
+    `SELECT route_id, lang_code, slug_url, meta_title, activo
+     FROM route_seo_settings ORDER BY route_id, lang_code`
+  );
+
+  const seoMap = {};
+  for (const row of seoData.rows) {
+    if (!seoMap[row.route_id]) seoMap[row.route_id] = {};
+    seoMap[row.route_id][row.lang_code] = {
+      slug: row.slug_url,
+      titulo: row.meta_title,
+      activo: row.activo
+    };
+  }
+
+  res.json({ rutas: rutas.rows, seo: seoMap, idiomas: IDIOMAS_PERMITIDOS });
+}));
+
+// Devuelve los datos SEO completos de una ruta en un idioma concreto
+app.get('/admin/seo/rutas/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  const result = await pool.query(
+    `SELECT * FROM route_seo_settings WHERE route_id = $1 AND lang_code = $2`,
+    [req.params.id, req.params.lang]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'No encontrado' });
+  res.json(result.rows[0]);
+}));
+
+// Guarda los datos SEO de una ruta en un idioma concreto
+app.post('/admin/seo/rutas/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  const { slug_url, meta_title, meta_description, og_title, og_description, robots_status } = req.body;
+  const canonical = BASE_URL + '/' + req.params.lang + '/' + SECCIONES_TRASLADO[req.params.lang] + '/' + (slug_url || '');
+  await pool.query(
+    `UPDATE route_seo_settings
+     SET slug_url = $1, meta_title = $2, meta_description = $3,
+         og_title = $4, og_description = $5, robots_status = $6,
+         canonical_url = $7, updated_at = NOW()
+     WHERE route_id = $8 AND lang_code = $9`,
+    [
+      slug_url || null,
+      meta_title || null,
+      meta_description || null,
+      og_title || meta_title || null,
+      og_description || meta_description || null,
+      robots_status || 'index,follow',
+      canonical,
+      req.params.id,
+      req.params.lang
+    ]
+  );
+  res.json({ ok: true });
+}));
+
+// Activa o desactiva la página pública de una ruta en un idioma concreto
+app.post('/admin/seo/rutas/:id/idioma/:lang/activar', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  await pool.query(
+    `UPDATE route_seo_settings SET activo = $1 WHERE route_id = $2 AND lang_code = $3`,
+    [!!req.body.activo, req.params.id, req.params.lang]
+  );
+  res.json({ ok: true });
+}));
+
+// Exporta todas las fichas SEO a un Excel listo para enviar a traductores
+app.get('/admin/seo/exportar', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT r.id AS ruta_id, r.origen, r.destino,
+            rss.lang_code, rss.slug_url, rss.meta_title, rss.meta_description,
+            rss.og_title, rss.og_description, rss.robots_status, rss.activo
+     FROM route_seo_settings rss
+     JOIN rutas r ON r.id = rss.route_id
+     ORDER BY r.origen, r.destino, rss.lang_code`
+  );
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Traslados GC Admin';
+  const sheet = workbook.addWorksheet('SEO Traducciones');
+
+  sheet.columns = [
+    { header: 'ruta_id',          key: 'ruta_id',          width: 8  },
+    { header: 'origen',           key: 'origen',           width: 30 },
+    { header: 'destino',          key: 'destino',          width: 30 },
+    { header: 'lang_code',        key: 'lang_code',        width: 10 },
+    { header: 'slug_url',         key: 'slug_url',         width: 45 },
+    { header: 'meta_title',       key: 'meta_title',       width: 55 },
+    { header: 'meta_description', key: 'meta_description', width: 90 },
+    { header: 'og_title',         key: 'og_title',         width: 55 },
+    { header: 'og_description',   key: 'og_description',   width: 90 },
+    { header: 'robots_status',    key: 'robots_status',    width: 15 },
+    { header: 'activo',           key: 'activo',           width: 8  }
+  ];
+
+  // Cabecera con estilo
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: 'FF1C1815' } };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8D5B0' } };
+
+  for (const row of result.rows) {
+    sheet.addRow(row);
+  }
+
+  // Congelar la fila de cabecera para facilitar el desplazamiento
+  sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="seo-traslados-gc.xlsx"');
+  await workbook.xlsx.write(res);
+  res.end();
+}));
+
+// Importa un Excel traducido y actualiza la base de datos
+app.post('/admin/seo/importar', requireAdmin, upload.single('archivo'), asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Falta el archivo Excel' });
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(req.file.buffer);
+  const sheet = workbook.worksheets[0];
+
+  const filas = [];
+  sheet.eachRow(function (row, rowNumber) {
+    if (rowNumber === 1) return; // cabecera
+    filas.push({
+      rutaId:          row.getCell(1).value,
+      langCode:        String(row.getCell(4).value  || '').trim(),
+      slugUrl:         String(row.getCell(5).value  || '').trim(),
+      metaTitle:       String(row.getCell(6).value  || '').trim(),
+      metaDescription: String(row.getCell(7).value  || '').trim(),
+      ogTitle:         String(row.getCell(8).value  || '').trim(),
+      ogDescription:   String(row.getCell(9).value  || '').trim(),
+      robotsStatus:    String(row.getCell(10).value || 'index,follow').trim()
+    });
+  });
+
+  let actualizadas = 0;
+  const errores = [];
+
+  for (const f of filas) {
+    if (!f.rutaId || !IDIOMAS_PERMITIDOS.includes(f.langCode)) continue;
+    try {
+      const canonical = BASE_URL + '/' + f.langCode + '/' + SECCIONES_TRASLADO[f.langCode] + '/' + f.slugUrl;
+      await pool.query(
+        `UPDATE route_seo_settings
+         SET slug_url = $1, meta_title = $2, meta_description = $3,
+             og_title = $4, og_description = $5, robots_status = $6,
+             canonical_url = $7, updated_at = NOW()
+         WHERE route_id = $8 AND lang_code = $9`,
+        [
+          f.slugUrl || null, f.metaTitle || null, f.metaDescription || null,
+          f.ogTitle || f.metaTitle || null, f.ogDescription || f.metaDescription || null,
+          f.robotsStatus, canonical, f.rutaId, f.langCode
+        ]
+      );
+      actualizadas++;
+    } catch (err) {
+      errores.push('Ruta ' + f.rutaId + '/' + f.langCode + ': ' + err.message);
+    }
+  }
+
+  res.json({ ok: true, actualizadas, errores });
+}));
+
+// ─── Páginas públicas por ruta (SSR) ─────────────────────────────────────────
+// URL: /:lang/traslado/:slug  (ej: /es/traslado/las-palmas-a-maspalomas)
+// El parámetro :lang solo acepta los 8 idiomas permitidos.
+// El parámetro :seccion debe coincidir con la palabra del idioma (traslado/transfer/etc.)
+app.get('/:lang(es|en|de|sv|no|nl|it|fr)/:seccion/:slug', asyncHandler(async (req, res) => {
+  const { lang, seccion, slug } = req.params;
+
+  // Verificar que la sección del URL corresponde al idioma
+  if (seccion !== SECCIONES_TRASLADO[lang]) {
+    return res.status(404).render('404', { mensaje: 'Página no encontrada' });
+  }
+
+  // Buscar la ficha SEO activa para este slug e idioma
+  const seoResult = await pool.query(
+    `SELECT rss.*, r.origen, r.destino, r.id AS ruta_id
+     FROM route_seo_settings rss
+     JOIN rutas r ON r.id = rss.route_id
+     WHERE rss.lang_code = $1 AND rss.slug_url = $2 AND rss.activo = TRUE AND r.activa = TRUE`,
+    [lang, slug]
+  );
+
+  if (seoResult.rows.length === 0) {
+    return res.status(404).send('Página no encontrada');
+  }
+
+  const seo = seoResult.rows[0];
+
+  // Precios disponibles para esta ruta (categorías disponibles con precio cargado)
+  const precios = await pool.query(
+    `SELECT cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, rp.precio
+     FROM rutas_precios rp
+     JOIN categorias_vehiculos cv ON cv.id = rp.categoria_id
+     WHERE rp.ruta_id = $1 AND cv.disponible = TRUE
+     ORDER BY cv.orden, cv.nombre`,
+    [seo.ruta_id]
+  );
+
+  // Todas las versiones de idioma activas de esta ruta (para hreflang)
+  const alternates = await pool.query(
+    `SELECT lang_code, slug_url FROM route_seo_settings
+     WHERE route_id = $1 AND activo = TRUE`,
+    [seo.ruta_id]
+  );
+
+  res.render('traslado', {
+    seo,
+    precios: precios.rows,
+    alternates: alternates.rows,
+    lang,
+    BASE_URL,
+    SECCIONES_TRASLADO
+  });
+}));
+
+// ─── Arranque ─────────────────────────────────────────────────────────────────
 initSchema()
   .then(function () {
     app.listen(PORT, function () {
