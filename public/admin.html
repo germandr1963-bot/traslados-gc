@@ -1069,7 +1069,10 @@ function renderizarCamposSEO(rutaId, lang, datos) {
     '</div>' +
 
     '<label class="etiqueta">URL amigable (slug)</label>' +
-    '<input class="campo" id="seo-slug" type="text" value="' + slug + '" style="margin-bottom:10px;font-family:\'JetBrains Mono\',monospace;font-size:13px;">' +
+    '<input class="campo" id="seo-slug" type="text" value="' + slug + '" ' +
+      'oninput="validarSlugEnVivo(this)" ' +
+      'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;">' +
+    '<div id="seo-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
 
     '<label class="etiqueta">Título para Google (máx. 80 caracteres)</label>' +
     '<input class="campo" id="seo-titulo" type="text" maxlength="80" value="' + titulo + '" ' +
@@ -1084,9 +1087,44 @@ function renderizarCamposSEO(rutaId, lang, datos) {
     '<button class="boton-primario" onclick="guardarSEO(' + rutaId + ', \'' + lang + '\')">💾 Guardar</button>';
 }
 
+function validarSlugEnVivo(input) {
+  var aviso = document.getElementById('seo-slug-aviso');
+  if (!aviso) return;
+  var error = validarSlug(input.value.trim());
+  if (error) {
+    aviso.innerHTML = '<span style="color:var(--rojo-error);">⚠️ ' + error + '</span>';
+    input.style.borderColor = 'var(--rojo-error)';
+  } else {
+    aviso.innerHTML = '<span style="color:#2e7d32;">✓ URL válida</span>';
+    input.style.borderColor = '#2e7d32';
+  }
+}
+
+function validarSlug(slug) {
+  if (!slug || slug.trim() === '') return 'El slug no puede estar vacío.';
+  if (slug.length < 5) return 'El slug es demasiado corto (mínimo 5 caracteres).';
+  if (/[^a-z0-9-]/.test(slug)) return 'Solo se permiten letras minúsculas sin tildes, números y guiones normales (-). Sin guiones bajos ni caracteres especiales.';
+  if (slug.includes('_')) return 'Los guiones bajos (_) no están permitidos. Usa guiones normales (-).';
+  if (slug.startsWith('-') || slug.endsWith('-')) return 'El slug no puede empezar ni terminar con un guión.';
+  if (slug.includes('--')) return 'El slug no puede tener guiones dobles (--).';
+  return null;
+}
+
 function guardarSEO(rutaId, lang) {
+  var slugInput = document.getElementById('seo-slug');
+  var slugVal = slugInput ? slugInput.value.trim() : '';
+  var errorSlug = validarSlug(slugVal);
+  var msg = document.getElementById('seo-mensaje-editor');
+
+  if (errorSlug) {
+    msg.innerHTML = '<div class="aviso-error">⚠️ URL no válida: ' + errorSlug + '</div>';
+    if (slugInput) { slugInput.style.borderColor = 'var(--rojo-error)'; slugInput.focus(); }
+    return;
+  }
+  if (slugInput) slugInput.style.borderColor = '';
+
   var datos = {
-    slug_url:         document.getElementById('seo-slug').value.trim(),
+    slug_url:         slugVal,
     meta_title:       document.getElementById('seo-titulo').value.trim(),
     meta_description: document.getElementById('seo-desc').value.trim()
   };
@@ -1095,7 +1133,6 @@ function guardarSEO(rutaId, lang) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(datos)
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
-    var msg = document.getElementById('seo-mensaje-editor');
     if (respuesta.ok) {
       msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
       cargarSEO();
