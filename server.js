@@ -88,18 +88,23 @@ function asyncHandler(fn) {
 
 // ─── Helpers SEO ─────────────────────────────────────────────────────────────
 
+// Limpia cualquier texto para usarlo como slug en una URL:
+// quita tildes, caracteres especiales, cirílico, etc.
+// Solo permite letras latinas (a-z), números y guiones.
+function slugify(texto) {
+  return String(texto)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // quita tildes y diacríticos
+    .replace(/[^a-z0-9\s-]/g, '')    // quita todo lo que no sea latín básico
+    .trim()
+    .replace(/\s+/g, '-')            // espacios → guiones
+    .replace(/-+/g, '-');            // guiones múltiples → uno solo
+}
+
 // Convierte "Las Palmas de Gran Canaria" + "Maspalomas"
 // en "las-palmas-de-gran-canaria-a-maspalomas"
 function generarSlug(origen, destino) {
-  function slugify(texto) {
-    return String(texto)
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // quita tildes
-      .replace(/[^a-z0-9\s]/g, '')
-      .trim()
-      .replace(/\s+/g, '-');
-  }
   return slugify(origen) + '-a-' + slugify(destino);
 }
 
@@ -810,7 +815,8 @@ app.post('/admin/seo/rutas/:id/idioma/:lang', requireAdmin, asyncHandler(async (
     return res.status(400).json({ error: 'Idioma no válido' });
   }
   const { slug_url, meta_title, meta_description, og_title, og_description, robots_status } = req.body;
-  const canonical = BASE_URL + '/' + req.params.lang + '/' + SECCIONES_TRASLADO[req.params.lang] + '/' + (slug_url || '');
+  const slugLimpio = slug_url ? slugify(slug_url) : null;
+  const canonical = BASE_URL + '/' + req.params.lang + '/' + SECCIONES_TRASLADO[req.params.lang] + '/' + (slugLimpio || '');
   await pool.query(
     `UPDATE route_seo_settings
      SET slug_url = $1, meta_title = $2, meta_description = $3,
@@ -818,7 +824,7 @@ app.post('/admin/seo/rutas/:id/idioma/:lang', requireAdmin, asyncHandler(async (
          canonical_url = $7, updated_at = NOW()
      WHERE route_id = $8 AND lang_code = $9`,
     [
-      slug_url || null,
+      slugLimpio || null,
       meta_title || null,
       meta_description || null,
       og_title || meta_title || null,
@@ -920,7 +926,8 @@ app.post('/admin/seo/importar', requireAdmin, upload.single('archivo'), asyncHan
   for (const f of filas) {
     if (!f.rutaId || !IDIOMAS_PERMITIDOS.includes(f.langCode)) continue;
     try {
-      const canonical = BASE_URL + '/' + f.langCode + '/' + SECCIONES_TRASLADO[f.langCode] + '/' + f.slugUrl;
+      const slugLimpio = slugify(f.slugUrl);
+      const canonical = BASE_URL + '/' + f.langCode + '/' + SECCIONES_TRASLADO[f.langCode] + '/' + slugLimpio;
       await pool.query(
         `UPDATE route_seo_settings
          SET slug_url = $1, meta_title = $2, meta_description = $3,
@@ -928,7 +935,7 @@ app.post('/admin/seo/importar', requireAdmin, upload.single('archivo'), asyncHan
              canonical_url = $7, updated_at = NOW()
          WHERE route_id = $8 AND lang_code = $9`,
         [
-          f.slugUrl || null, f.metaTitle || null, f.metaDescription || null,
+          slugLimpio || null, f.metaTitle || null, f.metaDescription || null,
           f.ogTitle || f.metaTitle || null, f.ogDescription || f.metaDescription || null,
           f.robotsStatus, canonical, f.rutaId, f.langCode
         ]
