@@ -98,6 +98,25 @@ table.tabla-precios input {
   border: 1px solid var(--piedra-borde);
   text-align: center;
 }
+.tab-idioma {
+  padding: 6px 14px;
+  border: 1px solid var(--gris-borde);
+  border-radius: 6px;
+  background: var(--gris-fondo);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--texto-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.tab-idioma.activo {
+  background: var(--charcoal);
+  color: white;
+  border-color: var(--charcoal);
+}
+.estado-seo-ok    { color: #2e7d32; font-weight: 600; font-size: 13px; }
+.estado-seo-draft { color: #b8860b; font-size: 13px; }
+.estado-seo-vacio { color: #ccc; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -119,6 +138,7 @@ table.tabla-precios input {
     <button class="item-menu" data-seccion="categorias">Categorías</button>
     <button class="item-menu" data-seccion="conductores">Conductores</button>
     <button class="item-menu" data-seccion="precios">Rutas y precios</button>
+    <button class="item-menu" data-seccion="seo">SEO</button>
     <button id="boton-salir" style="margin-top:30px;opacity:0.5;">Cerrar sesión</button>
   </div>
 
@@ -195,6 +215,41 @@ table.tabla-precios input {
       <div id="mensaje-precios" style="margin-top:10px;"></div>
     </div>
 
+    <div id="seccion-seo" class="oculto">
+      <h1>SEO — Páginas por ruta</h1>
+      <p class="subtitulo">Cada ruta tiene su propia página optimizada para Google. Rellena el título y la descripción en cada idioma y actívala cuando esté lista. Las páginas desactivadas no aparecen en internet.</p>
+
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <a id="boton-exportar-seo" href="/admin/seo/exportar" class="boton-primario" style="text-decoration:none;">⬇️ Exportar Excel para traducir</a>
+        <label class="boton-secundario" style="cursor:pointer;margin:0;">
+          ⬆️ Importar Excel traducido
+          <input type="file" id="archivo-importar-seo" accept=".xlsx" style="display:none;" onchange="importarSEO()">
+        </label>
+      </div>
+
+      <div id="mensaje-seo" style="margin-bottom:12px;"></div>
+
+      <table class="tabla-admin">
+        <thead>
+          <tr>
+            <th>Ruta</th>
+            <th style="text-align:center">ES</th>
+            <th style="text-align:center">EN</th>
+            <th style="text-align:center">DE</th>
+            <th style="text-align:center">SV</th>
+            <th style="text-align:center">NO</th>
+            <th style="text-align:center">NL</th>
+            <th style="text-align:center">IT</th>
+            <th style="text-align:center">FR</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-seo-cuerpo"></tbody>
+      </table>
+
+      <div id="editor-seo" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
+    </div>
+
   </div>
 </div>
 
@@ -243,10 +298,11 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'precios'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'precios', 'seo'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
+    if (boton.dataset.seccion === 'seo') cargarSEO();
   });
 });
 
@@ -916,6 +972,174 @@ document.getElementById('boton-guardar-precios').addEventListener('click', funct
     document.getElementById('mensaje-precios').innerHTML = '<div class="aviso-ok">Precios guardados</div>';
   });
 });
+
+
+
+// ─── SEO ──────────────────────────────────────────────────────────────────────
+var IDIOMAS_SEO = ['es', 'en', 'de', 'sv', 'no', 'nl', 'it', 'fr'];
+var seoCache = null;
+
+function cargarSEO() {
+  document.getElementById('tabla-seo-cuerpo').innerHTML = '<tr><td colspan="10" style="color:var(--texto-muted)">Cargando...</td></tr>';
+  fetch('/admin/seo/rutas').then(function (r) { return r.json(); }).then(function (datos) {
+    seoCache = datos;
+    renderizarTablaSEO(datos);
+  });
+}
+
+function badgeSEO(langData) {
+  if (!langData) return '<span class="estado-seo-vacio">—</span>';
+  if (langData.activo) return '<span class="estado-seo-ok">✓</span>';
+  if (langData.titulo) return '<span class="estado-seo-draft">✎</span>';
+  return '<span class="estado-seo-vacio">·</span>';
+}
+
+function renderizarTablaSEO(datos) {
+  var cuerpo = document.getElementById('tabla-seo-cuerpo');
+  if (!datos.rutas || datos.rutas.length === 0) {
+    cuerpo.innerHTML = '<tr><td colspan="10">No hay rutas cargadas todavía. Añádelas en "Rutas y precios".</td></tr>';
+    return;
+  }
+  cuerpo.innerHTML = datos.rutas.map(function (ruta) {
+    var seoRuta = datos.seo[ruta.id] || {};
+    var celdas = IDIOMAS_SEO.map(function (lang) {
+      return '<td style="text-align:center">' + badgeSEO(seoRuta[lang]) + '</td>';
+    }).join('');
+    return '<tr>' +
+      '<td><strong>' + escapar(ruta.origen) + ' → ' + escapar(ruta.destino) + '</strong></td>' +
+      celdas +
+      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorSEO(' + ruta.id + ')">✏️ Editar</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function abrirEditorSEO(rutaId) {
+  var ruta = seoCache && seoCache.rutas.find(function (r) { return r.id === rutaId; });
+  if (!ruta) return;
+
+  var editor = document.getElementById('editor-seo');
+  editor.classList.remove('oculto');
+
+  var tabs = IDIOMAS_SEO.map(function (lang, i) {
+    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + '" ' +
+      'onclick="cambiarIdiomaEditorSEO(' + rutaId + ', \'' + lang + '\', this)">' +
+      lang.toUpperCase() + '</button>';
+  }).join('');
+
+  editor.innerHTML =
+    '<h2 style="margin-top:0">✏️ SEO: ' + escapar(ruta.origen) + ' → ' + escapar(ruta.destino) + '</h2>' +
+    '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
+    '<div id="seo-campos-editor"></div>' +
+    '<div id="seo-mensaje-editor" style="margin-top:8px;"></div>' +
+    '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-seo\').classList.add(\'oculto\')">Cerrar</button>';
+
+  cambiarIdiomaEditorSEO(rutaId, 'es', editor.querySelector('.tab-idioma'));
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cambiarIdiomaEditorSEO(rutaId, lang, botonTab) {
+  document.querySelectorAll('.tab-idioma').forEach(function (b) { b.classList.remove('activo'); });
+  if (botonTab) botonTab.classList.add('activo');
+
+  fetch('/admin/seo/rutas/' + rutaId + '/idioma/' + lang)
+    .then(function (r) { return r.json(); })
+    .then(function (datos) { renderizarCamposSEO(rutaId, lang, datos); });
+}
+
+function contarCharsSEO(input, idContador, max) {
+  var el = document.getElementById(idContador);
+  if (el) el.textContent = input.value.length + '/' + max;
+}
+
+function renderizarCamposSEO(rutaId, lang, datos) {
+  var activo = datos.activo || false;
+  var slug    = escapar(datos.slug_url || '');
+  var titulo  = escapar(datos.meta_title || '');
+  var desc    = datos.meta_description || '';
+  var campos  = document.getElementById('seo-campos-editor');
+
+  campos.innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--gris-fondo);border-radius:8px;margin-bottom:16px;">' +
+      '<span style="font-size:14px;">' + (activo
+        ? '🟢 Esta página <strong>está activa</strong> en internet'
+        : '⚪ Esta página <strong>está desactivada</strong>') + '</span>' +
+      '<button class="' + (activo ? 'boton-peligro' : 'boton-costa') + '" style="padding:6px 14px;font-size:0.82rem;" ' +
+        'onclick="toggleActivarSEO(' + rutaId + ', \'' + lang + '\', ' + (!activo) + ')">' +
+        (activo ? 'Desactivar' : 'Activar') + '</button>' +
+    '</div>' +
+
+    '<label class="etiqueta">URL amigable (slug)</label>' +
+    '<input class="campo" id="seo-slug" type="text" value="' + slug + '" style="margin-bottom:10px;font-family:\'JetBrains Mono\',monospace;font-size:13px;">' +
+
+    '<label class="etiqueta">Título para Google (máx. 80 caracteres)</label>' +
+    '<input class="campo" id="seo-titulo" type="text" maxlength="80" value="' + titulo + '" ' +
+      'oninput="contarCharsSEO(this,\'seo-titulo-count\',80)" style="margin-bottom:4px;">' +
+    '<div style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:12px;" id="seo-titulo-count">' + (datos.meta_title || '').length + '/80</div>' +
+
+    '<label class="etiqueta">Descripción para Google (máx. 180 caracteres)</label>' +
+    '<textarea class="campo" id="seo-desc" maxlength="180" rows="3" ' +
+      'oninput="contarCharsSEO(this,\'seo-desc-count\',180)" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
+    '<div style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:16px;" id="seo-desc-count">' + desc.length + '/180</div>' +
+
+    '<button class="boton-primario" onclick="guardarSEO(' + rutaId + ', \'' + lang + '\')">💾 Guardar</button>';
+}
+
+function guardarSEO(rutaId, lang) {
+  var datos = {
+    slug_url:         document.getElementById('seo-slug').value.trim(),
+    meta_title:       document.getElementById('seo-titulo').value.trim(),
+    meta_description: document.getElementById('seo-desc').value.trim()
+  };
+  fetch('/admin/seo/rutas/' + rutaId + '/idioma/' + lang, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    var msg = document.getElementById('seo-mensaje-editor');
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+      cargarSEO();
+      setTimeout(function () { msg.innerHTML = ''; }, 2500);
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
+    }
+  });
+}
+
+function toggleActivarSEO(rutaId, lang, activar) {
+  fetch('/admin/seo/rutas/' + rutaId + '/idioma/' + lang + '/activar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo: activar })
+  }).then(function () {
+    cargarSEO();
+    fetch('/admin/seo/rutas/' + rutaId + '/idioma/' + lang)
+      .then(function (r) { return r.json(); })
+      .then(function (datos) { renderizarCamposSEO(rutaId, lang, datos); });
+  });
+}
+
+function importarSEO() {
+  var archivo = document.getElementById('archivo-importar-seo').files[0];
+  if (!archivo) return;
+  var msg = document.getElementById('mensaje-seo');
+  msg.innerHTML = '<div class="aviso-ok">Subiendo archivo...</div>';
+  var formData = new FormData();
+  formData.append('archivo', archivo);
+  fetch('/admin/seo/importar', { method: 'POST', body: formData })
+    .then(function (r) { return r.json(); })
+    .then(function (respuesta) {
+      if (respuesta.ok) {
+        var textoErrores = respuesta.errores && respuesta.errores.length
+          ? ' (' + respuesta.errores.length + ' errores)' : '';
+        msg.innerHTML = '<div class="aviso-ok">✅ Importado: ' + respuesta.actualizadas + ' filas actualizadas' + textoErrores + '</div>';
+        cargarSEO();
+      } else {
+        msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error en la importación') + '</div>';
+      }
+      document.getElementById('archivo-importar-seo').value = '';
+    });
+}
 
 comprobarSesion();
 </script>
