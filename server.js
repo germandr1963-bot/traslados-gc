@@ -909,7 +909,17 @@ app.get('/admin/seo/exportar', requireAdmin, asyncHandler(async (req, res) => {
   headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8D5B0' } };
 
   for (const row of result.rows) {
-    sheet.addRow(row);
+    const filaInsertada = sheet.addRow(row);
+
+    const pxTitulo = medirPxTitulo(row.meta_title);
+    const pxDesc = medirPxDescripcion(row.meta_description);
+
+    if (pxTitulo > 600) {
+      filaInsertada.getCell('meta_title').font = { bold: true, color: { argb: 'FFD32F2F' } };
+    }
+    if (pxDesc > 960) {
+      filaInsertada.getCell('meta_description').font = { bold: true, color: { argb: 'FFD32F2F' } };
+    }
   }
 
   // Congelar la fila de cabecera para facilitar el desplazamiento
