@@ -114,6 +114,16 @@ table.tabla-precios input {
   color: white;
   border-color: var(--charcoal);
 }
+.tab-idioma-rojo {
+  background: #fdecea !important;
+  color: var(--rojo-error) !important;
+  border-color: var(--rojo-error) !important;
+  font-weight: 700;
+}
+.tab-idioma-rojo.activo {
+  background: var(--rojo-error) !important;
+  color: white !important;
+}
 .estado-seo-ok    { color: #2e7d32; font-weight: 600; font-size: 13px; }
 .estado-seo-draft { color: #b8860b; font-size: 13px; }
 .estado-seo-vacio { color: #ccc; font-size: 12px; }
@@ -1014,28 +1024,40 @@ function renderizarTablaSEO(datos) {
   }).join('');
 }
 
+var editorSEOCache = {}; // rutaId -> { lang: {..., excede} }
+
 function abrirEditorSEO(rutaId) {
   var ruta = seoCache && seoCache.rutas.find(function (r) { return r.id === rutaId; });
   if (!ruta) return;
 
   var editor = document.getElementById('editor-seo');
   editor.classList.remove('oculto');
-
-  var tabs = IDIOMAS_SEO.map(function (lang, i) {
-    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + '" ' +
-      'onclick="cambiarIdiomaEditorSEO(' + rutaId + ', \'' + lang + '\', this)">' +
-      lang.toUpperCase() + '</button>';
-  }).join('');
-
-  editor.innerHTML =
-    '<h2 style="margin-top:0">✏️ SEO: ' + escapar(ruta.origen) + ' → ' + escapar(ruta.destino) + '</h2>' +
-    '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
-    '<div id="seo-campos-editor"></div>' +
-    '<div id="seo-mensaje-editor" style="margin-top:8px;"></div>' +
-    '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-seo\').classList.add(\'oculto\')">Cerrar</button>';
-
-  cambiarIdiomaEditorSEO(rutaId, 'es', editor.querySelector('.tab-idioma'));
+  editor.innerHTML = '<p style="color:var(--texto-muted)">Cargando los 9 idiomas...</p>';
   editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  fetch('/admin/seo/rutas/' + rutaId + '/completo')
+    .then(function (r) { return r.json(); })
+    .then(function (porIdioma) {
+      editorSEOCache[rutaId] = porIdioma;
+
+      var tabs = IDIOMAS_SEO.map(function (lang, i) {
+        var excede = porIdioma[lang] && porIdioma[lang].excede;
+        var clases = 'tab-idioma' + (i === 0 ? ' activo' : '') + (excede ? ' tab-idioma-rojo' : '');
+        return '<button class="' + clases + '" id="tab-idioma-' + lang + '" ' +
+          'onclick="cambiarIdiomaEditorSEO(' + rutaId + ', \'' + lang + '\', this)" ' +
+          'title="' + (excede ? 'Título o descripción pasados de píxeles' : '') + '">' +
+          lang.toUpperCase() + (excede ? ' ⚠️' : '') + '</button>';
+      }).join('');
+
+      editor.innerHTML =
+        '<h2 style="margin-top:0">✏️ SEO: ' + escapar(ruta.origen) + ' → ' + escapar(ruta.destino) + '</h2>' +
+        '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
+        '<div id="seo-campos-editor"></div>' +
+        '<div id="seo-mensaje-editor" style="margin-top:8px;"></div>' +
+        '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-seo\').classList.add(\'oculto\')">Cerrar</button>';
+
+      cambiarIdiomaEditorSEO(rutaId, 'es', editor.querySelector('.tab-idioma'));
+    });
 }
 
 function cambiarIdiomaEditorSEO(rutaId, lang, botonTab) {
@@ -1152,6 +1174,18 @@ function guardarSEO(rutaId, lang) {
     if (respuesta.ok) {
       var pxTitulo = medirPx(datos.meta_title, '20px arial');
       var pxDesc = medirPx(datos.meta_description, '13px arial');
+      var excede = pxTitulo > 600 || pxDesc > 960;
+
+      // Actualiza la pestaña de este idioma en vivo, sin tener que cerrar y reabrir el editor
+      var tab = document.getElementById('tab-idioma-' + lang);
+      if (tab) {
+        tab.classList.toggle('tab-idioma-rojo', excede);
+        tab.innerHTML = lang.toUpperCase() + (excede ? ' ⚠️' : '');
+      }
+      if (editorSEOCache[rutaId] && editorSEOCache[rutaId][lang]) {
+        editorSEOCache[rutaId][lang].excede = excede;
+      }
+
       var avisos = [];
       if (pxTitulo > 600) avisos.push('el título se pasa de 600px (' + pxTitulo + 'px) y Google podría cortarlo');
       if (pxDesc > 960) avisos.push('la descripción se pasa de 960px (' + pxDesc + 'px) y Google podría cortarla');
