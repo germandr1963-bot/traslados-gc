@@ -267,6 +267,17 @@ async function initSchema() {
     ALTER TABLE route_seo_settings ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT FALSE;
   `);
 
+  // Permite que sitemap.xml y robots.txt tengan una versión editada a mano
+  // que sustituya a la generada automáticamente, cuando se active.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS site_archivos_manual (
+      nombre TEXT PRIMARY KEY,
+      contenido TEXT,
+      activo BOOLEAN DEFAULT FALSE,
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
     await pool.query(
@@ -1008,24 +1019,21 @@ app.post('/admin/seo/importar', requireAdmin, upload.single('archivo'), asyncHan
 }));
 
 // ─── robots.txt y sitemap.xml ────────────────────────────────────────────────
-// Ambos se generan en el momento, a partir de lo que esté realmente activo en
-// la base de datos. Así nunca hay que tocarlos a mano cuando se activa un
-// idioma nuevo o se añade una ruta — siempre reflejan el estado real de la web.
+// Por defecto se generan en el momento, a partir de lo que esté realmente
+// activo en la base de datos. Desde el admin, German o su SEO pueden guardar
+// una versión manual que sustituye a la automática mientras esté activada.
 
-app.get('/robots.txt', asyncHandler(async (req, res) => {
-  const lineas = [
+function generarRobotsAuto() {
+  return [
     'User-agent: *',
     'Disallow: /admin.html',
     'Disallow: /admin/',
     '',
     'Sitemap: ' + BASE_URL + '/sitemap.xml'
-  ];
-  res.set('Content-Type', 'text/plain');
-  res.send(lineas.join('\n'));
-}));
+  ].join('\n');
+}
 
-app.get('/sitemap.xml', asyncHandler(async (req, res) => {
-  // Todas las fichas SEO activas, de rutas también activas
+async function generarSitemapAuto() {
   const result = await pool.query(
     `SELECT rss.route_id, rss.lang_code, rss.slug_url, rss.updated_at
      FROM route_seo_settings rss
@@ -1034,7 +1042,6 @@ app.get('/sitemap.xml', asyncHandler(async (req, res) => {
      ORDER BY rss.route_id, rss.lang_code`
   );
 
-  // Agrupar por ruta para poder listar las versiones de idioma hermanas (hreflang)
   const porRuta = {};
   for (const fila of result.rows) {
     if (!porRuta[fila.route_id]) porRuta[fila.route_id] = [];
@@ -1050,8 +1057,6 @@ app.get('/sitemap.xml', asyncHandler(async (req, res) => {
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
   xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ';
   xml += 'xmlns:xhtml="http://www.w3.org/1999/xhtml">\n';
-
-  // La página principal
   xml += '  <url>\n    <loc>' + escapeXml(BASE_URL) + '/</loc>\n';
   xml += '    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n  </url>\n';
 
@@ -1065,7 +1070,6 @@ app.get('/sitemap.xml', asyncHandler(async (req, res) => {
         xml += '    <lastmod>' + new Date(v.updated_at).toISOString().slice(0, 10) + '</lastmod>\n';
       }
       xml += '    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n';
-      // Anuncia a Google las versiones hermanas en otros idiomas de esta misma ruta
       for (const hermana of versiones) {
         const locHermana = BASE_URL + '/' + hermana.lang_code + '/' + SECCIONES_TRASLADO[hermana.lang_code] + '/' + hermana.slug_url;
         xml += '    <xhtml:link rel="alternate" hreflang="' + hermana.lang_code + '" href="' + escapeXml(locHermana) + '" />\n';
@@ -1073,11 +1077,74 @@ app.get('/sitemap.xml', asyncHandler(async (req, res) => {
       xml += '  </url>\n';
     }
   }
-
   xml += '</urlset>';
+  return xml;
+}
 
+app.get('/robots.txt', asyncHandler(async (req, res) => {
+  const manual = await pool.query(
+    `SELECT contenido FROM site_archivos_manual WHERE nombre = 'robots.txt' AND activo = TRUE`
+  );
+  res.set('Content-Type', 'text/plain');
+  res.send(manual.rows.length ? manual.rows[0].contenido : generarRobotsAuto());
+}));
+
+app.get('/sitemap.xml', asyncHandler(async (req, res) => {
+  const manual = await pool.query(
+    `SELECT contenido FROM site_archivos_manual WHERE nombre = 'sitemap.xml' AND activo = TRUE`
+  );
+  if (manual.rows.length) {
+    res.set('Content-Type', 'application/xml');
+    return res.send(manual.rows[0].contenido);
+  }
   res.set('Content-Type', 'application/xml');
-  res.send(xml);
+  res.send(await generarSitemapAuto());
+}));
+
+// Admin: ver el estado de ambos archivos (si hay versión manual activa, y el
+// contenido automático actual para poder partir de ahí al editar)
+app.get('/admin/site-archivos', requireAdmin, asyncHandler(async (req, res) => {
+  const manual = await pool.query(`SELECT nombre, contenido, activo FROM site_archivos_manual`);
+  const manualMap = {};
+  for (const fila of manual.rows) manualMap[fila.nombre] = fila;
+
+  res.json({
+    'robots.txt': {
+      activo: !!(manualMap['robots.txt'] && manualMap['robots.txt'].activo),
+      contenido_manual: manualMap['robots.txt'] ? manualMap['robots.txt'].contenido : '',
+      contenido_automatico: generarRobotsAuto()
+    },
+    'sitemap.xml': {
+      activo: !!(manualMap['sitemap.xml'] && manualMap['sitemap.xml'].activo),
+      contenido_manual: manualMap['sitemap.xml'] ? manualMap['sitemap.xml'].contenido : '',
+      contenido_automatico: await generarSitemapAuto()
+    }
+  });
+}));
+
+// Admin: guardar y activar una versión manual de uno de los dos archivos
+app.post('/admin/site-archivos/:nombre/guardar', requireAdmin, asyncHandler(async (req, res) => {
+  const nombre = req.params.nombre;
+  if (nombre !== 'robots.txt' && nombre !== 'sitemap.xml') {
+    return res.status(400).json({ error: 'Archivo no válido' });
+  }
+  await pool.query(
+    `INSERT INTO site_archivos_manual (nombre, contenido, activo, updated_at)
+     VALUES ($1, $2, TRUE, NOW())
+     ON CONFLICT (nombre) DO UPDATE SET contenido = $2, activo = TRUE, updated_at = NOW()`,
+    [nombre, req.body.contenido || '']
+  );
+  res.json({ ok: true });
+}));
+
+// Admin: volver al modo automático (desactiva la versión manual, no la borra)
+app.post('/admin/site-archivos/:nombre/restablecer', requireAdmin, asyncHandler(async (req, res) => {
+  const nombre = req.params.nombre;
+  if (nombre !== 'robots.txt' && nombre !== 'sitemap.xml') {
+    return res.status(400).json({ error: 'Archivo no válido' });
+  }
+  await pool.query(`UPDATE site_archivos_manual SET activo = FALSE WHERE nombre = $1`, [nombre]);
+  res.json({ ok: true });
 }));
 
 // ─── Páginas públicas por ruta (SSR) ─────────────────────────────────────────
