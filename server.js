@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
 const ExcelJS = require('exceljs');
+const { medirPxTitulo, medirPxDescripcion } = require('./medidor-pixeles');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -923,6 +924,14 @@ app.post('/admin/seo/importar', requireAdmin, upload.single('archivo'), asyncHan
 
   let actualizadas = 0;
   const errores = [];
+  const avisosPixeles = [];
+
+  // Mapa de rutas para que los avisos sean legibles (origen → destino)
+  const rutasInfo = await pool.query('SELECT id, origen, destino FROM rutas');
+  const nombreRuta = {};
+  for (const r of rutasInfo.rows) {
+    nombreRuta[r.id] = r.origen + ' → ' + r.destino;
+  }
 
   for (const f of filas) {
     if (!f.rutaId || !IDIOMAS_PERMITIDOS.includes(f.langCode)) continue;
@@ -942,12 +951,28 @@ app.post('/admin/seo/importar', requireAdmin, upload.single('archivo'), asyncHan
         ]
       );
       actualizadas++;
+
+      // Comprobación de píxeles: el editor manual avisa en rojo si se pasa,
+      // pero la importación por Excel no pasa por esa pantalla — así que
+      // replicamos aquí la misma comprobación para no dejar huecos.
+      const pxTitulo = medirPxTitulo(f.metaTitle);
+      const pxDesc = medirPxDescripcion(f.metaDescription);
+      const problemas = [];
+      if (pxTitulo > 600) problemas.push('título ' + pxTitulo + 'px (límite 600px)');
+      if (pxDesc > 960) problemas.push('descripción ' + pxDesc + 'px (límite 960px)');
+      if (problemas.length) {
+        avisosPixeles.push({
+          ruta: nombreRuta[f.rutaId] || ('Ruta ' + f.rutaId),
+          idioma: f.langCode,
+          problemas: problemas.join(' y ')
+        });
+      }
     } catch (err) {
       errores.push('Ruta ' + f.rutaId + '/' + f.langCode + ': ' + err.message);
     }
   }
 
-  res.json({ ok: true, actualizadas, errores });
+  res.json({ ok: true, actualizadas, errores, avisosPixeles });
 }));
 
 // ─── Páginas públicas por ruta (SSR) ─────────────────────────────────────────
