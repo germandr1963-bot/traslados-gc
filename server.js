@@ -1007,6 +1007,79 @@ app.post('/admin/seo/importar', requireAdmin, upload.single('archivo'), asyncHan
   res.json({ ok: true, actualizadas, errores, avisosPixeles });
 }));
 
+// ─── robots.txt y sitemap.xml ────────────────────────────────────────────────
+// Ambos se generan en el momento, a partir de lo que esté realmente activo en
+// la base de datos. Así nunca hay que tocarlos a mano cuando se activa un
+// idioma nuevo o se añade una ruta — siempre reflejan el estado real de la web.
+
+app.get('/robots.txt', asyncHandler(async (req, res) => {
+  const lineas = [
+    'User-agent: *',
+    'Disallow: /admin.html',
+    'Disallow: /admin/',
+    '',
+    'Sitemap: ' + BASE_URL + '/sitemap.xml'
+  ];
+  res.set('Content-Type', 'text/plain');
+  res.send(lineas.join('\n'));
+}));
+
+app.get('/sitemap.xml', asyncHandler(async (req, res) => {
+  // Todas las fichas SEO activas, de rutas también activas
+  const result = await pool.query(
+    `SELECT rss.route_id, rss.lang_code, rss.slug_url, rss.updated_at
+     FROM route_seo_settings rss
+     JOIN rutas r ON r.id = rss.route_id
+     WHERE rss.activo = TRUE AND r.activa = TRUE
+     ORDER BY rss.route_id, rss.lang_code`
+  );
+
+  // Agrupar por ruta para poder listar las versiones de idioma hermanas (hreflang)
+  const porRuta = {};
+  for (const fila of result.rows) {
+    if (!porRuta[fila.route_id]) porRuta[fila.route_id] = [];
+    porRuta[fila.route_id].push(fila);
+  }
+
+  function escapeXml(s) {
+    return String(s).replace(/[<>&'"]/g, function (c) {
+      return { '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c];
+    });
+  }
+
+  let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+  xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ';
+  xml += 'xmlns:xhtml="http://www.w3.org/1999/xhtml">\n';
+
+  // La página principal
+  xml += '  <url>\n    <loc>' + escapeXml(BASE_URL) + '/</loc>\n';
+  xml += '    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n  </url>\n';
+
+  for (const rutaId of Object.keys(porRuta)) {
+    const versiones = porRuta[rutaId];
+    for (const v of versiones) {
+      const loc = BASE_URL + '/' + v.lang_code + '/' + SECCIONES_TRASLADO[v.lang_code] + '/' + v.slug_url;
+      xml += '  <url>\n';
+      xml += '    <loc>' + escapeXml(loc) + '</loc>\n';
+      if (v.updated_at) {
+        xml += '    <lastmod>' + new Date(v.updated_at).toISOString().slice(0, 10) + '</lastmod>\n';
+      }
+      xml += '    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n';
+      // Anuncia a Google las versiones hermanas en otros idiomas de esta misma ruta
+      for (const hermana of versiones) {
+        const locHermana = BASE_URL + '/' + hermana.lang_code + '/' + SECCIONES_TRASLADO[hermana.lang_code] + '/' + hermana.slug_url;
+        xml += '    <xhtml:link rel="alternate" hreflang="' + hermana.lang_code + '" href="' + escapeXml(locHermana) + '" />\n';
+      }
+      xml += '  </url>\n';
+    }
+  }
+
+  xml += '</urlset>';
+
+  res.set('Content-Type', 'application/xml');
+  res.send(xml);
+}));
+
 // ─── Páginas públicas por ruta (SSR) ─────────────────────────────────────────
 // URL: /:lang/traslado/:slug  (ej: /es/traslado/las-palmas-a-maspalomas)
 // El parámetro :lang solo acepta los 9 idiomas permitidos.
