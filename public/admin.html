@@ -235,12 +235,14 @@ table.tabla-precios input {
           ⬆️ Importar Excel traducido
           <input type="file" id="archivo-importar-seo" accept=".xlsx" style="display:none;" onchange="importarSEO()">
         </label>
-        <a href="/sitemap.xml" target="_blank" rel="noopener" class="boton-secundario" style="text-decoration:none;">🗺️ Ver Sitemap</a>
-        <a href="/robots.txt" target="_blank" rel="noopener" class="boton-secundario" style="text-decoration:none;">🤖 Ver robots.txt</a>
+        <button type="button" class="boton-secundario" onclick="abrirEditorArchivo('sitemap.xml')">🗺️ Editar Sitemap</button>
+        <button type="button" class="boton-secundario" onclick="abrirEditorArchivo('robots.txt')">🤖 Editar robots.txt</button>
       </div>
       <p style="font-size:12px;color:var(--texto-muted);margin-top:-8px;margin-bottom:16px;">
-        Ambos se generan en el momento, siempre con los datos actuales. Para guardarlos como archivo, ábrelos y usa clic derecho → Guardar como.
+        Por defecto ambos se generan solos con los datos actuales. Si tu SEO necesita un ajuste manual, puede editarlos y guardarlos aquí.
       </p>
+
+      <div id="editor-archivo-manual" class="tarjeta oculto" style="margin-bottom:20px;"></div>
 
       <div id="mensaje-seo" style="margin-bottom:12px;"></div>
 
@@ -1252,6 +1254,59 @@ function importarSEO() {
       }
       document.getElementById('archivo-importar-seo').value = '';
     });
+}
+
+// ─── Editor manual de sitemap.xml y robots.txt ───────────────────────────────
+function abrirEditorArchivo(nombre) {
+  var caja = document.getElementById('editor-archivo-manual');
+  caja.classList.remove('oculto');
+  caja.innerHTML = '<p style="color:var(--texto-muted)">Cargando ' + nombre + '...</p>';
+  caja.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  fetch('/admin/site-archivos')
+    .then(function (r) { return r.json(); })
+    .then(function (datos) {
+      var info = datos[nombre];
+      var textoMostrado = info.activo ? info.contenido_manual : info.contenido_automatico;
+
+      caja.innerHTML =
+        '<h3 style="margin-top:0">' + (nombre === 'sitemap.xml' ? '🗺️' : '🤖') + ' ' + nombre + '</h3>' +
+        '<p style="font-size:13px;color:var(--texto-muted);margin-bottom:10px;">' +
+        (info.activo
+          ? '🟠 Hay una versión manual activa — esto es lo que ven los buscadores ahora mismo.'
+          : '🟢 Modo automático activo — esto es lo que se genera solo con los datos actuales.') +
+        '</p>' +
+        '<textarea id="contenido-archivo-manual" style="width:100%;min-height:280px;font-family:\'JetBrains Mono\',monospace;font-size:12px;padding:10px;border:1px solid var(--gris-borde);border-radius:8px;">' +
+        escapar(textoMostrado) + '</textarea>' +
+        '<div id="mensaje-archivo-manual" style="margin-top:8px;"></div>' +
+        '<div style="display:flex;gap:10px;margin-top:10px;">' +
+        '<button class="boton-primario" onclick="guardarArchivoManual(\'' + nombre + '\')">💾 Guardar y activar versión manual</button>' +
+        (info.activo ? '<button class="boton-peligro" onclick="restablecerArchivoAuto(\'' + nombre + '\')">↩️ Volver a automático</button>' : '') +
+        '<button class="boton-secundario" onclick="document.getElementById(\'editor-archivo-manual\').classList.add(\'oculto\')">Cerrar</button>' +
+        '</div>';
+    });
+}
+
+function guardarArchivoManual(nombre) {
+  var contenido = document.getElementById('contenido-archivo-manual').value;
+  var msg = document.getElementById('mensaje-archivo-manual');
+  fetch('/admin/site-archivos/' + nombre + '/guardar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contenido: contenido })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Guardado. Esta versión manual ya está activa en ' + nombre + '.</div>';
+      setTimeout(function () { abrirEditorArchivo(nombre); }, 1200);
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
+    }
+  });
+}
+
+function restablecerArchivoAuto(nombre) {
+  fetch('/admin/site-archivos/' + nombre + '/restablecer', { method: 'POST' })
+    .then(function () { abrirEditorArchivo(nombre); });
 }
 
 comprobarSesion();
