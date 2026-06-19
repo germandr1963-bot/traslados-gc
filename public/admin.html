@@ -241,6 +241,7 @@ table.tabla-precios input {
             <th style="text-align:center">NL</th>
             <th style="text-align:center">IT</th>
             <th style="text-align:center">FR</th>
+            <th style="text-align:center">FI</th>
             <th>Acción</th>
           </tr>
         </thead>
@@ -976,7 +977,7 @@ document.getElementById('boton-guardar-precios').addEventListener('click', funct
 
 
 // ─── SEO ──────────────────────────────────────────────────────────────────────
-var IDIOMAS_SEO = ['es', 'en', 'de', 'sv', 'no', 'nl', 'it', 'fr'];
+var IDIOMAS_SEO = ['es', 'en', 'de', 'sv', 'no', 'nl', 'it', 'fr', 'fi'];
 var seoCache = null;
 
 function cargarSEO() {
@@ -1046,9 +1047,24 @@ function cambiarIdiomaEditorSEO(rutaId, lang, botonTab) {
     .then(function (datos) { renderizarCamposSEO(rutaId, lang, datos); });
 }
 
-function contarCharsSEO(input, idContador, max) {
+// Mide el ancho real en píxeles de un texto, usando la misma tipografía
+// y tamaño que Google usa al mostrar los resultados de búsqueda
+// (Arial, 20px para el título y 13px para la descripción).
+var canvasMedidor = document.createElement('canvas');
+var ctxMedidor = canvasMedidor.getContext('2d');
+
+function medirPx(texto, fuente) {
+  ctxMedidor.font = fuente;
+  return Math.round(ctxMedidor.measureText(texto || '').width);
+}
+
+function contarPxSEO(input, idContador, maxPx, fuente) {
+  var px = medirPx(input.value, fuente);
   var el = document.getElementById(idContador);
-  if (el) el.textContent = input.value.length + '/' + max;
+  if (!el) return;
+  var color = px > maxPx ? 'var(--rojo-error)' : (px > maxPx * 0.92 ? '#b8860b' : 'var(--texto-muted)');
+  el.style.color = color;
+  el.textContent = px + ' / ' + maxPx + ' px';
 }
 
 function renderizarCamposSEO(rutaId, lang, datos) {
@@ -1074,15 +1090,15 @@ function renderizarCamposSEO(rutaId, lang, datos) {
       'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;">' +
     '<div id="seo-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
 
-    '<label class="etiqueta">Título para Google (máx. 80 caracteres)</label>' +
-    '<input class="campo" id="seo-titulo" type="text" maxlength="80" value="' + titulo + '" ' +
-      'oninput="contarCharsSEO(this,\'seo-titulo-count\',80)" style="margin-bottom:4px;">' +
-    '<div style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:12px;" id="seo-titulo-count">' + (datos.meta_title || '').length + '/80</div>' +
+    '<label class="etiqueta">Título para Google (máx. 600px de ancho real)</label>' +
+    '<input class="campo" id="seo-titulo" type="text" value="' + titulo + '" ' +
+      'oninput="contarPxSEO(this,\'seo-titulo-count\',600,\'20px arial\')" style="margin-bottom:4px;">' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:12px;" id="seo-titulo-count">' + medirPx(datos.meta_title || '', '20px arial') + ' / 600 px</div>' +
 
-    '<label class="etiqueta">Descripción para Google (máx. 180 caracteres)</label>' +
-    '<textarea class="campo" id="seo-desc" maxlength="180" rows="3" ' +
-      'oninput="contarCharsSEO(this,\'seo-desc-count\',180)" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
-    '<div style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:16px;" id="seo-desc-count">' + desc.length + '/180</div>' +
+    '<label class="etiqueta">Descripción para Google (máx. 960px de ancho real)</label>' +
+    '<textarea class="campo" id="seo-desc" rows="3" ' +
+      'oninput="contarPxSEO(this,\'seo-desc-count\',960,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-desc-count">' + medirPx(desc, '13px arial') + ' / 960 px</div>' +
 
     '<button class="boton-primario" onclick="guardarSEO(' + rutaId + ', \'' + lang + '\')">💾 Guardar</button>';
 }
@@ -1134,9 +1150,18 @@ function guardarSEO(rutaId, lang) {
     body: JSON.stringify(datos)
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
     if (respuesta.ok) {
-      msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+      var pxTitulo = medirPx(datos.meta_title, '20px arial');
+      var pxDesc = medirPx(datos.meta_description, '13px arial');
+      var avisos = [];
+      if (pxTitulo > 600) avisos.push('el título se pasa de 600px (' + pxTitulo + 'px) y Google podría cortarlo');
+      if (pxDesc > 960) avisos.push('la descripción se pasa de 960px (' + pxDesc + 'px) y Google podría cortarla');
+      if (avisos.length) {
+        msg.innerHTML = '<div class="aviso-error">✅ Guardado, pero ' + avisos.join(' y ') + '.</div>';
+      } else {
+        msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+      }
       cargarSEO();
-      setTimeout(function () { msg.innerHTML = ''; }, 2500);
+      setTimeout(function () { msg.innerHTML = ''; }, 4000);
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
     }
