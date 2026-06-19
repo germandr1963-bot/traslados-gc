@@ -1260,6 +1260,7 @@ function importarSEO() {
 function abrirEditorArchivo(nombre) {
   var caja = document.getElementById('editor-archivo-manual');
   caja.classList.remove('oculto');
+  caja.setAttribute('data-archivo', nombre);
   caja.innerHTML = '<p style="color:var(--texto-muted)">Cargando ' + nombre + '...</p>';
   caja.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -1276,15 +1277,28 @@ function abrirEditorArchivo(nombre) {
           ? '🟠 Hay una versión manual activa — esto es lo que ven los buscadores ahora mismo.'
           : '🟢 Modo automático activo — esto es lo que se genera solo con los datos actuales.') +
         '</p>' +
-        '<textarea id="contenido-archivo-manual" style="width:100%;min-height:280px;font-family:\'JetBrains Mono\',monospace;font-size:12px;padding:10px;border:1px solid var(--gris-borde);border-radius:8px;">' +
+        '<textarea id="contenido-archivo-manual" readonly style="width:100%;min-height:280px;font-family:\'JetBrains Mono\',monospace;font-size:12px;padding:10px;border:1px solid var(--gris-borde);border-radius:8px;background:var(--gris-fondo);color:var(--texto-muted);">' +
         escapar(textoMostrado) + '</textarea>' +
         '<div id="mensaje-archivo-manual" style="margin-top:8px;"></div>' +
-        '<div style="display:flex;gap:10px;margin-top:10px;">' +
-        '<button class="boton-primario" onclick="guardarArchivoManual(\'' + nombre + '\')">💾 Guardar y activar versión manual</button>' +
+        '<div id="botones-archivo-manual" style="display:flex;gap:10px;margin-top:10px;">' +
+        '<button class="boton-primario" onclick="habilitarEdicionArchivo(this)">✏️ Editar</button>' +
         (info.activo ? '<button class="boton-peligro" onclick="restablecerArchivoAuto(\'' + nombre + '\')">↩️ Volver a automático</button>' : '') +
         '<button class="boton-secundario" onclick="document.getElementById(\'editor-archivo-manual\').classList.add(\'oculto\')">Cerrar</button>' +
         '</div>';
     });
+}
+
+function habilitarEdicionArchivo(botonEditar) {
+  var nombre = document.getElementById('editor-archivo-manual').getAttribute('data-archivo');
+  var textarea = document.getElementById('contenido-archivo-manual');
+  textarea.readOnly = false;
+  textarea.style.background = 'white';
+  textarea.style.color = 'var(--texto-oscuro)';
+  textarea.focus();
+
+  document.getElementById('botones-archivo-manual').innerHTML =
+    '<button class="boton-primario" onclick="guardarArchivoManual(\'' + nombre + '\')">💾 Guardar y activar versión manual</button>' +
+    '<button class="boton-secundario" onclick="abrirEditorArchivo(\'' + nombre + '\')">Cancelar</button>';
 }
 
 function guardarArchivoManual(nombre) {
