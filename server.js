@@ -45,7 +45,7 @@ app.use(session({
 }));
 
 // ─── Idiomas y secciones ────────────────────────────────────────────────────
-const IDIOMAS_PERMITIDOS = ['es', 'en', 'de', 'sv', 'no', 'nl', 'it', 'fr'];
+const IDIOMAS_PERMITIDOS = ['es', 'en', 'de', 'sv', 'no', 'nl', 'it', 'fr', 'fi'];
 
 // Palabra "traslado" en cada idioma — forma parte de la URL pública
 const SECCIONES_TRASLADO = {
@@ -56,7 +56,8 @@ const SECCIONES_TRASLADO = {
   no: 'transfer',
   nl: 'transfer',
   it: 'trasferimento',
-  fr: 'transfert'
+  fr: 'transfert',
+  fi: 'siirto'
 };
 
 // URL base del sitio — se usa para construir canonical y hreflang
@@ -951,9 +952,9 @@ app.post('/admin/seo/importar', requireAdmin, upload.single('archivo'), asyncHan
 
 // ─── Páginas públicas por ruta (SSR) ─────────────────────────────────────────
 // URL: /:lang/traslado/:slug  (ej: /es/traslado/las-palmas-a-maspalomas)
-// El parámetro :lang solo acepta los 8 idiomas permitidos.
+// El parámetro :lang solo acepta los 9 idiomas permitidos.
 // El parámetro :seccion debe coincidir con la palabra del idioma (traslado/transfer/etc.)
-app.get('/:lang(es|en|de|sv|no|nl|it|fr)/:seccion/:slug', asyncHandler(async (req, res) => {
+app.get('/:lang(es|en|de|sv|no|nl|it|fr|fi)/:seccion/:slug', asyncHandler(async (req, res) => {
   const { lang, seccion, slug } = req.params;
 
   // Verificar que la sección del URL corresponde al idioma
