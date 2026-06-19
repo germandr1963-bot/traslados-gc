@@ -811,6 +811,28 @@ app.get('/admin/seo/rutas/:id/idioma/:lang', requireAdmin, asyncHandler(async (r
   res.json(result.rows[0]);
 }));
 
+// Devuelve los 9 idiomas de una ruta de golpe, cada uno con su medición de
+// píxeles ya calculada — así el admin puede pintar en rojo las pestañas de
+// los idiomas pasados de límite sin tener que entrar uno a uno.
+app.get('/admin/seo/rutas/:id/completo', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT * FROM route_seo_settings WHERE route_id = $1`,
+    [req.params.id]
+  );
+  const porIdioma = {};
+  for (const fila of result.rows) {
+    const pxTitulo = medirPxTitulo(fila.meta_title);
+    const pxDesc = medirPxDescripcion(fila.meta_description);
+    porIdioma[fila.lang_code] = {
+      ...fila,
+      px_titulo: pxTitulo,
+      px_descripcion: pxDesc,
+      excede: pxTitulo > 600 || pxDesc > 960
+    };
+  }
+  res.json(porIdioma);
+}));
+
 // Guarda los datos SEO de una ruta en un idioma concreto
 app.post('/admin/seo/rutas/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
   if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
