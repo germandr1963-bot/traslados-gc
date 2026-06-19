@@ -1194,7 +1194,19 @@ function importarSEO() {
       if (respuesta.ok) {
         var textoErrores = respuesta.errores && respuesta.errores.length
           ? ' (' + respuesta.errores.length + ' errores)' : '';
-        msg.innerHTML = '<div class="aviso-ok">✅ Importado: ' + respuesta.actualizadas + ' filas actualizadas' + textoErrores + '</div>';
+        var html = '<div class="aviso-ok">✅ Importado: ' + respuesta.actualizadas + ' filas actualizadas' + textoErrores + '</div>';
+
+        var avisos = respuesta.avisosPixeles || [];
+        if (avisos.length) {
+          html += '<div class="aviso-error" style="margin-top:8px;">' +
+            '⚠️ ' + avisos.length + ' ficha(s) se pasan del límite de píxeles y conviene revisarlas:' +
+            '<ul style="margin:8px 0 0 18px;padding:0;">' +
+            avisos.map(function (a) {
+              return '<li>' + escapar(a.ruta) + ' (' + a.idioma.toUpperCase() + '): ' + escapar(a.problemas) + '</li>';
+            }).join('') +
+            '</ul></div>';
+        }
+        msg.innerHTML = html;
         cargarSEO();
       } else {
         msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error en la importación') + '</div>';
