@@ -178,6 +178,13 @@ async function initSchema() {
     );
   `);
 
+  // Prioridad/frecuencia para el sitemap, e imagen propia para vistas previas
+  // de WhatsApp/redes — ambas son características del destino, no del idioma,
+  // así que viven en la tabla de rutas y valen para sus 9 versiones de idioma.
+  await pool.query(`ALTER TABLE rutas ADD COLUMN IF NOT EXISTS sitemap_prioridad NUMERIC(2,1) DEFAULT 0.8;`);
+  await pool.query(`ALTER TABLE rutas ADD COLUMN IF NOT EXISTS sitemap_frecuencia VARCHAR(20) DEFAULT 'monthly';`);
+  await pool.query(`ALTER TABLE rutas ADD COLUMN IF NOT EXISTS imagen_og TEXT;`);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rutas_precios (
       id SERIAL PRIMARY KEY,
@@ -853,7 +860,31 @@ app.get('/admin/seo/rutas/:id/completo', requireAdmin, asyncHandler(async (req, 
       excede: pxTitulo > 600 || pxDesc > 960
     };
   }
-  res.json(porIdioma);
+
+  const ruta = await pool.query(
+    'SELECT sitemap_prioridad, sitemap_frecuencia, (imagen_og IS NOT NULL) AS tiene_imagen FROM rutas WHERE id = $1',
+    [req.params.id]
+  );
+
+  res.json({
+    idiomas: porIdioma,
+    ruta: ruta.rows[0] || { sitemap_prioridad: 0.8, sitemap_frecuencia: 'monthly', tiene_imagen: false }
+  });
+}));
+
+// Guarda la prioridad/frecuencia de sitemap de una ruta (vale para sus 9 idiomas)
+app.post('/admin/rutas/:id/sitemap-config', requireAdmin, asyncHandler(async (req, res) => {
+  const prioridad = parseFloat(req.body.prioridad);
+  const frecuencia = req.body.frecuencia;
+  const frecuenciasValidas = ['daily', 'weekly', 'monthly', 'yearly'];
+  if (![1.0, 0.8, 0.5].includes(prioridad) || !frecuenciasValidas.includes(frecuencia)) {
+    return res.status(400).json({ error: 'Valores no válidos.' });
+  }
+  await pool.query(
+    'UPDATE rutas SET sitemap_prioridad = $1, sitemap_frecuencia = $2 WHERE id = $3',
+    [prioridad, frecuencia, req.params.id]
+  );
+  res.json({ ok: true });
 }));
 
 // Guarda los datos SEO de una ruta en un idioma concreto
@@ -1047,7 +1078,8 @@ function generarRobotsAuto() {
 
 async function generarSitemapAuto() {
   const result = await pool.query(
-    `SELECT rss.route_id, rss.lang_code, rss.slug_url, rss.updated_at
+    `SELECT rss.route_id, rss.lang_code, rss.slug_url, rss.updated_at,
+            r.sitemap_prioridad, r.sitemap_frecuencia
      FROM route_seo_settings rss
      JOIN rutas r ON r.id = rss.route_id
      WHERE rss.activo = TRUE AND r.activa = TRUE
@@ -1074,6 +1106,8 @@ async function generarSitemapAuto() {
 
   for (const rutaId of Object.keys(porRuta)) {
     const versiones = porRuta[rutaId];
+    const prioridad = versiones[0].sitemap_prioridad != null ? versiones[0].sitemap_prioridad : 0.8;
+    const frecuencia = versiones[0].sitemap_frecuencia || 'monthly';
     for (const v of versiones) {
       const loc = BASE_URL + '/' + v.lang_code + '/' + SECCIONES_TRASLADO[v.lang_code] + '/' + v.slug_url;
       xml += '  <url>\n';
@@ -1081,7 +1115,7 @@ async function generarSitemapAuto() {
       if (v.updated_at) {
         xml += '    <lastmod>' + new Date(v.updated_at).toISOString().slice(0, 10) + '</lastmod>\n';
       }
-      xml += '    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n';
+      xml += '    <changefreq>' + escapeXml(frecuencia) + '</changefreq>\n    <priority>' + prioridad + '</priority>\n';
       for (const hermana of versiones) {
         const locHermana = BASE_URL + '/' + hermana.lang_code + '/' + SECCIONES_TRASLADO[hermana.lang_code] + '/' + hermana.slug_url;
         xml += '    <xhtml:link rel="alternate" hreflang="' + hermana.lang_code + '" href="' + escapeXml(locHermana) + '" />\n';
