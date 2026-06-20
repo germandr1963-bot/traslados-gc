@@ -1048,7 +1048,9 @@ function abrirEditorSEO(rutaId) {
 
   fetch('/admin/seo/rutas/' + rutaId + '/completo')
     .then(function (r) { return r.json(); })
-    .then(function (porIdioma) {
+    .then(function (datos) {
+      var porIdioma = datos.idiomas;
+      var infoRuta = datos.ruta;
       editorSEOCache[rutaId] = porIdioma;
 
       var tabs = IDIOMAS_SEO.map(function (lang, i) {
@@ -1060,8 +1062,34 @@ function abrirEditorSEO(rutaId) {
           lang.toUpperCase() + (excede ? ' ⚠️' : '') + '</button>';
       }).join('');
 
+      var prioridadActual = infoRuta.sitemap_prioridad != null ? Number(infoRuta.sitemap_prioridad) : 0.8;
+      var frecuenciaActual = infoRuta.sitemap_frecuencia || 'monthly';
+
+      function opcionesPrioridad() {
+        var niveles = [[1.0, 'Alta (1.0)'], [0.8, 'Media (0.8)'], [0.5, 'Baja (0.5)']];
+        return niveles.map(function (n) {
+          return '<option value="' + n[0] + '"' + (n[0] === prioridadActual ? ' selected' : '') + '>' + n[1] + '</option>';
+        }).join('');
+      }
+      function opcionesFrecuencia() {
+        var freqs = [['daily', 'Diaria'], ['weekly', 'Semanal'], ['monthly', 'Mensual'], ['yearly', 'Anual']];
+        return freqs.map(function (f) {
+          return '<option value="' + f[0] + '"' + (f[0] === frecuenciaActual ? ' selected' : '') + '>' + f[1] + '</option>';
+        }).join('');
+      }
+
       editor.innerHTML =
         '<h2 style="margin-top:0">✏️ SEO: ' + escapar(ruta.origen) + ' → ' + escapar(ruta.destino) + '</h2>' +
+
+        '<div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;background:var(--gris-fondo);padding:12px 14px;border-radius:8px;margin-bottom:18px;">' +
+        '<div><label class="etiqueta" style="font-size:11px;">Prioridad en el sitemap</label>' +
+        '<select id="sitemap-prioridad" class="campo" style="height:32px;">' + opcionesPrioridad() + '</select></div>' +
+        '<div><label class="etiqueta" style="font-size:11px;">Frecuencia de actualización</label>' +
+        '<select id="sitemap-frecuencia" class="campo" style="height:32px;">' + opcionesFrecuencia() + '</select></div>' +
+        '<button class="boton-costa" style="padding:7px 14px;font-size:0.82rem;" onclick="guardarSitemapConfig(' + rutaId + ')">Guardar</button>' +
+        '<span id="sitemap-config-msg" style="font-size:12px;"></span>' +
+        '</div>' +
+
         '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
         '<div id="seo-campos-editor"></div>' +
         '<div id="seo-mensaje-editor" style="margin-top:8px;"></div>' +
@@ -1069,6 +1097,22 @@ function abrirEditorSEO(rutaId) {
 
       cambiarIdiomaEditorSEO(rutaId, 'es', editor.querySelector('.tab-idioma'));
     });
+}
+
+function guardarSitemapConfig(rutaId) {
+  var prioridad = document.getElementById('sitemap-prioridad').value;
+  var frecuencia = document.getElementById('sitemap-frecuencia').value;
+  var msg = document.getElementById('sitemap-config-msg');
+  fetch('/admin/rutas/' + rutaId + '/sitemap-config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prioridad: prioridad, frecuencia: frecuencia })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    msg.innerHTML = respuesta.ok
+      ? '<span style="color:#2e7d32;">✓ Guardado</span>'
+      : '<span style="color:var(--rojo-error);">' + escapar(respuesta.error || 'Error') + '</span>';
+    setTimeout(function () { msg.innerHTML = ''; }, 2500);
+  });
 }
 
 function cambiarIdiomaEditorSEO(rutaId, lang, botonTab) {
