@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title><%= seo.meta_title || (seo.origen + ' → ' + seo.destino + ' — Traslados GC') %></title>
+<title><%= seo.meta_title || (seo.origen + ' → ' + seo.destino + ' — ' + nombreMarca) %></title>
 
 <% if (seo.meta_description) { %>
 <meta name="description" content="<%= seo.meta_description %>">
@@ -14,6 +14,7 @@
 
 <!-- Open Graph -->
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="<%= nombreMarca %>">
 <meta property="og:title" content="<%= seo.og_title || seo.meta_title || (seo.origen + ' → ' + seo.destino) %>">
 <% if (seo.og_description || seo.meta_description) { %>
 <meta property="og:description" content="<%= seo.og_description || seo.meta_description %>">
@@ -25,6 +26,24 @@
 <meta property="og:image" content="<%= BASE_URL %>/ruta-imagen/<%= seo.ruta_id %>">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<% } else if (tieneImagenDefecto) { %>
+<meta property="og:image" content="<%= BASE_URL %>/imagen-og-defecto">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<% } %>
+
+<!-- Twitter / X (solo si está activado en los ajustes globales) -->
+<% if (twitterActivo) { %>
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="<%= seo.og_title || seo.meta_title || (seo.origen + ' → ' + seo.destino) %>">
+<% if (seo.og_description || seo.meta_description) { %>
+<meta name="twitter:description" content="<%= seo.og_description || seo.meta_description %>">
+<% } %>
+<% if (seo.tiene_imagen) { %>
+<meta name="twitter:image" content="<%= BASE_URL %>/ruta-imagen/<%= seo.ruta_id %>">
+<% } else if (tieneImagenDefecto) { %>
+<meta name="twitter:image" content="<%= BASE_URL %>/imagen-og-defecto">
+<% } %>
 <% } %>
 
 <!-- Canonical -->
@@ -174,7 +193,7 @@ footer {
 <div class="hero" id="hero">
   <div class="nav-superior">
     <a href="/" style="text-decoration:none;color:inherit;">
-      <span class="titular" style="font-size:18px;">Traslados · GC</span>
+      <span class="titular" style="font-size:18px;"><%= nombreMarca %></span>
     </a>
     <a href="/" class="nav-links" style="text-decoration:none;color:inherit;">← Todas las rutas</a>
   </div>
@@ -245,7 +264,7 @@ footer {
   </div>
 </div>
 
-<footer>Traslados · GC — Gran Canaria</footer>
+<footer><%= nombreMarca %> — Gran Canaria</footer>
 
 <script>
 // Carga el fondo de portada igual que en la página principal
