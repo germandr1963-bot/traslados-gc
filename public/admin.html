@@ -999,6 +999,7 @@ document.getElementById('boton-guardar-precios').addEventListener('click', funct
 
 // ─── SEO ──────────────────────────────────────────────────────────────────────
 var IDIOMAS_SEO = ['es', 'en', 'de', 'sv', 'no', 'nl', 'it', 'fr', 'fi'];
+var SECCIONES_TRASLADO_JS = { es: 'traslado', en: 'transfer', de: 'transfer', sv: 'transfer', no: 'transfer', nl: 'transfer', it: 'trasferimento', fr: 'transfert', fi: 'siirto' };
 var seoCache = null;
 
 function cargarSEO() {
@@ -1214,6 +1215,19 @@ function contarPxSEO(input, idContador, maxPx, fuente) {
   el.textContent = px + ' / ' + maxPx + ' px';
 }
 
+function copiarEnlacePublico(lang, slug, boton) {
+  var seccion = SECCIONES_TRASLADO_JS[lang] || 'traslado';
+  var url = window.location.origin + '/' + lang + '/' + seccion + '/' + slug;
+
+  navigator.clipboard.writeText(url).then(function () {
+    var textoOriginal = boton.textContent;
+    boton.textContent = '✓ ¡Copiado!';
+    setTimeout(function () { boton.textContent = textoOriginal; }, 1800);
+  }).catch(function () {
+    prompt('Copia el enlace manualmente:', url);
+  });
+}
+
 function renderizarCamposSEO(rutaId, lang, datos) {
   var activo = datos.activo || false;
   var slug    = escapar(datos.slug_url || '');
@@ -1222,13 +1236,14 @@ function renderizarCamposSEO(rutaId, lang, datos) {
   var campos  = document.getElementById('seo-campos-editor');
 
   campos.innerHTML =
-    '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--gris-fondo);border-radius:8px;margin-bottom:16px;">' +
+    '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--gris-fondo);border-radius:8px;margin-bottom:16px;flex-wrap:wrap;">' +
       '<span style="font-size:14px;">' + (activo
         ? '🟢 Esta página <strong>está activa</strong> en internet'
         : '⚪ Esta página <strong>está desactivada</strong>') + '</span>' +
       '<button class="' + (activo ? 'boton-peligro' : 'boton-costa') + '" style="padding:6px 14px;font-size:0.82rem;" ' +
         'onclick="toggleActivarSEO(' + rutaId + ', \'' + lang + '\', ' + (!activo) + ')">' +
         (activo ? 'Desactivar' : 'Activar') + '</button>' +
+      (activo ? '<button class="boton-secundario" style="padding:6px 14px;font-size:0.82rem;" onclick="copiarEnlacePublico(\'' + lang + '\', \'' + slug + '\', this)">🔗 Copiar enlace</button>' : '') +
     '</div>' +
 
     '<label class="etiqueta">URL amigable (slug)</label>' +
