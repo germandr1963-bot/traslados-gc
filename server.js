@@ -872,6 +872,37 @@ app.get('/admin/seo/rutas/:id/completo', requireAdmin, asyncHandler(async (req, 
   });
 }));
 
+// Guarda la imagen propia de una ruta (vale para sus 9 idiomas) — se usa
+// como og:image al compartir el link por WhatsApp/redes en vez de la genérica
+app.post('/admin/rutas/:id/imagen-og', requireAdmin, asyncHandler(async (req, res) => {
+  const { imagen } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/') || imagen.length > 900000) {
+    return res.status(400).json({ error: 'La imagen no es válida o pesa demasiado (máx. ~650KB).' });
+  }
+  await pool.query('UPDATE rutas SET imagen_og = $1 WHERE id = $2', [imagen, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/rutas/:id/imagen-og/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE rutas SET imagen_og = NULL WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Sirve la imagen de una ruta públicamente (la necesitan los crawlers de
+// WhatsApp/Facebook al generar la vista previa del enlace compartido)
+app.get('/ruta-imagen/:id', asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT imagen_og FROM rutas WHERE id = $1', [req.params.id]);
+  if (!result.rows.length || !result.rows[0].imagen_og) {
+    return res.status(404).end();
+  }
+  const dataUrl = result.rows[0].imagen_og;
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+  if (!match) return res.status(404).end();
+  res.set('Content-Type', match[1]);
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.send(Buffer.from(match[2], 'base64'));
+}));
+
 // Guarda la prioridad/frecuencia de sitemap de una ruta (vale para sus 9 idiomas)
 app.post('/admin/rutas/:id/sitemap-config', requireAdmin, asyncHandler(async (req, res) => {
   const prioridad = parseFloat(req.body.prioridad);
@@ -1288,7 +1319,7 @@ app.get('/:lang(es|en|de|sv|no|nl|it|fr|fi)/:seccion/:slug', asyncHandler(async 
 
   // Buscar la ficha SEO activa para este slug e idioma
   const seoResult = await pool.query(
-    `SELECT rss.*, r.origen, r.destino, r.id AS ruta_id
+    `SELECT rss.*, r.origen, r.destino, r.id AS ruta_id, (r.imagen_og IS NOT NULL) AS tiene_imagen
      FROM route_seo_settings rss
      JOIN rutas r ON r.id = rss.route_id
      WHERE rss.lang_code = $1 AND rss.slug_url = $2 AND rss.activo = TRUE AND r.activa = TRUE`,
