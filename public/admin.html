@@ -237,12 +237,16 @@ table.tabla-precios input {
         </label>
         <button type="button" class="boton-secundario" onclick="abrirEditorArchivo('sitemap.xml')">🗺️ Editar Sitemap</button>
         <button type="button" class="boton-secundario" onclick="abrirEditorArchivo('robots.txt')">🤖 Editar robots.txt</button>
+        <button type="button" class="boton-secundario" onclick="abrirPanelSalud()">🩺 Salud SEO</button>
+        <button type="button" class="boton-secundario" onclick="abrirPanelRedirecciones()">🔀 Redirecciones</button>
       </div>
       <p style="font-size:12px;color:var(--texto-muted);margin-top:-8px;margin-bottom:16px;">
         Por defecto ambos se generan solos con los datos actuales. Si tu SEO necesita un ajuste manual, puede editarlos y guardarlos aquí.
       </p>
 
       <div id="editor-archivo-manual" class="tarjeta oculto" style="margin-bottom:20px;"></div>
+      <div id="panel-salud-seo" class="tarjeta oculto" style="margin-bottom:20px;"></div>
+      <div id="panel-redirecciones" class="tarjeta oculto" style="margin-bottom:20px;"></div>
 
       <div id="mensaje-seo" style="margin-bottom:12px;"></div>
 
@@ -1258,6 +1262,8 @@ function importarSEO() {
 
 // ─── Editor manual de sitemap.xml y robots.txt ───────────────────────────────
 function abrirEditorArchivo(nombre) {
+  document.getElementById('panel-salud-seo').classList.add('oculto');
+  document.getElementById('panel-redirecciones').classList.add('oculto');
   var caja = document.getElementById('editor-archivo-manual');
   caja.classList.remove('oculto');
   caja.setAttribute('data-archivo', nombre);
@@ -1321,6 +1327,110 @@ function guardarArchivoManual(nombre) {
 function restablecerArchivoAuto(nombre) {
   fetch('/admin/site-archivos/' + nombre + '/restablecer', { method: 'POST' })
     .then(function () { abrirEditorArchivo(nombre); });
+}
+
+// ─── Panel de Salud SEO ───────────────────────────────────────────────────────
+var NOMBRES_IDIOMA = { es: 'Español', en: 'Inglés', de: 'Alemán', sv: 'Sueco', no: 'Noruego', nl: 'Holandés', it: 'Italiano', fr: 'Francés', fi: 'Finés' };
+
+function abrirPanelSalud() {
+  document.getElementById('editor-archivo-manual').classList.add('oculto');
+  document.getElementById('panel-redirecciones').classList.add('oculto');
+  var panel = document.getElementById('panel-salud-seo');
+  panel.classList.remove('oculto');
+  panel.innerHTML = '<p style="color:var(--texto-muted)">Calculando...</p>';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  fetch('/admin/seo/salud')
+    .then(function (r) { return r.json(); })
+    .then(function (datos) {
+      var filas = IDIOMAS_SEO.map(function (lang) {
+        var s = datos[lang];
+        if (!s) return '';
+        return '<tr>' +
+          '<td><strong>' + (NOMBRES_IDIOMA[lang] || lang.toUpperCase()) + '</strong></td>' +
+          '<td style="text-align:center">' + s.activas + ' / ' + s.total + '</td>' +
+          '<td style="text-align:center' + (s.vacios > 0 ? ';color:var(--rojo-error);font-weight:600' : '') + '">' + s.vacios + '</td>' +
+          '<td style="text-align:center' + (s.excedePx > 0 ? ';color:var(--rojo-error);font-weight:600' : '') + '">' + s.excedePx + '</td>' +
+          '<td style="text-align:center' + (s.duplicados > 0 ? ';color:#b8860b;font-weight:600' : '') + '">' + s.duplicados + '</td>' +
+        '</tr>';
+      }).join('');
+
+      panel.innerHTML =
+        '<h3 style="margin-top:0">🩺 Salud SEO</h3>' +
+        '<table class="tabla-admin">' +
+        '<thead><tr><th>Idioma</th><th style="text-align:center">Activas</th>' +
+        '<th style="text-align:center">Sin título/desc.</th><th style="text-align:center">Pasadas de píxeles</th>' +
+        '<th style="text-align:center">Títulos duplicados</th></tr></thead>' +
+        '<tbody>' + filas + '</tbody></table>' +
+        '<button class="boton-secundario" style="margin-top:14px;" onclick="document.getElementById(\'panel-salud-seo\').classList.add(\'oculto\')">Cerrar</button>';
+    });
+}
+
+// ─── Panel de Redirecciones 301 ───────────────────────────────────────────────
+function abrirPanelRedirecciones() {
+  document.getElementById('editor-archivo-manual').classList.add('oculto');
+  document.getElementById('panel-salud-seo').classList.add('oculto');
+  var panel = document.getElementById('panel-redirecciones');
+  panel.classList.remove('oculto');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  cargarRedirecciones();
+}
+
+function cargarRedirecciones() {
+  var panel = document.getElementById('panel-redirecciones');
+  panel.innerHTML = '<p style="color:var(--texto-muted)">Cargando...</p>';
+
+  fetch('/admin/redirecciones')
+    .then(function (r) { return r.json(); })
+    .then(function (lista) {
+      var filas = lista.map(function (r) {
+        return '<tr>' +
+          '<td style="font-family:\'JetBrains Mono\',monospace;font-size:12px;">' + escapar(r.ruta_antigua) + '</td>' +
+          '<td style="text-align:center">→</td>' +
+          '<td style="font-family:\'JetBrains Mono\',monospace;font-size:12px;">' + escapar(r.ruta_nueva) + '</td>' +
+          '<td><button class="boton-peligro" style="padding:4px 10px;font-size:0.78rem;" onclick="eliminarRedireccion(' + r.id + ')">🗑️</button></td>' +
+        '</tr>';
+      }).join('') || '<tr><td colspan="4" style="color:var(--texto-muted)">No hay redirecciones creadas todavía.</td></tr>';
+
+      panel.innerHTML =
+        '<h3 style="margin-top:0">🔀 Redirecciones 301</h3>' +
+        '<p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Cuando cambies una URL antigua, añádela aquí para que nadie se quede con un enlace roto.</p>' +
+        '<div class="fila-form" style="margin-bottom:14px;">' +
+        '<div><label class="etiqueta">URL antigua</label><input type="text" id="redir-antigua" class="campo" placeholder="/es/traslado/ruta-vieja"></div>' +
+        '<div><label class="etiqueta">URL nueva</label><input type="text" id="redir-nueva" class="campo" placeholder="/es/traslado/ruta-nueva"></div>' +
+        '<button class="boton-primario" onclick="guardarRedireccion()">Añadir</button>' +
+        '</div>' +
+        '<div id="mensaje-redirecciones" style="margin-bottom:10px;"></div>' +
+        '<table class="tabla-admin"><thead><tr><th>Antigua</th><th></th><th>Nueva</th><th></th></tr></thead>' +
+        '<tbody>' + filas + '</tbody></table>' +
+        '<button class="boton-secundario" style="margin-top:14px;" onclick="document.getElementById(\'panel-redirecciones\').classList.add(\'oculto\')">Cerrar</button>';
+    });
+}
+
+function guardarRedireccion() {
+  var antigua = document.getElementById('redir-antigua').value.trim();
+  var nueva = document.getElementById('redir-nueva').value.trim();
+  var msg = document.getElementById('mensaje-redirecciones');
+  if (!antigua || !nueva) {
+    msg.innerHTML = '<div class="aviso-error">Rellena las dos URLs.</div>';
+    return;
+  }
+  fetch('/admin/redirecciones', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ruta_antigua: antigua, ruta_nueva: nueva })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      cargarRedirecciones();
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
+    }
+  });
+}
+
+function eliminarRedireccion(id) {
+  fetch('/admin/redirecciones/' + id + '/eliminar', { method: 'POST' })
+    .then(function () { cargarRedirecciones(); });
 }
 
 comprobarSesion();
