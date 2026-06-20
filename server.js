@@ -278,6 +278,18 @@ async function initSchema() {
     );
   `);
 
+  // Redirecciones 301 — para cuando una URL antigua deja de existir
+  // (por ejemplo, al cambiar un slug) y hay que enviar a Google y a los
+  // visitantes a la dirección nueva, sin perder lo que ya estaba posicionado.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS redirecciones_301 (
+      id SERIAL PRIMARY KEY,
+      ruta_antigua TEXT UNIQUE NOT NULL,
+      ruta_nueva TEXT NOT NULL,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
     await pool.query(
@@ -1147,6 +1159,87 @@ app.post('/admin/site-archivos/:nombre/restablecer', requireAdmin, asyncHandler(
   res.json({ ok: true });
 }));
 
+// ─── Redirecciones 301 ────────────────────────────────────────────────────────
+app.get('/admin/redirecciones', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT * FROM redirecciones_301 ORDER BY creado_en DESC');
+  res.json(result.rows);
+}));
+
+app.post('/admin/redirecciones', requireAdmin, asyncHandler(async (req, res) => {
+  let { ruta_antigua, ruta_nueva } = req.body;
+  if (!ruta_antigua || !ruta_nueva) {
+    return res.status(400).json({ error: 'Faltan las dos rutas (antigua y nueva).' });
+  }
+  // Normalizar: siempre con / al principio, sin / al final, sin el dominio
+  function normalizar(r) {
+    r = r.trim().replace(/^https?:\/\/[^/]+/, '');
+    if (!r.startsWith('/')) r = '/' + r;
+    return r.replace(/\/+$/, '') || '/';
+  }
+  ruta_antigua = normalizar(ruta_antigua);
+  ruta_nueva = normalizar(ruta_nueva);
+
+  if (ruta_antigua === ruta_nueva) {
+    return res.status(400).json({ error: 'La ruta antigua y la nueva no pueden ser iguales.' });
+  }
+  try {
+    await pool.query(
+      `INSERT INTO redirecciones_301 (ruta_antigua, ruta_nueva) VALUES ($1, $2)
+       ON CONFLICT (ruta_antigua) DO UPDATE SET ruta_nueva = $2`,
+      [ruta_antigua, ruta_nueva]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    throw err;
+  }
+}));
+
+app.post('/admin/redirecciones/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM redirecciones_301 WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// ─── Panel de salud SEO ───────────────────────────────────────────────────────
+app.get('/admin/seo/salud', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT rss.lang_code, rss.meta_title, rss.meta_description, rss.activo,
+            r.activa AS ruta_activa
+     FROM route_seo_settings rss
+     JOIN rutas r ON r.id = rss.route_id`
+  );
+
+  const stats = {};
+  for (const lang of IDIOMAS_PERMITIDOS) {
+    stats[lang] = { total: 0, activas: 0, vacios: 0, excedePx: 0, duplicados: 0 };
+  }
+
+  const titulosPorIdioma = {};
+  for (const lang of IDIOMAS_PERMITIDOS) titulosPorIdioma[lang] = {};
+
+  for (const fila of result.rows) {
+    const lang = fila.lang_code;
+    if (!stats[lang]) continue;
+    stats[lang].total++;
+    if (fila.activo && fila.ruta_activa) stats[lang].activas++;
+    if (!fila.meta_title || !fila.meta_description) stats[lang].vacios++;
+
+    const pxT = medirPxTitulo(fila.meta_title);
+    const pxD = medirPxDescripcion(fila.meta_description);
+    if (pxT > 600 || pxD > 960) stats[lang].excedePx++;
+
+    if (fila.meta_title) {
+      const t = fila.meta_title.trim().toLowerCase();
+      titulosPorIdioma[lang][t] = (titulosPorIdioma[lang][t] || 0) + 1;
+    }
+  }
+
+  for (const lang of IDIOMAS_PERMITIDOS) {
+    stats[lang].duplicados = Object.values(titulosPorIdioma[lang]).filter(function (n) { return n > 1; }).length;
+  }
+
+  res.json(stats);
+}));
+
 // ─── Páginas públicas por ruta (SSR) ─────────────────────────────────────────
 // URL: /:lang/traslado/:slug  (ej: /es/traslado/las-palmas-a-maspalomas)
 // El parámetro :lang solo acepta los 9 idiomas permitidos.
@@ -1169,6 +1262,13 @@ app.get('/:lang(es|en|de|sv|no|nl|it|fr|fi)/:seccion/:slug', asyncHandler(async 
   );
 
   if (seoResult.rows.length === 0) {
+    const redirect = await pool.query(
+      'SELECT ruta_nueva FROM redirecciones_301 WHERE ruta_antigua = $1',
+      [req.path]
+    );
+    if (redirect.rows.length) {
+      return res.redirect(301, redirect.rows[0].ruta_nueva);
+    }
     return res.status(404).send('Página no encontrada');
   }
 
