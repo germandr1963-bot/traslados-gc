@@ -297,6 +297,23 @@ async function initSchema() {
     );
   `);
 
+  // Ajustes globales de SEO: nombre de marca, imagen de respaldo cuando una
+  // ruta no tiene la suya propia, y si las etiquetas de Twitter/X están
+  // activas. Una única fila (id = 1) que se edita desde el admin.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ajustes_seo_globales (
+      id INT PRIMARY KEY DEFAULT 1,
+      nombre_marca TEXT DEFAULT 'Traslados · GC',
+      imagen_og_defecto TEXT,
+      twitter_activo BOOLEAN DEFAULT FALSE,
+      updated_at TIMESTAMP DEFAULT NOW(),
+      CONSTRAINT solo_una_fila CHECK (id = 1)
+    );
+  `);
+  await pool.query(`
+    INSERT INTO ajustes_seo_globales (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+  `);
+
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
     await pool.query(
@@ -1224,6 +1241,49 @@ app.post('/admin/site-archivos/:nombre/restablecer', requireAdmin, asyncHandler(
   res.json({ ok: true });
 }));
 
+// ─── Ajustes globales de SEO ──────────────────────────────────────────────────
+app.get('/admin/seo/ajustes-globales', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
+  res.json(result.rows[0]);
+}));
+
+app.post('/admin/seo/ajustes-globales', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre_marca, twitter_activo } = req.body;
+  await pool.query(
+    `UPDATE ajustes_seo_globales
+     SET nombre_marca = $1, twitter_activo = $2, updated_at = NOW()
+     WHERE id = 1`,
+    [(nombre_marca || '').trim() || 'Traslados · GC', !!twitter_activo]
+  );
+  res.json({ ok: true });
+}));
+
+app.post('/admin/seo/ajustes-globales/imagen', requireAdmin, asyncHandler(async (req, res) => {
+  const { imagen } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/') || imagen.length > 900000) {
+    return res.status(400).json({ error: 'La imagen no es válida o pesa demasiado (máx. ~650KB).' });
+  }
+  await pool.query('UPDATE ajustes_seo_globales SET imagen_og_defecto = $1, updated_at = NOW() WHERE id = 1', [imagen]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/seo/ajustes-globales/imagen/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE ajustes_seo_globales SET imagen_og_defecto = NULL WHERE id = 1');
+  res.json({ ok: true });
+}));
+
+// Sirve la imagen de respaldo públicamente, igual que /ruta-imagen/:id
+app.get('/imagen-og-defecto', asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT imagen_og_defecto FROM ajustes_seo_globales WHERE id = 1');
+  const dataUrl = result.rows[0] && result.rows[0].imagen_og_defecto;
+  if (!dataUrl) return res.status(404).end();
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+  if (!match) return res.status(404).end();
+  res.set('Content-Type', match[1]);
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.send(Buffer.from(match[2], 'base64'));
+}));
+
 // ─── Redirecciones 301 ────────────────────────────────────────────────────────
 app.get('/admin/redirecciones', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT * FROM redirecciones_301 ORDER BY creado_en DESC');
@@ -1356,13 +1416,19 @@ app.get('/:lang(es|en|de|sv|no|nl|it|fr|fi)/:seccion/:slug', asyncHandler(async 
     [seo.ruta_id]
   );
 
+  const ajustesGlobales = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
+  const globales = ajustesGlobales.rows[0] || { nombre_marca: 'Traslados · GC', imagen_og_defecto: null, twitter_activo: false };
+
   res.render('traslado', {
     seo,
     precios: precios.rows,
     alternates: alternates.rows,
     lang,
     BASE_URL,
-    SECCIONES_TRASLADO
+    SECCIONES_TRASLADO,
+    nombreMarca: globales.nombre_marca || 'Traslados · GC',
+    tieneImagenDefecto: !!globales.imagen_og_defecto,
+    twitterActivo: !!globales.twitter_activo
   });
 }));
 
