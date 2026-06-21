@@ -149,6 +149,7 @@ table.tabla-precios input {
     <button class="item-menu" data-seccion="conductores">Conductores</button>
     <button class="item-menu" data-seccion="precios">Rutas y precios</button>
     <button class="item-menu" data-seccion="seo">SEO</button>
+    <button class="item-menu" data-seccion="idiomas">Idiomas</button>
     <button id="boton-salir" style="margin-top:30px;opacity:0.5;">Cerrar sesión</button>
   </div>
 
@@ -274,6 +275,57 @@ table.tabla-precios input {
       <div id="editor-seo" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
     </div>
 
+    <div id="seccion-idiomas" class="oculto">
+      <h1>Idiomas — Textos de la interfaz</h1>
+      <p class="subtitulo">Esto traduce los textos fijos de la propia web (botones, títulos, etiquetas) — no los datos de cada ruta, eso está en SEO. El español se gestiona desde el código; las demás traducciones, desde aquí.</p>
+
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+        <a href="/admin/textos/exportar" class="boton-primario" style="text-decoration:none;">⬇️ Exportar Excel para traducir</a>
+        <label class="boton-secundario" style="cursor:pointer;margin:0;">
+          ⬆️ Importar Excel traducido
+          <input type="file" id="archivo-importar-textos" accept=".xlsx" style="display:none;" onchange="importarTextosInterfaz()">
+        </label>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
+        <span style="font-size:13px;">🤖 Traducir automáticamente con IA:</span>
+        <select id="select-idioma-ia" class="campo" style="height:34px;width:auto;">
+          <option value="en">Inglés</option>
+          <option value="de">Alemán</option>
+          <option value="sv">Sueco</option>
+          <option value="no">Noruego</option>
+          <option value="nl">Holandés</option>
+          <option value="it">Italiano</option>
+          <option value="fr">Francés</option>
+          <option value="fi">Finés</option>
+        </select>
+        <button class="boton-costa" onclick="traducirConIA()">Traducir lo que falte</button>
+      </div>
+
+      <div id="mensaje-textos" style="margin-bottom:12px;"></div>
+
+      <table class="tabla-admin">
+        <thead>
+          <tr>
+            <th>Texto</th>
+            <th>Módulo</th>
+            <th style="text-align:center">EN</th>
+            <th style="text-align:center">DE</th>
+            <th style="text-align:center">SV</th>
+            <th style="text-align:center">NO</th>
+            <th style="text-align:center">NL</th>
+            <th style="text-align:center">IT</th>
+            <th style="text-align:center">FR</th>
+            <th style="text-align:center">FI</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-textos-cuerpo"></tbody>
+      </table>
+
+      <div id="editor-texto-interfaz" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
+    </div>
+
   </div>
 </div>
 
@@ -322,11 +374,12 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'precios', 'seo'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'precios', 'seo', 'idiomas'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
     if (boton.dataset.seccion === 'seo') cargarSEO();
+    if (boton.dataset.seccion === 'idiomas') cargarTextosInterfaz();
   });
 });
 
@@ -1690,6 +1743,196 @@ function guardarRedireccion() {
 function eliminarRedireccion(id) {
   fetch('/admin/redirecciones/' + id + '/eliminar', { method: 'POST' })
     .then(function () { cargarRedirecciones(); });
+}
+
+// ─── Idiomas — Textos de la interfaz ──────────────────────────────────────────
+var IDIOMAS_TEXTOS = ['en', 'de', 'sv', 'no', 'nl', 'it', 'fr', 'fi'];
+var textosCache = null;
+
+function cargarTextosInterfaz() {
+  document.getElementById('tabla-textos-cuerpo').innerHTML = '<tr><td colspan="11" style="color:var(--texto-muted)">Cargando...</td></tr>';
+  fetch('/admin/textos').then(function (r) { return r.json(); }).then(function (datos) {
+    textosCache = datos;
+    renderizarTablaTextos(datos);
+  });
+}
+
+function renderizarTablaTextos(datos) {
+  var cuerpo = document.getElementById('tabla-textos-cuerpo');
+  if (!datos.textos || datos.textos.length === 0) {
+    cuerpo.innerHTML = '<tr><td colspan="11">No hay textos registrados todavía.</td></tr>';
+    return;
+  }
+  cuerpo.innerHTML = datos.textos.map(function (t) {
+    var celdas = IDIOMAS_TEXTOS.map(function (lang) {
+      var ok = t.estado[lang];
+      return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+    }).join('');
+    return '<tr>' +
+      '<td><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
+      '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(t.modulo) + '</td>' +
+      celdas +
+      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function abrirEditorTexto(textoId) {
+  var texto = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
+  if (!texto) return;
+
+  var editor = document.getElementById('editor-texto-interfaz');
+  editor.classList.remove('oculto');
+
+  var tabs = IDIOMAS_TEXTOS.map(function (lang, i) {
+    var ok = texto.estado[lang];
+    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? '' : ' tab-idioma-rojo') + '" ' +
+      'onclick="cambiarIdiomaEditorTexto(' + textoId + ', \'' + lang + '\', this)">' +
+      lang.toUpperCase() + (ok ? '' : ' ⚠️') + '</button>';
+  }).join('');
+
+  editor.innerHTML =
+    '<h2 style="margin-top:0">✏️ ' + escapar(texto.clave) + '</h2>' +
+    '<div style="background:var(--gris-fondo);padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px;">' +
+    '<strong>Español (original):</strong> ' + escapar(texto.texto_es) + '<br>' +
+    (texto.contexto ? '<span style="color:var(--texto-muted);font-size:12px;"><strong>Contexto:</strong> ' + escapar(texto.contexto) + '</span>' : '') +
+    '</div>' +
+    '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
+    '<div id="texto-campo-editor"></div>' +
+    '<div id="texto-mensaje-editor" style="margin-top:8px;"></div>' +
+    '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-texto-interfaz\').classList.add(\'oculto\')">Cerrar</button>';
+
+  cambiarIdiomaEditorTexto(textoId, IDIOMAS_TEXTOS[0], editor.querySelector('.tab-idioma'));
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
+  document.querySelectorAll('#editor-texto-interfaz .tab-idioma').forEach(function (b) { b.classList.remove('activo'); });
+  if (botonTab) botonTab.classList.add('activo');
+
+  var campo = document.getElementById('texto-campo-editor');
+  campo.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+
+  fetch('/admin/textos/' + textoId + '/idioma/' + lang)
+    .then(function (r) { return r.json(); })
+    .then(function (datos) {
+      campo.innerHTML =
+        '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
+        '<textarea class="campo" id="texto-traduccion" rows="3" placeholder="Todavía sin traducir...">' + escapar(datos.texto || '') + '</textarea>' +
+        '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar</button>';
+    });
+}
+
+function guardarTraduccionTexto(textoId, lang) {
+  var valor = document.getElementById('texto-traduccion').value;
+  var msg = document.getElementById('texto-mensaje-editor');
+  fetch('/admin/textos/' + textoId + '/idioma/' + lang, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto: valor })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Guardado</div>';
+      cargarTextosInterfaz();
+      setTimeout(function () { msg.innerHTML = ''; }, 2000);
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
+    }
+  });
+}
+
+function importarTextosInterfaz() {
+  var archivo = document.getElementById('archivo-importar-textos').files[0];
+  if (!archivo) return;
+  var msg = document.getElementById('mensaje-textos');
+  msg.innerHTML = '<div class="aviso-ok">Subiendo archivo...</div>';
+  var formData = new FormData();
+  formData.append('archivo', archivo);
+  fetch('/admin/textos/importar', { method: 'POST', body: formData })
+    .then(function (r) { return r.json(); })
+    .then(function (respuesta) {
+      if (respuesta.ok) {
+        var textoErrores = respuesta.errores && respuesta.errores.length
+          ? ' (' + respuesta.errores.length + ' errores)' : '';
+        msg.innerHTML = '<div class="aviso-ok">✅ Importado: ' + respuesta.actualizadas + ' traducciones actualizadas' + textoErrores + '</div>';
+        cargarTextosInterfaz();
+      } else {
+        msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error en la importación') + '</div>';
+      }
+      document.getElementById('archivo-importar-textos').value = '';
+    });
+}
+
+// ─── Traducción automática con IA ─────────────────────────────────────────────
+function traducirConIA() {
+  var lang = document.getElementById('select-idioma-ia').value;
+  var msg = document.getElementById('mensaje-textos');
+  msg.innerHTML = '<div class="aviso-ok">🤖 Traduciendo con IA, puede tardar unos segundos...</div>';
+
+  fetch('/admin/textos/traducir-ia/' + lang, { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (respuesta) {
+      if (!respuesta.ok) {
+        msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al traducir') + '</div>';
+        return;
+      }
+      if (respuesta.propuestas.length === 0) {
+        msg.innerHTML = '<div class="aviso-ok">✅ Ya estaba todo traducido en ' + lang.toUpperCase() + '.</div>';
+        return;
+      }
+      msg.innerHTML = '';
+      mostrarRevisionIA(lang, respuesta.propuestas);
+    })
+    .catch(function () {
+      msg.innerHTML = '<div class="aviso-error">No se pudo conectar con la IA. Inténtalo de nuevo.</div>';
+    });
+}
+
+function mostrarRevisionIA(lang, propuestas) {
+  var editor = document.getElementById('editor-texto-interfaz');
+  editor.classList.remove('oculto');
+
+  var filas = propuestas.map(function (p) {
+    return '<div style="border-bottom:1px solid var(--gris-borde);padding:12px 0;">' +
+      '<div style="font-size:12px;color:var(--texto-muted);margin-bottom:4px;"><strong>' + escapar(p.clave) + '</strong>' +
+      (p.contexto ? ' — ' + escapar(p.contexto) : '') + '</div>' +
+      '<div style="font-size:13px;color:var(--texto-muted);margin-bottom:6px;">🇪🇸 ' + escapar(p.texto_es) + '</div>' +
+      '<textarea class="campo revision-ia-texto" data-texto-id="' + p.texto_id + '" rows="2" style="width:100%;">' + escapar(p.sugerencia) + '</textarea>' +
+    '</div>';
+  }).join('');
+
+  editor.innerHTML =
+    '<h2 style="margin-top:0">🤖 Revisión — traducción IA al ' + lang.toUpperCase() + '</h2>' +
+    '<p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Revisa cada propuesta antes de guardar. Puedes editar cualquier texto antes de confirmar.</p>' +
+    '<div style="max-height:400px;overflow-y:auto;">' + filas + '</div>' +
+    '<div id="revision-ia-msg" style="margin:12px 0;"></div>' +
+    '<button class="boton-primario" onclick="guardarRevisionIA(\'' + lang + '\')">💾 Guardar todas</button> ' +
+    '<button class="boton-secundario" onclick="document.getElementById(\'editor-texto-interfaz\').classList.add(\'oculto\')">Cancelar</button>';
+
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function guardarRevisionIA(lang) {
+  var textareas = document.querySelectorAll('.revision-ia-texto');
+  var traducciones = Array.prototype.map.call(textareas, function (ta) {
+    return { texto_id: parseInt(ta.dataset.textoId, 10), texto: ta.value };
+  });
+  var msg = document.getElementById('revision-ia-msg');
+  msg.innerHTML = 'Guardando...';
+
+  fetch('/admin/textos/guardar-lote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang: lang, traducciones: traducciones })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Guardadas ' + respuesta.guardadas + ' traducciones</div>';
+      cargarTextosInterfaz();
+      setTimeout(function () { document.getElementById('editor-texto-interfaz').classList.add('oculto'); }, 1200);
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
+    }
+  });
 }
 
 comprobarSesion();
