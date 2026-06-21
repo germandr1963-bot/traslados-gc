@@ -1127,6 +1127,20 @@ app.post('/admin/seo/rutas/:id/idioma/:lang/activar', requireAdmin, asyncHandler
   res.json({ ok: true });
 }));
 
+// Activa o desactiva TODAS las páginas de un idioma de golpe — para cuando
+// terminas de traducir un idioma entero y quieres publicarlo todo de una vez,
+// en vez de ir ruta por ruta. Solo afecta a ese idioma, no a los demás.
+app.post('/admin/seo/idioma/:lang/activar-todas', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  const result = await pool.query(
+    `UPDATE route_seo_settings SET activo = $1 WHERE lang_code = $2`,
+    [!!req.body.activo, req.params.lang]
+  );
+  res.json({ ok: true, afectadas: result.rowCount });
+}));
+
 // Exporta todas las fichas SEO a un Excel listo para enviar a traductores
 app.get('/admin/seo/exportar', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
@@ -1491,6 +1505,66 @@ async function traducirConClaudeIA(items, nombreIdioma) {
 
 // Lista todos los textos con su estado de traducción por idioma (para las
 // insignias de colores: verde traducido, rojo falta)
+// ─── Gestión de idiomas de la web ────────────────────────────────────────────
+app.get('/admin/idiomas', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT * FROM idiomas_web ORDER BY orden, codigo');
+  res.json(result.rows);
+}));
+
+// Añade un idioma nuevo: lo registra, y crea automáticamente la ficha SEO
+// vacía de ese idioma en todas las rutas existentes, lista para traducir.
+app.post('/admin/idiomas', requireAdmin, asyncHandler(async (req, res) => {
+  let { codigo, nombre, palabra_traslado } = req.body;
+  codigo = String(codigo || '').trim().toLowerCase();
+  nombre = String(nombre || '').trim();
+  palabra_traslado = String(palabra_traslado || '').trim().toLowerCase().replace(/[^a-z]/g, '');
+
+  if (!/^[a-z]{2}$/.test(codigo)) {
+    return res.status(400).json({ error: 'El código debe ser exactamente 2 letras minúsculas (ej: ru, zh, pt).' });
+  }
+  if (!nombre) {
+    return res.status(400).json({ error: 'Falta el nombre del idioma.' });
+  }
+  if (!palabra_traslado || palabra_traslado.length < 3) {
+    return res.status(400).json({ error: 'La palabra para la URL no es válida (solo letras, mínimo 3 — ej: "transfer").' });
+  }
+
+  const existe = await pool.query('SELECT codigo FROM idiomas_web WHERE codigo = $1', [codigo]);
+  if (existe.rows.length) {
+    return res.status(400).json({ error: 'Ese código de idioma ya existe.' });
+  }
+
+  const maxOrden = await pool.query('SELECT COALESCE(MAX(orden), 0) AS m FROM idiomas_web');
+  const nuevoOrden = maxOrden.rows[0].m + 1;
+
+  await pool.query(
+    `INSERT INTO idiomas_web (codigo, nombre, palabra_traslado, es_base, activo, orden)
+     VALUES ($1, $2, $3, FALSE, TRUE, $4)`,
+    [codigo, nombre, palabra_traslado, nuevoOrden]
+  );
+
+  await cargarIdiomasCache();
+
+  // Crear la ficha SEO vacía de este idioma nuevo en todas las rutas existentes
+  const rutas = await pool.query('SELECT id, origen, destino FROM rutas');
+  for (const ruta of rutas.rows) {
+    await crearFichasSEOSiFaltan(ruta.id, ruta.origen, ruta.destino);
+  }
+
+  res.json({ ok: true, codigo, rutasPreparadas: rutas.rows.length });
+}));
+
+// Activa/desactiva un idioma sin borrarlo (el idioma base no se puede desactivar)
+app.post('/admin/idiomas/:codigo/activo', requireAdmin, asyncHandler(async (req, res) => {
+  const codigo = req.params.codigo;
+  if (codigo === IDIOMA_BASE) {
+    return res.status(400).json({ error: 'No se puede desactivar el idioma base (español).' });
+  }
+  await pool.query('UPDATE idiomas_web SET activo = $1 WHERE codigo = $2', [!!req.body.activo, codigo]);
+  await cargarIdiomasCache();
+  res.json({ ok: true });
+}));
+
 app.get('/admin/textos', requireAdmin, asyncHandler(async (req, res) => {
   const textos = await pool.query(
     `SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY modulo, id`
