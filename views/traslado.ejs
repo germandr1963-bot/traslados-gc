@@ -269,6 +269,19 @@ footer {
   </div>
 </div>
 
+<% if (relacionadas && relacionadas.length > 0) { %>
+<div class="seccion">
+  <h2><%= textoOtrosTraslados %> <%= seo.origen %></h2>
+  <div class="tres-columnas">
+    <% relacionadas.forEach(function(r) { %>
+    <a href="/<%= lang %>/<%= SECCIONES_TRASLADO[lang] %>/<%= r.slug_url %>" class="tarjeta" style="text-decoration:none;color:inherit;display:block;">
+      <strong><%= seo.origen %> → <%= r.destino %></strong>
+    </a>
+    <% }); %>
+  </div>
+</div>
+<% } %>
+
 <footer><%= nombreMarca %> — Gran Canaria</footer>
 
 <script>
