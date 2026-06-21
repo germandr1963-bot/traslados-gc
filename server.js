@@ -64,18 +64,39 @@ const SECCIONES_TRASLADO = {
 // URL base del sitio — se usa para construir canonical y hreflang
 const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
 
-// Texto "Otros traslados desde..." en cada idioma, para el enlazado interno
-const TEXTO_OTROS_TRASLADOS = {
-  es: 'Otros traslados desde',
-  en: 'Other transfers from',
-  de: 'Weitere Transfers ab',
-  sv: 'Fler transfers från',
-  no: 'Flere transporter fra',
-  nl: 'Meer transfers vanaf',
-  it: 'Altri transfer da',
-  fr: 'Autres transferts depuis',
-  fi: 'Muita kuljetuksia lähtöpaikasta'
-};
+// ─── Sistema de traducción de la interfaz de la web ──────────────────────────
+// Caché en memoria de todos los textos fijos y sus traducciones, para no
+// consultar la base de datos en cada visita. Se recarga al arrancar el
+// servidor y cada vez que se guarda o importa una traducción desde el admin.
+let TEXTOS_CACHE = {};
+
+async function cargarTextosCache() {
+  const textos = await pool.query('SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz');
+  const traducciones = await pool.query('SELECT texto_id, lang_code, texto FROM textos_interfaz_traducciones');
+
+  const nuevaCache = {};
+  for (const fila of textos.rows) {
+    nuevaCache[fila.clave] = {
+      id: fila.id, modulo: fila.modulo, contexto: fila.contexto,
+      texto_es: fila.texto_es, traducciones: {}
+    };
+  }
+  for (const fila of traducciones.rows) {
+    const entrada = Object.values(nuevaCache).find(function (e) { return e.id === fila.texto_id; });
+    if (entrada) entrada.traducciones[fila.lang_code] = fila.texto;
+  }
+  TEXTOS_CACHE = nuevaCache;
+}
+
+// Devuelve el texto traducido de una clave en un idioma. Si falta la
+// traducción, cae al español; si la clave ni existe, devuelve la propia
+// clave entre corchetes para que sea fácil detectar el fallo durante pruebas.
+function obtenerTexto(clave, lang) {
+  const entrada = TEXTOS_CACHE[clave];
+  if (!entrada) return '[[' + clave + ']]';
+  if (lang !== 'es' && entrada.traducciones[lang]) return entrada.traducciones[lang];
+  return entrada.texto_es;
+}
 
 // ─── Helpers generales ───────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
@@ -326,6 +347,80 @@ async function initSchema() {
   await pool.query(`
     INSERT INTO ajustes_seo_globales (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
   `);
+
+  // ─── Sistema de traducción de la interfaz de la web ──────────────────────
+  // Distinto del SEO: esto traduce los textos fijos de la propia página
+  // (botones, títulos, etiquetas), no los datos de cada ruta.
+  // El texto en español es la fuente de verdad y se gestiona desde el código;
+  // las traducciones a los demás idiomas se gestionan desde el admin.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS textos_interfaz (
+      id SERIAL PRIMARY KEY,
+      clave TEXT UNIQUE NOT NULL,
+      modulo TEXT NOT NULL,
+      contexto TEXT,
+      texto_es TEXT NOT NULL,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS textos_interfaz_traducciones (
+      id SERIAL PRIMARY KEY,
+      texto_id INT NOT NULL REFERENCES textos_interfaz(id) ON DELETE CASCADE,
+      lang_code VARCHAR(2) NOT NULL,
+      texto TEXT,
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(texto_id, lang_code)
+    );
+  `);
+
+  // Los 21 textos fijos de la página de ruta (traslado.ejs), con su contexto
+  // para que cualquier traductor sepa exactamente dónde aparece cada uno.
+  // El español se mantiene siempre sincronizado con el código en cada deploy.
+  const TEXTOS_INTERFAZ_SEMILLA = [
+    { clave: 'nav_volver_rutas', modulo: 'Página de ruta', contexto: 'Enlace arriba a la derecha de la cabecera, vuelve a la página principal', es: '← Todas las rutas', en: '← All routes' },
+    { clave: 'etiqueta_categoria_ruta', modulo: 'Página de ruta', contexto: 'Etiqueta pequeña en mayúsculas, encima del título de la ruta', es: 'Traslado intermunicipal · Gran Canaria', en: 'Intermunicipal transfer · Gran Canaria' },
+    { clave: 'subtitulo_hero', modulo: 'Página de ruta', contexto: 'Frase debajo del título de la ruta, resume la propuesta de valor', es: 'Precio fijo, chofer confirmado antes de salir. Sin sorpresas en la factura.', en: 'Fixed price, confirmed driver before you leave. No surprises on the bill.' },
+    { clave: 'boton_solicitar_traslado', modulo: 'Página de ruta', contexto: 'Texto del botón principal de reserva (aparece dos veces en la página)', es: 'Solicitar este traslado', en: 'Request this transfer' },
+    { clave: 'titulo_tarifas', modulo: 'Página de ruta', contexto: 'Título de la sección con la tabla de precios', es: 'Tarifas disponibles', en: 'Available rates' },
+    { clave: 'tabla_columna_categoria', modulo: 'Página de ruta', contexto: 'Cabecera de columna en la tabla de tarifas', es: 'Categoría', en: 'Category' },
+    { clave: 'tabla_columna_pasajeros', modulo: 'Página de ruta', contexto: 'Cabecera de columna en la tabla de tarifas', es: 'Pasajeros', en: 'Passengers' },
+    { clave: 'tabla_columna_equipaje', modulo: 'Página de ruta', contexto: 'Cabecera de columna en la tabla de tarifas', es: 'Equipaje', en: 'Luggage' },
+    { clave: 'tabla_columna_precio', modulo: 'Página de ruta', contexto: 'Cabecera de columna en la tabla de tarifas', es: 'Precio', en: 'Price' },
+    { clave: 'sufijo_pax', modulo: 'Página de ruta', contexto: 'Abreviatura que sigue al número de plazas en la tabla, ej: "4 pax"', es: 'pax', en: 'pax' },
+    { clave: 'badge_precio_fijo', modulo: 'Página de ruta', contexto: 'Etiqueta pequeña junto al precio cuando es fijo', es: 'precio fijo', en: 'fixed price' },
+    { clave: 'texto_a_consultar', modulo: 'Página de ruta', contexto: 'Texto que sustituye al precio cuando esa categoría aún no tiene precio cargado', es: 'A consultar', en: 'On request' },
+    { clave: 'texto_consulta_disponibilidad', modulo: 'Página de ruta', contexto: 'Párrafo que se muestra si la ruta todavía no tiene ningún precio cargado', es: 'Consulta disponibilidad y precio para este traslado.', en: 'Check availability and price for this transfer.' },
+    { clave: 'titulo_como_funciona', modulo: 'Página de ruta', contexto: 'Título de la sección de 3 pasos que explica el proceso de reserva', es: 'Cómo funciona', en: 'How it works' },
+    { clave: 'paso1_titulo', modulo: 'Página de ruta', contexto: 'Título del paso 1 en la sección "Cómo funciona"', es: '1. Reserva', en: '1. Booking' },
+    { clave: 'paso1_texto', modulo: 'Página de ruta', contexto: 'Descripción del paso 1 en la sección "Cómo funciona"', es: 'Solicitas el traslado con tu ruta y categoría de vehículo. Ves el precio fijo antes de confirmar.', en: 'Request your transfer with your route and vehicle category. See the fixed price before confirming.' },
+    { clave: 'paso2_titulo', modulo: 'Página de ruta', contexto: 'Título del paso 2 en la sección "Cómo funciona"', es: '2. Confirmación', en: '2. Confirmation' },
+    { clave: 'paso2_texto', modulo: 'Página de ruta', contexto: 'Descripción del paso 2 en la sección "Cómo funciona"', es: 'Un chofer acepta tu viaje y te lo confirmamos antes de que salgas de casa.', en: 'A driver accepts your trip and we confirm it before you leave home.' },
+    { clave: 'paso3_titulo', modulo: 'Página de ruta', contexto: 'Título del paso 3 en la sección "Cómo funciona"', es: '3. Viaje', en: '3. Trip' },
+    { clave: 'paso3_texto', modulo: 'Página de ruta', contexto: 'Descripción del paso 3 en la sección "Cómo funciona"', es: 'Coordinamos los detalles por WhatsApp. Tu chofer ya sabe dónde y cuándo recogerte.', en: 'We coordinate the details by WhatsApp. Your driver already knows where and when to pick you up.' },
+    { clave: 'titulo_rutas_relacionadas', modulo: 'Página de ruta', contexto: 'Encabezado de la sección final con enlaces a otras rutas; va seguido del nombre del origen, ej: "Otros traslados desde Las Palmas"', es: 'Otros traslados desde', en: 'Other transfers from' }
+  ];
+
+  for (const t of TEXTOS_INTERFAZ_SEMILLA) {
+    const fila = await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (clave) DO UPDATE SET modulo = $2, contexto = $3, texto_es = $4
+       RETURNING id`,
+      [t.clave, t.modulo, t.contexto, t.es]
+    );
+    const textoId = fila.rows[0].id;
+    if (t.en) {
+      await pool.query(
+        `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
+         VALUES ($1, 'en', $2)
+         ON CONFLICT (texto_id, lang_code) DO NOTHING`,
+        [textoId, t.en]
+      );
+    }
+  }
+
+  await cargarTextosCache();
 
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
@@ -1299,6 +1394,269 @@ app.post('/admin/site-archivos/:nombre/restablecer', requireAdmin, asyncHandler(
   res.json({ ok: true });
 }));
 
+// ─── Sistema de traducción de la interfaz de la web ──────────────────────────
+const IDIOMAS_TRADUCIBLES = IDIOMAS_PERMITIDOS.filter(function (l) { return l !== 'es'; });
+
+const NOMBRE_IDIOMA_ES = {
+  en: 'inglés', de: 'alemán', sv: 'sueco', no: 'noruego',
+  nl: 'holandés', it: 'italiano', fr: 'francés', fi: 'finés'
+};
+
+// Llama a la API de Claude (Anthropic) para traducir un lote de textos de
+// golpe, usando el contexto de cada uno para que la traducción encaje con
+// dónde aparece en la web. Devuelve un objeto { clave: traducción }.
+async function traducirConClaudeIA(items, nombreIdioma) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.');
+  }
+
+  const prompt = 'Traduce los siguientes textos de una web de traslados privados en Gran Canaria, ' +
+    'del español al ' + nombreIdioma + '. Cada texto incluye una clave única y un contexto que explica ' +
+    'dónde aparece en la web — úsalo para elegir la traducción más natural (por ejemplo, un botón necesita ' +
+    'un tono distinto a un párrafo explicativo). Mantén un tono profesional pero cercano, igual que el original.\n\n' +
+    'Textos a traducir (JSON):\n' + JSON.stringify(items, null, 2) + '\n\n' +
+    'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, ' +
+    'sin bloques de markdown ni comillas triples, con esta forma exacta: ' +
+    '{"clave1": "traducción1", "clave2": "traducción2"}';
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+
+  if (!response.ok) {
+    const cuerpoError = await response.text();
+    throw new Error('Error de la API de Claude (' + response.status + '): ' + cuerpoError.slice(0, 200));
+  }
+
+  const data = await response.json();
+  const textoRespuesta = data.content.map(function (b) { return b.text || ''; }).join('');
+  const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
+  return JSON.parse(limpio);
+}
+
+// Lista todos los textos con su estado de traducción por idioma (para las
+// insignias de colores: verde traducido, rojo falta)
+app.get('/admin/textos', requireAdmin, asyncHandler(async (req, res) => {
+  const textos = await pool.query(
+    `SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY modulo, id`
+  );
+  const traducciones = await pool.query(
+    `SELECT texto_id, lang_code, texto FROM textos_interfaz_traducciones`
+  );
+
+  const traduccionesPorTexto = {};
+  for (const fila of traducciones.rows) {
+    if (!traduccionesPorTexto[fila.texto_id]) traduccionesPorTexto[fila.texto_id] = {};
+    traduccionesPorTexto[fila.texto_id][fila.lang_code] = fila.texto;
+  }
+
+  const lista = textos.rows.map(function (t) {
+    const estado = {};
+    for (const lang of IDIOMAS_TRADUCIBLES) {
+      const valor = traduccionesPorTexto[t.id] && traduccionesPorTexto[t.id][lang];
+      estado[lang] = !!(valor && valor.trim());
+    }
+    return { ...t, estado };
+  });
+
+  res.json({ textos: lista, idiomas: IDIOMAS_TRADUCIBLES });
+}));
+
+// Guarda (o actualiza) la traducción de un texto en un idioma concreto
+// Devuelve la traducción actual (o vacío) de un texto en un idioma concreto
+app.get('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  const result = await pool.query(
+    'SELECT texto FROM textos_interfaz_traducciones WHERE texto_id = $1 AND lang_code = $2',
+    [req.params.id, req.params.lang]
+  );
+  res.json({ texto: result.rows.length ? result.rows[0].texto : '' });
+}));
+
+app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  await pool.query(
+    `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
+    [req.params.id, req.params.lang, req.body.texto || '']
+  );
+  await cargarTextosCache();
+  res.json({ ok: true });
+}));
+
+// Exporta todos los textos a un Excel listo para traductores —
+// mismo patrón que el Excel de SEO, una fila por texto y por idioma
+app.get('/admin/textos/exportar', requireAdmin, asyncHandler(async (req, res) => {
+  const textos = await pool.query(`SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY modulo, id`);
+  const traducciones = await pool.query(`SELECT texto_id, lang_code, texto FROM textos_interfaz_traducciones`);
+
+  const traduccionesPorTexto = {};
+  for (const fila of traducciones.rows) {
+    if (!traduccionesPorTexto[fila.texto_id]) traduccionesPorTexto[fila.texto_id] = {};
+    traduccionesPorTexto[fila.texto_id][fila.lang_code] = fila.texto;
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Traslados GC Admin';
+  const sheet = workbook.addWorksheet('Textos interfaz');
+
+  sheet.columns = [
+    { header: 'texto_id', key: 'texto_id', width: 8 },
+    { header: 'clave', key: 'clave', width: 32 },
+    { header: 'modulo', key: 'modulo', width: 20 },
+    { header: 'contexto', key: 'contexto', width: 55 },
+    { header: 'texto_es', key: 'texto_es', width: 55 },
+    { header: 'lang_code', key: 'lang_code', width: 10 },
+    { header: 'traduccion', key: 'traduccion', width: 55 }
+  ];
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: 'FF1C1815' } };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8D5B0' } };
+
+  for (const t of textos.rows) {
+    for (const lang of IDIOMAS_TRADUCIBLES) {
+      sheet.addRow({
+        texto_id: t.id, clave: t.clave, modulo: t.modulo, contexto: t.contexto,
+        texto_es: t.texto_es, lang_code: lang,
+        traduccion: (traduccionesPorTexto[t.id] && traduccionesPorTexto[t.id][lang]) || ''
+      });
+    }
+  }
+
+  sheet.views = [{ state: 'frozen', ySplit: 1 }];
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="textos-interfaz-traslados-gc.xlsx"');
+  await workbook.xlsx.write(res);
+  res.end();
+}));
+
+// Importa el Excel traducido y actualiza las traducciones
+app.post('/admin/textos/importar', requireAdmin, upload.single('archivo'), asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Falta el archivo Excel' });
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(req.file.buffer);
+  const sheet = workbook.worksheets[0];
+
+  let actualizadas = 0;
+  const errores = [];
+
+  const filas = [];
+  sheet.eachRow(function (row, rowNumber) {
+    if (rowNumber === 1) return;
+    filas.push({
+      textoId: row.getCell(1).value,
+      langCode: String(row.getCell(6).value || '').trim(),
+      traduccion: String(row.getCell(7).value || '').trim()
+    });
+  });
+
+  for (const f of filas) {
+    if (!f.textoId || !IDIOMAS_TRADUCIBLES.includes(f.langCode)) continue;
+    try {
+      await pool.query(
+        `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
+        [f.textoId, f.langCode, f.traduccion]
+      );
+      actualizadas++;
+    } catch (err) {
+      errores.push('Texto ' + f.textoId + '/' + f.langCode + ': ' + err.message);
+    }
+  }
+
+  await cargarTextosCache();
+  res.json({ ok: true, actualizadas, errores });
+}));
+
+// Traduce con IA (Claude) todos los textos que falten en un idioma — no
+// guarda nada todavía, solo devuelve propuestas para revisar antes de guardar
+app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+
+  const textos = await pool.query('SELECT id, clave, contexto, texto_es FROM textos_interfaz ORDER BY id');
+  const traducciones = await pool.query(
+    'SELECT texto_id, texto FROM textos_interfaz_traducciones WHERE lang_code = $1',
+    [lang]
+  );
+  const yaTraducidos = {};
+  for (const fila of traducciones.rows) yaTraducidos[fila.texto_id] = fila.texto;
+
+  const pendientes = textos.rows.filter(function (t) {
+    return !(yaTraducidos[t.id] && yaTraducidos[t.id].trim());
+  });
+
+  if (pendientes.length === 0) {
+    return res.json({ ok: true, propuestas: [] });
+  }
+
+  const items = pendientes.map(function (t) {
+    return { clave: t.clave, contexto: t.contexto || '', texto_es: t.texto_es };
+  });
+
+  let traduccionesIA;
+  try {
+    traduccionesIA = await traducirConClaudeIA(items, NOMBRE_IDIOMA_ES[lang] || lang);
+  } catch (err) {
+    console.error('Error traduciendo con IA:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+
+  const propuestas = pendientes.map(function (t) {
+    return {
+      texto_id: t.id,
+      clave: t.clave,
+      contexto: t.contexto,
+      texto_es: t.texto_es,
+      sugerencia: traduccionesIA[t.clave] || ''
+    };
+  });
+
+  res.json({ ok: true, propuestas });
+}));
+
+// Guarda en bloque las traducciones revisadas (a mano o tras la propuesta de IA)
+app.post('/admin/textos/guardar-lote', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang, traducciones } = req.body;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang) || !Array.isArray(traducciones)) {
+    return res.status(400).json({ error: 'Datos no válidos' });
+  }
+  let guardadas = 0;
+  for (const item of traducciones) {
+    if (!item.texto_id) continue;
+    await pool.query(
+      `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
+      [item.texto_id, lang, item.texto || '']
+    );
+    guardadas++;
+  }
+  await cargarTextosCache();
+  res.json({ ok: true, guardadas });
+}));
+
 // ─── Ajustes globales de SEO ──────────────────────────────────────────────────
 app.get('/admin/seo/ajustes-globales', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
@@ -1530,12 +1888,15 @@ app.get('/:lang(es|en|de|sv|no|nl|it|fr|fi)/:seccion/:slug', asyncHandler(async 
     seo, precios.rows, nombreMarca, globales, BASE_URL, BASE_URL + req.path
   );
 
+  // Función de traducción de textos fijos de la interfaz, ligada al idioma de esta página
+  const t = function (clave) { return obtenerTexto(clave, lang); };
+
   res.render('traslado', {
     seo,
     precios: precios.rows,
     alternates: alternates.rows,
     relacionadas: relacionadas.rows,
-    textoOtrosTraslados: TEXTO_OTROS_TRASLADOS[lang] || TEXTO_OTROS_TRASLADOS.es,
+    t,
     lang,
     BASE_URL,
     SECCIONES_TRASLADO,
