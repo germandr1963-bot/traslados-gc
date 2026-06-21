@@ -1217,6 +1217,34 @@ function contarPxSEO(input, idContador, maxPx, fuente) {
   el.textContent = px + ' / ' + maxPx + ' px';
 }
 
+function verSchemaRuta(rutaId, lang) {
+  var caja = document.getElementById('schema-ruta-vista');
+  if (!caja) return;
+  caja.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+
+  fetch('/admin/seo/rutas/' + rutaId + '/idioma/' + lang + '/schema')
+    .then(function (r) { return r.json(); })
+    .then(function (datos) {
+      if (!datos.schemaTaxiService) {
+        caja.innerHTML = '<div class="aviso-error">' + escapar(datos.error || 'No se pudo cargar.') + '</div>';
+        return;
+      }
+      var jsonBonito = JSON.stringify({ TaxiService: datos.schemaTaxiService, BreadcrumbList: datos.schemaBreadcrumb }, null, 2);
+
+      caja.innerHTML =
+        '<div style="background:var(--gris-fondo);border-radius:8px;padding:12px 14px;">' +
+        '<p style="font-size:12px;color:var(--texto-muted);margin:0 0 8px;">' +
+        (datos.activo
+          ? '🟢 Esto es lo que ve Google ahora mismo en <code>' + escapar(datos.url) + '</code>'
+          : '⚪ Esta página está desactivada — esto es lo que se vería si la activas') +
+        '</p>' +
+        '<pre style="background:#1c1815;color:#d4d4d4;padding:12px;border-radius:6px;font-size:11px;overflow-x:auto;max-height:340px;font-family:\'JetBrains Mono\',monospace;">' +
+        escapar(jsonBonito) + '</pre>' +
+        '<button class="boton-secundario" style="margin-top:8px;padding:5px 12px;font-size:0.78rem;" onclick="document.getElementById(\'schema-ruta-vista\').innerHTML=\'\'">Cerrar</button>' +
+        '</div>';
+    });
+}
+
 function copiarEnlacePublico(lang, slug, boton) {
   var seccion = SECCIONES_TRASLADO_JS[lang] || 'traslado';
   var url = window.location.origin + '/' + lang + '/' + seccion + '/' + slug;
@@ -1264,7 +1292,9 @@ function renderizarCamposSEO(rutaId, lang, datos) {
       'oninput="contarPxSEO(this,\'seo-desc-count\',960,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
     '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-desc-count">' + medirPx(desc, '13px arial') + ' / 960 px</div>' +
 
-    '<button class="boton-primario" onclick="guardarSEO(' + rutaId + ', \'' + lang + '\')">💾 Guardar</button>';
+    '<button class="boton-primario" onclick="guardarSEO(' + rutaId + ', \'' + lang + '\')">💾 Guardar</button> ' +
+    '<button class="boton-secundario" onclick="verSchemaRuta(' + rutaId + ', \'' + lang + '\')">👁️ Ver datos estructurados</button>' +
+    '<div id="schema-ruta-vista" style="margin-top:14px;"></div>';
 }
 
 function validarSlugEnVivo(input) {
