@@ -256,18 +256,9 @@ table.tabla-precios input {
       <div id="mensaje-seo" style="margin-bottom:12px;"></div>
 
       <table class="tabla-admin">
-        <thead>
+        <thead id="thead-seo">
           <tr>
             <th>Ruta</th>
-            <th style="text-align:center">ES</th>
-            <th style="text-align:center">EN</th>
-            <th style="text-align:center">DE</th>
-            <th style="text-align:center">SV</th>
-            <th style="text-align:center">NO</th>
-            <th style="text-align:center">NL</th>
-            <th style="text-align:center">IT</th>
-            <th style="text-align:center">FR</th>
-            <th style="text-align:center">FI</th>
             <th>Acción</th>
           </tr>
         </thead>
@@ -294,34 +285,17 @@ table.tabla-precios input {
 
       <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
         <span style="font-size:13px;">🤖 Traducir automáticamente con IA:</span>
-        <select id="select-idioma-ia" class="campo" style="height:34px;width:auto;">
-          <option value="en">Inglés</option>
-          <option value="de">Alemán</option>
-          <option value="sv">Sueco</option>
-          <option value="no">Noruego</option>
-          <option value="nl">Holandés</option>
-          <option value="it">Italiano</option>
-          <option value="fr">Francés</option>
-          <option value="fi">Finés</option>
-        </select>
+        <select id="select-idioma-ia" class="campo" style="height:34px;width:auto;"></select>
         <button class="boton-costa" onclick="traducirConIA()">Traducir lo que falte</button>
       </div>
 
       <div id="mensaje-textos" style="margin-bottom:12px;"></div>
 
       <table class="tabla-admin">
-        <thead>
+        <thead id="thead-textos">
           <tr>
             <th>Texto</th>
             <th>Módulo</th>
-            <th style="text-align:center">EN</th>
-            <th style="text-align:center">DE</th>
-            <th style="text-align:center">SV</th>
-            <th style="text-align:center">NO</th>
-            <th style="text-align:center">NL</th>
-            <th style="text-align:center">IT</th>
-            <th style="text-align:center">FR</th>
-            <th style="text-align:center">FI</th>
             <th>Acción</th>
           </tr>
         </thead>
@@ -1058,13 +1032,43 @@ document.getElementById('boton-guardar-precios').addEventListener('click', funct
 
 
 // ─── SEO ──────────────────────────────────────────────────────────────────────
-var IDIOMAS_SEO = ['es', 'en', 'de', 'sv', 'no', 'nl', 'it', 'fr', 'fi'];
-var SECCIONES_TRASLADO_JS = { es: 'traslado', en: 'transfer', de: 'transfer', sv: 'transfer', no: 'transfer', nl: 'transfer', it: 'trasferimento', fr: 'transfert', fi: 'siirto' };
+var IDIOMAS_SEO = [];          // se rellena en tiempo real desde /admin/idiomas
+var SECCIONES_TRASLADO_JS = {}; // idem
 var seoCache = null;
+
+// Carga la lista de idiomas activos de la web desde la base de datos y
+// rellena todas las variables compartidas (IDIOMAS_SEO, IDIOMAS_TEXTOS,
+// SECCIONES_TRASLADO_JS, NOMBRES_IDIOMA). Se llama cada vez que se entra en
+// la pestaña SEO o Idiomas, así que un idioma añadido aparece al instante,
+// sin tener que recargar la página ni tocar código.
+function cargarListaIdiomasDinamica() {
+  return fetch('/admin/idiomas').then(function (r) { return r.json(); }).then(function (idiomas) {
+    var activos = idiomas.filter(function (i) { return i.activo; });
+    IDIOMAS_SEO = activos.map(function (i) { return i.codigo; });
+    IDIOMAS_TEXTOS = activos.filter(function (i) { return !i.es_base; }).map(function (i) { return i.codigo; });
+    SECCIONES_TRASLADO_JS = {};
+    NOMBRES_IDIOMA = {};
+    activos.forEach(function (i) {
+      SECCIONES_TRASLADO_JS[i.codigo] = i.palabra_traslado;
+      NOMBRES_IDIOMA[i.codigo] = i.nombre;
+    });
+  });
+}
+
+function renderizarCabeceraSEO() {
+  var thead = document.getElementById('thead-seo');
+  if (!thead) return;
+  thead.innerHTML = '<tr><th>Ruta</th>' +
+    IDIOMAS_SEO.map(function (l) { return '<th style="text-align:center">' + l.toUpperCase() + '</th>'; }).join('') +
+    '<th>Acción</th></tr>';
+}
 
 function cargarSEO() {
   document.getElementById('tabla-seo-cuerpo').innerHTML = '<tr><td colspan="10" style="color:var(--texto-muted)">Cargando...</td></tr>';
-  fetch('/admin/seo/rutas').then(function (r) { return r.json(); }).then(function (datos) {
+  cargarListaIdiomasDinamica().then(function () {
+    renderizarCabeceraSEO();
+    return fetch('/admin/seo/rutas');
+  }).then(function (r) { return r.json(); }).then(function (datos) {
     seoCache = datos;
     renderizarTablaSEO(datos);
   });
@@ -1551,7 +1555,7 @@ function restablecerArchivoAuto(nombre) {
 }
 
 // ─── Panel de Salud SEO ───────────────────────────────────────────────────────
-var NOMBRES_IDIOMA = { es: 'Español', en: 'Inglés', de: 'Alemán', sv: 'Sueco', no: 'Noruego', nl: 'Holandés', it: 'Italiano', fr: 'Francés', fi: 'Finés' };
+var NOMBRES_IDIOMA = {}; // se rellena en tiempo real desde /admin/idiomas
 
 function abrirPanelSalud() {
   document.getElementById('editor-archivo-manual').classList.add('oculto');
@@ -1808,12 +1812,32 @@ function eliminarRedireccion(id) {
 }
 
 // ─── Idiomas — Textos de la interfaz ──────────────────────────────────────────
-var IDIOMAS_TEXTOS = ['en', 'de', 'sv', 'no', 'nl', 'it', 'fr', 'fi'];
+var IDIOMAS_TEXTOS = []; // se rellena en tiempo real desde /admin/idiomas (excluye el idioma base)
 var textosCache = null;
+
+function renderizarCabeceraTextos() {
+  var thead = document.getElementById('thead-textos');
+  if (!thead) return;
+  thead.innerHTML = '<tr><th>Texto</th><th>Módulo</th>' +
+    IDIOMAS_TEXTOS.map(function (l) { return '<th style="text-align:center">' + l.toUpperCase() + '</th>'; }).join('') +
+    '<th>Acción</th></tr>';
+}
+
+function renderizarSelectIA() {
+  var select = document.getElementById('select-idioma-ia');
+  if (!select) return;
+  select.innerHTML = IDIOMAS_TEXTOS.map(function (l) {
+    return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
+  }).join('');
+}
 
 function cargarTextosInterfaz() {
   document.getElementById('tabla-textos-cuerpo').innerHTML = '<tr><td colspan="11" style="color:var(--texto-muted)">Cargando...</td></tr>';
-  fetch('/admin/textos').then(function (r) { return r.json(); }).then(function (datos) {
+  cargarListaIdiomasDinamica().then(function () {
+    renderizarCabeceraTextos();
+    renderizarSelectIA();
+    return fetch('/admin/textos');
+  }).then(function (r) { return r.json(); }).then(function (datos) {
     textosCache = datos;
     renderizarTablaTextos(datos);
   });
