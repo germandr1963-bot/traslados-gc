@@ -200,43 +200,43 @@ footer {
     <a href="/" style="text-decoration:none;color:inherit;">
       <span class="titular" style="font-size:18px;"><%= nombreMarca %></span>
     </a>
-    <a href="/" class="nav-links" style="text-decoration:none;color:inherit;">← Todas las rutas</a>
+    <a href="/" class="nav-links" style="text-decoration:none;color:inherit;"><%= t('nav_volver_rutas') %></a>
   </div>
 
   <div class="hero-overlay">
-    <div class="etiqueta-ruta titular">Traslado intermunicipal · Gran Canaria</div>
+    <div class="etiqueta-ruta titular"><%= t('etiqueta_categoria_ruta') %></div>
     <h1 class="titulo-ruta titular">
       <%= seo.origen %> <span class="acento">→</span><br><%= seo.destino %>
     </h1>
-    <p class="subtitulo-ruta">Precio fijo, chofer confirmado antes de salir. Sin sorpresas en la factura.</p>
-    <a href="/" class="boton-reservar">Solicitar este traslado</a>
+    <p class="subtitulo-ruta"><%= t('subtitulo_hero') %></p>
+    <a href="/" class="boton-reservar"><%= t('boton_solicitar_traslado') %></a>
   </div>
 </div>
 
 <div class="seccion">
-  <h2>Tarifas disponibles</h2>
+  <h2><%= t('titulo_tarifas') %></h2>
   <% if (precios.length > 0) { %>
   <table class="tabla-tarifas">
     <thead>
       <tr>
-        <th>Categoría</th>
-        <th>Pasajeros</th>
-        <th>Equipaje</th>
-        <th>Precio</th>
+        <th><%= t('tabla_columna_categoria') %></th>
+        <th><%= t('tabla_columna_pasajeros') %></th>
+        <th><%= t('tabla_columna_equipaje') %></th>
+        <th><%= t('tabla_columna_precio') %></th>
       </tr>
     </thead>
     <tbody>
       <% precios.forEach(function(p) { %>
       <tr>
         <td><strong><%= p.nombre %></strong></td>
-        <td><%= p.capacidad_pasajeros %> pax</td>
+        <td><%= p.capacidad_pasajeros %> <%= t('sufijo_pax') %></td>
         <td><%= p.capacidad_maletas %></td>
         <td>
           <% if (p.precio) { %>
             <span class="precio-fijo"><%= Number(p.precio).toFixed(0) %> €</span>
-            <span class="badge-fijo">precio fijo</span>
+            <span class="badge-fijo"><%= t('badge_precio_fijo') %></span>
           <% } else { %>
-            <span class="consultar">A consultar</span>
+            <span class="consultar"><%= t('texto_a_consultar') %></span>
           <% } %>
         </td>
       </tr>
@@ -244,34 +244,34 @@ footer {
     </tbody>
   </table>
   <% } else { %>
-  <p style="color:var(--texto-muted);font-size:14px;">Consulta disponibilidad y precio para este traslado.</p>
+  <p style="color:var(--texto-muted);font-size:14px;"><%= t('texto_consulta_disponibilidad') %></p>
   <% } %>
   <p style="margin-top:20px;">
-    <a href="/" class="boton-reservar">Solicitar este traslado</a>
+    <a href="/" class="boton-reservar"><%= t('boton_solicitar_traslado') %></a>
   </p>
 </div>
 
 <div class="seccion">
-  <h2>Cómo funciona</h2>
+  <h2><%= t('titulo_como_funciona') %></h2>
   <div class="tres-columnas">
     <div class="tarjeta">
-      <strong>1. Reserva</strong>
-      <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);">Solicitas el traslado con tu ruta y categoría de vehículo. Ves el precio fijo antes de confirmar.</p>
+      <strong><%= t('paso1_titulo') %></strong>
+      <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);"><%= t('paso1_texto') %></p>
     </div>
     <div class="tarjeta">
-      <strong>2. Confirmación</strong>
-      <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);">Un chofer acepta tu viaje y te lo confirmamos antes de que salgas de casa.</p>
+      <strong><%= t('paso2_titulo') %></strong>
+      <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);"><%= t('paso2_texto') %></p>
     </div>
     <div class="tarjeta">
-      <strong>3. Viaje</strong>
-      <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);">Coordinamos los detalles por WhatsApp. Tu chofer ya sabe dónde y cuándo recogerte.</p>
+      <strong><%= t('paso3_titulo') %></strong>
+      <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);"><%= t('paso3_texto') %></p>
     </div>
   </div>
 </div>
 
 <% if (relacionadas && relacionadas.length > 0) { %>
 <div class="seccion">
-  <h2><%= textoOtrosTraslados %> <%= seo.origen %></h2>
+  <h2><%= t('titulo_rutas_relacionadas') %> <%= seo.origen %></h2>
   <div class="tres-columnas">
     <% relacionadas.forEach(function(r) { %>
     <a href="/<%= lang %>/<%= SECCIONES_TRASLADO[lang] %>/<%= r.slug_url %>" class="tarjeta" style="text-decoration:none;color:inherit;display:block;">
