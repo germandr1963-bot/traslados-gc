@@ -64,6 +64,19 @@ const SECCIONES_TRASLADO = {
 // URL base del sitio — se usa para construir canonical y hreflang
 const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
 
+// Texto "Otros traslados desde..." en cada idioma, para el enlazado interno
+const TEXTO_OTROS_TRASLADOS = {
+  es: 'Otros traslados desde',
+  en: 'Other transfers from',
+  de: 'Weitere Transfers ab',
+  sv: 'Fler transfers från',
+  no: 'Flere transporter fra',
+  nl: 'Meer transfers vanaf',
+  it: 'Altri transfer da',
+  fr: 'Autres transferts depuis',
+  fi: 'Muita kuljetuksia lähtöpaikasta'
+};
+
 // ─── Helpers generales ───────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
   if (req.session && req.session.adminId) {
@@ -1500,6 +1513,19 @@ app.get('/:lang(es|en|de|sv|no|nl|it|fr|fi)/:seccion/:slug', asyncHandler(async 
   const globales = ajustesGlobales.rows[0] || { nombre_marca: 'Traslados · GC', imagen_og_defecto: null, twitter_activo: false };
   const nombreMarca = globales.nombre_marca || 'Traslados · GC';
 
+  // Otras rutas activas desde el mismo origen, en el mismo idioma — para el
+  // enlazado interno al final de la página ("otros traslados desde...")
+  const relacionadas = await pool.query(
+    `SELECT r.destino, rss.slug_url
+     FROM rutas r
+     JOIN route_seo_settings rss ON rss.route_id = r.id
+     WHERE r.origen = $1 AND r.id != $2 AND r.activa = TRUE
+       AND rss.lang_code = $3 AND rss.activo = TRUE
+     ORDER BY RANDOM()
+     LIMIT 4`,
+    [seo.origen, seo.ruta_id, lang]
+  );
+
   const { schemaTaxiService, schemaBreadcrumb } = construirSchemaRuta(
     seo, precios.rows, nombreMarca, globales, BASE_URL, BASE_URL + req.path
   );
@@ -1508,6 +1534,8 @@ app.get('/:lang(es|en|de|sv|no|nl|it|fr|fi)/:seccion/:slug', asyncHandler(async 
     seo,
     precios: precios.rows,
     alternates: alternates.rows,
+    relacionadas: relacionadas.rows,
+    textoOtrosTraslados: TEXTO_OTROS_TRASLADOS[lang] || TEXTO_OTROS_TRASLADOS.es,
     lang,
     BASE_URL,
     SECCIONES_TRASLADO,
