@@ -51,6 +51,11 @@
 <link rel="canonical" href="<%= seo.canonical_url %>">
 <% } %>
 
+<!-- Datos estructurados (Schema.org) — le dicen a Google qué es exactamente
+     esta página: un servicio de transporte concreto, con su precio real. -->
+<script type="application/ld+json"><%- JSON.stringify(schemaTaxiService).replace(/<\/script>/gi, '<\\/script>') %></script>
+<script type="application/ld+json"><%- JSON.stringify(schemaBreadcrumb).replace(/<\/script>/gi, '<\\/script>') %></script>
+
 <!-- Hreflang: una etiqueta por cada idioma activo de esta ruta -->
 <% alternates.forEach(function(alt) { %>
 <link rel="alternate" hreflang="<%= alt.lang_code %>" href="<%= BASE_URL %>/<%= alt.lang_code %>/<%= SECCIONES_TRASLADO[alt.lang_code] %>/<%= alt.slug_url %>">
