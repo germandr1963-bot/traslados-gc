@@ -241,6 +241,7 @@ table.tabla-precios input {
         <button type="button" class="boton-secundario" onclick="abrirPanelSalud()">🩺 Salud SEO</button>
         <button type="button" class="boton-secundario" onclick="abrirPanelRedirecciones()">🔀 Redirecciones</button>
         <button type="button" class="boton-secundario" onclick="abrirPanelAjustesGlobales()">⚙️ Ajustes globales</button>
+        <button type="button" class="boton-secundario" onclick="abrirPanelActivacionMasiva()">✅ Activar/desactivar por idioma</button>
       </div>
       <p style="font-size:12px;color:var(--texto-muted);margin-top:-8px;margin-bottom:16px;">
         Por defecto ambos se generan solos con los datos actuales. Si tu SEO necesita un ajuste manual, puede editarlos y guardarlos aquí.
@@ -250,6 +251,7 @@ table.tabla-precios input {
       <div id="panel-salud-seo" class="tarjeta oculto" style="margin-bottom:20px;"></div>
       <div id="panel-redirecciones" class="tarjeta oculto" style="margin-bottom:20px;"></div>
       <div id="panel-ajustes-globales" class="tarjeta oculto" style="margin-bottom:20px;"></div>
+      <div id="panel-activacion-masiva" class="tarjeta oculto" style="margin-bottom:20px;"></div>
 
       <div id="mensaje-seo" style="margin-bottom:12px;"></div>
 
@@ -285,7 +287,10 @@ table.tabla-precios input {
           ⬆️ Importar Excel traducido
           <input type="file" id="archivo-importar-textos" accept=".xlsx" style="display:none;" onchange="importarTextosInterfaz()">
         </label>
+        <button class="boton-secundario" onclick="abrirPanelIdiomas()">🌐 Gestionar idiomas de la web</button>
       </div>
+
+      <div id="panel-gestion-idiomas" class="tarjeta oculto" style="margin-bottom:18px;"></div>
 
       <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
         <span style="font-size:13px;">🤖 Traducir automáticamente con IA:</span>
@@ -1479,6 +1484,7 @@ function abrirEditorArchivo(nombre) {
   document.getElementById('panel-salud-seo').classList.add('oculto');
   document.getElementById('panel-redirecciones').classList.add('oculto');
   document.getElementById('panel-ajustes-globales').classList.add('oculto');
+  document.getElementById('panel-activacion-masiva').classList.add('oculto');
   var caja = document.getElementById('editor-archivo-manual');
   caja.classList.remove('oculto');
   caja.setAttribute('data-archivo', nombre);
@@ -1551,6 +1557,7 @@ function abrirPanelSalud() {
   document.getElementById('editor-archivo-manual').classList.add('oculto');
   document.getElementById('panel-redirecciones').classList.add('oculto');
   document.getElementById('panel-ajustes-globales').classList.add('oculto');
+  document.getElementById('panel-activacion-masiva').classList.add('oculto');
   var panel = document.getElementById('panel-salud-seo');
   panel.classList.remove('oculto');
   panel.innerHTML = '<p style="color:var(--texto-muted)">Calculando...</p>';
@@ -1588,6 +1595,7 @@ function abrirPanelRedirecciones() {
   document.getElementById('editor-archivo-manual').classList.add('oculto');
   document.getElementById('panel-salud-seo').classList.add('oculto');
   document.getElementById('panel-ajustes-globales').classList.add('oculto');
+  document.getElementById('panel-activacion-masiva').classList.add('oculto');
   var panel = document.getElementById('panel-redirecciones');
   panel.classList.remove('oculto');
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1599,6 +1607,7 @@ function abrirPanelAjustesGlobales() {
   document.getElementById('editor-archivo-manual').classList.add('oculto');
   document.getElementById('panel-salud-seo').classList.add('oculto');
   document.getElementById('panel-redirecciones').classList.add('oculto');
+  document.getElementById('panel-activacion-masiva').classList.add('oculto');
   var panel = document.getElementById('panel-ajustes-globales');
   panel.classList.remove('oculto');
   panel.innerHTML = '<p style="color:var(--texto-muted)">Cargando...</p>';
@@ -1686,6 +1695,59 @@ function subirImagenDefecto() {
 function eliminarImagenDefecto() {
   fetch('/admin/seo/ajustes-globales/imagen/eliminar', { method: 'POST' })
     .then(abrirPanelAjustesGlobales);
+}
+
+// ─── Activar/desactivar todas las páginas de un idioma de golpe ──────────────
+function abrirPanelActivacionMasiva() {
+  document.getElementById('editor-archivo-manual').classList.add('oculto');
+  document.getElementById('panel-salud-seo').classList.add('oculto');
+  document.getElementById('panel-redirecciones').classList.add('oculto');
+  document.getElementById('panel-ajustes-globales').classList.add('oculto');
+
+  var panel = document.getElementById('panel-activacion-masiva');
+  panel.classList.remove('oculto');
+  panel.innerHTML =
+    '<h3 style="margin-top:0">✅ Activar/desactivar por idioma</h3>' +
+    '<p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Activa o desactiva de golpe TODAS las páginas de un idioma, en vez de ruta por ruta. Útil cuando terminas de traducir un idioma entero y quieres publicarlo todo a la vez.</p>' +
+    '<div class="fila-form">' +
+    '<div><label class="etiqueta">Idioma</label>' +
+    '<select id="select-idioma-masivo" class="campo">' +
+    IDIOMAS_SEO.map(function (l) { return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>'; }).join('') +
+    '</select></div>' +
+    '<button class="boton-costa" onclick="activarMasivo(true)">✅ Activar todas</button>' +
+    '<button class="boton-peligro" onclick="activarMasivo(false)">⛔ Desactivar todas</button>' +
+    '</div>' +
+    '<div id="mensaje-activacion-masiva" style="margin-top:12px;"></div>' +
+    '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'panel-activacion-masiva\').classList.add(\'oculto\')">Cerrar</button>';
+
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function activarMasivo(activar) {
+  var lang = document.getElementById('select-idioma-masivo').value;
+  var nombreIdioma = NOMBRES_IDIOMA[lang] || lang.toUpperCase();
+  var confirmacion = confirm(
+    (activar ? 'Vas a ACTIVAR' : 'Vas a DESACTIVAR') + ' todas las páginas en ' + nombreIdioma + '.\n\n' +
+    (activar ? 'Asegúrate de que ya están bien traducidas antes de publicarlas todas.' : 'Dejarán de verse en internet inmediatamente.') +
+    '\n\n¿Continuar?'
+  );
+  if (!confirmacion) return;
+
+  var msg = document.getElementById('mensaje-activacion-masiva');
+  msg.innerHTML = 'Procesando...';
+
+  fetch('/admin/seo/idioma/' + lang + '/activar-todas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo: activar })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ ' + respuesta.afectadas + ' página(s) en ' + nombreIdioma + ' ' + (activar ? 'activadas' : 'desactivadas') + '.</div>';
+      cargarSEO();
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error') + '</div>';
+    }
+  });
 }
 
 function cargarRedirecciones() {
@@ -1864,6 +1926,74 @@ function importarTextosInterfaz() {
 }
 
 // ─── Traducción automática con IA ─────────────────────────────────────────────
+// ─── Gestión de idiomas de la web ─────────────────────────────────────────────
+function abrirPanelIdiomas() {
+  var panel = document.getElementById('panel-gestion-idiomas');
+  panel.classList.remove('oculto');
+  panel.innerHTML = '<p style="color:var(--texto-muted)">Cargando...</p>';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  fetch('/admin/idiomas').then(function (r) { return r.json(); }).then(function (idiomas) {
+    var filas = idiomas.map(function (idi) {
+      return '<tr>' +
+        '<td><strong>' + escapar(idi.nombre) + '</strong></td>' +
+        '<td style="font-family:\'JetBrains Mono\',monospace;">' + escapar(idi.codigo) + '</td>' +
+        '<td style="font-family:\'JetBrains Mono\',monospace;color:var(--texto-muted);">' + escapar(idi.palabra_traslado) + '</td>' +
+        '<td>' + (idi.es_base
+          ? '<span style="color:var(--texto-muted);font-size:12px;">Idioma base</span>'
+          : '<button class="' + (idi.activo ? 'boton-peligro' : 'boton-costa') + '" style="padding:5px 10px;font-size:0.78rem;" ' +
+            'onclick="toggleIdiomaActivo(\'' + idi.codigo + '\', ' + (!idi.activo) + ')">' +
+            (idi.activo ? 'Desactivar' : 'Activar') + '</button>') +
+        '</td>' +
+      '</tr>';
+    }).join('');
+
+    panel.innerHTML =
+      '<h3 style="margin-top:0">🌐 Idiomas de la web</h3>' +
+      '<table class="tabla-admin" style="margin-bottom:20px;">' +
+      '<thead><tr><th>Nombre</th><th>Código</th><th>Palabra en la URL</th><th>Acción</th></tr></thead>' +
+      '<tbody>' + filas + '</tbody></table>' +
+
+      '<h3>➕ Añadir idioma nuevo</h3>' +
+      '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">Al añadirlo, se crean automáticamente las fichas SEO vacías de este idioma en todas las rutas, listas para traducir.</p>' +
+      '<div class="fila-form">' +
+      '<div><label class="etiqueta">Código (2 letras)</label><input type="text" id="nuevo-idioma-codigo" class="campo" placeholder="ru" maxlength="2"></div>' +
+      '<div><label class="etiqueta">Nombre</label><input type="text" id="nuevo-idioma-nombre" class="campo" placeholder="Ruso"></div>' +
+      '<div><label class="etiqueta">Palabra para la URL</label><input type="text" id="nuevo-idioma-palabra" class="campo" placeholder="transfer"></div>' +
+      '<button class="boton-primario" onclick="anadirIdioma()">Añadir</button>' +
+      '</div>' +
+      '<div id="mensaje-nuevo-idioma" style="margin-top:10px;"></div>';
+  });
+}
+
+function toggleIdiomaActivo(codigo, activar) {
+  fetch('/admin/idiomas/' + codigo + '/activo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo: activar })
+  }).then(function () { abrirPanelIdiomas(); });
+}
+
+function anadirIdioma() {
+  var codigo = document.getElementById('nuevo-idioma-codigo').value.trim().toLowerCase();
+  var nombre = document.getElementById('nuevo-idioma-nombre').value.trim();
+  var palabra = document.getElementById('nuevo-idioma-palabra').value.trim().toLowerCase();
+  var msg = document.getElementById('mensaje-nuevo-idioma');
+
+  fetch('/admin/idiomas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ codigo: codigo, nombre: nombre, palabra_traslado: palabra })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Idioma añadido. Fichas SEO preparadas en ' + respuesta.rutasPreparadas + ' ruta(s). Recuerda: las tablas de SEO e Idiomas aún no muestran este idioma como columna — eso llega en el siguiente paso.</div>';
+      abrirPanelIdiomas();
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al añadir') + '</div>';
+    }
+  });
+}
+
 function traducirConIA() {
   var lang = document.getElementById('select-idioma-ia').value;
   var msg = document.getElementById('mensaje-textos');
