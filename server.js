@@ -1124,6 +1124,51 @@ function generarRobotsAuto() {
   ].join('\n');
 }
 
+// Construye los dos bloques de datos estructurados (Schema.org) para una
+// ruta concreta. Se usa tanto al renderizar la página pública como desde el
+// admin, para que German pueda ver exactamente lo mismo que ve Google.
+function construirSchemaRuta(seo, preciosRows, nombreMarca, globales, BASE_URL, urlActual) {
+  let imagenSchema = null;
+  if (seo.tiene_imagen) {
+    imagenSchema = BASE_URL + '/ruta-imagen/' + seo.ruta_id;
+  } else if (globales.imagen_og_defecto) {
+    imagenSchema = BASE_URL + '/imagen-og-defecto';
+  }
+
+  const schemaTaxiService = {
+    '@context': 'https://schema.org',
+    '@type': 'TaxiService',
+    name: seo.meta_title || (seo.origen + ' → ' + seo.destino),
+    description: seo.meta_description || undefined,
+    url: seo.canonical_url || undefined,
+    image: imagenSchema || undefined,
+    provider: { '@type': 'Organization', name: nombreMarca, url: BASE_URL },
+    areaServed: { '@type': 'Place', name: 'Gran Canaria' }
+  };
+  if (preciosRows.length > 0) {
+    schemaTaxiService.offers = preciosRows.map(function (p) {
+      return {
+        '@type': 'Offer',
+        name: p.nombre,
+        priceCurrency: 'EUR',
+        price: Number(p.precio).toFixed(2),
+        availability: 'https://schema.org/InStock'
+      };
+    });
+  }
+
+  const schemaBreadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Inicio', item: BASE_URL + '/' },
+      { '@type': 'ListItem', position: 2, name: seo.origen + ' → ' + seo.destino, item: seo.canonical_url || urlActual }
+    ]
+  };
+
+  return { schemaTaxiService, schemaBreadcrumb };
+}
+
 async function generarSitemapAuto() {
   const result = await pool.query(
     `SELECT rss.route_id, rss.lang_code, rss.slug_url, rss.updated_at,
@@ -1325,6 +1370,41 @@ app.post('/admin/redirecciones/:id/eliminar', requireAdmin, asyncHandler(async (
 }));
 
 // ─── Panel de salud SEO ───────────────────────────────────────────────────────
+// Devuelve los datos estructurados (Schema.org) que vería Google para una
+// ruta en un idioma concreto — para que German pueda verlos sin salir del admin
+app.get('/admin/seo/rutas/:id/idioma/:lang/schema', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  const seoResult = await pool.query(
+    `SELECT rss.*, r.origen, r.destino, r.id AS ruta_id, (r.imagen_og IS NOT NULL) AS tiene_imagen
+     FROM route_seo_settings rss
+     JOIN rutas r ON r.id = rss.route_id
+     WHERE rss.route_id = $1 AND rss.lang_code = $2`,
+    [req.params.id, req.params.lang]
+  );
+  if (seoResult.rows.length === 0) return res.status(404).json({ error: 'No encontrado' });
+  const seo = seoResult.rows[0];
+
+  const precios = await pool.query(
+    `SELECT cv.nombre, rp.precio FROM rutas_precios rp
+     JOIN categorias_vehiculos cv ON cv.id = rp.categoria_id
+     WHERE rp.ruta_id = $1 AND cv.disponible = TRUE`,
+    [seo.ruta_id]
+  );
+
+  const ajustesGlobales = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
+  const globales = ajustesGlobales.rows[0] || { nombre_marca: 'Traslados · GC', imagen_og_defecto: null };
+  const nombreMarca = globales.nombre_marca || 'Traslados · GC';
+
+  const urlActual = BASE_URL + '/' + req.params.lang + '/' + SECCIONES_TRASLADO[req.params.lang] + '/' + (seo.slug_url || '');
+  const { schemaTaxiService, schemaBreadcrumb } = construirSchemaRuta(
+    seo, precios.rows, nombreMarca, globales, BASE_URL, urlActual
+  );
+
+  res.json({ activo: seo.activo, url: urlActual, schemaTaxiService, schemaBreadcrumb });
+}));
+
 app.get('/admin/seo/salud', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT rss.lang_code, rss.meta_title, rss.meta_description, rss.activo,
@@ -1420,48 +1500,9 @@ app.get('/:lang(es|en|de|sv|no|nl|it|fr|fi)/:seccion/:slug', asyncHandler(async 
   const globales = ajustesGlobales.rows[0] || { nombre_marca: 'Traslados · GC', imagen_og_defecto: null, twitter_activo: false };
   const nombreMarca = globales.nombre_marca || 'Traslados · GC';
 
-  // Imagen real disponible para esta ruta (propia o de respaldo), si existe
-  let imagenSchema = null;
-  if (seo.tiene_imagen) {
-    imagenSchema = BASE_URL + '/ruta-imagen/' + seo.ruta_id;
-  } else if (globales.imagen_og_defecto) {
-    imagenSchema = BASE_URL + '/imagen-og-defecto';
-  }
-
-  // Schema.org — TaxiService: le dice a Google que esto es un servicio de
-  // transporte concreto, con su precio real por categoría cuando exista.
-  // No se inventan valoraciones ni reseñas: solo datos reales.
-  const schemaTaxiService = {
-    '@context': 'https://schema.org',
-    '@type': 'TaxiService',
-    name: seo.meta_title || (seo.origen + ' → ' + seo.destino),
-    description: seo.meta_description || undefined,
-    url: seo.canonical_url || undefined,
-    image: imagenSchema || undefined,
-    provider: { '@type': 'Organization', name: nombreMarca, url: BASE_URL },
-    areaServed: { '@type': 'Place', name: 'Gran Canaria' }
-  };
-  if (precios.rows.length > 0) {
-    schemaTaxiService.offers = precios.rows.map(function (p) {
-      return {
-        '@type': 'Offer',
-        name: p.nombre,
-        priceCurrency: 'EUR',
-        price: Number(p.precio).toFixed(2),
-        availability: 'https://schema.org/InStock'
-      };
-    });
-  }
-
-  // Schema.org — BreadcrumbList: la ruta de migas de pan (Inicio → esta página)
-  const schemaBreadcrumb = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Inicio', item: BASE_URL + '/' },
-      { '@type': 'ListItem', position: 2, name: seo.origen + ' → ' + seo.destino, item: seo.canonical_url || (BASE_URL + req.path) }
-    ]
-  };
+  const { schemaTaxiService, schemaBreadcrumb } = construirSchemaRuta(
+    seo, precios.rows, nombreMarca, globales, BASE_URL, BASE_URL + req.path
+  );
 
   res.render('traslado', {
     seo,
