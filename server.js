@@ -1141,6 +1141,90 @@ app.post('/admin/seo/idioma/:lang/activar-todas', requireAdmin, asyncHandler(asy
   res.json({ ok: true, afectadas: result.rowCount });
 }));
 
+// Traduce con IA (Claude) el título y la descripción que falten en las 21
+// rutas para un idioma — no guarda nada todavía, devuelve propuestas para revisar
+app.post('/admin/seo/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+
+  const result = await pool.query(
+    `SELECT rss.route_id, rss.meta_title, rss.meta_description, r.origen, r.destino
+     FROM route_seo_settings rss
+     JOIN rutas r ON r.id = rss.route_id
+     WHERE rss.lang_code = $1
+     ORDER BY rss.route_id`,
+    [lang]
+  );
+
+  const pendientes = result.rows.filter(function (r) { return !r.meta_title || !r.meta_description; });
+  if (pendientes.length === 0) {
+    return res.json({ ok: true, propuestas: [] });
+  }
+
+  // Necesitamos el texto en español de cada ruta como referencia para traducir
+  const esResult = await pool.query(
+    `SELECT route_id, meta_title, meta_description FROM route_seo_settings WHERE lang_code = $1`,
+    [IDIOMA_BASE]
+  );
+  const esPorRuta = {};
+  for (const fila of esResult.rows) esPorRuta[fila.route_id] = fila;
+
+  const items = pendientes
+    .map(function (r) {
+      const base = esPorRuta[r.route_id] || {};
+      return {
+        route_id: r.route_id, origen: r.origen, destino: r.destino,
+        titulo_es: base.meta_title || '', descripcion_es: base.meta_description || ''
+      };
+    })
+    .filter(function (i) { return i.titulo_es && i.descripcion_es; }); // sin base en español no hay nada que traducir
+
+  if (items.length === 0) {
+    return res.json({ ok: true, propuestas: [] });
+  }
+
+  let traduccionesIA;
+  try {
+    traduccionesIA = await traducirSEOConClaudeIA(items, NOMBRE_IDIOMA_ES[lang] || lang);
+  } catch (err) {
+    console.error('Error traduciendo SEO con IA:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+
+  const propuestas = items.map(function (i) {
+    const t = traduccionesIA[i.route_id] || traduccionesIA[String(i.route_id)] || {};
+    return {
+      route_id: i.route_id, origen: i.origen, destino: i.destino,
+      titulo_es: i.titulo_es, descripcion_es: i.descripcion_es,
+      titulo_sugerido: t.meta_title || '', descripcion_sugerida: t.meta_description || ''
+    };
+  });
+
+  res.json({ ok: true, propuestas });
+}));
+
+// Guarda en bloque las propuestas de título/descripción revisadas
+app.post('/admin/seo/guardar-lote', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang, propuestas } = req.body;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang) || !Array.isArray(propuestas)) {
+    return res.status(400).json({ error: 'Datos no válidos' });
+  }
+  let guardadas = 0;
+  for (const p of propuestas) {
+    if (!p.route_id) continue;
+    await pool.query(
+      `UPDATE route_seo_settings
+       SET meta_title = $1, meta_description = $2, og_title = $1, og_description = $2, updated_at = NOW()
+       WHERE route_id = $3 AND lang_code = $4`,
+      [p.meta_title || '', p.meta_description || '', p.route_id, lang]
+    );
+    guardadas++;
+  }
+  res.json({ ok: true, guardadas });
+}));
+
 // Exporta todas las fichas SEO a un Excel listo para enviar a traductores
 app.get('/admin/seo/exportar', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
@@ -1501,6 +1585,52 @@ async function traducirConClaudeIA(items, nombreIdioma) {
   const textoRespuesta = data.content.map(function (b) { return b.text || ''; }).join('');
   const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
   return JSON.parse(limpio);
+}
+
+// Igual que traducirConClaudeIA, pero pensada para título + descripción SEO
+// de rutas (no para los textos fijos de interfaz). El slug nunca se toca
+// aquí — eso lo decide German a propósito, no la IA.
+async function traducirSEOConClaudeIA(items, nombreIdioma) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.');
+  }
+
+  const prompt = 'Traduce los siguientes títulos y descripciones SEO de una web de traslados privados en Gran Canaria, ' +
+    'del español al ' + nombreIdioma + '. Cada uno incluye el origen y destino de la ruta — NO traduzcas los nombres ' +
+    'de los lugares, consérvalos tal cual están escritos — y el texto actual en español.\n\n' +
+    'Reglas importantes:\n' +
+    '- El título debe ser conciso, pensado para un resultado de búsqueda de Google (no te pases de unos 55-60 caracteres).\n' +
+    '- La descripción debe rondar 140-160 caracteres, persuasiva pero realista, sin inventar datos que no estén en el original.\n' +
+    '- Tono profesional pero cercano, igual que el original en español.\n\n' +
+    'Textos a traducir (JSON):\n' + JSON.stringify(items, null, 2) + '\n\n' +
+    'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, sin bloques de markdown, ' +
+    'usando el route_id de cada ruta como clave, con esta forma exacta: ' +
+    '{"3": {"meta_title": "...", "meta_description": "..."}, "18": {"meta_title": "...", "meta_description": "..."}}';
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+
+  if (!response.ok) {
+    const cuerpoError = await response.text();
+    throw new Error('Error de la API de Claude (' + response.status + '): ' + cuerpoError.slice(0, 200));
+  }
+
+  const data2 = await response.json();
+  const textoRespuesta2 = data2.content.map(function (b) { return b.text || ''; }).join('');
+  const limpio2 = textoRespuesta2.replace(/```json|```/g, '').trim();
+  return JSON.parse(limpio2);
 }
 
 // Lista todos los textos con su estado de traducción por idioma (para las
