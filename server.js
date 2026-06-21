@@ -1418,6 +1418,50 @@ app.get('/:lang(es|en|de|sv|no|nl|it|fr|fi)/:seccion/:slug', asyncHandler(async 
 
   const ajustesGlobales = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
   const globales = ajustesGlobales.rows[0] || { nombre_marca: 'Traslados · GC', imagen_og_defecto: null, twitter_activo: false };
+  const nombreMarca = globales.nombre_marca || 'Traslados · GC';
+
+  // Imagen real disponible para esta ruta (propia o de respaldo), si existe
+  let imagenSchema = null;
+  if (seo.tiene_imagen) {
+    imagenSchema = BASE_URL + '/ruta-imagen/' + seo.ruta_id;
+  } else if (globales.imagen_og_defecto) {
+    imagenSchema = BASE_URL + '/imagen-og-defecto';
+  }
+
+  // Schema.org — TaxiService: le dice a Google que esto es un servicio de
+  // transporte concreto, con su precio real por categoría cuando exista.
+  // No se inventan valoraciones ni reseñas: solo datos reales.
+  const schemaTaxiService = {
+    '@context': 'https://schema.org',
+    '@type': 'TaxiService',
+    name: seo.meta_title || (seo.origen + ' → ' + seo.destino),
+    description: seo.meta_description || undefined,
+    url: seo.canonical_url || undefined,
+    image: imagenSchema || undefined,
+    provider: { '@type': 'Organization', name: nombreMarca, url: BASE_URL },
+    areaServed: { '@type': 'Place', name: 'Gran Canaria' }
+  };
+  if (precios.rows.length > 0) {
+    schemaTaxiService.offers = precios.rows.map(function (p) {
+      return {
+        '@type': 'Offer',
+        name: p.nombre,
+        priceCurrency: 'EUR',
+        price: Number(p.precio).toFixed(2),
+        availability: 'https://schema.org/InStock'
+      };
+    });
+  }
+
+  // Schema.org — BreadcrumbList: la ruta de migas de pan (Inicio → esta página)
+  const schemaBreadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Inicio', item: BASE_URL + '/' },
+      { '@type': 'ListItem', position: 2, name: seo.origen + ' → ' + seo.destino, item: seo.canonical_url || (BASE_URL + req.path) }
+    ]
+  };
 
   res.render('traslado', {
     seo,
@@ -1426,9 +1470,11 @@ app.get('/:lang(es|en|de|sv|no|nl|it|fr|fi)/:seccion/:slug', asyncHandler(async 
     lang,
     BASE_URL,
     SECCIONES_TRASLADO,
-    nombreMarca: globales.nombre_marca || 'Traslados · GC',
+    nombreMarca,
     tieneImagenDefecto: !!globales.imagen_og_defecto,
-    twitterActivo: !!globales.twitter_activo
+    twitterActivo: !!globales.twitter_activo,
+    schemaTaxiService,
+    schemaBreadcrumb
   });
 }));
 
