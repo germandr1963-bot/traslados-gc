@@ -247,11 +247,18 @@ table.tabla-precios input {
         Por defecto ambos se generan solos con los datos actuales. Si tu SEO necesita un ajuste manual, puede editarlos y guardarlos aquí.
       </p>
 
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
+        <span style="font-size:13px;">🤖 Traducir título y descripción de las rutas con IA:</span>
+        <select id="select-idioma-ia-seo" class="campo" style="height:34px;width:auto;"></select>
+        <button class="boton-costa" onclick="traducirSEOConIA()">Traducir lo que falte</button>
+      </div>
+
       <div id="editor-archivo-manual" class="tarjeta oculto" style="margin-bottom:20px;"></div>
       <div id="panel-salud-seo" class="tarjeta oculto" style="margin-bottom:20px;"></div>
       <div id="panel-redirecciones" class="tarjeta oculto" style="margin-bottom:20px;"></div>
       <div id="panel-ajustes-globales" class="tarjeta oculto" style="margin-bottom:20px;"></div>
       <div id="panel-activacion-masiva" class="tarjeta oculto" style="margin-bottom:20px;"></div>
+      <div id="revision-seo-ia" class="tarjeta oculto" style="margin-bottom:20px;"></div>
 
       <div id="mensaje-seo" style="margin-bottom:12px;"></div>
 
@@ -1067,11 +1074,20 @@ function cargarSEO() {
   document.getElementById('tabla-seo-cuerpo').innerHTML = '<tr><td colspan="10" style="color:var(--texto-muted)">Cargando...</td></tr>';
   cargarListaIdiomasDinamica().then(function () {
     renderizarCabeceraSEO();
+    renderizarSelectIASEO();
     return fetch('/admin/seo/rutas');
   }).then(function (r) { return r.json(); }).then(function (datos) {
     seoCache = datos;
     renderizarTablaSEO(datos);
   });
+}
+
+function renderizarSelectIASEO() {
+  var select = document.getElementById('select-idioma-ia-seo');
+  if (!select) return;
+  select.innerHTML = IDIOMAS_TEXTOS.map(function (l) {
+    return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
+  }).join('');
 }
 
 function badgeSEO(langData) {
@@ -1489,6 +1505,7 @@ function abrirEditorArchivo(nombre) {
   document.getElementById('panel-redirecciones').classList.add('oculto');
   document.getElementById('panel-ajustes-globales').classList.add('oculto');
   document.getElementById('panel-activacion-masiva').classList.add('oculto');
+  document.getElementById('revision-seo-ia').classList.add('oculto');
   var caja = document.getElementById('editor-archivo-manual');
   caja.classList.remove('oculto');
   caja.setAttribute('data-archivo', nombre);
@@ -1562,6 +1579,7 @@ function abrirPanelSalud() {
   document.getElementById('panel-redirecciones').classList.add('oculto');
   document.getElementById('panel-ajustes-globales').classList.add('oculto');
   document.getElementById('panel-activacion-masiva').classList.add('oculto');
+  document.getElementById('revision-seo-ia').classList.add('oculto');
   var panel = document.getElementById('panel-salud-seo');
   panel.classList.remove('oculto');
   panel.innerHTML = '<p style="color:var(--texto-muted)">Calculando...</p>';
@@ -1600,6 +1618,7 @@ function abrirPanelRedirecciones() {
   document.getElementById('panel-salud-seo').classList.add('oculto');
   document.getElementById('panel-ajustes-globales').classList.add('oculto');
   document.getElementById('panel-activacion-masiva').classList.add('oculto');
+  document.getElementById('revision-seo-ia').classList.add('oculto');
   var panel = document.getElementById('panel-redirecciones');
   panel.classList.remove('oculto');
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1612,6 +1631,7 @@ function abrirPanelAjustesGlobales() {
   document.getElementById('panel-salud-seo').classList.add('oculto');
   document.getElementById('panel-redirecciones').classList.add('oculto');
   document.getElementById('panel-activacion-masiva').classList.add('oculto');
+  document.getElementById('revision-seo-ia').classList.add('oculto');
   var panel = document.getElementById('panel-ajustes-globales');
   panel.classList.remove('oculto');
   panel.innerHTML = '<p style="color:var(--texto-muted)">Cargando...</p>';
@@ -1707,6 +1727,7 @@ function abrirPanelActivacionMasiva() {
   document.getElementById('panel-salud-seo').classList.add('oculto');
   document.getElementById('panel-redirecciones').classList.add('oculto');
   document.getElementById('panel-ajustes-globales').classList.add('oculto');
+  document.getElementById('revision-seo-ia').classList.add('oculto');
 
   var panel = document.getElementById('panel-activacion-masiva');
   panel.classList.remove('oculto');
@@ -1750,6 +1771,85 @@ function activarMasivo(activar) {
       cargarSEO();
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error') + '</div>';
+    }
+  });
+}
+
+// ─── Traducción con IA del título y descripción de las rutas (SEO) ───────────
+function traducirSEOConIA() {
+  var lang = document.getElementById('select-idioma-ia-seo').value;
+  if (!lang) return;
+  var nombreIdioma = NOMBRES_IDIOMA[lang] || lang.toUpperCase();
+  var msg = document.getElementById('mensaje-seo');
+  msg.innerHTML = '<div class="aviso-ok">🤖 Traduciendo con IA, puede tardar unos segundos...</div>';
+
+  fetch('/admin/seo/traducir-ia/' + lang, { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (respuesta) {
+      if (!respuesta.ok) {
+        msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al traducir') + '</div>';
+        return;
+      }
+      if (respuesta.propuestas.length === 0) {
+        msg.innerHTML = '<div class="aviso-ok">✅ Ya estaba todo traducido en ' + nombreIdioma + ' (o falta el texto base en español de alguna ruta).</div>';
+        return;
+      }
+      msg.innerHTML = '';
+      mostrarRevisionSEOIA(lang, nombreIdioma, respuesta.propuestas);
+    })
+    .catch(function () {
+      msg.innerHTML = '<div class="aviso-error">No se pudo conectar con la IA. Inténtalo de nuevo.</div>';
+    });
+}
+
+function mostrarRevisionSEOIA(lang, nombreIdioma, propuestas) {
+  var editor = document.getElementById('revision-seo-ia');
+  editor.classList.remove('oculto');
+
+  var filas = propuestas.map(function (p) {
+    return '<div style="border-bottom:1px solid var(--gris-borde);padding:14px 0;">' +
+      '<div style="font-size:13px;font-weight:600;margin-bottom:6px;">' + escapar(p.origen) + ' → ' + escapar(p.destino) + '</div>' +
+      '<div style="font-size:12px;color:var(--texto-muted);margin-bottom:8px;">🇪🇸 ' + escapar(p.titulo_es) + ' — ' + escapar(p.descripcion_es) + '</div>' +
+      '<label class="etiqueta" style="font-size:11px;">Título sugerido</label>' +
+      '<input class="campo revision-seo-titulo" data-route-id="' + p.route_id + '" type="text" value="' + escapar(p.titulo_sugerido) + '" style="margin-bottom:6px;">' +
+      '<label class="etiqueta" style="font-size:11px;">Descripción sugerida</label>' +
+      '<textarea class="campo revision-seo-desc" data-route-id="' + p.route_id + '" rows="2">' + escapar(p.descripcion_sugerida) + '</textarea>' +
+    '</div>';
+  }).join('');
+
+  editor.innerHTML =
+    '<h2 style="margin-top:0">🤖 Revisión — traducción IA al ' + nombreIdioma + '</h2>' +
+    '<p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Revisa cada propuesta antes de guardar. El slug (URL) no se toca aquí — eso lo gestionas tú aparte.</p>' +
+    '<div style="max-height:440px;overflow-y:auto;">' + filas + '</div>' +
+    '<div id="revision-seo-ia-msg" style="margin:12px 0;"></div>' +
+    '<button class="boton-primario" onclick="guardarRevisionSEOIA(\'' + lang + '\')">💾 Guardar todas</button> ' +
+    '<button class="boton-secundario" onclick="document.getElementById(\'revision-seo-ia\').classList.add(\'oculto\')">Cancelar</button>';
+
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function guardarRevisionSEOIA(lang) {
+  var titulos = document.querySelectorAll('.revision-seo-titulo');
+  var propuestas = Array.prototype.map.call(titulos, function (input) {
+    var routeId = input.dataset.routeId;
+    var desc = document.querySelector('.revision-seo-desc[data-route-id="' + routeId + '"]');
+    return { route_id: parseInt(routeId, 10), meta_title: input.value, meta_description: desc ? desc.value : '' };
+  });
+
+  var msg = document.getElementById('revision-seo-ia-msg');
+  msg.innerHTML = 'Guardando...';
+
+  fetch('/admin/seo/guardar-lote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang: lang, propuestas: propuestas })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Guardadas ' + respuesta.guardadas + ' rutas</div>';
+      cargarSEO();
+      setTimeout(function () { document.getElementById('revision-seo-ia').classList.add('oculto'); }, 1200);
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
     }
   });
 }
