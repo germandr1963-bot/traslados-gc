@@ -46,20 +46,25 @@ app.use(session({
 }));
 
 // ─── Idiomas y secciones ────────────────────────────────────────────────────
-const IDIOMAS_PERMITIDOS = ['es', 'en', 'de', 'sv', 'no', 'nl', 'it', 'fr', 'fi'];
+// Estas dos ya NO están escritas a mano: se cargan de la tabla `idiomas_web`
+// al arrancar el servidor (y se recargan al añadir un idioma nuevo desde el
+// admin), para que añadir un idioma no requiera tocar código nunca más.
+let IDIOMAS_PERMITIDOS = [];
+let SECCIONES_TRASLADO = {};
+let IDIOMA_BASE = 'es';
 
-// Palabra "traslado" en cada idioma — forma parte de la URL pública
-const SECCIONES_TRASLADO = {
-  es: 'traslado',
-  en: 'transfer',
-  de: 'transfer',
-  sv: 'transfer',
-  no: 'transfer',
-  nl: 'transfer',
-  it: 'trasferimento',
-  fr: 'transfert',
-  fi: 'siirto'
-};
+async function cargarIdiomasCache() {
+  const result = await pool.query(
+    'SELECT codigo, palabra_traslado, es_base FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo'
+  );
+  IDIOMAS_PERMITIDOS = result.rows.map(function (r) { return r.codigo; });
+  SECCIONES_TRASLADO = {};
+  for (const fila of result.rows) {
+    SECCIONES_TRASLADO[fila.codigo] = fila.palabra_traslado;
+    if (fila.es_base) IDIOMA_BASE = fila.codigo;
+  }
+  IDIOMAS_TRADUCIBLES = IDIOMAS_PERMITIDOS.filter(function (l) { return l !== IDIOMA_BASE; });
+}
 
 // URL base del sitio — se usa para construir canonical y hreflang
 const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
@@ -421,6 +426,44 @@ async function initSchema() {
   }
 
   await cargarTextosCache();
+
+  // ─── Configuración de idiomas de la web ──────────────────────────────────
+  // Antes vivía escrita a mano en el código (IDIOMAS_PERMITIDOS y
+  // SECCIONES_TRASLADO); ahora vive aquí, para poder añadir un idioma nuevo
+  // desde el admin sin tocar código ni redesplegar.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS idiomas_web (
+      codigo VARCHAR(2) PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      palabra_traslado TEXT NOT NULL,
+      es_base BOOLEAN DEFAULT FALSE,
+      activo BOOLEAN DEFAULT TRUE,
+      orden INT DEFAULT 0,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  const IDIOMAS_WEB_SEMILLA = [
+    { codigo: 'es', nombre: 'Español', palabra: 'traslado', base: true, orden: 1 },
+    { codigo: 'en', nombre: 'Inglés', palabra: 'transfer', base: false, orden: 2 },
+    { codigo: 'de', nombre: 'Alemán', palabra: 'transfer', base: false, orden: 3 },
+    { codigo: 'sv', nombre: 'Sueco', palabra: 'transfer', base: false, orden: 4 },
+    { codigo: 'no', nombre: 'Noruego', palabra: 'transfer', base: false, orden: 5 },
+    { codigo: 'nl', nombre: 'Holandés', palabra: 'transfer', base: false, orden: 6 },
+    { codigo: 'it', nombre: 'Italiano', palabra: 'trasferimento', base: false, orden: 7 },
+    { codigo: 'fr', nombre: 'Francés', palabra: 'transfert', base: false, orden: 8 },
+    { codigo: 'fi', nombre: 'Finés', palabra: 'siirto', base: false, orden: 9 }
+  ];
+  for (const idioma of IDIOMAS_WEB_SEMILLA) {
+    await pool.query(
+      `INSERT INTO idiomas_web (codigo, nombre, palabra_traslado, es_base, orden)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (codigo) DO NOTHING`,
+      [idioma.codigo, idioma.nombre, idioma.palabra, idioma.base, idioma.orden]
+    );
+  }
+
+  await cargarIdiomasCache();
 
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
@@ -1395,7 +1438,8 @@ app.post('/admin/site-archivos/:nombre/restablecer', requireAdmin, asyncHandler(
 }));
 
 // ─── Sistema de traducción de la interfaz de la web ──────────────────────────
-const IDIOMAS_TRADUCIBLES = IDIOMAS_PERMITIDOS.filter(function (l) { return l !== 'es'; });
+const IDIOMAS_TRADUCIBLES_INICIAL = []; // se rellena de verdad en cargarIdiomasCache()
+let IDIOMAS_TRADUCIBLES = IDIOMAS_TRADUCIBLES_INICIAL;
 
 const NOMBRE_IDIOMA_ES = {
   en: 'inglés', de: 'alemán', sv: 'sueco', no: 'noruego',
@@ -1818,14 +1862,20 @@ app.get('/admin/seo/salud', requireAdmin, asyncHandler(async (req, res) => {
 
 // ─── Páginas públicas por ruta (SSR) ─────────────────────────────────────────
 // URL: /:lang/traslado/:slug  (ej: /es/traslado/las-palmas-a-maspalomas)
-// El parámetro :lang solo acepta los 9 idiomas permitidos.
-// El parámetro :seccion debe coincidir con la palabra del idioma (traslado/transfer/etc.)
-app.get('/:lang(es|en|de|sv|no|nl|it|fr|fi)/:seccion/:slug', asyncHandler(async (req, res) => {
+// El patrón de la URL solo exige 2 letras minúsculas — qué idiomas son
+// válidos de verdad se comprueba dentro contra la lista cargada de la base
+// de datos, así un idioma nuevo añadido desde el admin funciona al instante,
+// sin tener que redesplegar el servidor.
+app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
   const { lang, seccion, slug } = req.params;
+
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
 
   // Verificar que la sección del URL corresponde al idioma
   if (seccion !== SECCIONES_TRASLADO[lang]) {
-    return res.status(404).render('404', { mensaje: 'Página no encontrada' });
+    return res.status(404).send('Página no encontrada');
   }
 
   // Buscar la ficha SEO activa para este slug e idioma
