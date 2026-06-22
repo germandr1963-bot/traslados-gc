@@ -649,6 +649,68 @@ app.get('/api/precio', asyncHandler(async (req, res) => {
   res.json({ precio: Number(result.rows[0].precio), a_consultar: false });
 }));
 
+app.get('/api/extras-publicos', asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, nombre, precio FROM extras WHERE activo = TRUE ORDER BY id'
+  );
+  res.json(result.rows);
+}));
+
+app.post('/api/reservas', asyncHandler(async (req, res) => {
+  const {
+    origen, destino, categoria_id, precio_estimado,
+    fecha, hora, tipo_llegada, numero_vuelo, hora_llegada_vuelo,
+    nombre_barco, hora_atraque,
+    num_pasajeros, notas,
+    nombre_cliente, telefono_cliente, email_cliente,
+    extras
+  } = req.body;
+
+  if (!origen || !destino || !categoria_id || !fecha || !hora || !nombre_cliente || !telefono_cliente || !email_cliente) {
+    return res.status(400).json({ error: 'Faltan datos obligatorios.' });
+  }
+
+  const notasCompletas = [
+    tipo_llegada === 'aeropuerto' && numero_vuelo ? 'Vuelo: ' + numero_vuelo : null,
+    tipo_llegada === 'aeropuerto' && hora_llegada_vuelo ? 'Hora llegada vuelo: ' + hora_llegada_vuelo : null,
+    tipo_llegada === 'puerto' && nombre_barco ? 'Barco: ' + nombre_barco : null,
+    tipo_llegada === 'puerto' && hora_atraque ? 'Hora atraque: ' + hora_atraque : null,
+    num_pasajeros ? 'Pasajeros: ' + num_pasajeros : null,
+    notas || null
+  ].filter(Boolean).join(' | ');
+
+  const reserva = await pool.query(
+    `INSERT INTO reservas (ruta_id, categoria_id, fecha, hora, nombre_cliente, telefono_cliente, email_cliente, precio_estimado, notas, estado)
+     VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, 'pendiente') RETURNING id`,
+    [categoria_id, fecha, hora, nombre_cliente.trim(), telefono_cliente.trim(), email_cliente.trim(),
+     precio_estimado || null, notasCompletas || null]
+  );
+
+  const reservaId = reserva.rows[0].id;
+
+  // Guardar origen y destino en notas ya que son texto libre
+  await pool.query(
+    `UPDATE reservas SET notas = $1 WHERE id = $2`,
+    [('Origen: ' + origen + ' → Destino: ' + destino + (notasCompletas ? ' | ' + notasCompletas : '')), reservaId]
+  );
+
+  // Guardar extras seleccionados
+  if (Array.isArray(extras) && extras.length > 0) {
+    for (const extra of extras) {
+      await pool.query(
+        'INSERT INTO reservas_extras (reserva_id, extra_id, precio_en_reserva) VALUES ($1, $2, $3)',
+        [reservaId, extra.id, extra.precio]
+      );
+    }
+  }
+
+  res.json({ ok: true, reserva_id: reservaId });
+}));
+
+app.get('/reserva', (req, res) => {
+  res.sendFile('reserva.html', { root: path.join(__dirname, 'public') });
+});
+
 app.get('/fondo-activo', asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT imagen, tipo_mime FROM fondos_portada WHERE activo = TRUE LIMIT 1'
