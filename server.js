@@ -479,6 +479,58 @@ async function initSchema() {
 
   await cargarIdiomasCache();
 
+  // ─── Extras ───────────────────────────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS extras (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      precio NUMERIC(10,2) NOT NULL DEFAULT 0,
+      activo BOOLEAN DEFAULT TRUE,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  // Dos extras de ejemplo (solo se insertan si la tabla está vacía)
+  await pool.query(`
+    INSERT INTO extras (nombre, precio)
+    SELECT * FROM (VALUES
+      ('Silla de seguridad para niños', 5.00),
+      ('Transporte de bicicleta', 10.00)
+    ) AS v(nombre, precio)
+    WHERE NOT EXISTS (SELECT 1 FROM extras LIMIT 1);
+  `);
+
+  // ─── Reservas ─────────────────────────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS reservas (
+      id SERIAL PRIMARY KEY,
+      ruta_id INT REFERENCES rutas(id) ON DELETE SET NULL,
+      categoria_id INT REFERENCES categorias_vehiculos(id) ON DELETE SET NULL,
+      fecha DATE NOT NULL,
+      hora TIME NOT NULL,
+      nombre_cliente TEXT NOT NULL,
+      telefono_cliente TEXT NOT NULL,
+      email_cliente TEXT NOT NULL,
+      numero_vuelo TEXT,
+      hora_llegada TIME,
+      precio_estimado NUMERIC(10,2),
+      notas TEXT,
+      estado TEXT NOT NULL DEFAULT 'pendiente',
+      stripe_payment_intent_id TEXT,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  // ─── Reservas × Extras ────────────────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS reservas_extras (
+      id SERIAL PRIMARY KEY,
+      reserva_id INT NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,
+      extra_id INT NOT NULL REFERENCES extras(id) ON DELETE RESTRICT,
+      precio_en_reserva NUMERIC(10,2) NOT NULL
+    );
+  `);
+
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
     await pool.query(
