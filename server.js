@@ -427,6 +427,20 @@ async function initSchema() {
 
   await cargarTextosCache();
 
+  // ─── Tarifario de precios ─────────────────────────────────────────────────
+  // Todos los valores del tarifario son editables desde el admin — si el
+  // Cabildo cambia las tarifas, German solo tiene que actualizar estos campos.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tarifario (
+      id INT PRIMARY KEY DEFAULT 1,
+      bajada_bandera NUMERIC(6,2) DEFAULT 3.00,
+      precio_km_diurno NUMERIC(6,2) DEFAULT 1.35,
+      suplemento_aeropuerto NUMERIC(6,2) DEFAULT 2.10,
+      CONSTRAINT solo_una_fila CHECK (id = 1)
+    );
+  `);
+  await pool.query(`INSERT INTO tarifario (id) VALUES (1) ON CONFLICT (id) DO NOTHING;`);
+
   // ─── Configuración de idiomas de la web ──────────────────────────────────
   // Antes vivía escrita a mano en el código (IDIOMAS_PERMITIDOS y
   // SECCIONES_TRASLADO); ahora vive aquí, para poder añadir un idioma nuevo
@@ -1903,6 +1917,43 @@ app.post('/admin/textos/guardar-lote', requireAdmin, asyncHandler(async (req, re
   }
   await cargarTextosCache();
   res.json({ ok: true, guardadas });
+}));
+
+// ─── Calculador de tarifas ────────────────────────────────────────────────────
+// Herramienta interna del admin para calcular el precio aproximado de una
+// ruta según el tarifario oficial, sin nocturnos ni festivos (solo diurno base).
+
+app.get('/admin/tarifario', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT * FROM tarifario WHERE id = 1');
+  res.json(result.rows[0]);
+}));
+
+app.post('/admin/tarifario', requireAdmin, asyncHandler(async (req, res) => {
+  const { bajada_bandera, precio_km_diurno, suplemento_aeropuerto } = req.body;
+  await pool.query(
+    `UPDATE tarifario SET bajada_bandera = $1, precio_km_diurno = $2,
+     suplemento_aeropuerto = $3 WHERE id = 1`,
+    [
+      parseFloat(bajada_bandera) || 3.00,
+      parseFloat(precio_km_diurno) || 1.35,
+      parseFloat(suplemento_aeropuerto) || 2.10
+    ]
+  );
+  res.json({ ok: true });
+}));
+
+// Calcula el precio estimado dado unos km y si incluye aeropuerto/puerto
+app.post('/admin/tarifario/calcular', requireAdmin, asyncHandler(async (req, res) => {
+  const { km, con_suplemento } = req.body;
+  const tarifa = await pool.query('SELECT * FROM tarifario WHERE id = 1');
+  const t = tarifa.rows[0];
+
+  const distancia = parseFloat(km) || 0;
+  const precio = parseFloat(t.bajada_bandera) +
+    ((distancia - 1) * parseFloat(t.precio_km_diurno)) +
+    (con_suplemento ? parseFloat(t.suplemento_aeropuerto) : 0);
+
+  res.json({ precio: Math.max(precio, parseFloat(t.bajada_bandera)).toFixed(2) });
 }));
 
 // ─── Ajustes globales de SEO ──────────────────────────────────────────────────
