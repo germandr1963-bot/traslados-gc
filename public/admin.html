@@ -150,6 +150,7 @@ table.tabla-precios input {
     <button class="item-menu" data-seccion="precios">Rutas y precios</button>
     <button class="item-menu" data-seccion="seo">SEO</button>
     <button class="item-menu" data-seccion="idiomas">Idiomas</button>
+    <button class="item-menu" data-seccion="calculador">Calculador</button>
     <button id="boton-salir" style="margin-top:30px;opacity:0.5;">Cerrar sesión</button>
   </div>
 
@@ -312,6 +313,75 @@ table.tabla-precios input {
       <div id="editor-texto-interfaz" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
     </div>
 
+    <!-- ─── CALCULADOR DE TARIFAS ─────────────────────────────────────────── -->
+    <div id="seccion-calculador" class="oculto">
+      <h1>Calculador de tarifas</h1>
+      <p class="subtitulo">Herramienta interna para calcular el precio aproximado de una ruta según el tarifario diurno. El resultado es orientativo — el precio final siempre lo marca el taxímetro.</p>
+
+      <!-- Tarifario editable -->
+      <div class="tarjeta" style="margin-bottom:20px;">
+        <h3 style="margin-top:0;">⚙️ Tarifario (editable)</h3>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;">
+          <div>
+            <label class="etiqueta">Bajada de bandera (€)</label>
+            <input type="number" id="tarifa-bajada" class="campo" step="0.01" style="width:120px;">
+          </div>
+          <div>
+            <label class="etiqueta">Precio por km diurno (€)</label>
+            <input type="number" id="tarifa-km" class="campo" step="0.01" style="width:120px;">
+          </div>
+          <div>
+            <label class="etiqueta">Suplemento aeropuerto/puerto (€)</label>
+            <input type="number" id="tarifa-suplemento" class="campo" step="0.01" style="width:120px;">
+          </div>
+          <button class="boton-primario" onclick="guardarTarifario()">💾 Guardar tarifario</button>
+          <span id="tarifa-msg" style="font-size:12px;"></span>
+        </div>
+      </div>
+
+      <!-- Calculador con mapa -->
+      <div class="tarjeta">
+        <h3 style="margin-top:0;">🗺️ Calcular precio de una ruta</h3>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end;">
+          <div style="flex:1;min-width:200px;">
+            <label class="etiqueta">Origen</label>
+            <input type="text" id="calc-origen" class="campo" placeholder="Escribe el origen..." oninput="buscarLugar('origen')">
+            <div id="sugerencias-origen" style="position:relative;z-index:1000;"></div>
+          </div>
+          <div style="flex:1;min-width:200px;">
+            <label class="etiqueta">Destino</label>
+            <input type="text" id="calc-destino" class="campo" placeholder="Escribe el destino..." oninput="buscarLugar('destino')">
+            <div id="sugerencias-destino" style="position:relative;z-index:1000;"></div>
+          </div>
+          <div>
+            <label class="etiqueta">¿Incluye aeropuerto o puerto?</label>
+            <select id="calc-suplemento" class="campo" style="height:40px;">
+              <option value="0">No</option>
+              <option value="1">Sí (+2,10€)</option>
+            </select>
+          </div>
+          <button class="boton-primario" onclick="calcularRuta()">Calcular ruta</button>
+        </div>
+
+        <div id="mapa-calculador" style="height:380px;border-radius:10px;border:1px solid var(--gris-borde);margin-bottom:14px;"></div>
+
+        <div id="resultado-calculo" style="display:none;background:var(--gris-fondo);border-radius:8px;padding:16px 20px;">
+          <div style="display:flex;gap:30px;flex-wrap:wrap;align-items:center;">
+            <div>
+              <span style="font-size:12px;color:var(--texto-muted);">Distancia</span>
+              <div style="font-size:22px;font-weight:700;" id="res-km">— km</div>
+            </div>
+            <div>
+              <span style="font-size:12px;color:var(--texto-muted);">Precio aproximado (tarifa diurna)</span>
+              <div style="font-size:28px;font-weight:700;color:var(--terracota);" id="res-precio">— €</div>
+            </div>
+            <div style="font-size:12px;color:var(--texto-muted);max-width:280px;" id="res-formula"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -360,12 +430,13 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'precios', 'seo', 'idiomas'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'precios', 'seo', 'idiomas', 'calculador'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
     if (boton.dataset.seccion === 'seo') cargarSEO();
     if (boton.dataset.seccion === 'idiomas') cargarTextosInterfaz();
+    if (boton.dataset.seccion === 'calculador') iniciarCalculador();
   });
 });
 
@@ -2187,6 +2258,176 @@ function guardarRevisionIA(lang) {
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
     }
+  });
+}
+
+// ─── Calculador de tarifas ────────────────────────────────────────────────────
+var mapaCalc = null;
+var marcadorOrigen = null;
+var marcadorDestino = null;
+var lineaRuta = null;
+var coordOrigen = null;
+var coordDestino = null;
+
+function iniciarCalculador() {
+  // Cargar Leaflet dinámicamente si aún no está cargado
+  if (!window.L) {
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+    document.head.appendChild(link);
+
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+    script.onload = function () { inicializarMapa(); cargarTarifario(); };
+    document.head.appendChild(script);
+  } else {
+    inicializarMapa();
+    cargarTarifario();
+  }
+}
+
+function inicializarMapa() {
+  if (mapaCalc) { mapaCalc.remove(); mapaCalc = null; }
+  mapaCalc = L.map('mapa-calculador').setView([27.9202, -15.5474], 10); // Gran Canaria
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(mapaCalc);
+}
+
+function cargarTarifario() {
+  fetch('/admin/tarifario').then(function (r) { return r.json(); }).then(function (t) {
+    document.getElementById('tarifa-bajada').value = t.bajada_bandera;
+    document.getElementById('tarifa-km').value = t.precio_km_diurno;
+    document.getElementById('tarifa-suplemento').value = t.suplemento_aeropuerto;
+  });
+}
+
+function guardarTarifario() {
+  var datos = {
+    bajada_bandera: document.getElementById('tarifa-bajada').value,
+    precio_km_diurno: document.getElementById('tarifa-km').value,
+    suplemento_aeropuerto: document.getElementById('tarifa-suplemento').value
+  };
+  fetch('/admin/tarifario', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  }).then(function (r) { return r.json(); }).then(function (resp) {
+    var msg = document.getElementById('tarifa-msg');
+    msg.innerHTML = resp.ok ? '<span style="color:#2e7d32;">✓ Guardado</span>' : '<span style="color:var(--rojo-error);">Error</span>';
+    setTimeout(function () { msg.innerHTML = ''; }, 2000);
+  });
+}
+
+var timerBusqueda = null;
+function buscarLugar(tipo) {
+  clearTimeout(timerBusqueda);
+  var input = document.getElementById('calc-' + tipo);
+  var texto = input.value.trim();
+  if (texto.length < 3) {
+    document.getElementById('sugerencias-' + tipo).innerHTML = '';
+    return;
+  }
+  timerBusqueda = setTimeout(function () {
+    // Nominatim (OpenStreetMap) limitado a Gran Canaria con viewbox
+    fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' +
+      encodeURIComponent(texto + ' Gran Canaria') +
+      '&viewbox=-16.1,27.6,-15.2,28.2&bounded=0')
+      .then(function (r) { return r.json(); })
+      .then(function (resultados) {
+        var lista = resultados.map(function (r) {
+          return '<div onclick="seleccionarLugar(\'' + tipo + '\',' +
+            r.lat + ',' + r.lon + ',\'' + escapar(r.display_name.split(',')[0]) + '\')" ' +
+            'style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gris-borde);font-size:13px;" ' +
+            'onmouseover="this.style.background=\'var(--gris-fondo)\'" ' +
+            'onmouseout="this.style.background=\'\'">' +
+            escapar(r.display_name.split(',').slice(0, 2).join(',')) + '</div>';
+        }).join('');
+        document.getElementById('sugerencias-' + tipo).innerHTML = lista
+          ? '<div style="background:white;border:1px solid var(--gris-borde);border-radius:6px;position:absolute;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);">' + lista + '</div>'
+          : '';
+      });
+  }, 400);
+}
+
+function seleccionarLugar(tipo, lat, lon, nombre) {
+  document.getElementById('calc-' + tipo).value = nombre;
+  document.getElementById('sugerencias-' + tipo).innerHTML = '';
+
+  var latlng = [parseFloat(lat), parseFloat(lon)];
+  var icono = L.divIcon({
+    html: tipo === 'origen'
+      ? '<div style="background:#2e7d32;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div>'
+      : '<div style="background:#c0392b;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div>',
+    iconSize: [14, 14], iconAnchor: [7, 7]
+  });
+
+  if (tipo === 'origen') {
+    coordOrigen = latlng;
+    if (marcadorOrigen) marcadorOrigen.remove();
+    marcadorOrigen = L.marker(latlng, { icon: icono }).addTo(mapaCalc).bindPopup('Origen: ' + nombre);
+  } else {
+    coordDestino = latlng;
+    if (marcadorDestino) marcadorDestino.remove();
+    marcadorDestino = L.marker(latlng, { icon: icono }).addTo(mapaCalc).bindPopup('Destino: ' + nombre);
+  }
+
+  if (coordOrigen && coordDestino) {
+    mapaCalc.fitBounds([coordOrigen, coordDestino], { padding: [40, 40] });
+  } else {
+    mapaCalc.setView(latlng, 13);
+  }
+}
+
+function calcularRuta() {
+  if (!coordOrigen || !coordDestino) {
+    alert('Selecciona origen y destino del listado de sugerencias.');
+    return;
+  }
+
+  // OSRM (OpenStreetMap Routing Machine) — gratuito, sin clave
+  var url = 'https://router.project-osrm.org/route/v1/driving/' +
+    coordOrigen[1] + ',' + coordOrigen[0] + ';' +
+    coordDestino[1] + ',' + coordDestino[0] +
+    '?overview=full&geometries=geojson';
+
+  fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+    if (!data.routes || !data.routes.length) {
+      alert('No se pudo calcular la ruta. Intenta con otros puntos.');
+      return;
+    }
+
+    var ruta = data.routes[0];
+    var km = (ruta.distance / 1000).toFixed(2);
+
+    // Dibujar la ruta en el mapa
+    if (lineaRuta) lineaRuta.remove();
+    lineaRuta = L.geoJSON(ruta.geometry, {
+      style: { color: '#c0392b', weight: 4, opacity: 0.8 }
+    }).addTo(mapaCalc);
+    mapaCalc.fitBounds(lineaRuta.getBounds(), { padding: [30, 30] });
+
+    // Pedir al servidor el precio calculado
+    var conSupl = document.getElementById('calc-suplemento').value === '1';
+    fetch('/admin/tarifario/calcular', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ km: parseFloat(km), con_suplemento: conSupl })
+    }).then(function (r) { return r.json(); }).then(function (calc) {
+      var bd = parseFloat(document.getElementById('tarifa-bajada').value);
+      var pKm = parseFloat(document.getElementById('tarifa-km').value);
+      var supl = parseFloat(document.getElementById('tarifa-suplemento').value);
+      var formula = bd.toFixed(2) + '€ (bajada) + ((' + km + ' - 1) × ' + pKm.toFixed(2) + '€/km)' +
+        (conSupl ? ' + ' + supl.toFixed(2) + '€ (suplemento aeropuerto/puerto)' : '');
+
+      document.getElementById('res-km').textContent = km + ' km';
+      document.getElementById('res-precio').textContent = calc.precio + ' €';
+      document.getElementById('res-formula').textContent = formula;
+      document.getElementById('resultado-calculo').style.display = 'block';
+    });
+  }).catch(function () {
+    alert('Error al calcular la ruta. Comprueba la conexión.');
   });
 }
 
