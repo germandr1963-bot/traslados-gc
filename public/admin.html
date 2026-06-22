@@ -151,6 +151,7 @@ table.tabla-precios input {
     <button class="item-menu" data-seccion="seo">SEO</button>
     <button class="item-menu" data-seccion="idiomas">Idiomas</button>
     <button class="item-menu" data-seccion="calculador">Calculador</button>
+    <button class="item-menu" data-seccion="extras">Extras</button>
     <button id="boton-salir" style="margin-top:30px;opacity:0.5;">Cerrar sesión</button>
   </div>
 
@@ -409,6 +410,47 @@ table.tabla-precios input {
       </div>
     </div>
 
+    <div id="seccion-extras" class="oculto">
+      <h1>Extras del traslado</h1>
+      <p class="subtitulo">Define los servicios adicionales que el cliente puede seleccionar al reservar. El precio se suma al precio estimado del traslado.</p>
+
+      <div class="tarjeta" style="margin-bottom:20px;">
+        <button class="boton-primario" onclick="abrirFormularioExtra(null)">+ Añadir extra</button>
+      </div>
+
+      <table class="tabla-admin">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Precio</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-extras"></tbody>
+      </table>
+
+      <!-- Modal formulario extra -->
+      <div id="modal-extra" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
+        <div class="tarjeta" style="width:100%;max-width:420px;position:relative;">
+          <h3 style="margin-top:0;" id="modal-extra-titulo">Nuevo extra</h3>
+          <div style="margin-bottom:12px;">
+            <label class="etiqueta">Nombre del extra</label>
+            <input type="text" id="extra-nombre" class="campo" placeholder="Ej: Silla de seguridad para niños">
+          </div>
+          <div style="margin-bottom:20px;">
+            <label class="etiqueta">Precio (€)</label>
+            <input type="number" id="extra-precio" class="campo" step="0.01" min="0" placeholder="0.00" style="width:140px;">
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="boton-primario" onclick="guardarExtra()">💾 Guardar</button>
+            <button class="boton-secundario" onclick="cerrarModalExtra()">Cancelar</button>
+          </div>
+          <div id="extra-msg" style="margin-top:10px;font-size:13px;"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -457,13 +499,14 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'precios', 'seo', 'idiomas', 'calculador'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'precios', 'seo', 'idiomas', 'calculador', 'extras'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
     if (boton.dataset.seccion === 'seo') cargarSEO();
     if (boton.dataset.seccion === 'idiomas') cargarTextosInterfaz();
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
+    if (boton.dataset.seccion === 'extras') cargarExtras();
   });
 });
 
@@ -2475,6 +2518,98 @@ function guardarTarifario() {
     msg.innerHTML = resp.ok ? '<span style="color:#2e7d32;">✓ Guardado</span>' : '<span style="color:var(--rojo-error);">Error</span>';
     setTimeout(function () { msg.innerHTML = ''; }, 2000);
   });
+}
+
+// ─── Extras ───────────────────────────────────────────────────────────────────
+var extrasCache = [];
+var extraEditandoId = null;
+
+function cargarExtras() {
+  fetch('/admin/extras')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      extrasCache = data.extras;
+      var tbody = document.getElementById('tabla-extras');
+      if (!extrasCache.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--texto-muted);padding:20px;">No hay extras definidos todavía.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = extrasCache.map(function (ex) {
+        return '<tr>' +
+          '<td>' + ex.nombre + '</td>' +
+          '<td>' + Number(ex.precio).toFixed(2) + ' €</td>' +
+          '<td><span class="' + (ex.activo ? 'insignia-ok' : 'insignia-suspendido') + '">' + (ex.activo ? 'Activo' : 'Inactivo') + '</span></td>' +
+          '<td>' +
+            '<button class="boton-costa" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="abrirFormularioExtra(' + ex.id + ')">✏️ Editar</button>' +
+            '<button class="boton-secundario" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="toggleActivoExtra(' + ex.id + ',' + ex.activo + ')">' + (ex.activo ? '⏸ Desactivar' : '▶ Activar') + '</button>' +
+            '<button class="boton-peligro" style="font-size:12px;padding:4px 10px;" onclick="eliminarExtra(' + ex.id + ')">🗑️</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    });
+}
+
+function abrirFormularioExtra(id) {
+  extraEditandoId = id;
+  document.getElementById('extra-msg').textContent = '';
+  if (id === null) {
+    document.getElementById('modal-extra-titulo').textContent = 'Nuevo extra';
+    document.getElementById('extra-nombre').value = '';
+    document.getElementById('extra-precio').value = '';
+  } else {
+    var ex = extrasCache.find(function (e) { return e.id === id; });
+    document.getElementById('modal-extra-titulo').textContent = 'Editar extra';
+    document.getElementById('extra-nombre').value = ex.nombre;
+    document.getElementById('extra-precio').value = ex.precio;
+  }
+  document.getElementById('modal-extra').classList.remove('oculto');
+}
+
+function cerrarModalExtra() {
+  document.getElementById('modal-extra').classList.add('oculto');
+  extraEditandoId = null;
+}
+
+function guardarExtra() {
+  var nombre = document.getElementById('extra-nombre').value.trim();
+  var precio = parseFloat(document.getElementById('extra-precio').value);
+  var msg = document.getElementById('extra-msg');
+  if (!nombre) { msg.textContent = 'El nombre es obligatorio.'; return; }
+  if (isNaN(precio) || precio < 0) { msg.textContent = 'El precio debe ser un número positivo.'; return; }
+  var url = extraEditandoId ? '/admin/extras/' + extraEditandoId + '/editar' : '/admin/extras';
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre: nombre, precio: precio })
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (d.ok) {
+      cerrarModalExtra();
+      cargarExtras();
+    } else {
+      msg.textContent = d.error || 'Error al guardar.';
+    }
+  });
+}
+
+function toggleActivoExtra(id, activo) {
+  fetch('/admin/extras/' + id + '/activo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo: !activo })
+  }).then(function () { cargarExtras(); });
+}
+
+function eliminarExtra(id) {
+  if (!confirm('¿Eliminar este extra? Esta acción no se puede deshacer.')) return;
+  fetch('/admin/extras/' + id + '/eliminar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.ok) {
+        cargarExtras();
+      } else {
+        alert(d.error || 'No se pudo eliminar.');
+      }
+    });
 }
 
 comprobarSesion();
