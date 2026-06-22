@@ -67,25 +67,101 @@
   margin-bottom: 12px;
 }
 #resultado-precio {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   font-size: 14px;
   color: var(--texto-muted);
   min-height: 26px;
 }
-.precio-grande {
-  font-size: 22px;
-  font-weight: 500;
-  color: var(--texto-oscuro);
+.resultado-vacio {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
 }
-.badge-fijo {
+.tarjeta-resultado {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.tarjeta-resultado-foto {
+  width: 90px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.1);
+  flex-shrink: 0;
+}
+.tarjeta-resultado-foto-placeholder {
+  width: 90px;
+  height: 64px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+.tarjeta-resultado-info {
+  flex: 1;
+  min-width: 160px;
+}
+.tarjeta-resultado-nombre {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-size: 18px;
+  color: var(--texto-claro);
+  margin-bottom: 4px;
+}
+.tarjeta-resultado-datos {
+  font-size: 12px;
+  color: rgba(242,237,228,0.7);
+  margin-bottom: 8px;
+}
+.tarjeta-resultado-precio-bloque {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.precio-grande {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--texto-claro);
+}
+.badge-aproximado {
   background: var(--oro);
   color: var(--oro-texto);
   font-size: 11px;
   font-weight: 500;
   padding: 3px 9px;
   border-radius: 10px;
+}
+.tarjeta-resultado-nota {
+  font-size: 11px;
+  color: rgba(242,237,228,0.55);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+.boton-reservar {
+  background: var(--terracota);
+  color: var(--texto-claro);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 22px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+}
+.boton-reservar:hover {
+  background: var(--terracota-oscuro);
 }
 .seccion {
   max-width: 900px;
@@ -169,6 +245,7 @@ footer {
 
 <script>
 var rutasDisponibles = [];
+var categoriasDisponibles = [];
 
 function cargarFondo() {
   var img = new Image();
@@ -204,6 +281,7 @@ function cargarRutas() {
 
 function cargarCategorias() {
   fetch('/api/categorias').then(function (r) { return r.json(); }).then(function (categorias) {
+    categoriasDisponibles = categorias;
     var select = document.getElementById('categoria');
     select.innerHTML = '<option value="">Selecciona</option>';
     categorias.forEach(function (c) {
@@ -216,32 +294,67 @@ function cargarCategorias() {
 }
 
 function verPrecio() {
-  var desde = document.getElementById('desde').value;
-  var hasta = document.getElementById('hasta').value;
+  var desdeVal = document.getElementById('desde').value;
+  var hastaVal = document.getElementById('hasta').value;
   var categoriaId = document.getElementById('categoria').value;
   var resultado = document.getElementById('resultado-precio');
 
-  if (!desde || !hasta || !categoriaId) {
-    resultado.textContent = 'Elige una ruta y categoría para ver el precio';
+  if (!desdeVal || !hastaVal || !categoriaId) {
+    resultado.innerHTML = '<div class="resultado-vacio">Elige una ruta y categoría para ver el precio</div>';
     return;
   }
 
-  var ruta = rutasDisponibles.find(function (r) { return r.origen === desde && r.destino === hasta; });
+  var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; });
+  var categoriaSelect = document.getElementById('categoria');
+  var categoriaTexto = categoriaSelect.options[categoriaSelect.selectedIndex].text;
+
+  // Buscar datos de la categoría (foto, pax, maletas)
+  var catData = categoriasDisponibles.find(function (c) { return String(c.id) === String(categoriaId); });
 
   if (!ruta) {
-    resultado.textContent = 'Ruta a consultar';
+    resultado.innerHTML = '<div class="resultado-vacio">Ruta a consultar — contáctanos</div>';
     return;
   }
 
   fetch('/api/precio?ruta_id=' + ruta.id + '&categoria_id=' + categoriaId)
     .then(function (r) { return r.json(); })
     .then(function (data) {
-      if (data.a_consultar) {
-        resultado.textContent = 'Precio a consultar';
-      } else {
-        resultado.innerHTML = '<span class="precio precio-grande">' + data.precio.toFixed(0) + ' €</span><span class="badge-fijo">precio fijo</span>';
-      }
+      var fotoHtml = catData && catData.foto
+        ? '<img class="tarjeta-resultado-foto" src="' + catData.foto + '" alt="' + (catData.nombre || '') + '">'
+        : '<div class="tarjeta-resultado-foto-placeholder">🚗</div>';
+
+      var paxHtml = catData
+        ? '<span>👥 ' + catData.capacidad_pasajeros + ' pasajeros</span>' +
+          (catData.capacidad_maletas ? ' &nbsp;·&nbsp; <span>🧳 ' + catData.capacidad_maletas + ' maletas</span>' : '')
+        : '';
+
+      var precioHtml = data.a_consultar
+        ? '<span style="font-size:18px;color:var(--texto-claro);font-weight:500;">Precio a consultar</span>'
+        : '<span class="precio precio-grande">' + Number(data.precio).toFixed(0) + ' €</span>' +
+          '<span class="badge-aproximado">precio aproximado</span>';
+
+      var botonHtml = '<button class="boton-reservar" onclick="irAReserva()">Reservar este traslado →</button>';
+
+      resultado.innerHTML =
+        '<div class="tarjeta-resultado">' +
+          fotoHtml +
+          '<div class="tarjeta-resultado-info">' +
+            '<div class="tarjeta-resultado-nombre">' + (catData ? catData.nombre : categoriaTexto) + '</div>' +
+            '<div class="tarjeta-resultado-datos">' + paxHtml + '</div>' +
+            '<div class="tarjeta-resultado-precio-bloque">' + precioHtml + '</div>' +
+            '<div class="tarjeta-resultado-nota">Precio orientativo calculado por kilómetros y tarifas de referencia. El precio final lo determina el taxímetro del conductor.</div>' +
+          '</div>' +
+          botonHtml +
+        '</div>';
     });
+}
+
+function irAReserva() {
+  var desde = document.getElementById('desde').value;
+  var hasta = document.getElementById('hasta').value;
+  var categoriaId = document.getElementById('categoria').value;
+  var params = new URLSearchParams({ desde: desde, hasta: hasta, categoria_id: categoriaId });
+  window.location.href = '/reserva?' + params.toString();
 }
 
 document.getElementById('ver-precio').addEventListener('click', verPrecio);
