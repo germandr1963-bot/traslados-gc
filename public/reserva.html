@@ -206,16 +206,34 @@
 
       <div class="campo-grupo">
         <label>Número de pasajeros</label>
-        <select id="num-pasajeros">
-          <option value="1">1 pasajero</option>
-          <option value="2">2 pasajeros</option>
-          <option value="3">3 pasajeros</option>
-          <option value="4">4 pasajeros</option>
-          <option value="5">5 pasajeros</option>
-          <option value="6">6 pasajeros</option>
-          <option value="7">7 pasajeros</option>
-          <option value="8">8+ pasajeros</option>
-        </select>
+        <select id="num-pasajeros"></select>
+      </div>
+
+      <div style="border-top:1px solid var(--gris-borde);margin:18px 0;"></div>
+      <p style="font-size:12px;color:var(--texto-muted);margin-bottom:14px;font-weight:500;">DATOS PERSONALES DEL PASAJERO</p>
+
+      <div class="dos-columnas">
+        <div class="campo-grupo">
+          <label>Nombre *</label>
+          <input type="text" id="pasajero-nombre" placeholder="Nombre">
+          <div class="aviso-campo" id="err-pasajero-nombre">Este campo es obligatorio</div>
+        </div>
+        <div class="campo-grupo">
+          <label>Apellidos *</label>
+          <input type="text" id="pasajero-apellidos" placeholder="Apellidos">
+          <div class="aviso-campo" id="err-pasajero-apellidos">Este campo es obligatorio</div>
+        </div>
+      </div>
+
+      <div class="campo-grupo">
+        <label>Número de pasaporte o DNI *</label>
+        <input type="text" id="pasajero-pasaporte" placeholder="Ej: ABC123456">
+        <div class="aviso-campo" id="err-pasajero-pasaporte">Este campo es obligatorio</div>
+      </div>
+
+      <div class="campo-grupo">
+        <label>Comentarios o información adicional (opcional)</label>
+        <textarea id="pasajero-notas" placeholder="Equipaje especial, necesidades particulares..."></textarea>
       </div>
 
       <button class="boton-siguiente" onclick="siguientePaso1()">Continuar →</button>
@@ -275,27 +293,50 @@
     <div class="paso-cabecera">
       <div class="paso-numero" id="num-4">4</div>
       <div>
-        <div class="paso-titulo">Tus datos</div>
+        <div class="paso-titulo">Tus datos de contacto</div>
         <div class="paso-resumen" id="resumen-4">Nombre, teléfono y email</div>
       </div>
     </div>
     <div class="paso-cuerpo" id="cuerpo-4">
+
+      <p style="font-size:12px;color:var(--texto-muted);margin-bottom:14px;font-weight:500;">DATOS DE CONTACTO</p>
+
       <div class="campo-grupo">
-        <label>Nombre completo</label>
-        <input type="text" id="nombre-cliente" placeholder="Tu nombre completo">
+        <label>Nombre y apellidos de contacto *</label>
+        <input type="text" id="nombre-cliente" placeholder="Nombre completo">
         <div class="aviso-campo" id="err-nombre">Este campo es obligatorio</div>
       </div>
-      <div class="dos-columnas">
-        <div class="campo-grupo">
-          <label>Teléfono de contacto</label>
-          <input type="tel" id="telefono-cliente" placeholder="+34 600 000 000">
-          <div class="aviso-campo" id="err-telefono">Este campo es obligatorio</div>
+
+      <div class="campo-grupo">
+        <label>Teléfono de contacto (con código de país) *</label>
+        <div style="display:flex;gap:8px;">
+          <select id="telefono-prefijo" style="width:110px;flex-shrink:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 8px;font-family:inherit;font-size:14px;">
+            <option value="+34">🇪🇸 +34</option>
+            <option value="+44">🇬🇧 +44</option>
+            <option value="+49">🇩🇪 +49</option>
+            <option value="+46">🇸🇪 +46</option>
+            <option value="+47">🇳🇴 +47</option>
+            <option value="+31">🇳🇱 +31</option>
+            <option value="+39">🇮🇹 +39</option>
+            <option value="+33">🇫🇷 +33</option>
+            <option value="+358">🇫🇮 +358</option>
+            <option value="+7">🇷🇺 +7</option>
+            <option value="+1">🇺🇸 +1</option>
+            <option value="+351">🇵🇹 +351</option>
+            <option value="+32">🇧🇪 +32</option>
+            <option value="+41">🇨🇭 +41</option>
+            <option value="+43">🇦🇹 +43</option>
+            <option value="+48">🇵🇱 +48</option>
+          </select>
+          <input type="tel" id="telefono-numero" placeholder="600 000 000" style="flex:1;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 12px;font-family:inherit;font-size:14px;">
         </div>
-        <div class="campo-grupo">
-          <label>Email</label>
-          <input type="email" id="email-cliente" placeholder="tu@email.com">
-          <div class="aviso-campo" id="err-email">Introduce un email válido</div>
-        </div>
+        <div class="aviso-campo" id="err-telefono">Introduce un número de teléfono válido (mínimo 7 dígitos)</div>
+      </div>
+
+      <div class="campo-grupo">
+        <label>Email *</label>
+        <input type="email" id="email-cliente" placeholder="tu@email.com">
+        <div class="aviso-campo" id="err-email">Introduce un email válido</div>
       </div>
 
       <div class="resumen-box" id="resumen-final" style="display:none;"></div>
@@ -366,6 +407,16 @@ if (paramOrigen && paramDestino) {
       if (cat) {
         categoriaNombre = cat.nombre;
         document.getElementById('tbl-categoria').textContent = cat.nombre + ' · ' + cat.capacidad_pasajeros + ' pax';
+        // Cargar opciones de pasajeros según capacidad de la categoría
+        var maxPax = parseInt(cat.capacidad_pasajeros) || 8;
+        var sel = document.getElementById('num-pasajeros');
+        sel.innerHTML = '';
+        for (var i = 1; i <= maxPax; i++) {
+          var opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = i + (i === 1 ? ' pasajero' : ' pasajeros');
+          sel.appendChild(opt);
+        }
       }
     });
   }
@@ -437,11 +488,20 @@ function marcarPasoActivo(n) {
 function siguientePaso1() {
   var fecha = document.getElementById('fecha').value;
   var hora = document.getElementById('hora').value;
+  var nombre = document.getElementById('pasajero-nombre').value.trim();
+  var apellidos = document.getElementById('pasajero-apellidos').value.trim();
+  var pasaporte = document.getElementById('pasajero-pasaporte').value.trim();
+
   document.getElementById('err-fecha').style.display = fecha ? 'none' : 'block';
   document.getElementById('err-hora').style.display = hora ? 'none' : 'block';
-  if (!fecha || !hora) return;
+  document.getElementById('err-pasajero-nombre').style.display = nombre ? 'none' : 'block';
+  document.getElementById('err-pasajero-apellidos').style.display = apellidos ? 'none' : 'block';
+  document.getElementById('err-pasajero-pasaporte').style.display = pasaporte ? 'none' : 'block';
+
+  if (!fecha || !hora || !nombre || !apellidos || !pasaporte) return;
+
   var fechaTexto = new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric',month:'long',year:'numeric'});
-  document.getElementById('resumen-1').textContent = fechaTexto + ' a las ' + hora;
+  document.getElementById('resumen-1').textContent = fechaTexto + ' a las ' + hora + ' · ' + nombre + ' ' + apellidos;
   marcarPasoActivo(2);
 }
 
@@ -463,28 +523,37 @@ function siguientePaso3() {
 
 function mostrarResumen() {
   var nombre = document.getElementById('nombre-cliente').value.trim();
-  var telefono = document.getElementById('telefono-cliente').value.trim();
+  var telefonoNumero = document.getElementById('telefono-numero').value.trim().replace(/\s/g, '');
+  var telefonoPrefijo = document.getElementById('telefono-prefijo').value;
   var email = document.getElementById('email-cliente').value.trim();
   var emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  var telefonoValido = telefonoNumero.length >= 7 && /^\d+$/.test(telefonoNumero);
+
   document.getElementById('err-nombre').style.display = nombre ? 'none' : 'block';
-  document.getElementById('err-telefono').style.display = telefono ? 'none' : 'block';
+  document.getElementById('err-telefono').style.display = telefonoValido ? 'none' : 'block';
   document.getElementById('err-email').style.display = emailValido ? 'none' : 'block';
-  if (!nombre || !telefono || !emailValido) return;
+  if (!nombre || !telefonoValido || !emailValido) return;
 
   var fecha = document.getElementById('fecha').value;
   var hora = document.getElementById('hora').value;
   var fechaTexto = new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric',month:'long',year:'numeric'});
-  var totalExtras = extrasSeleccionados.reduce(function(s,e){ return s + Number(e.precio); }, 0);
+  var pasajeroNombre = document.getElementById('pasajero-nombre').value.trim();
+  var pasajeroApellidos = document.getElementById('pasajero-apellidos').value.trim();
+  var pasaporte = document.getElementById('pasajero-pasaporte').value.trim();
+  var telefonoCompleto = telefonoPrefijo + ' ' + telefonoNumero;
 
   var html =
-    '<strong>Origen:</strong> ' + paramOrigen + '<br>' +
-    '<strong>Destino:</strong> ' + paramDestino + ' — ' + document.getElementById('destino-detalle').value.trim() + '<br>' +
+    '<strong>Traslado:</strong> ' + paramOrigen + ' → ' + paramDestino + '<br>' +
+    '<strong>Destino exacto:</strong> ' + document.getElementById('destino-detalle').value.trim() + '<br>' +
     (categoriaNombre ? '<strong>Categoría:</strong> ' + categoriaNombre + '<br>' : '') +
     '<strong>Fecha y hora:</strong> ' + fechaTexto + ' a las ' + hora + '<br>' +
+    '<strong>Pasajeros:</strong> ' + document.getElementById('num-pasajeros').value + '<br>' +
     (precioEstimado ? '<strong>Precio estimado:</strong> ' + Number(precioEstimado).toFixed(0) + ' €<br>' : '') +
     (extrasSeleccionados.length ? '<strong>Extras:</strong> ' + extrasSeleccionados.map(function(e){ return e.nombre + ' (' + Number(e.precio).toFixed(2) + ' €)'; }).join(', ') + '<br>' : '') +
-    '<strong>Nombre:</strong> ' + nombre + '<br>' +
-    '<strong>Teléfono:</strong> ' + telefono + '<br>' +
+    '<strong>Pasajero:</strong> ' + pasajeroNombre + ' ' + pasajeroApellidos + '<br>' +
+    '<strong>Pasaporte/DNI:</strong> ' + pasaporte + '<br>' +
+    '<strong>Contacto:</strong> ' + nombre + '<br>' +
+    '<strong>Teléfono:</strong> ' + telefonoCompleto + '<br>' +
     '<strong>Email:</strong> ' + email;
 
   document.getElementById('resumen-final').innerHTML = html;
@@ -498,6 +567,8 @@ function confirmarEnvio() {
   var btn = document.getElementById('boton-enviar');
   btn.disabled = true;
   btn.textContent = 'Enviando...';
+
+  var telefonoCompleto = document.getElementById('telefono-prefijo').value + ' ' + document.getElementById('telefono-numero').value.trim().replace(/\s/g, '');
 
   var datos = {
     origen: paramOrigen,
@@ -513,9 +584,11 @@ function confirmarEnvio() {
     nombre_barco: document.getElementById('nombre-barco').value.trim(),
     hora_atraque: document.getElementById('hora-atraque').value,
     num_pasajeros: document.getElementById('num-pasajeros').value,
-    notas: document.getElementById('notas').value.trim(),
+    pasajero_nombre: document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim(),
+    pasajero_pasaporte: document.getElementById('pasajero-pasaporte').value.trim(),
+    notas: document.getElementById('pasajero-notas').value.trim(),
     nombre_cliente: document.getElementById('nombre-cliente').value.trim(),
-    telefono_cliente: document.getElementById('telefono-cliente').value.trim(),
+    telefono_cliente: telefonoCompleto,
     email_cliente: document.getElementById('email-cliente').value.trim(),
     extras: extrasSeleccionados.map(function(e){ return { id: e.id, precio: e.precio }; })
   };
@@ -528,9 +601,13 @@ function confirmarEnvio() {
   .then(function(r){ return r.json(); })
   .then(function(d){
     if (d.ok) {
+      // Ocultar todos los pasos y mostrar confirmación en su lugar
+      document.querySelectorAll('.paso').forEach(function(p){ p.style.display = 'none'; });
+      document.getElementById('tarjeta-traslado').style.display = 'none';
+      document.querySelector('h1').style.display = 'none';
+      document.querySelector('p[style]').style.display = 'none';
       document.getElementById('confirmacion').style.display = 'block';
-      document.querySelector('.contenedor').style.display = 'none';
-      document.getElementById('confirmacion').scrollIntoView({ behavior:'smooth' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       document.getElementById('err-envio').textContent = d.error || 'Error al enviar. Inténtalo de nuevo.';
       document.getElementById('err-envio').style.display = 'block';
@@ -549,6 +626,18 @@ function confirmarEnvio() {
 // Fecha mínima hoy
 var hoy = new Date().toISOString().split('T')[0];
 document.getElementById('fecha').min = hoy;
+
+// Si no hay categoría en la URL, cargar opciones por defecto
+if (!paramCategoriaId) {
+  var sel = document.getElementById('num-pasajeros');
+  sel.innerHTML = '';
+  for (var i = 1; i <= 8; i++) {
+    var opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = i + (i === 1 ? ' pasajero' : ' pasajeros');
+    sel.appendChild(opt);
+  }
+}
 </script>
 
 </body>
