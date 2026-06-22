@@ -62,9 +62,17 @@
 }
 .fila-busqueda {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
   margin-bottom: 12px;
+}
+.fila-busqueda select.campo,
+.fila-busqueda .campo {
+  height: auto;
+  min-height: 40px;
+  white-space: normal;
+  word-break: break-word;
+  padding: 8px 10px;
 }
 #resultado-precio {
   font-size: 14px;
@@ -75,90 +83,117 @@
   display: flex;
   align-items: center;
   min-height: 26px;
+  color: var(--texto-oscuro);
 }
 .tarjeta-resultado {
   display: flex;
-  gap: 18px;
-  align-items: center;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
+  gap: 20px;
+  align-items: stretch;
+  background: var(--charcoal-2);
+  border: 1px solid rgba(255,255,255,0.12);
   border-radius: 12px;
-  padding: 16px 18px;
-  margin-top: 4px;
+  padding: 18px 20px;
+  margin-top: 8px;
   flex-wrap: wrap;
 }
 .tarjeta-resultado-foto {
-  width: 90px;
-  height: 64px;
-  object-fit: cover;
+  width: 120px;
+  height: 80px;
+  object-fit: contain;
   border-radius: 8px;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06);
   flex-shrink: 0;
+  padding: 6px;
 }
 .tarjeta-resultado-foto-placeholder {
-  width: 90px;
-  height: 64px;
+  width: 120px;
+  height: 80px;
   border-radius: 8px;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-size: 36px;
   flex-shrink: 0;
 }
 .tarjeta-resultado-info {
   flex: 1;
-  min-width: 160px;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
 }
 .tarjeta-resultado-nombre {
   font-family: 'Big Shoulders Display', sans-serif;
-  font-size: 18px;
-  color: var(--texto-claro);
-  margin-bottom: 4px;
+  font-size: 20px;
+  color: #fff;
+  letter-spacing: 0.3px;
 }
 .tarjeta-resultado-datos {
-  font-size: 12px;
-  color: rgba(242,237,228,0.7);
-  margin-bottom: 8px;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.tarjeta-resultado-dato {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: rgba(242,237,228,0.85);
+  background: rgba(255,255,255,0.07);
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+.tarjeta-resultado-dato svg {
+  flex-shrink: 0;
 }
 .tarjeta-resultado-precio-bloque {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 140px;
 }
 .precio-grande {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 28px;
-  font-weight: 500;
-  color: var(--texto-claro);
+  font-size: 36px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
 }
 .badge-aproximado {
   background: var(--oro);
   color: var(--oro-texto);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 3px 9px;
-  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 20px;
+  letter-spacing: 0.2px;
 }
 .tarjeta-resultado-nota {
   font-size: 11px;
-  color: rgba(242,237,228,0.55);
-  margin-top: 8px;
+  color: rgba(242,237,228,0.45);
+  margin-top: 2px;
   line-height: 1.5;
+  text-align: right;
+  max-width: 180px;
 }
 .boton-reservar {
   background: var(--terracota);
-  color: var(--texto-claro);
+  color: #fff;
   border: none;
   border-radius: 8px;
-  padding: 12px 22px;
+  padding: 13px 24px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
   align-self: center;
+  margin-left: auto;
 }
 .boton-reservar:hover {
   background: var(--terracota-oscuro);
@@ -324,14 +359,21 @@ function verPrecio() {
         : '<div class="tarjeta-resultado-foto-placeholder">🚗</div>';
 
       var paxHtml = catData
-        ? '<span>👥 ' + catData.capacidad_pasajeros + ' pasajeros</span>' +
-          (catData.capacidad_maletas ? ' &nbsp;·&nbsp; <span>🧳 ' + catData.capacidad_maletas + ' maletas</span>' : '')
+        ? '<div class="tarjeta-resultado-dato">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D9A441" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
+            catData.capacidad_pasajeros + ' pasajeros' +
+          '</div>' +
+          (catData.capacidad_maletas
+            ? '<div class="tarjeta-resultado-dato">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D9A441" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>' +
+                catData.capacidad_maletas + ' maletas' +
+              '</div>'
+            : '')
         : '';
 
       var precioHtml = data.a_consultar
-        ? '<span style="font-size:18px;color:var(--texto-claro);font-weight:500;">Precio a consultar</span>'
-        : '<span class="precio precio-grande">' + Number(data.precio).toFixed(0) + ' €</span>' +
-          '<span class="badge-aproximado">precio aproximado</span>';
+        ? '<span style="font-size:20px;color:#fff;font-weight:600;">Precio a consultar</span>'
+        : '<span class="precio precio-grande">' + Number(data.precio).toFixed(0) + ' €</span>';
 
       var botonHtml = '<button class="boton-reservar" onclick="irAReserva()">Reservar este traslado →</button>';
 
@@ -341,8 +383,11 @@ function verPrecio() {
           '<div class="tarjeta-resultado-info">' +
             '<div class="tarjeta-resultado-nombre">' + (catData ? catData.nombre : categoriaTexto) + '</div>' +
             '<div class="tarjeta-resultado-datos">' + paxHtml + '</div>' +
-            '<div class="tarjeta-resultado-precio-bloque">' + precioHtml + '</div>' +
-            '<div class="tarjeta-resultado-nota">Precio orientativo calculado por kilómetros y tarifas de referencia. El precio final lo determina el taxímetro del conductor.</div>' +
+          '</div>' +
+          '<div class="tarjeta-resultado-precio-bloque">' +
+            precioHtml +
+            '<span class="badge-aproximado">precio aproximado</span>' +
+            '<div class="tarjeta-resultado-nota">El precio final lo determina<br>el taxímetro del conductor.</div>' +
           '</div>' +
           botonHtml +
         '</div>';
