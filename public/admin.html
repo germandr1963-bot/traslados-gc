@@ -343,46 +343,50 @@ table.tabla-precios input {
       <div class="tarjeta">
         <h3 style="margin-top:0;">🗺️ Calcular precio de una ruta</h3>
         <p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">
-          Mueve el mapa hasta que la punta del pin quede sobre el punto deseado, luego pulsa el botón correspondiente.
+          Escribe para buscar, selecciona una sugerencia y el mapa saltará ahí. Luego ajusta moviendo el mapa hasta que la punta del pin quede en el punto exacto y pulsa el botón.
         </p>
 
-        <!-- Estado actual: qué estamos fijando -->
-        <div id="calc-estado" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
-          <div id="calc-paso-indicador" style="background:var(--gris-fondo);padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;">
-            📍 Paso 1: posiciona el origen
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+          <!-- Origen -->
+          <div>
+            <label class="etiqueta" style="color:#2e7d32;">📍 Origen</label>
+            <div style="position:relative;">
+              <input type="text" id="calc-origen" class="campo" placeholder="Escribe el origen..." oninput="buscarLugar('origen')" autocomplete="off">
+              <div id="sugerencias-origen" style="position:absolute;top:100%;left:0;right:0;z-index:2000;"></div>
+            </div>
+            <div style="margin-top:6px;font-size:12px;color:#2e7d32;" id="label-origen">Sin fijar</div>
+            <button class="boton-costa" id="btn-fijar-origen" onclick="fijarPunto('origen')" style="margin-top:6px;padding:7px 14px;font-size:12px;">✅ Fijar origen en el pin</button>
           </div>
-          <button class="boton-costa" id="btn-fijar-origen" onclick="fijarPunto('origen')" style="padding:8px 18px;">
-            ✅ Fijar origen aquí
-          </button>
-          <button class="boton-secundario" id="btn-fijar-destino" onclick="fijarPunto('destino')" style="padding:8px 18px;display:none;">
-            ✅ Fijar destino aquí
-          </button>
-          <button class="boton-primario" id="btn-calcular" onclick="calcularRuta()" style="display:none;">
-            🧮 Calcular precio
-          </button>
-          <button class="boton-secundario" onclick="reiniciarCalculador()" style="padding:8px 14px;font-size:12px;">↺ Reiniciar</button>
+          <!-- Destino -->
+          <div>
+            <label class="etiqueta" style="color:#c0392b;">📍 Destino</label>
+            <div style="position:relative;">
+              <input type="text" id="calc-destino" class="campo" placeholder="Escribe el destino..." oninput="buscarLugar('destino')" autocomplete="off">
+              <div id="sugerencias-destino" style="position:absolute;top:100%;left:0;right:0;z-index:2000;"></div>
+            </div>
+            <div style="margin-top:6px;font-size:12px;color:#c0392b;" id="label-destino">Sin fijar</div>
+            <button class="boton-secundario" id="btn-fijar-destino" onclick="fijarPunto('destino')" style="margin-top:6px;padding:7px 14px;font-size:12px;">✅ Fijar destino en el pin</button>
+          </div>
         </div>
 
-        <!-- Puntos fijados -->
-        <div style="display:flex;gap:16px;margin-bottom:10px;font-size:13px;flex-wrap:wrap;">
-          <div><span style="color:#2e7d32;font-weight:600;">●</span> Origen: <span id="label-origen" style="color:var(--texto-muted);">sin fijar</span></div>
-          <div><span style="color:#c0392b;font-weight:600;">●</span> Destino: <span id="label-destino" style="color:var(--texto-muted);">sin fijar</span></div>
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
           <div>
             <label class="etiqueta" style="display:inline;margin-right:6px;">¿Aeropuerto o puerto?</label>
-            <select id="calc-suplemento" class="campo" style="height:30px;font-size:12px;display:inline;width:auto;">
+            <select id="calc-suplemento" class="campo" style="height:32px;font-size:12px;display:inline;width:auto;">
               <option value="0">No</option>
               <option value="1">Sí (+2,10€)</option>
             </select>
           </div>
+          <button class="boton-primario" id="btn-calcular" onclick="calcularRuta()">🧮 Calcular precio</button>
+          <button class="boton-secundario" onclick="reiniciarCalculador()" style="font-size:12px;">↺ Reiniciar</button>
         </div>
 
         <!-- Mapa con pin fijo en el centro -->
         <div style="position:relative;height:420px;border-radius:10px;overflow:hidden;border:1px solid var(--gris-borde);margin-bottom:14px;">
           <div id="mapa-calculador" style="height:100%;width:100%;"></div>
-          <!-- Pin fijo en el centro — la punta es el punto exacto -->
           <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-100%);pointer-events:none;z-index:1000;">
             <svg width="32" height="48" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M16 0C7.163 0 0 7.163 0 16C0 28 16 48 16 48C16 48 32 28 32 16C32 7.163 24.837 0 16 0Z" fill="#c0392b"/>
+              <path d="M16 0C7.163 0 0 7.163 0 16C0 28 16 48 16 48C16 48 32 28 32 16C32 7.163 24.837 0 16 0Z" fill="#1a1a2e" opacity="0.85"/>
               <circle cx="16" cy="16" r="7" fill="white"/>
             </svg>
           </div>
@@ -2291,7 +2295,7 @@ var marcadorDestino = null;
 var lineaRuta = null;
 var coordOrigen = null;
 var coordDestino = null;
-var pasoActual = 'origen'; // 'origen' | 'destino' | 'listo'
+var timerBusqueda = null;
 
 function iniciarCalculador() {
   if (!window.L) {
@@ -2320,73 +2324,95 @@ function inicializarMapa() {
 function reiniciarCalculador() {
   coordOrigen = null;
   coordDestino = null;
-  pasoActual = 'origen';
   if (marcadorOrigen) { marcadorOrigen.remove(); marcadorOrigen = null; }
   if (marcadorDestino) { marcadorDestino.remove(); marcadorDestino = null; }
   if (lineaRuta) { lineaRuta.remove(); lineaRuta = null; }
-  document.getElementById('label-origen').textContent = 'sin fijar';
-  document.getElementById('label-destino').textContent = 'sin fijar';
+  document.getElementById('calc-origen').value = '';
+  document.getElementById('calc-destino').value = '';
+  document.getElementById('label-origen').textContent = 'Sin fijar';
+  document.getElementById('label-destino').textContent = 'Sin fijar';
+  document.getElementById('sugerencias-origen').innerHTML = '';
+  document.getElementById('sugerencias-destino').innerHTML = '';
   document.getElementById('resultado-calculo').style.display = 'none';
-  document.getElementById('calc-paso-indicador').textContent = '📍 Paso 1: posiciona el origen';
-  document.getElementById('btn-fijar-origen').style.display = '';
-  document.getElementById('btn-fijar-destino').style.display = 'none';
-  document.getElementById('btn-calcular').style.display = 'none';
   mapaCalc.setView([27.9202, -15.5474], 11);
 }
 
+// Búsqueda de texto con Nominatim — el mapa salta al lugar seleccionado
+function buscarLugar(tipo) {
+  clearTimeout(timerBusqueda);
+  var texto = document.getElementById('calc-' + tipo).value.trim();
+  if (texto.length < 3) {
+    document.getElementById('sugerencias-' + tipo).innerHTML = '';
+    return;
+  }
+  timerBusqueda = setTimeout(function () {
+    fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' +
+      encodeURIComponent(texto + ' Gran Canaria') +
+      '&viewbox=-16.1,27.6,-15.2,28.2&bounded=0&accept-language=es')
+      .then(function (r) { return r.json(); })
+      .then(function (resultados) {
+        if (!resultados.length) {
+          document.getElementById('sugerencias-' + tipo).innerHTML = '';
+          return;
+        }
+        var lista = resultados.map(function (r) {
+          var nombre = r.display_name.split(',').slice(0, 2).join(',');
+          return '<div onclick="seleccionarSugerencia(\'' + tipo + '\',' + r.lat + ',' + r.lon + ',\'' + nombre.replace(/'/g, "\\'") + '\')" ' +
+            'style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gris-borde);font-size:13px;" ' +
+            'onmouseover="this.style.background=\'var(--gris-fondo)\'" onmouseout="this.style.background=\'\'">' +
+            escapar(nombre) + '</div>';
+        }).join('');
+        document.getElementById('sugerencias-' + tipo).innerHTML =
+          '<div style="background:white;border:1px solid var(--gris-borde);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.12);">' + lista + '</div>';
+      });
+  }, 400);
+}
+
+// Al seleccionar una sugerencia, el mapa salta al lugar — luego el usuario
+// puede afinar moviendo el mapa y fijando el pin
+function seleccionarSugerencia(tipo, lat, lon, nombre) {
+  document.getElementById('calc-' + tipo).value = nombre;
+  document.getElementById('sugerencias-' + tipo).innerHTML = '';
+  mapaCalc.setView([parseFloat(lat), parseFloat(lon)], 15);
+}
+
+// Fija el punto exacto tomando el centro actual del mapa (la punta del pin)
 function fijarPunto(tipo) {
-  // Toma las coordenadas del CENTRO del mapa — la punta del pin
   var centro = mapaCalc.getCenter();
   var latlng = [centro.lat, centro.lng];
+  var color = tipo === 'origen' ? '#2e7d32' : '#c0392b';
 
-  // Obtener nombre aproximado del punto con geocodificación inversa
-  fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + centro.lat + '&lon=' + centro.lng)
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      var nombre = data.address
-        ? (data.address.tourism || data.address.aeroway || data.address.harbour ||
-           data.address.road || data.address.suburb || data.address.village ||
-           data.address.town || data.address.city || 'Punto seleccionado')
-        : 'Punto seleccionado';
+  var icono = L.divIcon({
+    html: '<svg width="28" height="42" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M16 0C7.163 0 0 7.163 0 16C0 28 16 48 16 48C16 48 32 28 32 16C32 7.163 24.837 0 16 0Z" fill="' + color + '"/>' +
+      '<circle cx="16" cy="16" r="7" fill="white"/></svg>',
+    iconSize: [28, 42], iconAnchor: [14, 42]
+  });
 
-      var iconoColor = tipo === 'origen' ? '#2e7d32' : '#c0392b';
-      var icono = L.divIcon({
-        html: '<svg width="28" height="42" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-          '<path d="M16 0C7.163 0 0 7.163 0 16C0 28 16 48 16 48C16 48 32 28 32 16C32 7.163 24.837 0 16 0Z" fill="' + iconoColor + '"/>' +
-          '<circle cx="16" cy="16" r="7" fill="white"/></svg>',
-        iconSize: [28, 42], iconAnchor: [14, 42]
-      });
+  var nombre = document.getElementById('calc-' + tipo).value || ('(' + centro.lat.toFixed(4) + ', ' + centro.lng.toFixed(4) + ')');
 
-      if (tipo === 'origen') {
-        coordOrigen = latlng;
-        if (marcadorOrigen) marcadorOrigen.remove();
-        marcadorOrigen = L.marker(latlng, { icon: icono }).addTo(mapaCalc).bindPopup('Origen: ' + nombre);
-        document.getElementById('label-origen').textContent = nombre + ' (' + centro.lat.toFixed(5) + ', ' + centro.lng.toFixed(5) + ')';
-        document.getElementById('label-origen').style.color = '#2e7d32';
-        document.getElementById('calc-paso-indicador').textContent = '📍 Paso 2: posiciona el destino';
-        document.getElementById('btn-fijar-origen').style.display = 'none';
-        document.getElementById('btn-fijar-destino').style.display = '';
-        pasoActual = 'destino';
-      } else {
-        coordDestino = latlng;
-        if (marcadorDestino) marcadorDestino.remove();
-        marcadorDestino = L.marker(latlng, { icon: icono }).addTo(mapaCalc).bindPopup('Destino: ' + nombre);
-        document.getElementById('label-destino').textContent = nombre + ' (' + centro.lat.toFixed(5) + ', ' + centro.lng.toFixed(5) + ')';
-        document.getElementById('label-destino').style.color = '#c0392b';
-        document.getElementById('calc-paso-indicador').textContent = '✅ Origen y destino fijados — pulsa Calcular';
-        document.getElementById('btn-fijar-destino').style.display = 'none';
-        document.getElementById('btn-calcular').style.display = '';
-        pasoActual = 'listo';
+  if (tipo === 'origen') {
+    coordOrigen = latlng;
+    if (marcadorOrigen) marcadorOrigen.remove();
+    marcadorOrigen = L.marker(latlng, { icon: icono }).addTo(mapaCalc).bindPopup('Origen: ' + nombre);
+    document.getElementById('label-origen').textContent = '✓ ' + nombre;
+  } else {
+    coordDestino = latlng;
+    if (marcadorDestino) marcadorDestino.remove();
+    marcadorDestino = L.marker(latlng, { icon: icono }).addTo(mapaCalc).bindPopup('Destino: ' + nombre);
+    document.getElementById('label-destino').textContent = '✓ ' + nombre;
+  }
 
-        // Ajustar zoom para ver los dos puntos
-        mapaCalc.fitBounds([coordOrigen, coordDestino], { padding: [50, 50] });
-      }
-    });
+  if (coordOrigen && coordDestino) {
+    mapaCalc.fitBounds([coordOrigen, coordDestino], { padding: [50, 50] });
+  }
 }
 
 function calcularRuta() {
-  if (!coordOrigen || !coordDestino) return;
-
+  if (!coordOrigen || !coordDestino) {
+    alert('Fija primero el origen y el destino en el mapa.');
+    return;
+  }
   var url = 'https://router.project-osrm.org/route/v1/driving/' +
     coordOrigen[1] + ',' + coordOrigen[0] + ';' +
     coordDestino[1] + ',' + coordDestino[0] +
@@ -2416,8 +2442,7 @@ function calcularRuta() {
       var pKm = parseFloat(document.getElementById('tarifa-km').value);
       var supl = parseFloat(document.getElementById('tarifa-suplemento').value);
       var formula = bd.toFixed(2) + '€ (bajada) + ((' + km + 'km − 1) × ' + pKm.toFixed(2) + '€/km)' +
-        (conSupl ? ' + ' + supl.toFixed(2) + '€ (suplemento aeropuerto/puerto)' : '');
-
+        (conSupl ? ' + ' + supl.toFixed(2) + '€ (aeropuerto/puerto)' : '');
       document.getElementById('res-km').textContent = km + ' km';
       document.getElementById('res-precio').textContent = calc.precio + ' €';
       document.getElementById('res-formula').textContent = formula;
@@ -2437,15 +2462,14 @@ function cargarTarifario() {
 }
 
 function guardarTarifario() {
-  var datos = {
-    bajada_bandera: document.getElementById('tarifa-bajada').value,
-    precio_km_diurno: document.getElementById('tarifa-km').value,
-    suplemento_aeropuerto: document.getElementById('tarifa-suplemento').value
-  };
   fetch('/admin/tarifario', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(datos)
+    body: JSON.stringify({
+      bajada_bandera: document.getElementById('tarifa-bajada').value,
+      precio_km_diurno: document.getElementById('tarifa-km').value,
+      suplemento_aeropuerto: document.getElementById('tarifa-suplemento').value
+    })
   }).then(function (r) { return r.json(); }).then(function (resp) {
     var msg = document.getElementById('tarifa-msg');
     msg.innerHTML = resp.ok ? '<span style="color:#2e7d32;">✓ Guardado</span>' : '<span style="color:var(--rojo-error);">Error</span>';
