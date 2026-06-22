@@ -339,33 +339,56 @@ table.tabla-precios input {
         </div>
       </div>
 
-      <!-- Calculador con mapa -->
+      <!-- Calculador con mapa de pin central -->
       <div class="tarjeta">
         <h3 style="margin-top:0;">🗺️ Calcular precio de una ruta</h3>
+        <p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">
+          Mueve el mapa hasta que la punta del pin quede sobre el punto deseado, luego pulsa el botón correspondiente.
+        </p>
 
-        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end;">
-          <div style="flex:1;min-width:200px;">
-            <label class="etiqueta">Origen</label>
-            <input type="text" id="calc-origen" class="campo" placeholder="Escribe el origen..." oninput="buscarLugar('origen')">
-            <div id="sugerencias-origen" style="position:relative;z-index:1000;"></div>
+        <!-- Estado actual: qué estamos fijando -->
+        <div id="calc-estado" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+          <div id="calc-paso-indicador" style="background:var(--gris-fondo);padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;">
+            📍 Paso 1: posiciona el origen
           </div>
-          <div style="flex:1;min-width:200px;">
-            <label class="etiqueta">Destino</label>
-            <input type="text" id="calc-destino" class="campo" placeholder="Escribe el destino..." oninput="buscarLugar('destino')">
-            <div id="sugerencias-destino" style="position:relative;z-index:1000;"></div>
-          </div>
+          <button class="boton-costa" id="btn-fijar-origen" onclick="fijarPunto('origen')" style="padding:8px 18px;">
+            ✅ Fijar origen aquí
+          </button>
+          <button class="boton-secundario" id="btn-fijar-destino" onclick="fijarPunto('destino')" style="padding:8px 18px;display:none;">
+            ✅ Fijar destino aquí
+          </button>
+          <button class="boton-primario" id="btn-calcular" onclick="calcularRuta()" style="display:none;">
+            🧮 Calcular precio
+          </button>
+          <button class="boton-secundario" onclick="reiniciarCalculador()" style="padding:8px 14px;font-size:12px;">↺ Reiniciar</button>
+        </div>
+
+        <!-- Puntos fijados -->
+        <div style="display:flex;gap:16px;margin-bottom:10px;font-size:13px;flex-wrap:wrap;">
+          <div><span style="color:#2e7d32;font-weight:600;">●</span> Origen: <span id="label-origen" style="color:var(--texto-muted);">sin fijar</span></div>
+          <div><span style="color:#c0392b;font-weight:600;">●</span> Destino: <span id="label-destino" style="color:var(--texto-muted);">sin fijar</span></div>
           <div>
-            <label class="etiqueta">¿Incluye aeropuerto o puerto?</label>
-            <select id="calc-suplemento" class="campo" style="height:40px;">
+            <label class="etiqueta" style="display:inline;margin-right:6px;">¿Aeropuerto o puerto?</label>
+            <select id="calc-suplemento" class="campo" style="height:30px;font-size:12px;display:inline;width:auto;">
               <option value="0">No</option>
               <option value="1">Sí (+2,10€)</option>
             </select>
           </div>
-          <button class="boton-primario" onclick="calcularRuta()">Calcular ruta</button>
         </div>
 
-        <div id="mapa-calculador" style="height:380px;border-radius:10px;border:1px solid var(--gris-borde);margin-bottom:14px;"></div>
+        <!-- Mapa con pin fijo en el centro -->
+        <div style="position:relative;height:420px;border-radius:10px;overflow:hidden;border:1px solid var(--gris-borde);margin-bottom:14px;">
+          <div id="mapa-calculador" style="height:100%;width:100%;"></div>
+          <!-- Pin fijo en el centro — la punta es el punto exacto -->
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-100%);pointer-events:none;z-index:1000;">
+            <svg width="32" height="48" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M16 0C7.163 0 0 7.163 0 16C0 28 16 48 16 48C16 48 32 28 32 16C32 7.163 24.837 0 16 0Z" fill="#c0392b"/>
+              <circle cx="16" cy="16" r="7" fill="white"/>
+            </svg>
+          </div>
+        </div>
 
+        <!-- Resultado -->
         <div id="resultado-calculo" style="display:none;background:var(--gris-fondo);border-radius:8px;padding:16px 20px;">
           <div style="display:flex;gap:30px;flex-wrap:wrap;align-items:center;">
             <div>
@@ -376,7 +399,7 @@ table.tabla-precios input {
               <span style="font-size:12px;color:var(--texto-muted);">Precio aproximado (tarifa diurna)</span>
               <div style="font-size:28px;font-weight:700;color:var(--terracota);" id="res-precio">— €</div>
             </div>
-            <div style="font-size:12px;color:var(--texto-muted);max-width:280px;" id="res-formula"></div>
+            <div style="font-size:12px;color:var(--texto-muted);max-width:320px;" id="res-formula"></div>
           </div>
         </div>
       </div>
@@ -2268,31 +2291,141 @@ var marcadorDestino = null;
 var lineaRuta = null;
 var coordOrigen = null;
 var coordDestino = null;
+var pasoActual = 'origen'; // 'origen' | 'destino' | 'listo'
 
 function iniciarCalculador() {
-  // Cargar Leaflet dinámicamente si aún no está cargado
   if (!window.L) {
     var link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
     document.head.appendChild(link);
-
     var script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
     script.onload = function () { inicializarMapa(); cargarTarifario(); };
     document.head.appendChild(script);
   } else {
-    inicializarMapa();
+    if (!mapaCalc) inicializarMapa();
+    else mapaCalc.invalidateSize();
     cargarTarifario();
   }
 }
 
 function inicializarMapa() {
-  if (mapaCalc) { mapaCalc.remove(); mapaCalc = null; }
-  mapaCalc = L.map('mapa-calculador').setView([27.9202, -15.5474], 10); // Gran Canaria
+  mapaCalc = L.map('mapa-calculador', { zoomControl: true }).setView([27.9202, -15.5474], 11);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
+    attribution: '© OpenStreetMap contributors', maxZoom: 18
   }).addTo(mapaCalc);
+}
+
+function reiniciarCalculador() {
+  coordOrigen = null;
+  coordDestino = null;
+  pasoActual = 'origen';
+  if (marcadorOrigen) { marcadorOrigen.remove(); marcadorOrigen = null; }
+  if (marcadorDestino) { marcadorDestino.remove(); marcadorDestino = null; }
+  if (lineaRuta) { lineaRuta.remove(); lineaRuta = null; }
+  document.getElementById('label-origen').textContent = 'sin fijar';
+  document.getElementById('label-destino').textContent = 'sin fijar';
+  document.getElementById('resultado-calculo').style.display = 'none';
+  document.getElementById('calc-paso-indicador').textContent = '📍 Paso 1: posiciona el origen';
+  document.getElementById('btn-fijar-origen').style.display = '';
+  document.getElementById('btn-fijar-destino').style.display = 'none';
+  document.getElementById('btn-calcular').style.display = 'none';
+  mapaCalc.setView([27.9202, -15.5474], 11);
+}
+
+function fijarPunto(tipo) {
+  // Toma las coordenadas del CENTRO del mapa — la punta del pin
+  var centro = mapaCalc.getCenter();
+  var latlng = [centro.lat, centro.lng];
+
+  // Obtener nombre aproximado del punto con geocodificación inversa
+  fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + centro.lat + '&lon=' + centro.lng)
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var nombre = data.address
+        ? (data.address.tourism || data.address.aeroway || data.address.harbour ||
+           data.address.road || data.address.suburb || data.address.village ||
+           data.address.town || data.address.city || 'Punto seleccionado')
+        : 'Punto seleccionado';
+
+      var iconoColor = tipo === 'origen' ? '#2e7d32' : '#c0392b';
+      var icono = L.divIcon({
+        html: '<svg width="28" height="42" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+          '<path d="M16 0C7.163 0 0 7.163 0 16C0 28 16 48 16 48C16 48 32 28 32 16C32 7.163 24.837 0 16 0Z" fill="' + iconoColor + '"/>' +
+          '<circle cx="16" cy="16" r="7" fill="white"/></svg>',
+        iconSize: [28, 42], iconAnchor: [14, 42]
+      });
+
+      if (tipo === 'origen') {
+        coordOrigen = latlng;
+        if (marcadorOrigen) marcadorOrigen.remove();
+        marcadorOrigen = L.marker(latlng, { icon: icono }).addTo(mapaCalc).bindPopup('Origen: ' + nombre);
+        document.getElementById('label-origen').textContent = nombre + ' (' + centro.lat.toFixed(5) + ', ' + centro.lng.toFixed(5) + ')';
+        document.getElementById('label-origen').style.color = '#2e7d32';
+        document.getElementById('calc-paso-indicador').textContent = '📍 Paso 2: posiciona el destino';
+        document.getElementById('btn-fijar-origen').style.display = 'none';
+        document.getElementById('btn-fijar-destino').style.display = '';
+        pasoActual = 'destino';
+      } else {
+        coordDestino = latlng;
+        if (marcadorDestino) marcadorDestino.remove();
+        marcadorDestino = L.marker(latlng, { icon: icono }).addTo(mapaCalc).bindPopup('Destino: ' + nombre);
+        document.getElementById('label-destino').textContent = nombre + ' (' + centro.lat.toFixed(5) + ', ' + centro.lng.toFixed(5) + ')';
+        document.getElementById('label-destino').style.color = '#c0392b';
+        document.getElementById('calc-paso-indicador').textContent = '✅ Origen y destino fijados — pulsa Calcular';
+        document.getElementById('btn-fijar-destino').style.display = 'none';
+        document.getElementById('btn-calcular').style.display = '';
+        pasoActual = 'listo';
+
+        // Ajustar zoom para ver los dos puntos
+        mapaCalc.fitBounds([coordOrigen, coordDestino], { padding: [50, 50] });
+      }
+    });
+}
+
+function calcularRuta() {
+  if (!coordOrigen || !coordDestino) return;
+
+  var url = 'https://router.project-osrm.org/route/v1/driving/' +
+    coordOrigen[1] + ',' + coordOrigen[0] + ';' +
+    coordDestino[1] + ',' + coordDestino[0] +
+    '?overview=full&geometries=geojson';
+
+  fetch(url).then(function (r) { return r.json(); }).then(function (data) {
+    if (!data.routes || !data.routes.length) {
+      alert('No se pudo calcular la ruta entre esos puntos.');
+      return;
+    }
+    var ruta = data.routes[0];
+    var km = (ruta.distance / 1000).toFixed(2);
+
+    if (lineaRuta) lineaRuta.remove();
+    lineaRuta = L.geoJSON(ruta.geometry, {
+      style: { color: '#c0392b', weight: 4, opacity: 0.75, dashArray: '8,4' }
+    }).addTo(mapaCalc);
+    mapaCalc.fitBounds(lineaRuta.getBounds(), { padding: [40, 40] });
+
+    var conSupl = document.getElementById('calc-suplemento').value === '1';
+    fetch('/admin/tarifario/calcular', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ km: parseFloat(km), con_suplemento: conSupl })
+    }).then(function (r) { return r.json(); }).then(function (calc) {
+      var bd = parseFloat(document.getElementById('tarifa-bajada').value);
+      var pKm = parseFloat(document.getElementById('tarifa-km').value);
+      var supl = parseFloat(document.getElementById('tarifa-suplemento').value);
+      var formula = bd.toFixed(2) + '€ (bajada) + ((' + km + 'km − 1) × ' + pKm.toFixed(2) + '€/km)' +
+        (conSupl ? ' + ' + supl.toFixed(2) + '€ (suplemento aeropuerto/puerto)' : '');
+
+      document.getElementById('res-km').textContent = km + ' km';
+      document.getElementById('res-precio').textContent = calc.precio + ' €';
+      document.getElementById('res-formula').textContent = formula;
+      document.getElementById('resultado-calculo').style.display = 'block';
+    });
+  }).catch(function () {
+    alert('Error al calcular la ruta. Comprueba la conexión.');
+  });
 }
 
 function cargarTarifario() {
@@ -2317,117 +2450,6 @@ function guardarTarifario() {
     var msg = document.getElementById('tarifa-msg');
     msg.innerHTML = resp.ok ? '<span style="color:#2e7d32;">✓ Guardado</span>' : '<span style="color:var(--rojo-error);">Error</span>';
     setTimeout(function () { msg.innerHTML = ''; }, 2000);
-  });
-}
-
-var timerBusqueda = null;
-function buscarLugar(tipo) {
-  clearTimeout(timerBusqueda);
-  var input = document.getElementById('calc-' + tipo);
-  var texto = input.value.trim();
-  if (texto.length < 3) {
-    document.getElementById('sugerencias-' + tipo).innerHTML = '';
-    return;
-  }
-  timerBusqueda = setTimeout(function () {
-    // Nominatim (OpenStreetMap) limitado a Gran Canaria con viewbox
-    fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' +
-      encodeURIComponent(texto + ' Gran Canaria') +
-      '&viewbox=-16.1,27.6,-15.2,28.2&bounded=0')
-      .then(function (r) { return r.json(); })
-      .then(function (resultados) {
-        var lista = resultados.map(function (r) {
-          return '<div onclick="seleccionarLugar(\'' + tipo + '\',' +
-            r.lat + ',' + r.lon + ',\'' + escapar(r.display_name.split(',')[0]) + '\')" ' +
-            'style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gris-borde);font-size:13px;" ' +
-            'onmouseover="this.style.background=\'var(--gris-fondo)\'" ' +
-            'onmouseout="this.style.background=\'\'">' +
-            escapar(r.display_name.split(',').slice(0, 2).join(',')) + '</div>';
-        }).join('');
-        document.getElementById('sugerencias-' + tipo).innerHTML = lista
-          ? '<div style="background:white;border:1px solid var(--gris-borde);border-radius:6px;position:absolute;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);">' + lista + '</div>'
-          : '';
-      });
-  }, 400);
-}
-
-function seleccionarLugar(tipo, lat, lon, nombre) {
-  document.getElementById('calc-' + tipo).value = nombre;
-  document.getElementById('sugerencias-' + tipo).innerHTML = '';
-
-  var latlng = [parseFloat(lat), parseFloat(lon)];
-  var icono = L.divIcon({
-    html: tipo === 'origen'
-      ? '<div style="background:#2e7d32;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div>'
-      : '<div style="background:#c0392b;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div>',
-    iconSize: [14, 14], iconAnchor: [7, 7]
-  });
-
-  if (tipo === 'origen') {
-    coordOrigen = latlng;
-    if (marcadorOrigen) marcadorOrigen.remove();
-    marcadorOrigen = L.marker(latlng, { icon: icono }).addTo(mapaCalc).bindPopup('Origen: ' + nombre);
-  } else {
-    coordDestino = latlng;
-    if (marcadorDestino) marcadorDestino.remove();
-    marcadorDestino = L.marker(latlng, { icon: icono }).addTo(mapaCalc).bindPopup('Destino: ' + nombre);
-  }
-
-  if (coordOrigen && coordDestino) {
-    mapaCalc.fitBounds([coordOrigen, coordDestino], { padding: [40, 40] });
-  } else {
-    mapaCalc.setView(latlng, 13);
-  }
-}
-
-function calcularRuta() {
-  if (!coordOrigen || !coordDestino) {
-    alert('Selecciona origen y destino del listado de sugerencias.');
-    return;
-  }
-
-  // OSRM (OpenStreetMap Routing Machine) — gratuito, sin clave
-  var url = 'https://router.project-osrm.org/route/v1/driving/' +
-    coordOrigen[1] + ',' + coordOrigen[0] + ';' +
-    coordDestino[1] + ',' + coordDestino[0] +
-    '?overview=full&geometries=geojson';
-
-  fetch(url).then(function (r) { return r.json(); }).then(function (data) {
-    if (!data.routes || !data.routes.length) {
-      alert('No se pudo calcular la ruta. Intenta con otros puntos.');
-      return;
-    }
-
-    var ruta = data.routes[0];
-    var km = (ruta.distance / 1000).toFixed(2);
-
-    // Dibujar la ruta en el mapa
-    if (lineaRuta) lineaRuta.remove();
-    lineaRuta = L.geoJSON(ruta.geometry, {
-      style: { color: '#c0392b', weight: 4, opacity: 0.8 }
-    }).addTo(mapaCalc);
-    mapaCalc.fitBounds(lineaRuta.getBounds(), { padding: [30, 30] });
-
-    // Pedir al servidor el precio calculado
-    var conSupl = document.getElementById('calc-suplemento').value === '1';
-    fetch('/admin/tarifario/calcular', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ km: parseFloat(km), con_suplemento: conSupl })
-    }).then(function (r) { return r.json(); }).then(function (calc) {
-      var bd = parseFloat(document.getElementById('tarifa-bajada').value);
-      var pKm = parseFloat(document.getElementById('tarifa-km').value);
-      var supl = parseFloat(document.getElementById('tarifa-suplemento').value);
-      var formula = bd.toFixed(2) + '€ (bajada) + ((' + km + ' - 1) × ' + pKm.toFixed(2) + '€/km)' +
-        (conSupl ? ' + ' + supl.toFixed(2) + '€ (suplemento aeropuerto/puerto)' : '');
-
-      document.getElementById('res-km').textContent = km + ' km';
-      document.getElementById('res-precio').textContent = calc.precio + ' €';
-      document.getElementById('res-formula').textContent = formula;
-      document.getElementById('resultado-calculo').style.display = 'block';
-    });
-  }).catch(function () {
-    alert('Error al calcular la ruta. Comprueba la conexión.');
   });
 }
 
