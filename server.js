@@ -622,7 +622,7 @@ app.get('/admin/sesion', (req, res) => {
 // ─── API pública ──────────────────────────────────────────────────────────────
 app.get('/api/categorias', asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas FROM categorias_vehiculos WHERE disponible = TRUE ORDER BY orden, nombre'
+    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas, foto FROM categorias_vehiculos WHERE disponible = TRUE ORDER BY orden, nombre'
   );
   res.json(result.rows);
 }));
