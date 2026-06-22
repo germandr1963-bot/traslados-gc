@@ -180,11 +180,11 @@
       <div class="campos-extra" id="campos-aeropuerto">
         <div class="dos-columnas">
           <div class="campo-grupo">
-            <label>Número de vuelo</label>
+            <label id="label-vuelo">Número de vuelo</label>
             <input type="text" id="numero-vuelo" placeholder="Ej: IB3456">
           </div>
           <div class="campo-grupo">
-            <label>Hora de llegada del vuelo</label>
+            <label id="label-hora-vuelo">Hora del vuelo</label>
             <input type="time" id="hora-vuelo">
           </div>
         </div>
@@ -198,9 +198,26 @@
             <input type="text" id="nombre-barco" placeholder="Ej: MSC Bellísima">
           </div>
           <div class="campo-grupo">
-            <label>Hora de atraque</label>
+            <label id="label-hora-atraque">Hora de atraque</label>
             <input type="time" id="hora-atraque">
           </div>
+        </div>
+      </div>
+
+      <!-- Dirección de origen (solo si no es aeropuerto ni puerto) -->
+      <div class="campos-extra" id="campo-direccion-origen">
+        <div class="campo-grupo">
+          <label>Dirección exacta de recogida</label>
+          <input type="text" id="direccion-origen" placeholder="Calle, número, municipio...">
+        </div>
+      </div>
+
+      <!-- Dirección de destino (solo si el destino no es aeropuerto ni puerto) -->
+      <div class="campos-extra" id="campo-direccion-destino">
+        <div class="campo-grupo">
+          <label>Dirección exacta de destino</label>
+          <input type="text" id="direccion-destino" placeholder="Hotel, calle, número...">
+          <div class="aviso-campo" id="err-direccion-destino">Indica la dirección de destino</div>
         </div>
       </div>
 
@@ -240,39 +257,16 @@
     </div>
   </div>
 
-  <!-- PASO 2: Detalles del destino -->
+  <!-- PASO 2: Extras -->
   <div class="paso" id="paso-2">
     <div class="paso-cabecera">
       <div class="paso-numero" id="num-2">2</div>
       <div>
-        <div class="paso-titulo">Detalles del destino</div>
-        <div class="paso-resumen" id="resumen-2">Dirección exacta o nombre del hotel</div>
+        <div class="paso-titulo">Extras</div>
+        <div class="paso-resumen" id="resumen-2">Servicios adicionales opcionales</div>
       </div>
     </div>
     <div class="paso-cuerpo" id="cuerpo-2">
-      <div class="campo-grupo">
-        <label>Dirección exacta, hotel o lugar de destino</label>
-        <input type="text" id="destino-detalle" placeholder="Ej: Hotel Riu Palace, Av. de Tirajana 12, Maspalomas">
-        <div class="aviso-campo" id="err-destino-detalle">Indica el destino exacto</div>
-      </div>
-      <div class="campo-grupo">
-        <label>Notas para el conductor (opcional)</label>
-        <textarea id="notas" placeholder="Cualquier información útil..."></textarea>
-      </div>
-      <button class="boton-siguiente" onclick="siguientePaso2()">Continuar →</button>
-    </div>
-  </div>
-
-  <!-- PASO 3: Extras -->
-  <div class="paso" id="paso-3">
-    <div class="paso-cabecera">
-      <div class="paso-numero" id="num-3">3</div>
-      <div>
-        <div class="paso-titulo">Extras</div>
-        <div class="paso-resumen" id="resumen-3">Servicios adicionales opcionales</div>
-      </div>
-    </div>
-    <div class="paso-cuerpo" id="cuerpo-3">
       <div class="lista-extras" id="lista-extras">
         <p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>
       </div>
@@ -284,20 +278,20 @@
         <span style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;" id="total-extras-precio">0 €</span>
       </div>
       <p class="nota-extras">Los extras se abonan directamente al conductor junto con el precio del taxímetro. No forman parte de ningún cargo online.</p>
-      <button class="boton-siguiente" onclick="siguientePaso3()">Continuar →</button>
+      <button class="boton-siguiente" onclick="siguientePaso2()">Continuar →</button>
     </div>
   </div>
 
-  <!-- PASO 4: Datos del cliente -->
-  <div class="paso" id="paso-4">
+  <!-- PASO 3: Datos de contacto -->
+  <div class="paso" id="paso-3">
     <div class="paso-cabecera">
-      <div class="paso-numero" id="num-4">4</div>
+      <div class="paso-numero" id="num-3">3</div>
       <div>
         <div class="paso-titulo">Tus datos de contacto</div>
-        <div class="paso-resumen" id="resumen-4">Nombre, teléfono y email</div>
+        <div class="paso-resumen" id="resumen-3">Nombre, teléfono y email</div>
       </div>
     </div>
-    <div class="paso-cuerpo" id="cuerpo-4">
+    <div class="paso-cuerpo" id="cuerpo-3">
 
       <p style="font-size:12px;color:var(--texto-muted);margin-bottom:14px;font-weight:500;">DATOS DE CONTACTO</p>
 
@@ -340,7 +334,6 @@
       </div>
 
       <div class="resumen-box" id="resumen-final" style="display:none;"></div>
-
       <button class="boton-siguiente" id="boton-enviar" onclick="mostrarResumen()">Revisar y enviar solicitud</button>
       <div id="err-envio" style="margin-top:10px;font-size:13px;color:var(--rojo-error);display:none;"></div>
     </div>
@@ -376,12 +369,38 @@ if (paramOrigen && paramDestino) {
   document.getElementById('tbl-destino').textContent = paramDestino;
   document.getElementById('tarjeta-traslado').style.display = 'flex';
 
-  // Detectar tipo de origen automáticamente
+  // Detectar tipo de origen y destino automáticamente
   var origenLower = paramOrigen.toLowerCase();
-  if (origenLower.indexOf('aeropuerto') !== -1) {
+  var destinoLower = paramDestino.toLowerCase();
+  var esAeropuerto = origenLower.indexOf('aeropuerto') !== -1 || destinoLower.indexOf('aeropuerto') !== -1;
+  var esPuerto = origenLower.indexOf('puerto') !== -1 || destinoLower.indexOf('puerto') !== -1;
+
+  if (esAeropuerto) {
     document.getElementById('campos-aeropuerto').classList.add('visible');
-  } else if (origenLower.indexOf('puerto') !== -1) {
+    // Ajustar etiquetas según si es origen o destino
+    if (origenLower.indexOf('aeropuerto') !== -1) {
+      document.getElementById('label-vuelo').textContent = 'Número de vuelo de llegada';
+      document.getElementById('label-hora-vuelo').textContent = 'Hora de llegada del vuelo';
+    } else {
+      document.getElementById('label-vuelo').textContent = 'Número de vuelo de salida';
+      document.getElementById('label-hora-vuelo').textContent = 'Hora de salida del vuelo';
+    }
+  } else if (esPuerto) {
     document.getElementById('campos-puerto').classList.add('visible');
+    if (origenLower.indexOf('puerto') !== -1) {
+      document.getElementById('label-hora-atraque').textContent = 'Hora de atraque';
+    } else {
+      document.getElementById('label-hora-atraque').textContent = 'Hora de embarque';
+    }
+  }
+
+  // Mostrar campo de dirección solo si origen Y destino no son aeropuerto ni puerto
+  if (!esAeropuerto && !esPuerto) {
+    document.getElementById('campo-direccion-origen').classList.add('visible');
+  }
+  // Mostrar campo dirección destino solo si el destino no es aeropuerto ni puerto
+  if (destinoLower.indexOf('aeropuerto') === -1 && destinoLower.indexOf('puerto') === -1) {
+    document.getElementById('campo-direccion-destino').classList.add('visible');
   }
 
   // Cargar precio si tenemos categoría
@@ -463,9 +482,8 @@ function toggleExtra(id) {
   }
 }
 
-// Navegación entre pasos
 function marcarPasoActivo(n) {
-  for (var i = 1; i <= 4; i++) {
+  for (var i = 1; i <= 3; i++) {
     var num = document.getElementById('num-' + i);
     var cuerpo = document.getElementById('cuerpo-' + i);
     if (i < n) {
@@ -492,33 +510,33 @@ function siguientePaso1() {
   var apellidos = document.getElementById('pasajero-apellidos').value.trim();
   var pasaporte = document.getElementById('pasajero-pasaporte').value.trim();
 
+  // Validar dirección de destino si es necesaria
+  var campoDireccionDestino = document.getElementById('campo-direccion-destino');
+  var direccionDestino = document.getElementById('direccion-destino') ? document.getElementById('direccion-destino').value.trim() : '';
+  var necesitaDireccionDestino = campoDireccionDestino.classList.contains('visible');
+
   document.getElementById('err-fecha').style.display = fecha ? 'none' : 'block';
   document.getElementById('err-hora').style.display = hora ? 'none' : 'block';
   document.getElementById('err-pasajero-nombre').style.display = nombre ? 'none' : 'block';
   document.getElementById('err-pasajero-apellidos').style.display = apellidos ? 'none' : 'block';
   document.getElementById('err-pasajero-pasaporte').style.display = pasaporte ? 'none' : 'block';
+  if (necesitaDireccionDestino) {
+    document.getElementById('err-direccion-destino').style.display = direccionDestino ? 'none' : 'block';
+  }
 
-  if (!fecha || !hora || !nombre || !apellidos || !pasaporte) return;
+  if (!fecha || !hora || !nombre || !apellidos || !pasaporte || (necesitaDireccionDestino && !direccionDestino)) return;
 
   var fechaTexto = new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric',month:'long',year:'numeric'});
-  document.getElementById('resumen-1').textContent = fechaTexto + ' a las ' + hora + ' · ' + nombre + ' ' + apellidos;
+  document.getElementById('resumen-1').textContent = fechaTexto + ' · ' + nombre + ' ' + apellidos;
   marcarPasoActivo(2);
 }
 
 function siguientePaso2() {
-  var detalle = document.getElementById('destino-detalle').value.trim();
-  document.getElementById('err-destino-detalle').style.display = detalle ? 'none' : 'block';
-  if (!detalle) return;
-  document.getElementById('resumen-2').textContent = detalle;
-  marcarPasoActivo(3);
-}
-
-function siguientePaso3() {
   var txt = extrasSeleccionados.length > 0
     ? extrasSeleccionados.map(function(e){ return e.nombre; }).join(', ')
     : 'Sin extras';
-  document.getElementById('resumen-3').textContent = txt;
-  marcarPasoActivo(4);
+  document.getElementById('resumen-2').textContent = txt;
+  marcarPasoActivo(3);
 }
 
 function mostrarResumen() {
@@ -541,10 +559,10 @@ function mostrarResumen() {
   var pasajeroApellidos = document.getElementById('pasajero-apellidos').value.trim();
   var pasaporte = document.getElementById('pasajero-pasaporte').value.trim();
   var telefonoCompleto = telefonoPrefijo + ' ' + telefonoNumero;
+  var direccionDestino = document.getElementById('direccion-destino') ? document.getElementById('direccion-destino').value.trim() : '';
 
   var html =
-    '<strong>Traslado:</strong> ' + paramOrigen + ' → ' + paramDestino + '<br>' +
-    '<strong>Destino exacto:</strong> ' + document.getElementById('destino-detalle').value.trim() + '<br>' +
+    '<strong>Traslado:</strong> ' + paramOrigen + ' → ' + paramDestino + (direccionDestino ? ' (' + direccionDestino + ')' : '') + '<br>' +
     (categoriaNombre ? '<strong>Categoría:</strong> ' + categoriaNombre + '<br>' : '') +
     '<strong>Fecha y hora:</strong> ' + fechaTexto + ' a las ' + hora + '<br>' +
     '<strong>Pasajeros:</strong> ' + document.getElementById('num-pasajeros').value + '<br>' +
@@ -570,9 +588,10 @@ function confirmarEnvio() {
 
   var telefonoCompleto = document.getElementById('telefono-prefijo').value + ' ' + document.getElementById('telefono-numero').value.trim().replace(/\s/g, '');
 
+  var direccionDestino = document.getElementById('direccion-destino') ? document.getElementById('direccion-destino').value.trim() : '';
   var datos = {
     origen: paramOrigen,
-    destino: paramDestino + ' — ' + document.getElementById('destino-detalle').value.trim(),
+    destino: paramDestino + (direccionDestino ? ' — ' + direccionDestino : ''),
     categoria_id: paramCategoriaId,
     precio_estimado: precioEstimado,
     fecha: document.getElementById('fecha').value,
@@ -601,11 +620,8 @@ function confirmarEnvio() {
   .then(function(r){ return r.json(); })
   .then(function(d){
     if (d.ok) {
-      // Ocultar todos los pasos y mostrar confirmación en su lugar
       document.querySelectorAll('.paso').forEach(function(p){ p.style.display = 'none'; });
       document.getElementById('tarjeta-traslado').style.display = 'none';
-      document.querySelector('h1').style.display = 'none';
-      document.querySelector('p[style]').style.display = 'none';
       document.getElementById('confirmacion').style.display = 'block';
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
