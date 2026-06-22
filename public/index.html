@@ -87,113 +87,133 @@
 }
 .tarjeta-resultado {
   display: flex;
-  gap: 20px;
+  gap: 0;
   align-items: stretch;
   background: var(--charcoal-2);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 12px;
-  padding: 18px 20px;
   margin-top: 8px;
-  flex-wrap: wrap;
+  overflow: hidden;
 }
-.tarjeta-resultado-foto {
-  width: 120px;
-  height: 80px;
-  object-fit: contain;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.06);
+.tarjeta-resultado-foto-wrap {
+  width: 140px;
   flex-shrink: 0;
-  padding: 6px;
-}
-.tarjeta-resultado-foto-placeholder {
-  width: 120px;
-  height: 80px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.06);
+  background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 36px;
-  flex-shrink: 0;
+  padding: 12px;
 }
-.tarjeta-resultado-info {
+.tarjeta-resultado-foto {
+  width: 116px;
+  height: 100%;
+  max-height: 110px;
+  object-fit: contain;
+  display: block;
+}
+.tarjeta-resultado-foto-placeholder {
+  font-size: 48px;
+  line-height: 1;
+}
+.tarjeta-resultado-cuerpo {
   flex: 1;
-  min-width: 180px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: 1fr 1fr;
+  padding: 14px 18px;
+  gap: 0 20px;
+  min-width: 0;
 }
 .tarjeta-resultado-nombre {
   font-family: 'Big Shoulders Display', sans-serif;
   font-size: 20px;
   color: #fff;
   letter-spacing: 0.3px;
+  align-self: end;
+  grid-column: 1;
+  grid-row: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.precio-grande {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 34px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+  align-self: end;
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+  white-space: nowrap;
 }
 .tarjeta-resultado-datos {
   display: flex;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
+  align-items: center;
+  grid-column: 1;
+  grid-row: 2;
+  padding-top: 8px;
 }
 .tarjeta-resultado-dato {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
+  font-size: 12px;
   color: rgba(242,237,228,0.85);
   background: rgba(255,255,255,0.07);
   border-radius: 20px;
-  padding: 4px 10px;
+  padding: 3px 10px;
 }
 .tarjeta-resultado-dato svg {
   flex-shrink: 0;
 }
-.tarjeta-resultado-precio-bloque {
+.tarjeta-resultado-precio-inferior {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: flex-end;
-  gap: 8px;
-  flex-shrink: 0;
-  min-width: 140px;
-}
-.precio-grande {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 36px;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1;
+  justify-content: flex-end;
+  gap: 5px;
+  grid-column: 2;
+  grid-row: 2;
+  padding-top: 8px;
 }
 .badge-aproximado {
   background: var(--oro);
   color: var(--oro-texto);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  padding: 5px 14px;
+  padding: 4px 12px;
   border-radius: 20px;
-  letter-spacing: 0.2px;
+  white-space: nowrap;
 }
 .tarjeta-resultado-nota {
-  font-size: 11px;
-  color: rgba(242,237,228,0.45);
-  margin-top: 2px;
-  line-height: 1.5;
+  font-size: 10px;
+  color: rgba(242,237,228,0.4);
+  line-height: 1.4;
   text-align: right;
-  max-width: 180px;
+  white-space: nowrap;
+}
+.tarjeta-resultado-reservar {
+  display: flex;
+  align-items: center;
+  padding: 14px 18px;
+  border-left: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
 }
 .boton-reservar {
   background: var(--terracota);
   color: #fff;
   border: none;
   border-radius: 8px;
-  padding: 13px 24px;
-  font-size: 14px;
+  padding: 13px 20px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  flex-shrink: 0;
-  align-self: center;
-  margin-left: auto;
+  writing-mode: horizontal-tb;
 }
 .boton-reservar:hover {
   background: var(--terracota-oscuro);
@@ -355,8 +375,8 @@ function verPrecio() {
     .then(function (r) { return r.json(); })
     .then(function (data) {
       var fotoHtml = catData && catData.foto
-        ? '<img class="tarjeta-resultado-foto" src="' + catData.foto + '" alt="' + (catData.nombre || '') + '">'
-        : '<div class="tarjeta-resultado-foto-placeholder">🚗</div>';
+        ? '<div class="tarjeta-resultado-foto-wrap"><img class="tarjeta-resultado-foto" src="' + catData.foto + '" alt="' + (catData.nombre || '') + '"></div>'
+        : '<div class="tarjeta-resultado-foto-wrap"><div class="tarjeta-resultado-foto-placeholder">🚗</div></div>';
 
       var paxHtml = catData
         ? '<div class="tarjeta-resultado-dato">' +
@@ -380,16 +400,18 @@ function verPrecio() {
       resultado.innerHTML =
         '<div class="tarjeta-resultado">' +
           fotoHtml +
-          '<div class="tarjeta-resultado-info">' +
+          '<div class="tarjeta-resultado-cuerpo">' +
             '<div class="tarjeta-resultado-nombre">' + (catData ? catData.nombre : categoriaTexto) + '</div>' +
+            '<div class="precio precio-grande">' + (data.a_consultar ? '<span style="font-size:18px;">A consultar</span>' : Number(data.precio).toFixed(0) + ' €') + '</div>' +
             '<div class="tarjeta-resultado-datos">' + paxHtml + '</div>' +
+            '<div class="tarjeta-resultado-precio-inferior">' +
+              '<span class="badge-aproximado">precio aproximado</span>' +
+              '<div class="tarjeta-resultado-nota">El precio final lo determina el taxímetro del conductor.</div>' +
+            '</div>' +
           '</div>' +
-          '<div class="tarjeta-resultado-precio-bloque">' +
-            precioHtml +
-            '<span class="badge-aproximado">precio aproximado</span>' +
-            '<div class="tarjeta-resultado-nota">El precio final lo determina<br>el taxímetro del conductor.</div>' +
+          '<div class="tarjeta-resultado-reservar">' +
+            botonHtml +
           '</div>' +
-          botonHtml +
         '</div>';
     });
 }
