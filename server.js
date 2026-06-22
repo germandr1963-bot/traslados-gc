@@ -2008,6 +2008,52 @@ app.post('/admin/tarifario/calcular', requireAdmin, asyncHandler(async (req, res
   res.json({ precio: Math.max(precio, parseFloat(t.bajada_bandera)).toFixed(2) });
 }));
 
+// ─── Admin: extras ────────────────────────────────────────────────────────────
+app.get('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, nombre, precio, activo FROM extras ORDER BY id'
+  );
+  res.json({ extras: result.rows });
+}));
+
+app.post('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, precio } = req.body;
+  if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
+  const p = parseFloat(precio);
+  if (isNaN(p) || p < 0) return res.status(400).json({ error: 'El precio no es válido.' });
+  await pool.query(
+    'INSERT INTO extras (nombre, precio) VALUES ($1, $2)',
+    [nombre.trim(), p]
+  );
+  res.json({ ok: true });
+}));
+
+app.post('/admin/extras/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, precio } = req.body;
+  if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
+  const p = parseFloat(precio);
+  if (isNaN(p) || p < 0) return res.status(400).json({ error: 'El precio no es válido.' });
+  await pool.query(
+    'UPDATE extras SET nombre = $1, precio = $2 WHERE id = $3',
+    [nombre.trim(), p, req.params.id]
+  );
+  res.json({ ok: true });
+}));
+
+app.post('/admin/extras/:id/activo', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE extras SET activo = $1 WHERE id = $2', [!!req.body.activo, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/extras/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  const enUso = await pool.query('SELECT 1 FROM reservas_extras WHERE extra_id = $1 LIMIT 1', [req.params.id]);
+  if (enUso.rows.length) {
+    return res.status(400).json({ error: 'Este extra está asociado a una o más reservas y no se puede eliminar.' });
+  }
+  await pool.query('DELETE FROM extras WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
 // ─── Ajustes globales de SEO ──────────────────────────────────────────────────
 app.get('/admin/seo/ajustes-globales', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
