@@ -11,6 +11,8 @@
   background:var(--charcoal);
   padding:14px 24px;
   display:flex; align-items:center; justify-content:space-between;
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  box-shadow:0 2px 8px rgba(0,0,0,0.15);
 }
 .cabecera .marca { font-family:'Big Shoulders Display',sans-serif; font-size:18px; color:#fff; }
 .boton-volver {
@@ -28,7 +30,7 @@
   padding:7px 14px; font-size:13px; cursor:pointer;
 }
 .boton-reiniciar:hover { color:#fff; border-color:rgba(255,255,255,0.35); }
-.contenedor { max-width:720px; margin:36px auto; padding:0 20px 60px; }
+.contenedor { max-width:720px; margin:0 auto; padding:80px 20px 60px; }
 
 /* Tarjeta traslado */
 .tarjeta-traslado {
@@ -103,9 +105,9 @@
 .extra-precio { font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:600; }
 .total-extras {
   margin-top:14px; padding:12px 16px;
-  background:var(--charcoal-2); border-radius:8px;
-  color:var(--texto-claro); font-size:13px;
+  border-radius:8px; font-size:13px;
   display:none; justify-content:space-between; align-items:center;
+  color:var(--texto-oscuro);
 }
 .nota-extras { font-size:12px; color:var(--texto-muted); margin-top:10px; line-height:1.5; }
 
@@ -129,11 +131,12 @@
 
 /* Resumen y confirmación */
 .resumen-box {
-  background:var(--charcoal-2); border-radius:10px;
+  border:1px solid var(--gris-borde); border-radius:10px;
   padding:16px 18px; margin-bottom:20px;
-  color:var(--texto-claro); font-size:13px; line-height:1.9;
+  font-size:13px; line-height:1.9;
+  color:var(--texto-oscuro);
 }
-.resumen-box strong { color:#fff; }
+.resumen-box strong { color:var(--texto-oscuro); }
 .mensaje-ok { text-align:center; padding:50px 20px; }
 .mensaje-ok .icono { font-size:52px; margin-bottom:18px; }
 .mensaje-ok h2 { font-family:'Big Shoulders Display',sans-serif; font-size:28px; margin-bottom:10px; color:var(--texto-oscuro); }
@@ -324,12 +327,12 @@
       <div class="lista-extras" id="lista-extras">
         <p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>
       </div>
-      <div class="total-extras" id="total-extras">
+      <div class="total-extras" id="total-extras" style="border:1px solid var(--gris-borde);border-radius:8px;">
         <div>
           <div style="opacity:0.75;margin-bottom:2px;">Total extras</div>
           <div style="font-size:11px;opacity:0.45;">Se abonan directamente al conductor</div>
         </div>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;" id="total-extras-precio">0 €</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--texto-oscuro);" id="total-extras-precio">0 €</span>
       </div>
       <p class="nota-extras">Los extras se abonan directamente al conductor junto con el precio del taxímetro. No forman parte de ningún cargo online.</p>
       <button class="boton-siguiente" onclick="siguientePaso(3)">Continuar →</button>
