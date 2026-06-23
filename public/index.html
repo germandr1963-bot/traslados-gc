@@ -373,7 +373,7 @@ function verPrecio() {
         : '';
 
       var precioHtml = data.a_consultar
-        ? '<span style="font-size:20px;color:#fff;font-weight:600;">Precio a consultar</span>'
+        ? ''
         : '<span class="precio precio-grande">' + Number(data.precio).toFixed(0) + ' €</span>';
 
       var botonHtml = '<button class="boton-reservar" onclick="irAReserva()">Reservar este traslado →</button>';
