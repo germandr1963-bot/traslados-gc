@@ -664,6 +664,7 @@ app.get('/api/extras-publicos', asyncHandler(async (req, res) => {
 
 app.post('/api/reservas', asyncHandler(async (req, res) => {
   const {
+    numero_reserva_cliente,
     origen, destino, categoria_id, precio_estimado,
     fecha, hora, tipo_llegada, numero_vuelo, hora_llegada_vuelo,
     nombre_barco, hora_atraque,
@@ -685,14 +686,23 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     return 'TGC-' + l() + l() + l() + n() + n() + n();
   }
 
-  let numeroReserva;
-  let intentos = 0;
-  do {
-    numeroReserva = generarPNR();
-    const existe = await pool.query('SELECT 1 FROM reservas WHERE numero_reserva = $1', [numeroReserva]);
-    if (existe.rows.length === 0) break;
-    intentos++;
-  } while (intentos < 10);
+  // Usar PNR del cliente si viene, si no generar uno nuevo
+  let numeroReserva = null;
+  if (numero_reserva_cliente && /^TGC-[A-Z]{3}[0-9]{3}$/.test(numero_reserva_cliente)) {
+    const existe = await pool.query('SELECT 1 FROM reservas WHERE numero_reserva = $1', [numero_reserva_cliente]);
+    if (existe.rows.length === 0) {
+      numeroReserva = numero_reserva_cliente;
+    }
+  }
+  if (!numeroReserva) {
+    let intentos = 0;
+    do {
+      numeroReserva = generarPNR();
+      const existe = await pool.query('SELECT 1 FROM reservas WHERE numero_reserva = $1', [numeroReserva]);
+      if (existe.rows.length === 0) break;
+      intentos++;
+    } while (intentos < 10);
+  }
 
   const notasCompletas = [
     'Origen: ' + origen + ' → Destino: ' + destino,
