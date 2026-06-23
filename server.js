@@ -504,6 +504,7 @@ async function initSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS reservas (
       id SERIAL PRIMARY KEY,
+      numero_reserva TEXT UNIQUE,
       ruta_id INT REFERENCES rutas(id) ON DELETE SET NULL,
       categoria_id INT REFERENCES categorias_vehiculos(id) ON DELETE SET NULL,
       fecha DATE NOT NULL,
@@ -519,6 +520,11 @@ async function initSchema() {
       stripe_payment_intent_id TEXT,
       creado_en TIMESTAMP DEFAULT NOW()
     );
+  `);
+
+  // Añadir numero_reserva si no existe (para BD ya creadas)
+  await pool.query(`
+    ALTER TABLE reservas ADD COLUMN IF NOT EXISTS numero_reserva TEXT UNIQUE;
   `);
 
   // ─── Reservas × Extras ────────────────────────────────────────────────────
@@ -666,11 +672,30 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     extras
   } = req.body;
 
-  if (!origen || !destino || !categoria_id || !fecha || !hora || !nombre_cliente || !telefono_cliente || !email_cliente) {
+  if (!origen || !destino || !categoria_id || !fecha || !nombre_cliente || !telefono_cliente || !email_cliente) {
     return res.status(400).json({ error: 'Faltan datos obligatorios.' });
   }
 
+  // Generar número de reserva tipo PNR: TGC-XXX999
+  function generarPNR() {
+    const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const nums = '0123456789';
+    const l = () => letras[Math.floor(Math.random() * letras.length)];
+    const n = () => nums[Math.floor(Math.random() * nums.length)];
+    return 'TGC-' + l() + l() + l() + n() + n() + n();
+  }
+
+  let numeroReserva;
+  let intentos = 0;
+  do {
+    numeroReserva = generarPNR();
+    const existe = await pool.query('SELECT 1 FROM reservas WHERE numero_reserva = $1', [numeroReserva]);
+    if (existe.rows.length === 0) break;
+    intentos++;
+  } while (intentos < 10);
+
   const notasCompletas = [
+    'Origen: ' + origen + ' → Destino: ' + destino,
     tipo_llegada === 'aeropuerto' && numero_vuelo ? 'Vuelo: ' + numero_vuelo : null,
     tipo_llegada === 'aeropuerto' && hora_llegada_vuelo ? 'Hora llegada vuelo: ' + hora_llegada_vuelo : null,
     tipo_llegada === 'puerto' && nombre_barco ? 'Barco: ' + nombre_barco : null,
@@ -679,20 +704,16 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     notas || null
   ].filter(Boolean).join(' | ');
 
+  const horaGuardar = hora || '00:00';
+
   const reserva = await pool.query(
-    `INSERT INTO reservas (ruta_id, categoria_id, fecha, hora, nombre_cliente, telefono_cliente, email_cliente, precio_estimado, notas, estado)
-     VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, 'pendiente') RETURNING id`,
-    [categoria_id, fecha, hora, nombre_cliente.trim(), telefono_cliente.trim(), email_cliente.trim(),
+    `INSERT INTO reservas (numero_reserva, ruta_id, categoria_id, fecha, hora, nombre_cliente, telefono_cliente, email_cliente, precio_estimado, notas, estado)
+     VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, 'pendiente') RETURNING id`,
+    [numeroReserva, categoria_id, fecha, horaGuardar, nombre_cliente.trim(), telefono_cliente.trim(), email_cliente.trim(),
      precio_estimado || null, notasCompletas || null]
   );
 
   const reservaId = reserva.rows[0].id;
-
-  // Guardar origen y destino en notas ya que son texto libre
-  await pool.query(
-    `UPDATE reservas SET notas = $1 WHERE id = $2`,
-    [('Origen: ' + origen + ' → Destino: ' + destino + (notasCompletas ? ' | ' + notasCompletas : '')), reservaId]
-  );
 
   // Guardar extras seleccionados
   if (Array.isArray(extras) && extras.length > 0) {
@@ -704,7 +725,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     }
   }
 
-  res.json({ ok: true, reserva_id: reservaId });
+  res.json({ ok: true, reserva_id: reservaId, numero_reserva: numeroReserva });
 }));
 
 app.get('/reserva', (req, res) => {
