@@ -83,6 +83,19 @@
 .dos-columnas { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 @media(max-width:500px){ .dos-columnas { grid-template-columns:1fr; } }
 .aviso-campo { font-size:12px; color:var(--rojo-error); margin-top:4px; display:none; }
+.sugerencias-lista {
+  position:absolute; top:100%; left:0; right:0; z-index:200;
+  background:#fff; border:1px solid var(--gris-borde);
+  border-radius:0 0 8px 8px; max-height:220px; overflow-y:auto;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1); display:none;
+}
+.sugerencia-item {
+  padding:10px 14px; font-size:13px; color:var(--texto-oscuro);
+  cursor:pointer; border-bottom:1px solid var(--gris-borde);
+  line-height:1.4;
+}
+.sugerencia-item:last-child { border-bottom:none; }
+.sugerencia-item:hover { background:var(--gris-fondo); }
 .separador { border:none; border-top:1px solid var(--gris-borde); margin:18px 0 16px; }
 .bloque-oculto { display:none; }
 
@@ -238,21 +251,23 @@
 
       <hr class="separador">
 
-      <!-- Destino: dirección solo si NO es aeropuerto ni puerto -->
-      <div id="bloque-dir-destino" class="bloque-oculto">
-        <div class="campo-grupo">
-          <label>Dirección exacta, hotel o lugar de destino *</label>
-          <input type="text" id="direccion-destino" placeholder="Hotel, calle, número, municipio...">
-          <div class="aviso-campo" id="err-dir-destino">Indica el lugar de destino</div>
+      <!-- Si origen es OTRO: dirección de recogida (PRIMERO) -->
+      <div id="bloque-dir-origen" class="bloque-oculto">
+        <div class="campo-grupo" style="position:relative;">
+          <label>Dirección exacta de recogida *</label>
+          <input type="text" id="direccion-origen" placeholder="Calle, número, hotel, municipio..." autocomplete="off" oninput="buscarDireccion('origen')">
+          <div id="sugerencias-origen" class="sugerencias-lista"></div>
+          <div class="aviso-campo" id="err-dir-origen">Indica la dirección de recogida</div>
         </div>
       </div>
 
-      <!-- Si origen es OTRO: dirección de recogida -->
-      <div id="bloque-dir-origen" class="bloque-oculto">
-        <div class="campo-grupo">
-          <label>Dirección exacta de recogida *</label>
-          <input type="text" id="direccion-origen" placeholder="Calle, número, hotel, municipio...">
-          <div class="aviso-campo" id="err-dir-origen">Indica la dirección de recogida</div>
+      <!-- Destino: dirección solo si NO es aeropuerto ni puerto (DESPUÉS) -->
+      <div id="bloque-dir-destino" class="bloque-oculto">
+        <div class="campo-grupo" style="position:relative;">
+          <label>Dirección exacta, hotel o lugar de destino *</label>
+          <input type="text" id="direccion-destino" placeholder="Hotel, calle, número, municipio..." autocomplete="off" oninput="buscarDireccion('destino')">
+          <div id="sugerencias-destino" class="sugerencias-lista"></div>
+          <div class="aviso-campo" id="err-dir-destino">Indica el lugar de destino</div>
         </div>
       </div>
 
@@ -493,7 +508,8 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
             document.getElementById('tbl-precio').textContent = Number(data.precio).toFixed(0) + ' €';
             document.getElementById('tbl-badge').style.display = 'inline-block';
           } else {
-            document.getElementById('tbl-precio').textContent = 'A consultar';
+            document.getElementById('tbl-precio').textContent = '';
+            document.getElementById('tbl-badge').style.display = 'none';
           }
         });
     });
@@ -811,6 +827,56 @@ function copiarPermiso() {
     setTimeout(function(){ msg.style.display = 'none'; }, 3000);
   });
 }
+
+// ── Autocompletado de direcciones con Nominatim ─────────────────────────────
+var nominatimTimers = {};
+
+function buscarDireccion(campo) {
+  var inputId = campo === 'origen' ? 'direccion-origen' : 'direccion-destino';
+  var listaId = campo === 'origen' ? 'sugerencias-origen' : 'sugerencias-destino';
+  var input = document.getElementById(inputId);
+  var lista = document.getElementById(listaId);
+  var texto = input.value.trim();
+
+  if (texto.length < 3) { lista.style.display = 'none'; return; }
+
+  clearTimeout(nominatimTimers[campo]);
+  nominatimTimers[campo] = setTimeout(function() {
+    // Aproximar búsqueda a Gran Canaria usando viewbox
+    var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1' +
+      '&countrycodes=es' +
+      '&viewbox=-15.8,27.7,-15.3,28.2' +
+      '&bounded=0' +
+      '&q=' + encodeURIComponent(texto + ' Gran Canaria');
+
+    fetch(url, { headers: { 'Accept-Language': 'es' } })
+      .then(function(r){ return r.json(); })
+      .then(function(resultados) {
+        lista.innerHTML = '';
+        if (!resultados.length) { lista.style.display = 'none'; return; }
+        resultados.forEach(function(r) {
+          var nombre = r.display_name.split(',').slice(0, 3).join(',').trim();
+          var div = document.createElement('div');
+          div.className = 'sugerencia-item';
+          div.textContent = nombre;
+          div.onclick = function() {
+            input.value = nombre;
+            lista.style.display = 'none';
+          };
+          lista.appendChild(div);
+        });
+        lista.style.display = 'block';
+      })
+      .catch(function(){ lista.style.display = 'none'; });
+  }, 400);
+}
+
+// Cerrar sugerencias al hacer clic fuera
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.campo-grupo')) {
+    document.querySelectorAll('.sugerencias-lista').forEach(function(l){ l.style.display = 'none'; });
+  }
+});
 
 function reiniciarFormulario() {
   if (confirm('¿Seguro que quieres comenzar de nuevo? Se perderán los datos introducidos.')) {
