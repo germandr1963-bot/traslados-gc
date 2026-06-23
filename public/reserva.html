@@ -842,12 +842,8 @@ function buscarDireccion(campo) {
 
   clearTimeout(nominatimTimers[campo]);
   nominatimTimers[campo] = setTimeout(function() {
-    // Aproximar búsqueda a Gran Canaria usando viewbox
-    var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1' +
-      '&countrycodes=es' +
-      '&viewbox=-15.8,27.7,-15.3,28.2' +
-      '&bounded=0' +
-      '&q=' + encodeURIComponent(texto + ' Gran Canaria');
+    var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&accept-language=es' +
+      '&countrycodes=es&viewbox=-18.6,29.6,-13.0,27.2&bounded=1&q=' + encodeURIComponent(texto);
 
     fetch(url, { headers: { 'Accept-Language': 'es' } })
       .then(function(r){ return r.json(); })
@@ -855,7 +851,7 @@ function buscarDireccion(campo) {
         lista.innerHTML = '';
         if (!resultados.length) { lista.style.display = 'none'; return; }
         resultados.forEach(function(r) {
-          var nombre = r.display_name.split(',').slice(0, 3).join(',').trim();
+          var nombre = r.display_name.split(',').slice(0, 2).join(',').trim();
           var div = document.createElement('div');
           div.className = 'sugerencia-item';
           div.textContent = nombre;
