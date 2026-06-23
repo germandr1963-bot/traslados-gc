@@ -388,7 +388,11 @@
         <div class="aviso-campo" id="err-email">Introduce un email válido</div>
       </div>
 
-      <div class="resumen-box" id="resumen-final" style="display:none;"></div>
+      <div id="resumen-final" style="display:none;">
+        <h3 style="text-align:center;font-family:'Big Shoulders Display',sans-serif;font-size:20px;font-weight:600;color:var(--texto-oscuro);margin:0 0 14px;">Resumen de la reserva</h3>
+        <div id="resumen-final-contenido" class="resumen-box"></div>
+        <p style="font-size:13px;color:var(--texto-muted);text-align:center;margin:0 0 16px;line-height:1.6;">Revise que toda la información sea correcta antes de confirmar. Una vez enviada, recibirá su número de reserva por email, con el que podrá consultar y gestionar su traslado.</p>
+      </div>
       <button class="boton-siguiente" id="boton-enviar" onclick="mostrarResumen()">Revisar y enviar solicitud</button>
       <div id="err-envio" style="margin-top:10px;font-size:13px;color:var(--rojo-error);display:none;"></div>
     </div>
@@ -399,8 +403,13 @@
     <div class="tarjeta mensaje-ok">
       <div class="icono">✅</div>
       <h2>Solicitud recibida</h2>
-      <p>Hemos recibido tu solicitud. Te contactaremos en menos de 24 horas para confirmar la disponibilidad y los detalles finales.</p>
-      <a href="/" style="display:inline-block;margin-top:24px;background:var(--terracota);color:#fff;padding:12px 32px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;">Volver al inicio</a>
+      <p>Hemos recibido tu solicitud de traslado. Te contactaremos en menos de 24 horas para confirmar la disponibilidad.</p>
+      <div style="margin:20px auto;background:var(--gris-fondo);border:1px solid var(--gris-borde);border-radius:10px;padding:16px 24px;max-width:280px;">
+        <div style="font-size:11px;color:var(--texto-muted);letter-spacing:0.6px;margin-bottom:6px;">TU NÚMERO DE RESERVA</div>
+        <div id="numero-reserva-mostrar" style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--texto-oscuro);letter-spacing:2px;"></div>
+        <div style="font-size:11px;color:var(--texto-muted);margin-top:6px;">Guarda este número — lo recibirás también por email</div>
+      </div>
+      <a href="/" style="display:inline-block;margin-top:10px;background:var(--terracota);color:#fff;padding:12px 32px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;">Volver al inicio</a>
     </div>
   </div>
 
@@ -668,7 +677,7 @@ function mostrarResumen() {
     (document.getElementById('bloque-pasaporte').style.display !== 'none' ? '<strong>Pasaporte/DNI:</strong> ' + document.getElementById('pasajero-pasaporte').value.trim() + '<br>' : '') +
     '<strong>Contacto:</strong> ' + nombre + ' · ' + tel + ' · ' + email;
 
-  document.getElementById('resumen-final').innerHTML = html;
+  document.getElementById('resumen-final-contenido').innerHTML = html;
   document.getElementById('resumen-final').style.display = 'block';
   var btn = document.getElementById('boton-enviar');
   btn.textContent = 'Confirmar y enviar solicitud';
@@ -718,6 +727,9 @@ function confirmarEnvio() {
     if (d.ok) {
       document.querySelectorAll('.paso').forEach(function(p){ p.style.display = 'none'; });
       document.getElementById('tarjeta-traslado').style.display = 'none';
+      if (d.numero_reserva) {
+        document.getElementById('numero-reserva-mostrar').textContent = d.numero_reserva;
+      }
       document.getElementById('confirmacion').style.display = 'block';
       window.scrollTo({ top:0, behavior:'smooth' });
     } else {
