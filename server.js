@@ -479,6 +479,44 @@ async function initSchema() {
 
   await cargarIdiomasCache();
 
+  // ─── Destinos ─────────────────────────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS destinos (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      activo BOOLEAN DEFAULT TRUE,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  // Destinos iniciales (solo se insertan si la tabla está vacía)
+  await pool.query(`
+    INSERT INTO destinos (nombre)
+    SELECT * FROM (VALUES
+      ('Aeropuerto de Gran Canaria'),
+      ('Las Palmas de Gran Canaria'),
+      ('Maspalomas'),
+      ('Playa del Inglés'),
+      ('Puerto de Mogán'),
+      ('Puerto Rico'),
+      ('Arguineguín'),
+      ('San Bartolomé de Tirajana'),
+      ('Santa Lucía de Tirajana'),
+      ('Telde'),
+      ('Ingenio'),
+      ('Agüimes'),
+      ('Vecindario'),
+      ('Mogán (municipio)'),
+      ('Santa Brígida'),
+      ('Teror'),
+      ('Arucas'),
+      ('Gáldar'),
+      ('Puerto de Las Palmas (La Luz)'),
+      ('Puerto Deportivo de Mogán')
+    ) AS v(nombre)
+    WHERE NOT EXISTS (SELECT 1 FROM destinos LIMIT 1);
+  `);
+
   // ─── Extras ───────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS extras (
@@ -2099,6 +2137,48 @@ app.post('/admin/tarifario/calcular', requireAdmin, asyncHandler(async (req, res
     (con_suplemento ? parseFloat(t.suplemento_aeropuerto) : 0);
 
   res.json({ precio: Math.max(precio, parseFloat(t.bajada_bandera)).toFixed(2) });
+}));
+
+// ─── Admin: destinos ──────────────────────────────────────────────────────────
+app.get('/admin/destinos', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, nombre, activo FROM destinos ORDER BY nombre'
+  );
+  res.json({ destinos: result.rows });
+}));
+
+app.post('/admin/destinos', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre } = req.body;
+  if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
+  const existe = await pool.query(
+    'SELECT 1 FROM destinos WHERE LOWER(nombre) = LOWER($1) LIMIT 1',
+    [nombre.trim()]
+  );
+  if (existe.rows.length) return res.status(400).json({ error: 'Ya existe un destino con ese nombre.' });
+  await pool.query('INSERT INTO destinos (nombre) VALUES ($1)', [nombre.trim()]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/destinos/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre } = req.body;
+  if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
+  const existe = await pool.query(
+    'SELECT 1 FROM destinos WHERE LOWER(nombre) = LOWER($1) AND id <> $2 LIMIT 1',
+    [nombre.trim(), req.params.id]
+  );
+  if (existe.rows.length) return res.status(400).json({ error: 'Ya existe un destino con ese nombre.' });
+  await pool.query('UPDATE destinos SET nombre = $1 WHERE id = $2', [nombre.trim(), req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/destinos/:id/activo', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE destinos SET activo = $1 WHERE id = $2', [!!req.body.activo, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/destinos/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM destinos WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
 }));
 
 // ─── Admin: extras ────────────────────────────────────────────────────────────
