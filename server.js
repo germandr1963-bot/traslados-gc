@@ -1135,6 +1135,53 @@ app.post('/admin/rutas', requireAdmin, asyncHandler(async (req, res) => {
   res.json({ ok: true, id: rutaId });
 }));
 
+// Desactiva una ruta y todas sus fichas SEO de golpe
+app.post('/admin/rutas/:id/desactivar', requireAdmin, asyncHandler(async (req, res) => {
+  const id = req.params.id;
+  await pool.query('UPDATE rutas SET activa = FALSE WHERE id = $1', [id]);
+  await pool.query('UPDATE route_seo_settings SET activo = FALSE WHERE route_id = $1', [id]);
+  res.json({ ok: true });
+}));
+
+// Reactiva una ruta (las fichas SEO quedan desactivadas; el admin las activa manualmente desde SEO)
+app.post('/admin/rutas/:id/activar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE rutas SET activa = TRUE WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Elimina una ruta, sus precios, sus fichas SEO,
+// y registra una redirección 301 automática por cada slug que tenía
+app.post('/admin/rutas/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  const id = req.params.id;
+
+  // Recuperar todos los slugs activos antes de borrar nada
+  const fichas = await pool.query(
+    'SELECT lang_code, slug_url FROM route_seo_settings WHERE route_id = $1',
+    [id]
+  );
+
+  // Crear redirecciones 301 por cada slug → home
+  for (const ficha of fichas.rows) {
+    if (!ficha.slug_url) continue;
+    const seccion = SECCIONES_TRASLADO[ficha.lang_code];
+    if (!seccion) continue;
+    const rutaAntigua = '/' + ficha.lang_code + '/' + seccion + '/' + ficha.slug_url;
+    await pool.query(
+      `INSERT INTO redirecciones_301 (ruta_antigua, ruta_nueva)
+       VALUES ($1, '/')
+       ON CONFLICT (ruta_antigua) DO UPDATE SET ruta_nueva = '/'`,
+      [rutaAntigua]
+    );
+  }
+
+  // Borrar fichas SEO, precios y la ruta
+  await pool.query('DELETE FROM route_seo_settings WHERE route_id = $1', [id]);
+  await pool.query('DELETE FROM rutas_precios WHERE ruta_id = $1', [id]);
+  await pool.query('DELETE FROM rutas WHERE id = $1', [id]);
+
+  res.json({ ok: true });
+}));
+
 app.get('/admin/precios-grid', requireAdmin, asyncHandler(async (req, res) => {
   const rutas = await pool.query('SELECT id, origen, destino FROM rutas WHERE activa = TRUE ORDER BY origen, destino');
   const categorias = await pool.query('SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
