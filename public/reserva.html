@@ -10,14 +10,40 @@
 .cabecera {
   background: var(--charcoal);
   color: var(--texto-claro);
-  padding: 18px 24px;
+  padding: 14px 24px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: space-between;
 }
-.cabecera a { font-size:13px; opacity:0.6; color:var(--texto-claro); }
-.cabecera a:hover { opacity:1; }
-.cabecera .marca { font-family:'Big Shoulders Display',sans-serif; font-size:18px; }
+.cabecera .marca { font-family:'Big Shoulders Display',sans-serif; font-size:18px; color:#fff; }
+.boton-volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+}
+.boton-volver:hover { background: rgba(255,255,255,0.2); }
+.boton-reiniciar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: rgba(255,255,255,0.6);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.boton-reiniciar:hover { color:#fff; border-color:rgba(255,255,255,0.4); }
 .contenedor { max-width:720px; margin:36px auto; padding:0 20px 60px; }
 
 /* Tarjeta resumen del traslado seleccionado */
@@ -126,8 +152,9 @@
 <body>
 
 <div class="cabecera">
-  <a href="/">← Volver</a>
+  <a href="/" class="boton-volver">← Volver al inicio</a>
   <span class="marca">Traslados · GC</span>
+  <button class="boton-reiniciar" onclick="reiniciarFormulario()">↺ Comenzar de nuevo</button>
 </div>
 
 <div class="contenedor">
@@ -169,7 +196,7 @@
           <input type="date" id="fecha">
           <div class="aviso-campo" id="err-fecha">Selecciona una fecha</div>
         </div>
-        <div class="campo-grupo">
+        <div class="campo-grupo" id="bloque-hora-recogida">
           <label>Hora de recogida</label>
           <input type="time" id="hora">
           <div class="aviso-campo" id="err-hora">Selecciona una hora</div>
@@ -377,10 +404,11 @@ if (paramOrigen && paramDestino) {
 
   if (esAeropuerto) {
     document.getElementById('campos-aeropuerto').classList.add('visible');
-    // Ajustar etiquetas según si es origen o destino
     if (origenLower.indexOf('aeropuerto') !== -1) {
       document.getElementById('label-vuelo').textContent = 'Número de vuelo de llegada';
       document.getElementById('label-hora-vuelo').textContent = 'Hora de llegada del vuelo';
+      // Si el ORIGEN es aeropuerto, la hora del vuelo reemplaza a la hora de recogida
+      document.getElementById('bloque-hora-recogida').style.display = 'none';
     } else {
       document.getElementById('label-vuelo').textContent = 'Número de vuelo de salida';
       document.getElementById('label-hora-vuelo').textContent = 'Hora de salida del vuelo';
@@ -505,7 +533,8 @@ function marcarPasoActivo(n) {
 
 function siguientePaso1() {
   var fecha = document.getElementById('fecha').value;
-  var hora = document.getElementById('hora').value;
+  var horaRecogidaOculta = document.getElementById('bloque-hora-recogida').style.display === 'none';
+  var hora = horaRecogidaOculta ? '00:00' : document.getElementById('hora').value;
   var nombre = document.getElementById('pasajero-nombre').value.trim();
   var apellidos = document.getElementById('pasajero-apellidos').value.trim();
   var pasaporte = document.getElementById('pasajero-pasaporte').value.trim();
@@ -515,8 +544,13 @@ function siguientePaso1() {
   var direccionDestino = document.getElementById('direccion-destino') ? document.getElementById('direccion-destino').value.trim() : '';
   var necesitaDireccionDestino = campoDireccionDestino.classList.contains('visible');
 
+  var horaRecogidaOculta = document.getElementById('bloque-hora-recogida').style.display === 'none';
+  var hora = horaRecogidaOculta ? '00:00' : document.getElementById('hora').value;
+
   document.getElementById('err-fecha').style.display = fecha ? 'none' : 'block';
-  document.getElementById('err-hora').style.display = hora ? 'none' : 'block';
+  if (!horaRecogidaOculta) {
+    document.getElementById('err-hora').style.display = hora ? 'none' : 'block';
+  }
   document.getElementById('err-pasajero-nombre').style.display = nombre ? 'none' : 'block';
   document.getElementById('err-pasajero-apellidos').style.display = apellidos ? 'none' : 'block';
   document.getElementById('err-pasajero-pasaporte').style.display = pasaporte ? 'none' : 'block';
@@ -524,7 +558,7 @@ function siguientePaso1() {
     document.getElementById('err-direccion-destino').style.display = direccionDestino ? 'none' : 'block';
   }
 
-  if (!fecha || !hora || !nombre || !apellidos || !pasaporte || (necesitaDireccionDestino && !direccionDestino)) return;
+  if (!fecha || (!horaRecogidaOculta && !hora) || !nombre || !apellidos || !pasaporte || (necesitaDireccionDestino && !direccionDestino)) return;
 
   var fechaTexto = new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric',month:'long',year:'numeric'});
   document.getElementById('resumen-1').textContent = fechaTexto + ' · ' + nombre + ' ' + apellidos;
@@ -637,6 +671,12 @@ function confirmarEnvio() {
     btn.disabled = false;
     btn.textContent = 'Confirmar y enviar solicitud';
   });
+}
+
+function reiniciarFormulario() {
+  if (confirm('¿Seguro que quieres comenzar de nuevo? Se perderán los datos introducidos.')) {
+    window.location.href = '/';
+  }
 }
 
 // Fecha mínima hoy
