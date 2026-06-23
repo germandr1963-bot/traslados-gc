@@ -290,20 +290,16 @@
         </div>
       </div>
 
-      <!-- Vuelo en datos pasajero: solo si toca aeropuerto -->
-      <div id="bloque-vuelo-pasajero" class="bloque-oculto">
-        <div class="campo-grupo">
-          <label>Número de vuelo</label>
-          <input type="text" id="pasajero-vuelo" placeholder="Ej: IB3456">
+      <!-- Resumen de datos del trayecto para solicitud de permiso: solo si toca aeropuerto o puerto -->
+      <div id="bloque-resumen-permiso" class="bloque-oculto">
+        <div style="background:var(--charcoal-2);border-radius:10px;padding:16px 18px;margin-bottom:4px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:0.7px;color:rgba(255,255,255,0.45);margin-bottom:12px;">DATOS DEL TRAYECTO — PARA SOLICITUD DE PERMISO</div>
+          <div id="resumen-permiso-contenido" style="font-size:13px;color:var(--texto-claro);line-height:2;"></div>
         </div>
-      </div>
-
-      <!-- Barco en datos pasajero: solo si toca puerto -->
-      <div id="bloque-barco-pasajero" class="bloque-oculto">
-        <div class="campo-grupo">
-          <label>Nombre del barco / crucero</label>
-          <input type="text" id="pasajero-barco" placeholder="Ej: MSC Bellísima">
-        </div>
+        <button type="button" onclick="copiarPermiso()" style="margin-top:8px;background:transparent;border:1px solid var(--gris-borde);border-radius:6px;padding:8px 16px;font-size:12px;color:var(--texto-muted);cursor:pointer;width:100%;">
+          📋 Copiar datos para solicitud de permiso
+        </button>
+        <div id="msg-copiado" style="font-size:12px;color:#1E8E5A;margin-top:6px;display:none;text-align:center;">✓ Datos copiados al portapapeles</div>
       </div>
 
       <div class="campo-grupo">
@@ -456,9 +452,10 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
   }
 
   // Campos del paso 2 según tipo de trayecto
-  if (tocaAeropuerto || tocaPuerto) mostrar('bloque-pasaporte');
-  if (tocaAeropuerto) mostrar('bloque-vuelo-pasajero');
-  if (tocaPuerto) mostrar('bloque-barco-pasajero');
+  if (tocaAeropuerto || tocaPuerto) {
+    mostrar('bloque-pasaporte');
+    mostrar('bloque-resumen-permiso');
+  }
 
   // Fecha mínima hoy
   document.getElementById('fecha').min = new Date().toISOString().split('T')[0];
@@ -572,6 +569,7 @@ function siguientePaso(desde) {
     var fecha = document.getElementById('fecha').value;
     var fechaTexto = new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric',month:'long',year:'numeric'});
     document.getElementById('resumen-1').textContent = fechaTexto;
+    rellenarResumenPermiso();
   }
   if (desde === 2) {
     var nombre = document.getElementById('pasajero-nombre').value.trim();
@@ -730,6 +728,59 @@ function confirmarEnvio() {
     document.getElementById('err-envio').textContent = 'Error de conexión. Inténtalo de nuevo.';
     document.getElementById('err-envio').style.display = 'block';
     btn.disabled = false; btn.textContent = 'Confirmar y enviar solicitud';
+  });
+}
+
+function rellenarResumenPermiso() {
+  if (!tocaAeropuerto && !tocaPuerto) return;
+  var fecha = document.getElementById('fecha').value;
+  var fechaTexto = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric',month:'long',year:'numeric'}) : '';
+  var horaTexto = origenEsAero ? document.getElementById('hora-llegada-vuelo').value
+    : origenEsPuerto ? document.getElementById('hora-atraque').value
+    : document.getElementById('hora-recogida').value;
+  var vueloTexto = origenEsAero ? document.getElementById('vuelo-llegada').value.trim() : '';
+  var barcoTexto = origenEsPuerto ? document.getElementById('barco-llegada').value.trim() : '';
+
+  var html =
+    '<strong style="color:#fff;">Origen:</strong> ' + paramOrigen + '<br>' +
+    '<strong style="color:#fff;">Destino:</strong> ' + paramDestino + '<br>' +
+    '<strong style="color:#fff;">Fecha:</strong> ' + fechaTexto + '<br>' +
+    (origenEsAero ? '<strong style="color:#fff;">Vuelo llegada:</strong> ' + (vueloTexto || '—') + '<br>' : '') +
+    (origenEsPuerto ? '<strong style="color:#fff;">Barco:</strong> ' + (barcoTexto || '—') + '<br>' : '') +
+    '<strong style="color:#fff;">Hora:</strong> ' + (horaTexto || '—') + '<br>' +
+    '<strong style="color:#fff;">Pasajeros:</strong> ' + document.getElementById('num-pasajeros').value;
+
+  document.getElementById('resumen-permiso-contenido').innerHTML = html;
+}
+
+function copiarPermiso() {
+  var fecha = document.getElementById('fecha').value;
+  var fechaTexto = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric',month:'long',year:'numeric'}) : '';
+  var horaTexto = origenEsAero ? document.getElementById('hora-llegada-vuelo').value
+    : origenEsPuerto ? document.getElementById('hora-atraque').value
+    : document.getElementById('hora-recogida').value;
+  var vueloTexto = origenEsAero ? document.getElementById('vuelo-llegada').value.trim() : '';
+  var barcoTexto = origenEsPuerto ? document.getElementById('barco-llegada').value.trim() : '';
+  var pasajero = document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim();
+  var pasaporte = document.getElementById('pasajero-pasaporte') ? document.getElementById('pasajero-pasaporte').value.trim() : '';
+
+  var texto =
+    'SOLICITUD DE PERMISO — TRASLADOS GC\n' +
+    '─────────────────────────────────\n' +
+    'Origen: ' + paramOrigen + '\n' +
+    'Destino: ' + paramDestino + '\n' +
+    'Fecha: ' + fechaTexto + '\n' +
+    (origenEsAero ? 'Vuelo llegada: ' + (vueloTexto || '—') + '\n' : '') +
+    (origenEsPuerto ? 'Barco: ' + (barcoTexto || '—') + '\n' : '') +
+    'Hora: ' + (horaTexto || '—') + '\n' +
+    'Pasajeros: ' + document.getElementById('num-pasajeros').value + '\n' +
+    'Pasajero: ' + pasajero + '\n' +
+    (pasaporte ? 'Pasaporte/DNI: ' + pasaporte + '\n' : '');
+
+  navigator.clipboard.writeText(texto).then(function(){
+    var msg = document.getElementById('msg-copiado');
+    msg.style.display = 'block';
+    setTimeout(function(){ msg.style.display = 'none'; }, 3000);
   });
 }
 
