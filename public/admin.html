@@ -238,14 +238,15 @@ table.tabla-precios input {
       <div class="fila-form">
         <div>
           <label class="etiqueta">Desde</label>
-          <input type="text" id="ruta-origen" class="campo" placeholder="Ej. Las Palmas de GC">
+          <select id="ruta-origen" class="campo"></select>
         </div>
         <div>
           <label class="etiqueta">Hasta</label>
-          <input type="text" id="ruta-destino" class="campo" placeholder="Ej. Maspalomas">
+          <select id="ruta-destino" class="campo"></select>
         </div>
         <button id="boton-add-ruta" class="boton-primario">Añadir ruta</button>
       </div>
+      <div id="error-rutas" style="color:#e07b5a;margin-bottom:1rem;display:none;"></div>
       <div id="tabla-precios-contenedor" style="overflow-x:auto;"></div>
       <button id="boton-guardar-precios" class="boton-primario" style="margin-top:16px;">Guardar precios</button>
       <div id="mensaje-precios" style="margin-top:10px;"></div>
@@ -522,7 +523,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'precios', 'seo', 'idiomas', 'calculador', 'extras'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'extras'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
@@ -530,6 +531,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'idiomas') cargarTextosInterfaz();
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
     if (boton.dataset.seccion === 'destinos') cargarDestinos();
+    if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
     if (boton.dataset.seccion === 'extras') cargarExtras();
   });
 });
@@ -1132,17 +1134,24 @@ function guardarConductor() {
 }
 
 
+function mostrarErrorRutas(msg) {
+  var el = document.getElementById('error-rutas');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
 document.getElementById('boton-add-ruta').addEventListener('click', function () {
   var origen = document.getElementById('ruta-origen').value;
   var destino = document.getElementById('ruta-destino').value;
-  if (!origen || !destino) { return; }
+  mostrarErrorRutas('');
+  if (!origen || !destino) { mostrarErrorRutas('Selecciona un origen y un destino.'); return; }
+  if (origen === destino) { mostrarErrorRutas('El origen y el destino no pueden ser el mismo.'); return; }
   fetch('/admin/rutas', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ origen: origen, destino: destino })
-  }).then(function () {
-    document.getElementById('ruta-origen').value = '';
-    document.getElementById('ruta-destino').value = '';
+  }).then(function (r) { return r.json(); }).then(function (data) {
+    if (data.error) { mostrarErrorRutas(data.error); return; }
     cargarPreciosGrid();
   });
 });
@@ -1150,6 +1159,18 @@ document.getElementById('boton-add-ruta').addEventListener('click', function () 
 var precioGridDatos = null;
 
 function cargarPreciosGrid() {
+  // Cargar destinos activos en los selectores de la cabecera
+  fetch('/admin/destinos').then(function (r) { return r.json(); }).then(function (data) {
+    var destinos = (data.destinos || []).filter(function (d) { return d.activo; });
+    var opcionVacia = '<option value="">— Selecciona —</option>';
+    var opciones = destinos.map(function (d) {
+      return '<option value="' + d.nombre + '">' + d.nombre + '</option>';
+    }).join('');
+    document.getElementById('ruta-origen').innerHTML = opcionVacia + opciones;
+    document.getElementById('ruta-destino').innerHTML = opcionVacia + opciones;
+  });
+
+  // Cargar la cuadrícula de precios con todas las rutas (activas e inactivas)
   fetch('/admin/precios-grid').then(function (r) { return r.json(); }).then(function (datos) {
     precioGridDatos = datos;
     var contenedor = document.getElementById('tabla-precios-contenedor');
@@ -1165,19 +1186,52 @@ function cargarPreciosGrid() {
     datos.categorias.forEach(function (c) {
       html += '<th>' + c.nombre + '</th>';
     });
-    html += '</tr></thead><tbody>';
+    html += '<th>Acciones</th></tr></thead><tbody>';
     datos.rutas.forEach(function (r) {
-      html += '<tr><td>' + r.origen + ' → ' + r.destino + '</td>';
+      var esActiva = r.activa !== false;
+      var estiloFila = esActiva ? '' : 'opacity:0.5;';
+      html += '<tr style="' + estiloFila + '">';
+      html += '<td>' + r.origen + ' → ' + r.destino + (esActiva ? '' : ' <span style="color:#aaa;font-size:11px;">(inactiva)</span>') + '</td>';
       datos.categorias.forEach(function (c) {
         var clave = r.id + '-' + c.id;
         var valor = mapaPrecios[clave] !== undefined ? mapaPrecios[clave] : '';
-        html += '<td><input type="number" step="0.01" min="0" data-ruta="' + r.id + '" data-categoria="' + c.id + '" value="' + valor + '"></td>';
+        html += '<td><input type="number" step="0.01" min="0" data-ruta="' + r.id + '" data-categoria="' + c.id + '" value="' + valor + '" ' + (esActiva ? '' : 'disabled') + '></td>';
       });
-      html += '</tr>';
+      html += '<td style="white-space:nowrap;">';
+      if (esActiva) {
+        html += '<button class="boton-peligro" style="font-size:0.78rem;padding:0.25rem 0.6rem;margin-right:4px;" onclick="desactivarRuta(' + r.id + ', \'' + (r.origen + ' → ' + r.destino).replace(/'/g, "\\'") + '\')">⏸ Desactivar</button>';
+      } else {
+        html += '<button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.6rem;margin-right:4px;" onclick="activarRuta(' + r.id + ')">▶ Activar</button>';
+      }
+      html += '<button class="boton-peligro" style="font-size:0.78rem;padding:0.25rem 0.6rem;" onclick="eliminarRuta(' + r.id + ', \'' + (r.origen + ' → ' + r.destino).replace(/'/g, "\\'") + '\')">🗑 Eliminar</button>';
+      html += '</td></tr>';
     });
     html += '</tbody></table>';
     contenedor.innerHTML = html;
   });
+}
+
+function desactivarRuta(id, nombre) {
+  if (!confirm('¿Desactivar la ruta "' + nombre + '"?\n\nDesaparecerá de la web y del sitemap. Podrás reactivarla cuando quieras.')) return;
+  fetch('/admin/rutas/' + id + '/desactivar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function () { cargarPreciosGrid(); });
+}
+
+function activarRuta(id) {
+  fetch('/admin/rutas/' + id + '/activar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function () { cargarPreciosGrid(); });
+}
+
+function eliminarRuta(id, nombre) {
+  if (!confirm('¿ELIMINAR la ruta "' + nombre + '"?\n\nSe borrarán también sus precios y sus fichas SEO. Se crearán redirecciones 301 automáticas para que Google no encuentre páginas rotas.\n\nEsta acción no se puede deshacer.')) return;
+  fetch('/admin/rutas/' + id + '/eliminar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.error) { alert(data.error); return; }
+      cargarPreciosGrid();
+    });
 }
 
 document.getElementById('boton-guardar-precios').addEventListener('click', function () {
