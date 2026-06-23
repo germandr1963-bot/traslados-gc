@@ -260,3 +260,21 @@ table.tabla-admin td {
 .oculto {
   display: none !important;
 }
+
+/* ─── Tabla de precios (rutas × categorías) ───────────────────────────────── */
+table.tabla-precios td:first-child,
+table.tabla-precios th:first-child {
+  width: auto;
+  white-space: nowrap;
+}
+
+table.tabla-precios td:not(:first-child),
+table.tabla-precios th:not(:first-child) {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
+
+table.tabla-precios input[type="number"] {
+  width: 80px;
+}
