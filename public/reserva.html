@@ -673,7 +673,10 @@ function mostrarResumen() {
   var dirDestino = (!destinoEsAero && !destinoEsPuerto) ? document.getElementById('direccion-destino').value.trim() : '';
   var dirOrigen = (!origenEsAero && !origenEsPuerto) ? document.getElementById('direccion-origen').value.trim() : '';
 
+  if (!pnrGenerado) pnrGenerado = generarPNR();
+
   var html =
+    '<strong>Reserva número:</strong> ' + pnrGenerado.replace('TGC-', '') + '<br>' +
     '<strong>Origen:</strong> ' + paramOrigen + (dirOrigen ? ' — ' + dirOrigen : '') + '<br>' +
     '<strong>Destino:</strong> ' + paramDestino + (dirDestino ? ' — ' + dirDestino : '') + '<br>' +
     (categoriaNombre ? '<strong>Categoría:</strong> ' + categoriaNombre + '<br>' : '') +
@@ -687,7 +690,6 @@ function mostrarResumen() {
     '<strong>Contacto:</strong> ' + nombre + ' · ' + tel + ' · ' + email;
 
   document.getElementById('resumen-final-contenido').innerHTML = html;
-  if (!pnrGenerado) pnrGenerado = generarPNR();
   document.getElementById('resumen-titulo').innerHTML = 'Resumen de la reserva<br><span style="font-family:\'JetBrains Mono\',monospace;font-size:16px;letter-spacing:2px;color:var(--terracota);">' + pnrGenerado + '</span>';
   document.getElementById('resumen-final').style.display = 'block';
   var btn = document.getElementById('boton-enviar');
