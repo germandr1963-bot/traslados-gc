@@ -683,12 +683,12 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     const nums = '0123456789';
     const l = () => letras[Math.floor(Math.random() * letras.length)];
     const n = () => nums[Math.floor(Math.random() * nums.length)];
-    return 'TGC-' + l() + l() + l() + n() + n() + n();
+    return l() + l() + l() + n() + n() + n();
   }
 
   // Usar PNR del cliente si viene, si no generar uno nuevo
   let numeroReserva = null;
-  if (numero_reserva_cliente && /^TGC-[A-Z]{3}[0-9]{3}$/.test(numero_reserva_cliente)) {
+  if (numero_reserva_cliente && /^[A-Z]{3}[0-9]{3}$/.test(numero_reserva_cliente)) {
     const existe = await pool.query('SELECT 1 FROM reservas WHERE numero_reserva = $1', [numero_reserva_cliente]);
     if (existe.rows.length === 0) {
       numeroReserva = numero_reserva_cliente;
