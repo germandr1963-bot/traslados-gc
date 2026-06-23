@@ -389,7 +389,7 @@
       </div>
 
       <div id="resumen-final" style="display:none;">
-        <h3 style="text-align:center;font-family:'Big Shoulders Display',sans-serif;font-size:20px;font-weight:600;color:var(--texto-oscuro);margin:0 0 14px;">Resumen de la reserva</h3>
+        <h3 id="resumen-titulo" style="text-align:center;font-family:'Big Shoulders Display',sans-serif;font-size:20px;font-weight:600;color:var(--texto-oscuro);margin:0 0 14px;">Resumen de la reserva</h3>
         <div id="resumen-final-contenido" class="resumen-box"></div>
         <p style="font-size:13px;color:var(--texto-muted);text-align:center;margin:0 0 16px;line-height:1.6;">Revise que toda la información sea correcta antes de confirmar. Una vez enviada, recibirá su número de reserva por email, con el que podrá consultar y gestionar su traslado.</p>
       </div>
@@ -422,6 +422,15 @@ var extrasSeleccionados = [];
 var precioEstimado = null;
 var categoriaNombre = '';
 var pasoActual = 1;
+var pnrGenerado = '';
+
+function generarPNR() {
+  var letras = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  var nums = '0123456789';
+  var l = function(){ return letras[Math.floor(Math.random() * letras.length)]; };
+  var n = function(){ return nums[Math.floor(Math.random() * nums.length)]; };
+  return 'TGC-' + l() + l() + l() + n() + n() + n();
+}
 
 var params = new URLSearchParams(window.location.search);
 var paramOrigen = params.get('desde') || '';
@@ -678,6 +687,8 @@ function mostrarResumen() {
     '<strong>Contacto:</strong> ' + nombre + ' · ' + tel + ' · ' + email;
 
   document.getElementById('resumen-final-contenido').innerHTML = html;
+  if (!pnrGenerado) pnrGenerado = generarPNR();
+  document.getElementById('resumen-titulo').innerHTML = 'Resumen de la reserva<br><span style="font-family:\'JetBrains Mono\',monospace;font-size:16px;letter-spacing:2px;color:var(--terracota);">' + pnrGenerado + '</span>';
   document.getElementById('resumen-final').style.display = 'block';
   var btn = document.getElementById('boton-enviar');
   btn.textContent = 'Confirmar y enviar solicitud';
@@ -696,6 +707,7 @@ function confirmarEnvio() {
     : document.getElementById('hora-recogida').value;
 
   var datos = {
+    numero_reserva_cliente: pnrGenerado,
     origen: paramOrigen + (dirOrigen ? ' — ' + dirOrigen : ''),
     destino: paramDestino + (dirDestino ? ' — ' + dirDestino : ''),
     categoria_id: paramCategoriaId,
