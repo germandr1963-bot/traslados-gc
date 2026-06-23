@@ -147,6 +147,7 @@ table.tabla-precios input {
     <button class="item-menu activo" data-seccion="fondos">Fondos de portada</button>
     <button class="item-menu" data-seccion="categorias">Categorías</button>
     <button class="item-menu" data-seccion="conductores">Conductores</button>
+    <button class="item-menu" data-seccion="destinos">Destinos</button>
     <button class="item-menu" data-seccion="precios">Rutas y precios</button>
     <button class="item-menu" data-seccion="seo">SEO</button>
     <button class="item-menu" data-seccion="idiomas">Idiomas</button>
@@ -207,6 +208,28 @@ table.tabla-precios input {
 
       <div class="tarjeta oculto" id="editor-conductor" style="margin-top:16px;max-width:640px;"></div>
       <div class="tarjeta oculto" id="ficha-conductor" style="margin-top:16px;"></div>
+    </div>
+
+    <div id="seccion-destinos" class="oculto">
+      <h1>Destinos</h1>
+      <p class="subtitulo">Lista oficial de puntos de origen y destino. Solo los destinos activos estarán disponibles al crear rutas.</p>
+
+      <div style="margin-bottom:1.5rem;">
+        <input type="text" id="nuevo-destino-nombre" placeholder="Nombre del destino" style="padding:0.5rem 0.8rem;border-radius:6px;border:1px solid #555;background:#2a2a2a;color:#f0ebe3;width:280px;margin-right:0.5rem;">
+        <button class="boton-costa" onclick="crearDestino()">+ Añadir destino</button>
+      </div>
+      <div id="error-destinos" style="color:#e07b5a;margin-bottom:1rem;display:none;"></div>
+
+      <table class="tabla-admin">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-destinos"></tbody>
+      </table>
     </div>
 
     <div id="seccion-precios" class="oculto">
@@ -506,6 +529,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'seo') cargarSEO();
     if (boton.dataset.seccion === 'idiomas') cargarTextosInterfaz();
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
+    if (boton.dataset.seccion === 'destinos') cargarDestinos();
     if (boton.dataset.seccion === 'extras') cargarExtras();
   });
 });
@@ -2521,6 +2545,103 @@ function guardarTarifario() {
 }
 
 // ─── Extras ───────────────────────────────────────────────────────────────────
+// ─── Destinos ─────────────────────────────────────────────────────────────────
+function cargarDestinos() {
+  fetch('/admin/destinos')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var cuerpo = document.getElementById('tabla-destinos');
+      if (!data.destinos || data.destinos.length === 0) {
+        cuerpo.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#aaa;">No hay destinos todavía.</td></tr>';
+        return;
+      }
+      cuerpo.innerHTML = data.destinos.map(function(d) {
+        return '<tr>' +
+          '<td id="nombre-destino-' + d.id + '">' + d.nombre + '</td>' +
+          '<td>' +
+            '<span style="color:' + (d.activo ? '#7dbf8e' : '#aaa') + '">' +
+              (d.activo ? '✔ Activo' : '✗ Inactivo') +
+            '</span>' +
+          '</td>' +
+          '<td style="display:flex;gap:0.5rem;flex-wrap:wrap;">' +
+            '<button class="boton-costa" style="font-size:0.8rem;padding:0.3rem 0.7rem;" onclick="editarDestino(' + d.id + ', \'' + d.nombre.replace(/'/g, "\\'") + '\')">✏ Editar</button>' +
+            '<button class="' + (d.activo ? 'boton-peligro' : 'boton-costa') + '" style="font-size:0.8rem;padding:0.3rem 0.7rem;" onclick="toggleDestinoActivo(' + d.id + ', ' + !d.activo + ')">' +
+              (d.activo ? '⏸ Desactivar' : '▶ Activar') +
+            '</button>' +
+            '<button class="boton-peligro" style="font-size:0.8rem;padding:0.3rem 0.7rem;" onclick="eliminarDestino(' + d.id + ', \'' + d.nombre.replace(/'/g, "\\'") + '\')">🗑 Eliminar</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    })
+    .catch(function() {
+      document.getElementById('tabla-destinos').innerHTML =
+        '<tr><td colspan="3" style="color:#e07b5a;">Error al cargar destinos.</td></tr>';
+    });
+}
+
+function mostrarErrorDestinos(msg) {
+  var el = document.getElementById('error-destinos');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function crearDestino() {
+  var nombre = document.getElementById('nuevo-destino-nombre').value.trim();
+  mostrarErrorDestinos('');
+  if (!nombre) { mostrarErrorDestinos('Escribe un nombre para el destino.'); return; }
+  fetch('/admin/destinos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre: nombre })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { mostrarErrorDestinos(data.error); return; }
+      document.getElementById('nuevo-destino-nombre').value = '';
+      cargarDestinos();
+    });
+}
+
+function editarDestino(id, nombreActual) {
+  var nuevoNombre = prompt('Editar destino:', nombreActual);
+  if (nuevoNombre === null) return;
+  nuevoNombre = nuevoNombre.trim();
+  if (!nuevoNombre) { alert('El nombre no puede estar vacío.'); return; }
+  fetch('/admin/destinos/' + id + '/editar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre: nuevoNombre })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { alert(data.error); return; }
+      cargarDestinos();
+    });
+}
+
+function toggleDestinoActivo(id, nuevoEstado) {
+  fetch('/admin/destinos/' + id + '/activo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo: nuevoEstado })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function() { cargarDestinos(); });
+}
+
+function eliminarDestino(id, nombre) {
+  if (!confirm('¿Eliminar el destino "' + nombre + '"? Esta acción no se puede deshacer.')) return;
+  fetch('/admin/destinos/' + id + '/eliminar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { alert(data.error); return; }
+      cargarDestinos();
+    });
+}
+
 var extrasCache = [];
 var extraEditandoId = null;
 
