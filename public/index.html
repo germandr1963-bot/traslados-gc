@@ -340,7 +340,8 @@ function verPrecio() {
     return;
   }
 
-  var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; });
+  var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; })
+          || rutasDisponibles.find(function (r) { return r.origen === hastaVal && r.destino === desdeVal; });
   var categoriaSelect = document.getElementById('categoria');
   var categoriaTexto = categoriaSelect.options[categoriaSelect.selectedIndex].text;
 
@@ -373,7 +374,7 @@ function verPrecio() {
         : '';
 
       var precioHtml = data.a_consultar
-        ? ''
+        ? '<span class="precio precio-grande" style="font-size:22px;">A consultar</span>'
         : '<span class="precio precio-grande">' + Number(data.precio).toFixed(0) + ' €</span>';
 
       var botonHtml = '<button class="boton-reservar" onclick="irAReserva()">Reservar este traslado →</button>';
