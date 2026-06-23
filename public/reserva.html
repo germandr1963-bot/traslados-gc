@@ -851,7 +851,7 @@ function buscarDireccion(campo) {
         lista.innerHTML = '';
         if (!resultados.length) { lista.style.display = 'none'; return; }
         resultados.forEach(function(r) {
-          var nombre = r.display_name.split(',').slice(0, 2).join(',').trim();
+          var nombre = r.display_name.split(',').slice(0, 4).join(',').trim();
           var div = document.createElement('div');
           div.className = 'sugerencia-item';
           div.textContent = nombre;
