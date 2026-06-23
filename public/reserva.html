@@ -425,9 +425,9 @@ var paramCategoriaId = params.get('categoria_id') || '';
 var oL = paramOrigen.toLowerCase();
 var dL = paramDestino.toLowerCase();
 var origenEsAero    = oL.indexOf('aeropuerto') !== -1;
-var origenEsPuerto  = oL.indexOf('puerto') !== -1;
+var origenEsPuerto  = !origenEsAero && oL.indexOf('puerto') !== -1;
 var destinoEsAero   = dL.indexOf('aeropuerto') !== -1;
-var destinoEsPuerto = dL.indexOf('puerto') !== -1;
+var destinoEsPuerto = !destinoEsAero && dL.indexOf('puerto') !== -1;
 var tocaAeropuerto  = origenEsAero || destinoEsAero;
 var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
 
