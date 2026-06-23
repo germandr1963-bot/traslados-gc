@@ -97,6 +97,33 @@
 .dos-columnas { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 @media(max-width:500px){ .dos-columnas { grid-template-columns:1fr; } }
 
+/* Secciones origen/destino */
+.seccion-datos {
+  background: #fff;
+  border: 1px solid var(--gris-borde);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.seccion-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--texto-muted);
+  margin-bottom: 14px;
+}
+.seccion-icono { font-size: 14px; }
+.seccion-lugar {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--texto-oscuro);
+  letter-spacing: 0;
+  margin-left: 4px;
+}
+
 /* Campos adicionales según origen */
 .campos-extra { display:none; }
 .campos-extra.visible { display:block; }
@@ -179,72 +206,121 @@
     </div>
   </div>
 
-  <!-- PASO 1: Detalles del origen -->
+  <!-- PASO 1: Detalles del origen y destino -->
   <div class="paso" id="paso-1">
     <div class="paso-cabecera">
       <div class="paso-numero activo" id="num-1">1</div>
       <div>
-        <div class="paso-titulo">Detalles del origen</div>
-        <div class="paso-resumen" id="resumen-1">Fecha, hora y datos de recogida</div>
+        <div class="paso-titulo">Detalles del origen y destino</div>
+        <div class="paso-resumen" id="resumen-1">Datos de recogida y entrega</div>
       </div>
     </div>
     <div class="paso-cuerpo visible" id="cuerpo-1">
 
+      <!-- ORIGEN -->
+      <div class="seccion-datos">
+        <div class="seccion-titulo">
+          <span class="seccion-icono">📍</span>
+          <span>ORIGEN</span>
+          <span class="seccion-lugar" id="label-origen"></span>
+        </div>
+
+        <!-- Aeropuerto origen -->
+        <div class="campos-extra" id="campos-aero-origen">
+          <div class="dos-columnas">
+            <div class="campo-grupo">
+              <label>Número de vuelo de llegada</label>
+              <input type="text" id="numero-vuelo" placeholder="Ej: IB3456">
+            </div>
+            <div class="campo-grupo">
+              <label>Hora de llegada del vuelo</label>
+              <input type="time" id="hora-vuelo">
+            </div>
+          </div>
+        </div>
+
+        <!-- Puerto origen -->
+        <div class="campos-extra" id="campos-puerto-origen">
+          <div class="dos-columnas">
+            <div class="campo-grupo">
+              <label>Nombre del barco / crucero</label>
+              <input type="text" id="nombre-barco" placeholder="Ej: MSC Bellísima">
+            </div>
+            <div class="campo-grupo">
+              <label>Hora de atraque</label>
+              <input type="time" id="hora-atraque">
+            </div>
+          </div>
+        </div>
+
+        <!-- Dirección origen -->
+        <div class="campos-extra" id="campos-dir-origen">
+          <div class="campo-grupo">
+            <label>Dirección exacta de recogida</label>
+            <input type="text" id="direccion-origen" placeholder="Calle, número, municipio...">
+          </div>
+        </div>
+      </div>
+
+      <!-- DESTINO -->
+      <div class="seccion-datos" style="margin-top:20px;">
+        <div class="seccion-titulo">
+          <span class="seccion-icono">🏁</span>
+          <span>DESTINO</span>
+          <span class="seccion-lugar" id="label-destino"></span>
+        </div>
+
+        <!-- Aeropuerto destino -->
+        <div class="campos-extra" id="campos-aero-destino">
+          <div class="dos-columnas">
+            <div class="campo-grupo">
+              <label>Número de vuelo de salida</label>
+              <input type="text" id="vuelo-salida" placeholder="Ej: IB3457">
+            </div>
+            <div class="campo-grupo">
+              <label>Hora de salida del vuelo</label>
+              <input type="time" id="hora-vuelo-salida">
+            </div>
+          </div>
+        </div>
+
+        <!-- Puerto destino -->
+        <div class="campos-extra" id="campos-puerto-destino">
+          <div class="dos-columnas">
+            <div class="campo-grupo">
+              <label>Nombre del barco / crucero</label>
+              <input type="text" id="barco-destino" placeholder="Ej: MSC Bellísima">
+            </div>
+            <div class="campo-grupo">
+              <label>Hora de embarque</label>
+              <input type="time" id="hora-embarque">
+            </div>
+          </div>
+        </div>
+
+        <!-- Dirección destino -->
+        <div class="campos-extra" id="campos-dir-destino">
+          <div class="campo-grupo">
+            <label>Dirección exacta, hotel o lugar de destino</label>
+            <input type="text" id="direccion-destino" placeholder="Hotel, calle, número...">
+            <div class="aviso-campo" id="err-direccion-destino">Indica la dirección de destino</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FECHA, HORA Y PASAJEROS -->
+      <div style="border-top:1px solid var(--gris-borde);margin:20px 0 16px;"></div>
+
       <div class="dos-columnas">
         <div class="campo-grupo">
-          <label>Fecha del traslado</label>
+          <label>Fecha del traslado *</label>
           <input type="date" id="fecha">
           <div class="aviso-campo" id="err-fecha">Selecciona una fecha</div>
         </div>
         <div class="campo-grupo" id="bloque-hora-recogida">
-          <label>Hora de recogida</label>
+          <label>Hora de recogida *</label>
           <input type="time" id="hora">
           <div class="aviso-campo" id="err-hora">Selecciona una hora</div>
-        </div>
-      </div>
-
-      <!-- Campos aeropuerto -->
-      <div class="campos-extra" id="campos-aeropuerto">
-        <div class="dos-columnas">
-          <div class="campo-grupo">
-            <label id="label-vuelo">Número de vuelo</label>
-            <input type="text" id="numero-vuelo" placeholder="Ej: IB3456">
-          </div>
-          <div class="campo-grupo">
-            <label id="label-hora-vuelo">Hora del vuelo</label>
-            <input type="time" id="hora-vuelo">
-          </div>
-        </div>
-      </div>
-
-      <!-- Campos puerto -->
-      <div class="campos-extra" id="campos-puerto">
-        <div class="dos-columnas">
-          <div class="campo-grupo">
-            <label>Nombre del barco / crucero</label>
-            <input type="text" id="nombre-barco" placeholder="Ej: MSC Bellísima">
-          </div>
-          <div class="campo-grupo">
-            <label id="label-hora-atraque">Hora de atraque</label>
-            <input type="time" id="hora-atraque">
-          </div>
-        </div>
-      </div>
-
-      <!-- Dirección de origen (solo si no es aeropuerto ni puerto) -->
-      <div class="campos-extra" id="campo-direccion-origen">
-        <div class="campo-grupo">
-          <label>Dirección exacta de recogida</label>
-          <input type="text" id="direccion-origen" placeholder="Calle, número, municipio...">
-        </div>
-      </div>
-
-      <!-- Dirección de destino (solo si el destino no es aeropuerto ni puerto) -->
-      <div class="campos-extra" id="campo-direccion-destino">
-        <div class="campo-grupo">
-          <label>Dirección exacta de destino</label>
-          <input type="text" id="direccion-destino" placeholder="Hotel, calle, número...">
-          <div class="aviso-campo" id="err-direccion-destino">Indica la dirección de destino</div>
         </div>
       </div>
 
@@ -253,8 +329,9 @@
         <select id="num-pasajeros"></select>
       </div>
 
-      <div style="border-top:1px solid var(--gris-borde);margin:18px 0;"></div>
-      <p style="font-size:12px;color:var(--texto-muted);margin-bottom:14px;font-weight:500;">DATOS PERSONALES DEL PASAJERO</p>
+      <!-- DATOS DEL PASAJERO -->
+      <div style="border-top:1px solid var(--gris-borde);margin:20px 0 16px;"></div>
+      <p style="font-size:11px;font-weight:600;color:var(--texto-muted);letter-spacing:0.5px;margin-bottom:14px;">DATOS DEL PASAJERO</p>
 
       <div class="dos-columnas">
         <div class="campo-grupo">
@@ -396,39 +473,34 @@ if (paramOrigen && paramDestino) {
   document.getElementById('tbl-destino').textContent = paramDestino;
   document.getElementById('tarjeta-traslado').style.display = 'flex';
 
-  // Detectar tipo de origen y destino automáticamente
+  // Mostrar nombres en subtítulos del paso 1
+  document.getElementById('label-origen').textContent = paramOrigen;
+  document.getElementById('label-destino').textContent = paramDestino;
+
   var origenLower = paramOrigen.toLowerCase();
   var destinoLower = paramDestino.toLowerCase();
-  var esAeropuerto = origenLower.indexOf('aeropuerto') !== -1 || destinoLower.indexOf('aeropuerto') !== -1;
-  var esPuerto = origenLower.indexOf('puerto') !== -1 || destinoLower.indexOf('puerto') !== -1;
+  var origenEsAero = origenLower.indexOf('aeropuerto') !== -1;
+  var origenEsPuerto = origenLower.indexOf('puerto') !== -1;
+  var destinoEsAero = destinoLower.indexOf('aeropuerto') !== -1;
+  var destinoEsPuerto = destinoLower.indexOf('puerto') !== -1;
 
-  if (esAeropuerto) {
-    document.getElementById('campos-aeropuerto').classList.add('visible');
-    if (origenLower.indexOf('aeropuerto') !== -1) {
-      document.getElementById('label-vuelo').textContent = 'Número de vuelo de llegada';
-      document.getElementById('label-hora-vuelo').textContent = 'Hora de llegada del vuelo';
-      // Si el ORIGEN es aeropuerto, la hora del vuelo reemplaza a la hora de recogida
-      document.getElementById('bloque-hora-recogida').style.display = 'none';
-    } else {
-      document.getElementById('label-vuelo').textContent = 'Número de vuelo de salida';
-      document.getElementById('label-hora-vuelo').textContent = 'Hora de salida del vuelo';
-    }
-  } else if (esPuerto) {
-    document.getElementById('campos-puerto').classList.add('visible');
-    if (origenLower.indexOf('puerto') !== -1) {
-      document.getElementById('label-hora-atraque').textContent = 'Hora de atraque';
-    } else {
-      document.getElementById('label-hora-atraque').textContent = 'Hora de embarque';
-    }
+  // ORIGEN
+  if (origenEsAero) {
+    document.getElementById('campos-aero-origen').classList.add('visible');
+    document.getElementById('bloque-hora-recogida').style.display = 'none'; // la hora del vuelo ya cubre esto
+  } else if (origenEsPuerto) {
+    document.getElementById('campos-puerto-origen').classList.add('visible');
+  } else {
+    document.getElementById('campos-dir-origen').classList.add('visible');
   }
 
-  // Mostrar campo de dirección solo si origen Y destino no son aeropuerto ni puerto
-  if (!esAeropuerto && !esPuerto) {
-    document.getElementById('campo-direccion-origen').classList.add('visible');
-  }
-  // Mostrar campo dirección destino solo si el destino no es aeropuerto ni puerto
-  if (destinoLower.indexOf('aeropuerto') === -1 && destinoLower.indexOf('puerto') === -1) {
-    document.getElementById('campo-direccion-destino').classList.add('visible');
+  // DESTINO
+  if (destinoEsAero) {
+    document.getElementById('campos-aero-destino').classList.add('visible');
+  } else if (destinoEsPuerto) {
+    document.getElementById('campos-puerto-destino').classList.add('visible');
+  } else {
+    document.getElementById('campos-dir-destino').classList.add('visible');
   }
 
   // Cargar precio si tenemos categoría
@@ -539,26 +611,18 @@ function siguientePaso1() {
   var apellidos = document.getElementById('pasajero-apellidos').value.trim();
   var pasaporte = document.getElementById('pasajero-pasaporte').value.trim();
 
-  // Validar dirección de destino si es necesaria
-  var campoDireccionDestino = document.getElementById('campo-direccion-destino');
-  var direccionDestino = document.getElementById('direccion-destino') ? document.getElementById('direccion-destino').value.trim() : '';
-  var necesitaDireccionDestino = campoDireccionDestino.classList.contains('visible');
-
-  var horaRecogidaOculta = document.getElementById('bloque-hora-recogida').style.display === 'none';
-  var hora = horaRecogidaOculta ? '00:00' : document.getElementById('hora').value;
+  var campoDirDestino = document.getElementById('campos-dir-destino');
+  var necesitaDirDestino = campoDirDestino.classList.contains('visible');
+  var direccionDestino = necesitaDirDestino ? document.getElementById('direccion-destino').value.trim() : '';
 
   document.getElementById('err-fecha').style.display = fecha ? 'none' : 'block';
-  if (!horaRecogidaOculta) {
-    document.getElementById('err-hora').style.display = hora ? 'none' : 'block';
-  }
+  if (!horaRecogidaOculta) document.getElementById('err-hora').style.display = hora ? 'none' : 'block';
   document.getElementById('err-pasajero-nombre').style.display = nombre ? 'none' : 'block';
   document.getElementById('err-pasajero-apellidos').style.display = apellidos ? 'none' : 'block';
   document.getElementById('err-pasajero-pasaporte').style.display = pasaporte ? 'none' : 'block';
-  if (necesitaDireccionDestino) {
-    document.getElementById('err-direccion-destino').style.display = direccionDestino ? 'none' : 'block';
-  }
+  if (necesitaDirDestino) document.getElementById('err-direccion-destino').style.display = direccionDestino ? 'none' : 'block';
 
-  if (!fecha || (!horaRecogidaOculta && !hora) || !nombre || !apellidos || !pasaporte || (necesitaDireccionDestino && !direccionDestino)) return;
+  if (!fecha || (!horaRecogidaOculta && !hora) || !nombre || !apellidos || !pasaporte || (necesitaDirDestino && !direccionDestino)) return;
 
   var fechaTexto = new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric',month:'long',year:'numeric'});
   document.getElementById('resumen-1').textContent = fechaTexto + ' · ' + nombre + ' ' + apellidos;
@@ -629,13 +693,15 @@ function confirmarEnvio() {
     categoria_id: paramCategoriaId,
     precio_estimado: precioEstimado,
     fecha: document.getElementById('fecha').value,
-    hora: document.getElementById('hora').value,
-    tipo_llegada: document.getElementById('campos-aeropuerto').classList.contains('visible') ? 'aeropuerto'
-                : document.getElementById('campos-puerto').classList.contains('visible') ? 'puerto' : 'otra',
-    numero_vuelo: document.getElementById('numero-vuelo').value.trim(),
-    hora_llegada_vuelo: document.getElementById('hora-vuelo').value,
-    nombre_barco: document.getElementById('nombre-barco').value.trim(),
-    hora_atraque: document.getElementById('hora-atraque').value,
+    hora: document.getElementById('bloque-hora-recogida').style.display === 'none'
+          ? (document.getElementById('hora-vuelo') ? document.getElementById('hora-vuelo').value : document.getElementById('hora-atraque').value)
+          : document.getElementById('hora').value,
+    tipo_llegada: document.getElementById('campos-aero-origen').classList.contains('visible') ? 'aeropuerto'
+                : document.getElementById('campos-puerto-origen').classList.contains('visible') ? 'puerto' : 'otra',
+    numero_vuelo: document.getElementById('numero-vuelo') ? document.getElementById('numero-vuelo').value.trim() : '',
+    hora_llegada_vuelo: document.getElementById('hora-vuelo') ? document.getElementById('hora-vuelo').value : '',
+    nombre_barco: document.getElementById('nombre-barco') ? document.getElementById('nombre-barco').value.trim() : '',
+    hora_atraque: document.getElementById('hora-atraque') ? document.getElementById('hora-atraque').value : '',
     num_pasajeros: document.getElementById('num-pasajeros').value,
     pasajero_nombre: document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim(),
     pasajero_pasaporte: document.getElementById('pasajero-pasaporte').value.trim(),
