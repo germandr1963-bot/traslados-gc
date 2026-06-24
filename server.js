@@ -577,6 +577,10 @@ async function initSchema() {
     ALTER TABLE reservas ADD COLUMN IF NOT EXISTS numero_reserva TEXT UNIQUE;
   `);
 
+  // Columnas nuevas para reservas (se añaden si no existen en BD ya creadas)
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS conductor_id INT REFERENCES conductores(id) ON DELETE SET NULL`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS archivada BOOLEAN DEFAULT FALSE`);
+
   // ─── Reservas × Extras ────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS reservas_extras (
@@ -2342,38 +2346,172 @@ app.post('/admin/destinos/traducciones/guardar-lote', requireAdmin, asyncHandler
 // ─── Admin: reservas ─────────────────────────────────────────────────────────
 
 app.get('/admin/reservas', requireAdmin, asyncHandler(async (req, res) => {
-  const { estado } = req.query;
-  let where = '';
+  const { estado, periodo, orden, archivo } = req.query;
   const params = [];
-  if (estado && estado !== 'todas') {
-    where = 'WHERE r.estado = $1';
-    params.push(estado);
+  const condiciones = [];
+
+  // Archivadas o activas
+  if (archivo === 'si') {
+    condiciones.push('r.archivada = TRUE');
+  } else {
+    condiciones.push('r.archivada = FALSE');
   }
+
+  // Filtro por estado
+  if (estado && estado !== 'todas') {
+    params.push(estado);
+    condiciones.push('r.estado = $' + params.length);
+  }
+
+  // Filtro por periodo
+  if (periodo === 'hoy') {
+    condiciones.push('r.fecha = CURRENT_DATE');
+  } else if (periodo === 'semana') {
+    condiciones.push("r.fecha >= date_trunc('week', CURRENT_DATE) AND r.fecha < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'");
+  } else if (periodo === 'mes') {
+    condiciones.push("r.fecha >= date_trunc('month', CURRENT_DATE) AND r.fecha < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'");
+  }
+
+  const where = condiciones.length ? 'WHERE ' + condiciones.join(' AND ') : '';
+  const ordenSQL = orden === 'asc' ? 'r.fecha ASC, r.hora ASC' : 'r.fecha DESC, r.hora DESC';
+
   const result = await pool.query(
     `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.nombre_cliente,
             r.telefono_cliente, r.email_cliente, r.precio_estimado,
-            r.notas, r.estado, r.creado_en,
-            cv.nombre AS categoria_nombre
+            r.notas, r.estado, r.creado_en, r.archivada,
+            r.conductor_id,
+            cv.nombre AS categoria_nombre,
+            c.nombre AS conductor_nombre,
+            COALESCE((
+              SELECT SUM(re.precio_en_reserva)
+              FROM reservas_extras re WHERE re.reserva_id = r.id
+            ), 0) AS total_extras
      FROM reservas r
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     LEFT JOIN conductores c ON c.id = r.conductor_id
      ${where}
-     ORDER BY r.creado_en DESC`,
+     ORDER BY ${ordenSQL}`,
     params
   );
-  res.json({ reservas: result.rows });
+
+  // Calcular total por reserva
+  const reservas = result.rows.map(function(r) {
+    const extras = parseFloat(r.total_extras) || 0;
+    const viaje = parseFloat(r.precio_estimado) || 0;
+    return Object.assign({}, r, { total_estimado: viaje + extras });
+  });
+
+  res.json({ reservas });
+}));
+
+app.get('/admin/reservas/excel', requireAdmin, asyncHandler(async (req, res) => {
+  const { estado, periodo, archivo } = req.query;
+  const params = [];
+  const condiciones = [];
+
+  if (archivo === 'si') {
+    condiciones.push('r.archivada = TRUE');
+  } else {
+    condiciones.push('r.archivada = FALSE');
+  }
+  if (estado && estado !== 'todas') {
+    params.push(estado);
+    condiciones.push('r.estado = $' + params.length);
+  }
+  if (periodo === 'hoy') {
+    condiciones.push('r.fecha = CURRENT_DATE');
+  } else if (periodo === 'semana') {
+    condiciones.push("r.fecha >= date_trunc('week', CURRENT_DATE) AND r.fecha < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'");
+  } else if (periodo === 'mes') {
+    condiciones.push("r.fecha >= date_trunc('month', CURRENT_DATE) AND r.fecha < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'");
+  }
+  const where = condiciones.length ? 'WHERE ' + condiciones.join(' AND ') : '';
+
+  const result = await pool.query(
+    `SELECT r.numero_reserva, r.fecha, r.hora, r.nombre_cliente,
+            r.telefono_cliente, r.email_cliente,
+            r.notas, r.estado, r.creado_en,
+            cv.nombre AS categoria_nombre,
+            c.nombre AS conductor_nombre,
+            r.precio_estimado,
+            COALESCE((SELECT SUM(re.precio_en_reserva) FROM reservas_extras re WHERE re.reserva_id = r.id), 0) AS total_extras
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     LEFT JOIN conductores c ON c.id = r.conductor_id
+     ${where}
+     ORDER BY r.fecha DESC, r.hora DESC`,
+    params
+  );
+
+  const ExcelJS = require('exceljs');
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Reservas');
+
+  ws.columns = [
+    { header: 'PNR',          key: 'pnr',        width: 12 },
+    { header: 'Fecha viaje',  key: 'fecha',       width: 14 },
+    { header: 'Hora',         key: 'hora',        width: 8  },
+    { header: 'Cliente',      key: 'cliente',     width: 25 },
+    { header: 'Teléfono',     key: 'telefono',    width: 18 },
+    { header: 'Email',        key: 'email',       width: 28 },
+    { header: 'Categoría',    key: 'categoria',   width: 18 },
+    { header: 'Chofer',       key: 'chofer',      width: 20 },
+    { header: 'Precio viaje', key: 'precio',      width: 14 },
+    { header: 'Extras',       key: 'extras',      width: 10 },
+    { header: 'Total est.',   key: 'total',       width: 12 },
+    { header: 'Estado',       key: 'estado',      width: 14 },
+    { header: 'Detalles',     key: 'notas',       width: 50 },
+    { header: 'Recibida',     key: 'recibida',    width: 16 },
+  ];
+
+  // Cabecera en negrita
+  ws.getRow(1).font = { bold: true };
+  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9C4A0' } };
+
+  for (const r of result.rows) {
+    const viaje = parseFloat(r.precio_estimado) || 0;
+    const extras = parseFloat(r.total_extras) || 0;
+    ws.addRow({
+      pnr:       r.numero_reserva || '',
+      fecha:     r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '',
+      hora:      r.hora ? r.hora.slice(0,5) : '',
+      cliente:   r.nombre_cliente,
+      telefono:  r.telefono_cliente,
+      email:     r.email_cliente,
+      categoria: r.categoria_nombre || '',
+      chofer:    r.conductor_nombre || '',
+      precio:    viaje,
+      extras:    extras,
+      total:     viaje + extras,
+      estado:    r.estado,
+      notas:     r.notas || '',
+      recibida:  r.creado_en ? new Date(r.creado_en).toLocaleDateString('es-ES') : '',
+    });
+  }
+
+  // Formato número para columnas de precio
+  ['precio', 'extras', 'total'].forEach(function(key) {
+    const col = ws.getColumn(key);
+    col.numFmt = '#,##0.00 "€"';
+  });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="reservas.xlsx"');
+  await wb.xlsx.write(res);
+  res.end();
 }));
 
 app.get('/admin/reservas/:id', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    `SELECT r.*, cv.nombre AS categoria_nombre
+    `SELECT r.*, cv.nombre AS categoria_nombre, c.nombre AS conductor_nombre
      FROM reservas r
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     LEFT JOIN conductores c ON c.id = r.conductor_id
      WHERE r.id = $1`,
     [req.params.id]
   );
   if (!result.rows.length) return res.status(404).json({ error: 'Reserva no encontrada' });
   const reserva = result.rows[0];
-
   const extras = await pool.query(
     `SELECT e.nombre, re.precio_en_reserva
      FROM reservas_extras re
@@ -2382,16 +2520,41 @@ app.get('/admin/reservas/:id', requireAdmin, asyncHandler(async (req, res) => {
     [req.params.id]
   );
   reserva.extras = extras.rows;
+  const totalExtras = extras.rows.reduce(function(s, e) { return s + parseFloat(e.precio_en_reserva); }, 0);
+  reserva.total_estimado = (parseFloat(reserva.precio_estimado) || 0) + totalExtras;
   res.json({ reserva });
 }));
 
 app.post('/admin/reservas/:id/estado', requireAdmin, asyncHandler(async (req, res) => {
   const { estado } = req.body;
   const estadosValidos = ['pendiente', 'confirmada', 'completada', 'cancelada'];
-  if (!estadosValidos.includes(estado)) {
-    return res.status(400).json({ error: 'Estado no válido' });
-  }
+  if (!estadosValidos.includes(estado)) return res.status(400).json({ error: 'Estado no válido' });
   await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', [estado, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/reservas/:id/archivar', requireAdmin, asyncHandler(async (req, res) => {
+  const { archivar } = req.body;
+  await pool.query('UPDATE reservas SET archivada = $1 WHERE id = $2', [!!archivar, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/reservas/archivar-lote', requireAdmin, asyncHandler(async (req, res) => {
+  const { ids, archivar } = req.body;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'Sin IDs' });
+  await pool.query('UPDATE reservas SET archivada = $1 WHERE id = ANY($2)', [!!archivar, ids]);
+  res.json({ ok: true });
+}));
+
+app.delete('/admin/reservas/:id', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM reservas WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/reservas/borrar-lote', requireAdmin, asyncHandler(async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'Sin IDs' });
+  await pool.query('DELETE FROM reservas WHERE id = ANY($1)', [ids]);
   res.json({ ok: true });
 }));
 
