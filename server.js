@@ -517,7 +517,19 @@ async function initSchema() {
     WHERE NOT EXISTS (SELECT 1 FROM destinos LIMIT 1);
   `);
 
-  // ─── Extras ───────────────────────────────────────────────────────────────
+  // ─── Destinos: traducciones ───────────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS destinos_traducciones (
+      id SERIAL PRIMARY KEY,
+      destino_id INT NOT NULL REFERENCES destinos(id) ON DELETE CASCADE,
+      lang_code VARCHAR(5) NOT NULL,
+      nombre TEXT,
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(destino_id, lang_code)
+    );
+  `);
+
+    // ─── Extras ───────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS extras (
       id SERIAL PRIMARY KEY,
@@ -1841,16 +1853,19 @@ async function traducirSEOConClaudeIA(items, nombreIdioma) {
   }
 
   const prompt = 'Traduce los siguientes títulos y descripciones SEO de una web de traslados privados en Gran Canaria, ' +
-    'del español al ' + nombreIdioma + '. Cada uno incluye el origen y destino de la ruta — NO traduzcas los nombres ' +
-    'de los lugares, consérvalos tal cual están escritos — y el texto actual en español.\n\n' +
+    'del español al ' + nombreIdioma + '. Cada uno incluye el origen y destino de la ruta y el texto actual en español.\n\n' +
     'Reglas importantes:\n' +
     '- El título debe ser conciso, pensado para un resultado de búsqueda de Google (no te pases de unos 55-60 caracteres).\n' +
     '- La descripción debe rondar 140-160 caracteres, persuasiva pero realista, sin inventar datos que no estén en el original.\n' +
-    '- Tono profesional pero cercano, igual que el original en español.\n\n' +
+    '- Tono profesional pero cercano, igual que el original en español.\n' +
+    '- Para los nombres de lugares: usa la forma más natural y reconocible en ' + nombreIdioma + '. ' +
+    'Por ejemplo "Aeropuerto de Gran Canaria" puede traducirse como "Gran Canaria Airport" en inglés. ' +
+    'Si el nombre no tiene una forma establecida en ese idioma, consérvalo en español.\n' +
+    '- Los slugs de URL nunca se traducen, solo los textos visibles.\n\n' +
     'Textos a traducir (JSON):\n' + JSON.stringify(items, null, 2) + '\n\n' +
     'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, sin bloques de markdown, ' +
     'usando el route_id de cada ruta como clave, con esta forma exacta: ' +
-    '{"3": {"meta_title": "...", "meta_description": "..."}, "18": {"meta_title": "...", "meta_description": "..."}}';
+    '{\"3\": {\"meta_title\": \"...\", \"meta_description\": \"...\"}, \"18\": {\"meta_title\": \"...\", \"meta_description\": \"...\"}}';
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -2225,6 +2240,102 @@ app.post('/admin/destinos/:id/activo', requireAdmin, asyncHandler(async (req, re
 
 app.post('/admin/destinos/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM destinos WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// ─── Admin: destinos — traducciones ──────────────────────────────────────────
+
+// Devuelve todas las traducciones de todos los destinos para un idioma
+app.get('/admin/destinos/traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang } = req.params;
+  const destinos = await pool.query('SELECT id, nombre FROM destinos ORDER BY nombre');
+  const traducciones = await pool.query(
+    'SELECT destino_id, nombre FROM destinos_traducciones WHERE lang_code = $1',
+    [lang]
+  );
+  const mapaTrads = {};
+  for (const t of traducciones.rows) mapaTrads[t.destino_id] = t.nombre;
+  const resultado = destinos.rows.map(function (d) {
+    return { id: d.id, nombre_es: d.nombre, nombre_traducido: mapaTrads[d.id] || '' };
+  });
+  res.json({ destinos: resultado });
+}));
+
+// Guarda una traducción individual
+app.post('/admin/destinos/:id/traduccion/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const { id, lang } = req.params;
+  const { nombre } = req.body;
+  await pool.query(
+    `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW()`,
+    [id, lang, nombre || '']
+  );
+  res.json({ ok: true });
+}));
+
+// Traduce con IA todos los destinos vacíos para un idioma
+app.post('/admin/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang } = req.params;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+
+  const destinos = await pool.query('SELECT id, nombre FROM destinos WHERE activo = TRUE ORDER BY nombre');
+  const traducciones = await pool.query(
+    'SELECT destino_id, nombre FROM destinos_traducciones WHERE lang_code = $1',
+    [lang]
+  );
+  const yaTraducidos = {};
+  for (const t of traducciones.rows) yaTraducidos[t.destino_id] = t.nombre;
+
+  // Solo los que no tienen traducción todavía
+  const pendientes = destinos.rows.filter(function (d) { return !yaTraducidos[d.id]; });
+  if (pendientes.length === 0) return res.json({ ok: true, propuestas: [] });
+
+  const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || lang;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY en Render.' });
+
+  const prompt = 'Traduce los siguientes nombres de lugares turísticos de Gran Canaria del español al ' + nombreIdioma + '.\n' +
+    'Usa la forma más natural y reconocida en ese idioma (ej: "Aeropuerto de Gran Canaria" → "Gran Canaria Airport" en inglés).\n' +
+    'Si el nombre no tiene traducción establecida, devuélvelo igual en español.\n\n' +
+    'Lugares a traducir (JSON con id y nombre en español):\n' + JSON.stringify(pendientes) + '\n\n' +
+    'Responde EXCLUSIVAMENTE con un JSON válido, sin texto adicional, sin markdown, con esta forma exacta:\n' +
+    '[{"id": 1, "nombre": "..."}, {"id": 2, "nombre": "..."}]';
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    return res.status(500).json({ error: 'Error API Claude: ' + err.slice(0, 200) });
+  }
+
+  const data = await response.json();
+  const texto = data.content.map(function (b) { return b.text || ''; }).join('');
+  const limpio = texto.replace(/```json|```/g, '').trim();
+  const propuestas = JSON.parse(limpio);
+
+  res.json({ ok: true, propuestas });
+}));
+
+// Guarda en bloque las propuestas de traducciones de destinos revisadas
+app.post('/admin/destinos/traducciones/guardar-lote', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang, propuestas } = req.body;
+  if (!lang || !Array.isArray(propuestas)) return res.status(400).json({ error: 'Datos no válidos' });
+  for (const p of propuestas) {
+    if (!p.id || !p.nombre) continue;
+    await pool.query(
+      `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW()`,
+      [p.id, lang, p.nombre]
+    );
+  }
   res.json({ ok: true });
 }));
 
