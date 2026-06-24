@@ -453,6 +453,46 @@ async function initSchema() {
     }
   }
 
+  // ─── Textos de email de cotización (traducibles desde Idiomas) ───────────
+  const TEXTOS_EMAIL_COTIZACION = [
+    { clave: 'email_cotiz_asunto_positivo',   modulo: 'Email cotización', contexto: 'Asunto del email de respuesta positiva a una cotización', es: 'Tu traslado en Gran Canaria — precios disponibles' },
+    { clave: 'email_cotiz_asunto_negativo',   modulo: 'Email cotización', contexto: 'Asunto del email de respuesta negativa a una cotización', es: 'Tu solicitud de traslado' },
+    { clave: 'email_cotiz_saludo',            modulo: 'Email cotización', contexto: 'Saludo inicial del email de cotización', es: 'Hola,' },
+    { clave: 'email_cotiz_positivo_p1',       modulo: 'Email cotización', contexto: 'Primer párrafo del email positivo', es: 'Tenemos buenas noticias. Podemos asumir tu traslado.' },
+    { clave: 'email_cotiz_positivo_p2',       modulo: 'Email cotización', contexto: 'Segundo párrafo del email positivo, antes de la tabla de precios', es: 'Aquí tienes los precios disponibles para tu ruta:' },
+    { clave: 'email_cotiz_positivo_p3',       modulo: 'Email cotización', contexto: 'Párrafo antes del botón de reserva', es: 'Pulsa el botón para ver todos los detalles y hacer tu reserva.' },
+    { clave: 'email_cotiz_boton_reservar',    modulo: 'Email cotización', contexto: 'Texto del botón de reserva en el email positivo', es: 'Ver ruta y reservar' },
+    { clave: 'email_cotiz_nota_precio',       modulo: 'Email cotización', contexto: 'Nota final sobre el precio estimado en el email positivo', es: 'El precio es una estimación basada en los km de distancia. El precio final es lo que marca el taxímetro. El cobro lo realiza el conductor directamente.' },
+    { clave: 'email_cotiz_negativo_p1',       modulo: 'Email cotización', contexto: 'Primer párrafo del email negativo', es: 'Gracias por contactar con Traslados GC.' },
+    { clave: 'email_cotiz_negativo_p2',       modulo: 'Email cotización', contexto: 'Segundo párrafo del email negativo, antes de mostrar la ruta', es: 'Lamentablemente, en este momento no podemos asumir el traslado que nos solicitaste:' },
+    { clave: 'email_cotiz_negativo_p3',       modulo: 'Email cotización', contexto: 'Párrafo final del email negativo', es: 'Si tienes otras necesidades de transporte en Gran Canaria, no dudes en contactarnos.' },
+    { clave: 'email_cotiz_despedida',         modulo: 'Email cotización', contexto: 'Despedida final de todos los emails de cotización', es: 'Un saludo, el equipo de Traslados GC' },
+    { clave: 'email_cotiz_col_categoria',     modulo: 'Email cotización', contexto: 'Cabecera de columna Categoría en la tabla de precios del email', es: 'Categoría' },
+    { clave: 'email_cotiz_col_capacidad',     modulo: 'Email cotización', contexto: 'Cabecera de columna Capacidad en la tabla de precios del email', es: 'Capacidad' },
+    { clave: 'email_cotiz_col_precio',        modulo: 'Email cotización', contexto: 'Cabecera de columna Precio en la tabla de precios del email', es: 'Precio est.' },
+  ];
+
+  for (const t of TEXTOS_EMAIL_COTIZACION) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (clave) DO UPDATE SET modulo = $2, contexto = $3, texto_es = $4`,
+      [t.clave, t.modulo, t.contexto, t.es]
+    );
+  }
+
+  // Sincronizar nombres de categorías activas como textos traducibles
+  const catsActivas = await pool.query('SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
+  for (const cat of catsActivas.rows) {
+    const clave = 'categoria_nombre_' + cat.id;
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Categorías de vehículo', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+      [clave, 'Nombre de la categoría "' + cat.nombre + '" tal como aparece en emails y páginas públicas', cat.nombre]
+    );
+  }
+
   await cargarTextosCache();
 
   // ─── Tarifario de precios ─────────────────────────────────────────────────
@@ -2340,6 +2380,32 @@ app.post('/admin/destinos/:id/eliminar', requireAdmin, asyncHandler(async (req, 
   res.json({ ok: true });
 }));
 
+// Helper: obtener texto de interfaz traducido para un idioma
+async function obtenerTextoTraducido(clave, lang) {
+  const resultado = await pool.query(
+    `SELECT COALESCE(tit.texto, ti.texto_es) AS texto
+     FROM textos_interfaz ti
+     LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $2
+     WHERE ti.clave = $1`,
+    [clave, lang]
+  );
+  return resultado.rows.length ? resultado.rows[0].texto : '';
+}
+
+// Helper: obtener múltiples textos de una vez
+async function obtenerTextosTraducidos(claves, lang) {
+  const resultado = await pool.query(
+    `SELECT ti.clave, COALESCE(tit.texto, ti.texto_es) AS texto
+     FROM textos_interfaz ti
+     LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $2
+     WHERE ti.clave = ANY($1)`,
+    [claves, lang]
+  );
+  const mapa = {};
+  resultado.rows.forEach(function(r) { mapa[r.clave] = r.texto; });
+  return mapa;
+}
+
 // ─── API pública: cotizaciones ───────────────────────────────────────────────
 
 app.post('/api/cotizaciones', asyncHandler(async (req, res) => {
@@ -2537,41 +2603,28 @@ app.get('/admin/cotizaciones/rutas-activas', requireAdmin, asyncHandler(async (r
 
 // Respuesta negativa — email simple al cliente
 app.post('/admin/cotizaciones/:id/respuesta-negativa', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang_respuesta } = req.body;
   const cotiz = await pool.query('SELECT * FROM cotizaciones WHERE id = $1', [req.params.id]);
   if (!cotiz.rows.length) return res.status(404).json({ error: 'Cotización no encontrada' });
   const c = cotiz.rows[0];
 
-  // Traducir el mensaje negativo con Claude si no es español
-  let textoNegativo = {
-    asunto: 'Tu solicitud de traslado',
-    saludo: 'Hola,',
-    parrafo1: 'Gracias por contactar con Traslados GC.',
-    parrafo2: 'Lamentablemente, en este momento no podemos asumir el traslado que nos solicitaste:',
-    parrafo3: 'Si tienes otras necesidades de transporte en Gran Canaria, no dudes en contactarnos.',
-    despedida: 'Un saludo,<br>El equipo de Traslados GC'
-  };
+  const lang = lang_respuesta || c.lang_cliente || 'es';
 
-  const lang = c.lang_cliente || 'es';
-  if (lang !== 'es') {
-    try {
-      const idiomaResult = await pool.query('SELECT nombre FROM idiomas_web WHERE codigo = $1', [lang]);
-      const nombreIdioma = idiomaResult.rows.length ? idiomaResult.rows[0].nombre : lang;
-      const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (apiKey) {
-        const prompt = 'Traduce este objeto JSON de textos de email del español al ' + nombreIdioma + '. ' +
-          'Responde SOLO con el JSON traducido, sin markdown ni texto adicional:\n' +
-          JSON.stringify(textoNegativo);
-        const resp = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 500, messages: [{ role: 'user', content: prompt }] })
-        });
-        const data = await resp.json();
-        const texto = data.content.map(function(b) { return b.text || ''; }).join('');
-        textoNegativo = JSON.parse(texto.replace(/```json|```/g, '').trim());
-      }
-    } catch(err) { console.warn('Error traduciendo respuesta negativa:', err.message); }
-  }
+  // Obtener textos traducidos desde textos_interfaz
+  const t = await obtenerTextosTraducidos([
+    'email_cotiz_asunto_negativo', 'email_cotiz_saludo',
+    'email_cotiz_negativo_p1', 'email_cotiz_negativo_p2',
+    'email_cotiz_negativo_p3', 'email_cotiz_despedida'
+  ], lang);
+
+  const textoNegativo = {
+    asunto:    t['email_cotiz_asunto_negativo'] || 'Tu solicitud de traslado',
+    saludo:    t['email_cotiz_saludo'] || 'Hola,',
+    parrafo1:  t['email_cotiz_negativo_p1'] || 'Gracias por contactar con Traslados GC.',
+    parrafo2:  t['email_cotiz_negativo_p2'] || 'Lamentablemente, no podemos asumir el traslado que nos solicitaste:',
+    parrafo3:  t['email_cotiz_negativo_p3'] || 'Si tienes otras necesidades de transporte en Gran Canaria, no dudes en contactarnos.',
+    despedida: t['email_cotiz_despedida'] || 'Un saludo, el equipo de Traslados GC'
+  };
 
   const fechaViaje = c.fecha_aproximada ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES') : null;
 
@@ -2656,9 +2709,9 @@ app.post('/admin/cotizaciones/:id/respuesta-positiva', requireAdmin, asyncHandle
   const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
   const urlRuta = BASE_URL + '/' + lang + '/' + seo.palabra_traslado + '/' + seo.slug_url;
 
-  // Obtener precios de la cotización
+  // Obtener precios con IDs de categoría para traducción
   const preciosResult = await pool.query(
-    `SELECT cv.nombre, cv.capacidad_pasajeros, cp.precio
+    `SELECT cv.id AS categoria_id, cv.nombre, cv.capacidad_pasajeros, cp.precio
      FROM cotizaciones_precios cp
      JOIN categorias_vehiculos cv ON cv.id = cp.categoria_id
      WHERE cp.cotizacion_id = $1
@@ -2666,50 +2719,45 @@ app.post('/admin/cotizaciones/:id/respuesta-positiva', requireAdmin, asyncHandle
     [req.params.id]
   );
 
-  // Traducir textos del email si no es español
-  let textos = {
-    asunto: 'Tu traslado en Gran Canaria — precios disponibles',
-    saludo: 'Hola,',
-    parrafo1: 'Tenemos buenas noticias. Podemos asumir tu traslado.',
-    parrafo2: 'Aquí tienes los precios disponibles para tu ruta:',
-    col_categoria: 'Categoría',
-    col_capacidad: 'Capacidad',
-    col_precio: 'Precio est.',
-    parrafo3: 'Pulsa el botón para ver todos los detalles y hacer tu reserva.',
-    boton: 'Ver ruta y reservar',
-    nota: 'El precio es una estimación basada en los km de distancia. El precio final es lo que marca el taxímetro. El cobro lo realiza el conductor directamente.',
-    despedida: 'Un saludo,<br>El equipo de Traslados GC'
-  };
+  // Obtener textos traducidos desde textos_interfaz
+  const clavesTextos = [
+    'email_cotiz_asunto_positivo', 'email_cotiz_saludo',
+    'email_cotiz_positivo_p1', 'email_cotiz_positivo_p2', 'email_cotiz_positivo_p3',
+    'email_cotiz_boton_reservar', 'email_cotiz_nota_precio', 'email_cotiz_despedida',
+    'email_cotiz_col_categoria', 'email_cotiz_col_capacidad', 'email_cotiz_col_precio',
+    'sufijo_pax'
+  ];
+  // Añadir claves de nombres de categorías
+  preciosResult.rows.forEach(function(p) {
+    clavesTextos.push('categoria_nombre_' + p.categoria_id);
+  });
 
-  if (lang !== 'es') {
-    try {
-      const idiomaResult = await pool.query('SELECT nombre FROM idiomas_web WHERE codigo = $1', [lang]);
-      const nombreIdioma = idiomaResult.rows.length ? idiomaResult.rows[0].nombre : lang;
-      const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (apiKey) {
-        const prompt = 'Traduce este objeto JSON de textos de email del español al ' + nombreIdioma + '. ' +
-          'Responde SOLO con el JSON traducido, sin markdown ni texto adicional:\n' +
-          JSON.stringify(textos);
-        const resp = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 800, messages: [{ role: 'user', content: prompt }] })
-        });
-        const data = await resp.json();
-        const texto = data.content.map(function(b) { return b.text || ''; }).join('');
-        textos = JSON.parse(texto.replace(/```json|```/g, '').trim());
-      }
-    } catch(err) { console.warn('Error traduciendo respuesta positiva:', err.message); }
-  }
+  const t = await obtenerTextosTraducidos(clavesTextos, lang);
+
+  const textos = {
+    asunto:       t['email_cotiz_asunto_positivo'] || 'Tu traslado en Gran Canaria — precios disponibles',
+    saludo:       t['email_cotiz_saludo'] || 'Hola,',
+    parrafo1:     t['email_cotiz_positivo_p1'] || 'Tenemos buenas noticias. Podemos asumir tu traslado.',
+    parrafo2:     t['email_cotiz_positivo_p2'] || 'Aquí tienes los precios disponibles para tu ruta:',
+    col_categoria:t['email_cotiz_col_categoria'] || 'Categoría',
+    col_capacidad:t['email_cotiz_col_capacidad'] || 'Capacidad',
+    col_precio:   t['email_cotiz_col_precio'] || 'Precio est.',
+    parrafo3:     t['email_cotiz_positivo_p3'] || 'Pulsa el botón para ver todos los detalles y hacer tu reserva.',
+    boton:        t['email_cotiz_boton_reservar'] || 'Ver ruta y reservar',
+    nota:         t['email_cotiz_nota_precio'] || 'El precio es una estimación basada en los km de distancia.',
+    despedida:    t['email_cotiz_despedida'] || 'Un saludo, el equipo de Traslados GC',
+    pax:          t['sufijo_pax'] || 'pax'
+  };
 
   const fechaViaje = c.fecha_aproximada ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES') : null;
 
   const filasPrecios = preciosResult.rows.map(function(p) {
-    return `<tr>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;">${p.nombre}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;">${p.capacidad_pasajeros} pax</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;">${parseFloat(p.precio).toFixed(2)} €</td>
-    </tr>`;
+    var nombreCat = t['categoria_nombre_' + p.categoria_id] || p.nombre;
+    return '<tr>' +
+      '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' + nombreCat + '</td>' +
+      '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' + p.capacidad_pasajeros + ' ' + textos.pax + '</td>' +
+      '<td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;">' + parseFloat(p.precio).toFixed(2) + ' €</td>' +
+    '</tr>';
   }).join('');
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
