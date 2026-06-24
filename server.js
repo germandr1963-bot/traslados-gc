@@ -700,9 +700,16 @@ app.get('/api/categorias', asyncHandler(async (req, res) => {
 }));
 
 app.get('/api/rutas', asyncHandler(async (req, res) => {
-  const result = await pool.query(
-    'SELECT id, origen, destino FROM rutas WHERE activa = TRUE ORDER BY origen, destino'
-  );
+  // Solo rutas activas que tienen al menos un precio cargado
+  const result = await pool.query(`
+    SELECT r.id, r.origen, r.destino,
+           array_agg(rp.categoria_id) AS categorias_con_precio
+    FROM rutas r
+    JOIN rutas_precios rp ON rp.ruta_id = r.id
+    WHERE r.activa = TRUE
+    GROUP BY r.id, r.origen, r.destino
+    ORDER BY r.origen, r.destino
+  `);
   res.json(result.rows);
 }));
 
