@@ -2558,6 +2558,25 @@ app.post('/admin/reservas/borrar-lote', requireAdmin, asyncHandler(async (req, r
   res.json({ ok: true });
 }));
 
+// Asignar chofer manualmente a una reserva
+app.post('/admin/reservas/:id/chofer', requireAdmin, asyncHandler(async (req, res) => {
+  const { conductor_id } = req.body;
+  await pool.query(
+    'UPDATE reservas SET conductor_id = $1 WHERE id = $2',
+    [conductor_id || null, req.params.id]
+  );
+  res.json({ ok: true });
+}));
+
+// Listar conductores aprobados para el desplegable de asignación
+app.get('/admin/conductores-aprobados', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, nombre, telefono FROM conductores WHERE estado = $1 ORDER BY nombre',
+    ['aprobado']
+  );
+  res.json({ conductores: result.rows });
+}));
+
 // ─── Admin: extras ────────────────────────────────────────────────────────────
 app.get('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
