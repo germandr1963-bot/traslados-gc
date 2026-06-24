@@ -1949,7 +1949,8 @@ async function traducirConClaudeIA(items, nombreIdioma) {
   const prompt = 'Traduce los siguientes textos de una web de traslados privados en Gran Canaria, ' +
     'del español al ' + nombreIdioma + '. Cada texto incluye una clave única y un contexto que explica ' +
     'dónde aparece en la web — úsalo para elegir la traducción más natural (por ejemplo, un botón necesita ' +
-    'un tono distinto a un párrafo explicativo). Mantén un tono profesional pero cercano, igual que el original.\n\n' +
+    'un tono distinto a un párrafo explicativo). Mantén un tono profesional pero cercano.\n' +
+    '- Traduce TODOS los textos sin excepción, incluidos nombres de categorías como "Business", "Económico", "Confort", "Premium" — tradúcelos a su equivalente natural en ' + nombreIdioma + '.\n\n' +
     'Textos a traducir (JSON):\n' + JSON.stringify(items, null, 2) + '\n\n' +
     'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, ' +
     'sin bloques de markdown ni comillas triples, con esta forma exacta: ' +
@@ -2119,6 +2120,13 @@ app.get('/admin/textos', requireAdmin, asyncHandler(async (req, res) => {
 
 // Guarda (o actualiza) la traducción de un texto en un idioma concreto
 // Devuelve la traducción actual (o vacío) de un texto en un idioma concreto
+// Elimina todas las traducciones de un texto (solo para categorías mal traducidas)
+app.delete('/admin/textos/:id/traducciones', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM textos_interfaz_traducciones WHERE texto_id = $1', [req.params.id]);
+  await cargarTextosCache();
+  res.json({ ok: true });
+}));
+
 app.get('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
   if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
     return res.status(400).json({ error: 'Idioma no válido' });
