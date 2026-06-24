@@ -489,13 +489,37 @@ table.tabla-precios input {
         <h2 id="cotiz-detalle-titulo" style="font-size:1.1rem;margin:0 0 1rem 0;"></h2>
         <div id="cotiz-detalle-info" style="margin-bottom:1.5rem;"></div>
 
-        <h3 style="font-size:0.9rem;font-weight:600;margin:0 0 0.75rem 0;">Precios por categoría</h3>
+        <h3 style="font-size:0.9rem;font-weight:600;margin:0 0 0.75rem 0;">Precios por categoría <span style="font-size:0.78rem;color:#888;font-weight:400;">(opcional — solo para respuesta positiva)</span></h3>
         <div id="cotiz-detalle-precios" style="margin-bottom:1.5rem;"></div>
+
+        <!-- Selector de ruta e idioma para respuesta positiva -->
+        <div style="background:#f5f0ea;border-radius:8px;padding:1rem;margin-bottom:1rem;">
+          <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">✅ Respuesta positiva — enlace a ruta del sistema</p>
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+            <div style="flex:2;min-width:200px;">
+              <label style="font-size:0.78rem;color:#666;display:block;margin-bottom:3px;">Ruta del sistema</label>
+              <select id="cotiz-ruta-sistema" class="campo" style="height:36px;font-size:0.85rem;">
+                <option value="">— Cargando rutas... —</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:120px;">
+              <label style="font-size:0.78rem;color:#666;display:block;margin-bottom:3px;">Idioma respuesta</label>
+              <select id="cotiz-lang-respuesta" class="campo" style="height:36px;font-size:0.85rem;"></select>
+            </div>
+          </div>
+          <button class="boton-primario" style="font-size:0.82rem;" onclick="enviarRespuestaPositiva()">📧 Enviar respuesta positiva</button>
+        </div>
+
+        <!-- Respuesta negativa -->
+        <div style="background:#fdf5f5;border:1px solid #f1aeb5;border-radius:8px;padding:1rem;margin-bottom:1rem;">
+          <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.5rem 0;color:#842029;">❌ Respuesta negativa — no podemos asumir esta ruta</p>
+          <p style="font-size:0.78rem;color:#888;margin:0 0 0.75rem 0;">El cliente recibirá un email explicando que no podemos realizar este traslado.</p>
+          <button class="boton-peligro" style="font-size:0.82rem;" onclick="enviarRespuestaNegativa()">📧 Enviar respuesta negativa</button>
+        </div>
 
         <div id="aviso-cotiz-detalle" style="display:none;margin-bottom:1rem;"></div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
           <button class="boton-costa" onclick="guardarPreciosCotizacion()">💾 Guardar precios</button>
-          <button class="boton-primario" onclick="enviarRespuestaCotizacion()">📧 Enviar respuesta al cliente</button>
           <button class="boton-peligro" onclick="borrarCotizacion()">🗑 Eliminar</button>
           <button class="boton-costa" onclick="cerrarDetalleCotizacion()">Cerrar</button>
         </div>
@@ -3068,19 +3092,22 @@ function abrirDetalleCotizacion(id) {
       if (!c) return;
 
       var fechaViaje = c.fecha_aproximada ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES') : 'No indicada';
+      var langDetectado = c.lang_cliente || 'es';
+
       document.getElementById('cotiz-detalle-titulo').innerHTML =
         'Solicitud de <span style="color:var(--terracota)">' + c.email_cliente + '</span>';
 
       document.getElementById('cotiz-detalle-info').innerHTML =
         '<table class="tabla-admin" style="margin-bottom:0;">' +
-          '<tr><th style="width:160px">Origen</th><td>' + c.origen + '</td></tr>' +
-          '<tr><th>Destino</th><td>' + c.destino + '</td></tr>' +
+          '<tr><th style="width:160px">Origen solicitado</th><td>' + c.origen + '</td></tr>' +
+          '<tr><th>Destino solicitado</th><td>' + c.destino + '</td></tr>' +
           '<tr><th>Fecha aproximada</th><td>' + fechaViaje + '</td></tr>' +
           '<tr><th>Pasajeros</th><td>' + (c.num_pasajeros || '—') + '</td></tr>' +
           '<tr><th>Email</th><td>' + c.email_cliente + '</td></tr>' +
+          '<tr><th>Idioma detectado</th><td><strong style="color:var(--terracota);">' + langDetectado.toUpperCase() + '</strong></td></tr>' +
         '</table>';
 
-      // Cargar categorías activas con precios ya guardados
+      // Cargar categorías con precios existentes
       fetch('/admin/categorias')
         .then(function(r) { return r.json(); })
         .then(function(cats) {
@@ -3101,10 +3128,30 @@ function abrirDetalleCotizacion(id) {
               '</tr>';
             }).join('') +
             '</tbody></table>';
-
-          document.getElementById('detalle-cotizacion').classList.remove('oculto');
-          document.getElementById('detalle-cotizacion').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         });
+
+      // Cargar rutas activas del sistema en el selector
+      Promise.all([
+        fetch('/admin/cotizaciones/rutas-activas').then(function(r) { return r.json(); }),
+        fetch('/admin/idiomas').then(function(r) { return r.json(); })
+      ]).then(function(results) {
+        var rutas = results[0].rutas || [];
+        var idiomas = results[1].filter(function(i) { return i.activo; });
+
+        var selRuta = document.getElementById('cotiz-ruta-sistema');
+        selRuta.innerHTML = '<option value="">— Selecciona la ruta del sistema —</option>' +
+          rutas.map(function(r) {
+            return '<option value="' + r.id + '">' + r.origen + ' → ' + r.destino + '</option>';
+          }).join('');
+
+        var selLang = document.getElementById('cotiz-lang-respuesta');
+        selLang.innerHTML = idiomas.map(function(i) {
+          var sel = i.codigo === langDetectado ? ' selected' : '';
+          return '<option value="' + i.codigo + '"' + sel + '>' + i.nombre + '</option>';
+        }).join('');
+      });
+
+      document.getElementById('detalle-cotizacion').classList.remove('oculto');
     });
 }
 
@@ -3134,29 +3181,56 @@ function guardarPreciosCotizacion() {
   });
 }
 
-function enviarRespuestaCotizacion() {
+function enviarRespuestaPositiva() {
   if (!cotizacionDetalleId) return;
+  var rutaId = document.getElementById('cotiz-ruta-sistema').value;
+  var langResp = document.getElementById('cotiz-lang-respuesta').value;
+  var av = document.getElementById('aviso-cotiz-detalle');
+  if (!rutaId) {
+    av.style.display = 'block';
+    av.innerHTML = '<div class="aviso-error">❌ Selecciona primero la ruta del sistema.</div>';
+    return;
+  }
+  av.style.display = 'block';
+  av.innerHTML = '<div class="aviso-ok">📧 Traduciendo y enviando email...</div>';
+  fetch('/admin/cotizaciones/' + cotizacionDetalleId + '/respuesta-positiva', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ruta_id: Number(rutaId), lang_respuesta: langResp })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) {
+      av.innerHTML = '<div class="aviso-error">❌ ' + data.error + '</div>';
+      return;
+    }
+    av.innerHTML = '<div class="aviso-ok">✔ Respuesta positiva enviada.<br><small>Enlace: <a href="' + data.url_ruta + '" target="_blank">' + data.url_ruta + '</a></small></div>';
+    cargarCotizaciones();
+  })
+  .catch(function(err) {
+    av.innerHTML = '<div class="aviso-error">❌ ' + (err.message || 'Error de conexión') + '</div>';
+  });
+}
+
+function enviarRespuestaNegativa() {
+  if (!cotizacionDetalleId) return;
+  if (!confirm('¿Enviar respuesta negativa al cliente? Le informaremos de que no podemos asumir esa ruta.')) return;
   var av = document.getElementById('aviso-cotiz-detalle');
   av.style.display = 'block';
-  av.innerHTML = '<div class="aviso-ok">📧 Enviando email...</div>';
-  fetch('/admin/cotizaciones/' + cotizacionDetalleId + '/enviar', { method: 'POST' })
-    .then(function(r) {
-      if (!r.ok) {
-        return r.json().then(function(d) { throw new Error(d.error || 'Error ' + r.status); });
-      }
-      return r.json();
-    })
-    .then(function(data) {
-      if (data.error) {
-        av.innerHTML = '<div class="aviso-error">❌ Error: ' + data.error + '</div>';
-        return;
-      }
-      av.innerHTML = '<div class="aviso-ok">✔ Email enviado correctamente al cliente.</div>';
-      cargarCotizaciones();
-    })
-    .catch(function(err) {
-      av.innerHTML = '<div class="aviso-error">❌ ' + (err.message || 'Error de conexión') + '</div>';
-    });
+  av.innerHTML = '<div class="aviso-ok">📧 Traduciendo y enviando email...</div>';
+  fetch('/admin/cotizaciones/' + cotizacionDetalleId + '/respuesta-negativa', { method: 'POST' })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) {
+      av.innerHTML = '<div class="aviso-error">❌ ' + data.error + '</div>';
+      return;
+    }
+    av.innerHTML = '<div class="aviso-ok">✔ Respuesta negativa enviada al cliente.</div>';
+    cargarCotizaciones();
+  })
+  .catch(function(err) {
+    av.innerHTML = '<div class="aviso-error">❌ ' + (err.message || 'Error de conexión') + '</div>';
+  });
 }
 
 function borrarCotizacion() {
