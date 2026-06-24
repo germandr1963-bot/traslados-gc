@@ -215,7 +215,7 @@ table.tabla-precios input {
       <p class="subtitulo">Lista oficial de puntos de origen y destino. Solo los destinos activos estarán disponibles al crear rutas.</p>
 
       <div style="margin-bottom:1.5rem;">
-        <input type="text" id="nuevo-destino-nombre" placeholder="Nombre del destino" style="padding:0.5rem 0.8rem;border-radius:6px;border:1px solid #555;background:#2a2a2a;color:#f0ebe3;width:280px;margin-right:0.5rem;">
+        <input type="text" id="nuevo-destino-nombre" placeholder="Nombre del destino" class="campo" style="width:280px;margin-right:0.5rem;">
         <button class="boton-costa" onclick="crearDestino()">+ Añadir destino</button>
       </div>
       <div id="error-destinos" style="color:#e07b5a;margin-bottom:1rem;display:none;"></div>
@@ -236,15 +236,21 @@ table.tabla-precios input {
         <h2 style="font-size:1.1rem;margin-bottom:0.5rem;">Traducciones de destinos</h2>
         <p class="subtitulo" style="margin-bottom:1rem;">Nombres de los destinos en cada idioma activo. Se usan en selectores y listados. El SEO de cada ruta se traduce por separado.</p>
         <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
-          <select id="select-lang-destinos" class="campo" style="width:200px;" onchange="cargarTraduccionesDestinos()"></select>
-          <button class="boton-costa" onclick="traducirDestinosIA()">✨ Traducir vacíos con IA</button>
+          <select id="select-lang-destinos" class="campo" style="width:200px;height:40px;" onchange="cargarTraduccionesDestinos()"></select>
+          <button class="boton-costa" onclick="traducirDestinosIA()">✨ Sugerir con IA los que faltan</button>
         </div>
         <div id="aviso-traducciones-destinos" style="margin-bottom:1rem;display:none;"></div>
-        <table class="tabla-admin" id="tabla-traducciones-destinos">
-          <thead><tr><th>Nombre en español</th><th>Traducción</th></tr></thead>
+        <table class="tabla-admin">
+          <thead>
+            <tr>
+              <th style="width:35%">Nombre en español</th>
+              <th style="width:15%;text-align:center">Estado</th>
+              <th>Traducción</th>
+              <th style="width:100px"></th>
+            </tr>
+          </thead>
           <tbody id="cuerpo-traducciones-destinos"></tbody>
         </table>
-        <button class="boton-primario" style="margin-top:1rem;" onclick="guardarTraduccionesDestinos()">💾 Guardar traducciones</button>
       </div>
     </div>
 
@@ -2616,6 +2622,8 @@ function guardarTarifario() {
 
 // ─── Extras ───────────────────────────────────────────────────────────────────
 // ─── Destinos: traducciones ───────────────────────────────────────────────────
+var destinosTradCache = []; // cache de propuestas IA pendientes de guardar
+
 function cargarSelectorLangDestinos() {
   fetch('/admin/idiomas').then(function(r) { return r.json(); }).then(function(idiomas) {
     var activos = idiomas.filter(function(i) { return i.activo && !i.es_base; });
@@ -2631,37 +2639,69 @@ function cargarSelectorLangDestinos() {
 function cargarTraduccionesDestinos() {
   var lang = document.getElementById('select-lang-destinos').value;
   if (!lang) return;
+  destinosTradCache = [];
   fetch('/admin/destinos/traducciones/' + lang)
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      var cuerpo = document.getElementById('cuerpo-traducciones-destinos');
-      cuerpo.innerHTML = data.destinos.map(function(d) {
-        return '<tr>' +
-          '<td>' + d.nombre_es + '</td>' +
-          '<td><input type="text" data-id="' + d.id + '" value="' + (d.nombre_traducido || '') + '" ' +
-          'style="width:100%;padding:0.3rem 0.5rem;border-radius:4px;border:1px solid #555;background:#2a2a2a;color:#f0ebe3;"></td>' +
-          '</tr>';
-      }).join('');
+      renderizarTablaTraduccionesDestinos(data.destinos, []);
     });
 }
 
-function guardarTraduccionesDestinos() {
+function renderizarTablaTraduccionesDestinos(destinos, propuestasIA) {
+  var mapaIA = {};
+  propuestasIA.forEach(function(p) { mapaIA[p.id] = p.nombre; });
+
+  var cuerpo = document.getElementById('cuerpo-traducciones-destinos');
+  cuerpo.innerHTML = destinos.map(function(d) {
+    var tieneTraduccion = d.nombre_traducido && d.nombre_traducido.trim() !== '';
+    var tienePropuesta = !!mapaIA[d.id];
+    var valorCampo = mapaIA[d.id] || d.nombre_traducido || '';
+    var badge, badgeColor;
+    if (tieneTraduccion) {
+      badge = '✔ Traducido';
+      badgeColor = '#2d7a4f';
+    } else if (tienePropuesta) {
+      badge = '✨ Propuesta IA';
+      badgeColor = '#b07d2a';
+    } else {
+      badge = '— Pendiente';
+      badgeColor = '#888';
+    }
+    return '<tr id="fila-dest-' + d.id + '">' +
+      '<td>' + d.nombre_es + '</td>' +
+      '<td style="text-align:center;">' +
+        '<span id="badge-dest-' + d.id + '" style="font-size:0.75rem;font-weight:600;color:' + badgeColor + ';">' + badge + '</span>' +
+      '</td>' +
+      '<td>' +
+        '<input type="text" id="trad-dest-' + d.id + '" data-id="' + d.id + '" ' +
+        'value="' + valorCampo.replace(/"/g, '&quot;') + '" class="campo" style="height:34px;">' +
+      '</td>' +
+      '<td>' +
+        '<button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.7rem;" ' +
+        'onclick="guardarTraduccionDestino(' + d.id + ')">Guardar</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function guardarTraduccionDestino(id) {
   var lang = document.getElementById('select-lang-destinos').value;
-  if (!lang) return;
-  var inputs = document.querySelectorAll('#cuerpo-traducciones-destinos input');
-  var propuestas = [];
-  inputs.forEach(function(inp) {
-    propuestas.push({ id: Number(inp.dataset.id), nombre: inp.value.trim() });
-  });
-  fetch('/admin/destinos/traducciones/guardar-lote', {
+  var inp = document.getElementById('trad-dest-' + id);
+  var nombre = inp ? inp.value.trim() : '';
+  fetch('/admin/destinos/' + id + '/traduccion/' + lang, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lang: lang, propuestas: propuestas })
+    body: JSON.stringify({ nombre: nombre })
   }).then(function(r) { return r.json(); }).then(function() {
+    var badge = document.getElementById('badge-dest-' + id);
+    if (badge) {
+      badge.textContent = nombre ? '✔ Traducido' : '— Pendiente';
+      badge.style.color = nombre ? '#2d7a4f' : '#888';
+    }
     var av = document.getElementById('aviso-traducciones-destinos');
     av.style.display = 'block';
-    av.innerHTML = '<div class="aviso-ok">✔ Traducciones guardadas.</div>';
-    setTimeout(function() { av.style.display = 'none'; }, 3000);
+    av.innerHTML = '<div class="aviso-ok">✔ Guardado.</div>';
+    setTimeout(function() { av.style.display = 'none'; }, 2000);
   });
 }
 
@@ -2670,7 +2710,7 @@ function traducirDestinosIA() {
   if (!lang) return;
   var av = document.getElementById('aviso-traducciones-destinos');
   av.style.display = 'block';
-  av.innerHTML = '<div class="aviso-ok">✨ Traduciendo con IA, espera...</div>';
+  av.innerHTML = '<div class="aviso-ok">✨ Consultando a la IA, espera...</div>';
   fetch('/admin/destinos/traducir-ia/' + lang, { method: 'POST' })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -2683,15 +2723,16 @@ function traducirDestinosIA() {
         setTimeout(function() { av.style.display = 'none'; }, 3000);
         return;
       }
-      // Guardar automáticamente las propuestas
-      fetch('/admin/destinos/traducciones/guardar-lote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lang: lang, propuestas: data.propuestas })
-      }).then(function() {
-        av.innerHTML = '<div class="aviso-ok">✔ ' + data.propuestas.length + ' destinos traducidos. Revisa y ajusta si necesitas.</div>';
-        cargarTraduccionesDestinos();
+      // Mostrar propuestas en los campos SIN guardar — el usuario revisa y guarda una a una
+      data.propuestas.forEach(function(p) {
+        var inp = document.getElementById('trad-dest-' + p.id);
+        if (inp && !inp.value.trim()) {
+          inp.value = p.nombre;
+          var badge = document.getElementById('badge-dest-' + p.id);
+          if (badge) { badge.textContent = '✨ Propuesta IA'; badge.style.color = '#b07d2a'; }
+        }
       });
+      av.innerHTML = '<div class="aviso-ok">✨ La IA sugirió ' + data.propuestas.length + ' traducciones. Revisa cada una y pulsa Guardar.</div>';
     })
     .catch(function() {
       av.innerHTML = '<div class="aviso-error">Error de conexión con la IA.</div>';
