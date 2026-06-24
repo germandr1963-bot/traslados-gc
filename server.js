@@ -1,4 +1,5 @@
 const express = require('express');
+const nodemailer = require('nodemailer');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
@@ -9,6 +10,28 @@ const ExcelJS = require('exceljs');
 const { medirPxTitulo, medirPxDescripcion } = require('./medidor-pixeles');
 
 const app = express();
+
+// ─── Email (Nodemailer / Gmail) ───────────────────────────────────────────────
+function crearTransporter() {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null;
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+  });
+}
+
+async function enviarEmail({ to, subject, html }) {
+  const transporter = crearTransporter();
+  if (!transporter) {
+    console.warn('Email no configurado — EMAIL_USER/EMAIL_PASS no definidos');
+    return false;
+  }
+  await transporter.sendMail({
+    from: '"Traslados GC" <' + process.env.EMAIL_USER + '>',
+    to, subject, html
+  });
+  return true;
+}
 const PORT = process.env.PORT || 3000;
 
 // Motor de plantillas EJS para las páginas de ruta renderizadas en servidor
@@ -478,6 +501,32 @@ async function initSchema() {
   }
 
   await cargarIdiomasCache();
+
+  // ─── Cotizaciones ────────────────────────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cotizaciones (
+      id SERIAL PRIMARY KEY,
+      origen TEXT NOT NULL,
+      destino TEXT NOT NULL,
+      fecha_aproximada DATE,
+      num_pasajeros INT,
+      email_cliente TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'pendiente',
+      respuesta_enviada BOOLEAN DEFAULT FALSE,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  // ─── Cotizaciones × Precios propuestos ────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cotizaciones_precios (
+      id SERIAL PRIMARY KEY,
+      cotizacion_id INT NOT NULL REFERENCES cotizaciones(id) ON DELETE CASCADE,
+      categoria_id INT NOT NULL REFERENCES categorias_vehiculos(id) ON DELETE CASCADE,
+      precio NUMERIC(10,2) NOT NULL,
+      UNIQUE(cotizacion_id, categoria_id)
+    );
+  `);
 
   // ─── Destinos ─────────────────────────────────────────────────────────────
   await pool.query(`
@@ -2281,6 +2330,156 @@ app.post('/admin/destinos/:id/activo', requireAdmin, asyncHandler(async (req, re
 
 app.post('/admin/destinos/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM destinos WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// ─── API pública: cotizaciones ───────────────────────────────────────────────
+
+app.post('/api/cotizaciones', asyncHandler(async (req, res) => {
+  const { origen, destino, fecha_aproximada, num_pasajeros, email_cliente } = req.body;
+  if (!origen || !destino || !email_cliente) {
+    return res.status(400).json({ error: 'Faltan datos obligatorios.' });
+  }
+  const result = await pool.query(
+    `INSERT INTO cotizaciones (origen, destino, fecha_aproximada, num_pasajeros, email_cliente)
+     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    [origen.trim(), destino.trim(), fecha_aproximada || null, num_pasajeros || null, email_cliente.trim().toLowerCase()]
+  );
+  res.json({ ok: true, id: result.rows[0].id });
+}));
+
+// ─── Admin: cotizaciones ──────────────────────────────────────────────────────
+
+app.get('/admin/cotizaciones', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT c.*, 
+            array_agg(json_build_object('categoria_id', cp.categoria_id, 'nombre', cv.nombre, 'precio', cp.precio) ORDER BY cv.orden, cv.nombre) 
+              FILTER (WHERE cp.id IS NOT NULL) AS precios
+     FROM cotizaciones c
+     LEFT JOIN cotizaciones_precios cp ON cp.cotizacion_id = c.id
+     LEFT JOIN categorias_vehiculos cv ON cv.id = cp.categoria_id
+     GROUP BY c.id
+     ORDER BY c.creado_en DESC`
+  );
+  res.json({ cotizaciones: result.rows });
+}));
+
+app.get('/admin/cotizaciones/pendientes-count', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    "SELECT COUNT(*) AS total FROM cotizaciones WHERE estado = 'pendiente'"
+  );
+  res.json({ total: parseInt(result.rows[0].total) });
+}));
+
+app.post('/admin/cotizaciones/:id/precios', requireAdmin, asyncHandler(async (req, res) => {
+  const { precios } = req.body; // [{categoria_id, precio}]
+  if (!Array.isArray(precios)) return res.status(400).json({ error: 'Formato incorrecto' });
+  for (const p of precios) {
+    if (!p.precio || isNaN(p.precio)) continue;
+    await pool.query(
+      `INSERT INTO cotizaciones_precios (cotizacion_id, categoria_id, precio)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (cotizacion_id, categoria_id) DO UPDATE SET precio = $3`,
+      [req.params.id, p.categoria_id, p.precio]
+    );
+  }
+  res.json({ ok: true });
+}));
+
+app.post('/admin/cotizaciones/:id/enviar', requireAdmin, asyncHandler(async (req, res) => {
+  const cotiz = await pool.query(
+    `SELECT c.*, 
+            array_agg(json_build_object('nombre', cv.nombre, 'precio', cp.precio, 'pax', cv.capacidad_pasajeros) ORDER BY cv.orden, cv.nombre)
+              FILTER (WHERE cp.id IS NOT NULL) AS precios
+     FROM cotizaciones c
+     LEFT JOIN cotizaciones_precios cp ON cp.cotizacion_id = c.id
+     LEFT JOIN categorias_vehiculos cv ON cv.id = cp.categoria_id
+     WHERE c.id = $1
+     GROUP BY c.id`,
+    [req.params.id]
+  );
+
+  if (!cotiz.rows.length) return res.status(404).json({ error: 'Cotización no encontrada' });
+  const c = cotiz.rows[0];
+
+  if (!c.precios || !c.precios.length) {
+    return res.status(400).json({ error: 'Añade al menos un precio antes de enviar.' });
+  }
+
+  const fechaViaje = c.fecha_aproximada
+    ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES')
+    : 'A confirmar';
+
+  const filasPrecios = c.precios.map(function(p) {
+    return `<tr>
+      <td style="padding:8px 16px;border-bottom:1px solid #eee;">${p.nombre}</td>
+      <td style="padding:8px 16px;border-bottom:1px solid #eee;">${p.pax} pax</td>
+      <td style="padding:8px 16px;border-bottom:1px solid #eee;font-weight:600;">${parseFloat(p.precio).toFixed(2)} €</td>
+    </tr>`;
+  }).join('');
+
+  const html = `
+  <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;">
+    <div style="background:#2c2c2c;padding:24px;text-align:center;">
+      <h1 style="color:#d4956a;margin:0;font-size:22px;">Traslados GC</h1>
+      <p style="color:#aaa;margin:4px 0 0 0;font-size:13px;">Gran Canaria</p>
+    </div>
+    <div style="padding:32px 24px;">
+      <p>Hola,</p>
+      <p>Gracias por contactarnos. Aquí tienes los precios disponibles para tu traslado:</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+        <tr style="background:#f5f0ea;">
+          <td style="padding:8px 16px;font-weight:600;">Origen</td>
+          <td colspan="2" style="padding:8px 16px;">${c.origen}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 16px;font-weight:600;">Destino</td>
+          <td colspan="2" style="padding:8px 16px;">${c.destino}</td>
+        </tr>
+        <tr style="background:#f5f0ea;">
+          <td style="padding:8px 16px;font-weight:600;">Fecha aproximada</td>
+          <td colspan="2" style="padding:8px 16px;">${fechaViaje}</td>
+        </tr>
+        ${c.num_pasajeros ? `<tr><td style="padding:8px 16px;font-weight:600;">Pasajeros</td><td colspan="2" style="padding:8px 16px;">${c.num_pasajeros}</td></tr>` : ''}
+      </table>
+      <h3 style="color:#2c2c2c;margin:24px 0 8px 0;">Opciones disponibles</h3>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr style="background:#2c2c2c;color:#fff;">
+          <th style="padding:8px 16px;text-align:left;">Categoría</th>
+          <th style="padding:8px 16px;text-align:left;">Capacidad</th>
+          <th style="padding:8px 16px;text-align:left;">Precio estimado</th>
+        </tr>
+        ${filasPrecios}
+      </table>
+      <p style="margin-top:24px;font-size:13px;color:#888;">El precio es una estimación basada en el taxímetro. El cobro final lo realiza el conductor directamente.</p>
+      <div style="margin-top:32px;text-align:center;">
+        <a href="https://traslados-gc.onrender.com" style="background:#d4956a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;">Ver todas las rutas disponibles</a>
+      </div>
+    </div>
+    <div style="background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;">
+      Traslados GC · Gran Canaria
+    </div>
+  </div>`;
+
+  try {
+    await enviarEmail({
+      to: c.email_cliente,
+      subject: 'Precio de traslado: ' + c.origen + ' → ' + c.destino,
+      html
+    });
+    await pool.query(
+      "UPDATE cotizaciones SET estado = 'respondida', respuesta_enviada = TRUE WHERE id = $1",
+      [req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error enviando email cotización:', err.message);
+    res.status(500).json({ error: 'Error enviando email: ' + err.message });
+  }
+}));
+
+app.delete('/admin/cotizaciones/:id', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM cotizaciones WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
 
