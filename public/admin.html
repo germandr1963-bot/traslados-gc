@@ -502,15 +502,16 @@ table.tabla-precios input {
             <tr>
               <th style="width:32px;"><input type="checkbox" id="check-todas-reservas" onchange="toggleCheckTodasReservas(this)"></th>
               <th>PNR</th>
-              <th>Fecha viaje</th>
-              <th>Cliente</th>
+              <th class="th-ordenable" data-col="fecha" onclick="ordenarPorColumna('fecha')" style="cursor:pointer;white-space:nowrap;">Fecha viaje<span class="icono-orden-col"> ↓</span></th>
+              <th class="th-ordenable" data-col="creado_en" onclick="ordenarPorColumna('creado_en')" style="cursor:pointer;white-space:nowrap;">Fecha reserva<span class="icono-orden-col"> ↕</span></th>
+              <th class="th-ordenable" data-col="nombre_cliente" onclick="ordenarPorColumna('nombre_cliente')" style="cursor:pointer;white-space:nowrap;">Cliente<span class="icono-orden-col"> ↕</span></th>
               <th>Teléfono</th>
-              <th>Categoría</th>
-              <th>Chofer</th>
+              <th class="th-ordenable" data-col="categoria_nombre" onclick="ordenarPorColumna('categoria_nombre')" style="cursor:pointer;white-space:nowrap;">Categoría<span class="icono-orden-col"> ↕</span></th>
+              <th class="th-ordenable" data-col="conductor_nombre" onclick="ordenarPorColumna('conductor_nombre')" style="cursor:pointer;white-space:nowrap;">Chofer<span class="icono-orden-col"> ↕</span></th>
               <th>Precio viaje</th>
               <th>Extras</th>
               <th>Total est.</th>
-              <th>Estado</th>
+              <th class="th-ordenable" data-col="estado" onclick="ordenarPorColumna('estado')" style="cursor:pointer;white-space:nowrap;">Estado<span class="icono-orden-col"> ↕</span></th>
               <th></th>
             </tr>
           </thead>
@@ -522,7 +523,7 @@ table.tabla-precios input {
       <div id="detalle-reserva" class="oculto" style="margin-top:2rem;border:1px solid var(--gris-borde);border-radius:12px;padding:1.5rem;background:#fff;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
           <h2 id="detalle-titulo" style="font-size:1.1rem;margin:0;"></h2>
-          <button onclick="cerrarDetalleReserva()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✕ Cerrar</button>
+          <button class="boton-costa" onclick="cerrarDetalleReserva()" style="font-size:0.85rem;">Cerrar</button>
         </div>
         <div id="detalle-contenido"></div>
         <div style="margin-top:1.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;" id="detalle-botones-estado"></div>
@@ -2974,45 +2975,80 @@ function eliminarDestino(id, nombre) {
 var reservasFiltroEstado  = 'todas';
 var reservasFiltroperiodo = 'todas';
 var reservasFiltroArchivo = 'no';
-var reservasOrden         = 'desc';
+var reservasOrdenCol      = 'fecha';   // columna activa
+var reservasOrdenDir      = 'desc';    // asc | desc
 var reservaDetalleId      = null;
 
-function cargarReservas() {
-  cerrarDetalleReserva();
+// Recarga la tabla manteniendo el detalle abierto si lo había
+function cargarReservas(mantenerDetalle) {
   var url = '/admin/reservas?estado=' + reservasFiltroEstado +
             '&periodo=' + reservasFiltroperiodo +
-            '&orden=' + reservasOrden +
+            '&orden=' + reservasOrdenDir +
+            '&col=' + reservasOrdenCol +
             '&archivo=' + reservasFiltroArchivo;
   fetch(url)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var cuerpo = document.getElementById('cuerpo-reservas');
       document.getElementById('check-todas-reservas').checked = false;
+      actualizarCabecerасОрден();
       if (!data.reservas || data.reservas.length === 0) {
-        cuerpo.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#aaa;padding:2rem;">No hay reservas con estos filtros.</td></tr>';
+        cuerpo.innerHTML = '<tr><td colspan="13" style="text-align:center;color:#aaa;padding:2rem;">No hay reservas con estos filtros.</td></tr>';
         return;
       }
       cuerpo.innerHTML = data.reservas.map(function(r) {
-        var fecha    = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—';
-        var viaje    = parseFloat(r.precio_estimado) || 0;
-        var extras   = parseFloat(r.total_extras) || 0;
-        var total    = parseFloat(r.total_estimado) || 0;
-        return '<tr>' +
+        var fechaViaje   = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—';
+        var fechaReserva = r.creado_en ? new Date(r.creado_en).toLocaleDateString('es-ES') : '—';
+        var viaje  = parseFloat(r.precio_estimado) || 0;
+        var extras = parseFloat(r.total_extras) || 0;
+        var total  = parseFloat(r.total_estimado) || 0;
+        var activa = reservaDetalleId === r.id;
+        return '<tr' + (activa ? ' style="background:#fff8f0;"' : '') + '>' +
           '<td><input type="checkbox" class="check-reserva" data-id="' + r.id + '"></td>' +
           '<td><strong>' + (r.numero_reserva || '—') + '</strong></td>' +
-          '<td>' + fecha + ' ' + (r.hora ? r.hora.slice(0,5) : '') + '</td>' +
+          '<td>' + fechaViaje + ' ' + (r.hora ? r.hora.slice(0,5) : '') + '</td>' +
+          '<td>' + fechaReserva + '</td>' +
           '<td>' + r.nombre_cliente + '</td>' +
-          '<td>' + r.telefono_cliente + '</td>' +
           '<td>' + (r.categoria_nombre || '—') + '</td>' +
           '<td>' + (r.conductor_nombre || '<span style="color:#bbb;">Sin asignar</span>') + '</td>' +
           '<td style="text-align:right;">' + (viaje ? viaje.toFixed(2) + ' €' : '—') + '</td>' +
           '<td style="text-align:right;">' + (extras ? extras.toFixed(2) + ' €' : '—') + '</td>' +
           '<td style="text-align:right;font-weight:600;">' + (total ? total.toFixed(2) + ' €' : '—') + '</td>' +
           '<td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td>' +
-          '<td><button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.7rem;" onclick="abrirDetalleReserva(' + r.id + ')">Ver</button></td>' +
+          '<td><button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.7rem;" ' +
+            'onclick="abrirDetalleReserva(' + r.id + ')">Ver</button></td>' +
         '</tr>';
       }).join('');
+
+      // Si había un detalle abierto, volver a abrirlo sin scroll brusco
+      if (mantenerDetalle && reservaDetalleId) {
+        abrirDetalleReserva(reservaDetalleId, true);
+      }
     });
+}
+
+function actualizarCabecerасОрден() {
+  document.querySelectorAll('.th-ordenable').forEach(function(th) {
+    var icono = th.querySelector('.icono-orden-col');
+    if (!icono) return;
+    if (th.dataset.col === reservasOrdenCol) {
+      icono.textContent = reservasOrdenDir === 'asc' ? ' ↑' : ' ↓';
+      icono.style.color = 'var(--terracota)';
+    } else {
+      icono.textContent = ' ↕';
+      icono.style.color = '#ccc';
+    }
+  });
+}
+
+function ordenarPorColumna(col) {
+  if (reservasOrdenCol === col) {
+    reservasOrdenDir = reservasOrdenDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    reservasOrdenCol = col;
+    reservasOrdenDir = 'asc';
+  }
+  cargarReservas(true);
 }
 
 function filtrarReservas(tipo, boton) {
@@ -3025,7 +3061,7 @@ function filtrarReservas(tipo, boton) {
     boton.classList.add('activo-filtro-periodo');
     reservasFiltroperiodo = boton.dataset.periodo;
   }
-  cargarReservas();
+  cargarReservas(false);
 }
 
 function toggleArchivoReservas(boton) {
@@ -3033,13 +3069,7 @@ function toggleArchivoReservas(boton) {
   reservasFiltroArchivo = viendo ? 'no' : 'si';
   boton.textContent = viendo ? '📦 Ver archivo' : '📋 Ver activas';
   boton.classList.toggle('activo-filtro', !viendo);
-  cargarReservas();
-}
-
-function toggleOrdenReservas() {
-  reservasOrden = reservasOrden === 'desc' ? 'asc' : 'desc';
-  document.getElementById('icono-orden').textContent = reservasOrden === 'desc' ? '↓' : '↑';
-  cargarReservas();
+  cargarReservas(false);
 }
 
 function toggleCheckTodasReservas(master) {
@@ -3064,13 +3094,13 @@ function accionLoteReservas(accion) {
     fetch('/admin/reservas/archivar-lote', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids: ids, archivar: true })
-    }).then(function() { mostrarAvisoReservas('✔ ' + ids.length + ' reserva(s) archivadas.'); cargarReservas(); });
+    }).then(function() { mostrarAvisoReservas('✔ ' + ids.length + ' reserva(s) archivadas.'); cargarReservas(false); });
   } else if (accion === 'borrar') {
     if (!confirm('¿BORRAR ' + ids.length + ' reserva(s)? Esta acción no se puede deshacer.')) return;
     fetch('/admin/reservas/borrar-lote', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids: ids })
-    }).then(function() { mostrarAvisoReservas('✔ ' + ids.length + ' reserva(s) eliminadas.'); cargarReservas(); });
+    }).then(function() { mostrarAvisoReservas('✔ ' + ids.length + ' reserva(s) eliminadas.'); cargarReservas(false); });
   }
 }
 
@@ -3088,7 +3118,7 @@ function mostrarAvisoReservas(msg) {
   setTimeout(function() { av.style.display = 'none'; }, 3000);
 }
 
-function abrirDetalleReserva(id) {
+function abrirDetalleReserva(id, sinScroll) {
   reservaDetalleId = id;
   fetch('/admin/reservas/' + id)
     .then(function(r) { return r.json(); })
@@ -3096,6 +3126,7 @@ function abrirDetalleReserva(id) {
       var r = data.reserva;
       var panel = document.getElementById('detalle-reserva');
       var fecha  = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—';
+      var recibida = r.creado_en ? new Date(r.creado_en).toLocaleDateString('es-ES') : '—';
       var viaje  = parseFloat(r.precio_estimado) || 0;
       var total  = parseFloat(r.total_estimado) || 0;
 
@@ -3116,7 +3147,8 @@ function abrirDetalleReserva(id) {
           '<tr><th>Cliente</th><td>' + r.nombre_cliente + '</td></tr>' +
           '<tr><th>Teléfono</th><td>' + r.telefono_cliente + '</td></tr>' +
           '<tr><th>Email</th><td>' + r.email_cliente + '</td></tr>' +
-          '<tr><th>Fecha y hora</th><td>' + fecha + ' a las ' + (r.hora ? r.hora.slice(0,5) : '—') + '</td></tr>' +
+          '<tr><th>Fecha del viaje</th><td>' + fecha + ' a las ' + (r.hora ? r.hora.slice(0,5) : '—') + '</td></tr>' +
+          '<tr><th>Fecha de reserva</th><td>' + recibida + '</td></tr>' +
           '<tr><th>Categoría</th><td>' + (r.categoria_nombre || '—') + '</td></tr>' +
           '<tr><th>Chofer asignado</th><td>' + (r.conductor_nombre || '<span style="color:#bbb;">Sin asignar</span>') + '</td></tr>' +
           '<tr><th>Precio viaje</th><td>' + viaje.toFixed(2) + ' €</td></tr>' +
@@ -3132,7 +3164,6 @@ function abrirDetalleReserva(id) {
         completada: 'background:#cfe2ff;color:#084298;border:1px solid #9ec5fe;',
         cancelada:  'background:#f8d7da;color:#842029;border:1px solid #f1aeb5;'
       };
-      // Botones de estado — usar dataset para evitar problemas de comillas
       var contenedorEstado = document.getElementById('detalle-botones-estado');
       contenedorEstado.innerHTML = '<span style="font-size:0.85rem;color:#888;align-self:center;">Cambiar estado:</span>';
       estados.filter(function(e) { return e !== r.estado; }).forEach(function(e) {
@@ -3149,6 +3180,13 @@ function abrirDetalleReserva(id) {
 
       cargarConductoresEnDetalle(r.conductor_id);
       panel.classList.remove('oculto');
+
+      // Scroll suave solo cuando el usuario pulsa Ver, no en recargas automáticas
+      if (!sinScroll) {
+        setTimeout(function() {
+          panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 50);
+      }
     });
 }
 
@@ -3161,7 +3199,10 @@ function cambiarEstadoReserva(id, nuevoEstado) {
   fetch('/admin/reservas/' + id + '/estado', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ estado: nuevoEstado })
-  }).then(function() { cargarReservas(); abrirDetalleReserva(id); });
+  }).then(function() {
+    mostrarAvisoReservas('✔ Estado cambiado a "' + nuevoEstado + '".');
+    cargarReservas(true);
+  });
 }
 
 function cargarConductoresEnDetalle(conductorActualId) {
@@ -3171,8 +3212,8 @@ function cargarConductoresEnDetalle(conductorActualId) {
       var sel = document.getElementById('select-chofer-detalle');
       sel.innerHTML = '<option value="">— Sin asignar —</option>' +
         data.conductores.map(function(c) {
-          var sel2 = conductorActualId && c.id === conductorActualId ? ' selected' : '';
-          return '<option value="' + c.id + '"' + sel2 + '>' + c.nombre + ' · ' + c.telefono + '</option>';
+          var selected = conductorActualId && c.id === conductorActualId ? ' selected' : '';
+          return '<option value="' + c.id + '"' + selected + '>' + c.nombre + ' · ' + c.telefono + '</option>';
         }).join('');
     });
 }
@@ -3181,15 +3222,14 @@ function guardarChoferReserva() {
   if (!reservaDetalleId) return;
   var conductorId = document.getElementById('select-chofer-detalle').value;
   fetch('/admin/reservas/' + reservaDetalleId + '/chofer', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conductor_id: conductorId ? Number(conductorId) : null })
   }).then(function(r) { return r.json(); }).then(function() {
     var av = document.getElementById('aviso-chofer-detalle');
     av.style.display = 'block';
     av.innerHTML = '<span style="color:#2d7a4f;">✔ Chofer guardado correctamente.</span>';
     setTimeout(function() { av.style.display = 'none'; }, 3000);
-    cargarReservas();
+    cargarReservas(true);
   });
 }
 
@@ -3201,14 +3241,14 @@ function archivarDesdeDetalle() {
   fetch('/admin/reservas/' + reservaDetalleId + '/archivar', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ archivar: !estaEnArchivo })
-  }).then(function() { cerrarDetalleReserva(); cargarReservas(); });
+  }).then(function() { cerrarDetalleReserva(); cargarReservas(false); });
 }
 
 function borrarDesdeDetalle() {
   if (!reservaDetalleId) return;
   if (!confirm('¿BORRAR esta reserva? No se puede deshacer.')) return;
   fetch('/admin/reservas/' + reservaDetalleId, { method: 'DELETE' })
-    .then(function() { cerrarDetalleReserva(); cargarReservas(); });
+    .then(function() { cerrarDetalleReserva(); cargarReservas(false); });
 }
 
 var extrasCache = [];
