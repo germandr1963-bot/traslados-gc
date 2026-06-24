@@ -2346,7 +2346,7 @@ app.post('/admin/destinos/traducciones/guardar-lote', requireAdmin, asyncHandler
 // ─── Admin: reservas ─────────────────────────────────────────────────────────
 
 app.get('/admin/reservas', requireAdmin, asyncHandler(async (req, res) => {
-  const { estado, periodo, orden, archivo } = req.query;
+  const { estado, periodo, orden, col, archivo } = req.query;
   const params = [];
   const condiciones = [];
 
@@ -2373,7 +2373,14 @@ app.get('/admin/reservas', requireAdmin, asyncHandler(async (req, res) => {
   }
 
   const where = condiciones.length ? 'WHERE ' + condiciones.join(' AND ') : '';
-  const ordenSQL = orden === 'asc' ? 'r.fecha ASC, r.hora ASC' : 'r.fecha DESC, r.hora DESC';
+  // Columnas permitidas para ordenar (evitar SQL injection)
+  const colsPermitidas = {
+    fecha: 'r.fecha', creado_en: 'r.creado_en', nombre_cliente: 'r.nombre_cliente',
+    categoria_nombre: 'cv.nombre', conductor_nombre: 'c.nombre', estado: 'r.estado'
+  };
+  const colSQL = colsPermitidas[col] || 'r.fecha';
+  const dirSQL = orden === 'asc' ? 'ASC' : 'DESC';
+  const ordenSQL = colSQL + ' ' + dirSQL + ', r.hora ' + dirSQL;
 
   const result = await pool.query(
     `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.nombre_cliente,
