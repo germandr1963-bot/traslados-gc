@@ -199,6 +199,35 @@
 .boton-reservar:hover {
   background: var(--terracota-oscuro);
 }
+
+@media (max-width: 600px) {
+  .hero { padding: 20px 16px 24px; }
+  .caja-busqueda { padding: 14px 12px; }
+  .fila-busqueda { grid-template-columns: 1fr; }
+  .tarjeta-resultado {
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+  }
+  .tarjeta-resultado-foto,
+  .tarjeta-resultado-foto-placeholder {
+    width: 100%;
+    height: 160px;
+  }
+  .tarjeta-resultado-precio-bloque {
+    align-items: flex-start;
+    min-width: unset;
+    width: 100%;
+  }
+  .tarjeta-resultado-nota { text-align: left; max-width: 100%; }
+  .boton-reservar {
+    width: 100%;
+    margin-left: 0;
+    text-align: center;
+  }
+  .precio-grande { font-size: 28px; }
+}
+
 .seccion {
   max-width: 900px;
   margin: 50px auto;
@@ -263,10 +292,13 @@ footer {
 </div>
 
 <!-- Modal de cotización -->
-<div id="modal-cotizacion" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:12px;padding:2rem;max-width:440px;width:90%;position:relative;">
-    <h2 style="font-size:1.1rem;margin:0 0 0.5rem 0;color:#2c2c2c;">Solicitar precio de traslado</h2>
-    <p style="font-size:0.85rem;color:#888;margin:0 0 1.5rem 0;">Cuéntanos tu ruta y te respondemos por email con los precios disponibles.</p>
+<div id="modal-cotizacion" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;">
+  <div style="background:#fff;border-radius:12px;padding:1.5rem;max-width:440px;width:90%;margin:auto;position:relative;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+      <h2 style="font-size:1.1rem;margin:0;color:#2c2c2c;">Solicitar precio</h2>
+      <button onclick="cerrarFormCotizacion()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888;padding:0 4px;line-height:1;">✕</button>
+    </div>
+    <p style="font-size:0.85rem;color:#888;margin:0 0 1.25rem 0;">Te respondemos por email con los precios disponibles.</p>
     <div style="display:flex;flex-direction:column;gap:0.75rem;">
       <div>
         <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;">Origen *</label>
@@ -292,10 +324,8 @@ footer {
       </div>
       <div id="cotiz-error" style="color:#e07b5a;font-size:0.82rem;display:none;"></div>
       <div id="cotiz-ok" style="color:#2d7a4f;font-size:0.85rem;display:none;text-align:center;padding:0.75rem;background:#d1e7dd;border-radius:6px;"></div>
-      <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
-        <button onclick="enviarCotizacion()" class="boton-primario" style="flex:1;">Enviar solicitud</button>
-        <button onclick="cerrarFormCotizacion()" style="flex:1;background:#f5f0ea;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:0.9rem;">Cancelar</button>
-      </div>
+      <button onclick="enviarCotizacion()" class="boton-primario" style="width:100%;margin-top:0.5rem;">Enviar solicitud</button>
+      <button onclick="cerrarFormCotizacion()" style="width:100%;background:#f5f0ea;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:0.9rem;padding:0.6rem;">Cancelar</button>
     </div>
   </div>
 </div>

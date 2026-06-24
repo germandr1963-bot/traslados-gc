@@ -314,3 +314,79 @@ table.tabla-precios input[type="number"] {
   color: #fff;
   border-color: var(--dorado, #b08a3e);
 }
+
+/* ─── Responsive admin ────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .admin-shell {
+    flex-direction: column;
+  }
+
+  .admin-menu {
+    width: 100%;
+    padding: 12px 12px 8px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .admin-menu .marca {
+    margin-bottom: 10px;
+    font-size: 16px;
+  }
+
+  /* Menú de botones en cuadrícula */
+  .admin-menu-botones {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 4px;
+  }
+
+  .admin-menu button {
+    padding: 7px 6px;
+    font-size: 12px;
+    text-align: center;
+    margin-bottom: 0;
+  }
+
+  .admin-contenido {
+    padding: 16px 12px;
+  }
+
+  .admin-contenido h1 {
+    font-size: 17px;
+  }
+
+  /* Tablas con scroll horizontal */
+  .tabla-admin,
+  .tabla-precios {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Tarjetas a ancho completo */
+  .tarjeta {
+    padding: 14px;
+  }
+
+  /* Fila de formulario en columna */
+  .fila-form {
+    flex-direction: column;
+  }
+
+  .fila-form > div,
+  .fila-form > select,
+  .fila-form > button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-menu-botones {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  }
+
+  .admin-menu button {
+    font-size: 11px;
+    padding: 6px 4px;
+  }
+}

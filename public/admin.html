@@ -144,18 +144,20 @@ table.tabla-precios input {
 <div id="pantalla-admin" class="admin-shell oculto">
   <div class="admin-menu">
     <span class="marca">Traslados · GC</span>
-    <button class="item-menu activo" data-seccion="fondos">Fondos de portada</button>
-    <button class="item-menu" data-seccion="categorias">Categorías</button>
-    <button class="item-menu" data-seccion="conductores">Conductores</button>
-    <button class="item-menu" data-seccion="destinos">Destinos</button>
-    <button class="item-menu" data-seccion="precios">Rutas y precios</button>
-    <button class="item-menu" data-seccion="seo">SEO</button>
-    <button class="item-menu" data-seccion="idiomas">Idiomas</button>
-    <button class="item-menu" data-seccion="calculador">Calculador</button>
-    <button class="item-menu" data-seccion="extras">Extras</button>
-    <button class="item-menu" data-seccion="cotizaciones">Cotizaciones <span id="badge-cotiz" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">0</span></button>
-    <button class="item-menu" data-seccion="reservas">Reservas</button>
-    <button id="boton-salir" style="margin-top:30px;opacity:0.5;">Cerrar sesión</button>
+    <div class="admin-menu-botones">
+      <button class="item-menu activo" data-seccion="fondos">Fondos de portada</button>
+      <button class="item-menu" data-seccion="categorias">Categorías</button>
+      <button class="item-menu" data-seccion="conductores">Conductores</button>
+      <button class="item-menu" data-seccion="destinos">Destinos</button>
+      <button class="item-menu" data-seccion="precios">Rutas y precios</button>
+      <button class="item-menu" data-seccion="seo">SEO</button>
+      <button class="item-menu" data-seccion="idiomas">Idiomas</button>
+      <button class="item-menu" data-seccion="calculador">Calculador</button>
+      <button class="item-menu" data-seccion="extras">Extras</button>
+      <button class="item-menu" data-seccion="cotizaciones">Cotizaciones <span id="badge-cotiz" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">0</span></button>
+      <button class="item-menu" data-seccion="reservas">Reservas</button>
+    </div>
+    <button id="boton-salir" style="margin-top:16px;opacity:0.5;width:100%;">Cerrar sesión</button>
   </div>
 
   <div class="admin-contenido">
@@ -464,6 +466,7 @@ table.tabla-precios input {
     <div id="seccion-cotizaciones" class="oculto">
       <h1>Cotizaciones</h1>
       <p class="subtitulo">Solicitudes de precio recibidas desde el buscador. Carga los precios y envía la respuesta automáticamente al cliente.</p>
+      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="cargarCotizaciones()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
       <div id="aviso-cotizaciones" style="display:none;margin-bottom:1rem;"></div>
       <table class="tabla-admin">
         <thead>

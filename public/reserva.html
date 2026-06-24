@@ -82,6 +82,17 @@
 .campo-grupo textarea { height:76px; resize:vertical; }
 .dos-columnas { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 @media(max-width:500px){ .dos-columnas { grid-template-columns:1fr; } }
+@media(max-width:600px){
+  .contenedor { padding:70px 12px 40px; }
+  .tarjeta-traslado { flex-direction:column; align-items:flex-start; gap:10px; padding:14px; }
+  .traslado-precio-box { text-align:left; }
+  .traslado-precio { font-size:22px; }
+  .paso-cabecera { padding:12px 14px; gap:10px; }
+  .paso-cuerpo { padding:14px; }
+  .paso-titulo { font-size:14px; }
+  .cabecera-fija { padding:10px 12px; }
+  .boton-volver, .boton-reiniciar { font-size:12px; padding:5px 10px; }
+}
 .aviso-campo { font-size:12px; color:var(--rojo-error); margin-top:4px; display:none; }
 .sugerencias-lista {
   position:absolute; top:100%; left:0; right:0; z-index:200;
