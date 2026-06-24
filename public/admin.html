@@ -3009,6 +3009,7 @@ function cargarReservas(mantenerDetalle) {
           '<td>' + fechaViaje + ' ' + (r.hora ? r.hora.slice(0,5) : '') + '</td>' +
           '<td>' + fechaReserva + '</td>' +
           '<td>' + r.nombre_cliente + '</td>' +
+          '<td>' + r.telefono_cliente + '</td>' +
           '<td>' + (r.categoria_nombre || '—') + '</td>' +
           '<td>' + (r.conductor_nombre || '<span style="color:#bbb;">Sin asignar</span>') + '</td>' +
           '<td style="text-align:right;">' + (viaje ? viaje.toFixed(2) + ' €' : '—') + '</td>' +
@@ -3141,20 +3142,48 @@ function abrirDetalleReserva(id, sinScroll) {
           }).join(', ') + '</td></tr>';
       }
 
+      // Campos de operativa según tipo de llegada
+      var operativaHtml = '';
+      if (r.origen || r.destino) {
+        operativaHtml += '<tr><th>Desde</th><td>' + (r.origen || '—') + '</td></tr>';
+        operativaHtml += '<tr><th>Hasta</th><td>' + (r.destino || '—') + '</td></tr>';
+      }
+      if (r.tipo_llegada) {
+        var tipoTexto = r.tipo_llegada === 'aeropuerto' ? '✈ Aeropuerto' : r.tipo_llegada === 'puerto' ? '🚢 Puerto' : '📍 Dirección';
+        operativaHtml += '<tr><th>Tipo recogida</th><td>' + tipoTexto + '</td></tr>';
+      }
+      if (r.numero_vuelo) operativaHtml += '<tr><th>Número de vuelo</th><td>' + r.numero_vuelo + '</td></tr>';
+      if (r.hora_llegada_vuelo) operativaHtml += '<tr><th>Hora llegada vuelo</th><td>' + r.hora_llegada_vuelo.slice(0,5) + '</td></tr>';
+      if (r.nombre_barco) operativaHtml += '<tr><th>Nombre del barco</th><td>' + r.nombre_barco + '</td></tr>';
+      if (r.hora_atraque) operativaHtml += '<tr><th>Hora de atraque</th><td>' + r.hora_atraque.slice(0,5) + '</td></tr>';
+      if (r.direccion_recogida) operativaHtml += '<tr><th>Dirección recogida</th><td>' + r.direccion_recogida + '</td></tr>';
+      if (r.direccion_destino) operativaHtml += '<tr><th>Dirección destino</th><td>' + r.direccion_destino + '</td></tr>';
+      if (r.num_pasajeros) operativaHtml += '<tr><th>Nº pasajeros</th><td>' + r.num_pasajeros + '</td></tr>';
+      if (r.pasaporte_dni) operativaHtml += '<tr><th>Pasaporte / DNI</th><td>' + r.pasaporte_dni + '</td></tr>';
+
       document.getElementById('detalle-contenido').innerHTML =
         '<table class="tabla-admin" style="margin-bottom:0;">' +
-          '<tr><th style="width:160px">Estado</th><td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td></tr>' +
-          '<tr><th>Cliente</th><td>' + r.nombre_cliente + '</td></tr>' +
+          // — DATOS DEL CLIENTE —
+          '<tr><td colspan="2" style="background:#f5f0ea;font-size:0.75rem;font-weight:700;color:#888;letter-spacing:0.05em;padding:6px 10px;">CLIENTE</td></tr>' +
+          '<tr><th style="width:180px">Estado</th><td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td></tr>' +
+          '<tr><th>Nombre</th><td>' + r.nombre_cliente + '</td></tr>' +
           '<tr><th>Teléfono</th><td>' + r.telefono_cliente + '</td></tr>' +
           '<tr><th>Email</th><td>' + r.email_cliente + '</td></tr>' +
-          '<tr><th>Fecha del viaje</th><td>' + fecha + ' a las ' + (r.hora ? r.hora.slice(0,5) : '—') + '</td></tr>' +
           '<tr><th>Fecha de reserva</th><td>' + recibida + '</td></tr>' +
+          // — DETALLES DEL VIAJE —
+          '<tr><td colspan="2" style="background:#f5f0ea;font-size:0.75rem;font-weight:700;color:#888;letter-spacing:0.05em;padding:6px 10px;">VIAJE</td></tr>' +
+          '<tr><th>Fecha y hora</th><td>' + fecha + ' a las ' + (r.hora ? r.hora.slice(0,5) : '—') + '</td></tr>' +
           '<tr><th>Categoría</th><td>' + (r.categoria_nombre || '—') + '</td></tr>' +
+          operativaHtml +
+          // — NOTAS DEL CLIENTE —
+          (r.notas_cliente ? '<tr><td colspan="2" style="background:#f5f0ea;font-size:0.75rem;font-weight:700;color:#888;letter-spacing:0.05em;padding:6px 10px;">COMENTARIOS DEL CLIENTE</td></tr>' +
+          '<tr><td colspan="2" style="white-space:pre-wrap;padding:10px;font-style:italic;">' + r.notas_cliente + '</td></tr>' : '') +
+          // — ECONÓMICO —
+          '<tr><td colspan="2" style="background:#f5f0ea;font-size:0.75rem;font-weight:700;color:#888;letter-spacing:0.05em;padding:6px 10px;">ECONÓMICO</td></tr>' +
           '<tr><th>Chofer asignado</th><td>' + (r.conductor_nombre || '<span style="color:#bbb;">Sin asignar</span>') + '</td></tr>' +
           '<tr><th>Precio viaje</th><td>' + viaje.toFixed(2) + ' €</td></tr>' +
           extrasHtml +
           '<tr><th>Total estimado</th><td><strong>' + total.toFixed(2) + ' €</strong></td></tr>' +
-          '<tr><th>Detalles</th><td style="white-space:pre-wrap;">' + (r.notas || '—') + '</td></tr>' +
         '</table>';
 
       var estados = ['pendiente', 'confirmada', 'completada', 'cancelada'];
