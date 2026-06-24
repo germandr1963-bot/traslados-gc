@@ -3132,13 +3132,20 @@ function abrirDetalleReserva(id) {
         completada: 'background:#cfe2ff;color:#084298;border:1px solid #9ec5fe;',
         cancelada:  'background:#f8d7da;color:#842029;border:1px solid #f1aeb5;'
       };
-      document.getElementById('detalle-botones-estado').innerHTML =
-        '<span style="font-size:0.85rem;color:#888;align-self:center;">Cambiar estado:</span>' +
-        estados.filter(function(e) { return e !== r.estado; }).map(function(e) {
-          return '<button onclick="cambiarEstadoReserva(' + r.id + ', \"' + e + '\")" ' +
-            'style="padding:0.3rem 0.9rem;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;' + (estilos[e] || '') + '">' +
-            e.charAt(0).toUpperCase() + e.slice(1) + '</button>';
-        }).join('');
+      // Botones de estado — usar dataset para evitar problemas de comillas
+      var contenedorEstado = document.getElementById('detalle-botones-estado');
+      contenedorEstado.innerHTML = '<span style="font-size:0.85rem;color:#888;align-self:center;">Cambiar estado:</span>';
+      estados.filter(function(e) { return e !== r.estado; }).forEach(function(e) {
+        var btn = document.createElement('button');
+        btn.textContent = e.charAt(0).toUpperCase() + e.slice(1);
+        btn.dataset.reservaId = r.id;
+        btn.dataset.estado = e;
+        btn.style.cssText = 'padding:0.3rem 0.9rem;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;' + (estilos[e] || '');
+        btn.addEventListener('click', function() {
+          cambiarEstadoReserva(Number(this.dataset.reservaId), this.dataset.estado);
+        });
+        contenedorEstado.appendChild(btn);
+      });
 
       cargarConductoresEnDetalle(r.conductor_id);
       panel.classList.remove('oculto');
