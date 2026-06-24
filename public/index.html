@@ -240,11 +240,11 @@ footer {
       <div class="fila-busqueda">
         <div>
           <label class="etiqueta">Desde</label>
-          <select id="desde" class="campo"><option value="">Cargando...</option></select>
+          <select id="desde" class="campo" onchange="actualizarCategoriasSegunRuta()"><option value="">Cargando...</option></select>
         </div>
         <div>
           <label class="etiqueta">Hasta</label>
-          <select id="hasta" class="campo"><option value="">Cargando...</option></select>
+          <select id="hasta" class="campo" onchange="actualizarCategoriasSegunRuta()"><option value="">Cargando...</option></select>
         </div>
         <div>
           <label class="etiqueta">Categoría</label>
@@ -318,15 +318,45 @@ function cargarRutas() {
 function cargarCategorias() {
   fetch('/api/categorias').then(function (r) { return r.json(); }).then(function (categorias) {
     categoriasDisponibles = categorias;
-    var select = document.getElementById('categoria');
-    select.innerHTML = '<option value="">Selecciona</option>';
-    categorias.forEach(function (c) {
-      var opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = c.nombre + ' (' + c.capacidad_pasajeros + ' pax)';
-      select.appendChild(opt);
-    });
+    // No cargamos todas de golpe — se filtran al elegir ruta
+    actualizarCategoriasSegunRuta();
   });
+}
+
+function actualizarCategoriasSegunRuta() {
+  var desdeVal = document.getElementById('desde').value;
+  var hastaVal = document.getElementById('hasta').value;
+  var select = document.getElementById('categoria');
+  var valorActual = select.value;
+
+  // Buscar la ruta seleccionada (en ambas direcciones)
+  var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; })
+          || rutasDisponibles.find(function (r) { return r.origen === hastaVal && r.destino === desdeVal; });
+
+  select.innerHTML = '<option value="">Selecciona</option>';
+
+  if (!ruta || !desdeVal || !hastaVal) {
+    // Sin ruta seleccionada — no mostrar categorías
+    return;
+  }
+
+  // Filtrar solo las categorías que tienen precio para esta ruta
+  var categoriasRuta = categoriasDisponibles.filter(function (c) {
+    return ruta.categorias_con_precio && ruta.categorias_con_precio.indexOf(c.id) !== -1;
+  });
+
+  categoriasRuta.forEach(function (c) {
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.nombre + ' (' + c.capacidad_pasajeros + ' pax)';
+    if (String(c.id) === String(valorActual)) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  // Limpiar resultado si la categoría ya no es válida
+  if (valorActual && !categoriasRuta.find(function(c) { return String(c.id) === String(valorActual); })) {
+    document.getElementById('resultado-precio').innerHTML = '';
+  }
 }
 
 function verPrecio() {

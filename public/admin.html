@@ -521,10 +521,7 @@ table.tabla-precios input {
 
       <!-- Panel de detalle -->
       <div id="detalle-reserva" class="oculto" style="margin-top:2rem;border:1px solid var(--gris-borde);border-radius:12px;padding:1.5rem;background:#fff;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-          <h2 id="detalle-titulo" style="font-size:1.1rem;margin:0;"></h2>
-          <button class="boton-costa" onclick="cerrarDetalleReserva()" style="font-size:0.85rem;">Cerrar</button>
-        </div>
+        <h2 id="detalle-titulo" style="font-size:1.1rem;margin:0 0 1rem 0;"></h2>
         <div id="detalle-contenido"></div>
         <div style="margin-top:1.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;" id="detalle-botones-estado"></div>
 
@@ -543,6 +540,7 @@ table.tabla-precios input {
         <div style="margin-top:1rem;display:flex;gap:0.5rem;">
           <button class="boton-costa" style="font-size:0.82rem;" onclick="archivarDesdeDetalle()">📦 Archivar</button>
           <button class="boton-peligro" style="font-size:0.82rem;" onclick="borrarDesdeDetalle()">🗑 Borrar reserva</button>
+          <button class="boton-costa" style="font-size:0.82rem;" onclick="cerrarDetalleReserva()">Cerrar</button>
         </div>
       </div>
     </div>
