@@ -522,6 +522,8 @@ async function initSchema() {
     );
   `);
 
+  await pool.query(`ALTER TABLE cotizaciones ADD COLUMN IF NOT EXISTS lang_cliente VARCHAR(10) DEFAULT 'es'`);
+
   // ─── Cotizaciones × Precios propuestos ────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS cotizaciones_precios (
@@ -2341,14 +2343,26 @@ app.post('/admin/destinos/:id/eliminar', requireAdmin, asyncHandler(async (req, 
 // ─── API pública: cotizaciones ───────────────────────────────────────────────
 
 app.post('/api/cotizaciones', asyncHandler(async (req, res) => {
-  const { origen, destino, fecha_aproximada, num_pasajeros, email_cliente } = req.body;
+  const { origen, destino, fecha_aproximada, num_pasajeros, email_cliente, lang_cliente } = req.body;
   if (!origen || !destino || !email_cliente) {
     return res.status(400).json({ error: 'Faltan datos obligatorios.' });
   }
+  // Detectar idioma: del campo enviado o del header Accept-Language
+  let lang = lang_cliente || 'es';
+  if (!lang_cliente) {
+    const acceptLang = req.headers['accept-language'] || '';
+    const match = acceptLang.match(/^([a-z]{2})/i);
+    if (match) lang = match[1].toLowerCase();
+  }
+  // Solo aceptar idiomas conocidos, fallback a 'es'
+  const idiomasValidos = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE');
+  const codigos = idiomasValidos.rows.map(function(r) { return r.codigo; });
+  if (!codigos.includes(lang)) lang = 'es';
+
   const result = await pool.query(
-    `INSERT INTO cotizaciones (origen, destino, fecha_aproximada, num_pasajeros, email_cliente)
-     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-    [origen.trim(), destino.trim(), fecha_aproximada || null, num_pasajeros || null, email_cliente.trim().toLowerCase()]
+    `INSERT INTO cotizaciones (origen, destino, fecha_aproximada, num_pasajeros, email_cliente, lang_cliente)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    [origen.trim(), destino.trim(), fecha_aproximada || null, num_pasajeros || null, email_cliente.trim().toLowerCase(), lang]
   );
   res.json({ ok: true, id: result.rows[0].id });
 }));
@@ -2503,6 +2517,251 @@ app.post('/admin/cotizaciones/:id/enviar', requireAdmin, asyncHandler(async (req
     res.json({ ok: true });
   } catch (err) {
     console.error('Error enviando email cotización:', err.message);
+    res.status(500).json({ error: 'Error enviando email: ' + err.message });
+  }
+}));
+
+// Listar rutas activas con sus slugs SEO por idioma (para el selector de respuesta positiva)
+app.get('/admin/cotizaciones/rutas-activas', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT r.id, r.origen, r.destino,
+            json_object_agg(rss.lang_code, rss.slug_url) AS slugs
+     FROM rutas r
+     JOIN route_seo_settings rss ON rss.route_id = r.id AND rss.activo = TRUE
+     WHERE r.activa = TRUE
+     GROUP BY r.id, r.origen, r.destino
+     ORDER BY r.origen, r.destino`
+  );
+  res.json({ rutas: result.rows });
+}));
+
+// Respuesta negativa — email simple al cliente
+app.post('/admin/cotizaciones/:id/respuesta-negativa', requireAdmin, asyncHandler(async (req, res) => {
+  const cotiz = await pool.query('SELECT * FROM cotizaciones WHERE id = $1', [req.params.id]);
+  if (!cotiz.rows.length) return res.status(404).json({ error: 'Cotización no encontrada' });
+  const c = cotiz.rows[0];
+
+  // Traducir el mensaje negativo con Claude si no es español
+  let textoNegativo = {
+    asunto: 'Tu solicitud de traslado',
+    saludo: 'Hola,',
+    parrafo1: 'Gracias por contactar con Traslados GC.',
+    parrafo2: 'Lamentablemente, en este momento no podemos asumir el traslado que nos solicitaste:',
+    parrafo3: 'Si tienes otras necesidades de transporte en Gran Canaria, no dudes en contactarnos.',
+    despedida: 'Un saludo,<br>El equipo de Traslados GC'
+  };
+
+  const lang = c.lang_cliente || 'es';
+  if (lang !== 'es') {
+    try {
+      const idiomaResult = await pool.query('SELECT nombre FROM idiomas_web WHERE codigo = $1', [lang]);
+      const nombreIdioma = idiomaResult.rows.length ? idiomaResult.rows[0].nombre : lang;
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (apiKey) {
+        const prompt = 'Traduce este objeto JSON de textos de email del español al ' + nombreIdioma + '. ' +
+          'Responde SOLO con el JSON traducido, sin markdown ni texto adicional:\n' +
+          JSON.stringify(textoNegativo);
+        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 500, messages: [{ role: 'user', content: prompt }] })
+        });
+        const data = await resp.json();
+        const texto = data.content.map(function(b) { return b.text || ''; }).join('');
+        textoNegativo = JSON.parse(texto.replace(/```json|```/g, '').trim());
+      }
+    } catch(err) { console.warn('Error traduciendo respuesta negativa:', err.message); }
+  }
+
+  const fechaViaje = c.fecha_aproximada ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES') : null;
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <style>
+    body{margin:0;padding:0;background:#f5f5f5;}
+    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+    .header{background:#2c2c2c;padding:24px;text-align:center;}
+    .body{padding:24px;}
+    .ruta-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;}
+    .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
+    @media(max-width:480px){.body{padding:14px;}}
+  </style></head><body>
+  <div class="wrapper">
+    <div class="header">
+      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
+      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+    </div>
+    <div class="body">
+      <p>${textoNegativo.saludo}</p>
+      <p>${textoNegativo.parrafo1}</p>
+      <p>${textoNegativo.parrafo2}</p>
+      <div class="ruta-box">
+        <strong>${c.origen} → ${c.destino}</strong>
+        ${fechaViaje ? '<br><span style="font-size:13px;color:#888;">' + fechaViaje + '</span>' : ''}
+      </div>
+      <p>${textoNegativo.parrafo3}</p>
+      <p>${textoNegativo.despedida}</p>
+    </div>
+    <div class="footer">Traslados GC · Gran Canaria</div>
+  </div></body></html>`;
+
+  try {
+    await enviarEmail({ to: c.email_cliente, subject: textoNegativo.asunto, html });
+    await pool.query(
+      "UPDATE cotizaciones SET estado = 'no_disponible', respuesta_enviada = TRUE WHERE id = $1",
+      [req.params.id]
+    );
+    res.json({ ok: true });
+  } catch(err) {
+    res.status(500).json({ error: 'Error enviando email: ' + err.message });
+  }
+}));
+
+// Respuesta positiva con enlace a ruta específica en el idioma del cliente
+app.post('/admin/cotizaciones/:id/respuesta-positiva', requireAdmin, asyncHandler(async (req, res) => {
+  const { ruta_id, lang_respuesta } = req.body;
+  if (!ruta_id) return res.status(400).json({ error: 'Selecciona una ruta del sistema.' });
+
+  const cotiz = await pool.query('SELECT * FROM cotizaciones WHERE id = $1', [req.params.id]);
+  if (!cotiz.rows.length) return res.status(404).json({ error: 'Cotización no encontrada' });
+  const c = cotiz.rows[0];
+
+  const lang = lang_respuesta || c.lang_cliente || 'es';
+
+  // Obtener la ficha SEO de la ruta en ese idioma
+  const seoResult = await pool.query(
+    `SELECT rss.slug_url, i.palabra_traslado, r.origen, r.destino
+     FROM route_seo_settings rss
+     JOIN rutas r ON r.id = rss.route_id
+     JOIN idiomas_web i ON i.codigo = rss.lang_code
+     WHERE rss.route_id = $1 AND rss.lang_code = $2 AND rss.activo = TRUE`,
+    [ruta_id, lang]
+  );
+
+  // Fallback a español si no hay ficha en ese idioma
+  let seo = seoResult.rows[0];
+  if (!seo) {
+    const seoEs = await pool.query(
+      `SELECT rss.slug_url, i.palabra_traslado, r.origen, r.destino
+       FROM route_seo_settings rss
+       JOIN rutas r ON r.id = rss.route_id
+       JOIN idiomas_web i ON i.codigo = rss.lang_code
+       WHERE rss.route_id = $1 AND rss.lang_code = 'es' AND rss.activo = TRUE`,
+      [ruta_id]
+    );
+    seo = seoEs.rows[0];
+  }
+  if (!seo) return res.status(400).json({ error: 'La ruta no tiene página activa. Actívala en SEO primero.' });
+
+  const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+  const urlRuta = BASE_URL + '/' + lang + '/' + seo.palabra_traslado + '/' + seo.slug_url;
+
+  // Obtener precios de la cotización
+  const preciosResult = await pool.query(
+    `SELECT cv.nombre, cv.capacidad_pasajeros, cp.precio
+     FROM cotizaciones_precios cp
+     JOIN categorias_vehiculos cv ON cv.id = cp.categoria_id
+     WHERE cp.cotizacion_id = $1
+     ORDER BY cv.orden, cv.nombre`,
+    [req.params.id]
+  );
+
+  // Traducir textos del email si no es español
+  let textos = {
+    asunto: 'Tu traslado en Gran Canaria — precios disponibles',
+    saludo: 'Hola,',
+    parrafo1: 'Tenemos buenas noticias. Podemos asumir tu traslado.',
+    parrafo2: 'Aquí tienes los precios disponibles para tu ruta:',
+    col_categoria: 'Categoría',
+    col_capacidad: 'Capacidad',
+    col_precio: 'Precio est.',
+    parrafo3: 'Pulsa el botón para ver todos los detalles y hacer tu reserva.',
+    boton: 'Ver ruta y reservar',
+    nota: 'El precio es una estimación basada en los km de distancia. El precio final es lo que marca el taxímetro. El cobro lo realiza el conductor directamente.',
+    despedida: 'Un saludo,<br>El equipo de Traslados GC'
+  };
+
+  if (lang !== 'es') {
+    try {
+      const idiomaResult = await pool.query('SELECT nombre FROM idiomas_web WHERE codigo = $1', [lang]);
+      const nombreIdioma = idiomaResult.rows.length ? idiomaResult.rows[0].nombre : lang;
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (apiKey) {
+        const prompt = 'Traduce este objeto JSON de textos de email del español al ' + nombreIdioma + '. ' +
+          'Responde SOLO con el JSON traducido, sin markdown ni texto adicional:\n' +
+          JSON.stringify(textos);
+        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 800, messages: [{ role: 'user', content: prompt }] })
+        });
+        const data = await resp.json();
+        const texto = data.content.map(function(b) { return b.text || ''; }).join('');
+        textos = JSON.parse(texto.replace(/```json|```/g, '').trim());
+      }
+    } catch(err) { console.warn('Error traduciendo respuesta positiva:', err.message); }
+  }
+
+  const fechaViaje = c.fecha_aproximada ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES') : null;
+
+  const filasPrecios = preciosResult.rows.map(function(p) {
+    return `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;">${p.nombre}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;">${p.capacidad_pasajeros} pax</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;">${parseFloat(p.precio).toFixed(2)} €</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <style>
+    body{margin:0;padding:0;background:#f5f5f5;}
+    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+    .header{background:#2c2c2c;padding:24px;text-align:center;}
+    .body{padding:24px;}
+    .ruta-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;}
+    .tabla-precios{width:100%;border-collapse:collapse;}
+    .tabla-precios th{background:#2c2c2c;color:#fff;padding:8px 12px;text-align:left;font-size:13px;}
+    .boton-cta{display:block;background:#d4956a;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:600;text-align:center;margin:24px auto;max-width:280px;}
+    .nota{font-size:12px;color:#999;margin-top:16px;line-height:1.6;}
+    .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
+    @media(max-width:480px){.body{padding:14px;}.tabla-precios th,.tabla-precios td{padding:6px 8px;font-size:13px;}}
+  </style></head><body>
+  <div class="wrapper">
+    <div class="header">
+      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
+      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+    </div>
+    <div class="body">
+      <p>${textos.saludo}</p>
+      <p>${textos.parrafo1}</p>
+      <div class="ruta-box">
+        <strong>${seo.origen} → ${seo.destino}</strong>
+        ${fechaViaje ? '<br><span style="font-size:13px;color:#888;">' + fechaViaje + '</span>' : ''}
+        ${c.num_pasajeros ? '<br><span style="font-size:13px;color:#888;">' + c.num_pasajeros + ' pax</span>' : ''}
+      </div>
+      ${preciosResult.rows.length ? `
+      <p>${textos.parrafo2}</p>
+      <table class="tabla-precios">
+        <tr><th>${textos.col_categoria}</th><th>${textos.col_capacidad}</th><th>${textos.col_precio}</th></tr>
+        ${filasPrecios}
+      </table>` : ''}
+      <p>${textos.parrafo3}</p>
+      <a href="${urlRuta}" class="boton-cta">${textos.boton}</a>
+      <p class="nota">${textos.nota}</p>
+      <p>${textos.despedida}</p>
+    </div>
+    <div class="footer">Traslados GC · Gran Canaria</div>
+  </div></body></html>`;
+
+  try {
+    await enviarEmail({ to: c.email_cliente, subject: textos.asunto, html });
+    await pool.query(
+      "UPDATE cotizaciones SET estado = 'respondida', respuesta_enviada = TRUE WHERE id = $1",
+      [req.params.id]
+    );
+    res.json({ ok: true, url_ruta: urlRuta });
+  } catch(err) {
     res.status(500).json({ error: 'Error enviando email: ' + err.message });
   }
 }));
