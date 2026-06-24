@@ -1,5 +1,4 @@
 const express = require('express');
-const nodemailer = require('nodemailer');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
@@ -12,30 +11,30 @@ const { medirPxTitulo, medirPxDescripcion } = require('./medidor-pixeles');
 const app = express();
 
 // ─── Email (Nodemailer / Gmail) ───────────────────────────────────────────────
-function crearTransporter() {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null;
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    requireTLS: true,
-    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 20000
-  });
-}
-
+// ─── Email via Resend ─────────────────────────────────────────────────────────
 async function enviarEmail({ to, subject, html }) {
-  const transporter = crearTransporter();
-  if (!transporter) {
-    console.warn('Email no configurado — EMAIL_USER/EMAIL_PASS no definidos');
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn('Email no configurado — falta RESEND_API_KEY');
     return false;
   }
-  await transporter.sendMail({
-    from: '"Traslados GC" <' + process.env.EMAIL_USER + '>',
-    to, subject, html
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiKey
+    },
+    body: JSON.stringify({
+      from: 'Traslados GC <onboarding@resend.dev>',
+      to: [to],
+      subject: subject,
+      html: html
+    })
   });
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error('Resend error ' + response.status + ': ' + error);
+  }
   return true;
 }
 const PORT = process.env.PORT || 3000;
