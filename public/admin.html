@@ -513,7 +513,11 @@ table.tabla-precios input {
         <!-- Respuesta negativa -->
         <div style="background:#fdf5f5;border:1px solid #f1aeb5;border-radius:8px;padding:1rem;margin-bottom:1rem;">
           <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.5rem 0;color:#842029;">❌ Respuesta negativa — no podemos asumir esta ruta</p>
-          <p style="font-size:0.78rem;color:#888;margin:0 0 0.75rem 0;">El cliente recibirá un email explicando que no podemos realizar este traslado.</p>
+          <p style="font-size:0.78rem;color:#888;margin:0 0 0.75rem 0;">El cliente recibirá un email en el idioma seleccionado explicando que no podemos realizar este traslado.</p>
+          <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.78rem;color:#666;display:block;margin-bottom:3px;">Idioma de respuesta</label>
+            <select id="cotiz-lang-negativa" class="campo" style="height:36px;font-size:0.85rem;width:200px;"></select>
+          </div>
           <button class="boton-peligro" style="font-size:0.82rem;" onclick="enviarRespuestaNegativa()">📧 Enviar respuesta negativa</button>
         </div>
 
@@ -3145,10 +3149,15 @@ function abrirDetalleCotizacion(id) {
           }).join('');
 
         var selLang = document.getElementById('cotiz-lang-respuesta');
-        selLang.innerHTML = idiomas.map(function(i) {
+        var opcionesIdioma = idiomas.map(function(i) {
           var sel = i.codigo === langDetectado ? ' selected' : '';
           return '<option value="' + i.codigo + '"' + sel + '>' + i.nombre + '</option>';
         }).join('');
+        selLang.innerHTML = opcionesIdioma;
+
+        // Rellenar también el selector de idioma de respuesta negativa
+        var selLangNeg = document.getElementById('cotiz-lang-negativa');
+        if (selLangNeg) selLangNeg.innerHTML = opcionesIdioma;
       });
 
       document.getElementById('detalle-cotizacion').classList.remove('oculto');
@@ -3215,8 +3224,15 @@ function enviarRespuestaPositiva() {
 function enviarRespuestaNegativa() {
   if (!cotizacionDetalleId) return;
   if (!confirm('¿Enviar respuesta negativa al cliente? Le informaremos de que no podemos asumir esa ruta.')) return;
+  var langNeg = document.getElementById('cotiz-lang-negativa') ? document.getElementById('cotiz-lang-negativa').value : '';
   var av = document.getElementById('aviso-cotiz-detalle');
   av.style.display = 'block';
+  av.innerHTML = '<div class="aviso-ok">📧 Enviando email...</div>';
+  fetch('/admin/cotizaciones/' + cotizacionDetalleId + '/respuesta-negativa', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang_respuesta: langNeg })
+  })
   av.innerHTML = '<div class="aviso-ok">📧 Traduciendo y enviando email...</div>';
   fetch('/admin/cotizaciones/' + cotizacionDetalleId + '/respuesta-negativa', { method: 'POST' })
   .then(function(r) { return r.json(); })
