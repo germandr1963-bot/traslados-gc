@@ -580,6 +580,18 @@ async function initSchema() {
   // Columnas nuevas para reservas (se añaden si no existen en BD ya creadas)
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS conductor_id INT REFERENCES conductores(id) ON DELETE SET NULL`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS archivada BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS origen TEXT`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS destino TEXT`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS tipo_llegada TEXT`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS numero_vuelo TEXT`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS hora_llegada_vuelo TIME`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS nombre_barco TEXT`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS hora_atraque TIME`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS num_pasajeros INT`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS direccion_recogida TEXT`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS direccion_destino TEXT`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS notas_cliente TEXT`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS pasaporte_dni TEXT`);
 
   // ─── Reservas × Extras ────────────────────────────────────────────────────
   await pool.query(`
@@ -758,6 +770,9 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     } while (intentos < 10);
   }
 
+  const horaGuardar = hora || '00:00';
+
+  // Mantener notas completas como respaldo legible
   const notasCompletas = [
     'Origen: ' + origen + ' → Destino: ' + destino,
     tipo_llegada === 'aeropuerto' && numero_vuelo ? 'Vuelo: ' + numero_vuelo : null,
@@ -768,13 +783,28 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     notas || null
   ].filter(Boolean).join(' | ');
 
-  const horaGuardar = hora || '00:00';
-
   const reserva = await pool.query(
-    `INSERT INTO reservas (numero_reserva, ruta_id, categoria_id, fecha, hora, nombre_cliente, telefono_cliente, email_cliente, precio_estimado, notas, estado)
-     VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, 'pendiente') RETURNING id`,
-    [numeroReserva, categoria_id, fecha, horaGuardar, nombre_cliente.trim(), telefono_cliente.trim(), email_cliente.trim(),
-     precio_estimado || null, notasCompletas || null]
+    `INSERT INTO reservas (
+      numero_reserva, ruta_id, categoria_id, fecha, hora,
+      nombre_cliente, telefono_cliente, email_cliente,
+      precio_estimado, notas, estado,
+      origen, destino, tipo_llegada,
+      numero_vuelo, hora_llegada_vuelo,
+      nombre_barco, hora_atraque,
+      num_pasajeros, notas_cliente
+    )
+     VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, 'pendiente',
+             $10, $11, $12, $13, $14, $15, $16, $17, $18)
+     RETURNING id`,
+    [
+      numeroReserva, categoria_id, fecha, horaGuardar,
+      nombre_cliente.trim(), telefono_cliente.trim(), email_cliente.trim(),
+      precio_estimado || null, notasCompletas || null,
+      origen || null, destino || null, tipo_llegada || null,
+      numero_vuelo || null, hora_llegada_vuelo || null,
+      nombre_barco || null, hora_atraque || null,
+      num_pasajeros || null, notas || null
+    ]
   );
 
   const reservaId = reserva.rows[0].id;
