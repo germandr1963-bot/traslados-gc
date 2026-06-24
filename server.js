@@ -421,12 +421,12 @@ async function initSchema() {
     { clave: 'tabla_columna_equipaje', modulo: 'Página de ruta', contexto: 'Cabecera de columna en la tabla de tarifas', es: 'Equipaje', en: 'Luggage' },
     { clave: 'tabla_columna_precio', modulo: 'Página de ruta', contexto: 'Cabecera de columna en la tabla de tarifas', es: 'Precio', en: 'Price' },
     { clave: 'sufijo_pax', modulo: 'Página de ruta', contexto: 'Abreviatura que sigue al número de plazas en la tabla, ej: "4 pax"', es: 'pax', en: 'pax' },
-    { clave: 'badge_precio_fijo', modulo: 'Página de ruta', contexto: 'Etiqueta pequeña junto al precio cuando es fijo', es: 'precio fijo', en: 'fixed price' },
+    { clave: 'badge_precio_fijo', modulo: 'Página de ruta', contexto: 'Etiqueta pequeña junto al precio estimado', es: 'precio aproximado', en: 'estimated price' },
     { clave: 'texto_a_consultar', modulo: 'Página de ruta', contexto: 'Texto que sustituye al precio cuando esa categoría aún no tiene precio cargado', es: 'A consultar', en: 'On request' },
     { clave: 'texto_consulta_disponibilidad', modulo: 'Página de ruta', contexto: 'Párrafo que se muestra si la ruta todavía no tiene ningún precio cargado', es: 'Consulta disponibilidad y precio para este traslado.', en: 'Check availability and price for this transfer.' },
     { clave: 'titulo_como_funciona', modulo: 'Página de ruta', contexto: 'Título de la sección de 3 pasos que explica el proceso de reserva', es: 'Cómo funciona', en: 'How it works' },
     { clave: 'paso1_titulo', modulo: 'Página de ruta', contexto: 'Título del paso 1 en la sección "Cómo funciona"', es: '1. Reserva', en: '1. Booking' },
-    { clave: 'paso1_texto', modulo: 'Página de ruta', contexto: 'Descripción del paso 1 en la sección "Cómo funciona"', es: 'Solicitas el traslado con tu ruta y categoría de vehículo. Ves el precio fijo antes de confirmar.', en: 'Request your transfer with your route and vehicle category. See the fixed price before confirming.' },
+    { clave: 'paso1_texto', modulo: 'Página de ruta', contexto: 'Descripción del paso 1 en la sección "Cómo funciona"', es: 'Solicitas el traslado con tu ruta y categoría de vehículo. Ves el precio aproximado antes de confirmar.', en: 'Request your transfer with your route and vehicle category. See the estimated price before confirming.' },
     { clave: 'paso2_titulo', modulo: 'Página de ruta', contexto: 'Título del paso 2 en la sección "Cómo funciona"', es: '2. Confirmación', en: '2. Confirmation' },
     { clave: 'paso2_texto', modulo: 'Página de ruta', contexto: 'Descripción del paso 2 en la sección "Cómo funciona"', es: 'Un chofer acepta tu viaje y te lo confirmamos antes de que salgas de casa.', en: 'A driver accepts your trip and we confirm it before you leave home.' },
     { clave: 'paso3_titulo', modulo: 'Página de ruta', contexto: 'Título del paso 3 en la sección "Cómo funciona"', es: '3. Viaje', en: '3. Trip' },
@@ -3450,11 +3450,43 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
   // Función de traducción de textos fijos de la interfaz, ligada al idioma de esta página
   const t = function (clave) { return obtenerTexto(clave, lang); };
 
+  // Traducciones de destinos para este idioma
+  const destinosTrad = await pool.query(
+    `SELECT d.nombre AS nombre_es, dt.nombre AS nombre_traducido
+     FROM destinos d
+     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1`,
+    [lang]
+  );
+  const mapaDestinos = {};
+  for (const d of destinosTrad.rows) {
+    mapaDestinos[d.nombre_es] = (d.nombre_traducido && d.nombre_traducido.trim()) ? d.nombre_traducido : d.nombre_es;
+  }
+
+  // Traducciones de categorías para este idioma
+  const catsTrad = await pool.query(
+    `SELECT ti.texto_es, COALESCE(tit.texto, ti.texto_es) AS nombre_traducido
+     FROM textos_interfaz ti
+     LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+     WHERE ti.modulo = 'Categorías de vehículo'`,
+    [lang]
+  );
+  const mapaCategorias = {};
+  for (const c of catsTrad.rows) {
+    mapaCategorias[c.texto_es] = c.nombre_traducido;
+  }
+
+  const origenTraducido = mapaDestinos[seo.origen] || seo.origen;
+  const destinoTraducido = mapaDestinos[seo.destino] || seo.destino;
+
   res.render('traslado', {
-    seo,
-    precios: precios.rows,
+    seo: Object.assign({}, seo, { origen: origenTraducido, destino: destinoTraducido }),
+    precios: precios.rows.map(function(p) {
+      return Object.assign({}, p, { nombre: mapaCategorias[p.nombre] || p.nombre });
+    }),
     alternates: alternates.rows,
-    relacionadas: relacionadas.rows,
+    relacionadas: relacionadas.rows.map(function(r) {
+      return { destino: mapaDestinos[r.destino] || r.destino, slug_url: r.slug_url };
+    }),
     t,
     lang,
     BASE_URL,
