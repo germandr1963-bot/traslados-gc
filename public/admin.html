@@ -3017,7 +3017,7 @@ function abrirDetalleReserva(id) {
             completada: 'background:#cfe2ff;color:#084298;border:1px solid #9ec5fe;',
             cancelada:  'background:#f8d7da;color:#842029;border:1px solid #f1aeb5;'
           };
-          return '<button onclick="cambiarEstadoReserva(' + r.id + ', '' + e + '')" ' +
+          return '<button onclick="cambiarEstadoReserva(' + r.id + ', \"' + e + '\")" ' +
             'style="padding:0.3rem 0.9rem;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;' + (estilos[e] || '') + '">' +
             e.charAt(0).toUpperCase() + e.slice(1) + '</button>';
         }).join('');
