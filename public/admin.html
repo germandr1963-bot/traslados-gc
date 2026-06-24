@@ -1350,7 +1350,7 @@ function renderizarTablaSEO(datos) {
   cuerpo.innerHTML = datos.rutas.map(function (ruta) {
     var seoRuta = datos.seo[ruta.id] || {};
     var celdas = IDIOMAS_SEO.map(function (lang) {
-      return '<td style="text-align:center">' + badgeSEO(seoRuta[lang]) + '</td>';
+      return '<td style="text-align:center" data-ruta-id="' + ruta.id + '" data-lang="' + lang + '">' + badgeSEO(seoRuta[lang]) + '</td>';
     }).join('');
     return '<tr>' +
       '<td><strong>' + escapar(ruta.origen) + ' → ' + escapar(ruta.destino) + '</strong></td>' +
@@ -1702,10 +1702,24 @@ function toggleActivarSEO(rutaId, lang, activar) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ activo: activar })
   }).then(function () {
-    cargarSEO();
+    // Actualizar solo el badge de estado en la tabla principal sin recargar toda la sección
+    actualizarBadgeSEO(rutaId, lang, activar);
+    // Refrescar los campos del editor abierto
     fetch('/admin/seo/rutas/' + rutaId + '/idioma/' + lang)
       .then(function (r) { return r.json(); })
       .then(function (datos) { renderizarCamposSEO(rutaId, lang, datos); });
+  });
+}
+
+function actualizarBadgeSEO(rutaId, lang, activar) {
+  // Busca la celda del badge en la tabla SEO y la actualiza sin recargar
+  var celdas = document.querySelectorAll('#tabla-seo-cuerpo td');
+  celdas.forEach(function(td) {
+    if (td.dataset.rutaId == rutaId && td.dataset.lang === lang) {
+      td.innerHTML = activar
+        ? '<span class="estado-seo-ok">✓</span>'
+        : '<span class="estado-seo-vacio">—</span>';
+    }
   });
 }
 
