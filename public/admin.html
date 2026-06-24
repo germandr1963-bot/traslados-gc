@@ -153,6 +153,7 @@ table.tabla-precios input {
     <button class="item-menu" data-seccion="idiomas">Idiomas</button>
     <button class="item-menu" data-seccion="calculador">Calculador</button>
     <button class="item-menu" data-seccion="extras">Extras</button>
+    <button class="item-menu" data-seccion="cotizaciones">Cotizaciones <span id="badge-cotiz" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">0</span></button>
     <button class="item-menu" data-seccion="reservas">Reservas</button>
     <button id="boton-salir" style="margin-top:30px;opacity:0.5;">Cerrar sesión</button>
   </div>
@@ -460,6 +461,44 @@ table.tabla-precios input {
       </div>
     </div>
 
+    <div id="seccion-cotizaciones" class="oculto">
+      <h1>Cotizaciones</h1>
+      <p class="subtitulo">Solicitudes de precio recibidas desde el buscador. Carga los precios y envía la respuesta automáticamente al cliente.</p>
+      <div id="aviso-cotizaciones" style="display:none;margin-bottom:1rem;"></div>
+      <table class="tabla-admin">
+        <thead>
+          <tr>
+            <th>Fecha solicitud</th>
+            <th>Origen</th>
+            <th>Destino</th>
+            <th>Fecha viaje</th>
+            <th>Pax</th>
+            <th>Email cliente</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="cuerpo-cotizaciones"></tbody>
+      </table>
+
+      <!-- Panel de detalle cotización -->
+      <div id="detalle-cotizacion" class="oculto" style="margin-top:2rem;border:1px solid var(--gris-borde);border-radius:12px;padding:1.5rem;background:#fff;">
+        <h2 id="cotiz-detalle-titulo" style="font-size:1.1rem;margin:0 0 1rem 0;"></h2>
+        <div id="cotiz-detalle-info" style="margin-bottom:1.5rem;"></div>
+
+        <h3 style="font-size:0.9rem;font-weight:600;margin:0 0 0.75rem 0;">Precios por categoría</h3>
+        <div id="cotiz-detalle-precios" style="margin-bottom:1.5rem;"></div>
+
+        <div id="aviso-cotiz-detalle" style="display:none;margin-bottom:1rem;"></div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <button class="boton-costa" onclick="guardarPreciosCotizacion()">💾 Guardar precios</button>
+          <button class="boton-primario" onclick="enviarRespuestaCotizacion()">📧 Enviar respuesta al cliente</button>
+          <button class="boton-peligro" onclick="borrarCotizacion()">🗑 Eliminar</button>
+          <button class="boton-costa" onclick="cerrarDetalleCotizacion()">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
     <div id="seccion-reservas" class="oculto">
       <h1>Reservas</h1>
       <p class="subtitulo">Solicitudes de traslado recibidas. Gestiona el estado de cada una.</p>
@@ -597,6 +636,8 @@ function mostrarAdmin() {
   cargarCategorias();
   cargarConductores();
   cargarPreciosGrid();
+  // Badge de cotizaciones pendientes
+  setTimeout(function() { cargarCotizaciones(); }, 500);
 }
 
 function comprobarSesion() {
@@ -634,7 +675,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'extras', 'reservas'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'extras', 'cotizaciones', 'reservas'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
@@ -643,6 +684,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
     if (boton.dataset.seccion === 'destinos') { cargarDestinos(); cargarSelectorLangDestinos(); }
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
+    if (boton.dataset.seccion === 'cotizaciones') cargarCotizaciones();
     if (boton.dataset.seccion === 'reservas') cargarReservas();
     if (boton.dataset.seccion === 'extras') cargarExtras();
   });
@@ -2967,6 +3009,150 @@ function eliminarDestino(id, nombre) {
       if (data.error) { alert(data.error); return; }
       cargarDestinos();
     });
+}
+
+// ─── Cotizaciones ─────────────────────────────────────────────────────────────
+var cotizacionDetalleId = null;
+var categoriasCotiz = [];
+
+function cargarCotizaciones() {
+  // Actualizar badge de pendientes
+  fetch('/admin/cotizaciones/pendientes-count')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var badge = document.getElementById('badge-cotiz');
+      if (data.total > 0) {
+        badge.textContent = data.total;
+        badge.style.display = 'inline';
+      } else {
+        badge.style.display = 'none';
+      }
+    });
+
+  fetch('/admin/cotizaciones')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var cuerpo = document.getElementById('cuerpo-cotizaciones');
+      if (!data.cotizaciones || data.cotizaciones.length === 0) {
+        cuerpo.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:2rem;">No hay solicitudes todavía.</td></tr>';
+        return;
+      }
+      cuerpo.innerHTML = data.cotizaciones.map(function(c) {
+        var recibida = c.creado_en ? new Date(c.creado_en).toLocaleDateString('es-ES') : '—';
+        var fechaViaje = c.fecha_aproximada ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES') : '—';
+        var badgeColor = c.estado === 'pendiente' ? '#856404' : '#0f5132';
+        var badgeBg = c.estado === 'pendiente' ? '#fff3cd' : '#d1e7dd';
+        return '<tr>' +
+          '<td>' + recibida + '</td>' +
+          '<td>' + c.origen + '</td>' +
+          '<td>' + c.destino + '</td>' +
+          '<td>' + fechaViaje + '</td>' +
+          '<td>' + (c.num_pasajeros || '—') + '</td>' +
+          '<td>' + c.email_cliente + '</td>' +
+          '<td><span style="background:' + badgeBg + ';color:' + badgeColor + ';padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600;">' + c.estado + '</span></td>' +
+          '<td><button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.7rem;" onclick="abrirDetalleCotizacion(' + c.id + ')">Ver</button></td>' +
+        '</tr>';
+      }).join('');
+    });
+}
+
+function abrirDetalleCotizacion(id) {
+  cotizacionDetalleId = id;
+  fetch('/admin/cotizaciones')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var c = data.cotizaciones.find(function(x) { return x.id === id; });
+      if (!c) return;
+
+      var fechaViaje = c.fecha_aproximada ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES') : 'No indicada';
+      document.getElementById('cotiz-detalle-titulo').innerHTML =
+        'Solicitud de <span style="color:var(--terracota)">' + c.email_cliente + '</span>';
+
+      document.getElementById('cotiz-detalle-info').innerHTML =
+        '<table class="tabla-admin" style="margin-bottom:0;">' +
+          '<tr><th style="width:160px">Origen</th><td>' + c.origen + '</td></tr>' +
+          '<tr><th>Destino</th><td>' + c.destino + '</td></tr>' +
+          '<tr><th>Fecha aproximada</th><td>' + fechaViaje + '</td></tr>' +
+          '<tr><th>Pasajeros</th><td>' + (c.num_pasajeros || '—') + '</td></tr>' +
+          '<tr><th>Email</th><td>' + c.email_cliente + '</td></tr>' +
+        '</table>';
+
+      // Cargar categorías activas con precios ya guardados
+      fetch('/admin/categorias')
+        .then(function(r) { return r.json(); })
+        .then(function(cats) {
+          categoriasCotiz = cats;
+          var preciosExistentes = {};
+          if (c.precios) {
+            c.precios.forEach(function(p) { if (p) preciosExistentes[p.categoria_id] = p.precio; });
+          }
+          document.getElementById('cotiz-detalle-precios').innerHTML =
+            '<table class="tabla-admin"><thead><tr><th>Categoría</th><th>Capacidad</th><th>Precio (€)</th></tr></thead><tbody>' +
+            cats.filter(function(cat) { return cat.activa !== false; }).map(function(cat) {
+              var precio = preciosExistentes[cat.id] || '';
+              return '<tr>' +
+                '<td>' + cat.nombre + '</td>' +
+                '<td>' + cat.capacidad_pasajeros + ' pax</td>' +
+                '<td><input type="number" step="0.01" min="0" class="campo" style="height:32px;width:100px;" ' +
+                  'data-categoria-id="' + cat.id + '" value="' + precio + '" placeholder="—"></td>' +
+              '</tr>';
+            }).join('') +
+            '</tbody></table>';
+
+          document.getElementById('detalle-cotizacion').classList.remove('oculto');
+          document.getElementById('detalle-cotizacion').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+    });
+}
+
+function cerrarDetalleCotizacion() {
+  document.getElementById('detalle-cotizacion').classList.add('oculto');
+  cotizacionDetalleId = null;
+}
+
+function guardarPreciosCotizacion() {
+  if (!cotizacionDetalleId) return;
+  var inputs = document.querySelectorAll('#cotiz-detalle-precios input[type="number"]');
+  var precios = [];
+  inputs.forEach(function(inp) {
+    if (inp.value && !isNaN(inp.value)) {
+      precios.push({ categoria_id: Number(inp.dataset.categoriaId), precio: parseFloat(inp.value) });
+    }
+  });
+  fetch('/admin/cotizaciones/' + cotizacionDetalleId + '/precios', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ precios: precios })
+  }).then(function(r) { return r.json(); }).then(function() {
+    var av = document.getElementById('aviso-cotiz-detalle');
+    av.style.display = 'block';
+    av.innerHTML = '<div class="aviso-ok">✔ Precios guardados.</div>';
+    setTimeout(function() { av.style.display = 'none'; }, 2000);
+  });
+}
+
+function enviarRespuestaCotizacion() {
+  if (!cotizacionDetalleId) return;
+  var av = document.getElementById('aviso-cotiz-detalle');
+  av.style.display = 'block';
+  av.innerHTML = '<div class="aviso-ok">📧 Enviando email...</div>';
+  fetch('/admin/cotizaciones/' + cotizacionDetalleId + '/enviar', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        av.innerHTML = '<div class="aviso-error">Error: ' + data.error + '</div>';
+        return;
+      }
+      av.innerHTML = '<div class="aviso-ok">✔ Email enviado correctamente al cliente.</div>';
+      cargarCotizaciones();
+    });
+}
+
+function borrarCotizacion() {
+  if (!cotizacionDetalleId) return;
+  if (!confirm('¿Eliminar esta solicitud?')) return;
+  fetch('/admin/cotizaciones/' + cotizacionDetalleId, { method: 'DELETE' })
+    .then(function() { cerrarDetalleCotizacion(); cargarCotizaciones(); });
 }
 
 // ─── Reservas ─────────────────────────────────────────────────────────────────

@@ -255,6 +255,47 @@ footer {
         <button id="ver-precio" class="boton-primario" style="padding:10px 40px;">Ver precio</button>
       </div>
       <div id="resultado-precio">Elige una ruta y categoría para ver el precio</div>
+      <div style="text-align:center;margin-top:16px;">
+        <button onclick="abrirFormCotizacion()" style="background:none;border:none;color:#d4956a;cursor:pointer;font-size:0.9rem;text-decoration:underline;">¿No encuentras tu ruta? Pídenos precio →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de cotización -->
+<div id="modal-cotizacion" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:2rem;max-width:440px;width:90%;position:relative;">
+    <h2 style="font-size:1.1rem;margin:0 0 0.5rem 0;color:#2c2c2c;">Solicitar precio de traslado</h2>
+    <p style="font-size:0.85rem;color:#888;margin:0 0 1.5rem 0;">Cuéntanos tu ruta y te respondemos por email con los precios disponibles.</p>
+    <div style="display:flex;flex-direction:column;gap:0.75rem;">
+      <div>
+        <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;">Origen *</label>
+        <input type="text" id="cotiz-origen" class="campo" placeholder="Ej: Las Palmas de Gran Canaria">
+      </div>
+      <div>
+        <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;">Destino *</label>
+        <input type="text" id="cotiz-destino" class="campo" placeholder="Ej: Puerto de Mogán">
+      </div>
+      <div style="display:flex;gap:0.75rem;">
+        <div style="flex:1;">
+          <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;">Fecha aproximada</label>
+          <input type="date" id="cotiz-fecha" class="campo">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;">Nº pasajeros</label>
+          <input type="number" id="cotiz-pax" class="campo" min="1" max="16" placeholder="1">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;">Tu email *</label>
+        <input type="email" id="cotiz-email" class="campo" placeholder="tunombre@email.com">
+      </div>
+      <div id="cotiz-error" style="color:#e07b5a;font-size:0.82rem;display:none;"></div>
+      <div id="cotiz-ok" style="color:#2d7a4f;font-size:0.85rem;display:none;text-align:center;padding:0.75rem;background:#d1e7dd;border-radius:6px;"></div>
+      <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+        <button onclick="enviarCotizacion()" class="boton-primario" style="flex:1;">Enviar solicitud</button>
+        <button onclick="cerrarFormCotizacion()" style="flex:1;background:#f5f0ea;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:0.9rem;">Cancelar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -438,6 +479,80 @@ document.getElementById('ver-precio').addEventListener('click', verPrecio);
 cargarFondo();
 cargarRutas();
 cargarCategorias();
+
+function abrirFormCotizacion() {
+  var modal = document.getElementById('modal-cotizacion');
+  modal.style.display = 'flex';
+  // Prellenar origen y destino si el cliente ya los eligió
+  var desde = document.getElementById('desde').value;
+  var hasta = document.getElementById('hasta').value;
+  if (desde) document.getElementById('cotiz-origen').value = desde;
+  if (hasta) document.getElementById('cotiz-destino').value = hasta;
+  document.getElementById('cotiz-error').style.display = 'none';
+  document.getElementById('cotiz-ok').style.display = 'none';
+}
+
+function cerrarFormCotizacion() {
+  document.getElementById('modal-cotizacion').style.display = 'none';
+}
+
+function enviarCotizacion() {
+  var origen  = document.getElementById('cotiz-origen').value.trim();
+  var destino = document.getElementById('cotiz-destino').value.trim();
+  var email   = document.getElementById('cotiz-email').value.trim();
+  var fecha   = document.getElementById('cotiz-fecha').value;
+  var pax     = document.getElementById('cotiz-pax').value;
+  var err     = document.getElementById('cotiz-error');
+  var ok      = document.getElementById('cotiz-ok');
+
+  err.style.display = 'none';
+  ok.style.display = 'none';
+
+  if (!origen || !destino || !email) {
+    err.textContent = 'Por favor rellena origen, destino y email.';
+    err.style.display = 'block';
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    err.textContent = 'El email no es válido.';
+    err.style.display = 'block';
+    return;
+  }
+
+  fetch('/api/cotizaciones', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ origen: origen, destino: destino, fecha_aproximada: fecha || null, num_pasajeros: pax ? Number(pax) : null, email_cliente: email })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) {
+      err.textContent = data.error;
+      err.style.display = 'block';
+      return;
+    }
+    ok.textContent = '✔ Solicitud enviada. Te responderemos a ' + email + ' con los precios disponibles.';
+    ok.style.display = 'block';
+    // Limpiar y cerrar después de 4 segundos
+    setTimeout(function() {
+      document.getElementById('cotiz-origen').value = '';
+      document.getElementById('cotiz-destino').value = '';
+      document.getElementById('cotiz-fecha').value = '';
+      document.getElementById('cotiz-pax').value = '';
+      document.getElementById('cotiz-email').value = '';
+      cerrarFormCotizacion();
+    }, 4000);
+  })
+  .catch(function() {
+    err.textContent = 'Error de conexión. Inténtalo de nuevo.';
+    err.style.display = 'block';
+  });
+}
+
+// Cerrar modal al pulsar fuera
+document.getElementById('modal-cotizacion').addEventListener('click', function(e) {
+  if (e.target === this) cerrarFormCotizacion();
+});
 </script>
 
 </body>
