@@ -308,3 +308,9 @@ table.tabla-precios input[type="number"] {
 .badge-confirmada { background: #d1e7dd; color: #0f5132; }
 .badge-completada { background: #cfe2ff; color: #084298; }
 .badge-cancelada  { background: #f8d7da; color: #842029; }
+
+.boton-filtro-reserva.activo-filtro-periodo {
+  background: var(--dorado, #b08a3e);
+  color: #fff;
+  border-color: var(--dorado, #b08a3e);
+}

@@ -464,34 +464,59 @@ table.tabla-precios input {
       <h1>Reservas</h1>
       <p class="subtitulo">Solicitudes de traslado recibidas. Gestiona el estado de cada una.</p>
 
-      <!-- Filtro por estado -->
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.5rem;">
-        <button class="boton-filtro-reserva activo-filtro" data-estado="todas" onclick="filtrarReservas(this)">Todas</button>
-        <button class="boton-filtro-reserva" data-estado="pendiente" onclick="filtrarReservas(this)">🟡 Pendientes</button>
-        <button class="boton-filtro-reserva" data-estado="confirmada" onclick="filtrarReservas(this)">🟢 Confirmadas</button>
-        <button class="boton-filtro-reserva" data-estado="completada" onclick="filtrarReservas(this)">✅ Completadas</button>
-        <button class="boton-filtro-reserva" data-estado="cancelada" onclick="filtrarReservas(this)">🔴 Canceladas</button>
+      <!-- Fila de filtros: estado + periodo + archivo -->
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;align-items:center;">
+        <span style="font-size:0.8rem;color:#888;margin-right:0.25rem;">Estado:</span>
+        <button class="boton-filtro-reserva activo-filtro" data-estado="todas" onclick="filtrarReservas('estado',this)">Todas</button>
+        <button class="boton-filtro-reserva" data-estado="pendiente" onclick="filtrarReservas('estado',this)">🟡 Pendientes</button>
+        <button class="boton-filtro-reserva" data-estado="confirmada" onclick="filtrarReservas('estado',this)">🟢 Confirmadas</button>
+        <button class="boton-filtro-reserva" data-estado="completada" onclick="filtrarReservas('estado',this)">✅ Completadas</button>
+        <button class="boton-filtro-reserva" data-estado="cancelada" onclick="filtrarReservas('estado',this)">🔴 Canceladas</button>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center;">
+        <span style="font-size:0.8rem;color:#888;margin-right:0.25rem;">Periodo:</span>
+        <button class="boton-filtro-reserva activo-filtro-periodo" data-periodo="todas" onclick="filtrarReservas('periodo',this)">Todas las fechas</button>
+        <button class="boton-filtro-reserva" data-periodo="hoy" onclick="filtrarReservas('periodo',this)">Hoy</button>
+        <button class="boton-filtro-reserva" data-periodo="semana" onclick="filtrarReservas('periodo',this)">Esta semana</button>
+        <button class="boton-filtro-reserva" data-periodo="mes" onclick="filtrarReservas('periodo',this)">Este mes</button>
+        <span style="margin-left:1rem;font-size:0.8rem;color:#888;">|</span>
+        <button class="boton-filtro-reserva" id="btn-archivo-reservas" data-archivo="no" onclick="toggleArchivoReservas(this)" style="margin-left:0.5rem;">📦 Ver archivo</button>
+      </div>
+
+      <!-- Acciones en lote + exportar + orden -->
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center;">
+        <button class="boton-costa" style="font-size:0.82rem;" onclick="seleccionarTodasReservas()">☑ Seleccionar todas</button>
+        <button class="boton-costa" style="font-size:0.82rem;" onclick="accionLoteReservas('archivar')">📦 Archivar seleccionadas</button>
+        <button class="boton-peligro" style="font-size:0.82rem;" onclick="accionLoteReservas('borrar')">🗑 Borrar seleccionadas</button>
+        <span style="flex:1;"></span>
+        <button class="boton-costa" style="font-size:0.82rem;" onclick="toggleOrdenReservas()">📅 Fecha <span id="icono-orden">↓</span></button>
+        <button class="boton-primario" style="font-size:0.82rem;" onclick="exportarExcelReservas()">📥 Exportar Excel</button>
       </div>
 
       <div id="aviso-reservas" style="display:none;margin-bottom:1rem;"></div>
 
       <!-- Tabla resumen -->
-      <table class="tabla-admin" id="tabla-reservas">
-        <thead>
-          <tr>
-            <th>PNR</th>
-            <th>Fecha viaje</th>
-            <th>Cliente</th>
-            <th>Teléfono</th>
-            <th>Categoría</th>
-            <th>Precio est.</th>
-            <th>Estado</th>
-            <th>Recibida</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="cuerpo-reservas"></tbody>
-      </table>
+      <div style="overflow-x:auto;">
+        <table class="tabla-admin">
+          <thead>
+            <tr>
+              <th style="width:32px;"><input type="checkbox" id="check-todas-reservas" onchange="toggleCheckTodasReservas(this)"></th>
+              <th>PNR</th>
+              <th>Fecha viaje</th>
+              <th>Cliente</th>
+              <th>Teléfono</th>
+              <th>Categoría</th>
+              <th>Chofer</th>
+              <th>Precio viaje</th>
+              <th>Extras</th>
+              <th>Total est.</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo-reservas"></tbody>
+        </table>
+      </div>
 
       <!-- Panel de detalle -->
       <div id="detalle-reserva" class="oculto" style="margin-top:2rem;border:1px solid var(--gris-borde);border-radius:12px;padding:1.5rem;background:#fff;">
@@ -501,6 +526,10 @@ table.tabla-precios input {
         </div>
         <div id="detalle-contenido"></div>
         <div style="margin-top:1.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;" id="detalle-botones-estado"></div>
+        <div style="margin-top:1rem;display:flex;gap:0.5rem;">
+          <button class="boton-costa" style="font-size:0.82rem;" onclick="archivarDesdeDetalle()">📦 Archivar</button>
+          <button class="boton-peligro" style="font-size:0.82rem;" onclick="borrarDesdeDetalle()">🗑 Borrar reserva</button>
+        </div>
       </div>
     </div>
 
@@ -2929,61 +2958,136 @@ function eliminarDestino(id, nombre) {
 }
 
 // ─── Reservas ─────────────────────────────────────────────────────────────────
-var reservasFiltroActual = 'todas';
+var reservasFiltroEstado  = 'todas';
+var reservasFiltroperiodo = 'todas';
+var reservasFiltroArchivo = 'no';
+var reservasOrden         = 'desc';
+var reservaDetalleId      = null;
 
 function cargarReservas() {
-  var url = '/admin/reservas' + (reservasFiltroActual !== 'todas' ? '?estado=' + reservasFiltroActual : '');
+  cerrarDetalleReserva();
+  var url = '/admin/reservas?estado=' + reservasFiltroEstado +
+            '&periodo=' + reservasFiltroperiodo +
+            '&orden=' + reservasOrden +
+            '&archivo=' + reservasFiltroArchivo;
   fetch(url)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var cuerpo = document.getElementById('cuerpo-reservas');
+      document.getElementById('check-todas-reservas').checked = false;
       if (!data.reservas || data.reservas.length === 0) {
-        cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:2rem;">No hay reservas' +
-          (reservasFiltroActual !== 'todas' ? ' con estado "' + reservasFiltroActual + '"' : '') + '.</td></tr>';
+        cuerpo.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#aaa;padding:2rem;">No hay reservas con estos filtros.</td></tr>';
         return;
       }
       cuerpo.innerHTML = data.reservas.map(function(r) {
-        var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—';
-        var recibida = r.creado_en ? new Date(r.creado_en).toLocaleDateString('es-ES') : '—';
-        var precio = r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—';
+        var fecha    = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—';
+        var viaje    = parseFloat(r.precio_estimado) || 0;
+        var extras   = parseFloat(r.total_extras) || 0;
+        var total    = parseFloat(r.total_estimado) || 0;
         return '<tr>' +
+          '<td><input type="checkbox" class="check-reserva" data-id="' + r.id + '"></td>' +
           '<td><strong>' + (r.numero_reserva || '—') + '</strong></td>' +
           '<td>' + fecha + ' ' + (r.hora ? r.hora.slice(0,5) : '') + '</td>' +
           '<td>' + r.nombre_cliente + '</td>' +
           '<td>' + r.telefono_cliente + '</td>' +
           '<td>' + (r.categoria_nombre || '—') + '</td>' +
-          '<td>' + precio + '</td>' +
+          '<td>' + (r.conductor_nombre || '<span style="color:#bbb;">Sin asignar</span>') + '</td>' +
+          '<td style="text-align:right;">' + (viaje ? viaje.toFixed(2) + ' €' : '—') + '</td>' +
+          '<td style="text-align:right;">' + (extras ? extras.toFixed(2) + ' €' : '—') + '</td>' +
+          '<td style="text-align:right;font-weight:600;">' + (total ? total.toFixed(2) + ' €' : '—') + '</td>' +
           '<td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td>' +
-          '<td>' + recibida + '</td>' +
-          '<td><button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.7rem;" ' +
-            'onclick="abrirDetalleReserva(' + r.id + ')">Ver</button></td>' +
+          '<td><button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.7rem;" onclick="abrirDetalleReserva(' + r.id + ')">Ver</button></td>' +
         '</tr>';
       }).join('');
     });
 }
 
-function filtrarReservas(boton) {
-  document.querySelectorAll('.boton-filtro-reserva').forEach(function(b) { b.classList.remove('activo-filtro'); });
-  boton.classList.add('activo-filtro');
-  reservasFiltroActual = boton.dataset.estado;
-  cerrarDetalleReserva();
+function filtrarReservas(tipo, boton) {
+  if (tipo === 'estado') {
+    document.querySelectorAll('.boton-filtro-reserva[data-estado]').forEach(function(b) { b.classList.remove('activo-filtro'); });
+    boton.classList.add('activo-filtro');
+    reservasFiltroEstado = boton.dataset.estado;
+  } else if (tipo === 'periodo') {
+    document.querySelectorAll('.boton-filtro-reserva[data-periodo]').forEach(function(b) { b.classList.remove('activo-filtro-periodo'); });
+    boton.classList.add('activo-filtro-periodo');
+    reservasFiltroperiodo = boton.dataset.periodo;
+  }
   cargarReservas();
 }
 
+function toggleArchivoReservas(boton) {
+  var viendo = reservasFiltroArchivo === 'si';
+  reservasFiltroArchivo = viendo ? 'no' : 'si';
+  boton.textContent = viendo ? '📦 Ver archivo' : '📋 Ver activas';
+  boton.classList.toggle('activo-filtro', !viendo);
+  cargarReservas();
+}
+
+function toggleOrdenReservas() {
+  reservasOrden = reservasOrden === 'desc' ? 'asc' : 'desc';
+  document.getElementById('icono-orden').textContent = reservasOrden === 'desc' ? '↓' : '↑';
+  cargarReservas();
+}
+
+function toggleCheckTodasReservas(master) {
+  document.querySelectorAll('.check-reserva').forEach(function(c) { c.checked = master.checked; });
+}
+
+function seleccionarTodasReservas() {
+  var master = document.getElementById('check-todas-reservas');
+  master.checked = !master.checked;
+  toggleCheckTodasReservas(master);
+}
+
+function idsSeleccionados() {
+  return Array.from(document.querySelectorAll('.check-reserva:checked')).map(function(c) { return Number(c.dataset.id); });
+}
+
+function accionLoteReservas(accion) {
+  var ids = idsSeleccionados();
+  if (!ids.length) { alert('Selecciona al menos una reserva.'); return; }
+  if (accion === 'archivar') {
+    if (!confirm('¿Archivar ' + ids.length + ' reserva(s)?')) return;
+    fetch('/admin/reservas/archivar-lote', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: ids, archivar: true })
+    }).then(function() { mostrarAvisoReservas('✔ ' + ids.length + ' reserva(s) archivadas.'); cargarReservas(); });
+  } else if (accion === 'borrar') {
+    if (!confirm('¿BORRAR ' + ids.length + ' reserva(s)? Esta acción no se puede deshacer.')) return;
+    fetch('/admin/reservas/borrar-lote', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: ids })
+    }).then(function() { mostrarAvisoReservas('✔ ' + ids.length + ' reserva(s) eliminadas.'); cargarReservas(); });
+  }
+}
+
+function exportarExcelReservas() {
+  var url = '/admin/reservas/excel?estado=' + reservasFiltroEstado +
+            '&periodo=' + reservasFiltroperiodo +
+            '&archivo=' + reservasFiltroArchivo;
+  window.location.href = url;
+}
+
+function mostrarAvisoReservas(msg) {
+  var av = document.getElementById('aviso-reservas');
+  av.style.display = 'block';
+  av.innerHTML = '<div class="aviso-ok">' + msg + '</div>';
+  setTimeout(function() { av.style.display = 'none'; }, 3000);
+}
+
 function abrirDetalleReserva(id) {
+  reservaDetalleId = id;
   fetch('/admin/reservas/' + id)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var r = data.reserva;
       var panel = document.getElementById('detalle-reserva');
-      var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—';
-      var precio = r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—';
+      var fecha  = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—';
+      var viaje  = parseFloat(r.precio_estimado) || 0;
+      var total  = parseFloat(r.total_estimado) || 0;
 
       document.getElementById('detalle-titulo').innerHTML =
         'Reserva <span style="color:var(--terracota)">' + (r.numero_reserva || r.id) + '</span>';
-
-      // Extraer datos de notas
-      var notas = r.notas || '';
 
       var extrasHtml = '';
       if (r.extras && r.extras.length) {
@@ -3001,22 +3105,23 @@ function abrirDetalleReserva(id) {
           '<tr><th>Email</th><td>' + r.email_cliente + '</td></tr>' +
           '<tr><th>Fecha y hora</th><td>' + fecha + ' a las ' + (r.hora ? r.hora.slice(0,5) : '—') + '</td></tr>' +
           '<tr><th>Categoría</th><td>' + (r.categoria_nombre || '—') + '</td></tr>' +
-          '<tr><th>Precio estimado</th><td>' + precio + '</td></tr>' +
-          '<tr><th>Detalles</th><td style="white-space:pre-wrap;">' + notas + '</td></tr>' +
+          '<tr><th>Chofer asignado</th><td>' + (r.conductor_nombre || '<span style="color:#bbb;">Sin asignar</span>') + '</td></tr>' +
+          '<tr><th>Precio viaje</th><td>' + viaje.toFixed(2) + ' €</td></tr>' +
           extrasHtml +
+          '<tr><th>Total estimado</th><td><strong>' + total.toFixed(2) + ' €</strong></td></tr>' +
+          '<tr><th>Detalles</th><td style="white-space:pre-wrap;">' + (r.notas || '—') + '</td></tr>' +
         '</table>';
 
-      // Botones de cambio de estado
       var estados = ['pendiente', 'confirmada', 'completada', 'cancelada'];
+      var estilos = {
+        pendiente:  'background:#fff3cd;color:#856404;border:1px solid #ffe083;',
+        confirmada: 'background:#d1e7dd;color:#0f5132;border:1px solid #a3cfbb;',
+        completada: 'background:#cfe2ff;color:#084298;border:1px solid #9ec5fe;',
+        cancelada:  'background:#f8d7da;color:#842029;border:1px solid #f1aeb5;'
+      };
       document.getElementById('detalle-botones-estado').innerHTML =
         '<span style="font-size:0.85rem;color:#888;align-self:center;">Cambiar estado:</span>' +
         estados.filter(function(e) { return e !== r.estado; }).map(function(e) {
-          var estilos = {
-            pendiente:  'background:#fff3cd;color:#856404;border:1px solid #ffe083;',
-            confirmada: 'background:#d1e7dd;color:#0f5132;border:1px solid #a3cfbb;',
-            completada: 'background:#cfe2ff;color:#084298;border:1px solid #9ec5fe;',
-            cancelada:  'background:#f8d7da;color:#842029;border:1px solid #f1aeb5;'
-          };
           return '<button onclick="cambiarEstadoReserva(' + r.id + ', \"' + e + '\")" ' +
             'style="padding:0.3rem 0.9rem;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;' + (estilos[e] || '') + '">' +
             e.charAt(0).toUpperCase() + e.slice(1) + '</button>';
@@ -3029,17 +3134,32 @@ function abrirDetalleReserva(id) {
 
 function cerrarDetalleReserva() {
   document.getElementById('detalle-reserva').classList.add('oculto');
+  reservaDetalleId = null;
 }
 
 function cambiarEstadoReserva(id, nuevoEstado) {
   fetch('/admin/reservas/' + id + '/estado', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ estado: nuevoEstado })
-  }).then(function(r) { return r.json(); }).then(function() {
-    cargarReservas();
-    abrirDetalleReserva(id);
-  });
+  }).then(function() { cargarReservas(); abrirDetalleReserva(id); });
+}
+
+function archivarDesdeDetalle() {
+  if (!reservaDetalleId) return;
+  var estaEnArchivo = reservasFiltroArchivo === 'si';
+  var accion = estaEnArchivo ? 'desarchivar' : 'archivar';
+  if (!confirm('¿' + accion.charAt(0).toUpperCase() + accion.slice(1) + ' esta reserva?')) return;
+  fetch('/admin/reservas/' + reservaDetalleId + '/archivar', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ archivar: !estaEnArchivo })
+  }).then(function() { cerrarDetalleReserva(); cargarReservas(); });
+}
+
+function borrarDesdeDetalle() {
+  if (!reservaDetalleId) return;
+  if (!confirm('¿BORRAR esta reserva? No se puede deshacer.')) return;
+  fetch('/admin/reservas/' + reservaDetalleId, { method: 'DELETE' })
+    .then(function() { cerrarDetalleReserva(); cargarReservas(); });
 }
 
 var extrasCache = [];
