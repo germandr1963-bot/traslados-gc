@@ -152,8 +152,8 @@ table.tabla-precios input {
     <button class="item-menu" data-seccion="seo">SEO</button>
     <button class="item-menu" data-seccion="idiomas">Idiomas</button>
     <button class="item-menu" data-seccion="calculador">Calculador</button>
-    <button class="item-menu" data-seccion="reservas">Reservas</button>
     <button class="item-menu" data-seccion="extras">Extras</button>
+    <button class="item-menu" data-seccion="reservas">Reservas</button>
     <button id="boton-salir" style="margin-top:30px;opacity:0.5;">Cerrar sesión</button>
   </div>
 
@@ -526,6 +526,19 @@ table.tabla-precios input {
         </div>
         <div id="detalle-contenido"></div>
         <div style="margin-top:1.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;" id="detalle-botones-estado"></div>
+
+        <!-- Asignación manual de chofer -->
+        <div style="margin-top:1.25rem;padding:1rem;border:1px solid var(--gris-borde);border-radius:8px;background:#f9f7f4;">
+          <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.5rem 0;">👤 Asignar chofer</p>
+          <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+            <select id="select-chofer-detalle" class="campo" style="width:260px;height:36px;font-size:0.85rem;">
+              <option value="">— Sin asignar —</option>
+            </select>
+            <button class="boton-primario" style="font-size:0.82rem;height:36px;" onclick="guardarChoferReserva()">Guardar</button>
+          </div>
+          <div id="aviso-chofer-detalle" style="display:none;margin-top:0.5rem;font-size:0.82rem;"></div>
+        </div>
+
         <div style="margin-top:1rem;display:flex;gap:0.5rem;">
           <button class="boton-costa" style="font-size:0.82rem;" onclick="archivarDesdeDetalle()">📦 Archivar</button>
           <button class="boton-peligro" style="font-size:0.82rem;" onclick="borrarDesdeDetalle()">🗑 Borrar reserva</button>
@@ -622,7 +635,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'reservas', 'extras'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'extras', 'reservas'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
@@ -3127,6 +3140,7 @@ function abrirDetalleReserva(id) {
             e.charAt(0).toUpperCase() + e.slice(1) + '</button>';
         }).join('');
 
+      cargarConductoresEnDetalle(r.conductor_id);
       panel.classList.remove('oculto');
       panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
@@ -3142,6 +3156,35 @@ function cambiarEstadoReserva(id, nuevoEstado) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ estado: nuevoEstado })
   }).then(function() { cargarReservas(); abrirDetalleReserva(id); });
+}
+
+function cargarConductoresEnDetalle(conductorActualId) {
+  fetch('/admin/conductores-aprobados')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var sel = document.getElementById('select-chofer-detalle');
+      sel.innerHTML = '<option value="">— Sin asignar —</option>' +
+        data.conductores.map(function(c) {
+          var sel2 = conductorActualId && c.id === conductorActualId ? ' selected' : '';
+          return '<option value="' + c.id + '"' + sel2 + '>' + c.nombre + ' · ' + c.telefono + '</option>';
+        }).join('');
+    });
+}
+
+function guardarChoferReserva() {
+  if (!reservaDetalleId) return;
+  var conductorId = document.getElementById('select-chofer-detalle').value;
+  fetch('/admin/reservas/' + reservaDetalleId + '/chofer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conductor_id: conductorId ? Number(conductorId) : null })
+  }).then(function(r) { return r.json(); }).then(function() {
+    var av = document.getElementById('aviso-chofer-detalle');
+    av.style.display = 'block';
+    av.innerHTML = '<span style="color:#2d7a4f;">✔ Chofer guardado correctamente.</span>';
+    setTimeout(function() { av.style.display = 'none'; }, 3000);
+    cargarReservas();
+  });
 }
 
 function archivarDesdeDetalle() {
