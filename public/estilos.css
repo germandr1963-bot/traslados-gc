@@ -278,3 +278,33 @@ table.tabla-precios th:not(:first-child) {
 table.tabla-precios input[type="number"] {
   width: 80px;
 }
+
+/* ─── Sección Reservas ────────────────────────────────────────────────────── */
+.boton-filtro-reserva {
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--gris-borde);
+  background: #fff;
+  color: var(--texto-oscuro);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.15s;
+}
+.boton-filtro-reserva:hover { background: var(--gris-fondo); }
+.boton-filtro-reserva.activo-filtro {
+  background: var(--terracota);
+  color: #fff;
+  border-color: var(--terracota);
+}
+.badge-estado-reserva {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-pendiente  { background: #fff3cd; color: #856404; }
+.badge-confirmada { background: #d1e7dd; color: #0f5132; }
+.badge-completada { background: #cfe2ff; color: #084298; }
+.badge-cancelada  { background: #f8d7da; color: #842029; }

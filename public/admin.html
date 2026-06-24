@@ -152,6 +152,7 @@ table.tabla-precios input {
     <button class="item-menu" data-seccion="seo">SEO</button>
     <button class="item-menu" data-seccion="idiomas">Idiomas</button>
     <button class="item-menu" data-seccion="calculador">Calculador</button>
+    <button class="item-menu" data-seccion="reservas">Reservas</button>
     <button class="item-menu" data-seccion="extras">Extras</button>
     <button id="boton-salir" style="margin-top:30px;opacity:0.5;">Cerrar sesión</button>
   </div>
@@ -459,6 +460,50 @@ table.tabla-precios input {
       </div>
     </div>
 
+    <div id="seccion-reservas" class="oculto">
+      <h1>Reservas</h1>
+      <p class="subtitulo">Solicitudes de traslado recibidas. Gestiona el estado de cada una.</p>
+
+      <!-- Filtro por estado -->
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.5rem;">
+        <button class="boton-filtro-reserva activo-filtro" data-estado="todas" onclick="filtrarReservas(this)">Todas</button>
+        <button class="boton-filtro-reserva" data-estado="pendiente" onclick="filtrarReservas(this)">🟡 Pendientes</button>
+        <button class="boton-filtro-reserva" data-estado="confirmada" onclick="filtrarReservas(this)">🟢 Confirmadas</button>
+        <button class="boton-filtro-reserva" data-estado="completada" onclick="filtrarReservas(this)">✅ Completadas</button>
+        <button class="boton-filtro-reserva" data-estado="cancelada" onclick="filtrarReservas(this)">🔴 Canceladas</button>
+      </div>
+
+      <div id="aviso-reservas" style="display:none;margin-bottom:1rem;"></div>
+
+      <!-- Tabla resumen -->
+      <table class="tabla-admin" id="tabla-reservas">
+        <thead>
+          <tr>
+            <th>PNR</th>
+            <th>Fecha viaje</th>
+            <th>Cliente</th>
+            <th>Teléfono</th>
+            <th>Categoría</th>
+            <th>Precio est.</th>
+            <th>Estado</th>
+            <th>Recibida</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="cuerpo-reservas"></tbody>
+      </table>
+
+      <!-- Panel de detalle -->
+      <div id="detalle-reserva" class="oculto" style="margin-top:2rem;border:1px solid var(--gris-borde);border-radius:12px;padding:1.5rem;background:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+          <h2 id="detalle-titulo" style="font-size:1.1rem;margin:0;"></h2>
+          <button onclick="cerrarDetalleReserva()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#888;">✕ Cerrar</button>
+        </div>
+        <div id="detalle-contenido"></div>
+        <div style="margin-top:1.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;" id="detalle-botones-estado"></div>
+      </div>
+    </div>
+
     <div id="seccion-extras" class="oculto">
       <h1>Extras del traslado</h1>
       <p class="subtitulo">Define los servicios adicionales que el cliente puede seleccionar al reservar. El precio se suma al precio estimado del traslado.</p>
@@ -548,7 +593,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'extras'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'reservas', 'extras'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
@@ -557,6 +602,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
     if (boton.dataset.seccion === 'destinos') { cargarDestinos(); cargarSelectorLangDestinos(); }
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
+    if (boton.dataset.seccion === 'reservas') cargarReservas();
     if (boton.dataset.seccion === 'extras') cargarExtras();
   });
 });
@@ -2880,6 +2926,120 @@ function eliminarDestino(id, nombre) {
       if (data.error) { alert(data.error); return; }
       cargarDestinos();
     });
+}
+
+// ─── Reservas ─────────────────────────────────────────────────────────────────
+var reservasFiltroActual = 'todas';
+
+function cargarReservas() {
+  var url = '/admin/reservas' + (reservasFiltroActual !== 'todas' ? '?estado=' + reservasFiltroActual : '');
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var cuerpo = document.getElementById('cuerpo-reservas');
+      if (!data.reservas || data.reservas.length === 0) {
+        cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:2rem;">No hay reservas' +
+          (reservasFiltroActual !== 'todas' ? ' con estado "' + reservasFiltroActual + '"' : '') + '.</td></tr>';
+        return;
+      }
+      cuerpo.innerHTML = data.reservas.map(function(r) {
+        var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—';
+        var recibida = r.creado_en ? new Date(r.creado_en).toLocaleDateString('es-ES') : '—';
+        var precio = r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—';
+        return '<tr>' +
+          '<td><strong>' + (r.numero_reserva || '—') + '</strong></td>' +
+          '<td>' + fecha + ' ' + (r.hora ? r.hora.slice(0,5) : '') + '</td>' +
+          '<td>' + r.nombre_cliente + '</td>' +
+          '<td>' + r.telefono_cliente + '</td>' +
+          '<td>' + (r.categoria_nombre || '—') + '</td>' +
+          '<td>' + precio + '</td>' +
+          '<td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td>' +
+          '<td>' + recibida + '</td>' +
+          '<td><button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.7rem;" ' +
+            'onclick="abrirDetalleReserva(' + r.id + ')">Ver</button></td>' +
+        '</tr>';
+      }).join('');
+    });
+}
+
+function filtrarReservas(boton) {
+  document.querySelectorAll('.boton-filtro-reserva').forEach(function(b) { b.classList.remove('activo-filtro'); });
+  boton.classList.add('activo-filtro');
+  reservasFiltroActual = boton.dataset.estado;
+  cerrarDetalleReserva();
+  cargarReservas();
+}
+
+function abrirDetalleReserva(id) {
+  fetch('/admin/reservas/' + id)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var r = data.reserva;
+      var panel = document.getElementById('detalle-reserva');
+      var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—';
+      var precio = r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—';
+
+      document.getElementById('detalle-titulo').innerHTML =
+        'Reserva <span style="color:var(--terracota)">' + (r.numero_reserva || r.id) + '</span>';
+
+      // Extraer datos de notas
+      var notas = r.notas || '';
+
+      var extrasHtml = '';
+      if (r.extras && r.extras.length) {
+        extrasHtml = '<tr><th>Extras</th><td>' +
+          r.extras.map(function(e) {
+            return e.nombre + ' (' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €)';
+          }).join(', ') + '</td></tr>';
+      }
+
+      document.getElementById('detalle-contenido').innerHTML =
+        '<table class="tabla-admin" style="margin-bottom:0;">' +
+          '<tr><th style="width:160px">Estado</th><td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td></tr>' +
+          '<tr><th>Cliente</th><td>' + r.nombre_cliente + '</td></tr>' +
+          '<tr><th>Teléfono</th><td>' + r.telefono_cliente + '</td></tr>' +
+          '<tr><th>Email</th><td>' + r.email_cliente + '</td></tr>' +
+          '<tr><th>Fecha y hora</th><td>' + fecha + ' a las ' + (r.hora ? r.hora.slice(0,5) : '—') + '</td></tr>' +
+          '<tr><th>Categoría</th><td>' + (r.categoria_nombre || '—') + '</td></tr>' +
+          '<tr><th>Precio estimado</th><td>' + precio + '</td></tr>' +
+          '<tr><th>Detalles</th><td style="white-space:pre-wrap;">' + notas + '</td></tr>' +
+          extrasHtml +
+        '</table>';
+
+      // Botones de cambio de estado
+      var estados = ['pendiente', 'confirmada', 'completada', 'cancelada'];
+      document.getElementById('detalle-botones-estado').innerHTML =
+        '<span style="font-size:0.85rem;color:#888;align-self:center;">Cambiar estado:</span>' +
+        estados.filter(function(e) { return e !== r.estado; }).map(function(e) {
+          var estilos = {
+            pendiente:  'background:#fff3cd;color:#856404;border:1px solid #ffe083;',
+            confirmada: 'background:#d1e7dd;color:#0f5132;border:1px solid #a3cfbb;',
+            completada: 'background:#cfe2ff;color:#084298;border:1px solid #9ec5fe;',
+            cancelada:  'background:#f8d7da;color:#842029;border:1px solid #f1aeb5;'
+          };
+          return '<button onclick="cambiarEstadoReserva(' + r.id + ', '' + e + '')" ' +
+            'style="padding:0.3rem 0.9rem;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;' + (estilos[e] || '') + '">' +
+            e.charAt(0).toUpperCase() + e.slice(1) + '</button>';
+        }).join('');
+
+      panel.classList.remove('oculto');
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+}
+
+function cerrarDetalleReserva() {
+  document.getElementById('detalle-reserva').classList.add('oculto');
+}
+
+function cambiarEstadoReserva(id, nuevoEstado) {
+  fetch('/admin/reservas/' + id + '/estado', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ estado: nuevoEstado })
+  }).then(function(r) { return r.json(); }).then(function() {
+    cargarReservas();
+    abrirDetalleReserva(id);
+  });
 }
 
 var extrasCache = [];
