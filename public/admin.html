@@ -3137,14 +3137,22 @@ function enviarRespuestaCotizacion() {
   av.style.display = 'block';
   av.innerHTML = '<div class="aviso-ok">📧 Enviando email...</div>';
   fetch('/admin/cotizaciones/' + cotizacionDetalleId + '/enviar', { method: 'POST' })
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      if (!r.ok) {
+        return r.json().then(function(d) { throw new Error(d.error || 'Error ' + r.status); });
+      }
+      return r.json();
+    })
     .then(function(data) {
       if (data.error) {
-        av.innerHTML = '<div class="aviso-error">Error: ' + data.error + '</div>';
+        av.innerHTML = '<div class="aviso-error">❌ Error: ' + data.error + '</div>';
         return;
       }
       av.innerHTML = '<div class="aviso-ok">✔ Email enviado correctamente al cliente.</div>';
       cargarCotizaciones();
+    })
+    .catch(function(err) {
+      av.innerHTML = '<div class="aviso-error">❌ ' + (err.message || 'Error de conexión') + '</div>';
     });
 }
 
