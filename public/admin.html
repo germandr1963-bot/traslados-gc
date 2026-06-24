@@ -2404,10 +2404,22 @@ function abrirEditorTexto(textoId) {
     '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="texto-campo-editor"></div>' +
     '<div id="texto-mensaje-editor" style="margin-top:8px;"></div>' +
+    (texto.modulo === 'Categorías de vehículo' ?
+      '<button class="boton-peligro" style="margin-top:10px;margin-right:8px;font-size:0.82rem;" onclick="limpiarTraduccionesCategoria(' + textoId + ')">🗑 Limpiar todas las traducciones</button>' : '') +
     '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-texto-interfaz\').classList.add(\'oculto\')">Cerrar</button>';
 
   cambiarIdiomaEditorTexto(textoId, IDIOMAS_TEXTOS[0], editor.querySelector('.tab-idioma'));
   editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function limpiarTraduccionesCategoria(textoId) {
+  if (!confirm('¿Limpiar todas las traducciones de esta categoría? Quedará pendiente para que la IA la traduzca de nuevo.')) return;
+  fetch('/admin/textos/' + textoId + '/traducciones', { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      document.getElementById('editor-texto-interfaz').classList.add('oculto');
+      cargarTextosInterfaz();
+    });
 }
 
 function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
