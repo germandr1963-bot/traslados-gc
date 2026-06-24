@@ -251,6 +251,9 @@ table.tabla-precios input {
           </thead>
           <tbody id="cuerpo-traducciones-destinos"></tbody>
         </table>
+        <div style="margin-top:1rem;display:flex;justify-content:flex-end;">
+          <button class="boton-primario" onclick="guardarTodasTraduccionesDestinos()">💾 Guardar todo</button>
+        </div>
       </div>
     </div>
 
@@ -2702,6 +2705,35 @@ function guardarTraduccionDestino(id) {
     av.style.display = 'block';
     av.innerHTML = '<div class="aviso-ok">✔ Guardado.</div>';
     setTimeout(function() { av.style.display = 'none'; }, 2000);
+  });
+}
+
+function guardarTodasTraduccionesDestinos() {
+  var lang = document.getElementById('select-lang-destinos').value;
+  if (!lang) return;
+  var inputs = document.querySelectorAll('#cuerpo-traducciones-destinos input[type="text"]');
+  var propuestas = [];
+  inputs.forEach(function(inp) {
+    if (inp.dataset.id) propuestas.push({ id: Number(inp.dataset.id), nombre: inp.value.trim() });
+  });
+  if (!propuestas.length) return;
+  fetch('/admin/destinos/traducciones/guardar-lote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang: lang, propuestas: propuestas })
+  }).then(function(r) { return r.json(); }).then(function() {
+    // Actualizar badges
+    propuestas.forEach(function(p) {
+      var badge = document.getElementById('badge-dest-' + p.id);
+      if (badge) {
+        badge.textContent = p.nombre ? '✔ Traducido' : '— Pendiente';
+        badge.style.color = p.nombre ? '#2d7a4f' : '#888';
+      }
+    });
+    var av = document.getElementById('aviso-traducciones-destinos');
+    av.style.display = 'block';
+    av.innerHTML = '<div class="aviso-ok">✔ Todas las traducciones guardadas.</div>';
+    setTimeout(function() { av.style.display = 'none'; }, 3000);
   });
 }
 
