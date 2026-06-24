@@ -2339,6 +2339,62 @@ app.post('/admin/destinos/traducciones/guardar-lote', requireAdmin, asyncHandler
   res.json({ ok: true });
 }));
 
+// ─── Admin: reservas ─────────────────────────────────────────────────────────
+
+app.get('/admin/reservas', requireAdmin, asyncHandler(async (req, res) => {
+  const { estado } = req.query;
+  let where = '';
+  const params = [];
+  if (estado && estado !== 'todas') {
+    where = 'WHERE r.estado = $1';
+    params.push(estado);
+  }
+  const result = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.nombre_cliente,
+            r.telefono_cliente, r.email_cliente, r.precio_estimado,
+            r.notas, r.estado, r.creado_en,
+            cv.nombre AS categoria_nombre
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     ${where}
+     ORDER BY r.creado_en DESC`,
+    params
+  );
+  res.json({ reservas: result.rows });
+}));
+
+app.get('/admin/reservas/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT r.*, cv.nombre AS categoria_nombre
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     WHERE r.id = $1`,
+    [req.params.id]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'Reserva no encontrada' });
+  const reserva = result.rows[0];
+
+  const extras = await pool.query(
+    `SELECT e.nombre, re.precio_en_reserva
+     FROM reservas_extras re
+     JOIN extras e ON e.id = re.extra_id
+     WHERE re.reserva_id = $1`,
+    [req.params.id]
+  );
+  reserva.extras = extras.rows;
+  res.json({ reserva });
+}));
+
+app.post('/admin/reservas/:id/estado', requireAdmin, asyncHandler(async (req, res) => {
+  const { estado } = req.body;
+  const estadosValidos = ['pendiente', 'confirmada', 'completada', 'cancelada'];
+  if (!estadosValidos.includes(estado)) {
+    return res.status(400).json({ error: 'Estado no válido' });
+  }
+  await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', [estado, req.params.id]);
+  res.json({ ok: true });
+}));
+
 // ─── Admin: extras ────────────────────────────────────────────────────────────
 app.get('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
