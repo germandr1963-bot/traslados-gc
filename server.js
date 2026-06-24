@@ -2424,47 +2424,71 @@ app.post('/admin/cotizaciones/:id/enviar', requireAdmin, asyncHandler(async (req
   }).join('');
 
   const html = `
-  <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;">
-    <div style="background:#2c2c2c;padding:24px;text-align:center;">
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body { margin:0; padding:0; background:#f5f5f5; }
+      .wrapper { max-width:600px; margin:0 auto; background:#fff; }
+      .header { background:#2c2c2c; padding:24px; text-align:center; }
+      .body { padding:24px; }
+      .tabla-datos { width:100%; border-collapse:collapse; margin:16px 0; }
+      .tabla-datos td { padding:8px 12px; font-size:14px; }
+      .tabla-precios { width:100%; border-collapse:collapse; }
+      .tabla-precios th { background:#2c2c2c; color:#fff; padding:8px 12px; text-align:left; font-size:13px; }
+      .tabla-precios td { padding:8px 12px; border-bottom:1px solid #eee; font-size:14px; }
+      .boton-cta { display:block; background:#d4956a; color:#fff; padding:14px 28px; border-radius:6px; text-decoration:none; font-weight:600; text-align:center; margin:24px auto; max-width:280px; }
+      .footer { background:#f5f0ea; padding:16px; text-align:center; font-size:12px; color:#888; }
+      .nota { font-size:12px; color:#999; margin-top:16px; line-height:1.6; }
+      @media (max-width:480px) {
+        .body { padding:16px; }
+        .tabla-datos td, .tabla-precios th, .tabla-precios td { padding:6px 8px; font-size:13px; }
+        .boton-cta { padding:12px 16px; font-size:14px; }
+      }
+    </style>
+  </head>
+  <body>
+  <div class="wrapper">
+    <div class="header">
       <h1 style="color:#d4956a;margin:0;font-size:22px;">Traslados GC</h1>
       <p style="color:#aaa;margin:4px 0 0 0;font-size:13px;">Gran Canaria</p>
     </div>
-    <div style="padding:32px 24px;">
-      <p>Hola,</p>
-      <p>Gracias por contactarnos. Aquí tienes los precios disponibles para tu traslado:</p>
-      <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+    <div class="body">
+      <p style="margin:0 0 8px 0;">Hola,</p>
+      <p style="margin:0 0 16px 0;">Gracias por contactarnos. Aquí tienes los precios disponibles para tu traslado:</p>
+      <table class="tabla-datos">
         <tr style="background:#f5f0ea;">
-          <td style="padding:8px 16px;font-weight:600;">Origen</td>
-          <td colspan="2" style="padding:8px 16px;">${c.origen}</td>
+          <td style="font-weight:600;width:40%;">Origen</td>
+          <td>${c.origen}</td>
         </tr>
         <tr>
-          <td style="padding:8px 16px;font-weight:600;">Destino</td>
-          <td colspan="2" style="padding:8px 16px;">${c.destino}</td>
+          <td style="font-weight:600;">Destino</td>
+          <td>${c.destino}</td>
         </tr>
         <tr style="background:#f5f0ea;">
-          <td style="padding:8px 16px;font-weight:600;">Fecha aproximada</td>
-          <td colspan="2" style="padding:8px 16px;">${fechaViaje}</td>
+          <td style="font-weight:600;">Fecha aproximada</td>
+          <td>${fechaViaje}</td>
         </tr>
-        ${c.num_pasajeros ? `<tr><td style="padding:8px 16px;font-weight:600;">Pasajeros</td><td colspan="2" style="padding:8px 16px;">${c.num_pasajeros}</td></tr>` : ''}
+        ${c.num_pasajeros ? `<tr><td style="font-weight:600;">Pasajeros</td><td>${c.num_pasajeros}</td></tr>` : ''}
       </table>
-      <h3 style="color:#2c2c2c;margin:24px 0 8px 0;">Opciones disponibles</h3>
-      <table style="width:100%;border-collapse:collapse;">
-        <tr style="background:#2c2c2c;color:#fff;">
-          <th style="padding:8px 16px;text-align:left;">Categoría</th>
-          <th style="padding:8px 16px;text-align:left;">Capacidad</th>
-          <th style="padding:8px 16px;text-align:left;">Precio estimado</th>
+      <h3 style="color:#2c2c2c;margin:20px 0 8px 0;font-size:15px;">Opciones disponibles</h3>
+      <table class="tabla-precios">
+        <tr>
+          <th>Categoría</th>
+          <th>Capacidad</th>
+          <th>Precio estimado</th>
         </tr>
         ${filasPrecios}
       </table>
-      <p style="margin-top:24px;font-size:13px;color:#888;">El precio es una estimación basada en el taxímetro. El cobro final lo realiza el conductor directamente.</p>
-      <div style="margin-top:32px;text-align:center;">
-        <a href="https://traslados-gc.onrender.com" style="background:#d4956a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;">Ver todas las rutas disponibles</a>
-      </div>
+      <p class="nota">El precio es una estimación basada en los km de distancia. El precio final es lo que marca el taxímetro del conductor. El cobro lo realiza el conductor directamente.</p>
+      <a href="https://traslados-gc.onrender.com" class="boton-cta">Ver todas las rutas disponibles</a>
     </div>
-    <div style="background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;">
-      Traslados GC · Gran Canaria
-    </div>
-  </div>`;
+    <div class="footer">Traslados GC · Gran Canaria</div>
+  </div>
+  </body>
+  </html>`;
 
   try {
     await enviarEmail({
