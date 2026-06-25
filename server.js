@@ -553,6 +553,28 @@ async function initSchema() {
 
   await cargarIdiomasCache();
 
+  // ─── Configuración No-Show ───────────────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS configuracion_noshow (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL DEFAULT 'General',
+      es_general BOOLEAN DEFAULT FALSE,
+      fecha_inicio DATE,
+      fecha_fin DATE,
+      importe_deposito NUMERIC(10,2) NOT NULL DEFAULT 10.00,
+      horas_cancelacion INT NOT NULL DEFAULT 12,
+      activa BOOLEAN DEFAULT TRUE,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  // Insertar configuración general si no existe
+  await pool.query(`
+    INSERT INTO configuracion_noshow (nombre, es_general, importe_deposito, horas_cancelacion)
+    SELECT 'General', TRUE, 10.00, 12
+    WHERE NOT EXISTS (SELECT 1 FROM configuracion_noshow WHERE es_general = TRUE)
+  `);
+
   // ─── Cotizaciones ────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS cotizaciones (
@@ -2416,6 +2438,79 @@ app.post('/admin/tarifario/calcular', requireAdmin, asyncHandler(async (req, res
     (con_suplemento ? parseFloat(t.suplemento_aeropuerto) : 0);
 
   res.json({ precio: Math.max(precio, parseFloat(t.bajada_bandera)).toFixed(2) });
+}));
+
+// ─── Admin: configuración no-show ────────────────────────────────────────────
+
+// Obtener toda la configuración (general + temporadas)
+app.get('/admin/noshow', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT * FROM configuracion_noshow ORDER BY es_general DESC, fecha_inicio ASC'
+  );
+  res.json({ configuracion: result.rows });
+}));
+
+// Guardar configuración general
+app.post('/admin/noshow/general', requireAdmin, asyncHandler(async (req, res) => {
+  const { importe_deposito, horas_cancelacion } = req.body;
+  await pool.query(
+    'UPDATE configuracion_noshow SET importe_deposito = $1, horas_cancelacion = $2 WHERE es_general = TRUE',
+    [importe_deposito, horas_cancelacion]
+  );
+  res.json({ ok: true });
+}));
+
+// Crear temporada
+app.post('/admin/noshow/temporada', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, fecha_inicio, fecha_fin, importe_deposito, horas_cancelacion } = req.body;
+  if (!nombre || !fecha_inicio || !fecha_fin || !importe_deposito || !horas_cancelacion) {
+    return res.status(400).json({ error: 'Todos los campos son obligatorios.' });
+  }
+  if (fecha_inicio >= fecha_fin) {
+    return res.status(400).json({ error: 'La fecha de inicio debe ser anterior a la fecha de fin.' });
+  }
+  await pool.query(
+    `INSERT INTO configuracion_noshow (nombre, es_general, fecha_inicio, fecha_fin, importe_deposito, horas_cancelacion)
+     VALUES ($1, FALSE, $2, $3, $4, $5)`,
+    [nombre, fecha_inicio, fecha_fin, importe_deposito, horas_cancelacion]
+  );
+  res.json({ ok: true });
+}));
+
+// Editar temporada
+app.post('/admin/noshow/temporada/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, fecha_inicio, fecha_fin, importe_deposito, horas_cancelacion, activa } = req.body;
+  await pool.query(
+    `UPDATE configuracion_noshow SET nombre=$1, fecha_inicio=$2, fecha_fin=$3,
+     importe_deposito=$4, horas_cancelacion=$5, activa=$6 WHERE id=$7 AND es_general=FALSE`,
+    [nombre, fecha_inicio, fecha_fin, importe_deposito, horas_cancelacion, activa !== false, req.params.id]
+  );
+  res.json({ ok: true });
+}));
+
+// Eliminar temporada
+app.delete('/admin/noshow/temporada/:id', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM configuracion_noshow WHERE id=$1 AND es_general=FALSE', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Consultar condiciones aplicables a una fecha (usado al confirmar reserva)
+app.get('/admin/noshow/para-fecha/:fecha', requireAdmin, asyncHandler(async (req, res) => {
+  const { fecha } = req.params;
+  // Buscar temporada activa que cubra esa fecha
+  const temporada = await pool.query(
+    `SELECT * FROM configuracion_noshow
+     WHERE es_general = FALSE AND activa = TRUE
+     AND fecha_inicio <= $1 AND fecha_fin >= $1
+     ORDER BY fecha_inicio DESC LIMIT 1`,
+    [fecha]
+  );
+  if (temporada.rows.length) {
+    return res.json({ condiciones: temporada.rows[0], fuente: 'temporada' });
+  }
+  // Fallback a configuración general
+  const general = await pool.query('SELECT * FROM configuracion_noshow WHERE es_general = TRUE LIMIT 1');
+  res.json({ condiciones: general.rows[0], fuente: 'general' });
 }));
 
 // ─── Admin: destinos ──────────────────────────────────────────────────────────
