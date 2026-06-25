@@ -720,6 +720,9 @@ async function initSchema() {
       ADD COLUMN IF NOT EXISTS pasaporte_dni TEXT
   `);
 
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email_confirmacion_enviado BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email_voucher_enviado BOOLEAN DEFAULT FALSE`);
+
   // ─── Reservas × Extras ────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS reservas_extras (
@@ -3329,6 +3332,163 @@ app.get('/admin/conductores-aprobados', requireAdmin, asyncHandler(async (req, r
     ['aprobado']
   );
   res.json({ conductores: result.rows });
+}));
+
+// ─── Admin: emails de reserva ────────────────────────────────────────────────
+
+app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(async (req, res) => {
+  const reserva = await pool.query(
+    `SELECT r.*, cv.nombre AS categoria_nombre, c.nombre AS conductor_nombre
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     LEFT JOIN conductores c ON c.id = r.conductor_id
+     WHERE r.id = $1`,
+    [req.params.id]
+  );
+  if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada' });
+  const r = reserva.rows[0];
+
+  // Obtener condiciones de no-show para la fecha del viaje
+  const noshow = await pool.query(
+    `SELECT * FROM configuracion_noshow
+     WHERE es_general = FALSE AND activa = TRUE
+     AND fecha_inicio <= $1 AND fecha_fin >= $1
+     ORDER BY fecha_inicio DESC LIMIT 1`,
+    [r.fecha]
+  );
+  let condiciones = noshow.rows[0];
+  if (!condiciones) {
+    const general = await pool.query('SELECT * FROM configuracion_noshow WHERE es_general = TRUE LIMIT 1');
+    condiciones = general.rows[0];
+  }
+
+  const importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
+  const horas = condiciones ? condiciones.horas_cancelacion : 12;
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <style>
+    body{margin:0;padding:0;background:#f5f5f5;}
+    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+    .header{background:#2c2c2c;padding:24px;text-align:center;}
+    .body{padding:28px 24px;}
+    .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
+    .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;font-size:14px;line-height:1.8;}
+    .deposito-box{background:#d1e7dd;border-radius:8px;padding:16px 18px;margin:16px 0;}
+    .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
+    @media(max-width:480px){.body{padding:16px;}}
+  </style></head><body>
+  <div class="wrapper">
+    <div class="header">
+      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
+      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+    </div>
+    <div class="body">
+      <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+      <p>¡Tu traslado está confirmado! Hemos asignado un conductor para tu servicio.</p>
+      <p style="text-align:center;margin:20px 0;">Reserva <span class="pnr">${r.numero_reserva}</span></p>
+      <div class="info-box">
+        <strong>Detalles del traslado:</strong><br>
+        Origen: ${r.origen || '—'}<br>
+        Destino: ${r.destino || '—'}<br>
+        Fecha: ${fechaViaje}<br>
+        Hora: ${r.hora ? r.hora.slice(0,5) : '—'}<br>
+        Categoría: ${r.categoria_nombre || '—'}<br>
+        ${r.conductor_nombre ? 'Conductor: ' + r.conductor_nombre : ''}
+      </div>
+      <div class="deposito-box">
+        <p style="margin:0 0 8px 0;font-weight:600;color:#0f5132;">💳 Depósito de garantía — ${importe} €</p>
+        <p style="margin:0;font-size:13px;color:#0f5132;">Para confirmar tu reserva, es necesario abonar un depósito de garantía de <strong>${importe} €</strong>. Este importe te será devuelto íntegramente una vez completado el servicio.</p>
+        <p style="margin:8px 0 0 0;font-size:12px;color:#555;"><strong>Política de cancelación:</strong> Si cancelas con menos de ${horas} horas de antelación o no te presentas, el depósito no será reembolsable.</p>
+      </div>
+      <p style="font-size:13px;color:#888;">Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.</p>
+    </div>
+    <div class="footer">Traslados GC · Gran Canaria</div>
+  </div></body></html>`;
+
+  try {
+    await enviarEmail({
+      to: r.email_cliente,
+      subject: 'Traslado confirmado — ' + r.numero_reserva,
+      html
+    });
+    await pool.query(
+      'UPDATE reservas SET email_confirmacion_enviado = TRUE WHERE id = $1',
+      [req.params.id]
+    );
+    res.json({ ok: true });
+  } catch(err) {
+    res.status(500).json({ error: 'Error enviando email: ' + err.message });
+  }
+}));
+
+app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (req, res) => {
+  const reserva = await pool.query(
+    `SELECT r.*, cv.nombre AS categoria_nombre, c.nombre AS conductor_nombre, c.telefono AS conductor_telefono
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     LEFT JOIN conductores c ON c.id = r.conductor_id
+     WHERE r.id = $1`,
+    [req.params.id]
+  );
+  if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada' });
+  const r = reserva.rows[0];
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <style>
+    body{margin:0;padding:0;background:#f5f5f5;}
+    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+    .header{background:#2c2c2c;padding:24px;text-align:center;}
+    .body{padding:28px 24px;}
+    .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
+    .voucher-box{border:2px solid #d4956a;border-radius:10px;padding:20px;margin:20px 0;}
+    .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;font-size:14px;line-height:1.8;}
+    .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
+    @media(max-width:480px){.body{padding:16px;}}
+  </style></head><body>
+  <div class="wrapper">
+    <div class="header">
+      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
+      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+    </div>
+    <div class="body">
+      <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+      <p>Adjuntamos tu voucher de traslado. Muéstraselo a tu conductor al inicio del servicio.</p>
+      <div class="voucher-box">
+        <p style="text-align:center;margin:0 0 16px 0;font-size:12px;color:#888;letter-spacing:1px;">VOUCHER DE TRASLADO</p>
+        <p style="text-align:center;margin:0 0 16px 0;">Nº <span class="pnr">${r.numero_reserva}</span></p>
+        <div class="info-box" style="margin:0;">
+          <strong>Origen:</strong> ${r.origen || '—'}<br>
+          <strong>Destino:</strong> ${r.destino || '—'}<br>
+          <strong>Fecha:</strong> ${fechaViaje}<br>
+          <strong>Hora:</strong> ${r.hora ? r.hora.slice(0,5) : '—'}<br>
+          <strong>Categoría:</strong> ${r.categoria_nombre || '—'}<br>
+          <strong>Pasajeros:</strong> ${r.num_pasajeros || '—'}<br>
+          ${r.conductor_nombre ? '<strong>Conductor:</strong> ' + r.conductor_nombre : ''}
+        </div>
+      </div>
+      <p style="font-size:13px;color:#888;">El precio final será el que marque el taxímetro. Los extras contratados se abonan directamente al conductor. Ante cualquier duda contacta con nosotros por WhatsApp.</p>
+    </div>
+    <div class="footer">Traslados GC · Gran Canaria</div>
+  </div></body></html>`;
+
+  try {
+    await enviarEmail({
+      to: r.email_cliente,
+      subject: 'Voucher de traslado — ' + r.numero_reserva,
+      html
+    });
+    await pool.query(
+      'UPDATE reservas SET email_voucher_enviado = TRUE WHERE id = $1',
+      [req.params.id]
+    );
+    res.json({ ok: true });
+  } catch(err) {
+    res.status(500).json({ error: 'Error enviando email: ' + err.message });
+  }
 }));
 
 // ─── Admin: extras ────────────────────────────────────────────────────────────
