@@ -931,6 +931,53 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     }
   }
 
+  // Email de pre-reserva al cliente
+  try {
+    const fechaTexto = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+    const htmlEmail = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <style>
+      body{margin:0;padding:0;background:#f5f5f5;}
+      .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+      .header{background:#2c2c2c;padding:24px;text-align:center;}
+      .body{padding:28px 24px;}
+      .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
+      .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;font-size:14px;line-height:1.8;}
+      .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
+      @media(max-width:480px){.body{padding:16px;}}
+    </style></head><body>
+    <div class="wrapper">
+      <div class="header">
+        <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
+        <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+      </div>
+      <div class="body">
+        <p>Hola <strong>${nombre_cliente.trim()}</strong>,</p>
+        <p>Hemos recibido tu solicitud de traslado. Estamos trabajando en ella y en breve recibirás confirmación.</p>
+        <p>Tu número de reserva es:</p>
+        <p style="text-align:center;margin:20px 0;"><span class="pnr">${numeroReserva}</span></p>
+        <div class="info-box">
+          <strong>Detalles de tu solicitud:</strong><br>
+          Origen: ${origen}<br>
+          Destino: ${destino}<br>
+          Fecha: ${fechaTexto}<br>
+          Pasajeros: ${num_pasajeros || '—'}
+        </div>
+        <p style="font-size:13px;color:#888;">Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.</p>
+      </div>
+      <div class="footer">Traslados GC · Gran Canaria</div>
+    </div></body></html>`;
+
+    await enviarEmail({
+      to: email_cliente.trim(),
+      subject: 'Solicitud de traslado recibida — ' + numeroReserva,
+      html: htmlEmail
+    });
+  } catch(emailErr) {
+    console.warn('Error enviando email pre-reserva:', emailErr.message);
+    // No bloqueamos la respuesta si el email falla
+  }
+
   res.json({ ok: true, reserva_id: reservaId, numero_reserva: numeroReserva });
 }));
 
@@ -2955,11 +3002,11 @@ app.get('/admin/reservas', requireAdmin, asyncHandler(async (req, res) => {
   const params = [];
   const condiciones = [];
 
-  // Archivadas o activas
+  // Archivadas o activas (incluir NULL como no archivada)
   if (archivo === 'si') {
     condiciones.push('r.archivada = TRUE');
   } else {
-    condiciones.push('r.archivada = FALSE');
+    condiciones.push('(r.archivada = FALSE OR r.archivada IS NULL)');
   }
 
   // Filtro por estado
@@ -3024,7 +3071,7 @@ app.get('/admin/reservas/excel', requireAdmin, asyncHandler(async (req, res) => 
   if (archivo === 'si') {
     condiciones.push('r.archivada = TRUE');
   } else {
-    condiciones.push('r.archivada = FALSE');
+    condiciones.push('(r.archivada = FALSE OR r.archivada IS NULL)');
   }
   if (estado && estado !== 'todas') {
     params.push(estado);
