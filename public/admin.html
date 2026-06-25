@@ -533,6 +533,7 @@ table.tabla-precios input {
     <div id="seccion-reservas" class="oculto">
       <h1>Reservas</h1>
       <p class="subtitulo">Solicitudes de traslado recibidas. Gestiona el estado de cada una.</p>
+      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="cargarReservas(false)" style="font-size:0.85rem;">🔄 Actualizar</button></div>
 
       <!-- Fila de filtros: estado + periodo + archivo -->
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;align-items:center;">
@@ -593,11 +594,10 @@ table.tabla-precios input {
       <div id="detalle-reserva" class="oculto" style="margin-top:2rem;border:1px solid var(--gris-borde);border-radius:12px;padding:1.5rem;background:#fff;">
         <h2 id="detalle-titulo" style="font-size:1.1rem;margin:0 0 1rem 0;"></h2>
         <div id="detalle-contenido"></div>
-        <div style="margin-top:1.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;" id="detalle-botones-estado"></div>
 
-        <!-- Asignación manual de chofer -->
+        <!-- 1. Asignación de chofer PRIMERO -->
         <div style="margin-top:1.25rem;padding:1rem;border:1px solid var(--gris-borde);border-radius:8px;background:#f9f7f4;">
-          <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.5rem 0;">👤 Asignar chofer</p>
+          <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.5rem 0;">👤 Paso 1 — Asignar chofer</p>
           <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
             <select id="select-chofer-detalle" class="campo" style="width:260px;height:36px;font-size:0.85rem;">
               <option value="">— Sin asignar —</option>
@@ -607,7 +607,13 @@ table.tabla-precios input {
           <div id="aviso-chofer-detalle" style="display:none;margin-top:0.5rem;font-size:0.82rem;"></div>
         </div>
 
-        <div style="margin-top:1rem;display:flex;gap:0.5rem;">
+        <!-- 2. Cambiar estado DESPUÉS -->
+        <div style="margin-top:1rem;padding:1rem;border:1px solid var(--gris-borde);border-radius:8px;background:#f9f7f4;">
+          <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">📋 Paso 2 — Cambiar estado</p>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="detalle-botones-estado"></div>
+        </div>
+
+        <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
           <button class="boton-costa" style="font-size:0.82rem;" onclick="archivarDesdeDetalle()">📦 Archivar</button>
           <button class="boton-peligro" style="font-size:0.82rem;" onclick="borrarDesdeDetalle()">🗑 Borrar reserva</button>
           <button class="boton-costa" style="font-size:0.82rem;" onclick="cerrarDetalleReserva()">Cerrar</button>

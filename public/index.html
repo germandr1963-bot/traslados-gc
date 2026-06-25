@@ -284,11 +284,8 @@ footer {
         <button id="ver-precio" class="boton-primario" style="padding:10px 40px;">Ver precio</button>
       </div>
       <div id="resultado-precio">Elige una ruta y categoría para ver el precio</div>
-      <div id="zona-ayuda-busqueda" style="margin-top:16px;">
-        <p style="text-align:center;font-size:0.82rem;color:#888;margin:0 0 6px 0;">Para ver el precio de otras categorías, selecciónala y pulsa Ver precio.</p>
-        <div style="text-align:center;">
-          <button onclick="abrirFormCotizacion()" style="background:none;border:none;color:#d4956a;cursor:pointer;font-size:0.9rem;text-decoration:underline;">¿No encuentras tu ruta? Pídenos precio →</button>
-        </div>
+      <div style="text-align:center;margin-top:16px;">
+        <button onclick="abrirFormCotizacion()" style="background:none;border:none;color:#d4956a;cursor:pointer;font-size:0.9rem;text-decoration:underline;">¿No encuentras tu ruta? Pídenos precio →</button>
       </div>
     </div>
   </div>
@@ -327,8 +324,8 @@ footer {
       </div>
       <div id="cotiz-error" style="color:#e07b5a;font-size:0.82rem;display:none;"></div>
       <div id="cotiz-ok" style="color:#2d7a4f;font-size:0.85rem;display:none;text-align:center;padding:0.75rem;background:#d1e7dd;border-radius:6px;"></div>
-      <button onclick="enviarCotizacion()" class="boton-primario" style="width:100%;margin-top:0.5rem;">Enviar solicitud</button>
-      <button onclick="cerrarFormCotizacion()" style="width:100%;background:#f5f0ea;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:0.9rem;padding:0.6rem;">Cancelar</button>
+      <button id="btn-enviar-cotizacion" onclick="enviarCotizacion()" class="boton-primario" style="width:100%;margin-top:0.5rem;">Enviar solicitud</button>
+      <button id="btn-cancelar-cotizacion" onclick="cerrarFormCotizacion()" style="width:100%;background:#f5f0ea;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:0.9rem;padding:0.6rem;">Cancelar</button>
     </div>
   </div>
 </div>
@@ -430,8 +427,6 @@ function actualizarCategoriasSegunRuta() {
   // Limpiar resultado si la categoría ya no es válida
   if (valorActual && !categoriasRuta.find(function(c) { return String(c.id) === String(valorActual); })) {
     document.getElementById('resultado-precio').innerHTML = '';
-    var zonaAyuda = document.getElementById('zona-ayuda-busqueda');
-    if (zonaAyuda) zonaAyuda.style.display = 'block';
   }
 }
 
@@ -443,8 +438,6 @@ function verPrecio() {
 
   if (!desdeVal || !hastaVal || !categoriaId) {
     resultado.innerHTML = '<div class="resultado-vacio">Elige una ruta y categoría para ver el precio</div>';
-    var zonaAyuda = document.getElementById('zona-ayuda-busqueda');
-    if (zonaAyuda) zonaAyuda.style.display = 'block';
     return;
   }
 
@@ -487,10 +480,6 @@ function verPrecio() {
 
       var botonHtml = '<button class="boton-reservar" onclick="irAReserva()">Reservar este traslado →</button>';
 
-      // Ocultar zona de ayuda cuando se muestra el resultado
-      var zonaAyuda = document.getElementById('zona-ayuda-busqueda');
-      if (zonaAyuda) zonaAyuda.style.display = 'none';
-
       resultado.innerHTML =
         '<div class="tarjeta-resultado">' +
           fotoHtml +
@@ -504,7 +493,8 @@ function verPrecio() {
             '<div class="tarjeta-resultado-nota">El precio final lo determina<br>el taxímetro del conductor.</div>' +
           '</div>' +
           botonHtml +
-        '</div>';
+        '</div>' +
+        '<p style="text-align:center;font-size:0.82rem;color:#aaa;margin:12px 0 0 0;">Para ver el precio de otras categorías, selecciónala y pulsa Ver precio.</p>';
     });
 }
 
@@ -535,6 +525,18 @@ function abrirFormCotizacion() {
 
 function cerrarFormCotizacion() {
   document.getElementById('modal-cotizacion').style.display = 'none';
+  // Restaurar botones para próxima vez
+  var btnEnviar = document.getElementById('btn-enviar-cotizacion');
+  var btnCancelar = document.getElementById('btn-cancelar-cotizacion');
+  if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = 'Enviar solicitud'; btnEnviar.style.display = ''; }
+  if (btnCancelar) btnCancelar.textContent = 'Cancelar';
+  document.getElementById('cotiz-origen').value = '';
+  document.getElementById('cotiz-destino').value = '';
+  document.getElementById('cotiz-fecha').value = '';
+  document.getElementById('cotiz-pax').value = '';
+  document.getElementById('cotiz-email').value = '';
+  document.getElementById('cotiz-error').style.display = 'none';
+  document.getElementById('cotiz-ok').style.display = 'none';
 }
 
 function enviarCotizacion() {
@@ -560,6 +562,11 @@ function enviarCotizacion() {
     return;
   }
 
+  // Deshabilitar botón para evitar doble envío
+  var btnEnviar = document.getElementById('btn-enviar-cotizacion');
+  var btnCancelar = document.getElementById('btn-cancelar-cotizacion');
+  if (btnEnviar) { btnEnviar.disabled = true; btnEnviar.textContent = 'Enviando...'; }
+
   fetch('/api/cotizaciones', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -570,23 +577,19 @@ function enviarCotizacion() {
     if (data.error) {
       err.textContent = data.error;
       err.style.display = 'block';
+      if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = 'Enviar solicitud'; }
       return;
     }
-    ok.textContent = '✔ Solicitud enviada. Te responderemos a ' + email + ' con los precios disponibles.';
+    // Ocultar botones y mostrar mensaje de éxito
+    if (btnEnviar) btnEnviar.style.display = 'none';
+    if (btnCancelar) btnCancelar.textContent = 'Cerrar';
+    ok.innerHTML = '<strong>✔ Solicitud enviada</strong><br>Te responderemos a <strong>' + email + '</strong> en breve.';
     ok.style.display = 'block';
-    // Limpiar y cerrar después de 4 segundos
-    setTimeout(function() {
-      document.getElementById('cotiz-origen').value = '';
-      document.getElementById('cotiz-destino').value = '';
-      document.getElementById('cotiz-fecha').value = '';
-      document.getElementById('cotiz-pax').value = '';
-      document.getElementById('cotiz-email').value = '';
-      cerrarFormCotizacion();
-    }, 4000);
   })
   .catch(function() {
     err.textContent = 'Error de conexión. Inténtalo de nuevo.';
     err.style.display = 'block';
+    if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = 'Enviar solicitud'; }
   });
 }
 
