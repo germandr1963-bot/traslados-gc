@@ -3326,10 +3326,19 @@ app.post('/admin/reservas/borrar-lote', requireAdmin, asyncHandler(async (req, r
 // Asignar chofer manualmente a una reserva
 app.post('/admin/reservas/:id/chofer', requireAdmin, asyncHandler(async (req, res) => {
   const { conductor_id } = req.body;
-  await pool.query(
-    'UPDATE reservas SET conductor_id = $1 WHERE id = $2',
-    [conductor_id || null, req.params.id]
-  );
+  if (conductor_id) {
+    // Al asignar chofer → estado pasa a Confirmada
+    await pool.query(
+      'UPDATE reservas SET conductor_id = $1, estado = $2 WHERE id = $3',
+      [conductor_id, 'confirmada', req.params.id]
+    );
+  } else {
+    // Si se quita el chofer → vuelve a Pendiente
+    await pool.query(
+      'UPDATE reservas SET conductor_id = NULL, estado = $1 WHERE id = $2',
+      ['pendiente', req.params.id]
+    );
+  }
   res.json({ ok: true });
 }));
 
@@ -3423,8 +3432,8 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
 
     // Marcar depósito como pagado
     await pool.query(
-      'UPDATE reservas SET deposito_pagado = TRUE, estado = $1 WHERE id = $2',
-      ['confirmada', reservaId]
+      'UPDATE reservas SET deposito_pagado = TRUE WHERE id = $1',
+      [reservaId]
     );
 
     // Obtener datos de la reserva para el voucher
@@ -3668,8 +3677,9 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
       </div>
       <div class="deposito-box">
         <p style="margin:0 0 8px 0;font-weight:600;color:#0f5132;">💳 Depósito de garantía — ${importe} €</p>
-        <p style="margin:0;font-size:13px;color:#0f5132;">Para confirmar definitivamente tu reserva, es necesario abonar un depósito de <strong>${importe} €</strong>. Este importe te será devuelto íntegramente una vez completado el servicio.</p>
-        <p style="margin:8px 0 0 0;font-size:12px;color:#555;"><strong>Política de cancelación:</strong> Si cancelas con menos de ${horas} horas de antelación o no te presentas, el depósito no será reembolsable.</p>
+        <p style="margin:0 0 8px 0;font-size:13px;color:#0f5132;">Para garantizar tu plaza, realiza el pago del depósito de <strong>${importe} €</strong>. El voucher de tu traslado te llegará automáticamente al confirmar el pago.</p>
+        <p style="margin:0 0 8px 0;font-size:13px;color:#c0392b;"><strong>⚠️ Importante:</strong> Si no recibimos el pago ${horas} horas antes de tu traslado, la reserva será cancelada.</p>
+        <p style="margin:0;font-size:12px;color:#555;">El depósito te será devuelto íntegramente una vez completado el servicio. No es reembolsable en caso de no presentarse o cancelar con menos de ${horas} horas de antelación.</p>
       </div>
       ${botonPago}
       <p style="font-size:13px;color:#888;">Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.</p>
