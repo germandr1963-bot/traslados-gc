@@ -1,4 +1,5 @@
 const express = require('express');
+const Stripe = require('stripe');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
@@ -9,6 +10,9 @@ const ExcelJS = require('exceljs');
 const { medirPxTitulo, medirPxDescripcion } = require('./medidor-pixeles');
 
 const app = express();
+
+// ─── Stripe ───────────────────────────────────────────────────────────────────
+const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 // ─── Email (Nodemailer / Gmail) ───────────────────────────────────────────────
 // ─── Email via Resend ─────────────────────────────────────────────────────────
@@ -61,6 +65,8 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB para permitir Excel de traducciones
 });
 
+// El webhook de Stripe necesita el body sin parsear — va ANTES del JSON middleware
+app.use('/webhook/stripe', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -721,6 +727,8 @@ async function initSchema() {
   `);
 
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email_confirmacion_enviado BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS stripe_session_id TEXT`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_pagado BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email_voucher_enviado BOOLEAN DEFAULT FALSE`);
 
   // ─── Reservas × Extras ────────────────────────────────────────────────────
@@ -3334,6 +3342,227 @@ app.get('/admin/conductores-aprobados', requireAdmin, asyncHandler(async (req, r
   res.json({ conductores: result.rows });
 }));
 
+// ─── Stripe: pagos ────────────────────────────────────────────────────────────
+
+// Crear sesión de pago en Stripe para el depósito de una reserva
+app.post('/admin/reservas/:id/stripe-session', requireAdmin, asyncHandler(async (req, res) => {
+  if (!stripe) return res.status(500).json({ error: 'Stripe no configurado. Añade STRIPE_SECRET_KEY en Render.' });
+
+  const reserva = await pool.query('SELECT * FROM reservas WHERE id = $1', [req.params.id]);
+  if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada' });
+  const r = reserva.rows[0];
+
+  // Obtener importe del depósito según fecha del viaje
+  const noshow = await pool.query(
+    `SELECT * FROM configuracion_noshow
+     WHERE es_general = FALSE AND activa = TRUE
+     AND fecha_inicio <= $1 AND fecha_fin >= $1
+     ORDER BY fecha_inicio DESC LIMIT 1`,
+    [r.fecha]
+  );
+  let condiciones = noshow.rows[0];
+  if (!condiciones) {
+    const general = await pool.query('SELECT * FROM configuracion_noshow WHERE es_general = TRUE LIMIT 1');
+    condiciones = general.rows[0];
+  }
+  const importe = condiciones ? Math.round(parseFloat(condiciones.importe_deposito) * 100) : 1000; // en céntimos
+
+  // Detectar idioma de la reserva para Stripe
+  const lang = r.lang_cliente || 'es';
+  const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ['card'],
+    mode: 'payment',
+    locale: lang,
+    line_items: [{
+      price_data: {
+        currency: 'eur',
+        unit_amount: importe,
+        product_data: {
+          name: 'Depósito de garantía — Traslado ' + r.numero_reserva,
+          description: (r.origen || '') + ' → ' + (r.destino || '') +
+            (r.fecha ? ' · ' + new Date(r.fecha).toLocaleDateString('es-ES') : '')
+        }
+      },
+      quantity: 1
+    }],
+    customer_email: r.email_cliente,
+    success_url: BASE_URL + '/pago-exitoso?reserva=' + r.numero_reserva + '&session_id={CHECKOUT_SESSION_ID}',
+    cancel_url: BASE_URL + '/pago-cancelado?reserva=' + r.numero_reserva,
+    metadata: { reserva_id: String(r.id), numero_reserva: r.numero_reserva }
+  });
+
+  // Guardar session_id en la reserva
+  await pool.query('UPDATE reservas SET stripe_session_id = $1 WHERE id = $2', [session.id, r.id]);
+
+  res.json({ ok: true, url: session.url });
+}));
+
+// Webhook de Stripe — recibe confirmaciones de pago
+app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHandler(async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  let event;
+  try {
+    if (webhookSecret) {
+      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    } else {
+      event = JSON.parse(req.body.toString());
+    }
+  } catch (err) {
+    console.error('Webhook error:', err.message);
+    return res.status(400).send('Webhook error: ' + err.message);
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const reservaId = session.metadata && session.metadata.reserva_id;
+    if (!reservaId) return res.json({ received: true });
+
+    // Marcar depósito como pagado
+    await pool.query(
+      'UPDATE reservas SET deposito_pagado = TRUE, estado = $1 WHERE id = $2',
+      ['confirmada', reservaId]
+    );
+
+    // Obtener datos de la reserva para el voucher
+    const reserva = await pool.query(
+      `SELECT r.*, cv.nombre AS categoria_nombre, c.nombre AS conductor_nombre
+       FROM reservas r
+       LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+       LEFT JOIN conductores c ON c.id = r.conductor_id
+       WHERE r.id = $1`,
+      [reservaId]
+    );
+
+    if (reserva.rows.length) {
+      const r = reserva.rows[0];
+      const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+
+      const htmlVoucher = `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1.0">
+      <style>
+        body{margin:0;padding:0;background:#f5f5f5;}
+        .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+        .header{background:#2c2c2c;padding:24px;text-align:center;}
+        .body{padding:28px 24px;}
+        .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
+        .voucher-box{border:2px solid #d4956a;border-radius:10px;padding:20px;margin:20px 0;}
+        .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;font-size:14px;line-height:1.8;}
+        .pagado{background:#d1e7dd;border-radius:6px;padding:10px 16px;margin:16px 0;color:#0f5132;font-size:13px;}
+        .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
+        @media(max-width:480px){.body{padding:16px;}}
+      </style></head><body>
+      <div class="wrapper">
+        <div class="header">
+          <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
+          <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+        </div>
+        <div class="body">
+          <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+          <div class="pagado">✔ Depósito recibido correctamente. Tu reserva está confirmada.</div>
+          <div class="voucher-box">
+            <p style="text-align:center;margin:0 0 16px 0;font-size:12px;color:#888;letter-spacing:1px;">VOUCHER DE TRASLADO</p>
+            <p style="text-align:center;margin:0 0 16px 0;">Nº <span class="pnr">${r.numero_reserva}</span></p>
+            <div class="info-box" style="margin:0;">
+              <strong>Origen:</strong> ${r.origen || '—'}<br>
+              <strong>Destino:</strong> ${r.destino || '—'}<br>
+              <strong>Fecha:</strong> ${fechaViaje}<br>
+              <strong>Hora:</strong> ${r.hora ? r.hora.slice(0,5) : '—'}<br>
+              <strong>Categoría:</strong> ${r.categoria_nombre || '—'}<br>
+              <strong>Pasajeros:</strong> ${r.num_pasajeros || '—'}<br>
+              ${r.conductor_nombre ? '<strong>Conductor:</strong> ' + r.conductor_nombre : ''}
+            </div>
+          </div>
+          <p style="font-size:13px;color:#888;">Muestra este voucher a tu conductor al inicio del servicio. El precio final será el que marque el taxímetro.</p>
+        </div>
+        <div class="footer">Traslados GC · Gran Canaria</div>
+      </div></body></html>`;
+
+      try {
+        await enviarEmail({
+          to: r.email_cliente,
+          subject: '✔ Voucher de traslado — ' + r.numero_reserva,
+          html: htmlVoucher
+        });
+        await pool.query('UPDATE reservas SET email_voucher_enviado = TRUE WHERE id = $1', [reservaId]);
+      } catch(emailErr) {
+        console.warn('Error enviando voucher automático:', emailErr.message);
+      }
+    }
+  }
+
+  if (event.type === 'checkout.session.expired' || event.type === 'payment_intent.payment_failed') {
+    const session = event.data.object;
+    const reservaId = session.metadata && session.metadata.reserva_id;
+    if (!reservaId) return res.json({ received: true });
+
+    const reserva = await pool.query('SELECT * FROM reservas WHERE id = $1', [reservaId]);
+    if (reserva.rows.length) {
+      const r = reserva.rows[0];
+      try {
+        await enviarEmail({
+          to: r.email_cliente,
+          subject: 'Problema con el pago — ' + r.numero_reserva,
+          html: `<!DOCTYPE html><html><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body>
+          <div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif;">
+            <div style="background:#2c2c2c;padding:24px;text-align:center;">
+              <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
+            </div>
+            <div style="padding:24px;">
+              <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+              <p>No hemos podido procesar el pago del depósito para tu reserva <strong>${r.numero_reserva}</strong>.</p>
+              <p>Por favor contacta con nosotros por WhatsApp para resolver el pago y confirmar tu traslado.</p>
+              <p style="color:#888;font-size:13px;">Si crees que es un error, puedes intentarlo de nuevo respondiendo a este email.</p>
+            </div>
+            <div style="background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;">Traslados GC · Gran Canaria</div>
+          </div></body></html>`
+        });
+      } catch(emailErr) {
+        console.warn('Error enviando aviso de pago fallido:', emailErr.message);
+      }
+    }
+  }
+
+  res.json({ received: true });
+}));
+
+// Páginas de retorno de Stripe
+app.get('/pago-exitoso', (req, res) => {
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Pago completado</title>
+  <style>body{font-family:Arial,sans-serif;text-align:center;padding:60px 20px;background:#f5f5f5;}
+  .box{background:#fff;border-radius:12px;padding:40px;max-width:480px;margin:0 auto;}
+  .icono{font-size:48px;margin-bottom:16px;}h1{color:#2d7a4f;}p{color:#555;}</style>
+  </head><body><div class="box">
+  <div class="icono">✅</div>
+  <h1>¡Pago completado!</h1>
+  <p>Tu depósito ha sido procesado correctamente. En breve recibirás el voucher de tu traslado en tu email.</p>
+  <p style="font-size:13px;color:#aaa;">Reserva: <strong>${req.query.reserva || ''}</strong></p>
+  <a href="/" style="display:inline-block;margin-top:24px;background:#C1502E;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;">Volver al inicio</a>
+  </div></body></html>`);
+});
+
+app.get('/pago-cancelado', (req, res) => {
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Pago cancelado</title>
+  <style>body{font-family:Arial,sans-serif;text-align:center;padding:60px 20px;background:#f5f5f5;}
+  .box{background:#fff;border-radius:12px;padding:40px;max-width:480px;margin:0 auto;}
+  .icono{font-size:48px;margin-bottom:16px;}h1{color:#842029;}p{color:#555;}</style>
+  </head><body><div class="box">
+  <div class="icono">❌</div>
+  <h1>Pago cancelado</h1>
+  <p>No se ha procesado ningún cobro. Si necesitas ayuda para completar el pago, contáctanos por WhatsApp.</p>
+  <p style="font-size:13px;color:#aaa;">Reserva: <strong>${req.query.reserva || ''}</strong></p>
+  <a href="/" style="display:inline-block;margin-top:24px;background:#C1502E;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;">Volver al inicio</a>
+  </div></body></html>`);
+});
+
 // ─── Admin: emails de reserva ────────────────────────────────────────────────
 
 app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(async (req, res) => {
@@ -3365,6 +3594,46 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
   const importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
   const horas = condiciones ? condiciones.horas_cancelacion : 12;
   const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+
+  // Crear sesión de pago en Stripe si está configurado
+  let urlPago = null;
+  if (stripe) {
+    try {
+      const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+      const lang = r.lang_cliente || 'es';
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        mode: 'payment',
+        locale: lang,
+        line_items: [{
+          price_data: {
+            currency: 'eur',
+            unit_amount: Math.round(parseFloat(condiciones ? condiciones.importe_deposito : 10) * 100),
+            product_data: {
+              name: 'Depósito de garantía — Traslado ' + r.numero_reserva,
+              description: (r.origen || '') + ' → ' + (r.destino || '') +
+                (r.fecha ? ' · ' + fechaViaje : '')
+            }
+          },
+          quantity: 1
+        }],
+        customer_email: r.email_cliente,
+        success_url: BASE_URL + '/pago-exitoso?reserva=' + r.numero_reserva + '&session_id={CHECKOUT_SESSION_ID}',
+        cancel_url: BASE_URL + '/pago-cancelado?reserva=' + r.numero_reserva,
+        metadata: { reserva_id: String(r.id), numero_reserva: r.numero_reserva }
+      });
+      urlPago = session.url;
+      await pool.query('UPDATE reservas SET stripe_session_id = $1 WHERE id = $2', [session.id, r.id]);
+    } catch(stripeErr) {
+      console.warn('Error creando sesión Stripe:', stripeErr.message);
+    }
+  }
+
+  const botonPago = urlPago
+    ? `<div style="text-align:center;margin:24px 0;">
+        <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 Pagar depósito de ${importe} €</a>
+       </div>`
+    : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -3399,9 +3668,10 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
       </div>
       <div class="deposito-box">
         <p style="margin:0 0 8px 0;font-weight:600;color:#0f5132;">💳 Depósito de garantía — ${importe} €</p>
-        <p style="margin:0;font-size:13px;color:#0f5132;">Para confirmar tu reserva, es necesario abonar un depósito de garantía de <strong>${importe} €</strong>. Este importe te será devuelto íntegramente una vez completado el servicio.</p>
+        <p style="margin:0;font-size:13px;color:#0f5132;">Para confirmar definitivamente tu reserva, es necesario abonar un depósito de <strong>${importe} €</strong>. Este importe te será devuelto íntegramente una vez completado el servicio.</p>
         <p style="margin:8px 0 0 0;font-size:12px;color:#555;"><strong>Política de cancelación:</strong> Si cancelas con menos de ${horas} horas de antelación o no te presentas, el depósito no será reembolsable.</p>
       </div>
+      ${botonPago}
       <p style="font-size:13px;color:#888;">Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.</p>
     </div>
     <div class="footer">Traslados GC · Gran Canaria</div>
@@ -3417,7 +3687,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
       'UPDATE reservas SET email_confirmacion_enviado = TRUE WHERE id = $1',
       [req.params.id]
     );
-    res.json({ ok: true });
+    res.json({ ok: true, url_pago: urlPago });
   } catch(err) {
     res.status(500).json({ error: 'Error enviando email: ' + err.message });
   }
