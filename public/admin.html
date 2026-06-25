@@ -584,6 +584,7 @@ table.tabla-precios input {
               <th>Extras</th>
               <th>Total est.</th>
               <th class="th-ordenable" data-col="estado" onclick="ordenarPorColumna('estado')" style="cursor:pointer;white-space:nowrap;">Estado<span class="icono-orden-col"> ↕</span></th>
+              <th>Depósito</th>
               <th></th>
             </tr>
           </thead>
@@ -3537,7 +3538,8 @@ function cargarReservas(mantenerDetalle) {
           '<td style="text-align:right;">' + (extras ? extras.toFixed(2) + ' €' : '—') + '</td>' +
           '<td style="text-align:right;font-weight:600;">' + (total ? total.toFixed(2) + ' €' : '—') + '</td>' +
           '<td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td>' +
-          '<td><button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.7rem;" ' +
+          '<td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td>' +
+          '<td>' + (r.deposito_pagado ? '<span style="color:#2d7a4f;font-weight:600;font-size:0.8rem;">💳 Pagado</span>' : '<span style="color:#aaa;font-size:0.8rem;">Pendiente</span>') + '</td>' +
             'onclick="abrirDetalleReserva(' + r.id + ')">Ver</button></td>' +
         '</tr>';
       }).join('');
@@ -3705,6 +3707,7 @@ function abrirDetalleReserva(id, sinScroll) {
           '<tr><th>Precio viaje</th><td>' + viaje.toFixed(2) + ' €</td></tr>' +
           extrasHtml +
           '<tr><th>Total estimado</th><td><strong>' + total.toFixed(2) + ' €</strong></td></tr>' +
+          '<tr><th>Depósito</th><td>' + (r.deposito_pagado ? '<span style="color:#2d7a4f;font-weight:600;">💳 Pagado</span>' : '<span style="color:#e07b5a;">⏳ Pendiente de pago</span>') + '</td></tr>' +
         '</table>';
 
       var estados = ['pendiente', 'confirmada', 'completada', 'cancelada'];
