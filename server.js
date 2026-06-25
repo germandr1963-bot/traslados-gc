@@ -225,15 +225,18 @@ async function initSchema() {
     );
   `);
 
-  await pool.query(`ALTER TABLE categorias_vehiculos ALTER COLUMN capacidad_maletas DROP DEFAULT;`);
-  await pool.query(`ALTER TABLE categorias_vehiculos ALTER COLUMN capacidad_maletas TYPE TEXT USING capacidad_maletas::TEXT;`);
-  await pool.query(`ALTER TABLE categorias_vehiculos ALTER COLUMN capacidad_maletas SET DEFAULT '2';`);
-  await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS descripcion TEXT;`);
-  await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS limite_sillas INT DEFAULT 0;`);
-  await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS disponible BOOLEAN DEFAULT TRUE;`);
-  await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS bajada_diurna NUMERIC(10,2) DEFAULT 0;`);
-  await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS bajada_nocturna NUMERIC(10,2) DEFAULT 0;`);
-  await pool.query(`ALTER TABLE categorias_vehiculos ADD COLUMN IF NOT EXISTS foto TEXT;`);
+  await pool.query(`
+    ALTER TABLE categorias_vehiculos
+      ALTER COLUMN capacidad_maletas DROP DEFAULT,
+      ALTER COLUMN capacidad_maletas TYPE TEXT USING capacidad_maletas::TEXT,
+      ALTER COLUMN capacidad_maletas SET DEFAULT '2',
+      ADD COLUMN IF NOT EXISTS descripcion TEXT,
+      ADD COLUMN IF NOT EXISTS limite_sillas INT DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS disponible BOOLEAN DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS bajada_diurna NUMERIC(10,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS bajada_nocturna NUMERIC(10,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS foto TEXT
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rutas (
@@ -248,9 +251,12 @@ async function initSchema() {
   // Prioridad/frecuencia para el sitemap, e imagen propia para vistas previas
   // de WhatsApp/redes — ambas son características del destino, no del idioma,
   // así que viven en la tabla de rutas y valen para sus 9 versiones de idioma.
-  await pool.query(`ALTER TABLE rutas ADD COLUMN IF NOT EXISTS sitemap_prioridad NUMERIC(2,1) DEFAULT 0.8;`);
-  await pool.query(`ALTER TABLE rutas ADD COLUMN IF NOT EXISTS sitemap_frecuencia VARCHAR(20) DEFAULT 'monthly';`);
-  await pool.query(`ALTER TABLE rutas ADD COLUMN IF NOT EXISTS imagen_og TEXT;`);
+  await pool.query(`
+    ALTER TABLE rutas
+      ADD COLUMN IF NOT EXISTS sitemap_prioridad NUMERIC(2,1) DEFAULT 0.8,
+      ADD COLUMN IF NOT EXISTS sitemap_frecuencia VARCHAR(20) DEFAULT 'monthly',
+      ADD COLUMN IF NOT EXISTS imagen_og TEXT
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rutas_precios (
@@ -674,20 +680,23 @@ async function initSchema() {
   `);
 
   // Columnas nuevas para reservas (se añaden si no existen en BD ya creadas)
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS conductor_id INT REFERENCES conductores(id) ON DELETE SET NULL`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS archivada BOOLEAN DEFAULT FALSE`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS origen TEXT`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS destino TEXT`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS tipo_llegada TEXT`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS numero_vuelo TEXT`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS hora_llegada_vuelo TIME`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS nombre_barco TEXT`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS hora_atraque TIME`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS num_pasajeros INT`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS direccion_recogida TEXT`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS direccion_destino TEXT`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS notas_cliente TEXT`);
-  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS pasaporte_dni TEXT`);
+  await pool.query(`
+    ALTER TABLE reservas
+      ADD COLUMN IF NOT EXISTS conductor_id INT REFERENCES conductores(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS archivada BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS origen TEXT,
+      ADD COLUMN IF NOT EXISTS destino TEXT,
+      ADD COLUMN IF NOT EXISTS tipo_llegada TEXT,
+      ADD COLUMN IF NOT EXISTS numero_vuelo TEXT,
+      ADD COLUMN IF NOT EXISTS hora_llegada_vuelo TIME,
+      ADD COLUMN IF NOT EXISTS nombre_barco TEXT,
+      ADD COLUMN IF NOT EXISTS hora_atraque TIME,
+      ADD COLUMN IF NOT EXISTS num_pasajeros INT,
+      ADD COLUMN IF NOT EXISTS direccion_recogida TEXT,
+      ADD COLUMN IF NOT EXISTS direccion_destino TEXT,
+      ADD COLUMN IF NOT EXISTS notas_cliente TEXT,
+      ADD COLUMN IF NOT EXISTS pasaporte_dni TEXT
+  `);
 
   // ─── Reservas × Extras ────────────────────────────────────────────────────
   await pool.query(`
@@ -2127,33 +2136,7 @@ app.delete('/admin/textos/:id/traducciones', requireAdmin, asyncHandler(async (r
   res.json({ ok: true });
 }));
 
-app.get('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
-  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
-    return res.status(400).json({ error: 'Idioma no válido' });
-  }
-  const result = await pool.query(
-    'SELECT texto FROM textos_interfaz_traducciones WHERE texto_id = $1 AND lang_code = $2',
-    [req.params.id, req.params.lang]
-  );
-  res.json({ texto: result.rows.length ? result.rows[0].texto : '' });
-}));
 
-app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
-  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
-    return res.status(400).json({ error: 'Idioma no válido' });
-  }
-  await pool.query(
-    `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
-    [req.params.id, req.params.lang, req.body.texto || '']
-  );
-  await cargarTextosCache();
-  res.json({ ok: true });
-}));
-
-// Exporta todos los textos a un Excel listo para traductores —
-// mismo patrón que el Excel de SEO, una fila por texto y por idioma
 app.get('/admin/textos/exportar', requireAdmin, asyncHandler(async (req, res) => {
   const textos = await pool.query(`SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY modulo, id`);
   const traducciones = await pool.query(`SELECT texto_id, lang_code, texto FROM textos_interfaz_traducciones`);
@@ -2202,6 +2185,48 @@ app.get('/admin/textos/exportar', requireAdmin, asyncHandler(async (req, res) =>
 // Importa el Excel traducido y actualiza las traducciones
 app.post('/admin/textos/importar', requireAdmin, upload.single('archivo'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Falta el archivo Excel' });
+app.get('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  const result = await pool.query(
+    'SELECT texto FROM textos_interfaz_traducciones WHERE texto_id = $1 AND lang_code = $2',
+    [req.params.id, req.params.lang]
+  );
+  res.json({ texto: result.rows.length ? result.rows[0].texto : '' });
+}));
+
+app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  await pool.query(
+    `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
+    [req.params.id, req.params.lang, req.body.texto || '']
+  );
+  await cargarTextosCache();
+  res.json({ ok: true });
+}));
+
+
+app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  await pool.query(
+    `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
+    [req.params.id, req.params.lang, req.body.texto || '']
+  );
+  await cargarTextosCache();
+  res.json({ ok: true });
+}));
+
+// Exporta todos los textos a un Excel listo para traductores —
+// mismo patrón que el Excel de SEO, una fila por texto y por idioma
 
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(req.file.buffer);
