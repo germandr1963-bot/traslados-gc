@@ -153,6 +153,7 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="seo">SEO</button>
       <button class="item-menu" data-seccion="idiomas">Idiomas</button>
       <button class="item-menu" data-seccion="calculador">Calculador</button>
+      <button class="item-menu" data-seccion="configuracion">Configuración</button>
       <button class="item-menu" data-seccion="extras">Extras</button>
       <button class="item-menu" data-seccion="cotizaciones">Cotizaciones <span id="badge-cotiz" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">0</span></button>
       <button class="item-menu" data-seccion="reservas">Reservas</button>
@@ -621,6 +622,79 @@ table.tabla-precios input {
       </div>
     </div>
 
+    <div id="seccion-configuracion" class="oculto">
+      <h1>Configuración</h1>
+      <p class="subtitulo">Parámetros generales del servicio. Las temporadas sobreescriben la configuración general para las fechas indicadas.</p>
+
+      <!-- Configuración general -->
+      <div class="tarjeta" style="margin-bottom:2rem;">
+        <h2 style="font-size:1rem;margin:0 0 1rem 0;">⚙️ Configuración general (por defecto)</h2>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
+          <div style="flex:1;min-width:180px;">
+            <label class="etiqueta">Importe del depósito (€)</label>
+            <input type="number" id="noshow-general-importe" class="campo" step="0.50" min="0" placeholder="10.00">
+          </div>
+          <div style="flex:1;min-width:180px;">
+            <label class="etiqueta">Horas mínimas para cancelar sin penalización</label>
+            <input type="number" id="noshow-general-horas" class="campo" min="0" placeholder="12">
+          </div>
+        </div>
+        <button class="boton-primario" onclick="guardarConfigGeneral()">💾 Guardar configuración general</button>
+        <div id="aviso-noshow-general" style="display:none;margin-top:0.75rem;"></div>
+      </div>
+
+      <!-- Temporadas -->
+      <div class="tarjeta">
+        <h2 style="font-size:1rem;margin:0 0 1rem 0;">🗓️ Temporadas</h2>
+        <p style="font-size:0.85rem;color:#888;margin:0 0 1rem 0;">Las temporadas activas sobreescriben la configuración general para las fechas indicadas.</p>
+
+        <!-- Formulario nueva temporada -->
+        <div style="background:#f9f7f4;border-radius:8px;padding:1rem;margin-bottom:1.5rem;">
+          <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">+ Nueva temporada</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:0.75rem;margin-bottom:0.75rem;">
+            <div>
+              <label class="etiqueta">Nombre</label>
+              <input type="text" id="noshow-temp-nombre" class="campo" placeholder="Ej: Verano 2026">
+            </div>
+            <div>
+              <label class="etiqueta">Fecha inicio</label>
+              <input type="date" id="noshow-temp-inicio" class="campo">
+            </div>
+            <div>
+              <label class="etiqueta">Fecha fin</label>
+              <input type="date" id="noshow-temp-fin" class="campo">
+            </div>
+            <div>
+              <label class="etiqueta">Depósito (€)</label>
+              <input type="number" id="noshow-temp-importe" class="campo" step="0.50" min="0" placeholder="10.00">
+            </div>
+            <div>
+              <label class="etiqueta">Horas cancelación</label>
+              <input type="number" id="noshow-temp-horas" class="campo" min="0" placeholder="24">
+            </div>
+          </div>
+          <div id="aviso-noshow-temp" style="display:none;margin-bottom:0.5rem;"></div>
+          <button class="boton-costa" onclick="crearTemporada()">+ Añadir temporada</button>
+        </div>
+
+        <!-- Tabla de temporadas -->
+        <table class="tabla-admin">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Desde</th>
+              <th>Hasta</th>
+              <th>Depósito</th>
+              <th>Horas cancel.</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tabla-temporadas"></tbody>
+        </table>
+      </div>
+    </div>
+
     <div id="seccion-extras" class="oculto">
       <h1>Extras del traslado</h1>
       <p class="subtitulo">Define los servicios adicionales que el cliente puede seleccionar al reservar. El precio se suma al precio estimado del traslado.</p>
@@ -712,13 +786,14 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'extras', 'cotizaciones', 'reservas'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'extras', 'cotizaciones', 'reservas'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
     if (boton.dataset.seccion === 'seo') cargarSEO();
     if (boton.dataset.seccion === 'idiomas') cargarTextosInterfaz();
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
+    if (boton.dataset.seccion === 'configuracion') cargarConfiguracionNoshow();
     if (boton.dataset.seccion === 'destinos') { cargarDestinos(); cargarSelectorLangDestinos(); }
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
     if (boton.dataset.seccion === 'cotizaciones') cargarCotizaciones();
@@ -2816,6 +2891,132 @@ function guardarTarifario() {
 }
 
 // ─── Extras ───────────────────────────────────────────────────────────────────
+// ─── Configuración No-Show ────────────────────────────────────────────────────
+function cargarConfiguracionNoshow() {
+  fetch('/admin/noshow')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var general = data.configuracion.find(function(c) { return c.es_general; });
+      var temporadas = data.configuracion.filter(function(c) { return !c.es_general; });
+
+      if (general) {
+        document.getElementById('noshow-general-importe').value = general.importe_deposito;
+        document.getElementById('noshow-general-horas').value = general.horas_cancelacion;
+      }
+
+      renderizarTemporadas(temporadas);
+    });
+}
+
+function renderizarTemporadas(temporadas) {
+  var tbody = document.getElementById('tabla-temporadas');
+  tbody.innerHTML = '';
+  if (!temporadas.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:1.5rem;">No hay temporadas definidas.</td></tr>';
+    return;
+  }
+  temporadas.forEach(function(t) {
+    var inicio = t.fecha_inicio ? new Date(t.fecha_inicio).toLocaleDateString('es-ES') : '—';
+    var fin = t.fecha_fin ? new Date(t.fecha_fin).toLocaleDateString('es-ES') : '—';
+    var tr = document.createElement('tr');
+    if (!t.activa) tr.style.opacity = '0.5';
+    tr.innerHTML =
+      '<td>' + t.nombre + '</td>' +
+      '<td>' + inicio + '</td>' +
+      '<td>' + fin + '</td>' +
+      '<td>' + parseFloat(t.importe_deposito).toFixed(2) + ' €</td>' +
+      '<td>' + t.horas_cancelacion + 'h</td>' +
+      '<td><span style="color:' + (t.activa ? '#2d7a4f' : '#aaa') + ';font-weight:600;">' + (t.activa ? '✔ Activa' : '✗ Inactiva') + '</span></td>' +
+      '<td style="white-space:nowrap;"></td>';
+    var tdAcc = tr.querySelector('td:last-child');
+    var b1 = document.createElement('button');
+    b1.className = t.activa ? 'boton-peligro' : 'boton-costa';
+    b1.style.cssText = 'font-size:0.78rem;padding:0.25rem 0.6rem;margin-right:4px;';
+    b1.textContent = t.activa ? 'Desactivar' : 'Activar';
+    (function(id, activa) { b1.addEventListener('click', function() { toggleTemporada(id, activa); }); })(t.id, !t.activa);
+    tdAcc.appendChild(b1);
+    var b2 = document.createElement('button');
+    b2.className = 'boton-peligro';
+    b2.style.cssText = 'font-size:0.78rem;padding:0.25rem 0.6rem;';
+    b2.textContent = '🗑';
+    (function(id, nombre) { b2.addEventListener('click', function() { eliminarTemporada(id, nombre); }); })(t.id, t.nombre);
+    tdAcc.appendChild(b2);
+    tbody.appendChild(tr);
+  });
+}
+
+function guardarConfigGeneral() {
+  var importe = document.getElementById('noshow-general-importe').value;
+  var horas = document.getElementById('noshow-general-horas').value;
+  var av = document.getElementById('aviso-noshow-general');
+  if (!importe || !horas) {
+    av.style.display = 'block';
+    av.innerHTML = '<div class="aviso-error">Rellena ambos campos.</div>';
+    return;
+  }
+  fetch('/admin/noshow/general', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ importe_deposito: parseFloat(importe), horas_cancelacion: parseInt(horas) })
+  }).then(function(r) { return r.json(); }).then(function() {
+    av.style.display = 'block';
+    av.innerHTML = '<div class="aviso-ok">✔ Configuración guardada.</div>';
+    setTimeout(function() { av.style.display = 'none'; }, 3000);
+  });
+}
+
+function crearTemporada() {
+  var nombre  = document.getElementById('noshow-temp-nombre').value.trim();
+  var inicio  = document.getElementById('noshow-temp-inicio').value;
+  var fin     = document.getElementById('noshow-temp-fin').value;
+  var importe = document.getElementById('noshow-temp-importe').value;
+  var horas   = document.getElementById('noshow-temp-horas').value;
+  var av = document.getElementById('aviso-noshow-temp');
+  av.style.display = 'none';
+
+  if (!nombre || !inicio || !fin || !importe || !horas) {
+    av.style.display = 'block';
+    av.innerHTML = '<div class="aviso-error">Rellena todos los campos.</div>';
+    return;
+  }
+  if (inicio >= fin) {
+    av.style.display = 'block';
+    av.innerHTML = '<div class="aviso-error">La fecha de inicio debe ser anterior a la fecha de fin.</div>';
+    return;
+  }
+  fetch('/admin/noshow/temporada', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre: nombre, fecha_inicio: inicio, fecha_fin: fin, importe_deposito: parseFloat(importe), horas_cancelacion: parseInt(horas) })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) {
+      av.style.display = 'block';
+      av.innerHTML = '<div class="aviso-error">' + data.error + '</div>';
+      return;
+    }
+    document.getElementById('noshow-temp-nombre').value = '';
+    document.getElementById('noshow-temp-inicio').value = '';
+    document.getElementById('noshow-temp-fin').value = '';
+    document.getElementById('noshow-temp-importe').value = '';
+    document.getElementById('noshow-temp-horas').value = '';
+    cargarConfiguracionNoshow();
+  });
+}
+
+function toggleTemporada(id, activa) {
+  fetch('/admin/noshow/temporada/' + id, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activa: activa })
+  }).then(function() { cargarConfiguracionNoshow(); });
+}
+
+function eliminarTemporada(id, nombre) {
+  if (!confirm('¿Eliminar la temporada "' + nombre + '"?')) return;
+  fetch('/admin/noshow/temporada/' + id, { method: 'DELETE' })
+    .then(function() { cargarConfiguracionNoshow(); });
+}
+
 // ─── Destinos: traducciones ───────────────────────────────────────────────────
 var destinosTradCache = []; // cache de propuestas IA pendientes de guardar
 
