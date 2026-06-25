@@ -614,6 +614,22 @@ table.tabla-precios input {
           <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="detalle-botones-estado"></div>
         </div>
 
+        <!-- 3. Emails al cliente -->
+        <div style="margin-top:1rem;padding:1rem;border:1px solid var(--gris-borde);border-radius:8px;background:#f9f7f4;">
+          <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">📧 Paso 3 — Comunicación con el cliente</p>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+            <button class="boton-primario" style="font-size:0.82rem;display:flex;align-items:center;gap:6px;" onclick="enviarEmailConfirmacion()">
+              <span id="icono-confirmacion">📨</span> Enviar email de confirmación
+              <span id="badge-confirmacion" style="display:none;background:#2d7a4f;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.7rem;">✔ Enviado</span>
+            </button>
+            <button class="boton-costa" style="font-size:0.82rem;display:flex;align-items:center;gap:6px;" onclick="enviarEmailVoucher()">
+              <span id="icono-voucher">🎫</span> Enviar voucher
+              <span id="badge-voucher" style="display:none;background:#2d7a4f;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.7rem;">✔ Enviado</span>
+            </button>
+          </div>
+          <div id="aviso-email-reserva" style="display:none;margin-top:0.75rem;font-size:0.82rem;"></div>
+        </div>
+
         <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
           <button class="boton-costa" style="font-size:0.82rem;" onclick="archivarDesdeDetalle()">📦 Archivar</button>
           <button class="boton-peligro" style="font-size:0.82rem;" onclick="borrarDesdeDetalle()">🗑 Borrar reserva</button>
@@ -3712,6 +3728,13 @@ function abrirDetalleReserva(id, sinScroll) {
       });
 
       cargarConductoresEnDetalle(r.conductor_id);
+
+      // Actualizar badges de emails enviados
+      var badgeConf = document.getElementById('badge-confirmacion');
+      var badgeVouch = document.getElementById('badge-voucher');
+      if (badgeConf) badgeConf.style.display = r.email_confirmacion_enviado ? 'inline' : 'none';
+      if (badgeVouch) badgeVouch.style.display = r.email_voucher_enviado ? 'inline' : 'none';
+
       panel.classList.remove('oculto');
 
       // Scroll suave solo cuando el usuario pulsa Ver, no en recargas automáticas
@@ -3764,6 +3787,50 @@ function guardarChoferReserva() {
     setTimeout(function() { av.style.display = 'none'; }, 3000);
     cargarReservas(true);
   });
+}
+
+function enviarEmailConfirmacion() {
+  if (!reservaDetalleId) return;
+  var av = document.getElementById('aviso-email-reserva');
+  av.style.display = 'block';
+  av.innerHTML = '<div class="aviso-ok">📨 Enviando email de confirmación...</div>';
+  fetch('/admin/reservas/' + reservaDetalleId + '/email-confirmacion', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        av.innerHTML = '<div class="aviso-error">❌ ' + data.error + '</div>';
+        return;
+      }
+      av.innerHTML = '<div class="aviso-ok">✔ Email de confirmación enviado.</div>';
+      var badge = document.getElementById('badge-confirmacion');
+      if (badge) badge.style.display = 'inline';
+      setTimeout(function() { av.style.display = 'none'; }, 3000);
+    })
+    .catch(function() {
+      av.innerHTML = '<div class="aviso-error">❌ Error de conexión.</div>';
+    });
+}
+
+function enviarEmailVoucher() {
+  if (!reservaDetalleId) return;
+  var av = document.getElementById('aviso-email-reserva');
+  av.style.display = 'block';
+  av.innerHTML = '<div class="aviso-ok">🎫 Enviando voucher...</div>';
+  fetch('/admin/reservas/' + reservaDetalleId + '/email-voucher', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        av.innerHTML = '<div class="aviso-error">❌ ' + data.error + '</div>';
+        return;
+      }
+      av.innerHTML = '<div class="aviso-ok">✔ Voucher enviado al cliente.</div>';
+      var badge = document.getElementById('badge-voucher');
+      if (badge) badge.style.display = 'inline';
+      setTimeout(function() { av.style.display = 'none'; }, 3000);
+    })
+    .catch(function() {
+      av.innerHTML = '<div class="aviso-error">❌ Error de conexión.</div>';
+    });
 }
 
 function archivarDesdeDetalle() {
