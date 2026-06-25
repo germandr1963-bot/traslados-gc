@@ -3538,9 +3538,8 @@ function cargarReservas(mantenerDetalle) {
           '<td style="text-align:right;">' + (extras ? extras.toFixed(2) + ' €' : '—') + '</td>' +
           '<td style="text-align:right;font-weight:600;">' + (total ? total.toFixed(2) + ' €' : '—') + '</td>' +
           '<td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td>' +
-          '<td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td>' +
           '<td>' + (r.deposito_pagado ? '<span style="color:#2d7a4f;font-weight:600;font-size:0.8rem;">💳 Pagado</span>' : '<span style="color:#aaa;font-size:0.8rem;">Pendiente</span>') + '</td>' +
-            'onclick="abrirDetalleReserva(' + r.id + ')">Ver</button></td>' +
+          '<td><button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.7rem;" onclick="abrirDetalleReserva(' + r.id + ')">Ver</button></td>' +
         '</tr>';
       }).join('');
 
