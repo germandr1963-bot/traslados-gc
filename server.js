@@ -1,5 +1,6 @@
 const express = require('express');
 const Stripe = require('stripe');
+const { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } = require('docx');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
@@ -3499,6 +3500,133 @@ app.get('/admin/conductores-aprobados', requireAdmin, asyncHandler(async (req, r
   res.json({ conductores: result.rows });
 }));
 
+// ─── Helper: generar HTML del voucher ────────────────────────────────────────
+async function generarHtmlVoucher(reservaId) {
+  const result = await pool.query(
+    `SELECT r.*, cv.nombre AS categoria_nombre,
+            c.nombre AS conductor_nombre, c.foto AS conductor_foto, c.foto_estado AS conductor_foto_estado
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     LEFT JOIN conductores c ON c.id = r.conductor_id
+     WHERE r.id = $1`,
+    [reservaId]
+  );
+  if (!result.rows.length) return null;
+  const r = result.rows[0];
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+
+  // Foto del chofer solo si está aprobada
+  const fotoChoferHtml = (r.conductor_foto && r.conductor_foto_estado === 'aprobada')
+    ? `<div style="text-align:center;margin:16px 0;">
+        <img src="${r.conductor_foto}" alt="Foto del conductor" style="width:90px;height:90px;object-fit:cover;border-radius:50%;border:3px solid #d4956a;">
+        <p style="margin:6px 0 0 0;font-size:13px;font-weight:600;color:#2c2c2c;">${r.conductor_nombre || ''}</p>
+        <p style="margin:2px 0 0 0;font-size:11px;color:#888;">Tu conductor</p>
+       </div>`
+    : (r.conductor_nombre ? `<p style="text-align:center;font-size:13px;font-weight:600;margin:12px 0;"><strong>Conductor:</strong> ${r.conductor_nombre}</p>` : '');
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <style>
+    body{margin:0;padding:0;background:#f5f5f5;}
+    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+    .header{background:#2c2c2c;padding:24px;text-align:center;}
+    .body{padding:28px 24px;}
+    .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
+    .voucher-box{border:2px solid #d4956a;border-radius:10px;padding:20px;margin:20px 0;}
+    .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;font-size:14px;line-height:1.8;}
+    .pagado{background:#d1e7dd;border-radius:6px;padding:10px 16px;margin:16px 0;color:#0f5132;font-size:13px;}
+    .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
+    @media(max-width:480px){.body{padding:16px;}}
+  </style></head><body>
+  <div class="wrapper">
+    <div class="header">
+      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
+      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+    </div>
+    <div class="body">
+      <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+      <div class="pagado">✔ Depósito recibido. Tu traslado está confirmado.</div>
+      <div class="voucher-box">
+        <p style="text-align:center;margin:0 0 12px 0;font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;">Voucher de Traslado</p>
+        <p style="text-align:center;margin:0 0 16px 0;">Nº <span class="pnr">${r.numero_reserva}</span></p>
+        ${fotoChoferHtml}
+        <div class="info-box">
+          <strong>Origen:</strong> ${r.origen || '—'}<br>
+          <strong>Destino:</strong> ${r.destino || '—'}<br>
+          <strong>Fecha:</strong> ${fechaViaje}<br>
+          <strong>Hora:</strong> ${r.hora ? r.hora.slice(0,5) : '—'}<br>
+          <strong>Categoría:</strong> ${r.categoria_nombre || '—'}<br>
+          <strong>Pasajeros:</strong> ${r.num_pasajeros || '—'}
+        </div>
+      </div>
+      <p style="font-size:13px;color:#888;">Muestra este voucher a tu conductor al inicio del servicio. El precio final será el que marque el taxímetro.</p>
+    </div>
+    <div class="footer">Traslados GC · Gran Canaria</div>
+  </div></body></html>`;
+}
+
+// ─── Helper: generar cartel Word para el chofer ───────────────────────────────
+async function generarCartelChofer(reservaId) {
+  const result = await pool.query(
+    `SELECT r.*, c.nombre AS conductor_nombre, c.email AS conductor_email
+     FROM reservas r
+     LEFT JOIN conductores c ON c.id = r.conductor_id
+     WHERE r.id = $1`,
+    [reservaId]
+  );
+  if (!result.rows.length) return null;
+  const r = result.rows[0];
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '';
+
+  const doc = new Document({
+    sections: [{
+      properties: {},
+      children: [
+        new Paragraph({
+          text: 'TRASLADOS GC',
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 }
+        }),
+        new Paragraph({
+          text: 'Gran Canaria',
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 600 },
+          children: [new TextRun({ text: 'Gran Canaria', color: '888888', size: 22 })]
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 400 },
+          children: [new TextRun({ text: r.nombre_cliente, bold: true, size: 72, color: '2C2C2C' })]
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 300 },
+          children: [new TextRun({ text: 'Reserva: ' + r.numero_reserva, size: 32, color: 'C1502E', bold: true })]
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+          children: [new TextRun({ text: fechaViaje, size: 28, color: '555555' })]
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+          children: [new TextRun({ text: (r.hora ? r.hora.slice(0,5) : '') + 'h', size: 36, bold: true, color: '555555' })]
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 400 },
+          children: [new TextRun({ text: (r.origen || '') + ' → ' + (r.destino || ''), size: 24, color: '888888' })]
+        }),
+      ]
+    }]
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+  return { buffer, conductor_email: r.conductor_email, conductor_nombre: r.conductor_nombre };
+}
+
 // ─── Stripe: pagos ────────────────────────────────────────────────────────────
 
 // Crear sesión de pago en Stripe para el depósito de una reserva
@@ -3596,57 +3724,28 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
 
     if (reserva.rows.length) {
       const r = reserva.rows[0];
-      const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
-
-      const htmlVoucher = `<!DOCTYPE html><html><head><meta charset="utf-8">
-      <meta name="viewport" content="width=device-width,initial-scale=1.0">
-      <style>
-        body{margin:0;padding:0;background:#f5f5f5;}
-        .wrapper{max-width:600px;margin:0 auto;background:#fff;}
-        .header{background:#2c2c2c;padding:24px;text-align:center;}
-        .body{padding:28px 24px;}
-        .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
-        .voucher-box{border:2px solid #d4956a;border-radius:10px;padding:20px;margin:20px 0;}
-        .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;font-size:14px;line-height:1.8;}
-        .pagado{background:#d1e7dd;border-radius:6px;padding:10px 16px;margin:16px 0;color:#0f5132;font-size:13px;}
-        .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
-        @media(max-width:480px){.body{padding:16px;}}
-      </style></head><body>
-      <div class="wrapper">
-        <div class="header">
-          <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
-          <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
-        </div>
-        <div class="body">
-          <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-          <div class="pagado">✔ Depósito recibido correctamente. Tu reserva está confirmada.</div>
-          <div class="voucher-box">
-            <p style="text-align:center;margin:0 0 16px 0;font-size:12px;color:#888;letter-spacing:1px;">VOUCHER DE TRASLADO</p>
-            <p style="text-align:center;margin:0 0 16px 0;">Nº <span class="pnr">${r.numero_reserva}</span></p>
-            <div class="info-box" style="margin:0;">
-              <strong>Origen:</strong> ${r.origen || '—'}<br>
-              <strong>Destino:</strong> ${r.destino || '—'}<br>
-              <strong>Fecha:</strong> ${fechaViaje}<br>
-              <strong>Hora:</strong> ${r.hora ? r.hora.slice(0,5) : '—'}<br>
-              <strong>Categoría:</strong> ${r.categoria_nombre || '—'}<br>
-              <strong>Pasajeros:</strong> ${r.num_pasajeros || '—'}<br>
-              ${r.conductor_nombre ? '<strong>Conductor:</strong> ' + r.conductor_nombre : ''}
-            </div>
-          </div>
-          <p style="font-size:13px;color:#888;">Muestra este voucher a tu conductor al inicio del servicio. El precio final será el que marque el taxímetro.</p>
-        </div>
-        <div class="footer">Traslados GC · Gran Canaria</div>
-      </div></body></html>`;
-
       try {
-        await enviarEmail({
-          to: r.email_cliente,
-          subject: '✔ Voucher de traslado — ' + r.numero_reserva,
-          html: htmlVoucher
-        });
-        await pool.query('UPDATE reservas SET email_voucher_enviado = TRUE WHERE id = $1', [reservaId]);
+        const htmlVoucher = await generarHtmlVoucher(reservaId);
+        if (htmlVoucher) {
+          await enviarEmail({
+            to: r.email_cliente,
+            subject: '✔ Voucher de traslado — ' + r.numero_reserva,
+            html: htmlVoucher
+          });
+          await pool.query('UPDATE reservas SET email_voucher_enviado = TRUE WHERE id = $1', [reservaId]);
+        }
+        // Enviar cartel Word al chofer
+        const cartel = await generarCartelChofer(reservaId);
+        if (cartel && cartel.conductor_email) {
+          await enviarEmailConAdjunto({
+            to: cartel.conductor_email,
+            subject: 'Cartel de recogida — ' + r.numero_reserva,
+            html: '<p>Hola ' + (cartel.conductor_nombre || '') + ',</p><p>Adjuntamos el cartel de recogida para tu próximo servicio. Imprímelo y úsalo para identificar a tu cliente.</p><p>Reserva: <strong>' + r.numero_reserva + '</strong></p>',
+            adjunto: { filename: 'cartel-' + r.numero_reserva + '.docx', content: cartel.buffer }
+          });
+        }
       } catch(emailErr) {
-        console.warn('Error enviando voucher automático:', emailErr.message);
+        console.warn('Error enviando voucher/cartel automático:', emailErr.message);
       }
     }
   }
@@ -3934,70 +4033,40 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
 }));
 
 app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (req, res) => {
-  const reserva = await pool.query(
-    `SELECT r.*, cv.nombre AS categoria_nombre, c.nombre AS conductor_nombre, c.telefono AS conductor_telefono
-     FROM reservas r
-     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
-     LEFT JOIN conductores c ON c.id = r.conductor_id
-     WHERE r.id = $1`,
-    [req.params.id]
-  );
+  const reserva = await pool.query('SELECT * FROM reservas WHERE id = $1', [req.params.id]);
   if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada' });
   const r = reserva.rows[0];
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
-
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <style>
-    body{margin:0;padding:0;background:#f5f5f5;}
-    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
-    .header{background:#2c2c2c;padding:24px;text-align:center;}
-    .body{padding:28px 24px;}
-    .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
-    .voucher-box{border:2px solid #d4956a;border-radius:10px;padding:20px;margin:20px 0;}
-    .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;font-size:14px;line-height:1.8;}
-    .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
-    @media(max-width:480px){.body{padding:16px;}}
-  </style></head><body>
-  <div class="wrapper">
-    <div class="header">
-      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
-      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
-    </div>
-    <div class="body">
-      <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-      <p>Adjuntamos tu voucher de traslado. Muéstraselo a tu conductor al inicio del servicio.</p>
-      <div class="voucher-box">
-        <p style="text-align:center;margin:0 0 16px 0;font-size:12px;color:#888;letter-spacing:1px;">VOUCHER DE TRASLADO</p>
-        <p style="text-align:center;margin:0 0 16px 0;">Nº <span class="pnr">${r.numero_reserva}</span></p>
-        <div class="info-box" style="margin:0;">
-          <strong>Origen:</strong> ${r.origen || '—'}<br>
-          <strong>Destino:</strong> ${r.destino || '—'}<br>
-          <strong>Fecha:</strong> ${fechaViaje}<br>
-          <strong>Hora:</strong> ${r.hora ? r.hora.slice(0,5) : '—'}<br>
-          <strong>Categoría:</strong> ${r.categoria_nombre || '—'}<br>
-          <strong>Pasajeros:</strong> ${r.num_pasajeros || '—'}<br>
-          ${r.conductor_nombre ? '<strong>Conductor:</strong> ' + r.conductor_nombre : ''}
-        </div>
-      </div>
-      <p style="font-size:13px;color:#888;">El precio final será el que marque el taxímetro. Los extras contratados se abonan directamente al conductor. Ante cualquier duda contacta con nosotros por WhatsApp.</p>
-    </div>
-    <div class="footer">Traslados GC · Gran Canaria</div>
-  </div></body></html>`;
 
   try {
-    await enviarEmail({
-      to: r.email_cliente,
-      subject: 'Voucher de traslado — ' + r.numero_reserva,
-      html
-    });
-    await pool.query(
-      'UPDATE reservas SET email_voucher_enviado = TRUE WHERE id = $1',
-      [req.params.id]
-    );
+    const html = await generarHtmlVoucher(req.params.id);
+    if (!html) return res.status(500).json({ error: 'No se pudo generar el voucher.' });
+    await enviarEmail({ to: r.email_cliente, subject: 'Voucher de traslado — ' + r.numero_reserva, html });
+    await pool.query('UPDATE reservas SET email_voucher_enviado = TRUE WHERE id = $1', [req.params.id]);
     res.json({ ok: true });
   } catch(err) {
     res.status(500).json({ error: 'Error enviando email: ' + err.message });
+  }
+}));
+
+// Reenviar cartel al chofer
+app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async (req, res) => {
+  const reserva = await pool.query('SELECT * FROM reservas WHERE id = $1', [req.params.id]);
+  if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada' });
+  const r = reserva.rows[0];
+  if (!r.conductor_id) return res.status(400).json({ error: 'No hay chofer asignado.' });
+
+  try {
+    const cartel = await generarCartelChofer(req.params.id);
+    if (!cartel || !cartel.conductor_email) return res.status(400).json({ error: 'El chofer no tiene email configurado.' });
+    await enviarEmailConAdjunto({
+      to: cartel.conductor_email,
+      subject: 'Cartel de recogida — ' + r.numero_reserva,
+      html: '<p>Hola ' + (cartel.conductor_nombre || '') + ',</p><p>Adjuntamos el cartel de recogida para tu próximo servicio.</p><p>Reserva: <strong>' + r.numero_reserva + '</strong></p>',
+      adjunto: { filename: 'cartel-' + r.numero_reserva + '.docx', content: cartel.buffer }
+    });
+    res.json({ ok: true });
+  } catch(err) {
+    res.status(500).json({ error: 'Error enviando cartel: ' + err.message });
   }
 }));
 
