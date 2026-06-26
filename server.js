@@ -1,6 +1,6 @@
 const express = require('express');
 const Stripe = require('stripe');
-const { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } = require('docx');
+const { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, VerticalAlignSection } = require('docx');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
@@ -3631,7 +3631,7 @@ async function generarCartelChofer(reservaId) {
             left: 1000,
             right: 1000
           },
-          verticalAlign: 'center'  // Centrado vertical
+          verticalAlign: VerticalAlignSection.CENTER
         }
       },
       children: [
