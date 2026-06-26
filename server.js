@@ -727,6 +727,17 @@ async function initSchema() {
   `);
 
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email_confirmacion_enviado BOOLEAN DEFAULT FALSE`);
+
+  // Historial de cambios de chofer
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS reservas_historial_chofer (
+      id SERIAL PRIMARY KEY,
+      reserva_id INT NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,
+      conductor_id INT REFERENCES conductores(id) ON DELETE SET NULL,
+      motivo TEXT,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS stripe_session_id TEXT`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_pagado BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email_voucher_enviado BOOLEAN DEFAULT FALSE`);
@@ -3325,13 +3336,150 @@ app.post('/admin/reservas/borrar-lote', requireAdmin, asyncHandler(async (req, r
 
 // Asignar chofer manualmente a una reserva
 app.post('/admin/reservas/:id/chofer', requireAdmin, asyncHandler(async (req, res) => {
-  const { conductor_id } = req.body;
+  const { conductor_id, motivo } = req.body;
+
   if (conductor_id) {
     // Al asignar chofer → estado pasa a Confirmada
     await pool.query(
       'UPDATE reservas SET conductor_id = $1, estado = $2 WHERE id = $3',
       [conductor_id, 'confirmada', req.params.id]
     );
+
+    // Registrar en historial de chofer
+    if (motivo) {
+      await pool.query(
+        `INSERT INTO reservas_historial_chofer (reserva_id, conductor_id, motivo)
+         VALUES ($1, $2, $3)`,
+        [req.params.id, conductor_id, motivo]
+      );
+    }
+
+    // Enviar email de confirmación automáticamente
+    try {
+      const reserva = await pool.query(
+        `SELECT r.*, cv.nombre AS categoria_nombre, c.nombre AS conductor_nombre
+         FROM reservas r
+         LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+         LEFT JOIN conductores c ON c.id = $1
+         WHERE r.id = $2`,
+        [conductor_id, req.params.id]
+      );
+
+      if (reserva.rows.length) {
+        const r = reserva.rows[0];
+        const noshow = await pool.query(
+          `SELECT * FROM configuracion_noshow
+           WHERE es_general = FALSE AND activa = TRUE
+           AND fecha_inicio <= $1 AND fecha_fin >= $1
+           ORDER BY fecha_inicio DESC LIMIT 1`,
+          [r.fecha]
+        );
+        let condiciones = noshow.rows[0];
+        if (!condiciones) {
+          const general = await pool.query('SELECT * FROM configuracion_noshow WHERE es_general = TRUE LIMIT 1');
+          condiciones = general.rows[0];
+        }
+
+        const importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
+        const horas = condiciones ? condiciones.horas_cancelacion : 12;
+        const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+
+        // Crear sesión de pago en Stripe si está configurado
+        let urlPago = null;
+        if (stripe) {
+          try {
+            const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+            const lang = r.lang_cliente || 'es';
+            const session = await stripe.checkout.sessions.create({
+              payment_method_types: ['card'],
+              mode: 'payment',
+              locale: lang,
+              line_items: [{
+                price_data: {
+                  currency: 'eur',
+                  unit_amount: Math.round(parseFloat(condiciones ? condiciones.importe_deposito : 10) * 100),
+                  product_data: {
+                    name: 'Depósito de garantía — Traslado ' + r.numero_reserva,
+                    description: (r.origen || '') + ' → ' + (r.destino || '') + (fechaViaje ? ' · ' + fechaViaje : '')
+                  }
+                },
+                quantity: 1
+              }],
+              customer_email: r.email_cliente,
+              success_url: BASE_URL + '/pago-exitoso?reserva=' + r.numero_reserva + '&session_id={CHECKOUT_SESSION_ID}',
+              cancel_url: BASE_URL + '/pago-cancelado?reserva=' + r.numero_reserva,
+              metadata: { reserva_id: String(r.id), numero_reserva: r.numero_reserva }
+            });
+            urlPago = session.url;
+            await pool.query('UPDATE reservas SET stripe_session_id = $1 WHERE id = $2', [session.id, r.id]);
+          } catch(stripeErr) {
+            console.warn('Error creando sesión Stripe:', stripeErr.message);
+          }
+        }
+
+        const botonPago = urlPago
+          ? `<div style="text-align:center;margin:24px 0;">
+              <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 Pagar depósito de ${importe} €</a>
+             </div>`
+          : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
+
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1.0">
+        <style>
+          body{margin:0;padding:0;background:#f5f5f5;}
+          .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+          .header{background:#2c2c2c;padding:24px;text-align:center;}
+          .body{padding:28px 24px;}
+          .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
+          .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;font-size:14px;line-height:1.8;}
+          .deposito-box{background:#d1e7dd;border-radius:8px;padding:16px 18px;margin:16px 0;}
+          .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
+          @media(max-width:480px){.body{padding:16px;}}
+        </style></head><body>
+        <div class="wrapper">
+          <div class="header">
+            <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
+            <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+          </div>
+          <div class="body">
+            <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+            <p>¡Tu traslado está confirmado! Hemos asignado un conductor para tu servicio.</p>
+            <p style="text-align:center;margin:20px 0;">Reserva <span class="pnr">${r.numero_reserva}</span></p>
+            <div class="info-box">
+              <strong>Detalles del traslado:</strong><br>
+              Origen: ${r.origen || '—'}<br>
+              Destino: ${r.destino || '—'}<br>
+              Fecha: ${fechaViaje}<br>
+              Hora: ${r.hora ? r.hora.slice(0,5) : '—'}<br>
+              Categoría: ${r.categoria_nombre || '—'}<br>
+              ${r.conductor_nombre ? 'Conductor: ' + r.conductor_nombre : ''}
+            </div>
+            <div class="deposito-box">
+              <p style="margin:0 0 8px 0;font-weight:600;color:#0f5132;">💳 Depósito de garantía — ${importe} €</p>
+              <p style="margin:0 0 8px 0;font-size:13px;color:#0f5132;">Para garantizar tu plaza, realiza el pago del depósito de <strong>${importe} €</strong>. El voucher de tu traslado te llegará automáticamente al confirmar el pago.</p>
+              <p style="margin:0 0 8px 0;font-size:13px;color:#c0392b;"><strong>⚠️ Importante:</strong> Si no recibimos el pago ${horas} horas antes de tu traslado, la reserva será cancelada.</p>
+              <p style="margin:0;font-size:12px;color:#555;">El depósito te será devuelto íntegramente una vez completado el servicio. No es reembolsable en caso de no presentarse o cancelar con menos de ${horas} horas de antelación.</p>
+            </div>
+            ${botonPago}
+            <p style="font-size:13px;color:#888;">Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.</p>
+          </div>
+          <div class="footer">Traslados GC · Gran Canaria</div>
+        </div></body></html>`;
+
+        await enviarEmail({
+          to: r.email_cliente,
+          subject: 'Traslado confirmado — ' + r.numero_reserva,
+          html
+        });
+        await pool.query(
+          'UPDATE reservas SET email_confirmacion_enviado = TRUE WHERE id = $1',
+          [req.params.id]
+        );
+      }
+    } catch(emailErr) {
+      console.warn('Error enviando email confirmación automática:', emailErr.message);
+    }
+
   } else {
     // Si se quita el chofer → vuelve a Pendiente
     await pool.query(
