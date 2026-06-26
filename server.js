@@ -3609,48 +3609,48 @@ async function generarCartelChofer(reservaId) {
   );
   if (!result.rows.length) return null;
   const r = result.rows[0];
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '';
+
+  // Extraer solo nombre y primer apellido en mayúsculas
+  const partes = (r.nombre_cliente || '').trim().split(/\s+/);
+  const nombreCartel = (partes.length >= 2
+    ? partes[0] + ' ' + partes[1]
+    : partes[0] || ''
+  ).toUpperCase();
 
   const doc = new Document({
     sections: [{
-      properties: {},
+      properties: {
+        page: {
+          size: {
+            // A4 horizontal: 29.7cm x 21cm en twips (1cm = 567 twips)
+            width: 16838,  // 29.7cm
+            height: 11906  // 21cm
+          },
+          margin: {
+            top: 720,
+            bottom: 720,
+            left: 1000,
+            right: 1000
+          }
+        }
+      },
       children: [
+        // Logo pequeño arriba
         new Paragraph({
-          text: 'TRASLADOS GC',
-          heading: HeadingLevel.HEADING_1,
           alignment: AlignmentType.CENTER,
-          spacing: { after: 200 }
+          spacing: { after: 800 },
+          children: [new TextRun({ text: 'TRASLADOS GC', size: 28, color: 'C1502E', bold: true })]
         }),
-        new Paragraph({
-          text: 'Gran Canaria',
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 600 },
-          children: [new TextRun({ text: 'Gran Canaria', color: '888888', size: 22 })]
-        }),
+        // Nombre grande — ocupa el espacio principal
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          spacing: { after: 400 },
-          children: [new TextRun({ text: r.nombre_cliente, bold: true, size: 72, color: '2C2C2C' })]
-        }),
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 300 },
-          children: [new TextRun({ text: 'Reserva: ' + r.numero_reserva, size: 32, color: 'C1502E', bold: true })]
-        }),
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 200 },
-          children: [new TextRun({ text: fechaViaje, size: 28, color: '555555' })]
-        }),
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 200 },
-          children: [new TextRun({ text: (r.hora ? r.hora.slice(0,5) : '') + 'h', size: 36, bold: true, color: '555555' })]
-        }),
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 400 },
-          children: [new TextRun({ text: (r.origen || '') + ' → ' + (r.destino || ''), size: 24, color: '888888' })]
+          spacing: { before: 200, after: 200 },
+          children: [new TextRun({
+            text: nombreCartel,
+            bold: true,
+            size: 220,  // ~110pt — muy grande para aeropuerto
+            color: '1C1815'
+          })]
         }),
       ]
     }]
