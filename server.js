@@ -3622,33 +3622,33 @@ async function generarCartelChofer(reservaId) {
       properties: {
         page: {
           size: {
-            // A4 horizontal: 29.7cm x 21cm en twips (1cm = 567 twips)
-            width: 16838,  // 29.7cm
-            height: 11906  // 21cm
+            width: 16838,  // A4 horizontal: 29.7cm
+            height: 11906  // A4 horizontal: 21cm
           },
           margin: {
             top: 720,
             bottom: 720,
             left: 1000,
             right: 1000
-          }
+          },
+          verticalAlign: 'center'  // Centrado vertical
         }
       },
       children: [
-        // Logo pequeño arriba
+        // Logo pequeño
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          spacing: { after: 800 },
+          spacing: { after: 600 },
           children: [new TextRun({ text: 'TRASLADOS GC', size: 28, color: 'C1502E', bold: true })]
         }),
-        // Nombre grande — ocupa el espacio principal
+        // Nombre grande centrado
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          spacing: { before: 200, after: 200 },
+          spacing: { before: 0, after: 0 },
           children: [new TextRun({
             text: nombreCartel,
             bold: true,
-            size: 220,  // ~110pt — muy grande para aeropuerto
+            size: 220,
             color: '1C1815'
           })]
         }),
