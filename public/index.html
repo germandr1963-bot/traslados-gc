@@ -269,11 +269,11 @@ footer {
       <div class="fila-busqueda">
         <div>
           <label class="etiqueta">Desde</label>
-          <select id="desde" class="campo" onchange="actualizarCategoriasSegunRuta()"><option value="">Cargando...</option></select>
+          <select id="desde" class="campo" onchange="actualizarCategoriasSegunRuta()" size="1"><option value="">Selecciona origen</option></select>
         </div>
         <div>
           <label class="etiqueta">Hasta</label>
-          <select id="hasta" class="campo" onchange="actualizarCategoriasSegunRuta()"><option value="">Cargando...</option></select>
+          <select id="hasta" class="campo" onchange="actualizarCategoriasSegunRuta()" size="1"><option value="">Selecciona destino</option></select>
         </div>
         <div>
           <label class="etiqueta">Categoría</label>
@@ -514,13 +514,18 @@ cargarCategorias();
 function abrirFormCotizacion() {
   var modal = document.getElementById('modal-cotizacion');
   modal.style.display = 'flex';
-  // Prellenar origen y destino si el cliente ya los eligió
-  var desde = document.getElementById('desde').value;
-  var hasta = document.getElementById('hasta').value;
-  if (desde) document.getElementById('cotiz-origen').value = desde;
-  if (hasta) document.getElementById('cotiz-destino').value = hasta;
+  // Siempre limpio al abrir
+  document.getElementById('cotiz-origen').value = '';
+  document.getElementById('cotiz-destino').value = '';
+  document.getElementById('cotiz-fecha').value = '';
+  document.getElementById('cotiz-pax').value = '';
+  document.getElementById('cotiz-email').value = '';
   document.getElementById('cotiz-error').style.display = 'none';
   document.getElementById('cotiz-ok').style.display = 'none';
+  var btnEnviar = document.getElementById('btn-enviar-cotizacion');
+  var btnCancelar = document.getElementById('btn-cancelar-cotizacion');
+  if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = 'Enviar solicitud'; btnEnviar.style.display = ''; }
+  if (btnCancelar) btnCancelar.textContent = 'Cancelar';
 }
 
 function cerrarFormCotizacion() {
