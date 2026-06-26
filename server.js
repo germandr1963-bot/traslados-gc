@@ -101,8 +101,8 @@ const upload = multer({
 
 // El webhook de Stripe necesita el body sin parsear — va ANTES del JSON middleware
 app.use('/webhook/stripe', express.raw({ type: 'application/json' }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
@@ -1578,7 +1578,7 @@ app.get('/admin/seo/rutas/:id/completo', requireAdmin, asyncHandler(async (req, 
 // como og:image al compartir el link por WhatsApp/redes en vez de la genérica
 app.post('/admin/rutas/:id/imagen-og', requireAdmin, asyncHandler(async (req, res) => {
   const { imagen } = req.body;
-  if (!imagen || !imagen.startsWith('data:image/') || imagen.length > 900000) {
+  if (!imagen || !imagen.startsWith('data:image/') || imagen.length > 3000000) {
     return res.status(400).json({ error: 'La imagen no es válida o pesa demasiado (máx. ~650KB).' });
   }
   await pool.query('UPDATE rutas SET imagen_og = $1 WHERE id = $2', [imagen, req.params.id]);
@@ -4243,7 +4243,7 @@ app.post('/admin/seo/ajustes-globales', requireAdmin, asyncHandler(async (req, r
 
 app.post('/admin/seo/ajustes-globales/imagen', requireAdmin, asyncHandler(async (req, res) => {
   const { imagen } = req.body;
-  if (!imagen || !imagen.startsWith('data:image/') || imagen.length > 900000) {
+  if (!imagen || !imagen.startsWith('data:image/') || imagen.length > 3000000) {
     return res.status(400).json({ error: 'La imagen no es válida o pesa demasiado (máx. ~650KB).' });
   }
   await pool.query('UPDATE ajustes_seo_globales SET imagen_og_defecto = $1, updated_at = NOW() WHERE id = 1', [imagen]);
