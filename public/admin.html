@@ -646,6 +646,7 @@ table.tabla-precios input {
               <span id="badge-voucher" style="display:none;background:#2d7a4f;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.7rem;">✔ Enviado</span>
             </button>
             <button class="boton-costa" style="font-size:0.82rem;" onclick="reenviarEnlacePago()">🔗 Reenviar enlace de pago</button>
+            <button class="boton-costa" style="font-size:0.82rem;" onclick="reenviarCartelChofer()">📄 Reenviar cartel al chofer</button>
           </div>
           <div id="aviso-email-reserva" style="display:none;margin-top:0.75rem;font-size:0.82rem;"></div>
         </div>
@@ -3858,6 +3859,26 @@ function enviarEmailConfirmacion() {
       av.innerHTML = '<div class="aviso-ok">✔ Email de confirmación enviado.</div>';
       var badge = document.getElementById('badge-confirmacion');
       if (badge) badge.style.display = 'inline';
+      setTimeout(function() { av.style.display = 'none'; }, 3000);
+    })
+    .catch(function() {
+      av.innerHTML = '<div class="aviso-error">❌ Error de conexión.</div>';
+    });
+}
+
+function reenviarCartelChofer() {
+  if (!reservaDetalleId) return;
+  var av = document.getElementById('aviso-email-reserva');
+  av.style.display = 'block';
+  av.innerHTML = '<div class="aviso-ok">📄 Enviando cartel al chofer...</div>';
+  fetch('/admin/reservas/' + reservaDetalleId + '/reenviar-cartel', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        av.innerHTML = '<div class="aviso-error">❌ ' + data.error + '</div>';
+        return;
+      }
+      av.innerHTML = '<div class="aviso-ok">✔ Cartel enviado al chofer.</div>';
       setTimeout(function() { av.style.display = 'none'; }, 3000);
     })
     .catch(function() {
