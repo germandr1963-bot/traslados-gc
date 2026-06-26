@@ -179,6 +179,13 @@ function requireAdmin(req, res, next) {
   return res.status(401).json({ error: 'No autorizado' });
 }
 
+function requireChofer(req, res, next) {
+  if (req.session && req.session.choferId) {
+    return next();
+  }
+  return res.status(401).json({ error: 'No autorizado' });
+}
+
 // Envuelve cada ruta que habla con la base de datos: si algo falla (por
 // ejemplo, una consulta justo cuando la conexión se estaba reconectando),
 // se devuelve un error claro al navegador en vez de dejarlo colgado o
@@ -2494,6 +2501,74 @@ app.post('/admin/tarifario/calcular', requireAdmin, asyncHandler(async (req, res
     (con_suplemento ? parseFloat(t.suplemento_aeropuerto) : 0);
 
   res.json({ precio: Math.max(precio, parseFloat(t.bajada_bandera)).toFixed(2) });
+}));
+
+// ─── Portal del chofer ───────────────────────────────────────────────────────
+
+app.get('/chofer/login', (req, res) => {
+  if (req.session && req.session.choferId) return res.redirect('/chofer/portal');
+  res.sendFile(path.join(__dirname, 'public', 'chofer-login.html'));
+});
+
+app.get('/chofer/portal', (req, res) => {
+  if (!req.session || !req.session.choferId) return res.redirect('/chofer/login');
+  res.sendFile(path.join(__dirname, 'public', 'chofer-portal.html'));
+});
+
+app.post('/chofer/login', asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Introduce email y contraseña.' });
+
+  const result = await pool.query(
+    'SELECT * FROM conductores WHERE email = $1 AND estado = $2',
+    [email.trim().toLowerCase(), 'aprobado']
+  );
+  if (!result.rows.length) {
+    return res.status(401).json({ error: 'Email o contraseña incorrectos.' });
+  }
+  const chofer = result.rows[0];
+  const ok = await bcrypt.compare(password, chofer.password_hash);
+  if (!ok) return res.status(401).json({ error: 'Email o contraseña incorrectos.' });
+
+  req.session.choferId = chofer.id;
+  req.session.choferNombre = chofer.nombre;
+  res.json({ ok: true });
+}));
+
+app.post('/chofer/logout', (req, res) => {
+  req.session.destroy(function() { res.json({ ok: true }); });
+});
+
+app.get('/chofer/mis-reservas', requireChofer, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino,
+            r.nombre_cliente, r.num_pasajeros, r.estado, r.deposito_pagado,
+            cv.nombre AS categoria_nombre
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     WHERE r.conductor_id = $1
+       AND (r.archivada = FALSE OR r.archivada IS NULL)
+       AND r.estado NOT IN ('cancelada', 'completada')
+     ORDER BY r.fecha ASC, r.hora ASC`,
+    [req.session.choferId]
+  );
+  res.json({ nombre: req.session.choferNombre, reservas: result.rows });
+}));
+
+app.get('/chofer/cartel/:id', requireChofer, asyncHandler(async (req, res) => {
+  // Verificar que la reserva está asignada a este chofer
+  const check = await pool.query(
+    'SELECT id FROM reservas WHERE id = $1 AND conductor_id = $2',
+    [req.params.id, req.session.choferId]
+  );
+  if (!check.rows.length) return res.status(403).json({ error: 'No autorizado.' });
+
+  const cartel = await generarCartelChofer(req.params.id);
+  if (!cartel) return res.status(404).json({ error: 'No se pudo generar el cartel.' });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  res.setHeader('Content-Disposition', 'attachment; filename="cartel-' + req.params.id + '.docx"');
+  res.send(cartel.buffer);
 }));
 
 // ─── Admin: configuración no-show ────────────────────────────────────────────
