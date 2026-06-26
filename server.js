@@ -42,6 +42,39 @@ async function enviarEmail({ to, subject, html }) {
   }
   return true;
 }
+
+async function enviarEmailConAdjunto({ to, subject, html, adjunto }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn('Email no configurado — falta RESEND_API_KEY');
+    return false;
+  }
+  const body = {
+    from: 'Traslados GC <onboarding@resend.dev>',
+    to: [to],
+    subject: subject,
+    html: html
+  };
+  if (adjunto) {
+    body.attachments = [{
+      filename: adjunto.filename,
+      content: Buffer.isBuffer(adjunto.content)
+        ? adjunto.content.toString('base64')
+        : adjunto.content
+    }];
+  }
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error('Resend error ' + response.status + ': ' + error);
+  }
+  return true;
+}
+
 const PORT = process.env.PORT || 3000;
 
 // Motor de plantillas EJS para las páginas de ruta renderizadas en servidor
