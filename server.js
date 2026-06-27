@@ -388,6 +388,9 @@ async function initSchema() {
     );
   `);
 
+  // Columna observaciones en conductores: campo libre para notas del registro web.
+  await pool.query(`ALTER TABLE conductores ADD COLUMN IF NOT EXISTS observaciones TEXT DEFAULT ''`);
+
   // Columna activo en route_seo_settings: controla si la página
   // de esa ruta en ese idioma está visible en internet o no.
   await pool.query(`
