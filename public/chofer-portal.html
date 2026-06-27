@@ -4,22 +4,25 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Chofer — Traslados GC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/estilos.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f0ea; min-height: 100vh; }
-    .header {
-      background: #1C1815;
-      padding: 16px 24px;
+    header.app {
+      background: var(--charcoal);
+      padding: 12px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
+      border-bottom: 3px solid var(--terracota);
     }
-    .header-logo { color: #C1502E; font-weight: 700; font-size: 18px; letter-spacing: 1px; }
-    .header-info { color: #aaa; font-size: 13px; }
-    .header-info strong { color: #ECE6D8; }
-    .btn-salir {
+    header.app .marca {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 20px;
+      color: var(--texto-claro);
+      letter-spacing: 1px;
+      text-decoration: none;
+    }
+    header.app .btn-salir {
       background: none;
       border: 1px solid #555;
       color: #aaa;
@@ -28,39 +31,43 @@
       font-size: 12px;
       cursor: pointer;
     }
-    .btn-salir:hover { border-color: #C1502E; color: #C1502E; }
-    .contenido { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
-    h2 { font-size: 18px; color: #2c2c2c; margin-bottom: 16px; }
-    .seccion { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #e8e0d4; }
+    header.app .btn-salir:hover { border-color: var(--terracota); color: var(--terracota); }
+
+    main { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; }
+
+    h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: 26px; color: var(--texto-oscuro); margin-bottom: 6px; }
+    h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 18px; color: var(--texto-oscuro); margin-bottom: 12px; }
+    p.sub { color: var(--texto-muted); font-size: 14px; line-height: 1.6; margin-bottom: 16px; }
+
+    .tarjeta { background: #fff; border: 1px solid var(--gris-borde); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+
+    .etiqueta.pendiente { background: #fff3cd; color: #856404; border-radius: 6px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+    .etiqueta.aprobado { background: #d1e7dd; color: #0f5132; border-radius: 6px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+    .etiqueta.suspendido { background: #f8d7da; color: #842029; border-radius: 6px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+
     .reserva-card {
-      border: 1px solid #e8e0d4;
+      border: 1px solid var(--gris-borde);
       border-radius: 10px;
       padding: 16px;
       margin-bottom: 12px;
-      background: #fdfaf7;
+      background: var(--gris-fondo);
       display: flex;
       gap: 16px;
       align-items: flex-start;
       flex-wrap: wrap;
     }
     .reserva-info { flex: 1; min-width: 200px; }
-    .reserva-pnr { font-family: monospace; font-size: 16px; font-weight: 700; color: #C1502E; margin-bottom: 6px; }
-    .reserva-ruta { font-size: 15px; font-weight: 600; color: #2c2c2c; margin-bottom: 4px; }
-    .reserva-dato { font-size: 13px; color: #666; margin-bottom: 2px; }
-    .badge-estado {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: 600;
-      margin-top: 6px;
-    }
+    .reserva-pnr { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; color: var(--terracota); margin-bottom: 6px; }
+    .reserva-ruta { font-size: 15px; font-weight: 600; color: var(--texto-oscuro); margin-bottom: 4px; }
+    .reserva-dato { font-size: 13px; color: var(--texto-muted); margin-bottom: 2px; }
+    .badge-estado { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-top: 6px; }
     .badge-confirmada { background: #d1e7dd; color: #0f5132; }
     .badge-pendiente { background: #fff3cd; color: #664d03; }
     .badge-completada { background: #e2e3e5; color: #41464b; }
     .reserva-acciones { display: flex; flex-direction: column; gap: 8px; min-width: 160px; }
+
     .btn-cartel {
-      background: #C1502E;
+      background: var(--terracota);
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -68,11 +75,15 @@
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      text-align: center;
     }
-    .btn-cartel:hover { background: #8a3a20; }
-    .vacio { text-align: center; color: #aaa; padding: 40px 20px; font-size: 14px; }
-    .loading { text-align: center; color: #aaa; padding: 30px; }
+    .btn-cartel:hover { background: var(--terracota-oscuro); }
+
+    .vacio { text-align: center; color: var(--texto-muted); padding: 40px 20px; font-size: 14px; }
+    .loading { text-align: center; color: var(--texto-muted); padding: 30px; }
+
+    input[type=file] { display: block; margin-top: 8px; font-size: 13px; }
+    label.etiqueta-campo { display: block; font-size: 13px; font-weight: 600; color: var(--texto-oscuro); margin-top: 14px; }
+
     @media (max-width: 500px) {
       .reserva-card { flex-direction: column; }
       .reserva-acciones { flex-direction: row; flex-wrap: wrap; }
@@ -80,24 +91,146 @@
   </style>
 </head>
 <body>
-  <div class="header">
-    <span class="header-logo">TRASLADOS GC</span>
-    <span class="header-info">Hola, <strong id="chofer-nombre">...</strong></span>
-    <button class="btn-salir" onclick="cerrarSesion()">Cerrar sesión</button>
-  </div>
 
-  <div class="contenido">
-    <div class="seccion">
-      <h2>📋 Mis próximas reservas</h2>
-      <div id="lista-reservas"><div class="loading">Cargando...</div></div>
+  <header class="app">
+    <a href="/" class="marca">Traslados · GC</a>
+    <button class="btn-salir" onclick="cerrarSesion()">Cerrar sesión</button>
+  </header>
+
+  <main>
+    <!-- Panel del conductor -->
+    <div id="zona-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+        <h1 id="saludo">Hola</h1>
+        <button class="boton-secundario" onclick="cargarDatos()">🔄 Actualizar</button>
+      </div>
+      <p class="sub" id="texto-estado"></p>
+
+      <!-- Ficha del vehículo y foto -->
+      <div class="tarjeta" id="ficha-vehiculo"></div>
+
+      <!-- Reservas -->
+      <div class="tarjeta">
+        <h2>📋 Mis próximas reservas</h2>
+        <div id="lista-reservas"><div class="loading">Cargando...</div></div>
+      </div>
     </div>
-  </div>
+  </main>
 
   <script>
+    var TEXTOS_ESTADO = {
+      pendiente: 'Tu solicitud está en revisión. Te avisaremos cuando la administración apruebe tu cuenta.',
+      aprobado: 'Tu cuenta está aprobada. Ya formas parte de la plataforma.',
+      suspendido: 'Tu cuenta está suspendida. Contacta con la administración.'
+    };
+
+    var TEXTOS_FOTO = {
+      sin_foto: '📷 Aún no has subido tu foto de carné.',
+      pendiente: '🕐 Tu foto está pendiente de revisión por la administración.',
+      aprobada: '✅ Foto aprobada.',
+      rechazada: '❌ Foto rechazada. Sube otra, por favor.'
+    };
+
     function cerrarSesion() {
       fetch('/chofer/logout', { method: 'POST' }).then(function() {
         window.location.href = '/chofer/login';
       });
+    }
+
+    function cargarDatos() {
+      fetch('/chofer/me')
+        .then(function(r) {
+          if (r.status === 401) { window.location.href = '/chofer/login'; return null; }
+          return r.json();
+        })
+        .then(function(data) {
+          if (!data) return;
+          var c = data.conductor;
+          document.getElementById('saludo').textContent = 'Hola, ' + c.nombre;
+          document.getElementById('texto-estado').innerHTML =
+            '<span class="etiqueta ' + c.estado + '">' + c.estado.toUpperCase() + '</span> ' +
+            TEXTOS_ESTADO[c.estado];
+
+          var textoFoto = TEXTOS_FOTO[c.foto_estado || 'sin_foto'];
+          if (c.foto_estado === 'rechazada' && c.foto_motivo) {
+            textoFoto = '❌ Foto rechazada: ' + c.foto_motivo + '. Sube otra, por favor.';
+          }
+
+          document.getElementById('ficha-vehiculo').innerHTML =
+            '<h2 style="margin-top:0">Tu vehículo</h2>' +
+            (c.foto ? '<img src="' + c.foto + '" alt="Foto" style="width:90px;height:90px;object-fit:cover;border-radius:50%;border:2px solid var(--gris-borde);float:right;margin-left:10px">' : '') +
+            '<p><strong>' + (c.vehiculo_marca || '—') + ' ' + (c.vehiculo_modelo || '') + '</strong>' +
+            (c.categoria ? ' · Categoría <strong>' + c.categoria + '</strong>' : '') + '<br>' +
+            'Matrícula: ' + (c.matricula || '—') + ' · Nº de taxi: <strong>' + (c.numero_taxi || '—') + '</strong><br>' +
+            'Licencia: ' + (c.numero_licencia || '—') + ' (' + (c.municipio_licencia || '—') + ')<br>' +
+            'Plazas: ' + c.plazas + ' · Isla: ' + (c.isla || '—') + '</p>' +
+            '<p style="font-size:0.88rem;margin-top:8px">' + textoFoto + '</p>' +
+            '<label class="etiqueta-campo">📷 ' + (c.foto ? 'Cambiar' : 'Subir') + ' foto de carné (será revisada por la administración antes de mostrarse)</label>' +
+            '<input type="file" id="archivo-foto" accept="image/*" onchange="subirFoto(this)">';
+        });
+
+      fetch('/chofer/mis-reservas')
+        .then(function(r) {
+          if (r.status === 401) { window.location.href = '/chofer/login'; return null; }
+          return r.json();
+        })
+        .then(function(data) {
+          if (!data) return;
+          var lista = document.getElementById('lista-reservas');
+          if (!data.reservas || !data.reservas.length) {
+            lista.innerHTML = '<div class="vacio">No tienes reservas asignadas próximamente.</div>';
+            return;
+          }
+          lista.innerHTML = data.reservas.map(function(r) {
+            var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'short', day:'numeric', month:'short', year:'numeric'}) : '—';
+            var hora = r.hora ? r.hora.slice(0,5) : '—';
+            var badgeClass = 'badge-' + (r.estado || 'pendiente');
+            return '<div class="reserva-card">' +
+              '<div class="reserva-info">' +
+                '<div class="reserva-pnr">' + r.numero_reserva + '</div>' +
+                '<div class="reserva-ruta">' + (r.origen || '—') + ' → ' + (r.destino || '—') + '</div>' +
+                '<div class="reserva-dato">📅 ' + fecha + ' · ' + hora + 'h</div>' +
+                '<div class="reserva-dato">👤 ' + (r.nombre_cliente || '—') + '</div>' +
+                '<div class="reserva-dato">🚗 ' + (r.categoria_nombre || '—') + ' · ' + (r.num_pasajeros || '—') + ' pax</div>' +
+                '<span class="badge-estado ' + badgeClass + '">' + (r.estado || 'pendiente') + '</span>' +
+              '</div>' +
+              '<div class="reserva-acciones">' +
+                '<button class="btn-cartel" id="btn-cartel-' + r.id + '" onclick="descargarCartel(' + r.id + ',\'' + r.numero_reserva + '\')">📄 Descargar cartel</button>' +
+              '</div>' +
+            '</div>';
+          }).join('');
+        });
+    }
+
+    function subirFoto(entrada) {
+      var archivo = entrada.files && entrada.files[0];
+      if (!archivo) return;
+      var lector = new FileReader();
+      lector.onload = function(evento) {
+        var imagen = new Image();
+        imagen.onload = function() {
+          var escala = Math.min(1, 400 / Math.min(imagen.width, imagen.height));
+          var lienzo = document.createElement('canvas');
+          lienzo.width = Math.round(imagen.width * escala);
+          lienzo.height = Math.round(imagen.height * escala);
+          lienzo.getContext('2d').drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+          var datos = lienzo.toDataURL('image/jpeg', 0.8);
+          fetch('/chofer/foto', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ foto: datos })
+          }).then(function(r) { return r.json(); }).then(function(resp) {
+            if (resp.ok) {
+              alert('Foto enviada. 📷 Quedará visible cuando la administración la apruebe.');
+              cargarDatos();
+            } else {
+              alert(resp.error || 'Error al subir la foto.');
+            }
+          });
+        };
+        imagen.src = evento.target.result;
+      };
+      lector.readAsDataURL(archivo);
     }
 
     function descargarCartel(reservaId, pnr) {
@@ -126,42 +259,7 @@
         });
     }
 
-    function cargarReservas() {
-      fetch('/chofer/mis-reservas')
-        .then(function(r) {
-          if (r.status === 401) { window.location.href = '/chofer/login'; return null; }
-          return r.json();
-        })
-        .then(function(data) {
-          if (!data) return;
-          document.getElementById('chofer-nombre').textContent = data.nombre || '';
-          var lista = document.getElementById('lista-reservas');
-          if (!data.reservas || !data.reservas.length) {
-            lista.innerHTML = '<div class="vacio">No tienes reservas asignadas próximamente.</div>';
-            return;
-          }
-          lista.innerHTML = data.reservas.map(function(r) {
-            var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'short', day:'numeric', month:'short', year:'numeric'}) : '—';
-            var hora = r.hora ? r.hora.slice(0,5) : '—';
-            var badgeClass = 'badge-' + (r.estado || 'pendiente');
-            return '<div class="reserva-card">' +
-              '<div class="reserva-info">' +
-                '<div class="reserva-pnr">' + r.numero_reserva + '</div>' +
-                '<div class="reserva-ruta">' + (r.origen || '—') + ' → ' + (r.destino || '—') + '</div>' +
-                '<div class="reserva-dato">📅 ' + fecha + ' · ' + hora + 'h</div>' +
-                '<div class="reserva-dato">👤 ' + (r.nombre_cliente || '—') + '</div>' +
-                '<div class="reserva-dato">🚗 ' + (r.categoria_nombre || '—') + ' · ' + (r.num_pasajeros || '—') + ' pax</div>' +
-                '<span class="badge-estado ' + badgeClass + '">' + (r.estado || 'pendiente') + '</span>' +
-              '</div>' +
-              '<div class="reserva-acciones">' +
-                '<button class="btn-cartel" id="btn-cartel-' + r.id + '" onclick="descargarCartel(' + r.id + ',\'' + r.numero_reserva + '\')">📄 Descargar cartel</button>' +
-              '</div>' +
-            '</div>';
-          }).join('');
-        });
-    }
-
-    cargarReservas();
+    cargarDatos();
   </script>
 </body>
 </html>
