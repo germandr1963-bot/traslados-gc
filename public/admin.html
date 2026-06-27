@@ -1233,8 +1233,10 @@ function editarNombreConductor(id, actual) {
 }
 
 function campoFicha(etiqueta, idCampo, valor) {
-  return '<label class="etiqueta" style="margin-top:8px">' + etiqueta + '</label>' +
-    '<input class="campo" id="f-' + idCampo + '" type="text" value="' + escapar(valor == null ? '' : String(valor)) + '" style="margin-bottom:8px">';
+  return '<div>' +
+    '<label class="etiqueta" style="margin-top:8px">' + etiqueta + '</label>' +
+    '<input class="campo" id="f-' + idCampo + '" type="text" value="' + escapar(valor == null ? '' : String(valor)) + '" style="margin-bottom:8px">' +
+    '</div>';
 }
 
 function verFichaConductor(id) {
