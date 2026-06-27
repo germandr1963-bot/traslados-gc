@@ -1241,59 +1241,38 @@ function verFichaConductor(id) {
   fetch('/admin/conductores/' + id + '/ficha').then(function (r) { return r.json(); }).then(function (c) {
     var ficha = document.getElementById('ficha-conductor');
     ficha.classList.remove('oculto');
-
-    var seccion = function(titulo) {
-      return '<p style="margin:16px 0 6px;font-size:12px;font-weight:700;color:var(--terracota);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--gris-borde);padding-bottom:4px">' + titulo + '</p>';
-    };
-
-    ficha.innerHTML =
-      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px">' +
-        '<h2 style="margin:0">📋 Expediente: ' + escapar(c.nombre) + ' <span style="font-size:0.8rem;color:#5a6c79;font-weight:400">(modifica lo que necesites y pulsa Guardar)</span></h2>' +
-        (c.foto ? '<img src="' + c.foto + '" alt="Foto" style="width:80px;height:80px;object-fit:cover;border-radius:50%;border:2px solid var(--gris-borde);flex-shrink:0">' : '') +
-      '</div>' +
-
-      seccion('Datos personales') +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">' +
+    ficha.innerHTML = '' +
+      '<h2 style="margin-top:0">📋 Expediente: ' + escapar(c.nombre) + ' <span style="font-size:0.8rem;color:#5a6c79;font-weight:400">(modifica lo que necesites y pulsa Guardar)</span></h2>' +
+      (c.foto ? '<img src="' + c.foto + '" alt="Foto" style="width:100px;height:100px;object-fit:cover;border-radius:50%;float:right;margin-left:12px;border:2px solid var(--gris-borde)">' : '') +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 16px">' +
         campoFicha('Nombre completo', 'nombre', c.nombre) +
         campoFicha('Documento (DNI/NIE)', 'documento', c.documento) +
-        campoFicha('Email', 'email', c.email) +
         campoFicha('Teléfono', 'telefono', c.telefono) +
+        campoFicha('Email', 'email', c.email) +
         campoFicha('Dirección', 'direccion', c.direccion) +
         campoFicha('Código postal', 'cp', c.cp) +
         campoFicha('Municipio', 'municipio', c.municipio) +
-      '</div>' +
-
-      seccion('Licencia') +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">' +
         campoFicha('Municipio de la licencia', 'municipio_licencia', c.municipio_licencia) +
         campoFicha('Nº de licencia', 'numero_licencia', c.numero_licencia) +
         campoFicha('Central de flota', 'central_flota', c.central_flota) +
-      '</div>' +
-
-      seccion('Vehículo') +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">' +
-        campoFicha('Marca', 'vehiculo_marca', c.vehiculo_marca) +
+        campoFicha('Marca del vehículo', 'vehiculo_marca', c.vehiculo_marca) +
         campoFicha('Modelo', 'vehiculo_modelo', c.vehiculo_modelo) +
         campoFicha('Matrícula', 'matricula', c.matricula) +
         campoFicha('Nº de taxi', 'numero_taxi', c.numero_taxi) +
         campoFicha('Plazas', 'plazas', c.plazas) +
         campoFicha('Isla', 'isla', c.isla) +
       '</div>' +
-
-      seccion('Categoría y foto') +
-      '<p style="font-size:13px;margin:6px 0 12px">' +
-        '<strong>Categoría:</strong> ' + escapar(c.categoria || '—') + ' &nbsp;·&nbsp; ' +
+      '<p style="margin-top:4px;font-size:13px">' +
+        '<strong>Categoría:</strong> ' + escapar(c.categoria || '—') + ' · ' +
         '<strong>Foto de carné:</strong> ' + ETIQUETAS_FOTO_CONDUCTOR[c.foto_estado || 'sin_foto'] +
-        (c.foto_motivo ? '<br><em style="font-size:12px">Motivo del rechazo: ' + escapar(c.foto_motivo) + '</em>' : '') +
+        (c.foto_motivo ? '<br><em>Motivo del rechazo: ' + escapar(c.foto_motivo) + '</em>' : '') +
       '</p>' +
-
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
         '<button class="boton-primario" onclick="guardarFichaConductor(' + c.id + ')">💾 Guardar cambios</button>' +
         ((c.foto_estado === 'pendiente' || c.foto_estado === 'rechazada') ? '<button class="boton-costa" onclick="decidirFotoConductor(' + c.id + ', \'aprobar\')">✅ Aprobar foto</button>' : '') +
         ((c.foto_estado === 'pendiente' || c.foto_estado === 'aprobada') ? '<button class="boton-peligro" onclick="decidirFotoConductor(' + c.id + ', \'rechazar\')">❌ Rechazar foto</button>' : '') +
         '<button class="boton-secundario" onclick="document.getElementById(\'ficha-conductor\').classList.add(\'oculto\')">Cerrar ficha</button>' +
       '</div>';
-
     ficha.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
 }
