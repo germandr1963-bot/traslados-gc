@@ -783,6 +783,24 @@ async function initSchema() {
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_pagado BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email_voucher_enviado BOOLEAN DEFAULT FALSE`);
 
+  // Configuración de contacto público
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS configuracion_contacto (
+      id SERIAL PRIMARY KEY,
+      telefono TEXT,
+      whatsapp TEXT,
+      email TEXT,
+      direccion TEXT,
+      horario TEXT,
+      actualizado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+  await pool.query(`
+    INSERT INTO configuracion_contacto (id, telefono, whatsapp, email)
+    SELECT 1, '', '', ''
+    WHERE NOT EXISTS (SELECT 1 FROM configuracion_contacto WHERE id = 1)
+  `);
+
   // ─── Reservas × Extras ────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS reservas_extras (
@@ -2501,6 +2519,97 @@ app.post('/admin/tarifario/calcular', requireAdmin, asyncHandler(async (req, res
     (con_suplemento ? parseFloat(t.suplemento_aeropuerto) : 0);
 
   res.json({ precio: Math.max(precio, parseFloat(t.bajada_bandera)).toFixed(2) });
+}));
+
+// ─── Contacto público ─────────────────────────────────────────────────────────
+
+app.get('/contacto', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'contacto.html'));
+});
+
+app.get('/api/contacto', asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT * FROM configuracion_contacto WHERE id = 1');
+  res.json(result.rows[0] || {});
+}));
+
+app.post('/admin/contacto', requireAdmin, asyncHandler(async (req, res) => {
+  const { telefono, whatsapp, email, direccion, horario } = req.body;
+  await pool.query(
+    `UPDATE configuracion_contacto SET telefono=$1, whatsapp=$2, email=$3, direccion=$4, horario=$5, actualizado_en=NOW() WHERE id=1`,
+    [telefono||'', whatsapp||'', email||'', direccion||'', horario||'']
+  );
+  res.json({ ok: true });
+}));
+
+// ─── Registro público de choferes ─────────────────────────────────────────────
+
+app.get('/chofer/registro', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'chofer-registro.html'));
+});
+
+app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
+  const {
+    nombre, email, telefono, password,
+    documento, direccion, cp, municipio,
+    municipio_licencia, numero_licencia,
+    vehiculo_marca, vehiculo_modelo, matricula,
+    numero_taxi, plazas
+  } = req.body;
+
+  if (!nombre || !email || !telefono || !password) {
+    return res.status(400).json({ error: 'Los campos nombre, email, teléfono y contraseña son obligatorios.' });
+  }
+
+  // Verificar que el email no existe ya
+  const existe = await pool.query('SELECT id FROM conductores WHERE email = $1', [email.trim().toLowerCase()]);
+  if (existe.rows.length) {
+    return res.status(400).json({ error: 'Ya existe un chofer registrado con ese email.' });
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+
+  await pool.query(
+    `INSERT INTO conductores (
+      nombre, email, telefono, password_hash,
+      documento, direccion, cp, municipio,
+      municipio_licencia, numero_licencia,
+      vehiculo_marca, vehiculo_modelo, matricula,
+      numero_taxi, plazas, estado
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'pendiente')`,
+    [
+      nombre.trim(), email.trim().toLowerCase(), telefono.trim(), hash,
+      documento||'', direccion||'', cp||'', municipio||'',
+      municipio_licencia||'', numero_licencia||'',
+      vehiculo_marca||'', vehiculo_modelo||'', matricula||'',
+      numero_taxi||'', plazas ? parseInt(plazas) : 4
+    ]
+  );
+
+  // Email de confirmación al chofer
+  try {
+    await enviarEmail({
+      to: email.trim(),
+      subject: 'Solicitud recibida — Traslados GC',
+      html: `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body>
+      <div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif;">
+        <div style="background:#2c2c2c;padding:24px;text-align:center;">
+          <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
+          <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+        </div>
+        <div style="padding:28px 24px;">
+          <p>Hola <strong>${nombre.trim()}</strong>,</p>
+          <p>Hemos recibido tu solicitud para unirte a nuestra flota de choferes. Revisaremos tu información y te contactaremos en breve.</p>
+          <p style="font-size:13px;color:#888;">Si tienes alguna pregunta, no dudes en contactarnos.</p>
+        </div>
+        <div style="background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;">Traslados GC · Gran Canaria</div>
+      </div></body></html>`
+    });
+  } catch(err) {
+    console.warn('Error enviando email confirmación registro chofer:', err.message);
+  }
+
+  res.json({ ok: true });
 }));
 
 // ─── Portal del chofer ───────────────────────────────────────────────────────
