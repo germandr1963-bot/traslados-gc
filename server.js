@@ -2661,6 +2661,32 @@ app.post('/chofer/login', asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+app.get('/chofer/me', requireChofer, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT c.id, c.nombre, c.email, c.telefono, c.documento, c.direccion, c.cp, c.municipio,
+            c.municipio_licencia, c.numero_licencia, c.central_flota,
+            c.vehiculo_marca, c.vehiculo_modelo, c.matricula, c.numero_taxi, c.plazas, c.isla,
+            c.estado, c.foto, c.foto_estado, c.foto_motivo,
+            cat.nombre AS categoria
+     FROM conductores c
+     LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
+     WHERE c.id = $1`,
+    [req.session.choferId]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'No encontrado.' });
+  res.json({ conductor: result.rows[0] });
+}));
+
+app.post('/chofer/foto', requireChofer, asyncHandler(async (req, res) => {
+  const { foto } = req.body;
+  if (!foto) return res.status(400).json({ error: 'No se recibió foto.' });
+  await pool.query(
+    `UPDATE conductores SET foto = $1, foto_estado = 'pendiente', foto_motivo = NULL WHERE id = $2`,
+    [foto, req.session.choferId]
+  );
+  res.json({ ok: true });
+}));
+
 app.post('/chofer/logout', (req, res) => {
   req.session.destroy(function() { res.json({ ok: true }); });
 });
@@ -2879,6 +2905,13 @@ app.get('/admin/cotizaciones', requireAdmin, asyncHandler(async (req, res) => {
      ORDER BY c.creado_en DESC`
   );
   res.json({ cotizaciones: result.rows });
+}));
+
+app.get('/admin/conductores/pendientes-count', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    "SELECT COUNT(*) AS total FROM conductores WHERE estado = 'pendiente'"
+  );
+  res.json({ total: parseInt(result.rows[0].total) });
 }));
 
 app.get('/admin/cotizaciones/pendientes-count', requireAdmin, asyncHandler(async (req, res) => {
