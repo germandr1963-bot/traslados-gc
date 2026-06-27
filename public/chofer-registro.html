@@ -3,280 +3,178 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Únete a nuestra flota — Traslados GC</title>
-  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Alta de Chofer — Traslados GC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="estilos.css">
   <style>
+    body { background: var(--gris-fondo); }
 
     /* ── CABECERA ── */
-    .cabecera {
+    header.app {
       background: var(--charcoal);
-      padding: 18px 32px;
+      color: #fff;
+      padding: 12px 20px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      border-bottom: 3px solid var(--terracota);
     }
-    .logo {
+    header.app .marca {
       font-family: 'Big Shoulders Display', sans-serif;
       font-size: 20px;
       color: var(--texto-claro);
       letter-spacing: 1px;
       text-decoration: none;
     }
-    .nav-links a {
-      color: rgba(255,255,255,0.55);
-      font-size: 13px;
-      margin-left: 24px;
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-    .nav-links a:hover,
-    .nav-links a.activo { color: var(--terracota); }
-
-    /* ── HERO ── */
-    .hero {
-      background: var(--charcoal);
-      padding: 56px 24px 72px;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-    .hero::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse at 50% 0%, rgba(193,80,46,0.18) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .hero-eyebrow {
-      display: inline-block;
-      background: rgba(193,80,46,0.15);
-      border: 1px solid rgba(193,80,46,0.35);
-      color: var(--terracota);
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      padding: 5px 14px;
-      border-radius: 20px;
-      margin-bottom: 20px;
-    }
-    .hero h1 {
-      font-family: 'Big Shoulders Display', sans-serif;
-      font-size: clamp(34px, 6vw, 58px);
-      color: var(--texto-claro);
-      line-height: 1.05;
-      margin-bottom: 16px;
-    }
-    .hero h1 span { color: var(--terracota); }
-    .hero-subtitulo {
-      color: rgba(255,255,255,0.5);
-      font-size: 15px;
-      line-height: 1.75;
-      max-width: 520px;
-      margin: 0 auto 40px;
-    }
-    .ventajas {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
-      max-width: 680px;
-      margin: 0 auto;
-    }
-    .ventaja-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 30px;
-      padding: 7px 16px;
-      font-size: 13px;
-      color: rgba(255,255,255,0.75);
-    }
+    header.app a { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 14px; }
+    header.app a:hover { color: #fff; }
 
     /* ── CONTENIDO ── */
-    .pagina-contenido {
-      background: var(--gris-fondo);
-      padding: 48px 20px 80px;
-    }
-    .contenedor-form {
-      max-width: 620px;
-      margin: 0 auto;
-    }
+    main { max-width: 560px; margin: 0 auto; padding: 28px 16px 60px; }
+
+    h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: 28px; color: var(--texto-oscuro); margin-bottom: 6px; }
+    p.sub { color: var(--texto-muted); margin-bottom: 20px; font-size: 14px; line-height: 1.6; }
 
     /* ── TARJETA ── */
-    .card-form {
+    .tarjeta {
       background: #fff;
-      border-radius: 16px;
       border: 1px solid var(--gris-borde);
-      box-shadow: 0 4px 24px rgba(42,33,27,0.08);
-      overflow: hidden;
+      border-radius: 12px;
+      padding: 22px 24px;
+      margin-bottom: 16px;
     }
-    .card-form-header {
-      background: var(--charcoal-2);
-      padding: 20px 28px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .card-form-header .header-icono { font-size: 22px; }
-    .card-form-header h2 {
-      font-family: 'Big Shoulders Display', sans-serif;
-      font-size: 20px;
-      color: var(--texto-claro);
-      font-weight: 500;
-    }
-    .card-form-header p {
-      font-size: 12px;
-      color: rgba(255,255,255,0.45);
-      margin-top: 2px;
-    }
-    .card-form-body { padding: 28px 28px 32px; }
 
-    /* ── SECCIONES ── */
-    .seccion-titulo {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--terracota);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      margin: 28px 0 16px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--gris-borde);
+    /* ── PESTAÑAS ── */
+    .pestanas { display: flex; gap: 8px; margin-bottom: 20px; }
+    .pestanas button {
+      margin-top: 0;
+      flex: 1;
+      background: #fff;
+      border: 1px solid var(--gris-borde);
+      color: var(--texto-muted);
+      font-weight: 600;
+      font-family: 'Public Sans', sans-serif;
+      font-size: 14px;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
     }
-    .seccion-titulo:first-child { margin-top: 0; }
+    .pestanas button.activa {
+      background: var(--charcoal);
+      color: #fff;
+      border-color: var(--charcoal);
+    }
 
     /* ── CAMPOS ── */
-    .campo-grupo { margin-bottom: 16px; }
-    .campo-grupo label {
+    label {
       display: block;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
-      color: var(--texto-muted);
-      margin-bottom: 6px;
-      letter-spacing: 0.3px;
+      color: var(--texto-oscuro);
+      margin: 14px 0 4px;
     }
-    .campo-grupo input,
-    .campo-grupo select {
+    label:first-child { margin-top: 0; }
+    input[type=text], input[type=email], input[type=tel],
+    input[type=password], select {
       width: 100%;
-      border: 1.5px solid #c9bfb5;
+      padding: 10px 12px;
+      border: 1px solid var(--gris-borde);
       border-radius: 8px;
-      padding: 11px 14px;
       font-size: 14px;
+      font-family: 'Public Sans', sans-serif;
       color: var(--texto-oscuro);
       background: #fff;
-      font-family: 'Public Sans', sans-serif;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .campo-grupo input:focus,
-    .campo-grupo select:focus {
+    input:focus, select:focus {
       outline: none;
       border-color: var(--terracota);
       box-shadow: 0 0 0 3px rgba(193,80,46,0.1);
     }
-    .campo-grupo input::placeholder { color: #c0b5aa; }
-    .campo-grupo input.oculto,
-    .campo-grupo select.oculto { display: none; }
-    .requerido { color: var(--terracota); margin-left: 2px; }
+    input::placeholder { color: #c0b5aa; }
+    .oculto { display: none !important; }
 
-    .fila-dos {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
+    /* ── SECCIÓN TÍTULO ── */
+    h2 {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 16px;
+      color: var(--terracota);
+      margin: 22px 0 4px;
+      letter-spacing: 0.5px;
     }
 
     /* ── CATEGORÍAS ── */
     .categorias-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 10px;
-      margin-bottom: 8px;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
     }
-    .categoria-opcion {
-      border: 2px solid var(--gris-borde);
-      border-radius: 10px;
-      padding: 14px 12px;
-      cursor: pointer;
-      text-align: center;
-      transition: border-color 0.2s, background 0.2s;
-      background: #fff;
-    }
-    .categoria-opcion:hover { border-color: #b5a99a; }
-    .categoria-opcion.seleccionada {
-      border-color: var(--terracota);
-      background: rgba(193,80,46,0.05);
-    }
-    .categoria-opcion .cat-nombre {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--texto-oscuro);
-      margin-bottom: 3px;
-    }
-    .categoria-opcion .cat-detalle {
-      font-size: 11px;
-      color: var(--texto-muted);
-      line-height: 1.4;
-    }
-    .categoria-otra {
-      border: 2px dashed var(--gris-borde);
-      border-radius: 10px;
-      padding: 14px 12px;
-      cursor: pointer;
-      text-align: center;
-      transition: border-color 0.2s;
-      background: #fff;
-    }
-    .categoria-otra:hover { border-color: #b5a99a; }
-    .categoria-otra.seleccionada {
-      border-color: var(--oro);
-      background: rgba(217,164,65,0.05);
-    }
-    .categoria-otra .cat-nombre {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--texto-muted);
-    }
-    .aviso-categoria-otra {
-      display: none;
-      background: rgba(217,164,65,0.12);
-      border: 1px solid rgba(217,164,65,0.4);
+    .cat-opcion {
+      border: 1px solid var(--gris-borde);
       border-radius: 8px;
-      padding: 11px 14px;
+      padding: 12px 10px;
+      cursor: pointer;
+      text-align: center;
+      background: #fff;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .cat-opcion:hover { border-color: #b5a99a; }
+    .cat-opcion.sel { border-color: var(--terracota); background: rgba(193,80,46,0.05); }
+    .cat-opcion .cn { font-size: 13px; font-weight: 700; color: var(--texto-oscuro); }
+    .cat-opcion .cd { font-size: 11px; color: var(--texto-muted); margin-top: 2px; }
+    .cat-otra {
+      border: 1px dashed var(--gris-borde);
+      border-radius: 8px;
+      padding: 12px 10px;
+      cursor: pointer;
+      text-align: center;
+      background: #fff;
+      transition: border-color 0.15s;
+    }
+    .cat-otra:hover { border-color: #b5a99a; }
+    .cat-otra.sel { border-color: var(--oro); background: rgba(217,164,65,0.06); }
+    .cat-otra .cn { font-size: 13px; font-weight: 700; color: var(--texto-muted); }
+    .aviso-otra {
+      display: none;
+      background: #fdf8ec;
+      border: 1px solid rgba(217,164,65,0.5);
+      border-radius: 8px;
+      padding: 10px 12px;
       font-size: 13px;
       color: #5a4010;
-      line-height: 1.55;
-      margin-top: 10px;
+      margin-top: 8px;
+      line-height: 1.5;
     }
 
-    /* ── NOTA / AVISO ── */
-    .nota-campo {
-      font-size: 11px;
-      color: var(--texto-muted);
-      margin-top: 5px;
-      line-height: 1.5;
-    }
-    .aviso-error {
-      background: var(--rojo-error-fondo);
-      border: 1px solid #e8b4a8;
+    /* ── BOTÓN PRINCIPAL ── */
+    button.principal {
+      display: block;
+      width: 100%;
+      margin-top: 20px;
+      padding: 13px;
+      border: none;
       border-radius: 8px;
-      padding: 11px 14px;
-      font-size: 13px;
-      color: var(--rojo-error);
-      margin-bottom: 16px;
-      display: none;
-      line-height: 1.5;
+      background: var(--terracota);
+      color: #fff;
+      font-weight: 700;
+      font-size: 15px;
+      font-family: 'Public Sans', sans-serif;
+      cursor: pointer;
+      transition: background 0.2s;
     }
+    button.principal:hover { background: var(--terracota-oscuro); }
+    button.principal:disabled { opacity: 0.6; cursor: not-allowed; }
 
     /* ── CHECKBOX ── */
-    .campo-check {
+    .check-wrap {
       display: flex;
       align-items: flex-start;
       gap: 10px;
-      margin-bottom: 12px;
+      margin-top: 14px;
     }
-    .campo-check input[type="checkbox"] {
+    .check-wrap input[type=checkbox] {
       width: 16px;
       min-width: 16px;
       height: 16px;
@@ -284,278 +182,180 @@
       accent-color: var(--terracota);
       cursor: pointer;
     }
-    .campo-check label {
+    .check-wrap label {
       font-size: 13px;
+      font-weight: 400;
       color: var(--texto-muted);
+      margin: 0;
+      cursor: pointer;
       line-height: 1.55;
-      cursor: pointer;
     }
-    .campo-check label a {
-      color: var(--terracota);
-      text-decoration: underline;
-    }
+    .check-wrap label a { color: var(--terracota); text-decoration: underline; }
 
-    /* ── BOTÓN ── */
-    .btn-enviar {
-      width: 100%;
-      background: var(--terracota);
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      padding: 16px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 12px;
-      font-family: 'Public Sans', sans-serif;
-      letter-spacing: 0.3px;
-      transition: background 0.2s, transform 0.1s;
-      display: block;
-    }
-    .btn-enviar:hover { background: var(--terracota-oscuro); }
-    .btn-enviar:active { transform: scale(0.99); }
-    .btn-enviar:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-    .nota-legal {
-      font-size: 12px;
-      color: var(--texto-muted);
-      text-align: center;
-      margin-top: 14px;
-      line-height: 1.65;
-    }
+    /* ── MENSAJES ── */
+    .mensaje { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13px; display: none; }
+    .mensaje.error { display: block; background: var(--rojo-error-fondo); color: var(--rojo-error); border: 1px solid #e8b4a8; }
+    .mensaje.ok    { display: block; background: var(--verde-ok-fondo); color: var(--verde-ok); border: 1px solid #a8dece; padding: 20px; text-align: center; }
 
-    /* ── ÉXITO ── */
-    .ok-box {
-      background: var(--verde-ok-fondo);
-      border: 1px solid #a8dece;
-      border-radius: 14px;
-      padding: 48px 28px;
-      text-align: center;
-      display: none;
-    }
-    .ok-box .ok-icono { font-size: 48px; margin-bottom: 16px; }
-    .ok-box h3 {
-      font-family: 'Big Shoulders Display', sans-serif;
-      font-size: 26px;
-      color: var(--verde-ok);
-      margin-bottom: 10px;
-    }
-    .ok-box p {
-      color: #3a6b5a;
-      font-size: 14px;
-      line-height: 1.7;
-      max-width: 360px;
-      margin: 0 auto;
-    }
+    .nota-final { font-size: 12px; color: var(--texto-muted); text-align: center; margin-top: 10px; line-height: 1.6; }
 
-    /* ── RESPONSIVE ── */
-    @media (max-width: 560px) {
-      .cabecera { padding: 14px 16px; }
-      .hero { padding: 40px 16px 56px; }
-      .card-form-body { padding: 20px 18px 24px; }
-      .card-form-header { padding: 16px 18px; }
-      .fila-dos { grid-template-columns: 1fr; }
-      .categorias-grid { grid-template-columns: 1fr 1fr; }
+    @media (max-width: 480px) {
+      main { padding: 20px 12px 50px; }
+      .tarjeta { padding: 18px 16px; }
+      header.app { padding: 12px 14px; }
     }
   </style>
 </head>
 <body>
 
-  <!-- CABECERA -->
-  <header class="cabecera">
-    <a href="/" class="logo">Traslados · GC</a>
-    <nav class="nav-links">
-      <a href="/chofer/registro" class="activo">Alta choferes</a>
-      <a href="/contacto">Contacto</a>
-    </nav>
+  <header class="app">
+    <a href="/" class="marca">Traslados · GC</a>
+    <a href="/contacto">Contacto</a>
   </header>
 
-  <!-- HERO -->
-  <section class="hero">
-    <div class="hero-eyebrow">Trabaja con nosotros</div>
-    <h1>Únete a nuestra<br><span>flota de choferes</span></h1>
-    <p class="hero-subtitulo">
-      Buscamos choferes de taxi con licencia en Gran Canaria para traslados de larga distancia.
-      Rellena el formulario y nos ponemos en contacto contigo en breve.
-    </p>
-    <div class="ventajas">
-      <div class="ventaja-item">🗓️ Servicios programados</div>
-      <div class="ventaja-item">💼 Clientes de calidad</div>
-      <div class="ventaja-item">📲 Gestión sencilla</div>
-      <div class="ventaja-item">💰 Cobro directo</div>
-    </div>
-  </section>
+  <main>
+    <h1>Área de choferes</h1>
+    <p class="sub">Regístrate con tu vehículo. Tu cuenta será revisada y aprobada por el equipo antes de poder recibir servicios.</p>
 
-  <!-- CONTENIDO -->
-  <div class="pagina-contenido">
-    <div class="contenedor-form">
-
-      <!-- Éxito -->
-      <div id="ok-box" class="ok-box">
-        <div class="ok-icono">✅</div>
-        <h3>Solicitud enviada</h3>
-        <p>Hemos recibido tu solicitud correctamente y te hemos enviado un email de confirmación. Revisaremos tu información y nos pondremos en contacto contigo.</p>
+    <div class="tarjeta">
+      <div class="pestanas">
+        <button id="pestana-login" class="activa" onclick="mostrarPestana('login')">Iniciar sesión</button>
+        <button id="pestana-registro" onclick="mostrarPestana('registro')">Registrarme</button>
       </div>
 
-      <!-- Formulario -->
-      <div id="form-registro" class="card-form">
+      <!-- ── LOGIN ── -->
+      <div id="formulario-login">
+        <label for="login-email">Email</label>
+        <input id="login-email" type="email" autocomplete="email" placeholder="tu@email.com">
+        <label for="login-password">Contraseña</label>
+        <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••">
+        <button class="principal" onclick="iniciarSesion()">Entrar</button>
+        <div id="mensaje-login" class="mensaje"></div>
+      </div>
 
-        <div class="card-form-header">
-          <span class="header-icono">📋</span>
-          <div>
-            <h2>Solicitud de alta</h2>
-            <p>Los campos con <span style="color:var(--terracota)">*</span> son obligatorios</p>
-          </div>
+      <!-- ── REGISTRO ── -->
+      <div id="formulario-registro" class="oculto">
+
+        <h2>Datos personales</h2>
+        <label for="r-nombre">Nombre completo *</label>
+        <input id="r-nombre" type="text" autocomplete="name" placeholder="Tu nombre y apellidos">
+        <label for="r-documento">Documento de identidad (DNI/NIE)</label>
+        <input id="r-documento" type="text" placeholder="00000000A">
+        <label for="r-direccion">Dirección</label>
+        <input id="r-direccion" type="text" placeholder="Calle, número">
+        <label for="r-cp">Código postal</label>
+        <input id="r-cp" type="text" placeholder="35001">
+        <label for="r-municipio">Municipio</label>
+        <input id="r-municipio" type="text" placeholder="Las Palmas de Gran Canaria">
+        <label for="r-email">Email *</label>
+        <input id="r-email" type="email" autocomplete="email" placeholder="tu@email.com">
+        <label for="r-telefono">Teléfono móvil *</label>
+        <input id="r-telefono" type="tel" autocomplete="tel" placeholder="+34 600 000 000">
+        <label for="r-password">Contraseña (mínimo 6 caracteres) *</label>
+        <input id="r-password" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+        <label for="r-password2">Repetir contraseña *</label>
+        <input id="r-password2" type="password" autocomplete="new-password" placeholder="Repite la contraseña">
+
+        <h2>Licencia de taxi</h2>
+        <label for="r-municipio-licencia">Municipio de la licencia municipal</label>
+        <input id="r-municipio-licencia" type="text" placeholder="Las Palmas de Gran Canaria">
+        <label for="r-numero-licencia">Número de la licencia municipal</label>
+        <input id="r-numero-licencia" type="text" placeholder="LPA-0001">
+
+        <h2>Categoría de vehículo</h2>
+        <div id="categorias-grid" class="categorias-grid">
+          <div style="font-size:13px;color:var(--texto-muted)">Cargando...</div>
+        </div>
+        <div id="aviso-otra" class="aviso-otra">
+          Si tu vehículo no encaja en ninguna de estas categorías, indícalo en las observaciones. Lo estudiaremos y te contactaremos.
         </div>
 
-        <div class="card-form-body">
+        <h2>Vehículo</h2>
+        <label for="r-marca">Marca</label>
+        <select id="r-marca" onchange="cambioMarca()">
+          <option value="">Cargando...</option>
+        </select>
+        <input id="r-marca-nueva" type="text" class="oculto" placeholder="Escribe la marca" style="margin-top:8px">
 
-          <!-- DATOS PERSONALES -->
-          <div class="seccion-titulo">👤 Datos personales</div>
+        <label for="r-modelo">Modelo</label>
+        <select id="r-modelo" onchange="cambioModelo()">
+          <option value="">— Selecciona primero la marca —</option>
+        </select>
+        <input id="r-modelo-nuevo" type="text" class="oculto" placeholder="Escribe el modelo" style="margin-top:8px">
 
-          <div class="campo-grupo">
-            <label>Nombre completo <span class="requerido">*</span></label>
-            <input type="text" id="r-nombre" placeholder="Tu nombre y apellidos" autocomplete="name">
-          </div>
-          <div class="fila-dos">
-            <div class="campo-grupo">
-              <label>DNI / NIE</label>
-              <input type="text" id="r-documento" placeholder="00000000A">
-            </div>
-            <div class="campo-grupo">
-              <label>Teléfono móvil <span class="requerido">*</span></label>
-              <input type="tel" id="r-telefono" placeholder="+34 600 000 000" autocomplete="tel">
-            </div>
-          </div>
-          <div class="campo-grupo">
-            <label>Email <span class="requerido">*</span></label>
-            <input type="email" id="r-email" placeholder="tu@email.com" autocomplete="email">
-          </div>
-          <div class="campo-grupo">
-            <label>Dirección</label>
-            <input type="text" id="r-direccion" placeholder="Calle, número" autocomplete="street-address">
-          </div>
-          <div class="fila-dos">
-            <div class="campo-grupo">
-              <label>Código postal</label>
-              <input type="text" id="r-cp" placeholder="35001" autocomplete="postal-code">
-            </div>
-            <div class="campo-grupo">
-              <label>Municipio</label>
-              <input type="text" id="r-municipio" placeholder="Las Palmas de G.C." autocomplete="address-level2">
-            </div>
-          </div>
+        <label for="r-matricula">Matrícula</label>
+        <input id="r-matricula" type="text" placeholder="1234 ABC">
+        <label for="r-numero-taxi">Número de taxi</label>
+        <input id="r-numero-taxi" type="text" placeholder="Ej.: 154">
+        <label for="r-plazas">Plazas para pasajeros</label>
+        <select id="r-plazas">
+          <option value="4" selected>4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+        </select>
 
-          <!-- LICENCIA -->
-          <div class="seccion-titulo">🪪 Licencia de taxi</div>
+        <h2>Observaciones</h2>
+        <label for="r-observaciones">¿Algo que quieras añadir? (opcional)</label>
+        <input id="r-observaciones" type="text" placeholder="Tipo de vehículo especial, preguntas, etc.">
 
-          <div class="fila-dos">
-            <div class="campo-grupo">
-              <label>Municipio de la licencia</label>
-              <input type="text" id="r-municipio-licencia" placeholder="Las Palmas de G.C.">
-            </div>
-            <div class="campo-grupo">
-              <label>Número de licencia</label>
-              <input type="text" id="r-numero-licencia" placeholder="LPA-0001">
-            </div>
-          </div>
-
-          <!-- CATEGORÍA -->
-          <div class="seccion-titulo">🚗 Categoría de vehículo</div>
-
-          <div id="categorias-grid" class="categorias-grid">
-            <div style="color:var(--texto-muted);font-size:13px;grid-column:1/-1">Cargando categorías...</div>
-          </div>
-          <div id="aviso-categoria-otra" class="aviso-categoria-otra">
-            💬 Si tu vehículo no encaja en ninguna de las categorías disponibles, indícalo en el campo de observaciones al final del formulario. Lo estudiaremos y te contactaremos.
-          </div>
-
-          <!-- VEHÍCULO -->
-          <div class="seccion-titulo">🔧 Vehículo</div>
-
-          <div class="fila-dos">
-            <div class="campo-grupo">
-              <label>Marca</label>
-              <select id="r-marca" onchange="cambioMarca()">
-                <option value="">Cargando...</option>
-              </select>
-              <input type="text" id="r-marca-nueva" class="oculto" placeholder="Escribe la marca" style="margin-top:8px">
-            </div>
-            <div class="campo-grupo">
-              <label>Modelo</label>
-              <select id="r-modelo" onchange="cambioModelo()">
-                <option value="">— Selecciona primero la marca —</option>
-              </select>
-              <input type="text" id="r-modelo-nuevo" class="oculto" placeholder="Escribe el modelo" style="margin-top:8px">
-            </div>
-          </div>
-          <div class="fila-dos">
-            <div class="campo-grupo">
-              <label>Matrícula</label>
-              <input type="text" id="r-matricula" placeholder="1234 ABC">
-            </div>
-            <div class="campo-grupo">
-              <label>Número de taxi</label>
-              <input type="text" id="r-numero-taxi" placeholder="Ej.: 154">
-            </div>
-          </div>
-          <div class="campo-grupo">
-            <label>Plazas para pasajeros</label>
-            <select id="r-plazas">
-              <option value="4" selected>4 plazas</option>
-              <option value="5">5 plazas</option>
-              <option value="6">6 plazas</option>
-              <option value="7">7 plazas</option>
-              <option value="8">8 plazas</option>
-            </select>
-          </div>
-
-          <!-- OBSERVACIONES -->
-          <div class="seccion-titulo">📝 Observaciones</div>
-          <div class="campo-grupo">
-            <label>¿Algo que quieras añadir?</label>
-            <input type="text" id="r-observaciones" placeholder="Tipo de vehículo especial, preguntas, etc.">
-          </div>
-
-          <!-- CONTRASEÑA -->
-          <div class="seccion-titulo">🔒 Acceso al portal</div>
-
-          <div class="fila-dos">
-            <div class="campo-grupo">
-              <label>Contraseña <span class="requerido">*</span></label>
-              <input type="password" id="r-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
-            </div>
-            <div class="campo-grupo">
-              <label>Repetir contraseña <span class="requerido">*</span></label>
-              <input type="password" id="r-password2" placeholder="Repite la contraseña" autocomplete="new-password">
-            </div>
-          </div>
-          <p class="nota-campo">Usarás estas credenciales para acceder al portal de choferes y consultar tus servicios asignados.</p>
-
-          <!-- ACEPTACIONES -->
-          <div class="seccion-titulo">✅ Aceptaciones</div>
-          <div class="campo-check">
-            <input type="checkbox" id="acepta-privacidad">
-            <label for="acepta-privacidad">He leído y acepto la <a href="/privacidad" target="_blank">Política de Privacidad</a>. <span class="requerido">*</span></label>
-          </div>
-
-          <!-- ERROR -->
-          <div id="error-registro" class="aviso-error"></div>
-
-          <!-- BOTÓN -->
-          <button class="btn-enviar" id="btn-enviar-registro" onclick="enviarRegistro()">
-            Enviar solicitud de alta →
-          </button>
-          <p class="nota-legal">Tu solicitud será revisada por nuestro equipo antes de activar tu acceso al portal.</p>
-
+        <h2>Aceptaciones</h2>
+        <div class="check-wrap">
+          <input type="checkbox" id="acepta-privacidad">
+          <label for="acepta-privacidad">He leído y acepto la <a href="/privacidad" target="_blank">Política de Privacidad</a>.</label>
         </div>
-      </div><!-- /card-form -->
 
-    </div>
-  </div>
+        <div id="mensaje-registro" class="mensaje"></div>
+
+        <button class="principal" onclick="registrarse()">Enviar solicitud de alta</button>
+        <p class="nota-final">Tu solicitud será revisada por nuestro equipo antes de activar tu acceso al portal.</p>
+
+      </div><!-- /formulario-registro -->
+    </div><!-- /tarjeta -->
+  </main>
 
   <script>
     var catalogoMarcas = [];
     var categoriaSeleccionada = null;
+
+    // ── Pestañas ──
+    function mostrarPestana(cual) {
+      document.getElementById('formulario-login').classList.toggle('oculto', cual !== 'login');
+      document.getElementById('formulario-registro').classList.toggle('oculto', cual !== 'registro');
+      document.getElementById('pestana-login').classList.toggle('activa', cual === 'login');
+      document.getElementById('pestana-registro').classList.toggle('activa', cual === 'registro');
+    }
+
+    // ── Login ──
+    function iniciarSesion() {
+      var email    = document.getElementById('login-email').value.trim();
+      var password = document.getElementById('login-password').value;
+      var msg      = document.getElementById('mensaje-login');
+      msg.className = 'mensaje';
+      msg.style.display = 'none';
+      if (!email || !password) {
+        msg.textContent = 'Introduce tu email y contraseña.';
+        msg.className = 'mensaje error'; return;
+      }
+      fetch('/chofer/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, password: password })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) { msg.textContent = d.error; msg.className = 'mensaje error'; return; }
+        window.location.href = '/chofer/portal';
+      })
+      .catch(function() { msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error'; });
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        if (!document.getElementById('formulario-login').classList.contains('oculto')) iniciarSesion();
+      }
+    });
 
     // ── Cargar categorías ──
     fetch('/api/categorias')
@@ -563,28 +363,23 @@
       .then(function(cats) {
         var grid = document.getElementById('categorias-grid');
         var html = cats.map(function(c) {
-          return '<div class="categoria-opcion" data-id="' + c.id + '" data-nombre="' + c.nombre + '" onclick="seleccionarCategoria(this)">'
-            + '<div class="cat-nombre">' + c.nombre + '</div>'
-            + '<div class="cat-detalle">' + c.capacidad_pasajeros + ' pasajeros · ' + c.capacidad_maletas + ' maletas</div>'
+          return '<div class="cat-opcion" data-id="' + c.id + '" data-nombre="' + c.nombre + '" onclick="selCat(this)">'
+            + '<div class="cn">' + c.nombre + '</div>'
+            + '<div class="cd">' + c.capacidad_pasajeros + ' pas. · ' + c.capacidad_maletas + ' mal.</div>'
             + '</div>';
         }).join('');
-        html += '<div class="categoria-otra" data-id="otra" onclick="seleccionarCategoria(this)">'
-          + '<div class="cat-nombre">Otro tipo de vehículo</div>'
-          + '</div>';
+        html += '<div class="cat-otra" data-id="otra" onclick="selCat(this)"><div class="cn">Otro vehículo</div></div>';
         grid.innerHTML = html;
       })
       .catch(function() {
-        document.getElementById('categorias-grid').innerHTML = '<p style="color:var(--texto-muted);font-size:13px">No se pudieron cargar las categorías.</p>';
+        document.getElementById('categorias-grid').innerHTML = '<p style="font-size:13px;color:var(--texto-muted)">No se pudieron cargar las categorías.</p>';
       });
 
-    function seleccionarCategoria(el) {
-      document.querySelectorAll('.categoria-opcion, .categoria-otra').forEach(function(x) {
-        x.classList.remove('seleccionada');
-      });
-      el.classList.add('seleccionada');
+    function selCat(el) {
+      document.querySelectorAll('.cat-opcion, .cat-otra').forEach(function(x) { x.classList.remove('sel'); });
+      el.classList.add('sel');
       categoriaSeleccionada = el.dataset.id;
-      var aviso = document.getElementById('aviso-categoria-otra');
-      aviso.style.display = categoriaSeleccionada === 'otra' ? 'block' : 'none';
+      document.getElementById('aviso-otra').style.display = categoriaSeleccionada === 'otra' ? 'block' : 'none';
     }
 
     // ── Cargar marcas ──
@@ -598,7 +393,8 @@
           + '<option value="nueva">➕ Otra marca</option>';
       })
       .catch(function() {
-        document.getElementById('r-marca').innerHTML = '<option value="nueva">Escribir la marca</option>';
+        var sel = document.getElementById('r-marca');
+        sel.innerHTML = '<option value="nueva">Escribir la marca</option>';
         cambioMarca();
       });
 
@@ -606,139 +402,111 @@
       var val = document.getElementById('r-marca').value;
       var esNueva = (val === 'nueva');
       document.getElementById('r-marca-nueva').classList.toggle('oculto', !esNueva);
-      var selModelo = document.getElementById('r-modelo');
+      var selMod = document.getElementById('r-modelo');
       if (esNueva || val === '') {
-        selModelo.innerHTML = '<option value="nuevo">Escribir el modelo</option>';
+        selMod.innerHTML = '<option value="nuevo">Escribir el modelo</option>';
         document.getElementById('r-modelo-nuevo').classList.remove('oculto');
       } else {
         var marca = catalogoMarcas.find(function(m) { return String(m.id) === val; });
-        var opcionesModelo = marca && marca.modelos.length
+        var opts = marca && marca.modelos.length
           ? marca.modelos.map(function(mo) { return '<option value="' + mo.id + '">' + mo.nombre + '</option>'; }).join('')
           : '';
-        selModelo.innerHTML = '<option value="">— Selecciona el modelo —</option>'
-          + opcionesModelo
-          + '<option value="nuevo">➕ Otro modelo</option>';
+        selMod.innerHTML = '<option value="">— Selecciona el modelo —</option>' + opts + '<option value="nuevo">➕ Otro modelo</option>';
         document.getElementById('r-modelo-nuevo').classList.add('oculto');
       }
       cambioModelo();
     }
 
     function cambioModelo() {
-      var esNuevo = (document.getElementById('r-modelo').value === 'nuevo');
+      var esNuevo = document.getElementById('r-modelo').value === 'nuevo';
       document.getElementById('r-modelo-nuevo').classList.toggle('oculto', !esNuevo);
     }
 
-    // ── Enviar ──
-    function enviarRegistro() {
+    // ── Registro ──
+    function registrarse() {
       var nombre    = document.getElementById('r-nombre').value.trim();
       var email     = document.getElementById('r-email').value.trim();
       var telefono  = document.getElementById('r-telefono').value.trim();
       var password  = document.getElementById('r-password').value;
       var password2 = document.getElementById('r-password2').value;
       var privacidad = document.getElementById('acepta-privacidad').checked;
-      var err = document.getElementById('error-registro');
-      var btn = document.getElementById('btn-enviar-registro');
-      err.style.display = 'none';
+      var msg = document.getElementById('mensaje-registro');
+      msg.className = 'mensaje'; msg.style.display = 'none';
 
       if (!nombre || !email || !telefono) {
-        err.textContent = 'Nombre, email y teléfono son obligatorios.';
-        err.style.display = 'block';
-        err.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
+        msg.textContent = 'Nombre, email y teléfono son obligatorios.';
+        msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return;
       }
       if (!password || password.length < 6) {
-        err.textContent = 'La contraseña debe tener al menos 6 caracteres.';
-        err.style.display = 'block';
-        err.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
+        msg.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+        msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return;
       }
       if (password !== password2) {
-        err.textContent = 'Las contraseñas no coinciden.';
-        err.style.display = 'block';
-        err.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
+        msg.textContent = 'Las contraseñas no coinciden.';
+        msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return;
       }
       if (!privacidad) {
-        err.textContent = 'Debes aceptar la Política de Privacidad para continuar.';
-        err.style.display = 'block';
-        err.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
+        msg.textContent = 'Debes aceptar la Política de Privacidad para continuar.';
+        msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return;
       }
 
-      // Marca y modelo: texto final
       var marcaVal = document.getElementById('r-marca').value;
       var marcaTexto = marcaVal === 'nueva'
         ? document.getElementById('r-marca-nueva').value.trim()
-        : (document.getElementById('r-marca').options[document.getElementById('r-marca').selectedIndex] || {}).text || '';
-
+        : (document.getElementById('r-marca').selectedOptions[0] || {}).text || '';
       var modeloVal = document.getElementById('r-modelo').value;
       var modeloTexto = modeloVal === 'nuevo'
         ? document.getElementById('r-modelo-nuevo').value.trim()
-        : (document.getElementById('r-modelo').options[document.getElementById('r-modelo').selectedIndex] || {}).text || '';
+        : (document.getElementById('r-modelo').selectedOptions[0] || {}).text || '';
 
-      // Categoría: nombre para guardar en observaciones si es "otra"
-      var catNombre = '';
-      if (categoriaSeleccionada && categoriaSeleccionada !== 'otra') {
-        var catEl = document.querySelector('.categoria-opcion.seleccionada');
-        if (catEl) catNombre = catEl.dataset.nombre;
-      } else if (categoriaSeleccionada === 'otra') {
-        catNombre = 'Otro (a consultar)';
+      var obs = document.getElementById('r-observaciones').value.trim();
+      if (categoriaSeleccionada === 'otra') {
+        obs = obs ? '[Otro vehículo] ' + obs : '[Otro vehículo]';
       }
 
-      var observaciones = document.getElementById('r-observaciones').value.trim();
-      if (catNombre === 'Otro (a consultar)' && observaciones) {
-        observaciones = '[Categoría: Otro tipo de vehículo] ' + observaciones;
-      } else if (catNombre === 'Otro (a consultar)') {
-        observaciones = '[Categoría: Otro tipo de vehículo]';
-      }
-
-      btn.disabled = true;
-      btn.textContent = 'Enviando...';
+      var btn = document.querySelector('#formulario-registro button.principal');
+      btn.disabled = true; btn.textContent = 'Enviando...';
 
       fetch('/api/chofer/registro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nombre:             nombre,
-          email:              email,
-          telefono:           telefono,
-          password:           password,
-          documento:          document.getElementById('r-documento').value.trim(),
-          direccion:          document.getElementById('r-direccion').value.trim(),
-          cp:                 document.getElementById('r-cp').value.trim(),
-          municipio:          document.getElementById('r-municipio').value.trim(),
+          nombre: nombre, email: email, telefono: telefono, password: password,
+          documento: document.getElementById('r-documento').value.trim(),
+          direccion: document.getElementById('r-direccion').value.trim(),
+          cp: document.getElementById('r-cp').value.trim(),
+          municipio: document.getElementById('r-municipio').value.trim(),
           municipio_licencia: document.getElementById('r-municipio-licencia').value.trim(),
-          numero_licencia:    document.getElementById('r-numero-licencia').value.trim(),
-          vehiculo_marca:     marcaTexto,
-          vehiculo_modelo:    modeloTexto,
-          matricula:          document.getElementById('r-matricula').value.trim(),
-          numero_taxi:        document.getElementById('r-numero-taxi').value.trim(),
-          plazas:             document.getElementById('r-plazas').value,
-          observaciones:      observaciones
+          numero_licencia: document.getElementById('r-numero-licencia').value.trim(),
+          vehiculo_marca: marcaTexto,
+          vehiculo_modelo: modeloTexto,
+          matricula: document.getElementById('r-matricula').value.trim(),
+          numero_taxi: document.getElementById('r-numero-taxi').value.trim(),
+          plazas: document.getElementById('r-plazas').value,
+          observaciones: obs
         })
       })
       .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.error) {
-          err.textContent = data.error;
-          err.style.display = 'block';
-          err.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          btn.disabled = false;
-          btn.textContent = 'Enviar solicitud de alta →';
-          return;
+      .then(function(d) {
+        if (d.error) {
+          msg.textContent = d.error; msg.className = 'mensaje error';
+          msg.scrollIntoView({ behavior:'smooth', block:'center' });
+          btn.disabled = false; btn.textContent = 'Enviar solicitud de alta'; return;
         }
-        document.getElementById('form-registro').style.display = 'none';
-        document.getElementById('ok-box').style.display = 'block';
+        document.getElementById('formulario-registro').innerHTML =
+          '<div class="mensaje ok" style="display:block;margin-top:0">'
+          + '<strong style="font-size:18px;display:block;margin-bottom:8px">✅ Solicitud enviada</strong>'
+          + 'Hemos recibido tu solicitud y te hemos enviado un email de confirmación. '
+          + 'Revisaremos tu información y nos pondremos en contacto contigo en breve.'
+          + '</div>';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       })
       .catch(function() {
-        err.textContent = 'Error de conexión. Inténtalo de nuevo.';
-        err.style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = 'Enviar solicitud de alta →';
+        msg.textContent = 'Error de conexión. Inténtalo de nuevo.';
+        msg.className = 'mensaje error';
+        btn.disabled = false; btn.textContent = 'Enviar solicitud de alta';
       });
     }
   </script>
-
 </body>
 </html>
