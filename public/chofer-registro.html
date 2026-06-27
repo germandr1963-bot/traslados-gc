@@ -7,12 +7,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="estilos.css">
   <style>
-    body { background: var(--gris-fondo); }
-
-    /* ── CABECERA ── */
     header.app {
       background: var(--charcoal);
-      color: #fff;
       padding: 12px 20px;
       display: flex;
       align-items: center;
@@ -26,204 +22,81 @@
       letter-spacing: 1px;
       text-decoration: none;
     }
-    header.app a { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 14px; }
-    header.app a:hover { color: #fff; }
+    header.app a.nav { color: rgba(255,255,255,0.65); text-decoration: none; font-size: 14px; }
+    header.app a.nav:hover { color: #fff; }
 
-    /* ── CONTENIDO ── */
-    main { max-width: 560px; margin: 0 auto; padding: 28px 16px 60px; }
+    main { max-width: 920px; margin: 0 auto; padding: 28px 20px 60px; }
 
-    h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: 28px; color: var(--texto-oscuro); margin-bottom: 6px; }
+    h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: 26px; color: var(--texto-oscuro); margin-bottom: 6px; }
+    h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 15px; color: var(--terracota); margin: 20px 0 6px; letter-spacing: 0.5px; }
     p.sub { color: var(--texto-muted); margin-bottom: 20px; font-size: 14px; line-height: 1.6; }
 
-    /* ── TARJETA ── */
-    .tarjeta {
-      background: #fff;
-      border: 1px solid var(--gris-borde);
-      border-radius: 12px;
-      padding: 22px 24px;
-      margin-bottom: 16px;
-    }
-
-    /* ── PESTAÑAS ── */
-    .pestanas { display: flex; gap: 8px; margin-bottom: 20px; }
+    .pestanas { display: flex; gap: 8px; margin-bottom: 18px; }
     .pestanas button {
-      margin-top: 0;
-      flex: 1;
-      background: #fff;
-      border: 1px solid var(--gris-borde);
-      color: var(--texto-muted);
-      font-weight: 600;
-      font-family: 'Public Sans', sans-serif;
-      font-size: 14px;
-      padding: 10px;
-      border-radius: 8px;
-      cursor: pointer;
+      flex: 1; margin-top: 0; background: #fff;
+      border: 1px solid var(--gris-borde); border-radius: 8px;
+      color: var(--texto-muted); font-family: 'Public Sans', sans-serif;
+      font-size: 14px; font-weight: 600; padding: 10px; cursor: pointer;
       transition: background 0.15s, color 0.15s;
     }
-    .pestanas button.activa {
-      background: var(--charcoal);
-      color: #fff;
-      border-color: var(--charcoal);
-    }
+    .pestanas button.activa { background: var(--charcoal); color: #fff; border-color: var(--charcoal); }
 
-    /* ── CAMPOS ── */
-    label {
-      display: block;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--texto-oscuro);
-      margin: 14px 0 4px;
-    }
-    label:first-child { margin-top: 0; }
-    input[type=text], input[type=email], input[type=tel],
-    input[type=password], select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid var(--gris-borde);
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: 'Public Sans', sans-serif;
-      color: var(--texto-oscuro);
-      background: #fff;
+    label { display: block; font-size: 13px; font-weight: 600; color: var(--texto-oscuro); margin: 14px 0 4px; }
+    input[type=text], input[type=email], input[type=tel], input[type=password], select {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--gris-borde);
+      border-radius: 8px; font-size: 14px; font-family: 'Public Sans', sans-serif;
+      color: var(--texto-oscuro); background: #fff;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
-    input:focus, select:focus {
-      outline: none;
-      border-color: var(--terracota);
-      box-shadow: 0 0 0 3px rgba(193,80,46,0.1);
-    }
+    input:focus, select:focus { outline: none; border-color: var(--terracota); box-shadow: 0 0 0 3px rgba(193,80,46,0.1); }
     input::placeholder { color: #c0b5aa; }
-    .oculto { display: none !important; }
 
-    /* ── SECCIÓN TÍTULO ── */
-    h2 {
-      font-family: 'Big Shoulders Display', sans-serif;
-      font-size: 16px;
-      color: var(--terracota);
-      margin: 22px 0 4px;
-      letter-spacing: 0.5px;
-    }
-
-    /* ── CATEGORÍAS ── */
-    .categorias-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .cat-opcion {
-      border: 1px solid var(--gris-borde);
-      border-radius: 8px;
-      padding: 12px 10px;
-      cursor: pointer;
-      text-align: center;
-      background: #fff;
-      transition: border-color 0.15s, background 0.15s;
-    }
+    .categorias-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-top: 6px; }
+    .cat-opcion { border: 1px solid var(--gris-borde); border-radius: 8px; padding: 12px 10px; cursor: pointer; text-align: center; background: #fff; transition: border-color 0.15s, background 0.15s; }
     .cat-opcion:hover { border-color: #b5a99a; }
     .cat-opcion.sel { border-color: var(--terracota); background: rgba(193,80,46,0.05); }
     .cat-opcion .cn { font-size: 13px; font-weight: 700; color: var(--texto-oscuro); }
     .cat-opcion .cd { font-size: 11px; color: var(--texto-muted); margin-top: 2px; }
-    .cat-otra {
-      border: 1px dashed var(--gris-borde);
-      border-radius: 8px;
-      padding: 12px 10px;
-      cursor: pointer;
-      text-align: center;
-      background: #fff;
-      transition: border-color 0.15s;
-    }
+    .cat-otra { border: 1px dashed var(--gris-borde); border-radius: 8px; padding: 12px 10px; cursor: pointer; text-align: center; background: #fff; transition: border-color 0.15s; }
     .cat-otra:hover { border-color: #b5a99a; }
     .cat-otra.sel { border-color: var(--oro); background: rgba(217,164,65,0.06); }
     .cat-otra .cn { font-size: 13px; font-weight: 700; color: var(--texto-muted); }
-    .aviso-otra {
-      display: none;
-      background: #fdf8ec;
-      border: 1px solid rgba(217,164,65,0.5);
-      border-radius: 8px;
-      padding: 10px 12px;
-      font-size: 13px;
-      color: #5a4010;
-      margin-top: 8px;
-      line-height: 1.5;
-    }
+    .aviso-otra { display: none; margin-top: 8px; background: #fdf8ec; border: 1px solid rgba(217,164,65,0.5); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #5a4010; line-height: 1.5; }
 
-    /* ── BOTÓN PRINCIPAL ── */
-    button.principal {
-      display: block;
-      width: 100%;
-      margin-top: 20px;
-      padding: 13px;
-      border: none;
-      border-radius: 8px;
-      background: var(--terracota);
-      color: #fff;
-      font-weight: 700;
-      font-size: 15px;
-      font-family: 'Public Sans', sans-serif;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
+    .check-wrap { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; }
+    .check-wrap input[type=checkbox] { width: 16px; min-width: 16px; height: 16px; margin-top: 2px; accent-color: var(--terracota); cursor: pointer; }
+    .check-wrap label { font-size: 13px; font-weight: 400; color: var(--texto-muted); margin: 0; cursor: pointer; line-height: 1.55; }
+    .check-wrap label a { color: var(--terracota); text-decoration: underline; }
+
+    button.principal { display: block; width: 100%; margin-top: 20px; padding: 13px; border: none; border-radius: 8px; background: var(--terracota); color: #fff; font-weight: 700; font-size: 15px; font-family: 'Public Sans', sans-serif; cursor: pointer; transition: background 0.2s; }
     button.principal:hover { background: var(--terracota-oscuro); }
     button.principal:disabled { opacity: 0.6; cursor: not-allowed; }
 
-    /* ── CHECKBOX ── */
-    .check-wrap {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      margin-top: 14px;
-    }
-    .check-wrap input[type=checkbox] {
-      width: 16px;
-      min-width: 16px;
-      height: 16px;
-      margin-top: 2px;
-      accent-color: var(--terracota);
-      cursor: pointer;
-    }
-    .check-wrap label {
-      font-size: 13px;
-      font-weight: 400;
-      color: var(--texto-muted);
-      margin: 0;
-      cursor: pointer;
-      line-height: 1.55;
-    }
-    .check-wrap label a { color: var(--terracota); text-decoration: underline; }
-
-    /* ── MENSAJES ── */
-    .mensaje { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13px; display: none; }
+    .mensaje { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13px; display: none; line-height: 1.5; }
     .mensaje.error { display: block; background: var(--rojo-error-fondo); color: var(--rojo-error); border: 1px solid #e8b4a8; }
-    .mensaje.ok    { display: block; background: var(--verde-ok-fondo); color: var(--verde-ok); border: 1px solid #a8dece; padding: 20px; text-align: center; }
+    .mensaje.ok { display: block; background: var(--verde-ok-fondo); color: var(--verde-ok); border: 1px solid #a8dece; padding: 20px; text-align: center; }
 
     .nota-final { font-size: 12px; color: var(--texto-muted); text-align: center; margin-top: 10px; line-height: 1.6; }
-
-    @media (max-width: 480px) {
-      main { padding: 20px 12px 50px; }
-      .tarjeta { padding: 18px 16px; }
-      header.app { padding: 12px 14px; }
-    }
   </style>
 </head>
 <body>
 
   <header class="app">
     <a href="/" class="marca">Traslados · GC</a>
-    <a href="/contacto">Contacto</a>
+    <a href="/contacto" class="nav">Contacto</a>
   </header>
 
   <main>
     <h1>Área de choferes</h1>
     <p class="sub">Regístrate con tu vehículo. Tu cuenta será revisada y aprobada por el equipo antes de poder recibir servicios.</p>
 
-    <div class="tarjeta">
+    <div class="tarjeta" style="max-width:520px">
       <div class="pestanas">
         <button id="pestana-login" class="activa" onclick="mostrarPestana('login')">Iniciar sesión</button>
         <button id="pestana-registro" onclick="mostrarPestana('registro')">Registrarme</button>
       </div>
 
-      <!-- ── LOGIN ── -->
+      <!-- LOGIN -->
       <div id="formulario-login">
         <label for="login-email">Email</label>
         <input id="login-email" type="email" autocomplete="email" placeholder="tu@email.com">
@@ -233,7 +106,7 @@
         <div id="mensaje-login" class="mensaje"></div>
       </div>
 
-      <!-- ── REGISTRO ── -->
+      <!-- REGISTRO -->
       <div id="formulario-registro" class="oculto">
 
         <h2>Datos personales</h2>
@@ -252,9 +125,9 @@
         <label for="r-telefono">Teléfono móvil *</label>
         <input id="r-telefono" type="tel" autocomplete="tel" placeholder="+34 600 000 000">
         <label for="r-password">Contraseña (mínimo 6 caracteres) *</label>
-        <input id="r-password" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+        <input id="r-password" type="password" autocomplete="new-password">
         <label for="r-password2">Repetir contraseña *</label>
-        <input id="r-password2" type="password" autocomplete="new-password" placeholder="Repite la contraseña">
+        <input id="r-password2" type="password" autocomplete="new-password">
 
         <h2>Licencia de taxi</h2>
         <label for="r-municipio-licencia">Municipio de la licencia municipal</label>
@@ -272,17 +145,11 @@
 
         <h2>Vehículo</h2>
         <label for="r-marca">Marca</label>
-        <select id="r-marca" onchange="cambioMarca()">
-          <option value="">Cargando...</option>
-        </select>
+        <select id="r-marca" onchange="cambioMarca()"><option value="">Cargando...</option></select>
         <input id="r-marca-nueva" type="text" class="oculto" placeholder="Escribe la marca" style="margin-top:8px">
-
         <label for="r-modelo">Modelo</label>
-        <select id="r-modelo" onchange="cambioModelo()">
-          <option value="">— Selecciona primero la marca —</option>
-        </select>
+        <select id="r-modelo" onchange="cambioModelo()"><option value="">— Selecciona primero la marca —</option></select>
         <input id="r-modelo-nuevo" type="text" class="oculto" placeholder="Escribe el modelo" style="margin-top:8px">
-
         <label for="r-matricula">Matrícula</label>
         <input id="r-matricula" type="text" placeholder="1234 ABC">
         <label for="r-numero-taxi">Número de taxi</label>
@@ -311,15 +178,14 @@
         <button class="principal" onclick="registrarse()">Enviar solicitud de alta</button>
         <p class="nota-final">Tu solicitud será revisada por nuestro equipo antes de activar tu acceso al portal.</p>
 
-      </div><!-- /formulario-registro -->
-    </div><!-- /tarjeta -->
+      </div>
+    </div>
   </main>
 
   <script>
     var catalogoMarcas = [];
     var categoriaSeleccionada = null;
 
-    // ── Pestañas ──
     function mostrarPestana(cual) {
       document.getElementById('formulario-login').classList.toggle('oculto', cual !== 'login');
       document.getElementById('formulario-registro').classList.toggle('oculto', cual !== 'registro');
@@ -327,62 +193,44 @@
       document.getElementById('pestana-registro').classList.toggle('activa', cual === 'registro');
     }
 
-    // ── Login ──
     function iniciarSesion() {
-      var email    = document.getElementById('login-email').value.trim();
+      var email = document.getElementById('login-email').value.trim();
       var password = document.getElementById('login-password').value;
-      var msg      = document.getElementById('mensaje-login');
-      msg.className = 'mensaje';
-      msg.style.display = 'none';
-      if (!email || !password) {
-        msg.textContent = 'Introduce tu email y contraseña.';
-        msg.className = 'mensaje error'; return;
-      }
-      fetch('/chofer/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email, password: password })
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (d.error) { msg.textContent = d.error; msg.className = 'mensaje error'; return; }
-        window.location.href = '/chofer/portal';
-      })
-      .catch(function() { msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error'; });
+      var msg = document.getElementById('mensaje-login');
+      msg.className = 'mensaje'; msg.style.display = 'none';
+      if (!email || !password) { msg.textContent = 'Introduce tu email y contraseña.'; msg.className = 'mensaje error'; return; }
+      fetch('/chofer/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: password }) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.error) { msg.textContent = d.error; msg.className = 'mensaje error'; return; }
+          window.location.href = '/chofer/portal';
+        })
+        .catch(function() { msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error'; });
     }
 
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
-        if (!document.getElementById('formulario-login').classList.contains('oculto')) iniciarSesion();
-      }
+      if (e.key === 'Enter' && !document.getElementById('formulario-login').classList.contains('oculto')) iniciarSesion();
     });
 
-    // ── Cargar categorías ──
     fetch('/api/categorias')
       .then(function(r) { return r.json(); })
       .then(function(cats) {
-        var grid = document.getElementById('categorias-grid');
         var html = cats.map(function(c) {
           return '<div class="cat-opcion" data-id="' + c.id + '" data-nombre="' + c.nombre + '" onclick="selCat(this)">'
             + '<div class="cn">' + c.nombre + '</div>'
-            + '<div class="cd">' + c.capacidad_pasajeros + ' pas. · ' + c.capacidad_maletas + ' mal.</div>'
-            + '</div>';
-        }).join('');
-        html += '<div class="cat-otra" data-id="otra" onclick="selCat(this)"><div class="cn">Otro vehículo</div></div>';
-        grid.innerHTML = html;
+            + '<div class="cd">' + c.capacidad_pasajeros + ' pas. · ' + c.capacidad_maletas + ' mal.</div></div>';
+        }).join('') + '<div class="cat-otra" data-id="otra" onclick="selCat(this)"><div class="cn">Otro vehículo</div></div>';
+        document.getElementById('categorias-grid').innerHTML = html;
       })
-      .catch(function() {
-        document.getElementById('categorias-grid').innerHTML = '<p style="font-size:13px;color:var(--texto-muted)">No se pudieron cargar las categorías.</p>';
-      });
+      .catch(function() { document.getElementById('categorias-grid').innerHTML = '<p style="font-size:13px;color:var(--texto-muted)">No se pudieron cargar las categorías.</p>'; });
 
     function selCat(el) {
-      document.querySelectorAll('.cat-opcion, .cat-otra').forEach(function(x) { x.classList.remove('sel'); });
+      document.querySelectorAll('.cat-opcion,.cat-otra').forEach(function(x) { x.classList.remove('sel'); });
       el.classList.add('sel');
       categoriaSeleccionada = el.dataset.id;
       document.getElementById('aviso-otra').style.display = categoriaSeleccionada === 'otra' ? 'block' : 'none';
     }
 
-    // ── Cargar marcas ──
     fetch('/api/marcas-vehiculos')
       .then(function(r) { return r.json(); })
       .then(function(marcas) {
@@ -392,15 +240,11 @@
           + marcas.map(function(m) { return '<option value="' + m.id + '">' + m.nombre + '</option>'; }).join('')
           + '<option value="nueva">➕ Otra marca</option>';
       })
-      .catch(function() {
-        var sel = document.getElementById('r-marca');
-        sel.innerHTML = '<option value="nueva">Escribir la marca</option>';
-        cambioMarca();
-      });
+      .catch(function() { document.getElementById('r-marca').innerHTML = '<option value="nueva">Escribir la marca</option>'; cambioMarca(); });
 
     function cambioMarca() {
       var val = document.getElementById('r-marca').value;
-      var esNueva = (val === 'nueva');
+      var esNueva = val === 'nueva';
       document.getElementById('r-marca-nueva').classList.toggle('oculto', !esNueva);
       var selMod = document.getElementById('r-modelo');
       if (esNueva || val === '') {
@@ -408,9 +252,7 @@
         document.getElementById('r-modelo-nuevo').classList.remove('oculto');
       } else {
         var marca = catalogoMarcas.find(function(m) { return String(m.id) === val; });
-        var opts = marca && marca.modelos.length
-          ? marca.modelos.map(function(mo) { return '<option value="' + mo.id + '">' + mo.nombre + '</option>'; }).join('')
-          : '';
+        var opts = marca && marca.modelos.length ? marca.modelos.map(function(mo) { return '<option value="' + mo.id + '">' + mo.nombre + '</option>'; }).join('') : '';
         selMod.innerHTML = '<option value="">— Selecciona el modelo —</option>' + opts + '<option value="nuevo">➕ Otro modelo</option>';
         document.getElementById('r-modelo-nuevo').classList.add('oculto');
       }
@@ -418,58 +260,36 @@
     }
 
     function cambioModelo() {
-      var esNuevo = document.getElementById('r-modelo').value === 'nuevo';
-      document.getElementById('r-modelo-nuevo').classList.toggle('oculto', !esNuevo);
+      document.getElementById('r-modelo-nuevo').classList.toggle('oculto', document.getElementById('r-modelo').value !== 'nuevo');
     }
 
-    // ── Registro ──
     function registrarse() {
-      var nombre    = document.getElementById('r-nombre').value.trim();
-      var email     = document.getElementById('r-email').value.trim();
-      var telefono  = document.getElementById('r-telefono').value.trim();
-      var password  = document.getElementById('r-password').value;
+      var nombre = document.getElementById('r-nombre').value.trim();
+      var email = document.getElementById('r-email').value.trim();
+      var telefono = document.getElementById('r-telefono').value.trim();
+      var password = document.getElementById('r-password').value;
       var password2 = document.getElementById('r-password2').value;
       var privacidad = document.getElementById('acepta-privacidad').checked;
       var msg = document.getElementById('mensaje-registro');
       msg.className = 'mensaje'; msg.style.display = 'none';
 
-      if (!nombre || !email || !telefono) {
-        msg.textContent = 'Nombre, email y teléfono son obligatorios.';
-        msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return;
-      }
-      if (!password || password.length < 6) {
-        msg.textContent = 'La contraseña debe tener al menos 6 caracteres.';
-        msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return;
-      }
-      if (password !== password2) {
-        msg.textContent = 'Las contraseñas no coinciden.';
-        msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return;
-      }
-      if (!privacidad) {
-        msg.textContent = 'Debes aceptar la Política de Privacidad para continuar.';
-        msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return;
-      }
+      if (!nombre || !email || !telefono) { msg.textContent = 'Nombre, email y teléfono son obligatorios.'; msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return; }
+      if (!password || password.length < 6) { msg.textContent = 'La contraseña debe tener al menos 6 caracteres.'; msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return; }
+      if (password !== password2) { msg.textContent = 'Las contraseñas no coinciden.'; msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return; }
+      if (!privacidad) { msg.textContent = 'Debes aceptar la Política de Privacidad.'; msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return; }
 
       var marcaVal = document.getElementById('r-marca').value;
-      var marcaTexto = marcaVal === 'nueva'
-        ? document.getElementById('r-marca-nueva').value.trim()
-        : (document.getElementById('r-marca').selectedOptions[0] || {}).text || '';
+      var marcaTexto = marcaVal === 'nueva' ? document.getElementById('r-marca-nueva').value.trim() : (document.getElementById('r-marca').selectedOptions[0] || {}).text || '';
       var modeloVal = document.getElementById('r-modelo').value;
-      var modeloTexto = modeloVal === 'nuevo'
-        ? document.getElementById('r-modelo-nuevo').value.trim()
-        : (document.getElementById('r-modelo').selectedOptions[0] || {}).text || '';
-
+      var modeloTexto = modeloVal === 'nuevo' ? document.getElementById('r-modelo-nuevo').value.trim() : (document.getElementById('r-modelo').selectedOptions[0] || {}).text || '';
       var obs = document.getElementById('r-observaciones').value.trim();
-      if (categoriaSeleccionada === 'otra') {
-        obs = obs ? '[Otro vehículo] ' + obs : '[Otro vehículo]';
-      }
+      if (categoriaSeleccionada === 'otra') obs = obs ? '[Otro vehículo] ' + obs : '[Otro vehículo]';
 
       var btn = document.querySelector('#formulario-registro button.principal');
       btn.disabled = true; btn.textContent = 'Enviando...';
 
       fetch('/api/chofer/registro', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre: nombre, email: email, telefono: telefono, password: password,
           documento: document.getElementById('r-documento').value.trim(),
@@ -478,8 +298,7 @@
           municipio: document.getElementById('r-municipio').value.trim(),
           municipio_licencia: document.getElementById('r-municipio-licencia').value.trim(),
           numero_licencia: document.getElementById('r-numero-licencia').value.trim(),
-          vehiculo_marca: marcaTexto,
-          vehiculo_modelo: modeloTexto,
+          vehiculo_marca: marcaTexto, vehiculo_modelo: modeloTexto,
           matricula: document.getElementById('r-matricula').value.trim(),
           numero_taxi: document.getElementById('r-numero-taxi').value.trim(),
           plazas: document.getElementById('r-plazas').value,
@@ -495,15 +314,13 @@
         }
         document.getElementById('formulario-registro').innerHTML =
           '<div class="mensaje ok" style="display:block;margin-top:0">'
-          + '<strong style="font-size:18px;display:block;margin-bottom:8px">✅ Solicitud enviada</strong>'
-          + 'Hemos recibido tu solicitud y te hemos enviado un email de confirmación. '
-          + 'Revisaremos tu información y nos pondremos en contacto contigo en breve.'
+          + '<strong style="font-size:17px;display:block;margin-bottom:8px">✅ Solicitud enviada</strong>'
+          + 'Hemos recibido tu solicitud y te hemos enviado un email de confirmación. Revisaremos tu información y nos pondremos en contacto contigo en breve.'
           + '</div>';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       })
       .catch(function() {
-        msg.textContent = 'Error de conexión. Inténtalo de nuevo.';
-        msg.className = 'mensaje error';
+        msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error';
         btn.disabled = false; btn.textContent = 'Enviar solicitud de alta';
       });
     }
