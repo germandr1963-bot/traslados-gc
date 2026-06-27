@@ -263,6 +263,12 @@
       document.getElementById('r-modelo-nuevo').classList.toggle('oculto', document.getElementById('r-modelo').value !== 'nuevo');
     }
 
+    function mostrarError(msg, texto) {
+      msg.textContent = texto;
+      msg.style.cssText = 'display:block;margin-top:12px;padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.5;background:var(--rojo-error-fondo);color:var(--rojo-error);border:1px solid #e8b4a8;';
+      msg.scrollIntoView({ behavior:'smooth', block:'center' });
+    }
+
     function registrarse() {
       var nombre = document.getElementById('r-nombre').value.trim();
       var email = document.getElementById('r-email').value.trim();
@@ -271,12 +277,12 @@
       var password2 = document.getElementById('r-password2').value;
       var privacidad = document.getElementById('acepta-privacidad').checked;
       var msg = document.getElementById('mensaje-registro');
-      msg.className = 'mensaje'; msg.style.display = 'none';
+      msg.style.display = 'none';
 
-      if (!nombre || !email || !telefono) { msg.textContent = 'Nombre, email y teléfono son obligatorios.'; msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return; }
-      if (!password || password.length < 6) { msg.textContent = 'La contraseña debe tener al menos 6 caracteres.'; msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return; }
-      if (password !== password2) { msg.textContent = 'Las contraseñas no coinciden.'; msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return; }
-      if (!privacidad) { msg.textContent = 'Debes aceptar la Política de Privacidad.'; msg.className = 'mensaje error'; msg.scrollIntoView({ behavior:'smooth', block:'center' }); return; }
+      if (!nombre || !email || !telefono) { mostrarError(msg, 'Nombre, email y teléfono son obligatorios.'); return; }
+      if (!password || password.length < 6) { mostrarError(msg, 'La contraseña debe tener al menos 6 caracteres.'); return; }
+      if (password !== password2) { mostrarError(msg, 'Las contraseñas no coinciden.'); return; }
+      if (!privacidad) { mostrarError(msg, 'Debes aceptar la Política de Privacidad.'); return; }
 
       var marcaVal = document.getElementById('r-marca').value;
       var marcaTexto = marcaVal === 'nueva' ? document.getElementById('r-marca-nueva').value.trim() : (document.getElementById('r-marca').selectedOptions[0] || {}).text || '';
@@ -308,19 +314,18 @@
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (d.error) {
-          msg.textContent = d.error; msg.className = 'mensaje error';
-          msg.scrollIntoView({ behavior:'smooth', block:'center' });
+          mostrarError(msg, d.error);
           btn.disabled = false; btn.textContent = 'Enviar solicitud de alta'; return;
         }
         document.getElementById('formulario-registro').innerHTML =
-          '<div class="mensaje ok" style="display:block;margin-top:0">'
+          '<div style="margin-top:0;padding:20px;border-radius:8px;background:var(--verde-ok-fondo);color:var(--verde-ok);border:1px solid #a8dece;text-align:center;">'
           + '<strong style="font-size:17px;display:block;margin-bottom:8px">✅ Solicitud enviada</strong>'
           + 'Hemos recibido tu solicitud y te hemos enviado un email de confirmación. Revisaremos tu información y nos pondremos en contacto contigo en breve.'
           + '</div>';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       })
       .catch(function() {
-        msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error';
+        mostrarError(msg, 'Error de conexión. Inténtalo de nuevo.');
         btn.disabled = false; btn.textContent = 'Enviar solicitud de alta';
       });
     }
