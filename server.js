@@ -2560,8 +2560,9 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
     nombre, email, telefono, password,
     documento, direccion, cp, municipio,
     municipio_licencia, numero_licencia,
+    central_flota, categoria_id,
     vehiculo_marca, vehiculo_modelo, matricula,
-    numero_taxi, plazas
+    numero_taxi, plazas, isla, observaciones
   } = req.body;
 
   if (!nombre || !email || !telefono || !password) {
@@ -2575,21 +2576,25 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
   }
 
   const hash = await bcrypt.hash(password, 10);
+  const catId = categoria_id ? parseInt(categoria_id) : null;
 
   await pool.query(
     `INSERT INTO conductores (
       nombre, email, telefono, password_hash,
       documento, direccion, cp, municipio,
       municipio_licencia, numero_licencia,
+      central_flota, categoria_id,
       vehiculo_marca, vehiculo_modelo, matricula,
-      numero_taxi, plazas, estado
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'pendiente')`,
+      numero_taxi, plazas, isla, observaciones, estado
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'pendiente')`,
     [
       nombre.trim(), email.trim().toLowerCase(), telefono.trim(), hash,
       documento||'', direccion||'', cp||'', municipio||'',
       municipio_licencia||'', numero_licencia||'',
+      central_flota||'', catId,
       vehiculo_marca||'', vehiculo_modelo||'', matricula||'',
-      numero_taxi||'', plazas ? parseInt(plazas) : 4
+      numero_taxi||'', plazas ? parseInt(plazas) : 4,
+      isla||'Gran Canaria', observaciones||''
     ]
   );
 
