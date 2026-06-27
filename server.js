@@ -2565,7 +2565,7 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
     municipio_licencia, numero_licencia,
     central_flota, categoria_id,
     vehiculo_marca, vehiculo_modelo, matricula,
-    numero_taxi, plazas, isla, observaciones
+    numero_taxi, plazas, isla, observaciones, foto
   } = req.body;
 
   if (!nombre || !email || !telefono || !password) {
@@ -2588,8 +2588,8 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
       municipio_licencia, numero_licencia,
       central_flota, categoria_id,
       vehiculo_marca, vehiculo_modelo, matricula,
-      numero_taxi, plazas, isla, observaciones, estado
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'pendiente')`,
+      numero_taxi, plazas, isla, observaciones, foto, foto_estado, estado
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'pendiente')`,
     [
       nombre.trim(), email.trim().toLowerCase(), telefono.trim(), hash,
       documento||'', direccion||'', cp||'', municipio||'',
@@ -2597,7 +2597,8 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
       central_flota||'', catId,
       vehiculo_marca||'', vehiculo_modelo||'', matricula||'',
       numero_taxi||'', plazas ? parseInt(plazas) : 4,
-      isla||'Gran Canaria', observaciones||''
+      isla||'Gran Canaria', observaciones||'',
+      foto||null, foto ? 'pendiente' : 'sin_foto'
     ]
   );
 
