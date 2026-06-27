@@ -81,20 +81,23 @@
     .campo-grupo input,
     .campo-grupo select {
       width: 100%;
-      border: 1.5px solid var(--gris-borde);
+      border: 2px solid #b5a99a;
       border-radius: 8px;
-      padding: 10px 14px;
+      padding: 11px 14px;
       font-size: 14px;
       color: var(--texto-oscuro);
       background: #fff;
       font-family: 'Public Sans', sans-serif;
       transition: border-color 0.2s;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
     }
     .campo-grupo input:focus,
     .campo-grupo select:focus {
       outline: none;
       border-color: var(--terracota);
+      box-shadow: 0 0 0 3px rgba(193,80,46,0.12);
     }
+    .campo-grupo input::placeholder { color: #b5a99a; }
     .requerido { color: var(--terracota); }
 
     .aviso-error {
