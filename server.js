@@ -2687,6 +2687,14 @@ app.post('/chofer/foto', requireChofer, asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+app.get('/chofer/sesion', (req, res) => {
+  if (req.session && req.session.choferId) {
+    res.json({ rol: 'conductor' });
+  } else {
+    res.json({ rol: null });
+  }
+});
+
 app.post('/chofer/logout', (req, res) => {
   req.session.destroy(function() { res.json({ ok: true }); });
 });
