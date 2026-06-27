@@ -1338,6 +1338,51 @@ app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req,
     return res.status(400).json({ error: 'Estado no válido.' });
   }
   await pool.query('UPDATE conductores SET estado = $1 WHERE id = $2', [estado, req.params.id]);
+
+  // Email de bienvenida al aprobar
+  if (estado === 'aprobado') {
+    try {
+      const chofer = await pool.query('SELECT nombre, email FROM conductores WHERE id = $1', [req.params.id]);
+      if (chofer.rows.length) {
+        const { nombre, email } = chofer.rows[0];
+        const nombreEmpresa = 'Traslados GC';
+        await enviarEmail({
+          to: email,
+          subject: `¡Bienvenido a ${nombreEmpresa}!`,
+          html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <div style="max-width:600px;margin:0 auto;padding:40px 16px">
+    <div style="background:#1C1815;padding:28px 32px;border-radius:12px 12px 0 0;text-align:center">
+      <h1 style="color:#D9A441;margin:0;font-size:22px;letter-spacing:1px">${nombreEmpresa}</h1>
+    </div>
+    <div style="background:#ffffff;padding:36px 32px;border-radius:0 0 12px 12px;border:1px solid #e1dcd0;border-top:none">
+      <h2 style="color:#2A211B;font-size:20px;margin:0 0 16px">¡Hola, ${nombre}!</h2>
+      <p style="color:#2A211B;font-size:16px;line-height:1.7;margin:0 0 16px">
+        Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de ${nombreEmpresa}.
+      </p>
+      <p style="color:#5b5347;font-size:15px;line-height:1.7;margin:0 0 24px">
+        Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.
+      </p>
+      <div style="text-align:center;margin:28px 0">
+        <a href="https://traslados-gc.onrender.com/chofer/login"
+           style="background:#C1502E;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">
+          Acceder a mi portal
+        </a>
+      </div>
+      <p style="color:#5b5347;font-size:14px;line-height:1.6;margin:24px 0 0;border-top:1px solid #e1dcd0;padding-top:20px">
+        Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. Nos alegra tenerte con nosotros — ¡bienvenido al equipo!
+      </p>
+    </div>
+    <p style="text-align:center;color:#b5a99a;font-size:12px;margin-top:20px">${nombreEmpresa} · Gran Canaria</p>
+  </div>
+</body></html>`
+        });
+      }
+    } catch(err) {
+      console.warn('Error enviando email bienvenida chofer:', err.message);
+    }
+  }
+
   res.json({ ok: true });
 }));
 
