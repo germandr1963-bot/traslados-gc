@@ -943,6 +943,14 @@ app.get('/api/extras-publicos', asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
+app.get('/api/marcas-vehiculos', asyncHandler(async (req, res) => {
+  const marcas = await pool.query('SELECT id, nombre FROM marcas_vehiculos ORDER BY nombre');
+  const modelos = await pool.query('SELECT id, marca_id, nombre FROM modelos_vehiculos ORDER BY nombre');
+  res.json(marcas.rows.map(function(m) {
+    return { id: m.id, nombre: m.nombre, modelos: modelos.rows.filter(function(mo) { return mo.marca_id === m.id; }) };
+  }));
+}));
+
 app.post('/api/reservas', asyncHandler(async (req, res) => {
   const {
     numero_reserva_cliente,
