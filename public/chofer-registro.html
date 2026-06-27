@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alta de Chofer — Traslados GC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+  <style>
+    body { background: var(--charcoal); color: var(--texto-claro); min-height: 100vh; }
+    .cabecera {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 20px 32px; max-width: 900px; margin: 0 auto;
+    }
+    .logo { font-family: 'Big Shoulders Display', sans-serif; font-size: 20px; color: var(--texto-claro); text-decoration: none; letter-spacing: 1px; }
+    .nav-links a { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 13px; margin-left: 24px; transition: color 0.2s; }
+    .nav-links a:hover, .nav-links a.activo { color: var(--terracota); }
+    .contenido { max-width: 760px; margin: 0 auto; padding: 32px 24px 80px; }
+    .bienvenida {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 32px;
+      text-align: center;
+    }
+    .bienvenida h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: clamp(28px,5vw,42px); margin-bottom: 10px; }
+    .bienvenida h1 span { color: var(--terracota); }
+    .bienvenida p { color: rgba(255,255,255,0.55); font-size: 14px; line-height: 1.7; max-width: 520px; margin: 0 auto; }
+    .form-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+    .form-card h2 { font-size: 14px; font-weight: 600; color: var(--oro); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 20px; }
+    .dos-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    label { display: block; font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 4px; font-weight: 500; }
+    .campo-dark {
+      width: 100%; background: rgba(255,255,255,0.07); border: 1.5px solid rgba(255,255,255,0.12);
+      border-radius: 8px; padding: 10px 14px; font-size: 14px; color: #fff;
+      font-family: 'Public Sans', sans-serif; transition: border-color 0.2s; margin-bottom: 0;
+    }
+    .campo-dark:focus { outline: none; border-color: var(--terracota); }
+    .campo-dark::placeholder { color: rgba(255,255,255,0.25); }
+    .requerido { color: var(--terracota); }
+    .error { background: rgba(193,80,46,0.15); border: 1px solid rgba(193,80,46,0.4); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #f8a89a; margin-bottom: 16px; display: none; }
+    .ok-box { background: rgba(45,122,79,0.15); border: 1px solid rgba(45,122,79,0.4); border-radius: 12px; padding: 24px; text-align: center; display: none; }
+    .ok-box .icono { font-size: 40px; margin-bottom: 12px; }
+    .ok-box h3 { font-size: 18px; margin-bottom: 8px; }
+    .ok-box p { color: rgba(255,255,255,0.55); font-size: 13px; }
+    .btn-enviar { width: 100%; background: var(--terracota); color: #fff; border: none; border-radius: 10px; padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: background 0.2s; font-family: 'Public Sans', sans-serif; }
+    .btn-enviar:hover { background: var(--terracota-oscuro); }
+    .btn-enviar:disabled { opacity: 0.6; cursor: not-allowed; }
+    .nota { font-size: 12px; color: rgba(255,255,255,0.35); text-align: center; margin-top: 16px; line-height: 1.6; }
+    @media (max-width: 580px) { .dos-col { grid-template-columns: 1fr; } .cabecera { padding: 16px; } .contenido { padding: 20px 14px 60px; } .form-card { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <div class="cabecera">
+    <a href="/" class="logo">Traslados · GC</a>
+    <nav class="nav-links">
+      <a href="/chofer/registro" class="activo">Alta choferes</a>
+      <a href="/contacto">Contacto</a>
+    </nav>
+  </div>
+
+  <div class="contenido">
+    <div class="bienvenida">
+      <h1>Únete a nuestra<br><span>flota de choferes</span></h1>
+      <p>Buscamos choferes de taxi con licencia en Gran Canaria para realizar traslados de larga distancia. Rellena el formulario y nos pondremos en contacto contigo.</p>
+    </div>
+
+    <div id="ok-box" class="ok-box">
+      <div class="icono">✅</div>
+      <h3>Solicitud enviada</h3>
+      <p>Hemos recibido tu solicitud. Revisaremos tu información y te contactaremos en breve. Recibirás un email de confirmación.</p>
+    </div>
+
+    <div id="form-registro">
+      <div id="error-registro" class="error"></div>
+
+      <div class="form-card">
+        <h2>Datos personales</h2>
+        <div class="dos-col">
+          <div>
+            <label>Nombre completo <span class="requerido">*</span></label>
+            <input type="text" id="r-nombre" class="campo-dark" placeholder="Tu nombre y apellidos">
+          </div>
+          <div>
+            <label>Email <span class="requerido">*</span></label>
+            <input type="email" id="r-email" class="campo-dark" placeholder="tu@email.com">
+          </div>
+          <div>
+            <label>Teléfono <span class="requerido">*</span></label>
+            <input type="tel" id="r-telefono" class="campo-dark" placeholder="+34 600 000 000">
+          </div>
+          <div>
+            <label>DNI / Pasaporte</label>
+            <input type="text" id="r-documento" class="campo-dark" placeholder="12345678A">
+          </div>
+          <div>
+            <label>Dirección</label>
+            <input type="text" id="r-direccion" class="campo-dark" placeholder="Calle, número">
+          </div>
+          <div>
+            <label>Código postal</label>
+            <input type="text" id="r-cp" class="campo-dark" placeholder="35001">
+          </div>
+          <div>
+            <label>Municipio de residencia</label>
+            <input type="text" id="r-municipio" class="campo-dark" placeholder="Las Palmas de G.C.">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <h2>Licencia de taxi</h2>
+        <div class="dos-col">
+          <div>
+            <label>Municipio de la licencia</label>
+            <input type="text" id="r-municipio-licencia" class="campo-dark" placeholder="Las Palmas de G.C.">
+          </div>
+          <div>
+            <label>Número de licencia</label>
+            <input type="text" id="r-numero-licencia" class="campo-dark" placeholder="LPA-0001">
+          </div>
+          <div>
+            <label>Número de taxi</label>
+            <input type="text" id="r-numero-taxi" class="campo-dark" placeholder="1234">
+          </div>
+          <div>
+            <label>Plazas del vehículo</label>
+            <input type="number" id="r-plazas" class="campo-dark" placeholder="4" min="1" max="20">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <h2>Vehículo</h2>
+        <div class="dos-col">
+          <div>
+            <label>Marca</label>
+            <input type="text" id="r-marca" class="campo-dark" placeholder="Toyota">
+          </div>
+          <div>
+            <label>Modelo</label>
+            <input type="text" id="r-modelo" class="campo-dark" placeholder="Prius">
+          </div>
+          <div>
+            <label>Matrícula</label>
+            <input type="text" id="r-matricula" class="campo-dark" placeholder="1234 ABC">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <h2>Contraseña de acceso</h2>
+        <div class="dos-col">
+          <div>
+            <label>Contraseña <span class="requerido">*</span></label>
+            <input type="password" id="r-password" class="campo-dark" placeholder="Mínimo 6 caracteres">
+          </div>
+          <div>
+            <label>Repetir contraseña <span class="requerido">*</span></label>
+            <input type="password" id="r-password2" class="campo-dark" placeholder="Repite la contraseña">
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-enviar" id="btn-enviar-registro" onclick="enviarRegistro()">Enviar solicitud</button>
+      <p class="nota">Al enviar aceptas que tus datos sean utilizados para gestionar tu alta como chofer colaborador de Traslados GC. Tu solicitud será revisada por nuestro equipo.</p>
+    </div>
+  </div>
+
+  <script>
+    function enviarRegistro() {
+      var nombre   = document.getElementById('r-nombre').value.trim();
+      var email    = document.getElementById('r-email').value.trim();
+      var telefono = document.getElementById('r-telefono').value.trim();
+      var password = document.getElementById('r-password').value;
+      var password2 = document.getElementById('r-password2').value;
+      var err = document.getElementById('error-registro');
+      var btn = document.getElementById('btn-enviar-registro');
+
+      err.style.display = 'none';
+
+      if (!nombre || !email || !telefono) {
+        err.textContent = 'Nombre, email y teléfono son obligatorios.';
+        err.style.display = 'block';
+        return;
+      }
+      if (!password || password.length < 6) {
+        err.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+        err.style.display = 'block';
+        return;
+      }
+      if (password !== password2) {
+        err.textContent = 'Las contraseñas no coinciden.';
+        err.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+
+      fetch('/api/chofer/registro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: nombre,
+          email: email,
+          telefono: telefono,
+          password: password,
+          documento: document.getElementById('r-documento').value.trim(),
+          direccion: document.getElementById('r-direccion').value.trim(),
+          cp: document.getElementById('r-cp').value.trim(),
+          municipio: document.getElementById('r-municipio').value.trim(),
+          municipio_licencia: document.getElementById('r-municipio-licencia').value.trim(),
+          numero_licencia: document.getElementById('r-numero-licencia').value.trim(),
+          vehiculo_marca: document.getElementById('r-marca').value.trim(),
+          vehiculo_modelo: document.getElementById('r-modelo').value.trim(),
+          matricula: document.getElementById('r-matricula').value.trim(),
+          numero_taxi: document.getElementById('r-numero-taxi').value.trim(),
+          plazas: document.getElementById('r-plazas').value || 4
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) {
+          err.textContent = data.error;
+          err.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Enviar solicitud';
+          return;
+        }
+        document.getElementById('form-registro').style.display = 'none';
+        document.getElementById('ok-box').style.display = 'block';
+      })
+      .catch(function() {
+        err.textContent = 'Error de conexión. Inténtalo de nuevo.';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Enviar solicitud';
+      });
+    }
+  </script>
+</body>
+</html>

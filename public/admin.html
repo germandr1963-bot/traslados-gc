@@ -154,6 +154,7 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="idiomas">Idiomas</button>
       <button class="item-menu" data-seccion="calculador">Calculador</button>
       <button class="item-menu" data-seccion="configuracion">No-Show</button>
+      <button class="item-menu" data-seccion="contacto">Contacto</button>
       <button class="item-menu" data-seccion="extras">Extras</button>
       <button class="item-menu" data-seccion="cotizaciones">Cotizaciones <span id="badge-cotiz" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">0</span></button>
       <button class="item-menu" data-seccion="reservas">Reservas</button>
@@ -732,6 +733,37 @@ table.tabla-precios input {
       </div>
     </div>
 
+    <div id="seccion-contacto" class="oculto">
+      <h1>Contacto público</h1>
+      <p class="subtitulo">Información que aparecerá en la página de contacto de la web.</p>
+      <div class="tarjeta">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+          <div>
+            <label class="etiqueta">Teléfono</label>
+            <input type="text" id="contacto-telefono" class="campo" placeholder="+34 600 000 000">
+          </div>
+          <div>
+            <label class="etiqueta">WhatsApp</label>
+            <input type="text" id="contacto-whatsapp" class="campo" placeholder="+34 600 000 000">
+          </div>
+          <div>
+            <label class="etiqueta">Email de contacto</label>
+            <input type="email" id="contacto-email" class="campo" placeholder="info@trasladosgc.com">
+          </div>
+          <div>
+            <label class="etiqueta">Horario de atención</label>
+            <input type="text" id="contacto-horario" class="campo" placeholder="Lun–Vie 9:00–18:00">
+          </div>
+          <div style="grid-column:1/-1;">
+            <label class="etiqueta">Dirección (opcional)</label>
+            <input type="text" id="contacto-direccion" class="campo" placeholder="Calle Ejemplo, 1 — Las Palmas de Gran Canaria">
+          </div>
+        </div>
+        <button class="boton-primario" onclick="guardarContacto()">💾 Guardar</button>
+        <div id="aviso-contacto" style="display:none;margin-top:0.75rem;"></div>
+      </div>
+    </div>
+
     <div id="seccion-extras" class="oculto">
       <h1>Extras del traslado</h1>
       <p class="subtitulo">Define los servicios adicionales que el cliente puede seleccionar al reservar. El precio se suma al precio estimado del traslado.</p>
@@ -823,7 +855,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'extras', 'cotizaciones', 'reservas'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'extras', 'cotizaciones', 'reservas'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
@@ -831,6 +863,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'idiomas') cargarTextosInterfaz();
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
     if (boton.dataset.seccion === 'configuracion') cargarConfiguracionNoshow();
+    if (boton.dataset.seccion === 'contacto') cargarContacto();
     if (boton.dataset.seccion === 'destinos') { cargarDestinos(); cargarSelectorLangDestinos(); }
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
     if (boton.dataset.seccion === 'cotizaciones') cargarCotizaciones();
@@ -2926,6 +2959,38 @@ function guardarTarifario() {
 }
 
 // ─── Extras ───────────────────────────────────────────────────────────────────
+// ─── Contacto público ─────────────────────────────────────────────────────────
+function cargarContacto() {
+  fetch('/api/contacto')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('contacto-telefono').value = d.telefono || '';
+      document.getElementById('contacto-whatsapp').value = d.whatsapp || '';
+      document.getElementById('contacto-email').value = d.email || '';
+      document.getElementById('contacto-horario').value = d.horario || '';
+      document.getElementById('contacto-direccion').value = d.direccion || '';
+    });
+}
+
+function guardarContacto() {
+  var av = document.getElementById('aviso-contacto');
+  fetch('/admin/contacto', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      telefono: document.getElementById('contacto-telefono').value.trim(),
+      whatsapp: document.getElementById('contacto-whatsapp').value.trim(),
+      email: document.getElementById('contacto-email').value.trim(),
+      horario: document.getElementById('contacto-horario').value.trim(),
+      direccion: document.getElementById('contacto-direccion').value.trim()
+    })
+  }).then(function(r) { return r.json(); }).then(function() {
+    av.style.display = 'block';
+    av.innerHTML = '<div class="aviso-ok">✔ Datos de contacto guardados.</div>';
+    setTimeout(function() { av.style.display = 'none'; }, 3000);
+  });
+}
+
 // ─── Configuración No-Show ────────────────────────────────────────────────────
 function cargarConfiguracionNoshow() {
   fetch('/admin/noshow')
