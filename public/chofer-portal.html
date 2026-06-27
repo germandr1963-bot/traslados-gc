@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Chofer — Traslados GC</title>
-  <link rel="stylesheet" href="/estilos.css">
+  <link rel="stylesheet" href="/estilos-chofer.css">
 </head>
 <body>
   <header class="app">
@@ -53,7 +53,7 @@
       };
       document.getElementById('ficha-vehiculo').innerHTML =
         '<h2 style="margin-top:0">Tu vehículo</h2>' +
-        (conductor.foto ? '<img src="' + conductor.foto + '" alt="Foto de carné" style="width:90px;height:90px;object-fit:cover;border-radius:50%;border:2px solid var(--gris-borde);float:right;margin-left:10px">' : '') +
+        (conductor.foto ? '<img src="' + conductor.foto + '" alt="Foto de carné" style="width:90px;height:90px;object-fit:cover;border-radius:50%;border:2px solid var(--borde);float:right;margin-left:10px">' : '') +
         '<p><strong>' + (conductor.vehiculo_marca || '—') + ' ' + (conductor.vehiculo_modelo || '') + '</strong>' +
         (conductor.categoria ? ' · Categoría <strong>' + conductor.categoria + '</strong>' : '') + '<br>' +
         'Matrícula: ' + (conductor.matricula || '—') + ' · Nº de taxi: <strong>' + (conductor.numero_taxi || '—') + '</strong><br>' +
