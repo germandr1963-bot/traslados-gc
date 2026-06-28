@@ -4791,7 +4791,13 @@ app.post('/admin/notificaciones', requireAdmin, asyncHandler(async (req, res) =>
 // ═══════════════════════════════════════════════════════════════════════════════
 
 app.get('/mi-reserva', (req, res) => {
+  if (req.session && req.session.clienteReservaId) return res.redirect('/cliente/portal');
   res.sendFile(path.join(__dirname, 'public', 'mi-reserva.html'));
+});
+
+app.get('/cliente/portal', (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.redirect('/mi-reserva');
+  res.sendFile(path.join(__dirname, 'public', 'cliente-portal.html'));
 });
 
 // Verificar PNR + email y enviar contraseña provisional
