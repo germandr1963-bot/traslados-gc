@@ -865,7 +865,7 @@ async function obtenerEmailsNotificacion() {
 
 // ─── Helper: generar contraseña provisional ───────────────────────────────────
 function generarPasswordProvisional() {
-  return '1234';
+  return '123456';
 }
 
 async function resolverVehiculo(marca_id, marca_nueva, modelo_id, modelo_nuevo) {
