@@ -109,12 +109,12 @@
     <!-- PANTALLA LOGIN -->
     <div id="pantalla-login">
       <div id="error-login" class="error"></div>
-      <label for="login-pnr">Número de reserva</label>
-      <input type="text" id="login-pnr" placeholder="Ej: GCA123" style="text-transform:uppercase;letter-spacing:2px;font-weight:700">
+      <label for="login-email">Tu email</label>
+      <input type="email" id="login-email" placeholder="tucorreo@email.com">
       <label for="login-pwd">Contraseña</label>
       <input type="password" id="login-pwd" placeholder="Tu contraseña">
       <button class="boton" id="btn-login" onclick="hacerLogin()">Entrar</button>
-      <span class="enlace" onclick="mostrarSolicitar()">¿Primera vez o contraseña olvidada? Solicitar acceso</span>
+      <span class="enlace" onclick="mostrarSolicitar()">¿Primera vez? Accede con tu número de reserva</span>
     </div>
 
     <!-- PANTALLA SOLICITAR CONTRASEÑA -->
@@ -179,16 +179,16 @@
     }
 
     function hacerLogin() {
-      var pnr = document.getElementById('login-pnr').value.trim();
+      var email = document.getElementById('login-email').value.trim();
       var pwd = document.getElementById('login-pwd').value;
       var btn = document.getElementById('btn-login');
       ocultarError('error-login');
-      if (!pnr || !pwd) { mostrarError('error-login', 'Rellena todos los campos.'); return; }
+      if (!email || !pwd) { mostrarError('error-login', 'Rellena todos los campos.'); return; }
       btn.disabled = true; btn.textContent = 'Entrando...';
       fetch('/api/cliente/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pnr: pnr, password: pwd })
+        body: JSON.stringify({ email: email, password: pwd })
       })
       .then(function(r) { return r.json(); })
       .then(function(d) {
