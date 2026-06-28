@@ -4867,25 +4867,27 @@ app.post('/api/cliente/solicitar-acceso', asyncHandler(async (req, res) => {
 
 // Login del cliente
 app.post('/api/cliente/login', asyncHandler(async (req, res) => {
-  const { pnr, password } = req.body;
-  if (!pnr || !password) return res.status(400).json({ error: 'PNR y contraseña son obligatorios.' });
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Email y contraseña son obligatorios.' });
 
+  // Buscar cualquier reserva activa del cliente con ese email que tenga contraseña
   const result = await pool.query(
-    'SELECT id, nombre_cliente, cliente_password_hash, cliente_primer_acceso FROM reservas WHERE UPPER(numero_reserva) = UPPER($1)',
-    [pnr.trim()]
+    `SELECT id, nombre_cliente, email_cliente, cliente_password_hash, cliente_primer_acceso
+     FROM reservas
+     WHERE LOWER(email_cliente) = LOWER($1) AND cliente_password_hash IS NOT NULL
+     ORDER BY creado_en DESC LIMIT 1`,
+    [email.trim()]
   );
-  if (!result.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  if (!result.rows.length) return res.status(404).json({ error: 'No encontramos una cuenta con ese email. Si es tu primera vez, usa el acceso con número de reserva.' });
   const reserva = result.rows[0];
-  if (!reserva.cliente_password_hash) return res.status(401).json({ error: 'Acceso no configurado. Solicita tu contraseña primero.' });
 
   const ok = await bcrypt.compare(password, reserva.cliente_password_hash);
   if (!ok) return res.status(401).json({ error: 'Contraseña incorrecta.' });
 
   req.session.clienteReservaId = reserva.id;
-  req.session.clientePnr = pnr.toUpperCase();
+  req.session.clientePnr = reserva.id.toString();
   req.session.clienteEmail = reserva.email_cliente;
   req.session.save(function(err) {
-    console.log('[CLIENTE LOGIN] PNR:', pnr, '| SessionID:', req.session.id, '| Error:', err || 'ninguno');
     res.json({ ok: true, primer_acceso: reserva.cliente_primer_acceso });
   });
 }));
