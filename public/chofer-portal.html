@@ -24,6 +24,7 @@
 
       <div class="tarjeta">
         <h2 style="margin-top:0">Reservas</h2>
+        <div id="lista-reservas"><p style="color:#5a6c79;font-size:14px">Cargando...</p></div>
       </div>
 
       <button class="secundario" onclick="cerrarSesion()">Cerrar sesión</button>
@@ -97,7 +98,50 @@
       window.location.href = '/chofer/login';
     }
 
+    async function cargarReservas() {
+      const r = await fetch('/chofer/mis-reservas');
+      if (!r.ok) return;
+      const data = await r.json();
+      const lista = document.getElementById('lista-reservas');
+      if (!data.reservas || !data.reservas.length) {
+        lista.innerHTML = '<p style="color:#5a6c79;font-size:14px;text-align:center;padding:20px 0">No tienes reservas asignadas próximamente.</p>';
+        return;
+      }
+      lista.innerHTML = data.reservas.map(function(r) {
+        var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '—';
+        var hora = r.hora ? r.hora.slice(0,5) : '—';
+        return '<div style="border:1px solid var(--borde);border-radius:10px;padding:16px;margin-bottom:12px;background:#fafaf8">' +
+          '<div style="font-family:monospace;font-size:15px;font-weight:700;color:var(--costa);margin-bottom:6px">' + r.numero_reserva + '</div>' +
+          '<div style="font-size:15px;font-weight:600;margin-bottom:6px">' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
+          '<div style="font-size:13px;color:#5a6c79;margin-bottom:2px">📅 ' + fecha + ' · ' + hora + 'h</div>' +
+          '<div style="font-size:13px;color:#5a6c79;margin-bottom:2px">👤 ' + (r.nombre_cliente||'—') + ' · ' + (r.num_pasajeros||'—') + ' pasajeros</div>' +
+          '<div style="font-size:13px;color:#5a6c79;margin-bottom:12px">🚗 ' + (r.categoria_nombre||'—') + '</div>' +
+          '<button id="btn-cartel-' + r.id + '" onclick="descargarCartel(' + r.id + ','' + r.numero_reserva + '')" ' +
+          'style="background:var(--costa);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer">📄 Descargar cartel</button>' +
+        '</div>';
+      }).join('');
+    }
+
+    function descargarCartel(reservaId, pnr) {
+      var btn = document.getElementById('btn-cartel-' + reservaId);
+      btn.textContent = 'Generando...'; btn.disabled = true;
+      fetch('/chofer/cartel/' + reservaId)
+        .then(function(r) { if (!r.ok) throw new Error(); return r.blob(); })
+        .then(function(blob) {
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a'); a.href = url;
+          a.download = 'cartel-' + pnr + '.docx'; a.click();
+          URL.revokeObjectURL(url);
+          btn.textContent = '📄 Descargar cartel'; btn.disabled = false;
+        })
+        .catch(function() {
+          btn.textContent = '❌ Error'; btn.disabled = false;
+          setTimeout(function() { btn.textContent = '📄 Descargar cartel'; }, 2000);
+        });
+    }
+
     mostrarPanel();
+    cargarReservas();
   </script>
 </body>
 </html>
