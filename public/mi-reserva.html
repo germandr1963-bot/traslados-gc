@@ -8,15 +8,19 @@
   <link rel="stylesheet" href="/estilos.css">
   <style>
     /* ── Layout general ─────────────────────────────────────── */
-    body { background: var(--charcoal); color: var(--texto-claro); min-height: 100vh; }
+    body { background: var(--gris-fondo); color: var(--texto-oscuro); min-height: 100vh; }
 
+    .cabecera-wrapper {
+      background: var(--charcoal);
+      border-bottom: 3px solid var(--terracota);
+    }
     .cabecera {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 20px 32px; max-width: 860px; margin: 0 auto;
+      padding: 18px 32px; max-width: 860px; margin: 0 auto;
     }
     .logo { font-family: 'Big Shoulders Display', sans-serif; font-size: 20px;
       color: var(--texto-claro); text-decoration: none; letter-spacing: 1px; }
-    .nav-links a { color: rgba(255,255,255,0.5); font-size: 13px; margin-left: 22px; text-decoration: none; transition: color 0.2s; }
+    .nav-links a { color: rgba(255,255,255,0.55); font-size: 13px; margin-left: 22px; text-decoration: none; transition: color 0.2s; }
     .nav-links a:hover { color: var(--terracota); }
 
     .contenido { max-width: 860px; margin: 0 auto; padding: 20px 24px 80px; }
@@ -29,35 +33,38 @@
     #pantalla-acceso p.sub { color: rgba(255,255,255,0.5); font-size: 14px; line-height: 1.6; margin-bottom: 32px; }
 
     .tarjeta-acceso {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
+      background: #fff;
+      border: 1px solid var(--gris-borde);
       border-radius: 16px; padding: 28px 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
     }
-    .tarjeta-acceso h2 { font-size: 14px; font-weight: 600; margin-bottom: 20px;
-      color: rgba(255,255,255,0.7); letter-spacing: 0.5px; text-transform: uppercase; }
+    .tarjeta-acceso h2 { font-size: 14px; font-weight: 600; margin-bottom: 6px;
+      color: var(--texto-oscuro); letter-spacing: 0.5px; }
+    .tarjeta-acceso .campo-hint { font-size: 12px; color: var(--texto-muted); margin-bottom: 16px; }
 
-    .campo-acceso { width: 100%; background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
-      padding: 11px 14px; color: var(--texto-claro); font-size: 14px;
+    .campo-acceso { width: 100%; background: #fff;
+      border: 1px solid var(--piedra-borde); border-radius: 8px;
+      padding: 11px 14px; color: var(--texto-oscuro); font-size: 14px;
       font-family: 'Public Sans', sans-serif; margin-bottom: 12px; transition: border-color 0.2s; }
-    .campo-acceso:focus { outline: none; border-color: var(--terracota); }
+    .campo-acceso:focus { outline: none; border-color: var(--terracota); box-shadow: 0 0 0 3px rgba(193,80,46,0.08); }
     .campo-acceso.pnr-input { font-family: 'JetBrains Mono', monospace; letter-spacing: 3px;
       text-transform: uppercase; font-size: 16px; }
-    .campo-acceso::placeholder { color: rgba(255,255,255,0.25); }
+    .campo-acceso::placeholder { color: #c0b5aa; }
 
     .btn-acceso { width: 100%; background: var(--terracota); color: #fff;
       border: none; border-radius: 8px; padding: 13px; font-size: 15px;
       font-weight: 600; cursor: pointer; transition: background 0.2s; margin-top: 4px; }
     .btn-acceso:hover { background: var(--terracota-oscuro); }
 
-    .enlace-accion { display: block; text-align: center; margin-top: 14px;
-      color: rgba(255,255,255,0.45); font-size: 13px; cursor: pointer; }
-    .enlace-accion:hover { color: var(--oro); }
+    .enlace-accion { display: block; text-align: center; margin-top: 20px;
+      padding-top: 16px; border-top: 1px solid var(--gris-borde);
+      color: var(--texto-muted); font-size: 13px; cursor: pointer; text-decoration: underline; }
+    .enlace-accion:hover { color: var(--terracota); }
 
     .aviso-acceso { border-radius: 8px; padding: 10px 14px; margin-top: 14px;
-      font-size: 13px; display: none; }
-    .aviso-error { background: var(--rojo-error-fondo); color: var(--rojo-error); }
-    .aviso-ok { background: var(--verde-ok-fondo); color: var(--verde-ok); }
+      font-size: 13px; display: none; border: 1px solid; }
+    .aviso-acceso.aviso-error { background: var(--rojo-error-fondo); color: var(--rojo-error); border-color: #f1aeb5; }
+    .aviso-acceso.aviso-ok { background: var(--verde-ok-fondo); color: var(--verde-ok); border-color: #a3cfbb; }
 
     /* ── Cambio de contraseña (primer acceso) ───────────────── */
     #pantalla-cambiar-pass { max-width: 460px; margin: 0 auto; padding-top: 40px; }
@@ -229,11 +236,13 @@
 </head>
 <body>
 
-  <div class="cabecera">
-    <a href="/" class="logo">Traslados · GC</a>
-    <nav class="nav-links">
-      <a href="/contacto">Contacto</a>
-    </nav>
+  <div class="cabecera-wrapper">
+    <div class="cabecera">
+      <a href="/" class="logo">Traslados · GC</a>
+      <nav class="nav-links">
+        <a href="/contacto">Contacto</a>
+      </nav>
+    </div>
   </div>
 
   <div class="contenido">
@@ -241,12 +250,15 @@
     <!-- ═══ PANTALLA: SOLICITAR CONTRASEÑA ════════════════════════════════ -->
     <div id="pantalla-solicitar" class="oculto">
       <div style="max-width:460px;margin:0 auto;padding-top:40px;">
-        <a href="#" onclick="mostrarLogin()" class="btn-volver" style="display:inline-flex;align-items:center;gap:6px;color:rgba(255,255,255,0.4);font-size:13px;text-decoration:none;margin-bottom:28px;">← Volver</a>
-        <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:32px;margin-bottom:8px;">Acceder a<br><span style="color:var(--terracota);">mi reserva</span></h1>
-        <p style="color:rgba(255,255,255,0.45);font-size:14px;margin-bottom:28px;line-height:1.6;">Introduce tu número de reserva y el email con el que reservaste. Te enviaremos una contraseña provisional.</p>
+        <a href="#" onclick="mostrarLogin()" class="btn-volver" style="display:inline-flex;align-items:center;gap:6px;color:var(--texto-muted);font-size:13px;text-decoration:none;margin-bottom:28px;">← Volver</a>
+        <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:32px;margin-bottom:8px;color:var(--texto-oscuro);">Solicitar<br><span style="color:var(--terracota);">contraseña</span></h1>
+        <p style="color:var(--texto-muted);font-size:14px;margin-bottom:28px;line-height:1.6;">Introduce tu número de reserva y el email con el que reservaste. Te enviaremos una contraseña provisional.</p>
         <div class="tarjeta-acceso">
-          <h2>Solicitar contraseña</h2>
-          <input type="text" id="sol-pnr" class="campo-acceso pnr-input" placeholder="ABC123" maxlength="10">
+          <h2>Número de reserva</h2>
+          <p class="campo-hint">Lo encontrarás en el email que recibiste al hacer la reserva</p>
+          <input type="text" id="sol-pnr" class="campo-acceso pnr-input" placeholder="Ej: GCA123" maxlength="10">
+          <h2 style="margin-top:4px;">Tu email</h2>
+          <p class="campo-hint">El mismo con el que hiciste la reserva</p>
           <input type="email" id="sol-email" class="campo-acceso" placeholder="tu@email.com">
           <button class="btn-acceso" onclick="solicitarAcceso()">Enviar contraseña provisional</button>
           <div id="aviso-solicitar" class="aviso-acceso"></div>
@@ -257,15 +269,18 @@
     <!-- ═══ PANTALLA: LOGIN ════════════════════════════════════════════════ -->
     <div id="pantalla-login">
       <div style="max-width:460px;margin:0 auto;padding-top:40px;">
-        <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:clamp(28px,5vw,44px);margin-bottom:8px;line-height:1.1;">Mi <span style="color:var(--terracota);">reserva</span></h1>
-        <p style="color:rgba(255,255,255,0.45);font-size:14px;margin-bottom:32px;line-height:1.6;">Accede con tu número de reserva y contraseña para ver el estado, gestionar cambios y comunicarte con el equipo.</p>
+        <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:clamp(28px,5vw,44px);margin-bottom:8px;line-height:1.1;color:var(--texto-oscuro);">Mi <span style="color:var(--terracota);">reserva</span></h1>
+        <p style="color:var(--texto-muted);font-size:14px;margin-bottom:32px;line-height:1.6;">Accede para ver el estado de tu traslado, gestionar cambios y comunicarte con el equipo.</p>
         <div class="tarjeta-acceso">
-          <h2>Acceder</h2>
-          <input type="text" id="login-pnr" class="campo-acceso pnr-input" placeholder="ABC123" maxlength="10">
-          <input type="password" id="login-pwd" class="campo-acceso" placeholder="Contraseña">
+          <h2>Número de reserva</h2>
+          <p class="campo-hint">Lo encontrarás en el email que recibiste al hacer la reserva</p>
+          <input type="text" id="login-pnr" class="campo-acceso pnr-input" placeholder="Ej: GCA123" maxlength="10">
+          <h2 style="margin-top:4px;">Tu contraseña</h2>
+          <p class="campo-hint">La que elegiste al acceder por primera vez</p>
+          <input type="password" id="login-pwd" class="campo-acceso" placeholder="Tu contraseña">
           <button class="btn-acceso" onclick="hacerLogin()">Entrar</button>
           <div id="aviso-login" class="aviso-acceso"></div>
-          <span class="enlace-accion" onclick="mostrarSolicitar()">¿Primera vez o contraseña olvidada? Solicitar acceso</span>
+          <span class="enlace-accion" onclick="mostrarSolicitar()">¿Es tu primera vez o no recuerdas la contraseña? Solicitar acceso</span>
         </div>
       </div>
     </div>
@@ -273,8 +288,8 @@
     <!-- ═══ PANTALLA: CAMBIAR CONTRASEÑA ══════════════════════════════════ -->
     <div id="pantalla-cambiar-pass" class="oculto">
       <div style="max-width:460px;margin:0 auto;padding-top:40px;">
-        <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:32px;margin-bottom:8px;">Elige tu<br><span style="color:var(--terracota);">contraseña</span></h1>
-        <p style="color:rgba(255,255,255,0.45);font-size:14px;margin-bottom:28px;line-height:1.6;">Es tu primera vez o has recibido una provisional. Elige una contraseña propia para acceder en el futuro.</p>
+        <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:32px;margin-bottom:8px;color:var(--texto-oscuro);">Elige tu<br><span style="color:var(--terracota);">contraseña</span></h1>
+        <p style="color:var(--texto-muted);font-size:14px;margin-bottom:28px;line-height:1.6;">Es tu primera vez o has recibido una provisional. Elige una contraseña propia para acceder en el futuro.</p>
         <div class="tarjeta-acceso">
           <h2>Nueva contraseña</h2>
           <input type="password" id="nueva-pwd" class="campo-acceso" placeholder="Mínimo 6 caracteres">
