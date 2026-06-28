@@ -381,12 +381,23 @@
   // Navegación entre pantallas
   // ═══════════════════════════════════════════════════════════════
   function mostrarSolo(id) {
-    ['pantalla-login','pantalla-solicitar','pantalla-cambiar-pass','pantalla-portal'].forEach(function(p) {
+    ['pantalla-solicitar','pantalla-cambiar-pass','pantalla-portal'].forEach(function(p) {
       document.getElementById(p).classList.add('oculto');
     });
+    // Login: solo se oculta si vamos al portal
+    if (id === 'pantalla-portal') {
+      document.getElementById('pantalla-login').classList.add('oculto');
+    } else {
+      document.getElementById('pantalla-login').classList.remove('oculto');
+    }
     document.getElementById(id).classList.remove('oculto');
   }
-  function mostrarLogin() { mostrarSolo('pantalla-login'); }
+  function mostrarLogin() {
+    ['pantalla-solicitar','pantalla-cambiar-pass','pantalla-portal'].forEach(function(p) {
+      document.getElementById(p).classList.add('oculto');
+    });
+    document.getElementById('pantalla-login').classList.remove('oculto');
+  }
   function mostrarSolicitar() { mostrarSolo('pantalla-solicitar'); }
 
   // ═══════════════════════════════════════════════════════════════
