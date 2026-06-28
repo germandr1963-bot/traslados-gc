@@ -3891,8 +3891,7 @@ function cargarMensajesAdmin(reservaId) {
         return '<div style="background:' + (esCliente ? '#fff3e0' : '#e8f5e9') + ';border:1px solid ' + (esCliente ? '#ffe0b2' : '#c8e6c9') + ';border-radius:8px;padding:8px 12px;font-size:0.82rem;">' +
           '<span style="font-weight:600;color:' + (esCliente ? '#e65100' : '#2e7d32') + ';">' + (esCliente ? '👤 Cliente' : '👨‍💼 Equipo') + '</span>' +
           '<span style="color:#999;font-size:0.75rem;margin-left:8px;">' + fecha + '</span>' +
-          '<p style="margin:4px 0 0;color:#333;">' + m.mensaje.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/
-/g,'<br>') + '</p>' +
+          '<p style="margin:4px 0 0;color:#333;">' + m.mensaje.replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n').join('<br>') + '</p>' +
           '</div>';
       }).join('');
     });
