@@ -464,7 +464,7 @@
       body: JSON.stringify({ password_nueva: p1 })
     }).then(function(r) { return r.json(); }).then(function(d) {
       if (d.ok) {
-        window.location.href = '/mi-reserva';
+        cargarPortal();
       } else {
         mostrarAviso('aviso-cambiar', d.error || 'Error al guardar.', 'error');
       }
@@ -478,11 +478,7 @@
     fetch('/api/cliente/mi-reserva')
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.error) {
-          mostrarLogin();
-          mostrarAviso('aviso-login', 'Error: ' + d.error, 'error');
-          return;
-        }
+        if (d.error) { mostrarLogin(); return; }
         datosReserva = d;
         renderPortal(d);
         cargarMensajes();
@@ -708,16 +704,7 @@
     return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
   }
 
-  fetch('/api/cliente/sesion')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d && d.autenticado) {
-        cargarPortal();
-      } else {
-        mostrarLogin();
-      }
-    })
-    .catch(function() { mostrarLogin(); });
+  mostrarLogin();
 
   </script>
 </body>
