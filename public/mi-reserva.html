@@ -277,10 +277,7 @@
           <input type="text" id="login-pnr" class="campo-acceso pnr-input" placeholder="Ej: XKF130" maxlength="10" autocomplete="off">
           <h2 style="margin-top:4px;">Tu contraseña</h2>
           <p class="campo-hint">La que elegiste al acceder por primera vez</p>
-          <div style="position:relative;">
-            <input type="password" id="login-pwd" class="campo-acceso" placeholder="Tu contraseña" autocomplete="new-password" style="padding-right:42px;">
-            <button type="button" onclick="toggleVer('login-pwd',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%) translateY(-6px);background:none;border:none;cursor:pointer;font-size:18px;color:var(--texto-muted);">👁</button>
-          </div>
+          <input type="password" id="login-pwd" class="campo-acceso" placeholder="Tu contraseña" autocomplete="new-password">
           <button class="btn-acceso" onclick="hacerLogin()">Entrar</button>
           <div id="aviso-login" class="aviso-acceso"></div>
           <span class="enlace-accion" onclick="mostrarSolicitar()">¿Es tu primera vez o no recuerdas la contraseña? Solicitar acceso</span>
@@ -295,14 +292,8 @@
         <p style="color:var(--texto-muted);font-size:14px;margin-bottom:28px;line-height:1.6;">Es tu primera vez o has recibido una provisional. Elige una contraseña propia para acceder en el futuro.</p>
         <div class="tarjeta-acceso">
           <h2>Nueva contraseña</h2>
-          <div style="position:relative;">
-            <input type="password" id="nueva-pwd" class="campo-acceso" placeholder="Mínimo 6 caracteres" style="padding-right:42px;">
-            <button type="button" onclick="toggleVer('nueva-pwd',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%) translateY(-6px);background:none;border:none;cursor:pointer;font-size:18px;color:var(--texto-muted);">👁</button>
-          </div>
-          <div style="position:relative;">
-            <input type="password" id="nueva-pwd2" class="campo-acceso" placeholder="Repite la contraseña" style="padding-right:42px;">
-            <button type="button" onclick="toggleVer('nueva-pwd2',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%) translateY(-6px);background:none;border:none;cursor:pointer;font-size:18px;color:var(--texto-muted);">👁</button>
-          </div>
+          <input type="password" id="nueva-pwd" class="campo-acceso" placeholder="Mínimo 6 caracteres">
+          <input type="password" id="nueva-pwd2" class="campo-acceso" placeholder="Repite la contraseña">
           <button class="btn-acceso" onclick="cambiarPassword()">Guardar contraseña</button>
           <div id="aviso-cambiar" class="aviso-acceso"></div>
         </div>
@@ -381,23 +372,12 @@
   // Navegación entre pantallas
   // ═══════════════════════════════════════════════════════════════
   function mostrarSolo(id) {
-    ['pantalla-solicitar','pantalla-cambiar-pass','pantalla-portal'].forEach(function(p) {
+    ['pantalla-login','pantalla-solicitar','pantalla-cambiar-pass','pantalla-portal'].forEach(function(p) {
       document.getElementById(p).classList.add('oculto');
     });
-    // Login: solo se oculta si vamos al portal
-    if (id === 'pantalla-portal') {
-      document.getElementById('pantalla-login').classList.add('oculto');
-    } else {
-      document.getElementById('pantalla-login').classList.remove('oculto');
-    }
     document.getElementById(id).classList.remove('oculto');
   }
-  function mostrarLogin() {
-    ['pantalla-solicitar','pantalla-cambiar-pass','pantalla-portal'].forEach(function(p) {
-      document.getElementById(p).classList.add('oculto');
-    });
-    document.getElementById('pantalla-login').classList.remove('oculto');
-  }
+  function mostrarLogin() { mostrarSolo('pantalla-login'); }
   function mostrarSolicitar() { mostrarSolo('pantalla-solicitar'); }
 
   // ═══════════════════════════════════════════════════════════════
@@ -721,20 +701,6 @@
   // ═══════════════════════════════════════════════════════════════
   function escHtml(t) {
     return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Ver/ocultar contraseña
-  // ═══════════════════════════════════════════════════════════════
-  function toggleVer(id, btn) {
-    var input = document.getElementById(id);
-    if (input.type === 'password') {
-      input.type = 'text';
-      btn.textContent = '🙈';
-    } else {
-      input.type = 'password';
-      btn.textContent = '👁';
-    }
   }
 
   // ═══════════════════════════════════════════════════════════════
