@@ -68,6 +68,8 @@
         '<div><strong>Categoría</strong><br>' + (reserva.categoria_nombre || '—') + '</div>' +
         '<div><strong>Precio estimado</strong><br>' + (reserva.precio_estimado ? parseFloat(reserva.precio_estimado).toFixed(2) + ' €' : '—') + '</div>' +
         '<div><strong>Extras</strong><br>' + extrasHTML + '</div>' +
+        (reserva.direccion_recogida ? '<div style="grid-column:span 2"><strong>Dirección de recogida</strong><br>' + reserva.direccion_recogida + '</div>' : '') +
+        (reserva.direccion_destino ? '<div style="grid-column:span 2"><strong>Dirección de destino</strong><br>' + reserva.direccion_destino + '</div>' : '') +
         (reserva.numero_vuelo ? '<div><strong>Vuelo</strong><br>' + reserva.numero_vuelo + (reserva.hora_llegada_vuelo ? ' · Llegada ' + reserva.hora_llegada_vuelo.slice(0,5) : '') + '</div>' : '') +
         (reserva.nombre_barco ? '<div><strong>Barco</strong><br>' + reserva.nombre_barco + (reserva.hora_atraque ? ' · Atraque ' + reserva.hora_atraque.slice(0,5) : '') + '</div>' : '') +
         '</div>' +
