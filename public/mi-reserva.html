@@ -250,8 +250,8 @@
     <!-- ═══ PANTALLA: SOLICITAR CONTRASEÑA ════════════════════════════════ -->
     <div id="pantalla-solicitar" class="oculto">
       <div style="max-width:460px;margin:0 auto;padding-top:40px;">
-        <a href="javascript:void(0)" onclick="mostrarLogin()" class="btn-volver" style="display:inline-flex;align-items:center;gap:6px;color:var(--texto-muted);font-size:13px;text-decoration:none;margin-bottom:28px;">← Volver</a>
-        <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:32px;margin-bottom:8px;color:var(--texto-oscuro);">Solicitar contraseña</h1>
+        <a href="#" onclick="mostrarLogin()" class="btn-volver" style="display:inline-flex;align-items:center;gap:6px;color:var(--texto-muted);font-size:13px;text-decoration:none;margin-bottom:28px;">← Volver</a>
+        <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:32px;margin-bottom:8px;color:var(--texto-oscuro);">Solicitar<br><span style="color:var(--terracota);">contraseña</span></h1>
         <p style="color:var(--texto-muted);font-size:14px;margin-bottom:28px;line-height:1.6;">Introduce tu número de reserva y el email con el que reservaste. Te enviaremos una contraseña provisional.</p>
         <div class="tarjeta-acceso">
           <h2>Número de reserva</h2>
@@ -283,7 +283,7 @@
           </div>
           <button class="btn-acceso" onclick="hacerLogin()">Entrar</button>
           <div id="aviso-login" class="aviso-acceso"></div>
-          <span class="enlace-accion" onclick="mostrarSolicitar()">¿Es tu primera vez o no recuerdas la contraseña?<br>Solicitar acceso</span>
+          <span class="enlace-accion" onclick="mostrarSolicitar()">¿Es tu primera vez o no recuerdas la contraseña? Solicitar acceso</span>
         </div>
       </div>
     </div>
@@ -486,23 +486,11 @@
     fetch('/api/cliente/mi-reserva')
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.error) {
-          mostrarLogin();
-          setTimeout(function() {
-            mostrarAviso('aviso-login', 'Tu sesión ha expirado. Vuelve a entrar con tu número de reserva y contraseña.', 'error');
-          }, 100);
-          return;
-        }
+        if (d.error) { mostrarLogin(); return; }
         datosReserva = d;
         renderPortal(d);
         cargarMensajes();
         mostrarSolo('pantalla-portal');
-      })
-      .catch(function() {
-        mostrarLogin();
-        setTimeout(function() {
-          mostrarAviso('aviso-login', 'Error de conexión. Inténtalo de nuevo.', 'error');
-        }, 100);
       });
   }
 
@@ -741,19 +729,16 @@
   // ═══════════════════════════════════════════════════════════════
   // Init: comprobar si ya hay sesión activa
   // ═══════════════════════════════════════════════════════════════
-  // Mostrar login por defecto, luego comprobar sesión
-  // Si hay sesión activa se carga el portal, si no se queda el login
   fetch('/api/cliente/sesion')
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (d.autenticado) {
         cargarPortal();
+      } else {
+        mostrarLogin();
       }
-      // Si no está autenticado, el login ya está visible — no hace falta nada
     })
-    .catch(function() {
-      // Si falla la conexión, el login ya está visible
-    });
+    .catch(function() { mostrarLogin(); });
 
   </script>
 </body>
