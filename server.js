@@ -865,10 +865,7 @@ async function obtenerEmailsNotificacion() {
 
 // ─── Helper: generar contraseña provisional ───────────────────────────────────
 function generarPasswordProvisional() {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  let pwd = '';
-  for (let i = 0; i < 10; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
-  return pwd;
+  return '1234';
 }
 
 async function resolverVehiculo(marca_id, marca_nueva, modelo_id, modelo_nuevo) {
