@@ -5,6 +5,115 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Reserva — Traslados GC</title>
   <link rel="stylesheet" href="/estilos-chofer.css">
+  <style>
+    .reserva-card {
+      border: 1px solid var(--borde);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .reserva-card.historial {
+      opacity: 0.75;
+    }
+    .reserva-resumen {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      cursor: pointer;
+      gap: 12px;
+    }
+    .reserva-resumen:hover { background: #fafaf8; }
+    .reserva-info { flex: 1; }
+    .reserva-pnr {
+      font-family: monospace;
+      font-size: 15px;
+      font-weight: 700;
+      color: #C1502E;
+      margin-bottom: 4px;
+    }
+    .reserva-ruta {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .reserva-fecha {
+      font-size: 13px;
+      color: #5a6c79;
+    }
+    .estado-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-activa { background: #4caf50; }
+    .dot-historial { background: #e53935; }
+    .dot-pendiente { background: #ff9800; }
+    .reserva-chevron {
+      font-size: 12px;
+      color: #999;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .reserva-chevron.abierto { transform: rotate(180deg); }
+    .reserva-detalle {
+      display: none;
+      border-top: 1px solid var(--borde);
+      padding: 20px;
+    }
+    .reserva-detalle.visible { display: block; }
+    .dato-fila {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    .dato-fila div strong { display: block; font-size: 11px; color: #5a6c79; font-weight: 600; text-transform: uppercase; margin-bottom: 2px; }
+    .seccion-titulo {
+      font-size: 13px;
+      font-weight: 700;
+      color: #444;
+      margin: 20px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--borde);
+    }
+    .campo-mod {
+      width: 100%;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      margin-top: 4px;
+      margin-bottom: 10px;
+    }
+    .campo-mod:focus { outline: none; border-color: #C1502E; }
+    .label-mod { font-size: 12px; font-weight: 600; color: #444; display: block; }
+    .mensaje-burbuja {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      max-width: 85%;
+    }
+    .msg-cliente { background: #fff3e0; border: 1px solid #ffe0b2; margin-left: auto; }
+    .msg-equipo { background: #e8f5e9; border: 1px solid #c8e6c9; }
+    .msg-fecha { font-size: 11px; color: #999; margin-top: 4px; }
+    .etiqueta-seccion {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+    .etiqueta-activa { background: #e8f5e9; color: #2e7d32; }
+    .etiqueta-historial { background: #fbe9e7; color: #c62828; }
+  </style>
 </head>
 <body>
   <header class="app">
@@ -15,156 +124,184 @@
   <main>
     <section id="zona-portal">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px">
-        <h1 id="saludo" style="margin:0">Mi reserva</h1>
+        <h1 id="saludo" style="margin:0">Mis reservas</h1>
         <button class="secundario" style="margin:0;padding:8px 18px" onclick="cargarPortal()">🔄 Actualizar</button>
       </div>
+      <p class="sub" id="subtitulo"></p>
 
-      <!-- Detalles del traslado -->
-      <div class="tarjeta" id="bloque-detalles"></div>
-
-      <!-- Depósito -->
-      <div class="tarjeta" id="bloque-deposito"></div>
-
-      <!-- Modificar datos -->
-      <div class="tarjeta" id="bloque-modificar"></div>
-
-      <!-- Mensajes -->
-      <div class="tarjeta">
-        <h2 style="margin-top:0">Mensajes al equipo</h2>
-        <p style="font-size:13px;color:#5a6c79;margin-bottom:16px;">Escríbenos cualquier incidencia, retraso de vuelo o petición especial.</p>
-        <div id="hilo-mensajes" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
-        <textarea id="campo-mensaje" rows="3" placeholder="Ej: Mi vuelo llega con retraso, hora estimada 21:30…"
-          style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:10px 14px;font-size:14px;font-family:inherit;resize:vertical;"></textarea>
-        <button class="secundario" style="margin-top:10px;" onclick="enviarMensaje()">Enviar mensaje</button>
-        <div id="aviso-mensaje" style="display:none;margin-top:10px;font-size:13px;"></div>
-      </div>
-
-      <button class="secundario" onclick="cerrarSesion()">Cerrar sesión</button>
+      <div id="lista-reservas" style="margin-top:20px;"></div>
     </section>
   </main>
 
   <script>
+    var reservasData = [];
+
     async function cargarPortal() {
-      const r = await fetch('/api/cliente/mi-reserva');
+      var lista = document.getElementById('lista-reservas');
+      lista.innerHTML = '<p style="color:#5a6c79;font-size:14px">Cargando...</p>';
+      var r = await fetch('/api/cliente/mi-reserva');
       if (!r.ok) { window.location.href = '/mi-reserva'; return; }
-      const { reserva, extras, noshow } = await r.json();
-
-      document.getElementById('saludo').textContent = 'Hola, ' + reserva.nombre_cliente.split(' ')[0];
-
-      // Detalles
-      var fecha = reserva.fecha ? new Date(reserva.fecha).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '—';
-      var hora = reserva.hora ? reserva.hora.slice(0,5) : '—';
-      var estadoBadge = { pendiente: '🟡 Pendiente', confirmada: '🟢 Confirmada', completada: '✅ Completada', cancelada: '🔴 Cancelada' };
-      var extrasHTML = extras.length ? extras.map(function(e) { return e.nombre + ' (+' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €)'; }).join(', ') : '—';
-
-      document.getElementById('bloque-detalles').innerHTML =
-        '<h2 style="margin-top:0">Tu traslado</h2>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:14px;">' +
-        '<div><strong>Reserva</strong><br><span style="font-family:monospace;font-size:16px;color:#C1502E;font-weight:700;">' + reserva.numero_reserva + '</span></div>' +
-        '<div><strong>Estado</strong><br>' + (estadoBadge[reserva.estado] || reserva.estado) + '</div>' +
-        '<div><strong>Ruta</strong><br>' + (reserva.origen || '—') + ' → ' + (reserva.destino || '—') + '</div>' +
-        '<div><strong>Fecha y hora</strong><br>' + fecha + ' · ' + hora + 'h</div>' +
-        '<div><strong>Pasajeros</strong><br>' + (reserva.num_pasajeros || '—') + '</div>' +
-        '<div><strong>Categoría</strong><br>' + (reserva.categoria_nombre || '—') + '</div>' +
-        '<div><strong>Precio estimado</strong><br>' + (reserva.precio_estimado ? parseFloat(reserva.precio_estimado).toFixed(2) + ' €' : '—') + '</div>' +
-        '<div><strong>Extras</strong><br>' + extrasHTML + '</div>' +
-        (reserva.direccion_recogida ? '<div style="grid-column:span 2"><strong>Dirección de recogida</strong><br>' + reserva.direccion_recogida + '</div>' : '') +
-        (reserva.direccion_destino ? '<div style="grid-column:span 2"><strong>Dirección de destino</strong><br>' + reserva.direccion_destino + '</div>' : '') +
-        (reserva.numero_vuelo ? '<div><strong>Vuelo</strong><br>' + reserva.numero_vuelo + (reserva.hora_llegada_vuelo ? ' · Llegada ' + reserva.hora_llegada_vuelo.slice(0,5) : '') + '</div>' : '') +
-        (reserva.nombre_barco ? '<div><strong>Barco</strong><br>' + reserva.nombre_barco + (reserva.hora_atraque ? ' · Atraque ' + reserva.hora_atraque.slice(0,5) : '') + '</div>' : '') +
-        '</div>' +
-        (reserva.conductor_nombre && reserva.deposito_pagado ?
-          '<div style="margin-top:16px;padding:12px;background:#f5f0ea;border-radius:8px;display:flex;align-items:center;gap:14px;">' +
-          (reserva.conductor_foto && reserva.conductor_foto_estado === 'aprobada' ? '<img src="' + reserva.conductor_foto + '" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid #C1502E;">' : '') +
-          '<div><strong>Tu conductor</strong><br><span style="font-size:15px;">' + reserva.conductor_nombre + '</span></div></div>' : '');
-
-      // Depósito
-      var depHTML = '<h2 style="margin-top:0">Depósito de garantía</h2>';
-      if (reserva.deposito_liberado) {
-        depHTML += '<p style="color:#1b5e20;">✅ Depósito liberado. El importe retenido ha quedado libre en tu tarjeta.</p>';
-      } else if (reserva.deposito_pagado) {
-        depHTML += '<p style="color:#856404;">🔒 Depósito retenido de <strong>' + noshow.importe + ' €</strong>. Se liberará cuando el servicio se complete.</p>';
-      } else {
-        depHTML += '<p style="color:#5a6c79;">⏳ Depósito pendiente de pago.</p>';
-      }
-      if (noshow && reserva.estado !== 'completada' && reserva.estado !== 'cancelada') {
-        var fechaLim = new Date(noshow.fecha_limite);
-        var textoLim = fechaLim.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + fechaLim.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
-        depHTML += '<p style="font-size:13px;color:#5a6c79;margin-top:8px;">' +
-          (noshow.puede_modificar ? '📅 Cancelación gratuita hasta el <strong>' + textoLim + '</strong>.' : '🔒 El plazo de cancelación gratuita venció el <strong>' + textoLim + '</strong>.') + '</p>';
-      }
-      document.getElementById('bloque-deposito').innerHTML = depHTML;
-
-      // Modificar datos
-      var modHTML = '<h2 style="margin-top:0">Modificar datos</h2>';
-      if (!noshow.puede_modificar) {
-        modHTML += '<p style="color:#5a6c79;font-size:14px;">El plazo de modificación ha vencido. Usa el canal de mensajes para cualquier incidencia urgente.</p>';
-      } else {
-        modHTML +=
-          '<div style="display:flex;flex-direction:column;gap:10px;">' +
-          '<div><label style="font-size:12px;font-weight:600;color:#444;">Hora de recogida</label><input type="time" id="mod-hora" value="' + (reserva.hora ? reserva.hora.slice(0,5) : '') + '" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;margin-top:4px;"></div>' +
-          '<div><label style="font-size:12px;font-weight:600;color:#444;">Número de vuelo</label><input type="text" id="mod-vuelo" value="' + (reserva.numero_vuelo || '') + '" placeholder="Ej: IB3456" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;margin-top:4px;"></div>' +
-          '<div><label style="font-size:12px;font-weight:600;color:#444;">Dirección de recogida</label><input type="text" id="mod-recogida" value="' + (reserva.direccion_recogida || '') + '" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;margin-top:4px;"></div>' +
-          '<div><label style="font-size:12px;font-weight:600;color:#444;">Dirección de destino</label><input type="text" id="mod-destino" value="' + (reserva.direccion_destino || '') + '" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;margin-top:4px;"></div>' +
-          '<div><label style="font-size:12px;font-weight:600;color:#444;">Notas adicionales</label><textarea id="mod-notas" rows="2" style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;margin-top:4px;resize:vertical;">' + (reserva.notas_cliente || '') + '</textarea></div>' +
-          '<button class="secundario" onclick="guardarModificaciones()">Guardar cambios</button>' +
-          '<div id="aviso-mod" style="display:none;font-size:13px;"></div>' +
-          '</div>';
-      }
-      document.getElementById('bloque-modificar').innerHTML = modHTML;
-
-      cargarMensajes();
+      var d = await r.json();
+      reservasData = d.reservas || [];
+      document.getElementById('saludo').textContent = 'Hola, ' + (d.nombre ? d.nombre.split(' ')[0] : '');
+      document.getElementById('subtitulo').textContent = reservasData.length + ' reserva' + (reservasData.length !== 1 ? 's' : '') + ' encontrada' + (reservasData.length !== 1 ? 's' : '');
+      renderLista();
     }
 
-    async function guardarModificaciones() {
+    function renderLista() {
+      var lista = document.getElementById('lista-reservas');
+      if (!reservasData.length) {
+        lista.innerHTML = '<p style="color:#5a6c79;font-size:14px;text-align:center;padding:30px 0">No tienes reservas.</p>';
+        return;
+      }
+      lista.innerHTML = reservasData.map(function(r, i) {
+        var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '—';
+        var hora = r.hora ? r.hora.slice(0,5) : '—';
+        var esHistorial = r.es_historial;
+        var dotClass = esHistorial ? 'dot-historial' : (r.estado === 'pendiente' ? 'dot-pendiente' : 'dot-activa');
+        var etiqueta = esHistorial ? '<span class="etiqueta-seccion etiqueta-historial">Realizado</span>' : '<span class="etiqueta-seccion etiqueta-activa">Activo</span>';
+        return '<div class="reserva-card' + (esHistorial ? ' historial' : '') + '" id="card-' + i + '">' +
+          '<div class="reserva-resumen" onclick="toggleDetalle(' + i + ')">' +
+            '<div class="estado-dot ' + dotClass + '"></div>' +
+            '<div class="reserva-info">' +
+              '<div class="reserva-pnr">' + r.numero_reserva + '</div>' +
+              '<div class="reserva-ruta">' + (r.origen || '—') + ' → ' + (r.destino || '—') + '</div>' +
+              '<div class="reserva-fecha">📅 ' + fecha + ' · ' + hora + 'h</div>' +
+            '</div>' +
+            '<span class="reserva-chevron" id="chev-' + i + '">▼</span>' +
+          '</div>' +
+          '<div class="reserva-detalle" id="detalle-' + i + '">' +
+            etiqueta +
+            renderDetalle(r, i) +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function renderDetalle(r, i) {
+      var estadoBadge = { pendiente: '🟡 Pendiente', confirmada: '🟢 Confirmada', completada: '✅ Completada', cancelada: '🔴 Cancelada' };
+      var extrasHTML = r.extras && r.extras.length ? r.extras.map(function(e) { return e.nombre + ' (+' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €)'; }).join(', ') : '—';
+      var html = '<div class="dato-fila">' +
+        '<div><strong>Estado</strong>' + (estadoBadge[r.estado] || r.estado) + '</div>' +
+        '<div><strong>Categoría</strong>' + (r.categoria_nombre || '—') + '</div>' +
+        '<div><strong>Pasajeros</strong>' + (r.num_pasajeros || '—') + '</div>' +
+        '<div><strong>Precio estimado</strong>' + (r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—') + '</div>' +
+        (r.direccion_recogida ? '<div style="grid-column:span 2"><strong>Dirección de recogida</strong>' + r.direccion_recogida + '</div>' : '') +
+        (r.direccion_destino ? '<div style="grid-column:span 2"><strong>Dirección de destino</strong>' + r.direccion_destino + '</div>' : '') +
+        (r.numero_vuelo ? '<div><strong>Vuelo</strong>' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · ' + r.hora_llegada_vuelo.slice(0,5) : '') + '</div>' : '') +
+        (r.nombre_barco ? '<div><strong>Barco</strong>' + r.nombre_barco + (r.hora_atraque ? ' · ' + r.hora_atraque.slice(0,5) : '') + '</div>' : '') +
+        (r.extras && r.extras.length ? '<div style="grid-column:span 2"><strong>Extras</strong>' + extrasHTML + '</div>' : '') +
+        '</div>';
+
+      // Conductor si está asignado y pagado
+      if (r.conductor_nombre && r.deposito_pagado) {
+        html += '<div style="padding:12px;background:#f5f0ea;border-radius:8px;display:flex;align-items:center;gap:14px;margin-bottom:16px;">' +
+          (r.conductor_foto && r.conductor_foto_estado === 'aprobada' ? '<img src="' + r.conductor_foto + '" style="width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid #C1502E;">' : '') +
+          '<div><strong style="font-size:12px;color:#5a6c79;text-transform:uppercase;">Tu conductor</strong><br>' + r.conductor_nombre + '</div></div>';
+      }
+
+      // Depósito
+      html += '<div class="seccion-titulo">Depósito de garantía</div>';
+      if (r.deposito_liberado) {
+        html += '<p style="color:#2e7d32;font-size:14px;">✅ Depósito liberado.</p>';
+      } else if (r.deposito_pagado) {
+        html += '<p style="color:#856404;font-size:14px;">🔒 Depósito retenido de <strong>' + r.noshow.importe + ' €</strong>. Se liberará al completar el servicio.</p>';
+      } else {
+        html += '<p style="color:#5a6c79;font-size:14px;">⏳ Depósito pendiente de pago.</p>';
+      }
+
+      // Solo si no es historial: modificar y mensajes
+      if (!r.es_historial) {
+        html += '<div class="seccion-titulo">Modificar datos</div>';
+        if (!r.noshow.puede_modificar) {
+          html += '<p style="color:#5a6c79;font-size:14px;">El plazo de modificación ha vencido. Usa el canal de mensajes para cualquier incidencia.</p>';
+        } else {
+          html += '<label class="label-mod">Hora de recogida</label>' +
+            '<input type="time" class="campo-mod" id="mod-hora-' + i + '" value="' + (r.hora ? r.hora.slice(0,5) : '') + '">' +
+            '<label class="label-mod">Número de vuelo</label>' +
+            '<input type="text" class="campo-mod" id="mod-vuelo-' + i + '" value="' + (r.numero_vuelo || '') + '" placeholder="Ej: IB3456">' +
+            '<label class="label-mod">Dirección de recogida</label>' +
+            '<input type="text" class="campo-mod" id="mod-recogida-' + i + '" value="' + (r.direccion_recogida || '') + '">' +
+            '<label class="label-mod">Dirección de destino</label>' +
+            '<input type="text" class="campo-mod" id="mod-destino-' + i + '" value="' + (r.direccion_destino || '') + '">' +
+            '<label class="label-mod">Notas adicionales</label>' +
+            '<textarea class="campo-mod" id="mod-notas-' + i + '" rows="2">' + (r.notas_cliente || '') + '</textarea>' +
+            '<button class="secundario" onclick="guardarModificaciones(' + i + ',' + r.id + ')">Guardar cambios</button>' +
+            '<div id="aviso-mod-' + i + '" style="display:none;font-size:13px;margin-top:8px;"></div>';
+        }
+
+        html += '<div class="seccion-titulo">Mensajes al equipo</div>' +
+          '<div id="hilo-' + i + '" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>' +
+          '<textarea class="campo-mod" id="msg-' + i + '" rows="2" placeholder="Escribe tu mensaje…"></textarea>' +
+          '<button class="secundario" onclick="enviarMensaje(' + i + ',' + r.id + ')">Enviar mensaje</button>' +
+          '<div id="aviso-msg-' + i + '" style="display:none;font-size:13px;margin-top:8px;"></div>';
+      }
+
+      return html;
+    }
+
+    function toggleDetalle(i) {
+      var detalle = document.getElementById('detalle-' + i);
+      var chev = document.getElementById('chev-' + i);
+      var abierto = detalle.classList.toggle('visible');
+      chev.classList.toggle('abierto', abierto);
+      if (abierto && !reservasData[i].es_historial) {
+        cargarMensajes(i, reservasData[i].id);
+      }
+    }
+
+    async function guardarModificaciones(i, reservaId) {
       var datos = {
-        hora: document.getElementById('mod-hora') ? document.getElementById('mod-hora').value : null,
-        numero_vuelo: document.getElementById('mod-vuelo') ? document.getElementById('mod-vuelo').value : null,
-        direccion_recogida: document.getElementById('mod-recogida') ? document.getElementById('mod-recogida').value : null,
-        direccion_destino: document.getElementById('mod-destino') ? document.getElementById('mod-destino').value : null,
-        notas_cliente: document.getElementById('mod-notas') ? document.getElementById('mod-notas').value : null
+        hora: document.getElementById('mod-hora-' + i) ? document.getElementById('mod-hora-' + i).value : null,
+        numero_vuelo: document.getElementById('mod-vuelo-' + i) ? document.getElementById('mod-vuelo-' + i).value : null,
+        direccion_recogida: document.getElementById('mod-recogida-' + i) ? document.getElementById('mod-recogida-' + i).value : null,
+        direccion_destino: document.getElementById('mod-destino-' + i) ? document.getElementById('mod-destino-' + i).value : null,
+        notas_cliente: document.getElementById('mod-notas-' + i) ? document.getElementById('mod-notas-' + i).value : null,
+        reserva_id: reservaId
       };
-      var av = document.getElementById('aviso-mod');
+      var av = document.getElementById('aviso-mod-' + i);
       var r = await fetch('/api/cliente/modificar', {
         method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(datos)
       });
       var d = await r.json();
       av.style.display = 'block';
-      av.style.color = d.ok ? '#1b5e20' : '#842029';
+      av.style.color = d.ok ? '#2e7d32' : '#842029';
       av.textContent = d.ok ? '✅ Cambios guardados.' : (d.error || 'Error al guardar.');
     }
 
-    async function cargarMensajes() {
-      var r = await fetch('/api/cliente/mensajes');
+    async function cargarMensajes(i, reservaId) {
+      var r = await fetch('/api/cliente/mensajes?reserva_id=' + reservaId);
       if (!r.ok) return;
       var d = await r.json();
-      var hilo = document.getElementById('hilo-mensajes');
+      var hilo = document.getElementById('hilo-' + i);
+      if (!hilo) return;
       if (!d.mensajes || !d.mensajes.length) { hilo.innerHTML = ''; return; }
       hilo.innerHTML = d.mensajes.map(function(m) {
         var fecha = new Date(m.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
         var esCliente = m.autor === 'cliente';
-        return '<div style="background:' + (esCliente ? '#fff3e0' : '#e8f5e9') + ';border:1px solid ' + (esCliente ? '#ffe0b2' : '#c8e6c9') + ';border-radius:8px;padding:10px 14px;font-size:13px;max-width:85%;' + (esCliente ? 'align-self:flex-end;margin-left:auto;' : '') + '">' +
-          '<strong style="color:' + (esCliente ? '#e65100' : '#2e7d32') + ';">' + (esCliente ? '👤 Tú' : '👨‍💼 Equipo') + '</strong>' +
+        return '<div class="mensaje-burbuja ' + (esCliente ? 'msg-cliente' : 'msg-equipo') + '">' +
+          '<strong style="color:' + (esCliente ? '#e65100' : '#2e7d32') + ';font-size:12px;">' + (esCliente ? '👤 Tú' : '👨‍💼 Equipo') + '</strong>' +
           '<span style="color:#999;font-size:11px;margin-left:8px;">' + fecha + '</span>' +
-          '<p style="margin:4px 0 0;">' + m.mensaje.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') + '</p>' +
+          '<p style="margin:4px 0 0;font-size:13px;">' + m.mensaje.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') + '</p>' +
           '</div>';
       }).join('');
     }
 
-    async function enviarMensaje() {
-      var texto = document.getElementById('campo-mensaje').value.trim();
-      var av = document.getElementById('aviso-mensaje');
+    async function enviarMensaje(i, reservaId) {
+      var texto = document.getElementById('msg-' + i).value.trim();
+      var av = document.getElementById('aviso-msg-' + i);
       if (!texto) { av.style.display='block'; av.style.color='#842029'; av.textContent='Escribe un mensaje antes de enviar.'; return; }
       var r = await fetch('/api/cliente/mensaje', {
-        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ mensaje: texto })
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ mensaje: texto, reserva_id: reservaId })
       });
       var d = await r.json();
       av.style.display = 'block';
       if (d.ok) {
-        av.style.color = '#1b5e20';
+        av.style.color = '#2e7d32';
         av.textContent = '✅ Mensaje enviado.';
-        document.getElementById('campo-mensaje').value = '';
-        cargarMensajes();
+        document.getElementById('msg-' + i).value = '';
+        cargarMensajes(i, reservaId);
       } else {
         av.style.color = '#842029';
         av.textContent = d.error || 'Error al enviar.';
