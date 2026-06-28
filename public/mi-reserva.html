@@ -267,7 +267,7 @@
     </div>
 
     <!-- ═══ PANTALLA: LOGIN ════════════════════════════════════════════════ -->
-    <div id="pantalla-login">
+    <div id="pantalla-login" class="oculto">
       <div style="max-width:460px;margin:0 auto;padding-top:40px;">
         <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:clamp(28px,5vw,44px);margin-bottom:8px;line-height:1.1;color:var(--texto-oscuro);">Mi <span style="color:var(--terracota);">reserva</span></h1>
         <p style="color:var(--texto-muted);font-size:14px;margin-bottom:32px;line-height:1.6;">Accede para ver el estado de tu traslado, gestionar cambios y comunicarte con el equipo.</p>
@@ -742,7 +742,10 @@
   // Init: comprobar si ya hay sesión activa
   // ═══════════════════════════════════════════════════════════════
   fetch('/api/cliente/sesion')
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      if (!r.ok) throw new Error('error');
+      return r.json();
+    })
     .then(function(d) {
       if (d.autenticado) {
         cargarPortal();
