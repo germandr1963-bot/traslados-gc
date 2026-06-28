@@ -4872,7 +4872,9 @@ app.post('/api/cliente/login', asyncHandler(async (req, res) => {
 
   req.session.clienteReservaId = reserva.id;
   req.session.clientePnr = pnr.toUpperCase();
-  res.json({ ok: true, primer_acceso: reserva.cliente_primer_acceso });
+  req.session.save(function() {
+    res.json({ ok: true, primer_acceso: reserva.cliente_primer_acceso });
+  });
 }));
 
 // Cambiar contraseña (primer acceso o voluntario)
