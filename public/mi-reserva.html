@@ -464,8 +464,7 @@
       body: JSON.stringify({ password_nueva: p1 })
     }).then(function(r) { return r.json(); }).then(function(d) {
       if (d.ok) {
-        mostrarSolo('pantalla-portal');
-        cargarPortal();
+        window.location.href = '/mi-reserva';
       } else {
         mostrarAviso('aviso-cambiar', d.error || 'Error al guardar.', 'error');
       }
@@ -709,7 +708,16 @@
     return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
   }
 
-  mostrarLogin();
+  fetch('/api/cliente/sesion')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d && d.autenticado) {
+        cargarPortal();
+      } else {
+        mostrarLogin();
+      }
+    })
+    .catch(function() { mostrarLogin(); });
 
   </script>
 </body>
