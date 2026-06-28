@@ -704,16 +704,7 @@
     return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Init: comprobar si ya hay sesión activa
-  // ═══════════════════════════════════════════════════════════════
-  // El login siempre visible por defecto
-  // Solo se comprueba sesión si hay token activo
   mostrarLogin();
-  fetch('/api/cliente/sesion')
-    .then(function(r) { return r.json(); })
-    .then(function(d) { if (d && d.autenticado) cargarPortal(); })
-    .catch(function() {});
 
   </script>
 </body>
