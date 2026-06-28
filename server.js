@@ -105,12 +105,13 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.set('trust proxy', 1);
 app.use(session({
   store: new pgSession({ pool: pool, tableName: 'session', createTableIfMissing: true }),
   secret: process.env.SESSION_SECRET || 'cambia-este-secreto',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 1000 * 60 * 60 * 8 }
+  cookie: { maxAge: 1000 * 60 * 60 * 8, secure: true, sameSite: 'lax' }
 }));
 
 // ─── Idiomas y secciones ────────────────────────────────────────────────────
