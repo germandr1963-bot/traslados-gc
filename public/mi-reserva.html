@@ -706,16 +706,18 @@
   // ═══════════════════════════════════════════════════════════════
   // Init: comprobar si ya hay sesión activa
   // ═══════════════════════════════════════════════════════════════
-  fetch('/api/cliente/sesion')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d.autenticado) {
-        cargarPortal();
-      } else {
-        mostrarLogin();
-      }
-    })
-    .catch(function() { mostrarLogin(); });
+  // El login siempre visible por defecto
+  // Solo se comprueba sesión si hay token activo
+  try {
+    fetch('/api/cliente/sesion')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.autenticado) {
+          cargarPortal();
+        }
+      })
+      .catch(function() { /* login ya visible */ });
+  } catch(e) { /* login ya visible */ }
 
   </script>
 </body>
