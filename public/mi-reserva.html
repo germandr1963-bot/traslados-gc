@@ -4,708 +4,270 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Reserva — Traslados GC</title>
-  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/estilos.css">
   <style>
-    /* ── Layout general ─────────────────────────────────────── */
-    body { background: var(--gris-fondo); color: var(--texto-oscuro); min-height: 100vh; }
-
-    .cabecera-wrapper {
-      background: var(--charcoal);
-      border-bottom: 3px solid var(--terracota);
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #1C1815;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
     }
-    .cabecera {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 18px 32px; max-width: 860px; margin: 0 auto;
-    }
-    .logo { font-family: 'Big Shoulders Display', sans-serif; font-size: 20px;
-      color: var(--texto-claro); text-decoration: none; letter-spacing: 1px; }
-    .nav-links a { color: rgba(255,255,255,0.55); font-size: 13px; margin-left: 22px; text-decoration: none; transition: color 0.2s; }
-    .nav-links a:hover { color: var(--terracota); }
-
-    .contenido { max-width: 860px; margin: 0 auto; padding: 20px 24px 80px; }
-
-    /* ── Pantalla de acceso ─────────────────────────────────── */
-    #pantalla-acceso { max-width: 460px; margin: 0 auto; padding-top: 40px; }
-    #pantalla-acceso h1 { font-family: 'Big Shoulders Display', sans-serif;
-      font-size: clamp(28px, 5vw, 44px); margin-bottom: 8px; line-height: 1.1; }
-    #pantalla-acceso h1 span { color: var(--terracota); }
-    #pantalla-acceso p.sub { color: rgba(255,255,255,0.5); font-size: 14px; line-height: 1.6; margin-bottom: 32px; }
-
-    .tarjeta-acceso {
+    .card {
       background: #fff;
-      border: 1px solid var(--gris-borde);
-      border-radius: 16px; padding: 28px 24px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      border-radius: 16px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
     }
-    .tarjeta-acceso h2 { font-size: 14px; font-weight: 600; margin-bottom: 6px;
-      color: var(--texto-oscuro); letter-spacing: 0.5px; }
-    .tarjeta-acceso .campo-hint { font-size: 12px; color: var(--texto-muted); margin-bottom: 16px; }
-
-    .campo-acceso { width: 100%; background: #fff;
-      border: 1px solid var(--piedra-borde); border-radius: 8px;
-      padding: 11px 14px; color: var(--texto-oscuro); font-size: 14px;
-      font-family: 'Public Sans', sans-serif; margin-bottom: 12px; transition: border-color 0.2s; }
-    .campo-acceso:focus { outline: none; border-color: var(--terracota); box-shadow: 0 0 0 3px rgba(193,80,46,0.08); }
-    .campo-acceso.pnr-input { font-family: 'JetBrains Mono', monospace; letter-spacing: 3px;
-      text-transform: uppercase; font-size: 16px; }
-    .campo-acceso::placeholder { color: #c0b5aa; }
-
-    .btn-acceso { width: 100%; background: var(--terracota); color: #fff;
-      border: none; border-radius: 8px; padding: 13px; font-size: 15px;
-      font-weight: 600; cursor: pointer; transition: background 0.2s; margin-top: 4px; }
-    .btn-acceso:hover { background: var(--terracota-oscuro); }
-
-    .enlace-accion { display: block; text-align: center; margin-top: 20px;
-      padding-top: 16px; border-top: 1px solid var(--gris-borde);
-      color: var(--texto-muted); font-size: 13px; cursor: pointer; text-decoration: underline; }
-    .enlace-accion:hover { color: var(--terracota); }
-
-    .aviso-acceso { border-radius: 8px; padding: 10px 14px; margin-top: 14px;
-      font-size: 13px; display: none; border: 1px solid; }
-    .aviso-acceso.aviso-error { background: var(--rojo-error-fondo); color: var(--rojo-error); border-color: #f1aeb5; }
-    .aviso-acceso.aviso-ok { background: var(--verde-ok-fondo); color: var(--verde-ok); border-color: #a3cfbb; }
-
-    /* ── Cambio de contraseña (primer acceso) ───────────────── */
-    #pantalla-cambiar-pass { max-width: 460px; margin: 0 auto; padding-top: 40px; }
-
-    /* ── Portal del cliente ─────────────────────────────────── */
-    #pantalla-portal { display: none; }
-
-    .portal-header { margin-bottom: 32px; }
-    .portal-header .pnr-badge {
-      font-family: 'JetBrains Mono', monospace; font-size: 13px;
-      color: var(--terracota); letter-spacing: 2px; background: rgba(193,80,46,0.12);
-      border: 1px solid rgba(193,80,46,0.25); border-radius: 6px;
-      padding: 4px 10px; display: inline-block; margin-bottom: 10px;
+    .logo { text-align: center; margin-bottom: 32px; }
+    .logo h1 { font-size: 22px; color: #C1502E; font-weight: 700; letter-spacing: 1px; }
+    .logo p { font-size: 13px; color: #888; margin-top: 4px; }
+    .logo .badge {
+      display: inline-block;
+      background: #f5f0ea;
+      color: #6b5c44;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 10px;
+      margin-top: 8px;
+      letter-spacing: 0.5px;
     }
-    .portal-header h1 { font-family: 'Big Shoulders Display', sans-serif;
-      font-size: clamp(24px, 4vw, 36px); line-height: 1.1; margin-bottom: 4px; }
-    .portal-header .estado-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
-      text-transform: uppercase; letter-spacing: 0.5px;
+    label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 5px; }
+    input {
+      width: 100%;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 15px;
+      color: #2c2c2c;
+      margin-bottom: 18px;
+      transition: border-color 0.2s;
+      font-family: inherit;
     }
-    .estado-pendiente { background: rgba(217,164,65,0.15); color: var(--oro); border: 1px solid rgba(217,164,65,0.3); }
-    .estado-confirmada { background: rgba(8,80,65,0.25); color: #4caf87; border: 1px solid rgba(76,175,135,0.3); }
-    .estado-completada { background: rgba(8,80,65,0.35); color: #5dd4a8; border: 1px solid rgba(93,212,168,0.3); }
-    .estado-cancelada { background: rgba(138,36,36,0.2); color: #e07070; border: 1px solid rgba(224,112,112,0.3); }
-
-    /* ── Línea de progreso ──────────────────────────────────── */
-    .progreso { display: flex; align-items: center; margin: 24px 0; gap: 0; }
-    .paso-prog { flex: 1; text-align: center; position: relative; }
-    .paso-prog .circulo {
-      width: 32px; height: 32px; border-radius: 50%; margin: 0 auto 6px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 700; border: 2px solid rgba(255,255,255,0.15);
-      color: rgba(255,255,255,0.3); background: transparent;
+    input:focus { outline: none; border-color: #C1502E; }
+    .boton {
+      width: 100%;
+      background: #C1502E;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: inherit;
     }
-    .paso-prog.activo .circulo { border-color: var(--terracota); color: #fff; background: var(--terracota); }
-    .paso-prog.completado .circulo { border-color: #4caf87; color: #4caf87; background: transparent; }
-    .paso-prog .etiq { font-size: 10px; color: rgba(255,255,255,0.35);
-      text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.3; }
-    .paso-prog.activo .etiq, .paso-prog.completado .etiq { color: rgba(255,255,255,0.7); }
-    .linea-prog { flex: 1; height: 1px; background: rgba(255,255,255,0.1); margin-bottom: 22px; max-width: 40px; }
-    .linea-prog.hecha { background: var(--terracota); }
-
-    /* ── Secciones del portal ───────────────────────────────── */
-    .seccion-portal {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.09);
-      border-radius: 14px; padding: 22px; margin-bottom: 16px;
+    .boton:hover { background: #8a3a20; }
+    .boton:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error {
+      background: #fdf0ee;
+      border: 1px solid #e8b4a8;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #842029;
+      margin-bottom: 16px;
+      display: none;
     }
-    .seccion-portal h2 {
-      font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.4);
-      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px;
+    .ok {
+      background: #e8f5e9;
+      border: 1px solid #a5d6a7;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #1b5e20;
+      margin-bottom: 16px;
+      display: none;
     }
-
-    /* ── Grid de datos ──────────────────────────────────────── */
-    .datos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    @media (max-width: 600px) { .datos-grid { grid-template-columns: 1fr; } }
-    .dato-item { }
-    .dato-label { font-size: 10px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
-    .dato-valor { font-size: 14px; color: var(--texto-claro); font-weight: 500; }
-    .dato-valor.mono { font-family: 'JetBrains Mono', monospace; }
-    .dato-vacio { color: rgba(255,255,255,0.2); font-style: italic; }
-
-    /* ── Depósito ───────────────────────────────────────────── */
-    .deposito-estado {
-      display: flex; align-items: center; gap: 12px; padding: 14px 16px;
-      border-radius: 10px; margin-bottom: 12px;
+    .enlace {
+      display: block;
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+      color: #C1502E;
+      cursor: pointer;
+      text-decoration: underline;
     }
-    .deposito-retenido { background: rgba(217,164,65,0.1); border: 1px solid rgba(217,164,65,0.2); }
-    .deposito-liberado { background: rgba(8,80,65,0.2); border: 1px solid rgba(76,175,135,0.25); }
-    .deposito-pendiente { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); }
-    .deposito-icono { font-size: 22px; }
-    .deposito-texto strong { display: block; font-size: 14px; font-weight: 600; }
-    .deposito-texto span { font-size: 12px; color: rgba(255,255,255,0.45); }
-
-    .cancelacion-info {
-      background: rgba(193,80,46,0.08); border: 1px solid rgba(193,80,46,0.2);
-      border-radius: 8px; padding: 10px 14px; font-size: 12px; color: rgba(255,255,255,0.55);
-      margin-top: 10px; line-height: 1.6;
-    }
-    .cancelacion-info strong { color: var(--terracota); }
-
-    /* ── Documentos ─────────────────────────────────────────── */
-    .docs-grid { display: flex; gap: 10px; flex-wrap: wrap; }
-    .doc-btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-      color: var(--texto-claro); border-radius: 8px; padding: 10px 16px;
-      font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s;
-      text-decoration: none;
-    }
-    .doc-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
-    .doc-btn.no-disponible { opacity: 0.35; cursor: default; pointer-events: none; }
-
-    /* ── Modificar datos ────────────────────────────────────── */
-    .btn-modif { background: rgba(193,80,46,0.15); border: 1px solid rgba(193,80,46,0.3);
-      color: var(--terracota); border-radius: 8px; padding: 9px 18px;
-      font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; margin-bottom: 16px; }
-    .btn-modif:hover { background: rgba(193,80,46,0.25); }
-
-    .form-modif { display: none; }
-    .form-modif.visible { display: block; }
-    .label-campo { font-size: 11px; color: rgba(255,255,255,0.4); text-transform: uppercase;
-      letter-spacing: 0.5px; display: block; margin-bottom: 5px; margin-top: 14px; }
-    .campo-portal { width: 100%; background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
-      padding: 10px 13px; color: var(--texto-claro); font-size: 14px;
-      font-family: 'Public Sans', sans-serif; transition: border-color 0.2s; }
-    .campo-portal:focus { outline: none; border-color: var(--terracota); }
-    .campo-portal::placeholder { color: rgba(255,255,255,0.2); }
-
-    .btn-guardar { background: var(--terracota); color: #fff; border: none;
-      border-radius: 8px; padding: 11px 22px; font-size: 14px; font-weight: 600;
-      cursor: pointer; margin-top: 16px; transition: background 0.2s; }
-    .btn-guardar:hover { background: var(--terracota-oscuro); }
-
-    .aviso-portal { border-radius: 8px; padding: 10px 14px; margin-top: 12px;
-      font-size: 13px; display: none; }
-
-    .bloqueo-info {
-      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
-      border-radius: 8px; padding: 12px 16px; font-size: 13px;
-      color: rgba(255,255,255,0.4); display: flex; align-items: flex-start; gap: 10px;
-    }
-    .bloqueo-info .icono { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
-
-    /* ── Mensajes ───────────────────────────────────────────── */
-    .mensajes-hilo { margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; }
-    .mensaje-burbuja {
-      max-width: 85%; padding: 10px 14px; border-radius: 12px;
-      font-size: 13px; line-height: 1.6;
-    }
-    .mensaje-cliente { background: rgba(193,80,46,0.15); border: 1px solid rgba(193,80,46,0.2);
-      align-self: flex-end; border-bottom-right-radius: 3px; }
-    .mensaje-fecha { font-size: 10px; color: rgba(255,255,255,0.25); margin-top: 4px; }
-
-    .textarea-mensaje { width: 100%; background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
-      padding: 11px 13px; color: var(--texto-claro); font-size: 14px;
-      font-family: 'Public Sans', sans-serif; resize: vertical; min-height: 80px;
-      transition: border-color 0.2s; }
-    .textarea-mensaje:focus { outline: none; border-color: var(--terracota); }
-    .textarea-mensaje::placeholder { color: rgba(255,255,255,0.2); }
-
-    /* ── Logout ─────────────────────────────────────────────── */
-    .btn-logout { background: transparent; border: 1px solid rgba(255,255,255,0.15);
-      color: rgba(255,255,255,0.4); border-radius: 6px; padding: 7px 14px;
-      font-size: 12px; cursor: pointer; transition: all 0.2s; }
-    .btn-logout:hover { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.7); }
-
-    /* ── Vuelo info ─────────────────────────────────────────── */
-    .vuelo-info {
-      background: rgba(217,164,65,0.08); border: 1px solid rgba(217,164,65,0.15);
-      border-radius: 8px; padding: 10px 14px; font-size: 12px;
-      color: rgba(255,255,255,0.5); margin-top: 10px; display: none;
-    }
-    .vuelo-info strong { color: var(--oro); }
-
-    /* ── Oculto ─────────────────────────────────────────────── */
-    .oculto { display: none !important; }
-
-    @media (max-width: 600px) {
-      .cabecera { padding: 16px; }
-      .contenido { padding: 16px 16px 60px; }
-      .tarjeta-acceso { padding: 20px 16px; }
-      .seccion-portal { padding: 16px; }
-    }
+    .oculto { display: none; }
+    @media (max-width: 420px) { .card { padding: 28px 20px; } }
   </style>
 </head>
 <body>
+  <div class="card">
+    <div class="logo">
+      <h1>TRASLADOS GC</h1>
+      <p>Gran Canaria</p>
+      <span class="badge">📋 Portal del Cliente</span>
+    </div>
 
-  <div class="cabecera-wrapper">
-    <div class="cabecera">
-      <a href="/" class="logo">Traslados · GC</a>
-      <nav class="nav-links">
-        <a href="/contacto">Contacto</a>
-      </nav>
+    <!-- PANTALLA LOGIN -->
+    <div id="pantalla-login">
+      <div id="error-login" class="error"></div>
+      <label for="login-pnr">Número de reserva</label>
+      <input type="text" id="login-pnr" placeholder="Ej: GCA123" style="text-transform:uppercase;letter-spacing:2px;font-weight:700">
+      <label for="login-pwd">Contraseña</label>
+      <input type="password" id="login-pwd" placeholder="Tu contraseña">
+      <button class="boton" id="btn-login" onclick="hacerLogin()">Entrar</button>
+      <span class="enlace" onclick="mostrarSolicitar()">¿Primera vez o contraseña olvidada? Solicitar acceso</span>
+    </div>
+
+    <!-- PANTALLA SOLICITAR CONTRASEÑA -->
+    <div id="pantalla-solicitar" class="oculto">
+      <div id="error-solicitar" class="error"></div>
+      <div id="ok-solicitar" class="ok"></div>
+      <label for="sol-pnr">Número de reserva</label>
+      <input type="text" id="sol-pnr" placeholder="Ej: GCA123" style="text-transform:uppercase;letter-spacing:2px;font-weight:700">
+      <label for="sol-email">Tu email</label>
+      <input type="email" id="sol-email" placeholder="El email con el que reservaste">
+      <button class="boton" id="btn-solicitar" onclick="solicitarAcceso()">Enviar contraseña provisional</button>
+      <span class="enlace" onclick="mostrarLogin()">← Volver al acceso</span>
+    </div>
+
+    <!-- PANTALLA CAMBIAR CONTRASEÑA -->
+    <div id="pantalla-cambiar" class="oculto">
+      <p style="font-size:13px;color:#666;margin-bottom:20px;">Es tu primera vez. Elige una contraseña propia para acceder en el futuro.</p>
+      <div id="error-cambiar" class="error"></div>
+      <label for="nueva-pwd">Nueva contraseña</label>
+      <input type="password" id="nueva-pwd" placeholder="Mínimo 6 caracteres">
+      <label for="nueva-pwd2">Repite la contraseña</label>
+      <input type="password" id="nueva-pwd2" placeholder="Repite la contraseña">
+      <button class="boton" id="btn-cambiar" onclick="cambiarPassword()">Guardar y entrar</button>
     </div>
   </div>
 
-  <div class="contenido">
-
-    <!-- ═══ PANTALLA: SOLICITAR CONTRASEÑA ════════════════════════════════ -->
-    <div id="pantalla-solicitar" class="oculto">
-      <div style="max-width:460px;margin:0 auto;padding-top:40px;">
-        <a href="#" onclick="mostrarLogin()" class="btn-volver" style="display:inline-flex;align-items:center;gap:6px;color:var(--texto-muted);font-size:13px;text-decoration:none;margin-bottom:28px;">← Volver</a>
-        <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:32px;margin-bottom:8px;color:var(--texto-oscuro);">Solicitar<br><span style="color:var(--terracota);">contraseña</span></h1>
-        <p style="color:var(--texto-muted);font-size:14px;margin-bottom:28px;line-height:1.6;">Introduce tu número de reserva y el email con el que reservaste. Te enviaremos una contraseña provisional.</p>
-        <div class="tarjeta-acceso">
-          <h2>Número de reserva</h2>
-          <p class="campo-hint">Lo encontrarás en el email que recibiste al hacer la reserva</p>
-          <input type="text" id="sol-pnr" class="campo-acceso pnr-input" placeholder="Ej: GCA123" maxlength="10">
-          <h2 style="margin-top:4px;">Tu email</h2>
-          <p class="campo-hint">El mismo con el que hiciste la reserva</p>
-          <input type="email" id="sol-email" class="campo-acceso" placeholder="tu@email.com">
-          <button class="btn-acceso" onclick="solicitarAcceso()">Enviar contraseña provisional</button>
-          <div id="aviso-solicitar" class="aviso-acceso"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ PANTALLA: LOGIN ════════════════════════════════════════════════ -->
-    <div id="pantalla-login">
-      <div style="max-width:460px;margin:0 auto;padding-top:40px;">
-        <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:clamp(28px,5vw,44px);margin-bottom:8px;line-height:1.1;color:var(--texto-oscuro);">Mi <span style="color:var(--terracota);">reserva</span></h1>
-        <p style="color:var(--texto-muted);font-size:14px;margin-bottom:32px;line-height:1.6;">Accede para ver el estado de tu traslado, gestionar cambios y comunicarte con el equipo.</p>
-        <div class="tarjeta-acceso">
-          <h2>Número de reserva</h2>
-          <p class="campo-hint">Lo encontrarás en el email que recibiste al hacer la reserva</p>
-          <input type="text" id="login-pnr" class="campo-acceso pnr-input" placeholder="Ej: GCA123" maxlength="10">
-          <h2 style="margin-top:4px;">Tu contraseña</h2>
-          <p class="campo-hint">La que elegiste al acceder por primera vez</p>
-          <input type="password" id="login-pwd" class="campo-acceso" placeholder="Tu contraseña">
-          <button class="btn-acceso" onclick="hacerLogin()">Entrar</button>
-          <div id="aviso-login" class="aviso-acceso"></div>
-          <span class="enlace-accion" onclick="mostrarSolicitar()">¿Es tu primera vez o no recuerdas la contraseña? Solicitar acceso</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ PANTALLA: CAMBIAR CONTRASEÑA ══════════════════════════════════ -->
-    <div id="pantalla-cambiar-pass" class="oculto">
-      <div style="max-width:460px;margin:0 auto;padding-top:40px;">
-        <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:32px;margin-bottom:8px;color:var(--texto-oscuro);">Elige tu<br><span style="color:var(--terracota);">contraseña</span></h1>
-        <p style="color:var(--texto-muted);font-size:14px;margin-bottom:28px;line-height:1.6;">Es tu primera vez o has recibido una provisional. Elige una contraseña propia para acceder en el futuro.</p>
-        <div class="tarjeta-acceso">
-          <h2>Nueva contraseña</h2>
-          <input type="password" id="nueva-pwd" class="campo-acceso" placeholder="Mínimo 6 caracteres">
-          <input type="password" id="nueva-pwd2" class="campo-acceso" placeholder="Repite la contraseña">
-          <button class="btn-acceso" onclick="cambiarPassword()">Guardar contraseña</button>
-          <div id="aviso-cambiar" class="aviso-acceso"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ PORTAL DEL CLIENTE ════════════════════════════════════════════ -->
-    <div id="pantalla-portal" class="oculto">
-
-      <!-- Cabecera del portal -->
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:28px;">
-        <div class="portal-header" style="margin-bottom:0;">
-          <div class="pnr-badge" id="portal-pnr-badge"></div>
-          <h1>Hola, <span id="portal-nombre" style="color:var(--terracota);"></span></h1>
-          <div style="margin-top:8px;" id="portal-estado-badge"></div>
-        </div>
-        <button class="btn-logout" onclick="hacerLogout()">Cerrar sesión</button>
-      </div>
-
-      <!-- Línea de progreso -->
-      <div class="progreso" id="linea-progreso"></div>
-
-      <!-- ── Aviso de bloqueo próximo ── -->
-      <div id="aviso-bloqueo" class="oculto" style="background:rgba(193,80,46,0.1);border:1px solid rgba(193,80,46,0.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:rgba(255,255,255,0.65);display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">⏰</span>
-        <span id="texto-aviso-bloqueo"></span>
-      </div>
-
-      <!-- ── 1. Detalles del traslado ── -->
-      <div class="seccion-portal">
-        <h2>Detalles del traslado</h2>
-        <div class="datos-grid" id="portal-datos-viaje"></div>
-        <div id="info-vuelo" class="vuelo-info"></div>
-      </div>
-
-      <!-- ── 2. Depósito y cancelación ── -->
-      <div class="seccion-portal">
-        <h2>Depósito de garantía</h2>
-        <div id="portal-deposito"></div>
-        <div id="portal-cancelacion" class="cancelacion-info" style="display:none;"></div>
-      </div>
-
-      <!-- ── 3. Modificar datos ── -->
-      <div class="seccion-portal" id="seccion-modificar">
-        <h2>Modificar datos</h2>
-        <div id="contenido-modificar"></div>
-      </div>
-
-      <!-- ── 4. Documentos ── -->
-      <div class="seccion-portal">
-        <h2>Mis documentos</h2>
-        <div class="docs-grid" id="portal-documentos"></div>
-      </div>
-
-      <!-- ── 5. Mensajes al equipo ── -->
-      <div class="seccion-portal">
-        <h2>Mensajes al equipo</h2>
-        <p style="font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:16px;">Escríbenos cualquier incidencia, retraso de vuelo o petición especial. Siempre disponible.</p>
-        <div class="mensajes-hilo" id="hilo-mensajes"></div>
-        <textarea class="textarea-mensaje" id="campo-mensaje" placeholder="Ej: Mi vuelo llega con retraso, nueva hora de llegada aproximada 21:30…" rows="3"></textarea>
-        <button class="btn-guardar" onclick="enviarMensaje()" style="margin-top:10px;">Enviar mensaje</button>
-        <div id="aviso-mensaje" class="aviso-portal"></div>
-      </div>
-
-    </div><!-- fin pantalla-portal -->
-
-  </div><!-- fin contenido -->
-
   <script>
-  // ═══════════════════════════════════════════════════════════════
-  // Estado global
-  // ═══════════════════════════════════════════════════════════════
-  var datosReserva = null;
-
-  // ═══════════════════════════════════════════════════════════════
-  // Navegación entre pantallas
-  // ═══════════════════════════════════════════════════════════════
-  function mostrarSolo(id) {
-    ['pantalla-login','pantalla-solicitar','pantalla-cambiar-pass','pantalla-portal'].forEach(function(p) {
-      document.getElementById(p).classList.add('oculto');
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        if (!document.getElementById('pantalla-login').classList.contains('oculto')) hacerLogin();
+        else if (!document.getElementById('pantalla-solicitar').classList.contains('oculto')) solicitarAcceso();
+        else if (!document.getElementById('pantalla-cambiar').classList.contains('oculto')) cambiarPassword();
+      }
     });
-    document.getElementById(id).classList.remove('oculto');
-  }
-  function mostrarLogin() { mostrarSolo('pantalla-login'); }
-  function mostrarSolicitar() { mostrarSolo('pantalla-solicitar'); }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Avisos helper
-  // ═══════════════════════════════════════════════════════════════
-  function mostrarAviso(id, texto, tipo) {
-    var el = document.getElementById(id);
-    el.textContent = texto;
-    el.className = 'aviso-acceso ' + (tipo === 'ok' ? 'aviso-ok' : 'aviso-error');
-    el.style.display = 'block';
-  }
-  function mostrarAvisoPortal(id, texto, tipo) {
-    var el = document.getElementById(id);
-    el.textContent = texto;
-    el.className = 'aviso-portal ' + (tipo === 'ok' ? 'aviso-ok' : 'aviso-error');
-    el.style.display = 'block';
-    setTimeout(function() { el.style.display = 'none'; }, 4000);
-  }
+    function mostrarLogin() {
+      document.getElementById('pantalla-login').classList.remove('oculto');
+      document.getElementById('pantalla-solicitar').classList.add('oculto');
+      document.getElementById('pantalla-cambiar').classList.add('oculto');
+    }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Solicitar contraseña provisional
-  // ═══════════════════════════════════════════════════════════════
-  function solicitarAcceso() {
-    var pnr = document.getElementById('sol-pnr').value.trim();
-    var email = document.getElementById('sol-email').value.trim();
-    if (!pnr || !email) { mostrarAviso('aviso-solicitar','Rellena el número de reserva y el email.','error'); return; }
-    fetch('/api/cliente/solicitar-acceso', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ pnr: pnr, email: email })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-      if (d.ok) {
-        mostrarAviso('aviso-solicitar','Te hemos enviado la contraseña provisional. Revisa tu email.','ok');
+    function mostrarSolicitar() {
+      document.getElementById('pantalla-login').classList.add('oculto');
+      document.getElementById('pantalla-solicitar').classList.remove('oculto');
+      document.getElementById('pantalla-cambiar').classList.add('oculto');
+    }
+
+    function mostrarCambiar() {
+      document.getElementById('pantalla-login').classList.add('oculto');
+      document.getElementById('pantalla-solicitar').classList.add('oculto');
+      document.getElementById('pantalla-cambiar').classList.remove('oculto');
+    }
+
+    function mostrarError(id, texto) {
+      var el = document.getElementById(id);
+      el.textContent = texto;
+      el.style.display = 'block';
+    }
+
+    function ocultarError(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    function hacerLogin() {
+      var pnr = document.getElementById('login-pnr').value.trim();
+      var pwd = document.getElementById('login-pwd').value;
+      var btn = document.getElementById('btn-login');
+      ocultarError('error-login');
+      if (!pnr || !pwd) { mostrarError('error-login', 'Rellena todos los campos.'); return; }
+      btn.disabled = true; btn.textContent = 'Entrando...';
+      fetch('/api/cliente/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pnr: pnr, password: pwd })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) {
+          mostrarError('error-login', d.error);
+          btn.disabled = false; btn.textContent = 'Entrar';
+          return;
+        }
+        if (d.primer_acceso) {
+          mostrarCambiar();
+          btn.disabled = false; btn.textContent = 'Entrar';
+        } else {
+          window.location.href = '/cliente/portal';
+        }
+      })
+      .catch(function() {
+        mostrarError('error-login', 'Error de conexión. Inténtalo de nuevo.');
+        btn.disabled = false; btn.textContent = 'Entrar';
+      });
+    }
+
+    function solicitarAcceso() {
+      var pnr = document.getElementById('sol-pnr').value.trim();
+      var email = document.getElementById('sol-email').value.trim();
+      var btn = document.getElementById('btn-solicitar');
+      ocultarError('error-solicitar');
+      document.getElementById('ok-solicitar').style.display = 'none';
+      if (!pnr || !email) { mostrarError('error-solicitar', 'Rellena todos los campos.'); return; }
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      fetch('/api/cliente/solicitar-acceso', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pnr: pnr, email: email })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        btn.disabled = false; btn.textContent = 'Enviar contraseña provisional';
+        if (d.error) { mostrarError('error-solicitar', d.error); return; }
+        var ok = document.getElementById('ok-solicitar');
+        ok.textContent = 'Te hemos enviado la contraseña provisional. Revisa tu email.';
+        ok.style.display = 'block';
         setTimeout(function() {
-          document.getElementById('login-pnr').value = pnr;
+          document.getElementById('login-pnr').value = pnr.toUpperCase();
           mostrarLogin();
         }, 3000);
-      } else {
-        mostrarAviso('aviso-solicitar', d.error || 'Error al enviar.', 'error');
-      }
-    }).catch(function() { mostrarAviso('aviso-solicitar','Error de conexión.','error'); });
-  }
+      })
+      .catch(function() {
+        mostrarError('error-solicitar', 'Error de conexión. Inténtalo de nuevo.');
+        btn.disabled = false; btn.textContent = 'Enviar contraseña provisional';
+      });
+    }
 
-  // ═══════════════════════════════════════════════════════════════
-  // Login
-  // ═══════════════════════════════════════════════════════════════
-  function hacerLogin() {
-    var pnr = document.getElementById('login-pnr').value.trim();
-    var pwd = document.getElementById('login-pwd').value;
-    if (!pnr || !pwd) { mostrarAviso('aviso-login','Rellena todos los campos.','error'); return; }
-    fetch('/api/cliente/login', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ pnr: pnr, password: pwd })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-      if (d.ok) {
-        if (d.primer_acceso) {
-          mostrarSolo('pantalla-cambiar-pass');
-        } else {
-          cargarPortal();
+    function cambiarPassword() {
+      var p1 = document.getElementById('nueva-pwd').value;
+      var p2 = document.getElementById('nueva-pwd2').value;
+      var btn = document.getElementById('btn-cambiar');
+      ocultarError('error-cambiar');
+      if (!p1 || p1.length < 6) { mostrarError('error-cambiar', 'Mínimo 6 caracteres.'); return; }
+      if (p1 !== p2) { mostrarError('error-cambiar', 'Las contraseñas no coinciden.'); return; }
+      btn.disabled = true; btn.textContent = 'Guardando...';
+      fetch('/api/cliente/cambiar-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password_nueva: p1 })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) {
+          mostrarError('error-cambiar', d.error);
+          btn.disabled = false; btn.textContent = 'Guardar y entrar';
+          return;
         }
-      } else {
-        mostrarAviso('aviso-login', d.error || 'Datos incorrectos.', 'error');
-      }
-    }).catch(function() { mostrarAviso('aviso-login','Error de conexión.','error'); });
-  }
-
-  // Enter en campos de login
-  ['login-pnr','login-pwd'].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') hacerLogin();
-    });
-  });
-
-  // ═══════════════════════════════════════════════════════════════
-  // Cambiar contraseña
-  // ═══════════════════════════════════════════════════════════════
-  function cambiarPassword() {
-    var p1 = document.getElementById('nueva-pwd').value;
-    var p2 = document.getElementById('nueva-pwd2').value;
-    if (!p1 || p1.length < 6) { mostrarAviso('aviso-cambiar','Mínimo 6 caracteres.','error'); return; }
-    if (p1 !== p2) { mostrarAviso('aviso-cambiar','Las contraseñas no coinciden.','error'); return; }
-    fetch('/api/cliente/cambiar-password', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ password_nueva: p1 })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-      if (d.ok) {
-        cargarPortal();
-      } else {
-        mostrarAviso('aviso-cambiar', d.error || 'Error al guardar.', 'error');
-      }
-    });
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Cargar el portal
-  // ═══════════════════════════════════════════════════════════════
-  function cargarPortal() {
-    fetch('/api/cliente/mi-reserva')
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (d.error) { mostrarLogin(); return; }
-        datosReserva = d;
-        renderPortal(d);
-        cargarMensajes();
-        mostrarSolo('pantalla-portal');
+        window.location.href = '/cliente/portal';
+      })
+      .catch(function() {
+        mostrarError('error-cambiar', 'Error de conexión.');
+        btn.disabled = false; btn.textContent = 'Guardar y entrar';
       });
-  }
-
-  function renderPortal(d) {
-    var r = d.reserva;
-    var noshow = d.noshow;
-
-    // PNR y nombre
-    document.getElementById('portal-pnr-badge').textContent = r.numero_reserva;
-    document.getElementById('portal-nombre').textContent = r.nombre_cliente.split(' ')[0];
-
-    // Estado badge
-    var badges = {
-      pendiente:  ['estado-pendiente',  '🟡 Pendiente de confirmación'],
-      confirmada: ['estado-confirmada', '🟢 Confirmada'],
-      completada: ['estado-completada', '✅ Completada'],
-      cancelada:  ['estado-cancelada',  '🔴 Cancelada']
-    };
-    var b = badges[r.estado] || ['estado-pendiente', r.estado];
-    document.getElementById('portal-estado-badge').innerHTML =
-      '<span class="estado-badge ' + b[0] + '">' + b[1] + '</span>';
-
-    // Línea de progreso
-    var pasos = [
-      { label: 'Solicitud<br>recibida', clave: 'solicitud' },
-      { label: 'Confirmada', clave: 'confirmada' },
-      { label: 'Depósito<br>pagado', clave: 'pagado' },
-      { label: 'Traslado<br>realizado', clave: 'completado' }
-    ];
-    var activo = { pendiente: 0, confirmada: 1, completada: 3, cancelada: 0 }[r.estado] || 0;
-    if (r.deposito_pagado && r.estado !== 'completada') activo = 2;
-    var htmlProg = '';
-    pasos.forEach(function(p, i) {
-      var cls = i < activo ? 'completado' : (i === activo ? 'activo' : '');
-      var icono = i < activo ? '✓' : (i + 1);
-      htmlProg += '<div class="paso-prog ' + cls + '"><div class="circulo">' + icono + '</div><div class="etiq">' + p.label + '</div></div>';
-      if (i < pasos.length - 1) htmlProg += '<div class="linea-prog' + (i < activo ? ' hecha' : '') + '"></div>';
-    });
-    document.getElementById('linea-progreso').innerHTML = htmlProg;
-
-    // Aviso de bloqueo próximo (menos de 24h para el límite)
-    var fechaLimite = new Date(noshow.fecha_limite);
-    var ahora = new Date();
-    var msHasta = fechaLimite - ahora;
-    var avisoEl = document.getElementById('aviso-bloqueo');
-    if (noshow.puede_modificar && msHasta > 0 && msHasta < 24 * 3600 * 1000) {
-      var horas = Math.floor(msHasta / 3600000);
-      var mins = Math.floor((msHasta % 3600000) / 60000);
-      document.getElementById('texto-aviso-bloqueo').textContent =
-        'Te quedan ' + (horas > 0 ? horas + 'h ' : '') + mins + ' min para modificar tus datos sin coste. Después, el servicio queda cerrado a cambios.';
-      avisoEl.classList.remove('oculto');
-      avisoEl.style.display = 'flex';
     }
-
-    // Datos del viaje
-    var fecha = r.fecha ? new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '—';
-    var hora = r.hora ? r.hora.slice(0,5) : '—';
-    var datosViaje = [
-      { label: 'Origen', valor: r.origen || '—' },
-      { label: 'Destino', valor: r.destino || '—' },
-      { label: 'Fecha', valor: fecha },
-      { label: 'Hora', valor: hora },
-      { label: 'Categoría', valor: r.categoria_nombre || '—' },
-      { label: 'Pasajeros', valor: r.num_pasajeros || '—' }
-    ];
-    if (r.conductor_nombre && r.estado !== 'pendiente') {
-      datosViaje.push({ label: 'Conductor', valor: r.conductor_nombre });
-    }
-    var htmlDatos = datosViaje.map(function(x) {
-      return '<div class="dato-item"><div class="dato-label">' + x.label + '</div><div class="dato-valor">' + x.valor + '</div></div>';
-    }).join('');
-    document.getElementById('portal-datos-viaje').innerHTML = htmlDatos;
-
-    // Info de vuelo
-    var vuelo = document.getElementById('info-vuelo');
-    if (r.numero_vuelo) {
-      vuelo.innerHTML = '✈️ <strong>Vuelo ' + r.numero_vuelo + '</strong>' +
-        (r.hora_llegada_vuelo ? ' · Hora llegada: ' + r.hora_llegada_vuelo.slice(0,5) : '') +
-        '<br><span style="font-size:11px;">Si tu vuelo se retrasa, usa el canal de mensajes para avisarnos. Haremos todo lo posible por adaptarnos.</span>';
-      vuelo.style.display = 'block';
-    }
-
-    // Depósito
-    var htmlDep = '';
-    if (!r.deposito_pagado) {
-      htmlDep = '<div class="deposito-estado deposito-pendiente"><span class="deposito-icono">⏳</span><div class="deposito-texto"><strong>Depósito pendiente de pago</strong><span>El depósito de garantía aún no ha sido procesado</span></div></div>';
-    } else if (r.deposito_liberado) {
-      htmlDep = '<div class="deposito-estado deposito-liberado"><span class="deposito-icono">✅</span><div class="deposito-texto"><strong style="color:#4caf87;">Depósito liberado — ' + noshow.importe + ' €</strong><span>El importe retenido queda libre en tu tarjeta. Puede tardar 5–10 días hábiles en reflejarse.</span></div></div>';
-    } else {
-      htmlDep = '<div class="deposito-estado deposito-retenido"><span class="deposito-icono">🔒</span><div class="deposito-texto"><strong style="color:var(--oro);">Depósito retenido — ' + noshow.importe + ' €</strong><span>Se liberará una vez completado el servicio</span></div></div>';
-    }
-    document.getElementById('portal-deposito').innerHTML = htmlDep;
-
-    // Info de cancelación
-    var cancelEl = document.getElementById('portal-cancelacion');
-    if (r.estado !== 'completada' && r.estado !== 'cancelada') {
-      var fechaLimTexto = fechaLimite.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) +
-        ' a las ' + fechaLimite.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
-      cancelEl.innerHTML = noshow.puede_modificar
-        ? '📅 Cancelación gratuita hasta el <strong>' + fechaLimTexto + '</strong>. Después, el depósito de ' + noshow.importe + ' € no será reembolsado.'
-        : '🔒 El plazo de cancelación gratuita venció el <strong>' + fechaLimTexto + '</strong>. El depósito de ' + noshow.importe + ' € no es reembolsable.';
-      cancelEl.style.display = 'block';
-    }
-
-    // Sección modificar datos
-    var modEl = document.getElementById('contenido-modificar');
-    if (!noshow.puede_modificar) {
-      modEl.innerHTML = '<div class="bloqueo-info"><span class="icono">🔒</span><div>El plazo de modificación ha vencido. Si tienes una incidencia urgente (retraso de vuelo, cambio de hora…), usa el canal de mensajes de abajo — siempre está disponible.</div></div>';
-    } else {
-      modEl.innerHTML =
-        '<button class="btn-modif" onclick="toggleFormModif()">✏️ Modificar datos del traslado</button>' +
-        '<div class="form-modif" id="form-modif">' +
-        '<label class="label-campo">Hora de recogida</label>' +
-        '<input type="time" class="campo-portal" id="mod-hora" value="' + (r.hora ? r.hora.slice(0,5) : '') + '">' +
-        '<label class="label-campo">Número de vuelo</label>' +
-        '<input type="text" class="campo-portal" id="mod-vuelo" placeholder="Ej: IB3456" value="' + (r.numero_vuelo || '') + '">' +
-        '<label class="label-campo">Hora llegada vuelo</label>' +
-        '<input type="time" class="campo-portal" id="mod-hora-vuelo" value="' + (r.hora_llegada_vuelo ? r.hora_llegada_vuelo.slice(0,5) : '') + '">' +
-        '<label class="label-campo">Dirección de recogida</label>' +
-        '<input type="text" class="campo-portal" id="mod-dir-recogida" placeholder="Calle, número, municipio" value="' + (r.direccion_recogida || '') + '">' +
-        '<label class="label-campo">Dirección de destino</label>' +
-        '<input type="text" class="campo-portal" id="mod-dir-destino" placeholder="Calle, número, municipio" value="' + (r.direccion_destino || '') + '">' +
-        '<label class="label-campo">Notas adicionales</label>' +
-        '<textarea class="campo-portal" id="mod-notas" rows="3" placeholder="Cualquier información útil para el conductor">' + (r.notas_cliente || '') + '</textarea>' +
-        '<button class="btn-guardar" onclick="guardarModificaciones()">Guardar cambios</button>' +
-        '<div id="aviso-modif" class="aviso-portal"></div>' +
-        '</div>';
-    }
-
-    // Documentos
-    var docs = [];
-    if (r.email_confirmacion_enviado) {
-      docs.push('<div class="doc-btn">📋 Confirmación de reserva</div>');
-    }
-    if (r.email_voucher_enviado && r.deposito_pagado) {
-      docs.push('<div class="doc-btn">🎫 Voucher de traslado</div>');
-    }
-    if (!docs.length) {
-      docs.push('<span style="font-size:13px;color:rgba(255,255,255,0.3);">Los documentos aparecerán aquí cuando estén disponibles.</span>');
-    }
-    document.getElementById('portal-documentos').innerHTML = docs.join('');
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Modificar datos
-  // ═══════════════════════════════════════════════════════════════
-  function toggleFormModif() {
-    var f = document.getElementById('form-modif');
-    if (f) f.classList.toggle('visible');
-  }
-
-  function guardarModificaciones() {
-    var datos = {
-      hora: document.getElementById('mod-hora') ? document.getElementById('mod-hora').value : null,
-      numero_vuelo: document.getElementById('mod-vuelo') ? document.getElementById('mod-vuelo').value : null,
-      hora_llegada_vuelo: document.getElementById('mod-hora-vuelo') ? document.getElementById('mod-hora-vuelo').value : null,
-      direccion_recogida: document.getElementById('mod-dir-recogida') ? document.getElementById('mod-dir-recogida').value : null,
-      direccion_destino: document.getElementById('mod-dir-destino') ? document.getElementById('mod-dir-destino').value : null,
-      notas_cliente: document.getElementById('mod-notas') ? document.getElementById('mod-notas').value : null
-    };
-    fetch('/api/cliente/modificar', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(datos)
-    }).then(function(r) { return r.json(); }).then(function(d) {
-      if (d.ok) {
-        mostrarAvisoPortal('aviso-modif', '✅ Cambios guardados correctamente.', 'ok');
-        document.getElementById('form-modif').classList.remove('visible');
-      } else {
-        mostrarAvisoPortal('aviso-modif', d.error || 'Error al guardar.', 'error');
-      }
-    });
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Mensajes
-  // ═══════════════════════════════════════════════════════════════
-  function cargarMensajes() {
-    fetch('/api/cliente/mensajes')
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        var hilo = document.getElementById('hilo-mensajes');
-        if (!d.mensajes || !d.mensajes.length) { hilo.innerHTML = ''; return; }
-        hilo.innerHTML = d.mensajes.map(function(m) {
-          var fecha = new Date(m.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
-          return '<div class="mensaje-burbuja mensaje-cliente">' + escHtml(m.mensaje) + '<div class="mensaje-fecha">' + fecha + '</div></div>';
-        }).join('');
-      });
-  }
-
-  function enviarMensaje() {
-    var texto = document.getElementById('campo-mensaje').value.trim();
-    if (!texto) { mostrarAvisoPortal('aviso-mensaje','Escribe un mensaje antes de enviar.','error'); return; }
-    fetch('/api/cliente/mensaje', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ mensaje: texto })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-      if (d.ok) {
-        document.getElementById('campo-mensaje').value = '';
-        mostrarAvisoPortal('aviso-mensaje','✅ Mensaje enviado. El equipo lo recibirá en breve.','ok');
-        cargarMensajes();
-      } else {
-        mostrarAvisoPortal('aviso-mensaje', d.error || 'Error al enviar.', 'error');
-      }
-    });
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Logout
-  // ═══════════════════════════════════════════════════════════════
-  function hacerLogout() {
-    fetch('/api/cliente/logout', { method: 'POST' })
-      .then(function() { mostrarLogin(); });
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // Utilidades
-  // ═══════════════════════════════════════════════════════════════
-  function escHtml(t) {
-    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-  }
-
-  mostrarLogin();
-
   </script>
 </body>
 </html>
