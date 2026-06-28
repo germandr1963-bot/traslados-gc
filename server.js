@@ -786,6 +786,12 @@ async function initSchema() {
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_pagado BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email_voucher_enviado BOOLEAN DEFAULT FALSE`);
 
+  // ─── Portal del cliente ───────────────────────────────────────────────────
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_password_hash TEXT`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_primer_acceso BOOLEAN DEFAULT TRUE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
+  await pool.query(`\n    CREATE TABLE IF NOT EXISTS reservas_mensajes (\n      id SERIAL PRIMARY KEY,\n      reserva_id INT NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,\n      autor TEXT NOT NULL DEFAULT 'cliente',\n      mensaje TEXT NOT NULL,\n      leido BOOLEAN DEFAULT FALSE,\n      creado_en TIMESTAMP DEFAULT NOW()\n    );\n  `);
+
   // Configuración de contacto público
   await pool.query(`
     CREATE TABLE IF NOT EXISTS configuracion_contacto (
@@ -803,6 +809,7 @@ async function initSchema() {
     SELECT 1, '', '', ''
     WHERE NOT EXISTS (SELECT 1 FROM configuracion_contacto WHERE id = 1)
   `);
+  await pool.query(`ALTER TABLE configuracion_contacto ADD COLUMN IF NOT EXISTS emails_notificacion TEXT DEFAULT ''`);
 
   // ─── Reservas × Extras ────────────────────────────────────────────────────
   await pool.query(`
@@ -827,6 +834,43 @@ async function initSchema() {
 
 // Resuelve la marca y el modelo de un conductor: por id si ya existen en el
 // catálogo, o creándolos a partir de un nombre nuevo (el catálogo crece solo).
+// ─── Helper: obtener configuración No-Show para una fecha ────────────────────
+async function obtenerConfigNoshow(fechaViaje) {
+  const temporada = await pool.query(
+    `SELECT * FROM configuracion_noshow
+     WHERE es_general = FALSE AND activa = TRUE
+     AND fecha_inicio <= $1 AND fecha_fin >= $1
+     ORDER BY fecha_inicio DESC LIMIT 1`,
+    [fechaViaje]
+  );
+  if (temporada.rows.length) return temporada.rows[0];
+  const general = await pool.query('SELECT * FROM configuracion_noshow WHERE es_general = TRUE LIMIT 1');
+  return general.rows[0] || { importe_deposito: 10.00, horas_cancelacion: 12 };
+}
+
+// ─── Helper: calcular fecha límite de cancelación gratuita ───────────────────
+function calcularFechaCancelacion(fechaViaje, horaViaje, horasCancelacion) {
+  const fechaHoraStr = fechaViaje.toISOString().slice(0, 10) + 'T' + (horaViaje || '00:00:00');
+  const fechaHora = new Date(fechaHoraStr);
+  fechaHora.setHours(fechaHora.getHours() - horasCancelacion);
+  return fechaHora;
+}
+
+// ─── Helper: obtener emails de notificación del admin ────────────────────────
+async function obtenerEmailsNotificacion() {
+  const cfg = await pool.query('SELECT emails_notificacion FROM configuracion_contacto WHERE id = 1');
+  if (!cfg.rows.length || !cfg.rows[0].emails_notificacion) return [];
+  return cfg.rows[0].emails_notificacion.split(',').map(e => e.trim()).filter(Boolean);
+}
+
+// ─── Helper: generar contraseña provisional ───────────────────────────────────
+function generarPasswordProvisional() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let pwd = '';
+  for (let i = 0; i < 10; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+  return pwd;
+}
+
 async function resolverVehiculo(marca_id, marca_nueva, modelo_id, modelo_nuevo) {
   let marcaId = parseInt(marca_id, 10) || null;
   let marcaNombre = null;
@@ -2588,15 +2632,6 @@ app.get('/api/contacto', asyncHandler(async (req, res) => {
   res.json(result.rows[0] || {});
 }));
 
-app.post('/admin/contacto', requireAdmin, asyncHandler(async (req, res) => {
-  const { telefono, whatsapp, email, direccion, horario } = req.body;
-  await pool.query(
-    `UPDATE configuracion_contacto SET telefono=$1, whatsapp=$2, email=$3, direccion=$4, horario=$5, actualizado_en=NOW() WHERE id=1`,
-    [telefono||'', whatsapp||'', email||'', direccion||'', horario||'']
-  );
-  res.json({ ok: true });
-}));
-
 // ─── Registro público de choferes ─────────────────────────────────────────────
 
 app.get('/chofer/registro', (req, res) => {
@@ -3704,6 +3739,8 @@ app.post('/admin/reservas/:id/chofer', requireAdmin, asyncHandler(async (req, re
         const importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
         const horas = condiciones ? condiciones.horas_cancelacion : 12;
         const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+        const _fechaLimiteCancelEmail = calcularFechaCancelacion(new Date(r.fecha), r.hora, horas);
+        const _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
 
         // Crear sesión de pago en Stripe si está configurado
         let urlPago = null;
@@ -3779,10 +3816,12 @@ app.post('/admin/reservas/:id/chofer', requireAdmin, asyncHandler(async (req, re
               <p style="margin:0 0 8px 0;font-weight:600;color:#0f5132;">💳 Depósito de garantía — ${importe} €</p>
               <p style="margin:0 0 8px 0;font-size:13px;color:#0f5132;">Para garantizar tu plaza, realiza el pago del depósito de <strong>${importe} €</strong>. El voucher de tu traslado te llegará automáticamente al confirmar el pago.</p>
               <p style="margin:0 0 8px 0;font-size:13px;color:#c0392b;"><strong>⚠️ Importante:</strong> Si no recibimos el pago ${horas} horas antes de tu traslado, la reserva será cancelada.</p>
-              <p style="margin:0;font-size:12px;color:#555;">El depósito te será devuelto íntegramente una vez completado el servicio. No es reembolsable en caso de no presentarse o cancelar con menos de ${horas} horas de antelación.</p>
+              <p style="margin:0 0 6px 0;font-size:12px;color:#555;">El depósito te será devuelto íntegramente una vez completado el servicio.</p>
+              <p style="margin:0;font-size:12px;color:#c0392b;"><strong>Cancelación gratuita hasta el ${_textoLimiteCancelEmail}.</strong> Después de esa fecha, el depósito de ${importe} € no será reembolsable.</p>
             </div>
             ${botonPago}
             <p style="font-size:13px;color:#888;">Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.</p>
+            <p style="font-size:12px;color:#aaa;margin-top:12px;">💡 Puedes consultar el estado de tu reserva en cualquier momento desde <a href="${process.env.BASE_URL || 'https://traslados-gc.onrender.com'}/mi-reserva" style="color:#C1502E;">Mi Reserva</a>.</p>
           </div>
           <div class="footer">Traslados GC · Gran Canaria</div>
         </div></body></html>`;
@@ -3835,6 +3874,12 @@ async function generarHtmlVoucher(reservaId) {
   const r = result.rows[0];
   const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
 
+  // Fecha límite de cancelación gratuita para el voucher
+  const _cfgNoshowVoucher = await obtenerConfigNoshow(r.fecha);
+  const _fechaLimiteVoucher = calcularFechaCancelacion(new Date(r.fecha), r.hora, _cfgNoshowVoucher.horas_cancelacion);
+  const _importeVoucher = parseFloat(_cfgNoshowVoucher.importe_deposito).toFixed(2);
+  const _textoLimiteVoucher = _fechaLimiteVoucher.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteVoucher.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+
   // Foto del chofer solo si está aprobada
   const fotoChoferHtml = (r.conductor_foto && r.conductor_foto_estado === 'aprobada')
     ? `<div style="text-align:center;margin:16px 0;">
@@ -3880,6 +3925,9 @@ async function generarHtmlVoucher(reservaId) {
         </div>
       </div>
       <p style="font-size:13px;color:#888;">Muestra este voucher a tu conductor al inicio del servicio. El precio final será el que marque el taxímetro.</p>
+      <div style="background:#fff3cd;border-radius:6px;padding:10px 14px;margin-top:14px;font-size:12px;color:#856404;">
+        <strong>⚠️ Cancelación gratuita hasta el ${_textoLimiteVoucher}.</strong> Después de esa fecha, el depósito de ${_importeVoucher} € no será reembolsado.
+      </div>
     </div>
     <div class="footer">Traslados GC · Gran Canaria</div>
   </div></body></html>`;
@@ -4723,6 +4771,334 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
     schemaTaxiService,
     schemaBreadcrumb
   });
+}));
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── PORTAL DEL CLIENTE (/mi-reserva) ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+app.get('/mi-reserva', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'mi-reserva.html'));
+});
+
+// Verificar PNR + email y enviar contraseña provisional
+app.post('/api/cliente/solicitar-acceso', asyncHandler(async (req, res) => {
+  const { pnr, email } = req.body;
+  if (!pnr || !email) return res.status(400).json({ error: 'PNR y email son obligatorios.' });
+
+  const result = await pool.query(
+    'SELECT id, nombre_cliente, email_cliente, cliente_password_hash, cliente_primer_acceso FROM reservas WHERE UPPER(numero_reserva) = UPPER($1)',
+    [pnr.trim()]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'No encontramos una reserva con ese número.' });
+  const reserva = result.rows[0];
+  if (reserva.email_cliente.toLowerCase() !== email.trim().toLowerCase()) {
+    return res.status(403).json({ error: 'El email no coincide con el de la reserva.' });
+  }
+
+  // Generar y guardar nueva contraseña provisional
+  const pwd = generarPasswordProvisional();
+  const hash = await bcrypt.hash(pwd, 10);
+  await pool.query(
+    'UPDATE reservas SET cliente_password_hash = $1, cliente_primer_acceso = TRUE WHERE id = $2',
+    [hash, reserva.id]
+  );
+
+  // Enviar email con contraseña provisional
+  const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+  await enviarEmail({
+    to: reserva.email_cliente,
+    subject: 'Acceso a tu reserva ' + pnr.toUpperCase() + ' — Traslados GC',
+    html: `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <style>
+      body{margin:0;padding:0;background:#f5f5f5;}
+      .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+      .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #C1502E;}
+      .body{padding:28px 24px;}
+      .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
+      .pwd-box{background:#ECE6D8;border-radius:8px;padding:16px 20px;margin:20px 0;text-align:center;}
+      .pwd{font-family:monospace;font-size:24px;font-weight:700;color:#1C1815;letter-spacing:4px;}
+      .boton{display:inline-block;background:#C1502E;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0;}
+      .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}
+    </style></head><body>
+    <div class="wrapper">
+      <div class="header"><h1 style="color:#D9A441;margin:0;font-size:20px;">Traslados GC</h1></div>
+      <div class="body">
+        <p>Hola <strong>${reserva.nombre_cliente}</strong>,</p>
+        <p>Aquí tienes tu contraseña provisional para acceder al seguimiento de tu reserva <span class="pnr">${pnr.toUpperCase()}</span>.</p>
+        <div class="pwd-box">
+          <div style="font-size:12px;color:#5b5347;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Contraseña provisional</div>
+          <div class="pwd">${pwd}</div>
+        </div>
+        <p style="font-size:13px;color:#5b5347;">Al entrar por primera vez se te pedirá que la cambies por una propia.</p>
+        <div style="text-align:center;"><a href="${BASE_URL}/mi-reserva" class="boton">Ver mi reserva</a></div>
+        <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado este acceso, ignora este mensaje.</p>
+      </div>
+      <div class="footer">Traslados GC · Gran Canaria</div>
+    </div></body></html>`
+  });
+
+  res.json({ ok: true });
+}));
+
+// Login del cliente
+app.post('/api/cliente/login', asyncHandler(async (req, res) => {
+  const { pnr, password } = req.body;
+  if (!pnr || !password) return res.status(400).json({ error: 'PNR y contraseña son obligatorios.' });
+
+  const result = await pool.query(
+    'SELECT id, nombre_cliente, cliente_password_hash, cliente_primer_acceso FROM reservas WHERE UPPER(numero_reserva) = UPPER($1)',
+    [pnr.trim()]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const reserva = result.rows[0];
+  if (!reserva.cliente_password_hash) return res.status(401).json({ error: 'Acceso no configurado. Solicita tu contraseña primero.' });
+
+  const ok = await bcrypt.compare(password, reserva.cliente_password_hash);
+  if (!ok) return res.status(401).json({ error: 'Contraseña incorrecta.' });
+
+  req.session.clienteReservaId = reserva.id;
+  req.session.clientePnr = pnr.toUpperCase();
+  res.json({ ok: true, primer_acceso: reserva.cliente_primer_acceso });
+}));
+
+// Cambiar contraseña (primer acceso o voluntario)
+app.post('/api/cliente/cambiar-password', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+  const { password_nueva } = req.body;
+  if (!password_nueva || password_nueva.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+
+  const hash = await bcrypt.hash(password_nueva, 10);
+  await pool.query(
+    'UPDATE reservas SET cliente_password_hash = $1, cliente_primer_acceso = FALSE WHERE id = $2',
+    [hash, req.session.clienteReservaId]
+  );
+  res.json({ ok: true });
+}));
+
+// Logout del cliente
+app.post('/api/cliente/logout', (req, res) => {
+  req.session.destroy(() => res.json({ ok: true }));
+});
+
+// Comprobar sesión del cliente
+app.get('/api/cliente/sesion', (req, res) => {
+  if (req.session && req.session.clienteReservaId) {
+    res.json({ autenticado: true, pnr: req.session.clientePnr });
+  } else {
+    res.json({ autenticado: false });
+  }
+});
+
+// Datos completos de la reserva para el portal
+app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+
+  const result = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
+            r.fecha, r.hora, r.origen, r.destino, r.num_pasajeros,
+            r.numero_vuelo, r.hora_llegada_vuelo, r.nombre_barco, r.hora_atraque,
+            r.tipo_llegada, r.direccion_recogida, r.direccion_destino,
+            r.notas_cliente, r.pasaporte_dni,
+            r.estado, r.deposito_pagado, r.deposito_liberado,
+            r.precio_estimado,
+            r.email_confirmacion_enviado, r.email_voucher_enviado,
+            cv.nombre AS categoria_nombre,
+            c.nombre AS conductor_nombre, c.foto AS conductor_foto, c.foto_estado AS conductor_foto_estado
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     LEFT JOIN conductores c ON c.id = r.conductor_id
+     WHERE r.id = $1`,
+    [req.session.clienteReservaId]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = result.rows[0];
+
+  // Extras
+  const extras = await pool.query(
+    `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
+     JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`,
+    [r.id]
+  );
+
+  // Configuración No-Show activa para esta reserva
+  const cfgNoshow = await obtenerConfigNoshow(r.fecha);
+  const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
+  const ahora = new Date();
+  const puedeMod = ahora < fechaCancelacion;
+
+  res.json({
+    reserva: r,
+    extras: extras.rows,
+    noshow: {
+      importe: parseFloat(cfgNoshow.importe_deposito).toFixed(2),
+      horas: cfgNoshow.horas_cancelacion,
+      fecha_limite: fechaCancelacion.toISOString(),
+      puede_modificar: puedeMod
+    }
+  });
+}));
+
+// Modificar datos de la reserva (cliente)
+app.post('/api/cliente/modificar', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+
+  const reserva = await pool.query(
+    'SELECT fecha, hora, estado FROM reservas WHERE id = $1',
+    [req.session.clienteReservaId]
+  );
+  if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = reserva.rows[0];
+
+  const cfgNoshow = await obtenerConfigNoshow(r.fecha);
+  const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
+  if (new Date() >= fechaCancelacion) {
+    return res.status(403).json({ error: 'El plazo de modificación ha vencido. El servicio está cerrado a cambios.' });
+  }
+
+  const { hora, numero_vuelo, hora_llegada_vuelo, nombre_barco, hora_atraque, direccion_recogida, direccion_destino, notas_cliente } = req.body;
+  await pool.query(
+    `UPDATE reservas SET
+      hora = COALESCE($1, hora),
+      numero_vuelo = COALESCE($2, numero_vuelo),
+      hora_llegada_vuelo = COALESCE($3, hora_llegada_vuelo),
+      nombre_barco = COALESCE($4, nombre_barco),
+      hora_atraque = COALESCE($5, hora_atraque),
+      direccion_recogida = COALESCE($6, direccion_recogida),
+      direccion_destino = COALESCE($7, direccion_destino),
+      notas_cliente = COALESCE($8, notas_cliente)
+     WHERE id = $9`,
+    [hora||null, numero_vuelo||null, hora_llegada_vuelo||null, nombre_barco||null,
+     hora_atraque||null, direccion_recogida||null, direccion_destino||null, notas_cliente||null,
+     req.session.clienteReservaId]
+  );
+
+  // Notificar al equipo
+  try {
+    const emails = await obtenerEmailsNotificacion();
+    const pnr = req.session.clientePnr;
+    if (emails.length) {
+      for (const em of emails) {
+        await enviarEmail({
+          to: em,
+          subject: '✏️ Cliente modificó datos — ' + pnr,
+          html: `<p>El cliente de la reserva <strong>${pnr}</strong> ha modificado los datos de su traslado.</p>
+                 <p>Accede al panel de administración para ver los cambios.</p>`
+        });
+      }
+    }
+  } catch(e) { console.warn('Error notificando modificación:', e.message); }
+
+  res.json({ ok: true });
+}));
+
+// Enviar mensaje al operador (siempre disponible)
+app.post('/api/cliente/mensaje', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+  const { mensaje } = req.body;
+  if (!mensaje || !mensaje.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
+
+  await pool.query(
+    'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
+    [req.session.clienteReservaId, 'cliente', mensaje.trim()]
+  );
+
+  // Notificar al equipo
+  try {
+    const emails = await obtenerEmailsNotificacion();
+    const pnr = req.session.clientePnr;
+    const reservaInfo = await pool.query('SELECT nombre_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+    const nombre = reservaInfo.rows[0] ? reservaInfo.rows[0].nombre_cliente : 'Cliente';
+    if (emails.length) {
+      for (const em of emails) {
+        await enviarEmail({
+          to: em,
+          subject: '💬 Nuevo mensaje de cliente — ' + pnr,
+          html: `<p><strong>${nombre}</strong> (reserva <strong>${pnr}</strong>) ha enviado un mensaje:</p>
+                 <blockquote style="border-left:3px solid #C1502E;padding-left:12px;color:#333;margin:16px 0;">${mensaje.trim()}</blockquote>
+                 <p>Accede al panel de administración para responder o ver el historial.</p>`
+        });
+      }
+    }
+  } catch(e) { console.warn('Error notificando mensaje:', e.message); }
+
+  res.json({ ok: true });
+}));
+
+// Ver mensajes de la reserva (cliente)
+app.get('/api/cliente/mensajes', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+  const result = await pool.query(
+    'SELECT id, autor, mensaje, creado_en FROM reservas_mensajes WHERE reserva_id = $1 ORDER BY creado_en ASC',
+    [req.session.clienteReservaId]
+  );
+  res.json({ mensajes: result.rows });
+}));
+
+// ─── Admin: mensajes de una reserva ──────────────────────────────────────────
+app.get('/admin/reservas/:id/mensajes', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, autor, mensaje, leido, creado_en FROM reservas_mensajes WHERE reserva_id = $1 ORDER BY creado_en ASC',
+    [req.params.id]
+  );
+  // Marcar mensajes del cliente como leídos
+  await pool.query(
+    "UPDATE reservas_mensajes SET leido = TRUE WHERE reserva_id = $1 AND autor = 'cliente'",
+    [req.params.id]
+  );
+  res.json({ mensajes: result.rows });
+}));
+
+// Admin: liberar depósito
+app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(async (req, res) => {
+  const reserva = await pool.query('SELECT * FROM reservas WHERE id = $1', [req.params.id]);
+  if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = reserva.rows[0];
+
+  await pool.query('UPDATE reservas SET deposito_liberado = TRUE WHERE id = $1', [req.params.id]);
+
+  // Email al cliente avisando de la liberación
+  try {
+    await enviarEmail({
+      to: r.email_cliente,
+      subject: '✅ Tu depósito ha sido liberado — ' + r.numero_reserva,
+      html: `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <style>
+        body{margin:0;padding:0;background:#f5f5f5;}
+        .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+        .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #C1502E;}
+        .body{padding:28px 24px;}
+        .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
+        .ok-box{background:#E1F5EE;border-radius:8px;padding:16px 20px;margin:20px 0;color:#085041;}
+        .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}
+      </style></head><body>
+      <div class="wrapper">
+        <div class="header"><h1 style="color:#D9A441;margin:0;font-size:20px;">Traslados GC</h1></div>
+        <div class="body">
+          <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+          <div class="ok-box">
+            <strong>✅ Tu depósito de garantía ha sido liberado.</strong><br>
+            <span style="font-size:13px;margin-top:6px;display:block;">El importe retenido para la reserva <span class="pnr">${r.numero_reserva}</span> ha quedado libre en tu tarjeta. El proceso bancario puede tardar entre 5 y 10 días hábiles según tu entidad.</span>
+          </div>
+          <p style="font-size:13px;color:#5b5347;">Gracias por viajar con Traslados GC. Esperamos verte de nuevo.</p>
+        </div>
+        <div class="footer">Traslados GC · Gran Canaria</div>
+      </div></body></html>`
+    });
+  } catch(e) { console.warn('Error enviando email liberación depósito:', e.message); }
+
+  res.json({ ok: true });
+}));
+
+// Admin: emails de notificación (guardar)
+app.post('/admin/contacto', requireAdmin, asyncHandler(async (req, res) => {
+  const { telefono, whatsapp, email, direccion, horario, emails_notificacion } = req.body;
+  await pool.query(
+    `UPDATE configuracion_contacto SET telefono=$1, whatsapp=$2, email=$3, direccion=$4, horario=$5, emails_notificacion=$6, actualizado_en=NOW() WHERE id=1`,
+    [telefono||'', whatsapp||'', email||'', direccion||'', horario||'', emails_notificacion||'']
+  );
+  res.json({ ok: true });
 }));
 
 // ─── Arranque ─────────────────────────────────────────────────────────────────
