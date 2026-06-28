@@ -4815,6 +4815,11 @@ app.post('/api/cliente/solicitar-acceso', asyncHandler(async (req, res) => {
     return res.status(403).json({ error: 'El email no coincide con el de la reserva.' });
   }
 
+  // Si ya tiene contraseña creada (no provisional), no la sobrescribimos
+  if (reserva.cliente_password_hash && !reserva.cliente_primer_acceso) {
+    return res.status(403).json({ error: 'Ya tienes una cuenta creada. Accede con tu email y contraseña.' });
+  }
+
   // Generar y guardar nueva contraseña provisional
   const pwd = generarPasswordProvisional();
   const hash = await bcrypt.hash(pwd, 10);
