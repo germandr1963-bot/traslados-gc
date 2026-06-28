@@ -4872,7 +4872,8 @@ app.post('/api/cliente/login', asyncHandler(async (req, res) => {
 
   req.session.clienteReservaId = reserva.id;
   req.session.clientePnr = pnr.toUpperCase();
-  req.session.save(function() {
+  req.session.save(function(err) {
+    console.log('[CLIENTE LOGIN] PNR:', pnr, '| SessionID:', req.session.id, '| Error:', err || 'ninguno');
     res.json({ ok: true, primer_acceso: reserva.cliente_primer_acceso });
   });
 }));
@@ -4907,6 +4908,7 @@ app.get('/api/cliente/sesion', (req, res) => {
 
 // Datos completos de la reserva para el portal
 app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
+  console.log('[CLIENTE MI-RESERVA] SessionID:', req.session.id, '| clienteReservaId:', req.session.clienteReservaId);
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
 
   const result = await pool.query(
