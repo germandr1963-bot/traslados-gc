@@ -4883,6 +4883,7 @@ app.post('/api/cliente/login', asyncHandler(async (req, res) => {
 
   req.session.clienteReservaId = reserva.id;
   req.session.clientePnr = pnr.toUpperCase();
+  req.session.clienteEmail = reserva.email_cliente;
   req.session.save(function(err) {
     console.log('[CLIENTE LOGIN] PNR:', pnr, '| SessionID:', req.session.id, '| Error:', err || 'ninguno');
     res.json({ ok: true, primer_acceso: reserva.cliente_primer_acceso });
@@ -4917,11 +4918,16 @@ app.get('/api/cliente/sesion', (req, res) => {
   }
 });
 
-// Datos completos de la reserva para el portal
+// Datos completos de las reservas para el portal
 app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
-  console.log('[CLIENTE MI-RESERVA] SessionID:', req.session.id, '| clienteReservaId:', req.session.clienteReservaId);
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
 
+  // Obtener email del cliente desde la reserva de acceso
+  const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+  if (!emailResult.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const emailCliente = req.session.clienteEmail || emailResult.rows[0].email_cliente;
+
+  // Todas las reservas de ese email
   const result = await pool.query(
     `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
             r.fecha, r.hora, r.origen, r.destino, r.num_pasajeros,
@@ -4936,47 +4942,54 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
      FROM reservas r
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
      LEFT JOIN conductores c ON c.id = r.conductor_id
-     WHERE r.id = $1`,
-    [req.session.clienteReservaId]
-  );
-  if (!result.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
-  const r = result.rows[0];
-
-  // Extras
-  const extras = await pool.query(
-    `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
-     JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`,
-    [r.id]
+     WHERE LOWER(r.email_cliente) = LOWER($1) AND r.archivada = FALSE
+     ORDER BY r.fecha DESC, r.hora DESC`,
+    [emailCliente]
   );
 
-  // Configuración No-Show activa para esta reserva
-  const cfgNoshow = await obtenerConfigNoshow(r.fecha);
-  const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
-  const ahora = new Date();
-  const puedeMod = ahora < fechaCancelacion;
+  // Para cada reserva obtener extras y noshow
+  const reservas = await Promise.all(result.rows.map(async function(r) {
+    const extras = await pool.query(
+      `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
+       JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`,
+      [r.id]
+    );
+    const cfgNoshow = await obtenerConfigNoshow(r.fecha);
+    const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
+    const ahora = new Date();
+    const esHistorial = new Date(r.fecha) < ahora;
+    return Object.assign({}, r, {
+      extras: extras.rows,
+      noshow: {
+        importe: parseFloat(cfgNoshow.importe_deposito).toFixed(2),
+        horas: cfgNoshow.horas_cancelacion,
+        fecha_limite: fechaCancelacion.toISOString(),
+        puede_modificar: ahora < fechaCancelacion
+      },
+      es_historial: esHistorial
+    });
+  }));
 
-  res.json({
-    reserva: r,
-    extras: extras.rows,
-    noshow: {
-      importe: parseFloat(cfgNoshow.importe_deposito).toFixed(2),
-      horas: cfgNoshow.horas_cancelacion,
-      fecha_limite: fechaCancelacion.toISOString(),
-      puede_modificar: puedeMod
-    }
-  });
+  res.json({ reservas, nombre: result.rows.length ? result.rows[0].nombre_cliente : '' });
 }));
 
 // Modificar datos de la reserva (cliente)
 app.post('/api/cliente/modificar', asyncHandler(async (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
 
+  const reservaId = req.body.reserva_id || req.session.clienteReservaId;
+
+  // Verificar que la reserva pertenece al email del cliente
+  const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+  const emailCliente = req.session.clienteEmail || (emailResult.rows[0] ? emailResult.rows[0].email_cliente : null);
+
   const reserva = await pool.query(
-    'SELECT fecha, hora, estado FROM reservas WHERE id = $1',
-    [req.session.clienteReservaId]
+    'SELECT fecha, hora, estado, email_cliente FROM reservas WHERE id = $1',
+    [reservaId]
   );
   if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
   const r = reserva.rows[0];
+  if (r.email_cliente.toLowerCase() !== emailCliente.toLowerCase()) return res.status(403).json({ error: 'No autorizado.' });
 
   const cfgNoshow = await obtenerConfigNoshow(r.fecha);
   const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
@@ -4998,7 +5011,7 @@ app.post('/api/cliente/modificar', asyncHandler(async (req, res) => {
      WHERE id = $9`,
     [hora||null, numero_vuelo||null, hora_llegada_vuelo||null, nombre_barco||null,
      hora_atraque||null, direccion_recogida||null, direccion_destino||null, notas_cliente||null,
-     req.session.clienteReservaId]
+     reservaId]
   );
 
   // Notificar al equipo
@@ -5023,20 +5036,21 @@ app.post('/api/cliente/modificar', asyncHandler(async (req, res) => {
 // Enviar mensaje al operador (siempre disponible)
 app.post('/api/cliente/mensaje', asyncHandler(async (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
-  const { mensaje } = req.body;
+  const { mensaje, reserva_id } = req.body;
   if (!mensaje || !mensaje.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
+  const reservaId = reserva_id || req.session.clienteReservaId;
 
   await pool.query(
     'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
-    [req.session.clienteReservaId, 'cliente', mensaje.trim()]
+    [reservaId, 'cliente', mensaje.trim()]
   );
 
   // Notificar al equipo
   try {
     const emails = await obtenerEmailsNotificacion();
-    const pnr = req.session.clientePnr;
-    const reservaInfo = await pool.query('SELECT nombre_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+    const reservaInfo = await pool.query('SELECT nombre_cliente, numero_reserva FROM reservas WHERE id = $1', [reservaId]);
     const nombre = reservaInfo.rows[0] ? reservaInfo.rows[0].nombre_cliente : 'Cliente';
+    const pnr = reservaInfo.rows[0] ? reservaInfo.rows[0].numero_reserva : '—';
     if (emails.length) {
       for (const em of emails) {
         await enviarEmail({
@@ -5056,9 +5070,10 @@ app.post('/api/cliente/mensaje', asyncHandler(async (req, res) => {
 // Ver mensajes de la reserva (cliente)
 app.get('/api/cliente/mensajes', asyncHandler(async (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+  const reservaId = req.query.reserva_id || req.session.clienteReservaId;
   const result = await pool.query(
     'SELECT id, autor, mensaje, creado_en FROM reservas_mensajes WHERE reserva_id = $1 ORDER BY creado_en ASC',
-    [req.session.clienteReservaId]
+    [reservaId]
   );
   res.json({ mensajes: result.rows });
 }));
