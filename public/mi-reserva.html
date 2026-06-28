@@ -267,7 +267,7 @@
     </div>
 
     <!-- ═══ PANTALLA: LOGIN ════════════════════════════════════════════════ -->
-    <div id="pantalla-login" class="oculto">
+    <div id="pantalla-login">
       <div style="max-width:460px;margin:0 auto;padding-top:40px;">
         <h1 style="font-family:'Big Shoulders Display',sans-serif;font-size:clamp(28px,5vw,44px);margin-bottom:8px;line-height:1.1;color:var(--texto-oscuro);">Mi <span style="color:var(--terracota);">reserva</span></h1>
         <p style="color:var(--texto-muted);font-size:14px;margin-bottom:32px;line-height:1.6;">Accede para ver el estado de tu traslado, gestionar cambios y comunicarte con el equipo.</p>
@@ -741,19 +741,19 @@
   // ═══════════════════════════════════════════════════════════════
   // Init: comprobar si ya hay sesión activa
   // ═══════════════════════════════════════════════════════════════
+  // Mostrar login por defecto, luego comprobar sesión
+  // Si hay sesión activa se carga el portal, si no se queda el login
   fetch('/api/cliente/sesion')
-    .then(function(r) {
-      if (!r.ok) throw new Error('error');
-      return r.json();
-    })
+    .then(function(r) { return r.json(); })
     .then(function(d) {
       if (d.autenticado) {
         cargarPortal();
-      } else {
-        mostrarLogin();
       }
+      // Si no está autenticado, el login ya está visible — no hace falta nada
     })
-    .catch(function() { mostrarLogin(); });
+    .catch(function() {
+      // Si falla la conexión, el login ya está visible
+    });
 
   </script>
 </body>
