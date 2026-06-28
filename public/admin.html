@@ -653,6 +653,21 @@ table.tabla-precios input {
           <div id="aviso-email-reserva" style="display:none;margin-top:0.75rem;font-size:0.82rem;"></div>
         </div>
 
+        <!-- 4. Mensajes del cliente -->
+        <div style="margin-top:1rem;padding:1rem;border:1px solid var(--gris-borde);border-radius:8px;background:#f9f7f4;">
+          <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">💬 Mensajes del cliente</p>
+          <div id="hilo-mensajes-admin" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;max-height:200px;overflow-y:auto;"></div>
+          <div id="aviso-sin-mensajes" style="font-size:0.82rem;color:var(--texto-muted);display:none;">Sin mensajes de este cliente.</div>
+        </div>
+
+        <!-- 5. Depósito -->
+        <div style="margin-top:1rem;padding:1rem;border:1px solid var(--gris-borde);border-radius:8px;background:#f9f7f4;">
+          <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">🔒 Depósito de garantía</p>
+          <div id="deposito-estado-admin" style="font-size:0.85rem;color:var(--texto-muted);margin-bottom:0.75rem;"></div>
+          <button id="btn-liberar-deposito" class="boton-costa" style="font-size:0.82rem;display:none;" onclick="liberarDeposito()">✅ Marcar depósito como liberado</button>
+          <div id="aviso-deposito-admin" style="display:none;margin-top:0.5rem;font-size:0.82rem;"></div>
+        </div>
+
         <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
           <button class="boton-costa" style="font-size:0.82rem;" onclick="archivarDesdeDetalle()">📦 Archivar</button>
           <button class="boton-peligro" style="font-size:0.82rem;" onclick="borrarDesdeDetalle()">🗑 Borrar reserva</button>
@@ -758,6 +773,11 @@ table.tabla-precios input {
           <div style="grid-column:1/-1;">
             <label class="etiqueta">Dirección (opcional)</label>
             <input type="text" id="contacto-direccion" class="campo" placeholder="Calle Ejemplo, 1 — Las Palmas de Gran Canaria">
+          </div>
+          <div style="grid-column:1/-1;">
+            <label class="etiqueta">Emails de notificación interna</label>
+            <input type="text" id="contacto-emails-notif" class="campo" placeholder="operaciones@empresa.com, gerencia@empresa.com">
+            <p style="font-size:12px;color:var(--texto-muted);margin-top:5px;">Separados por coma. Recibirán aviso cuando un cliente modifique datos o envíe un mensaje desde su portal.</p>
           </div>
         </div>
         <button class="boton-primario" onclick="guardarContacto()">💾 Guardar</button>
@@ -2970,6 +2990,7 @@ function cargarContacto() {
       document.getElementById('contacto-email').value = d.email || '';
       document.getElementById('contacto-horario').value = d.horario || '';
       document.getElementById('contacto-direccion').value = d.direccion || '';
+      document.getElementById('contacto-emails-notif').value = d.emails_notificacion || '';
     });
 }
 
@@ -2983,7 +3004,8 @@ function guardarContacto() {
       whatsapp: document.getElementById('contacto-whatsapp').value.trim(),
       email: document.getElementById('contacto-email').value.trim(),
       horario: document.getElementById('contacto-horario').value.trim(),
-      direccion: document.getElementById('contacto-direccion').value.trim()
+      direccion: document.getElementById('contacto-direccion').value.trim(),
+      emails_notificacion: document.getElementById('contacto-emails-notif').value.trim()
     })
   }).then(function(r) { return r.json(); }).then(function() {
     av.style.display = 'block';
@@ -3823,11 +3845,74 @@ function abrirDetalleReserva(id, sinScroll) {
 
       panel.classList.remove('oculto');
 
+      // Mensajes del cliente
+      cargarMensajesAdmin(id);
+
+      // Estado del depósito
+      var depEl = document.getElementById('deposito-estado-admin');
+      var btnLiberar = document.getElementById('btn-liberar-deposito');
+      if (r.deposito_liberado) {
+        depEl.innerHTML = '<span style="color:#2d7a4f;font-weight:600;">✅ Depósito ya liberado y notificado al cliente.</span>';
+        btnLiberar.style.display = 'none';
+      } else if (r.deposito_pagado) {
+        depEl.innerHTML = '<span style="color:#856404;">🔒 Depósito retenido — ' + (r.deposito_importe || '—') + ' €. Pulsa el botón cuando el servicio esté completado y quieras liberar la retención.</span>';
+        btnLiberar.style.display = 'inline-block';
+      } else {
+        depEl.innerHTML = '<span style="color:var(--texto-muted);">⏳ Depósito pendiente de pago. No hay nada que liberar aún.</span>';
+        btnLiberar.style.display = 'none';
+      }
+
       // Scroll suave solo cuando el usuario pulsa Ver, no en recargas automáticas
       if (!sinScroll) {
         setTimeout(function() {
           panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }, 50);
+      }
+    });
+}
+
+
+// ─── Mensajes del cliente (admin) ─────────────────────────────────────────────
+function cargarMensajesAdmin(reservaId) {
+  fetch('/admin/reservas/' + reservaId + '/mensajes')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var hilo = document.getElementById('hilo-mensajes-admin');
+      var aviso = document.getElementById('aviso-sin-mensajes');
+      if (!d.mensajes || !d.mensajes.length) {
+        hilo.innerHTML = '';
+        aviso.style.display = 'block';
+        return;
+      }
+      aviso.style.display = 'none';
+      hilo.innerHTML = d.mensajes.map(function(m) {
+        var fecha = new Date(m.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+        var esCliente = m.autor === 'cliente';
+        return '<div style="background:' + (esCliente ? '#fff3e0' : '#e8f5e9') + ';border:1px solid ' + (esCliente ? '#ffe0b2' : '#c8e6c9') + ';border-radius:8px;padding:8px 12px;font-size:0.82rem;">' +
+          '<span style="font-weight:600;color:' + (esCliente ? '#e65100' : '#2e7d32') + ';">' + (esCliente ? '👤 Cliente' : '👨‍💼 Equipo') + '</span>' +
+          '<span style="color:#999;font-size:0.75rem;margin-left:8px;">' + fecha + '</span>' +
+          '<p style="margin:4px 0 0;color:#333;">' + m.mensaje.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/
+/g,'<br>') + '</p>' +
+          '</div>';
+      }).join('');
+    });
+}
+
+// ─── Liberar depósito (admin) ──────────────────────────────────────────────────
+function liberarDeposito() {
+  if (!reservaDetalleId) return;
+  if (!confirm('¿Confirmas que el depósito ha sido liberado y quieres notificar al cliente?')) return;
+  var av = document.getElementById('aviso-deposito-admin');
+  fetch('/admin/reservas/' + reservaDetalleId + '/liberar-deposito', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        document.getElementById('btn-liberar-deposito').style.display = 'none';
+        document.getElementById('deposito-estado-admin').innerHTML = '<span style="color:#2d7a4f;font-weight:600;">✅ Depósito liberado. Email enviado al cliente.</span>';
+        av.style.display = 'none';
+      } else {
+        av.textContent = d.error || 'Error al liberar depósito.';
+        av.style.display = 'block';
       }
     });
 }
