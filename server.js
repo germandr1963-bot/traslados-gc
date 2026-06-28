@@ -3517,7 +3517,11 @@ app.get('/admin/reservas', requireAdmin, asyncHandler(async (req, res) => {
             COALESCE((
               SELECT SUM(re.precio_en_reserva)
               FROM reservas_extras re WHERE re.reserva_id = r.id
-            ), 0) AS total_extras
+            ), 0) AS total_extras,
+            COALESCE((
+              SELECT COUNT(*) FROM reservas_mensajes rm
+              WHERE rm.reserva_id = r.id AND rm.autor = 'cliente' AND rm.leido = FALSE
+            ), 0) AS mensajes_sin_leer
      FROM reservas r
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
      LEFT JOIN conductores c ON c.id = r.conductor_id
@@ -4773,6 +4777,16 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
   });
 }));
 
+
+// ─── Admin: guardar emails de notificación ───────────────────────────────────
+app.post('/admin/notificaciones', requireAdmin, asyncHandler(async (req, res) => {
+  const { emails_notificacion } = req.body;
+  await pool.query(
+    'UPDATE configuracion_contacto SET emails_notificacion = $1, actualizado_en = NOW() WHERE id = 1',
+    [emails_notificacion || '']
+  );
+  res.json({ ok: true });
+}));
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ─── PORTAL DEL CLIENTE (/mi-reserva) ─────────────────────────────────────────
