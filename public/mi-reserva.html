@@ -709,18 +709,11 @@
   // ═══════════════════════════════════════════════════════════════
   // El login siempre visible por defecto
   // Solo se comprueba sesión si hay token activo
-  try {
-    fetch('/api/cliente/sesion')
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (d && d.autenticado) {
-          cargarPortal();
-        } else {
-          mostrarLogin();
-        }
-      })
-      .catch(function() { mostrarLogin(); });
-  } catch(e) { mostrarLogin(); }
+  mostrarLogin();
+  fetch('/api/cliente/sesion')
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (d && d.autenticado) cargarPortal(); })
+    .catch(function() {});
 
   </script>
 </body>
