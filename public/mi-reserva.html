@@ -464,6 +464,7 @@
       body: JSON.stringify({ password_nueva: p1 })
     }).then(function(r) { return r.json(); }).then(function(d) {
       if (d.ok) {
+        mostrarSolo('pantalla-portal');
         cargarPortal();
       } else {
         mostrarAviso('aviso-cambiar', d.error || 'Error al guardar.', 'error');
