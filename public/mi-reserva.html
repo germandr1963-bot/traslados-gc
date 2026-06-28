@@ -479,7 +479,11 @@
     fetch('/api/cliente/mi-reserva')
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.error) { mostrarLogin(); return; }
+        if (d.error) {
+          mostrarLogin();
+          mostrarAviso('aviso-login', 'Error: ' + d.error, 'error');
+          return;
+        }
         datosReserva = d;
         renderPortal(d);
         cargarMensajes();
