@@ -56,9 +56,9 @@
       font-weight: 600; cursor: pointer; transition: background 0.2s; margin-top: 4px; }
     .btn-acceso:hover { background: var(--terracota-oscuro); }
 
-    .enlace-accion { display: block; text-align: center; margin-top: 28px;
-      padding-top: 20px; border-top: 1px solid var(--gris-borde);
-      color: var(--texto-muted); font-size: 13px; cursor: pointer; text-decoration: underline; line-height: 1.6; }
+    .enlace-accion { display: block; text-align: center; margin-top: 20px;
+      padding-top: 16px; border-top: 1px solid var(--gris-borde);
+      color: var(--texto-muted); font-size: 13px; cursor: pointer; text-decoration: underline; }
     .enlace-accion:hover { color: var(--terracota); }
 
     .aviso-acceso { border-radius: 8px; padding: 10px 14px; margin-top: 14px;
@@ -256,7 +256,7 @@
         <div class="tarjeta-acceso">
           <h2>Número de reserva</h2>
           <p class="campo-hint">Lo encontrarás en el email que recibiste al hacer la reserva</p>
-          <input type="text" id="sol-pnr" class="campo-acceso pnr-input" placeholder="Ej: XKF130" maxlength="10" autocomplete="off">
+          <input type="text" id="sol-pnr" class="campo-acceso pnr-input" placeholder="Ej: XKF130" maxlength="10">
           <h2 style="margin-top:4px;">Tu email</h2>
           <p class="campo-hint">El mismo con el que hiciste la reserva</p>
           <input type="email" id="sol-email" class="campo-acceso" placeholder="tu@email.com">
@@ -274,10 +274,10 @@
         <div class="tarjeta-acceso">
           <h2>Número de reserva</h2>
           <p class="campo-hint">Lo encontrarás en el email que recibiste al hacer la reserva</p>
-          <input type="text" id="login-pnr" class="campo-acceso pnr-input" placeholder="Ej: XKF130" maxlength="10" autocomplete="off">
+          <input type="text" id="login-pnr" class="campo-acceso pnr-input" placeholder="Ej: XKF130" maxlength="10">
           <h2 style="margin-top:4px;">Tu contraseña</h2>
           <p class="campo-hint">La que elegiste al acceder por primera vez</p>
-          <input type="password" id="login-pwd" class="campo-acceso" placeholder="Tu contraseña" autocomplete="new-password">
+          <input type="password" id="login-pwd" class="campo-acceso" placeholder="Tu contraseña">
           <button class="btn-acceso" onclick="hacerLogin()">Entrar</button>
           <div id="aviso-login" class="aviso-acceso"></div>
           <span class="enlace-accion" onclick="mostrarSolicitar()">¿Es tu primera vez o no recuerdas la contraseña? Solicitar acceso</span>
