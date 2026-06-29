@@ -706,6 +706,33 @@ table.tabla-precios input {
           <div id="aviso-edicion-reserva" style="display:none;margin-top:0.5rem;font-size:0.82rem;"></div>
         </div>
 
+        <!-- 4. Editar reserva -->
+        <div style="margin-top:1rem;padding:1rem;border:1px solid var(--gris-borde);border-radius:8px;background:#f9f7f4;">
+          <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleEdicionReserva()">
+            <p style="font-size:0.85rem;font-weight:600;margin:0;">✏️ Editar reserva</p>
+            <span id="icono-edicion" style="font-size:0.82rem;color:#888;">▼ Abrir</span>
+          </div>
+          <div id="panel-edicion-reserva" style="display:none;margin-top:0.75rem;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+              <div><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Fecha del traslado</label><input type="date" id="edit-fecha" class="campo" style="height:34px;font-size:0.82rem;width:100%;"></div>
+              <div><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Hora de recogida</label><input type="time" id="edit-hora" class="campo" style="height:34px;font-size:0.82rem;width:100%;"></div>
+              <div><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Nº pasajeros</label><input type="number" id="edit-pasajeros" class="campo" min="1" style="height:34px;font-size:0.82rem;width:100%;"></div>
+              <div><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Número de vuelo</label><input type="text" id="edit-vuelo" class="campo" placeholder="Ej: IB3456" style="height:34px;font-size:0.82rem;width:100%;"></div>
+              <div><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Hora llegada vuelo</label><input type="time" id="edit-hora-vuelo" class="campo" style="height:34px;font-size:0.82rem;width:100%;"></div>
+              <div><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Nombre del barco</label><input type="text" id="edit-barco" class="campo" style="height:34px;font-size:0.82rem;width:100%;"></div>
+              <div><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Hora de atraque</label><input type="time" id="edit-hora-atraque" class="campo" style="height:34px;font-size:0.82rem;width:100%;"></div>
+            </div>
+            <div style="margin-top:0.75rem;"><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Dirección de recogida</label><input type="text" id="edit-recogida" class="campo" style="height:34px;font-size:0.82rem;width:100%;"></div>
+            <div style="margin-top:0.5rem;"><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Dirección de destino</label><input type="text" id="edit-destino" class="campo" style="height:34px;font-size:0.82rem;width:100%;"></div>
+            <div style="margin-top:0.5rem;"><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Notas</label><textarea id="edit-notas" class="campo" rows="2" style="font-size:0.82rem;width:100%;resize:vertical;"></textarea></div>
+            <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+              <button class="boton-primario" style="font-size:0.82rem;" onclick="guardarEdicionReserva()">💾 Guardar cambios</button>
+              <span style="font-size:0.78rem;color:#888;">Los cambios quedan registrados en el historial.</span>
+            </div>
+            <div id="aviso-edicion-reserva" style="display:none;margin-top:0.5rem;font-size:0.82rem;"></div>
+          </div>
+        </div>
+
         <!-- 5. Mensajes del cliente -->
         <div style="margin-top:1rem;padding:1rem;border:1px solid var(--gris-borde);border-radius:8px;background:#f9f7f4;">
           <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">💬 Mensajes del cliente</p>
@@ -3979,6 +4006,7 @@ function abrirDetalleReserva(id, sinScroll) {
       });
 
       cargarConductoresEnDetalle(r.conductor_id, r.conductor_nombre);
+      rellenarCamposEdicion(r);
 
       // Rellenar campos de edición
       var ef = document.getElementById('edit-fecha');
@@ -4062,8 +4090,46 @@ function enviarRespuestaCliente() {
     }
   });
 }
+function toggleEdicionReserva() {
+  var panel = document.getElementById('panel-edicion-reserva');
+  var icono = document.getElementById('icono-edicion');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    icono.textContent = '▲ Cerrar';
+  } else {
+    panel.style.display = 'none';
+    icono.textContent = '▼ Abrir';
+  }
+}
 
-// ─── Editar reserva (admin) ────────────────────────────────────────────────────
+function rellenarCamposEdicion(r) {
+  var ef = document.getElementById('edit-fecha');
+  var eh = document.getElementById('edit-hora');
+  var ep = document.getElementById('edit-pasajeros');
+  var ev = document.getElementById('edit-vuelo');
+  var ehv = document.getElementById('edit-hora-vuelo');
+  var eb = document.getElementById('edit-barco');
+  var eha = document.getElementById('edit-hora-atraque');
+  var er = document.getElementById('edit-recogida');
+  var ed = document.getElementById('edit-destino');
+  var en2 = document.getElementById('edit-notas');
+  if (ef) ef.value = r.fecha ? r.fecha.slice(0,10) : '';
+  if (eh) eh.value = r.hora ? r.hora.slice(0,5) : '';
+  if (ep) ep.value = r.num_pasajeros || '';
+  if (ev) ev.value = r.numero_vuelo || '';
+  if (ehv) ehv.value = r.hora_llegada_vuelo ? r.hora_llegada_vuelo.slice(0,5) : '';
+  if (eb) eb.value = r.nombre_barco || '';
+  if (eha) eha.value = r.hora_atraque ? r.hora_atraque.slice(0,5) : '';
+  if (er) er.value = r.direccion_recogida || '';
+  if (ed) ed.value = r.direccion_destino || '';
+  if (en2) en2.value = r.notas_cliente || '';
+  // Asegurarse de que el panel empieza cerrado
+  var panel = document.getElementById('panel-edicion-reserva');
+  var icono = document.getElementById('icono-edicion');
+  if (panel) panel.style.display = 'none';
+  if (icono) icono.textContent = '▼ Abrir';
+}
+
 function guardarEdicionReserva() {
   if (!reservaDetalleId) return;
   var av = document.getElementById('aviso-edicion-reserva');
