@@ -843,8 +843,10 @@ table.tabla-precios input {
 
     <div id="seccion-facturacion" class="oculto">
       <h1>Facturación</h1>
-      <p class="subtitulo">Datos fiscales de la empresa. Se usarán en las facturas generadas automáticamente al liberar el depósito.</p>
-      <div class="tarjeta">
+      <p class="subtitulo">Datos fiscales de la empresa y registro de facturas emitidas.</p>
+
+      <div class="tarjeta" style="margin-bottom:20px;">
+        <h2 style="font-size:1rem;margin:0 0 1rem 0;">🏢 Datos de la empresa</h2>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
           <div style="grid-column:1/-1;">
             <label class="etiqueta">Razón social</label>
@@ -877,6 +879,33 @@ table.tabla-precios input {
         </div>
         <button class="boton-primario" onclick="guardarFacturacion()">💾 Guardar</button>
         <div id="aviso-facturacion" style="display:none;margin-top:0.75rem;font-size:0.85rem;"></div>
+      </div>
+
+      <div class="tarjeta">
+        <h2 style="font-size:1rem;margin:0 0 1rem 0;">📄 Facturas emitidas</h2>
+        <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">
+          <input type="text" id="fact-buscar-pnr" class="campo" placeholder="Buscar por PNR…" style="max-width:220px;height:36px;">
+          <button class="boton-primario" style="height:36px;font-size:0.82rem;" onclick="cargarFacturas()">Buscar</button>
+          <button class="boton-costa" style="height:36px;font-size:0.82rem;" onclick="document.getElementById('fact-buscar-pnr').value='';cargarFacturas()">Ver todas</button>
+        </div>
+        <div id="lista-facturas-admin">
+          <p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>
+        </div>
+      </div>
+
+      <div id="modal-enviar-factura" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:12px;padding:28px;max-width:440px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+          <h3 style="margin:0 0 16px;font-size:1rem;">📧 Enviar factura al cliente</h3>
+          <input type="hidden" id="modal-factura-id">
+          <label class="etiqueta">Email destino</label>
+          <input type="email" id="modal-email-destino" class="campo" placeholder="email@cliente.com" style="margin-bottom:12px;">
+          <p style="font-size:12px;color:var(--texto-muted);margin:0 0 16px;">Déjalo vacío para enviar al email de la reserva.</p>
+          <div style="display:flex;gap:8px;">
+            <button class="boton-primario" style="font-size:0.82rem;" onclick="confirmarEnvioFactura()">📨 Enviar</button>
+            <button class="boton-costa" style="font-size:0.82rem;" onclick="cerrarModalFactura()">Cancelar</button>
+          </div>
+          <div id="aviso-envio-factura" style="display:none;margin-top:10px;font-size:0.82rem;"></div>
+        </div>
       </div>
     </div>
 
@@ -3208,6 +3237,7 @@ function cargarFacturacion() {
       document.getElementById('fact-ciudad').value = f.ciudad || '';
       document.getElementById('fact-email').value = f.email || '';
       document.getElementById('fact-telefono').value = f.telefono || '';
+      cargarFacturas();
     });
 }
 
@@ -3232,21 +3262,93 @@ function guardarFacturacion() {
   });
 }
 
+function cargarFacturas() {
+  var pnr = document.getElementById('fact-buscar-pnr') ? document.getElementById('fact-buscar-pnr').value.trim() : '';
+  var lista = document.getElementById('lista-facturas-admin');
+  if (!lista) return;
+  lista.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+  fetch('/admin/facturas' + (pnr ? '?pnr=' + encodeURIComponent(pnr) : ''))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.facturas || !d.facturas.length) {
+        lista.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">No hay facturas' + (pnr ? ' para ese PNR' : '') + '.</p>';
+        return;
+      }
+      lista.innerHTML = '<table class="tabla-admin"><thead><tr>' +
+        '<th>Nº Factura</th><th>PNR</th><th>Cliente</th><th>Fecha</th><th>Importe</th><th>Acciones</th>' +
+        '</tr></thead><tbody>' +
+        d.facturas.map(function(f) {
+          var fecha = new Date(f.generada_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', year:'numeric'});
+          return '<tr>' +
+            '<td style="font-family:monospace;font-weight:600;">' + f.numero_factura + '</td>' +
+            '<td style="font-family:monospace;">' + f.numero_reserva + '</td>' +
+            '<td>' + f.nombre_cliente + '<br><span style="font-size:11px;color:#888;">' + f.email_cliente + '</span></td>' +
+            '<td style="font-size:13px;">' + fecha + '</td>' +
+            '<td style="font-family:monospace;font-weight:600;">' + parseFloat(f.importe_total).toFixed(2) + ' €</td>' +
+            '<td style="display:flex;gap:6px;flex-wrap:wrap;">' +
+              '<button class="boton-costa" style="font-size:0.78rem;padding:4px 10px;" onclick="descargarFacturaAdmin(' + f.reserva_id + ', \'' + f.numero_reserva + '\')">📄 Descargar</button>' +
+              '<button class="boton-primario" style="font-size:0.78rem;padding:4px 10px;" onclick="abrirModalFactura(' + f.id + ', \'' + f.email_cliente + '\')">📧 Enviar</button>' +
+            '</td>' +
+          '</tr>';
+        }).join('') +
+        '</tbody></table>';
+    });
+}
+
+function abrirModalFactura(facturaId, emailCliente) {
+  document.getElementById('modal-factura-id').value = facturaId;
+  document.getElementById('modal-email-destino').value = emailCliente || '';
+  document.getElementById('aviso-envio-factura').style.display = 'none';
+  document.getElementById('modal-enviar-factura').style.display = 'flex';
+}
+
+function cerrarModalFactura() {
+  document.getElementById('modal-enviar-factura').style.display = 'none';
+}
+
+function confirmarEnvioFactura() {
+  var id = document.getElementById('modal-factura-id').value;
+  var email = document.getElementById('modal-email-destino').value.trim();
+  var av = document.getElementById('aviso-envio-factura');
+  av.style.display = 'block'; av.style.color = '#888'; av.textContent = 'Enviando…';
+  fetch('/admin/facturas/' + id + '/enviar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email_destino: email })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok) {
+      av.style.color = 'green'; av.textContent = '✅ Factura enviada correctamente.';
+      setTimeout(function() { cerrarModalFactura(); }, 2000);
+    } else {
+      av.style.color = 'var(--rojo)'; av.textContent = d.error || 'Error al enviar.';
+    }
+  });
+}
+
+function descargarFacturaAdmin(reservaId, pnr) {
+  fetch('/admin/reservas/' + reservaId + '/factura')
+    .then(function(r) { if (!r.ok) throw new Error(); return r.blob(); })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'factura-' + pnr + '.docx'; a.click();
+      URL.revokeObjectURL(url);
+    })
+    .catch(function() { alert('Error al generar la factura.'); });
+}
+
 function descargarFactura() {
   if (!reservaDetalleId) return;
   var btn = event.target;
   btn.textContent = 'Generando...'; btn.disabled = true;
   fetch('/admin/reservas/' + reservaDetalleId + '/factura')
-    .then(function(r) {
-      if (!r.ok) throw new Error();
-      return r.blob();
-    })
+    .then(function(r) { if (!r.ok) throw new Error(); return r.blob(); })
     .then(function(blob) {
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      a.href = url;
-      a.download = 'factura-' + reservaDetalleId + '.docx';
-      a.click();
+      a.href = url; a.download = 'factura-' + reservaDetalleId + '.docx'; a.click();
       URL.revokeObjectURL(url);
       btn.textContent = '📄 Descargar factura'; btn.disabled = false;
     })

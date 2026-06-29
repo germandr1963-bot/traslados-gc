@@ -231,6 +231,13 @@
           '</div>';
         html += '<div id="aviso-cancelar-' + i + '" style="display:none;font-size:13px;margin-bottom:12px;"></div>';
 
+        // Factura disponible
+        if (r.tiene_factura) {
+          html += '<div style="margin-bottom:12px;">' +
+            '<a href="/api/cliente/factura/' + r.id + '" download style="display:inline-flex;align-items:center;gap:8px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;color:#2e7d32;text-decoration:none;">📄 Descargar factura</a>' +
+          '</div>';
+        }
+
         // Mensajes — colapsado por defecto
         var numMsg = r.mensajes_sin_leer || 0;
         html += '<div style="border:1px solid var(--borde-suave);border-radius:10px;overflow:hidden;margin-bottom:12px;">' +
