@@ -5086,62 +5086,6 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
   const { fecha, hora, num_pasajeros, direccion_recogida, direccion_destino,
           numero_vuelo, hora_llegada_vuelo, nombre_barco, hora_atraque, notas_cliente } = req.body;
 
-  // Leer valores actuales para registrar qué cambió
-  const actual = await pool.query('SELECT * FROM reservas WHERE id = $1', [req.params.id]);
-  if (!actual.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
-  const r = actual.rows[0];
-
-  // Registrar cambios en el historial de mensajes
-  const cambios = [];
-  if (fecha && fecha !== (r.fecha ? r.fecha.toISOString().slice(0,10) : '')) cambios.push('Fecha: ' + r.fecha?.toISOString().slice(0,10) + ' → ' + fecha);
-  if (hora && hora !== (r.hora ? r.hora.slice(0,5) : '')) cambios.push('Hora: ' + (r.hora ? r.hora.slice(0,5) : '—') + ' → ' + hora);
-  if (num_pasajeros && parseInt(num_pasajeros) !== r.num_pasajeros) cambios.push('Pasajeros: ' + (r.num_pasajeros || '—') + ' → ' + num_pasajeros);
-  if (direccion_recogida !== undefined && direccion_recogida !== (r.direccion_recogida || '')) cambios.push('Recogida: ' + (r.direccion_recogida || '—') + ' → ' + (direccion_recogida || '—'));
-  if (direccion_destino !== undefined && direccion_destino !== (r.direccion_destino || '')) cambios.push('Destino: ' + (r.direccion_destino || '—') + ' → ' + (direccion_destino || '—'));
-  if (numero_vuelo !== undefined && numero_vuelo !== (r.numero_vuelo || '')) cambios.push('Vuelo: ' + (r.numero_vuelo || '—') + ' → ' + (numero_vuelo || '—'));
-  if (hora_llegada_vuelo !== undefined && hora_llegada_vuelo !== (r.hora_llegada_vuelo ? r.hora_llegada_vuelo.slice(0,5) : '')) cambios.push('Hora vuelo: ' + (r.hora_llegada_vuelo ? r.hora_llegada_vuelo.slice(0,5) : '—') + ' → ' + (hora_llegada_vuelo || '—'));
-  if (nombre_barco !== undefined && nombre_barco !== (r.nombre_barco || '')) cambios.push('Barco: ' + (r.nombre_barco || '—') + ' → ' + (nombre_barco || '—'));
-  if (hora_atraque !== undefined && hora_atraque !== (r.hora_atraque ? r.hora_atraque.slice(0,5) : '')) cambios.push('Hora atraque: ' + (r.hora_atraque ? r.hora_atraque.slice(0,5) : '—') + ' → ' + (hora_atraque || '—'));
-  if (notas_cliente !== undefined && notas_cliente !== (r.notas_cliente || '')) cambios.push('Notas: actualizadas');
-
-  // Guardar cambios en la BD
-  await pool.query(
-    `UPDATE reservas SET
-      fecha = COALESCE($1, fecha),
-      hora = COALESCE($2, hora),
-      num_pasajeros = COALESCE($3, num_pasajeros),
-      direccion_recogida = COALESCE($4, direccion_recogida),
-      direccion_destino = COALESCE($5, direccion_destino),
-      numero_vuelo = COALESCE($6, numero_vuelo),
-      hora_llegada_vuelo = COALESCE($7, hora_llegada_vuelo),
-      nombre_barco = COALESCE($8, nombre_barco),
-      hora_atraque = COALESCE($9, hora_atraque),
-      notas_cliente = COALESCE($10, notas_cliente)
-     WHERE id = $11`,
-    [fecha||null, hora||null, num_pasajeros||null,
-     direccion_recogida||null, direccion_destino||null,
-     numero_vuelo||null, hora_llegada_vuelo||null,
-     nombre_barco||null, hora_atraque||null,
-     notas_cliente||null, req.params.id]
-  );
-
-  // Registrar en el historial de mensajes si hubo cambios
-  if (cambios.length) {
-    const texto = '✏️ Reserva modificada por el equipo:\n' + cambios.join('\n');
-    await pool.query(
-      'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
-      [req.params.id, 'admin', texto]
-    );
-  }
-
-  res.json({ ok: true, cambios: cambios.length });
-}));
-
-// Admin: editar datos de una reserva
-app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
-  const { fecha, hora, num_pasajeros, direccion_recogida, direccion_destino,
-          numero_vuelo, hora_llegada_vuelo, nombre_barco, hora_atraque, notas_cliente } = req.body;
-
   const actual = await pool.query('SELECT * FROM reservas WHERE id = $1', [req.params.id]);
   if (!actual.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
   const r = actual.rows[0];
@@ -5188,6 +5132,7 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
 
   res.json({ ok: true, cambios: cambios.length });
 }));
+
 
 // Admin: responder al cliente
 app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, res) => {
