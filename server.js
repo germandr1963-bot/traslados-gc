@@ -5717,7 +5717,8 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
   // Email al cliente con factura adjunta
   try {
     const adjunto = facturaBuffer ? { filename: 'factura-' + r.numero_reserva + '.docx', content: facturaBuffer } : null;
-    await enviarEmail({
+    const fnEmail = adjunto ? enviarEmailConAdjunto : enviarEmail;
+    await fnEmail({
       to: r.email_cliente,
       subject: '✅ Tu depósito ha sido liberado — ' + r.numero_reserva,
       html: `<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -5929,7 +5930,7 @@ app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, re
   const resultado = await generarFacturaWord(f.reserva_id);
   if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
 
-  await enviarEmail({
+  await enviarEmailConAdjunto({
     to: emailDestino,
     subject: '📄 Factura ' + f.numero_factura + ' — Reserva ' + f.numero_reserva,
     html: `<p>Hola <strong>${f.nombre_cliente}</strong>,</p>
