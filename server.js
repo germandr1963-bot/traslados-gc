@@ -5043,8 +5043,10 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
     const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
     const ahora = new Date();
     const esHistorial = new Date(r.fecha) < ahora;
+    const facturaQ = await pool.query('SELECT id FROM facturas WHERE reserva_id = $1 LIMIT 1', [r.id]);
     return Object.assign({}, r, {
       extras: extras.rows,
+      tiene_factura: facturaQ.rows.length > 0,
       noshow: {
         importe: parseFloat(cfgNoshow.importe_deposito).toFixed(2),
         horas: cfgNoshow.horas_cancelacion,
@@ -5895,6 +5897,76 @@ async function generarFacturaWord(reservaId) {
   const buffer = await Packer.toBuffer(doc);
   return { buffer, numeroFactura };
 }
+
+// ─── Admin: lista de facturas ─────────────────────────────────────────────────
+app.get('/admin/facturas', requireAdmin, asyncHandler(async (req, res) => {
+  const { pnr } = req.query;
+  let query = `SELECT f.id, f.numero_factura, f.importe_total, f.generada_en,
+                      r.numero_reserva, r.nombre_cliente, r.email_cliente, r.id AS reserva_id
+               FROM facturas f
+               JOIN reservas r ON r.id = f.reserva_id`;
+  const params = [];
+  if (pnr && pnr.trim()) {
+    params.push('%' + pnr.trim().toUpperCase() + '%');
+    query += ' WHERE UPPER(r.numero_reserva) LIKE $1';
+  }
+  query += ' ORDER BY f.generada_en DESC LIMIT 100';
+  const result = await pool.query(query, params);
+  res.json({ facturas: result.rows });
+}));
+
+// ─── Admin: reenviar factura al cliente ───────────────────────────────────────
+app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, res) => {
+  const { email_destino } = req.body;
+  const facturaQ = await pool.query(
+    'SELECT f.*, r.email_cliente, r.nombre_cliente, r.numero_reserva FROM facturas f JOIN reservas r ON r.id = f.reserva_id WHERE f.id = $1',
+    [req.params.id]
+  );
+  if (!facturaQ.rows.length) return res.status(404).json({ error: 'Factura no encontrada.' });
+  const f = facturaQ.rows[0];
+  const emailDestino = (email_destino && email_destino.trim()) ? email_destino.trim() : f.email_cliente;
+
+  const resultado = await generarFacturaWord(f.reserva_id);
+  if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
+
+  await enviarEmail({
+    to: emailDestino,
+    subject: '📄 Factura ' + f.numero_factura + ' — Reserva ' + f.numero_reserva,
+    html: `<p>Hola <strong>${f.nombre_cliente}</strong>,</p>
+           <p>Adjuntamos la factura <strong>${f.numero_factura}</strong> correspondiente a tu reserva <strong>${f.numero_reserva}</strong>.</p>
+           <p>Gracias por viajar con Traslados GC.</p>`,
+    adjunto: { filename: 'factura-' + f.numero_reserva + '.docx', content: resultado.buffer }
+  });
+
+  res.json({ ok: true });
+}));
+
+// ─── Portal cliente: descargar factura ───────────────────────────────────────
+app.get('/api/cliente/factura/:reservaId', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+  const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+  if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
+  const emailCliente = req.session.clienteEmail || emailResult.rows[0].email_cliente;
+
+  const reservaQ = await pool.query(
+    'SELECT id, numero_reserva FROM reservas WHERE id = $1 AND LOWER(email_cliente) = LOWER($2)',
+    [req.params.reservaId, emailCliente]
+  );
+  if (!reservaQ.rows.length) return res.status(403).json({ error: 'No autorizado.' });
+
+  const facturaQ = await pool.query(
+    'SELECT id FROM facturas WHERE reserva_id = $1 ORDER BY generada_en DESC LIMIT 1',
+    [req.params.reservaId]
+  );
+  if (!facturaQ.rows.length) return res.status(404).json({ error: 'No hay factura disponible para esta reserva.' });
+
+  const resultado = await generarFacturaWord(req.params.reservaId);
+  if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  res.setHeader('Content-Disposition', 'attachment; filename="factura-' + reservaQ.rows[0].numero_reserva + '.docx"');
+  res.send(resultado.buffer);
+}));
 
 // ─── Admin: configuración de facturación ─────────────────────────────────────
 app.get('/admin/facturacion', requireAdmin, asyncHandler(async (req, res) => {
