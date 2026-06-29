@@ -5714,39 +5714,96 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
     if (resultado) { facturaBuffer = resultado.buffer; numeroFactura = resultado.numeroFactura; }
   } catch(e) { console.warn('Error generando factura:', e.message); }
 
-  // Email al cliente con factura adjunta
+  // Email elegante al cliente con factura adjunta
   try {
     const adjunto = facturaBuffer ? { filename: 'factura-' + r.numero_reserva + '.docx', content: facturaBuffer } : null;
     const fnEmail = adjunto ? enviarEmailConAdjunto : enviarEmail;
+    const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
     await fnEmail({
       to: r.email_cliente,
-      subject: '✅ Tu depósito ha sido liberado — ' + r.numero_reserva,
+      subject: '✅ Servicio completado — ' + r.numero_reserva,
       html: `<!DOCTYPE html><html><head><meta charset="utf-8">
       <style>
-        body{margin:0;padding:0;background:#f5f5f5;}
-        .wrapper{max-width:600px;margin:0 auto;background:#fff;}
-        .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #C1502E;}
-        .body{padding:28px 24px;}
-        .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
-        .ok-box{background:#E1F5EE;border-radius:8px;padding:16px 20px;margin:20px 0;color:#085041;}
-        .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}
+        body{margin:0;padding:0;background:#f5f0ea;font-family:'Helvetica Neue',Arial,sans-serif;}
+        .wrapper{max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
+        .header{background:#1C1815;padding:28px 32px;text-align:center;border-bottom:4px solid #C1502E;}
+        .header h1{color:#D9A441;margin:0;font-size:22px;letter-spacing:1px;font-weight:700;}
+        .body{padding:32px;}
+        .saludo{font-size:17px;color:#1C1815;margin-bottom:20px;}
+        .caja-ok{background:#f0faf5;border:1px solid #a8dfc2;border-radius:10px;padding:20px 24px;margin:20px 0;}
+        .caja-ok .titulo{font-size:16px;font-weight:700;color:#1a6640;margin-bottom:8px;}
+        .caja-ok .texto{font-size:14px;color:#2d5a42;line-height:1.6;}
+        .pnr{font-family:monospace;font-size:20px;font-weight:700;color:#C1502E;letter-spacing:3px;display:inline-block;background:#fdf4f2;padding:4px 14px;border-radius:6px;}
+        .datos{background:#f9f7f4;border-radius:8px;padding:16px 20px;margin:20px 0;font-size:14px;color:#3a3330;line-height:1.9;}
+        .datos strong{color:#1C1815;}
+        .factura-aviso{background:#fff8f0;border:1px solid #f5d9b0;border-radius:8px;padding:14px 18px;margin:20px 0;font-size:13px;color:#7a4f1a;}
+        .despedida{font-size:14px;color:#5b5347;line-height:1.7;margin-top:20px;}
+        .footer{background:#ECE6D8;padding:18px 32px;text-align:center;font-size:12px;color:#888;line-height:1.6;}
       </style></head><body>
       <div class="wrapper">
-        <div class="header"><h1 style="color:#D9A441;margin:0;font-size:20px;">Traslados GC</h1></div>
+        <div class="header"><h1>Traslados · GC</h1></div>
         <div class="body">
-          <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-          <div class="ok-box">
-            <strong>✅ Tu depósito de garantía ha sido liberado.</strong><br>
-            <span style="font-size:13px;margin-top:6px;display:block;">El importe retenido para la reserva <span class="pnr">${r.numero_reserva}</span> ha quedado libre en tu tarjeta. El proceso bancario puede tardar entre 5 y 10 días hábiles según tu entidad.</span>
+          <p class="saludo">Hola, <strong>${r.nombre_cliente}</strong> 👋</p>
+          <div class="caja-ok">
+            <div class="titulo">✅ Servicio completado con éxito</div>
+            <div class="texto">El depósito de garantía correspondiente a tu reserva <span class="pnr">${r.numero_reserva}</span> ha sido liberado correctamente. El importe quedará disponible en tu tarjeta en un plazo de 5 a 10 días hábiles según tu entidad bancaria.</div>
           </div>
-          ${facturaBuffer ? '<p style="font-size:13px;color:#5b5347;">Adjuntamos la factura del servicio <strong>' + (numeroFactura || '') + '</strong> para tus registros.</p>' : ''}
-          <p style="font-size:13px;color:#5b5347;">Gracias por viajar con Traslados GC. Esperamos verte de nuevo.</p>
+          <div class="datos">
+            <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
+            <strong>Fecha del servicio:</strong> ${fechaViaje}<br>
+            <strong>Reserva:</strong> <span style="font-family:monospace;">${r.numero_reserva}</span>
+          </div>
+          ${facturaBuffer ? `<div class="factura-aviso">📄 Adjuntamos la <strong>factura ${numeroFactura}</strong> de tu servicio para tus registros. Puedes descargarla también desde tu portal de cliente.</div>` : ''}
+          <p class="despedida">Ha sido un placer acompañarte en este viaje. Si en algún momento necesitas otro traslado en Gran Canaria, estaremos encantados de ayudarte.<br><br>Un saludo cordial,<br><strong>El equipo de Traslados GC</strong></p>
         </div>
-        <div class="footer">Traslados GC · Gran Canaria</div>
+        <div class="footer">Traslados GC · Gran Canaria<br>Este email es una confirmación automática del servicio realizado.</div>
       </div></body></html>`,
       ...(adjunto ? { adjunto } : {})
     });
   } catch(e) { console.warn('Error enviando email liberación depósito:', e.message); }
+
+  // Email de gracias al chofer
+  try {
+    const conductorQ = await pool.query(
+      'SELECT c.email, c.nombre FROM conductores c JOIN reservas r ON r.conductor_id = c.id WHERE r.id = $1',
+      [req.params.id]
+    );
+    if (conductorQ.rows.length && conductorQ.rows[0].email) {
+      const chofer = conductorQ.rows[0];
+      const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+      await enviarEmail({
+        to: chofer.email,
+        subject: '🙏 Gracias por el servicio — ' + r.numero_reserva,
+        html: `<!DOCTYPE html><html><head><meta charset="utf-8">
+        <style>
+          body{margin:0;padding:0;background:#f5f0ea;font-family:'Helvetica Neue',Arial,sans-serif;}
+          .wrapper{max-width:560px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
+          .header{background:#1C1815;padding:24px 28px;text-align:center;border-bottom:4px solid #C1502E;}
+          .header h1{color:#D9A441;margin:0;font-size:20px;font-weight:700;}
+          .body{padding:28px;}
+          .caja{background:#f0faf5;border:1px solid #a8dfc2;border-radius:10px;padding:18px 22px;margin:16px 0;font-size:14px;color:#1a6640;line-height:1.7;}
+          .datos{background:#f9f7f4;border-radius:8px;padding:14px 18px;font-size:14px;color:#3a3330;line-height:1.9;margin:16px 0;}
+          .footer{background:#ECE6D8;padding:16px 28px;text-align:center;font-size:12px;color:#888;}
+        </style></head><body>
+        <div class="wrapper">
+          <div class="header"><h1>Traslados · GC</h1></div>
+          <div class="body">
+            <p style="font-size:16px;color:#1C1815;">Hola, <strong>${chofer.nombre}</strong> 👋</p>
+            <div class="caja">
+              ✅ <strong>Servicio completado.</strong> Gracias por realizar el traslado con profesionalidad y puntualidad. Tu trabajo es la base de nuestro servicio.
+            </div>
+            <div class="datos">
+              <strong>Reserva:</strong> <span style="font-family:monospace;">${r.numero_reserva}</span><br>
+              <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
+              <strong>Fecha:</strong> ${fechaViaje}
+            </div>
+            <p style="font-size:14px;color:#5b5347;line-height:1.7;">Seguimos contando contigo para los próximos servicios. ¡Hasta pronto!<br><br>El equipo de <strong>Traslados GC</strong></p>
+          </div>
+          <div class="footer">Traslados GC · Gran Canaria</div>
+        </div></body></html>`
+      });
+    }
+  } catch(e) { console.warn('Error enviando email gracias al chofer:', e.message); }
 
   res.json({ ok: true });
 }));
