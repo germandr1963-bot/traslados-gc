@@ -659,6 +659,9 @@ table.tabla-precios input {
           <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">💬 Mensajes del cliente</p>
           <div id="hilo-mensajes-admin" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;max-height:200px;overflow-y:auto;"></div>
           <div id="aviso-sin-mensajes" style="font-size:0.82rem;color:var(--texto-muted);display:none;">Sin mensajes de este cliente.</div>
+          <textarea id="campo-respuesta-admin" rows="2" placeholder="Escribe tu respuesta al cliente…" style="width:100%;border:1px solid var(--gris-borde);border-radius:6px;padding:8px 10px;font-size:0.82rem;font-family:inherit;resize:vertical;margin-top:8px;"></textarea>
+          <button class="boton-costa" style="font-size:0.82rem;margin-top:6px;" onclick="enviarRespuestaCliente()">📨 Responder al cliente</button>
+          <div id="aviso-respuesta-admin" style="display:none;font-size:0.82rem;margin-top:6px;"></div>
         </div>
 
         <!-- 5. Depósito -->
@@ -3959,6 +3962,31 @@ function abrirDetalleReserva(id, sinScroll) {
     });
 }
 
+
+// ─── Respuesta del admin al cliente ───────────────────────────────────────────
+function enviarRespuestaCliente() {
+  var mensaje = document.getElementById('campo-respuesta-admin').value.trim();
+  var av = document.getElementById('aviso-respuesta-admin');
+  if (!mensaje) { av.style.display='block'; av.style.color='var(--rojo)'; av.textContent='Escribe un mensaje antes de enviar.'; return; }
+  fetch('/admin/reservas/' + reservaDetalleId + '/mensaje', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mensaje: mensaje })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    av.style.display = 'block';
+    if (d.ok) {
+      av.style.color = 'green';
+      av.textContent = '✅ Mensaje enviado al cliente por email.';
+      document.getElementById('campo-respuesta-admin').value = '';
+      cargarMensajesAdmin(reservaDetalleId);
+    } else {
+      av.style.color = 'var(--rojo)';
+      av.textContent = d.error || 'Error al enviar.';
+    }
+  });
+}
 
 // ─── Mensajes del cliente (admin) ─────────────────────────────────────────────
 function cargarMensajesAdmin(reservaId) {
