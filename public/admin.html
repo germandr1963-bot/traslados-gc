@@ -633,6 +633,22 @@ table.tabla-precios input {
 
           <div id="aviso-chofer-detalle" style="display:none;margin-top:0.5rem;font-size:0.82rem;"></div>
           <p id="nota-email-auto" style="font-size:0.78rem;color:#888;margin:0.5rem 0 0 0;">📧 Al guardar se enviará automáticamente el email de confirmación con el enlace de pago al cliente.</p>
+
+          <!-- Reenviar cartel al chofer -->
+          <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--gris-borde);">
+            <button class="boton-costa" style="font-size:0.82rem;" onclick="reenviarCartelChofer()">📄 Reenviar cartel al chofer</button>
+            <div id="aviso-cartel-chofer" style="display:none;margin-top:0.4rem;font-size:0.82rem;"></div>
+          </div>
+
+          <!-- Chat con el chofer -->
+          <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--gris-borde);">
+            <p style="font-size:0.82rem;font-weight:600;margin:0 0 8px 0;">💬 Comunicación con el chofer</p>
+            <div id="hilo-mensajes-chofer" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;max-height:160px;overflow-y:auto;"></div>
+            <div id="aviso-sin-mensajes-chofer" style="font-size:0.82rem;color:var(--texto-muted);display:none;">Sin mensajes con el chofer.</div>
+            <textarea id="campo-mensaje-chofer" rows="2" placeholder="Escribe un mensaje al chofer…" style="width:100%;border:1px solid var(--gris-borde);border-radius:6px;padding:8px 10px;font-size:0.82rem;font-family:inherit;resize:vertical;margin-top:4px;"></textarea>
+            <button class="boton-costa" style="font-size:0.82rem;margin-top:6px;" onclick="enviarMensajeChofer()">📨 Enviar al chofer</button>
+            <div id="aviso-mensaje-chofer" style="display:none;font-size:0.82rem;margin-top:6px;"></div>
+          </div>
         </div>
 
         <!-- 2. Cambiar estado DESPUÉS -->
@@ -654,7 +670,6 @@ table.tabla-precios input {
               <span id="badge-voucher" style="display:none;background:#2d7a4f;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.7rem;">✔ Enviado</span>
             </button>
             <button class="boton-costa" style="font-size:0.82rem;" onclick="reenviarEnlacePago()">🔗 Reenviar enlace de pago</button>
-            <button class="boton-costa" style="font-size:0.82rem;" onclick="reenviarCartelChofer()">📄 Reenviar cartel al chofer</button>
           </div>
           <div id="aviso-email-reserva" style="display:none;margin-top:0.75rem;font-size:0.82rem;"></div>
         </div>
@@ -4000,6 +4015,7 @@ function abrirDetalleReserva(id, sinScroll) {
 
       // Mensajes del cliente
       cargarMensajesAdmin(id);
+      cargarMensajesChofer(id);
       iniciarRefrescoMensajes(id);
 
       // Estado del depósito
@@ -4192,6 +4208,55 @@ function guardarEdicionReserva() {
 
 // ─── Mensajes del cliente (admin) ─────────────────────────────────────────────
 var _intervaloMensajes = null;
+
+function cargarMensajesChofer(reservaId) {
+  fetch('/admin/reservas/' + reservaId + '/mensajes-chofer')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var hilo = document.getElementById('hilo-mensajes-chofer');
+      var aviso = document.getElementById('aviso-sin-mensajes-chofer');
+      if (!hilo) return;
+      if (!d.mensajes || !d.mensajes.length) {
+        hilo.innerHTML = '';
+        if (aviso) aviso.style.display = 'block';
+        return;
+      }
+      if (aviso) aviso.style.display = 'none';
+      hilo.innerHTML = d.mensajes.map(function(m) {
+        var fecha = new Date(m.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+        var esChofer = m.autor === 'chofer';
+        return '<div style="background:' + (esChofer ? '#e3f2fd' : '#e8f5e9') + ';border:1px solid ' + (esChofer ? '#90caf9' : '#c8e6c9') + ';border-radius:8px;padding:8px 12px;font-size:0.82rem;">' +
+          '<span style="font-weight:600;color:' + (esChofer ? '#1565c0' : '#2e7d32') + ';">' + (esChofer ? '🚗 Chofer' : '👨‍💼 Equipo') + '</span>' +
+          '<span style="color:#999;font-size:0.75rem;margin-left:8px;">' + fecha + '</span>' +
+          '<p style="margin:4px 0 0;color:#333;">' + m.mensaje.replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n').join('<br>') + '</p>' +
+          '</div>';
+      }).join('');
+      hilo.scrollTop = hilo.scrollHeight;
+    });
+}
+
+function enviarMensajeChofer() {
+  if (!reservaDetalleId) return;
+  var campo = document.getElementById('campo-mensaje-chofer');
+  var av = document.getElementById('aviso-mensaje-chofer');
+  var texto = campo ? campo.value.trim() : '';
+  if (!texto) return;
+  fetch('/admin/reservas/' + reservaDetalleId + '/mensaje-chofer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mensaje: texto })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok) {
+      campo.value = '';
+      if (av) { av.style.display = 'block'; av.style.color = 'green'; av.textContent = '✅ Mensaje enviado al chofer.'; setTimeout(function() { av.style.display = 'none'; }, 3000); }
+      cargarMensajesChofer(reservaDetalleId);
+    } else {
+      if (av) { av.style.display = 'block'; av.style.color = 'var(--rojo)'; av.textContent = d.error || 'Error al enviar.'; }
+    }
+  });
+}
 
 function cargarMensajesAdmin(reservaId) {
   fetch('/admin/reservas/' + reservaId + '/mensajes')
@@ -4415,15 +4480,18 @@ function enviarEmailVoucher() {
 function aprobarModificacion() {
   if (!reservaDetalleId) return;
   var av = document.getElementById('aviso-edicion-reserva');
+  var comentario = document.getElementById('campo-respuesta-admin') ? document.getElementById('campo-respuesta-admin').value.trim() : '';
   if (!confirm('¿Aprobar la modificación solicitada por el cliente? Se notificará al cliente por email.')) return;
   fetch('/admin/reservas/' + reservaDetalleId + '/aprobar-modificacion', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ comentario: comentario })
   })
   .then(function(r) { return r.json(); })
   .then(function(d) {
     if (d.ok) {
       if (av) { av.style.display = 'block'; av.style.color = 'green'; av.textContent = '✅ Modificación aprobada y cliente notificado.'; }
+      if (comentario && document.getElementById('campo-respuesta-admin')) document.getElementById('campo-respuesta-admin').value = '';
       abrirDetalleReserva(reservaDetalleId, true);
     } else {
       if (av) { av.style.display = 'block'; av.style.color = 'var(--rojo)'; av.textContent = d.error || 'Error al aprobar.'; }

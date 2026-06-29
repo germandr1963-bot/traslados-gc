@@ -215,14 +215,14 @@
         html += '<div class="seccion-titulo">Gestionar reserva</div>';
         html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">' +
           '<a href="/modificar-reserva?pnr=' + r.numero_reserva + '" style="text-decoration:none;flex:1;min-width:140px;">' +
-            '<div style="border:2px solid #C1502E;border-radius:10px;padding:12px 16px;text-align:center;background:#fdf4f2;cursor:pointer;">' +
+            '<div style="border:2px solid #e65100;border-radius:10px;padding:12px 16px;text-align:center;background:#fff8f0;cursor:pointer;">' +
               '<div style="font-size:20px;margin-bottom:4px;">✏️</div>' +
-              '<div style="font-size:13px;font-weight:600;color:#C1502E;">Modificar reserva</div>' +
+              '<div style="font-size:13px;font-weight:600;color:#e65100;">Modificar reserva</div>' +
               '<div style="font-size:11px;color:#888;margin-top:2px;">Cambia fecha, extras, categoría…</div>' +
             '</div>' +
           '</a>' +
           '<div style="flex:1;min-width:140px;cursor:pointer;" onclick="cancelarReserva(' + r.id + ', \'' + r.numero_reserva + '\', ' + i + ')">' +
-            '<div style="border:2px solid #e53935;border-radius:10px;padding:12px 16px;text-align:center;background:#fdf2f2;">' +
+            '<div style="border:2px solid #c62828;border-radius:10px;padding:12px 16px;text-align:center;background:#fdf2f2;">' +
               '<div style="font-size:20px;margin-bottom:4px;">❌</div>' +
               '<div style="font-size:13px;font-weight:600;color:#c62828;">Cancelar reserva</div>' +
               '<div style="font-size:11px;color:#888;margin-top:2px;">Anular esta reserva</div>' +

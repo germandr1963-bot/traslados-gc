@@ -402,9 +402,9 @@ function mostrar(id) { document.getElementById(id).style.display = 'block'; }
 // ── Categorías ───────────────────────────────────────────────────────────────
 async function cargarCategorias() {
   var sel = document.getElementById('sel-categoria');
-  var cats = await fetch('/admin/categorias').then(r => r.json()).catch(() => ({ categorias: [] }));
+  var cats = await fetch('/api/categorias-publicas').then(r => r.json()).catch(() => []);
   sel.innerHTML = '';
-  (cats.categorias || []).forEach(function(c) {
+  (cats || []).forEach(function(c) {
     var opt = document.createElement('option');
     opt.value = c.id;
     opt.textContent = c.nombre;
@@ -413,7 +413,7 @@ async function cargarCategorias() {
   });
 
   // Poblar pasajeros según categoría actual
-  var catActual = (cats.categorias || []).find(c => c.id === reservaData.categoria_id);
+  var catActual = (cats || []).find(c => c.id === reservaData.categoria_id);
   poblarPasajeros(catActual ? catActual.capacidad_pasajeros : 8);
 }
 
