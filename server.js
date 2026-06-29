@@ -861,6 +861,7 @@ async function initSchema() {
     WHERE NOT EXISTS (SELECT 1 FROM configuracion_contacto WHERE id = 1)
   `);
   await pool.query(`ALTER TABLE configuracion_contacto ADD COLUMN IF NOT EXISTS emails_notificacion TEXT DEFAULT ''`);
+  await pool.query(`ALTER TABLE configuracion_contacto ADD COLUMN IF NOT EXISTS wa_grupo_choferes TEXT DEFAULT ''`);
 
   // ─── Reservas × Extras ────────────────────────────────────────────────────
   await pool.query(`
@@ -5809,6 +5810,59 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
 }));
 
 // Admin: emails de notificación (guardar)
+app.get('/admin/whatsapp-texto', requireAdmin, asyncHandler(async (req, res) => {
+  const { pnr } = req.query;
+  if (!pnr) return res.json({ ok: false, error: 'PNR requerido.' });
+
+  const result = await pool.query(
+    `SELECT r.numero_reserva, r.origen, r.destino, r.fecha, r.hora, r.num_pasajeros, cv.nombre AS categoria_nombre
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     WHERE UPPER(r.numero_reserva) = UPPER($1) AND (r.archivada = FALSE OR r.archivada IS NULL)`,
+    [pnr]
+  );
+
+  if (!result.rows.length) return res.json({ ok: false, error: 'Reserva no encontrada.' });
+  const r = result.rows[0];
+
+  const fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+  const hora = r.hora ? r.hora.slice(0, 5) : '—';
+
+  const texto =
+    '🚗 TRASLADOS GC — Nueva reserva\n\n' +
+    '📋 PNR: ' + r.numero_reserva + '\n' +
+    '📍 Ruta: ' + (r.origen || '—') + ' → ' + (r.destino || '—') + '\n' +
+    '📅 Fecha: ' + fecha + '\n' +
+    '🕐 Hora: ' + hora + '\n' +
+    '👥 Pasajeros: ' + (r.num_pasajeros || '—') + '\n' +
+    '🚙 Categoría: ' + (r.categoria_nombre || '—') + '\n\n' +
+    '¿Aceptas este servicio? Responde SÍ o NO.\n' +
+    'El primero en confirmar queda asignado.';
+
+  res.json({ ok: true, texto });
+}));
+
+app.get('/admin/choferes-whatsapp', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    "SELECT id, nombre, telefono FROM conductores WHERE estado = 'aprobado' ORDER BY nombre"
+  );
+  res.json({ choferes: result.rows });
+}));
+
+app.post('/admin/whatsapp-config', requireAdmin, asyncHandler(async (req, res) => {
+  const { whatsapp, wa_grupo_choferes } = req.body;
+  await pool.query(
+    'UPDATE configuracion_contacto SET whatsapp = $1, wa_grupo_choferes = $2, actualizado_en = NOW() WHERE id = 1',
+    [whatsapp || '', wa_grupo_choferes || '']
+  );
+  res.json({ ok: true });
+}));
+
+app.get('/admin/contacto-info', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT * FROM configuracion_contacto WHERE id = 1');
+  res.json(result.rows[0] || {});
+}));
+
 app.post('/admin/contacto', requireAdmin, asyncHandler(async (req, res) => {
   const { telefono, whatsapp, email, direccion, horario, emails_notificacion } = req.body;
   await pool.query(
