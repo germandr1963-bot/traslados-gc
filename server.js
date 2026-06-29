@@ -791,7 +791,26 @@ async function initSchema() {
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_password_hash TEXT`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_primer_acceso BOOLEAN DEFAULT TRUE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
-  await pool.query(`\n    CREATE TABLE IF NOT EXISTS reservas_mensajes (\n      id SERIAL PRIMARY KEY,\n      reserva_id INT NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,\n      autor TEXT NOT NULL DEFAULT 'cliente',\n      mensaje TEXT NOT NULL,\n      leido BOOLEAN DEFAULT FALSE,\n      creado_en TIMESTAMP DEFAULT NOW()\n    );\n  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS reservas_mensajes (
+      id SERIAL PRIMARY KEY,
+      reserva_id INT NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,
+      autor TEXT NOT NULL DEFAULT 'cliente',
+      mensaje TEXT NOT NULL,
+      leido BOOLEAN DEFAULT FALSE,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS reservas_mensajes_chofer (
+      id SERIAL PRIMARY KEY,
+      reserva_id INT NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,
+      autor TEXT NOT NULL DEFAULT 'admin',
+      mensaje TEXT NOT NULL,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
 
   // Configuración de contacto público
   await pool.query(`
@@ -979,6 +998,13 @@ app.get('/api/precio', asyncHandler(async (req, res) => {
     return res.json({ a_consultar: true });
   }
   res.json({ precio: Number(result.rows[0].precio), a_consultar: false });
+}));
+
+app.get('/api/categorias-publicas', asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, nombre, capacidad_pasajeros FROM categorias_vehiculos WHERE activa = TRUE ORDER BY id'
+  );
+  res.json(result.rows);
 }));
 
 app.get('/api/extras-publicos', asyncHandler(async (req, res) => {
@@ -5166,10 +5192,13 @@ app.post('/api/cliente/modificar-completo', asyncHandler(async (req, res) => {
   const idsNuevos = Array.isArray(extras) ? extras.map(e => e.extra_id).sort() : idsActuales;
   const extrasChanged = JSON.stringify(idsActuales) !== JSON.stringify(idsNuevos);
   if (extrasChanged) {
-    const nombresQ = await pool.query('SELECT id, nombre FROM extras WHERE id = ANY($1)', [idsNuevos.length ? idsNuevos : [0]]);
-    const nombresMap = {};
-    nombresQ.rows.forEach(e => { nombresMap[e.id] = e.nombre; });
-    cambios.push('Extras: ' + (idsNuevos.length ? idsNuevos.map(id => nombresMap[id] || id).join(', ') : 'ninguno'));
+    const nombresActualesQ = await pool.query('SELECT id, nombre FROM extras WHERE id = ANY($1)', [idsActuales.length ? idsActuales : [0]]);
+    const nombresNuevosQ = await pool.query('SELECT id, nombre FROM extras WHERE id = ANY($1)', [idsNuevos.length ? idsNuevos : [0]]);
+    const mapAct = {}; nombresActualesQ.rows.forEach(e => { mapAct[e.id] = e.nombre; });
+    const mapNuev = {}; nombresNuevosQ.rows.forEach(e => { mapNuev[e.id] = e.nombre; });
+    const descAntes = idsActuales.length ? idsActuales.map(id => mapAct[id] || id).join(', ') : 'ninguno';
+    const descDespues = idsNuevos.length ? idsNuevos.map(id => mapNuev[id] || id).join(', ') : 'ninguno';
+    cambios.push('Extras: ' + descAntes + ' → ' + descDespues);
   }
 
   // Actualizar reserva
@@ -5255,6 +5284,11 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Esta reserva no se puede cancelar.' });
   }
 
+  // Verificar política de cancelación (no-show)
+  const cfgNoshow = await obtenerConfigNoshow(r.fecha);
+  const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
+  const fueraDePlazo = new Date() >= fechaCancelacion;
+
   await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', ['cancelada', r.id]);
 
   await pool.query(
@@ -5278,31 +5312,40 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
 
   // Confirmar al cliente
   try {
+    const avisoNoshow = fueraDePlazo
+      ? '<p style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:10px 14px;font-size:13px;color:#856404;">⚠️ La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía podría ser retenido según nuestra política de cancelación.</p>'
+      : '<p style="color:#2e7d32;font-size:13px;">✅ La cancelación se ha realizado dentro del plazo establecido.</p>';
     await enviarEmail({
       to: r.email_cliente,
       subject: 'Tu reserva ' + r.numero_reserva + ' ha sido cancelada',
       html: `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
              <p>Tu reserva <strong>${r.numero_reserva}</strong> (${r.origen || '—'} → ${r.destino || '—'}) ha sido cancelada correctamente.</p>
+             ${avisoNoshow}
              <p>Si tienes alguna duda, puedes contactarnos por WhatsApp.</p>`
     });
   } catch(e) { console.warn('Error enviando email cancelación al cliente:', e.message); }
 
-  res.json({ ok: true });
+  res.json({ ok: true, fuera_de_plazo: fueraDePlazo });
 }));
 
 // ─── Admin: aprobar modificación de reserva ───────────────────────────────────
 app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(async (req, res) => {
+  const { comentario } = req.body;
   const reservaQ = await pool.query('SELECT * FROM reservas WHERE id = $1', [req.params.id]);
   if (!reservaQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
   const r = reservaQ.rows[0];
 
-  // Volver a confirmada (o pendiente si no tiene chofer)
   const nuevoEstado = r.conductor_id ? 'confirmada' : 'pendiente';
   await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', [nuevoEstado, r.id]);
 
+  // Mensaje unificado: aprobación + comentario si existe
+  const textoMensaje = comentario
+    ? '✅ Modificación aprobada por el equipo. Comentario: ' + comentario
+    : '✅ Modificación aprobada por el equipo.';
+
   await pool.query(
     'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
-    [r.id, 'admin', '✅ Modificación aprobada por el equipo.']
+    [r.id, 'admin', textoMensaje]
   );
 
   // Notificar al cliente
@@ -5343,6 +5386,50 @@ app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(
   } catch(e) { console.warn('Error enviando email aprobación:', e.message); }
 
   res.json({ ok: true, nuevo_estado: nuevoEstado });
+}));
+
+// ─── Admin: mensaje al chofer ─────────────────────────────────────────────────
+app.post('/admin/reservas/:id/mensaje-chofer', requireAdmin, asyncHandler(async (req, res) => {
+  const { mensaje } = req.body;
+  if (!mensaje || !mensaje.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
+
+  const reserva = await pool.query(
+    `SELECT r.*, c.email AS conductor_email, c.nombre AS conductor_nombre
+     FROM reservas r LEFT JOIN conductores c ON c.id = r.conductor_id WHERE r.id = $1`,
+    [req.params.id]
+  );
+  if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = reserva.rows[0];
+
+  await pool.query(
+    'INSERT INTO reservas_mensajes_chofer (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
+    [req.params.id, 'admin', mensaje.trim()]
+  );
+
+  // Notificar al chofer por email si tiene email
+  if (r.conductor_email) {
+    try {
+      await enviarEmail({
+        to: r.conductor_email,
+        subject: '💬 Mensaje sobre la reserva ' + r.numero_reserva,
+        html: `<p>Hola <strong>${r.conductor_nombre || 'Chofer'}</strong>,</p>
+               <p>El equipo de Traslados GC te ha enviado un mensaje sobre la reserva <strong>${r.numero_reserva}</strong>:</p>
+               <blockquote style="border-left:3px solid #C1502E;padding-left:12px;color:#333;margin:16px 0;">${mensaje.trim().replace(/\n/g,'<br>')}</blockquote>
+               <p>Accede a tu portal para ver los detalles:<br>
+               <a href="${BASE_URL}/chofer/portal" style="color:#C1502E;">${BASE_URL}/chofer/portal</a></p>`
+      });
+    } catch(e) { console.warn('Error enviando email al chofer:', e.message); }
+  }
+
+  res.json({ ok: true });
+}));
+
+app.get('/admin/reservas/:id/mensajes-chofer', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, autor, mensaje, creado_en FROM reservas_mensajes_chofer WHERE reserva_id = $1 ORDER BY creado_en ASC',
+    [req.params.id]
+  );
+  res.json({ mensajes: result.rows });
 }));
 
 // ─── Admin: mensajes de una reserva ──────────────────────────────────────────
