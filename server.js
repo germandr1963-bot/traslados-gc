@@ -3923,7 +3923,7 @@ async function generarHtmlVoucher(reservaId) {
           <strong>Fecha:</strong> ${fechaViaje}<br>
           <strong>Hora:</strong> ${r.hora ? r.hora.slice(0,5) : '—'}<br>
           <strong>Categoría:</strong> ${r.categoria_nombre || '—'}<br>
-          <strong>Pasajeros:</strong> ${r.num_pasajeros || '—'}
+          <strong>Pasajeros:</strong> ${r.num_pasajeros || '—'}${r.direccion_recogida ? '<br><strong>Dirección de recogida:</strong> ' + r.direccion_recogida : ''}${r.direccion_destino ? '<br><strong>Dirección de destino:</strong> ' + r.direccion_destino : ''}${r.numero_vuelo ? '<br><strong>Vuelo:</strong> ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · Llegada ' + r.hora_llegada_vuelo.slice(0,5) : '') : ''}${r.nombre_barco ? '<br><strong>Barco:</strong> ' + r.nombre_barco + (r.hora_atraque ? ' · Atraque ' + r.hora_atraque.slice(0,5) : '') : ''}${r.notas_cliente ? '<br><strong>Notas:</strong> ' + r.notas_cliente : ''}
         </div>
       </div>
       <p style="font-size:13px;color:#888;">Muestra este voucher a tu conductor al inicio del servicio. El precio final será el que marque el taxímetro.</p>
@@ -5122,12 +5122,51 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
      notas_cliente||null, req.params.id]
   );
 
-  if (cambios.length) {
+  // Leer reserva actualizada para el resumen
+  const actualizada = await pool.query(
+    `SELECT r.*, cv.nombre AS categoria_nombre
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     WHERE r.id = $1`,
+    [req.params.id]
+  );
+  const ra = actualizada.rows[0];
+
+  if (cambios.length && ra) {
+    // Registrar en historial
     const texto = '✏️ Reserva modificada por el equipo:\n' + cambios.join('\n');
     await pool.query(
       'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
       [req.params.id, 'admin', texto]
     );
+
+    // Enviar email al cliente con resumen actualizado
+    try {
+      const fechaViaje = ra.fecha ? new Date(ra.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+      const lineas = [
+        '<strong>Ruta:</strong> ' + (ra.origen || '—') + ' → ' + (ra.destino || '—'),
+        '<strong>Fecha:</strong> ' + fechaViaje,
+        '<strong>Hora de recogida:</strong> ' + (ra.hora ? ra.hora.slice(0,5) : '—'),
+        '<strong>Pasajeros:</strong> ' + (ra.num_pasajeros || '—'),
+        '<strong>Categoría:</strong> ' + (ra.categoria_nombre || '—'),
+      ];
+      if (ra.direccion_recogida) lineas.push('<strong>Dirección de recogida:</strong> ' + ra.direccion_recogida);
+      if (ra.direccion_destino) lineas.push('<strong>Dirección de destino:</strong> ' + ra.direccion_destino);
+      if (ra.numero_vuelo) lineas.push('<strong>Vuelo:</strong> ' + ra.numero_vuelo + (ra.hora_llegada_vuelo ? ' · Llegada ' + ra.hora_llegada_vuelo.slice(0,5) : ''));
+      if (ra.nombre_barco) lineas.push('<strong>Barco:</strong> ' + ra.nombre_barco + (ra.hora_atraque ? ' · Atraque ' + ra.hora_atraque.slice(0,5) : ''));
+      if (ra.notas_cliente) lineas.push('<strong>Notas:</strong> ' + ra.notas_cliente);
+
+      await enviarEmail({
+        to: ra.email_cliente,
+        subject: '✏️ Tu reserva ' + ra.numero_reserva + ' ha sido actualizada',
+        html: `<p>Hola <strong>${ra.nombre_cliente}</strong>,</p>
+               <p>Tu reserva <strong>${ra.numero_reserva}</strong> ha sido actualizada por nuestro equipo.</p>
+               <p><strong>Resumen actualizado de tu reserva:</strong></p>
+               <div style="background:#f5f0ea;border-radius:8px;padding:14px 18px;font-size:14px;line-height:2;margin:12px 0;">${lineas.join('<br>')}</div>
+               <p>Si tienes alguna pregunta, accede a tu portal:<br>
+               <a href="${BASE_URL}/mi-reserva" style="color:#C1502E;">${BASE_URL}/mi-reserva</a></p>`
+      });
+    } catch(e) { console.warn('Error enviando email de modificación al cliente:', e.message); }
   }
 
   res.json({ ok: true, cambios: cambios.length });
