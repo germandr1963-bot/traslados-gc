@@ -3732,7 +3732,7 @@ function cargarReservas(mantenerDetalle) {
           '<td>' + (r.deposito_pagado ? '<span style="color:#2d7a4f;font-weight:600;font-size:0.8rem;">💳 Pagado</span>' : '<span style="color:#aaa;font-size:0.8rem;">Pendiente</span>') + '</td>' +
           '<td style="white-space:nowrap;">' +
             (parseInt(r.mensajes_sin_leer) > 0
-              ? '<span style="display:inline-block;background:#e65100;color:#fff;font-size:0.72rem;font-weight:700;padding:2px 7px;border-radius:10px;margin-right:5px;vertical-align:middle;">💬 ' + r.mensajes_sin_leer + '</span>'
+              ? '<span data-badge-msg="' + r.id + '" style="display:inline-block;background:#e65100;color:#fff;font-size:0.72rem;font-weight:700;padding:2px 7px;border-radius:10px;margin-right:5px;vertical-align:middle;">💬 ' + r.mensajes_sin_leer + '</span>'
               : '') +
             '<button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.7rem;" onclick="abrirDetalleReserva(' + r.id + ')">Ver</button>' +
           '</td>' +
@@ -4014,6 +4014,9 @@ function cargarMensajesAdmin(reservaId) {
           '</div>';
       }).join('');
       hilo.scrollTop = hilo.scrollHeight;
+      // Eliminar badge de mensajes sin leer de esa fila en la tabla
+      var badge = document.querySelector('[data-badge-msg="' + reservaId + '"]');
+      if (badge) badge.remove();
     });
 }
 
