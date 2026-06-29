@@ -155,6 +155,7 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="calculador">Calculador</button>
       <button class="item-menu" data-seccion="configuracion">No-Show</button>
       <button class="item-menu" data-seccion="contacto">Contacto</button>
+      <button class="item-menu" data-seccion="facturacion">Facturación</button>
       <button class="item-menu" data-seccion="extras">Extras</button>
       <button class="item-menu" data-seccion="cotizaciones">Cotizaciones <span id="badge-cotiz" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">0</span></button>
       <button class="item-menu" data-seccion="reservas">Reservas</button>
@@ -727,6 +728,7 @@ table.tabla-precios input {
 
         <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
           <button id="btn-aprobar-modificacion" class="boton-primario" style="font-size:0.82rem;display:none;" onclick="aprobarModificacion()">✅ Aprobar modificación</button>
+          <button class="boton-costa" style="font-size:0.82rem;" onclick="descargarFactura()">📄 Descargar factura</button>
           <button class="boton-costa" style="font-size:0.82rem;" onclick="archivarDesdeDetalle()">📦 Archivar</button>
           <button class="boton-peligro" style="font-size:0.82rem;" onclick="borrarDesdeDetalle()">🗑 Borrar reserva</button>
           <button class="boton-costa" style="font-size:0.82rem;" onclick="cerrarDetalleReserva()">Cerrar</button>
@@ -836,6 +838,45 @@ table.tabla-precios input {
         </div>
         <button class="boton-primario" onclick="guardarContacto()">💾 Guardar</button>
         <div id="aviso-contacto" style="display:none;margin-top:0.75rem;"></div>
+      </div>
+    </div>
+
+    <div id="seccion-facturacion" class="oculto">
+      <h1>Facturación</h1>
+      <p class="subtitulo">Datos fiscales de la empresa. Se usarán en las facturas generadas automáticamente al liberar el depósito.</p>
+      <div class="tarjeta">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+          <div style="grid-column:1/-1;">
+            <label class="etiqueta">Razón social</label>
+            <input type="text" id="fact-razon-social" class="campo" placeholder="Traslados GC S.L.">
+          </div>
+          <div>
+            <label class="etiqueta">NIF / CIF</label>
+            <input type="text" id="fact-nif" class="campo" placeholder="B12345678">
+          </div>
+          <div>
+            <label class="etiqueta">Teléfono</label>
+            <input type="text" id="fact-telefono" class="campo" placeholder="+34 600 000 000">
+          </div>
+          <div style="grid-column:1/-1;">
+            <label class="etiqueta">Dirección fiscal</label>
+            <input type="text" id="fact-direccion" class="campo" placeholder="Calle Ejemplo, 1">
+          </div>
+          <div>
+            <label class="etiqueta">Código postal</label>
+            <input type="text" id="fact-cp" class="campo" placeholder="35001">
+          </div>
+          <div>
+            <label class="etiqueta">Ciudad</label>
+            <input type="text" id="fact-ciudad" class="campo" placeholder="Las Palmas de Gran Canaria">
+          </div>
+          <div style="grid-column:1/-1;">
+            <label class="etiqueta">Email fiscal</label>
+            <input type="email" id="fact-email" class="campo" placeholder="facturacion@trasladosgc.com">
+          </div>
+        </div>
+        <button class="boton-primario" onclick="guardarFacturacion()">💾 Guardar</button>
+        <div id="aviso-facturacion" style="display:none;margin-top:0.75rem;font-size:0.85rem;"></div>
       </div>
     </div>
 
@@ -957,6 +998,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
     if (boton.dataset.seccion === 'configuracion') cargarConfiguracionNoshow();
     if (boton.dataset.seccion === 'contacto') cargarContacto();
+    if (boton.dataset.seccion === 'facturacion') cargarFacturacion();
     if (boton.dataset.seccion === 'notificaciones') cargarNotificaciones();
     if (boton.dataset.seccion === 'destinos') { cargarDestinos(); cargarSelectorLangDestinos(); }
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
@@ -3152,6 +3194,66 @@ function guardarContacto() {
     av.innerHTML = '<div class="aviso-ok">✔ Datos de contacto guardados.</div>';
     setTimeout(function() { av.style.display = 'none'; }, 3000);
   });
+}
+
+function cargarFacturacion() {
+  fetch('/admin/facturacion')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var f = d.facturacion || {};
+      document.getElementById('fact-razon-social').value = f.razon_social || '';
+      document.getElementById('fact-nif').value = f.nif || '';
+      document.getElementById('fact-direccion').value = f.direccion || '';
+      document.getElementById('fact-cp').value = f.codigo_postal || '';
+      document.getElementById('fact-ciudad').value = f.ciudad || '';
+      document.getElementById('fact-email').value = f.email || '';
+      document.getElementById('fact-telefono').value = f.telefono || '';
+    });
+}
+
+function guardarFacturacion() {
+  var av = document.getElementById('aviso-facturacion');
+  fetch('/admin/facturacion', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      razon_social: document.getElementById('fact-razon-social').value.trim(),
+      nif: document.getElementById('fact-nif').value.trim(),
+      direccion: document.getElementById('fact-direccion').value.trim(),
+      codigo_postal: document.getElementById('fact-cp').value.trim(),
+      ciudad: document.getElementById('fact-ciudad').value.trim(),
+      email: document.getElementById('fact-email').value.trim(),
+      telefono: document.getElementById('fact-telefono').value.trim()
+    })
+  }).then(function(r) { return r.json(); }).then(function() {
+    av.style.display = 'block';
+    av.innerHTML = '<div class="aviso-ok">✔ Datos de facturación guardados.</div>';
+    setTimeout(function() { av.style.display = 'none'; }, 3000);
+  });
+}
+
+function descargarFactura() {
+  if (!reservaDetalleId) return;
+  var btn = event.target;
+  btn.textContent = 'Generando...'; btn.disabled = true;
+  fetch('/admin/reservas/' + reservaDetalleId + '/factura')
+    .then(function(r) {
+      if (!r.ok) throw new Error();
+      return r.blob();
+    })
+    .then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'factura-' + reservaDetalleId + '.docx';
+      a.click();
+      URL.revokeObjectURL(url);
+      btn.textContent = '📄 Descargar factura'; btn.disabled = false;
+    })
+    .catch(function() {
+      btn.textContent = '❌ Error'; btn.disabled = false;
+      setTimeout(function() { btn.textContent = '📄 Descargar factura'; }, 2000);
+    });
 }
 
 // ─── Configuración No-Show ────────────────────────────────────────────────────
