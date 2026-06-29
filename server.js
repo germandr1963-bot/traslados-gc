@@ -3647,7 +3647,7 @@ app.get('/admin/reservas/:id', requireAdmin, asyncHandler(async (req, res) => {
   if (!result.rows.length) return res.status(404).json({ error: 'Reserva no encontrada' });
   const reserva = result.rows[0];
   const extras = await pool.query(
-    `SELECT e.nombre, re.precio_en_reserva
+    `SELECT re.extra_id, e.nombre, re.precio_en_reserva
      FROM reservas_extras re
      JOIN extras e ON e.id = re.extra_id
      WHERE re.reserva_id = $1`,
@@ -3661,7 +3661,7 @@ app.get('/admin/reservas/:id', requireAdmin, asyncHandler(async (req, res) => {
 
 app.post('/admin/reservas/:id/estado', requireAdmin, asyncHandler(async (req, res) => {
   const { estado } = req.body;
-  const estadosValidos = ['pendiente', 'confirmada', 'completada', 'cancelada'];
+  const estadosValidos = ['pendiente', 'confirmada', 'completada', 'cancelada', 'modificacion_pendiente'];
   if (!estadosValidos.includes(estado)) return res.status(400).json({ error: 'Estado no válido' });
   await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', [estado, req.params.id]);
   res.json({ ok: true });
@@ -5080,16 +5080,302 @@ app.get('/api/cliente/mensajes', asyncHandler(async (req, res) => {
   res.json({ mensajes: result.rows });
 }));
 
+// ─── Portal cliente: página de modificación ──────────────────────────────────
+app.get('/modificar-reserva', (req, res) => {
+  res.sendFile('modificar-reserva.html', { root: path.join(__dirname, 'public') });
+});
+
+// ─── Portal cliente: cargar datos de reserva para pre-rellenar el formulario ─
+app.get('/api/cliente/datos-modificacion', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+  const pnr = req.query.pnr;
+  if (!pnr) return res.status(400).json({ error: 'PNR requerido.' });
+
+  const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+  if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
+  const emailCliente = req.session.clienteEmail || emailResult.rows[0].email_cliente;
+
+  const result = await pool.query(
+    `SELECT r.*, cv.nombre AS categoria_nombre, cv.id AS categoria_id_actual
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     WHERE UPPER(r.numero_reserva) = UPPER($1) AND LOWER(r.email_cliente) = LOWER($2) AND r.archivada = FALSE`,
+    [pnr, emailCliente]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = result.rows[0];
+
+  const extras = await pool.query(
+    `SELECT re.extra_id, e.nombre, re.precio_en_reserva FROM reservas_extras re
+     JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`,
+    [r.id]
+  );
+
+  const cfgNoshow = await obtenerConfigNoshow(r.fecha);
+  const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
+  if (new Date() >= fechaCancelacion) {
+    return res.status(403).json({ error: 'El plazo de modificación ha vencido para esta reserva.' });
+  }
+
+  res.json({ reserva: Object.assign({}, r, { extras: extras.rows }) });
+}));
+
+// ─── Portal cliente: guardar modificación de reserva ─────────────────────────
+app.post('/api/cliente/modificar-completo', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+
+  const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+  if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
+  const emailCliente = req.session.clienteEmail || emailResult.rows[0].email_cliente;
+
+  const { pnr, fecha, hora, num_pasajeros, tipo_llegada, numero_vuelo, hora_llegada_vuelo,
+          nombre_barco, hora_atraque, direccion_recogida, direccion_destino,
+          notas_cliente, categoria_id, precio_estimado, extras } = req.body;
+
+  const reservaQ = await pool.query(
+    'SELECT * FROM reservas WHERE UPPER(numero_reserva) = UPPER($1) AND LOWER(email_cliente) = LOWER($2) AND archivada = FALSE',
+    [pnr, emailCliente]
+  );
+  if (!reservaQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = reservaQ.rows[0];
+
+  const cfgNoshow = await obtenerConfigNoshow(r.fecha);
+  const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
+  if (new Date() >= fechaCancelacion) {
+    return res.status(403).json({ error: 'El plazo de modificación ha vencido.' });
+  }
+
+  // Detectar cambios para el historial
+  const cambios = [];
+  if (fecha && fecha !== (r.fecha ? r.fecha.toISOString().slice(0,10) : '')) cambios.push('Fecha: ' + (r.fecha ? r.fecha.toISOString().slice(0,10) : '—') + ' → ' + fecha);
+  if (hora && hora !== (r.hora ? r.hora.slice(0,5) : '')) cambios.push('Hora: ' + (r.hora ? r.hora.slice(0,5) : '—') + ' → ' + hora);
+  if (num_pasajeros && parseInt(num_pasajeros) !== r.num_pasajeros) cambios.push('Pasajeros: ' + (r.num_pasajeros || '—') + ' → ' + num_pasajeros);
+  if (direccion_recogida !== undefined && direccion_recogida !== (r.direccion_recogida || '')) cambios.push('Recogida: ' + (r.direccion_recogida || '—') + ' → ' + (direccion_recogida || '—'));
+  if (direccion_destino !== undefined && direccion_destino !== (r.direccion_destino || '')) cambios.push('Destino dirección: ' + (r.direccion_destino || '—') + ' → ' + (direccion_destino || '—'));
+  if (numero_vuelo !== undefined && numero_vuelo !== (r.numero_vuelo || '')) cambios.push('Vuelo: ' + (r.numero_vuelo || '—') + ' → ' + (numero_vuelo || '—'));
+  if (nombre_barco !== undefined && nombre_barco !== (r.nombre_barco || '')) cambios.push('Barco: ' + (r.nombre_barco || '—') + ' → ' + (nombre_barco || '—'));
+  if (categoria_id && parseInt(categoria_id) !== r.categoria_id) {
+    const catQ = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [categoria_id]);
+    const catActQ = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [r.categoria_id]);
+    cambios.push('Categoría: ' + (catActQ.rows[0] ? catActQ.rows[0].nombre : '—') + ' → ' + (catQ.rows[0] ? catQ.rows[0].nombre : '—'));
+  }
+
+  // Extras
+  const extrasActualesQ = await pool.query('SELECT extra_id FROM reservas_extras WHERE reserva_id = $1 ORDER BY extra_id', [r.id]);
+  const idsActuales = extrasActualesQ.rows.map(e => e.extra_id).sort();
+  const idsNuevos = Array.isArray(extras) ? extras.map(e => e.extra_id).sort() : idsActuales;
+  const extrasChanged = JSON.stringify(idsActuales) !== JSON.stringify(idsNuevos);
+  if (extrasChanged) {
+    const nombresQ = await pool.query('SELECT id, nombre FROM extras WHERE id = ANY($1)', [idsNuevos.length ? idsNuevos : [0]]);
+    const nombresMap = {};
+    nombresQ.rows.forEach(e => { nombresMap[e.id] = e.nombre; });
+    cambios.push('Extras: ' + (idsNuevos.length ? idsNuevos.map(id => nombresMap[id] || id).join(', ') : 'ninguno'));
+  }
+
+  // Actualizar reserva
+  await pool.query(
+    `UPDATE reservas SET
+      estado = 'modificacion_pendiente',
+      fecha = COALESCE($1::date, fecha),
+      hora = COALESCE($2::time, hora),
+      num_pasajeros = COALESCE($3::int, num_pasajeros),
+      tipo_llegada = COALESCE(NULLIF($4,''), tipo_llegada),
+      numero_vuelo = COALESCE(NULLIF($5,''), numero_vuelo),
+      hora_llegada_vuelo = COALESCE(NULLIF($6,'')::time, hora_llegada_vuelo),
+      nombre_barco = COALESCE(NULLIF($7,''), nombre_barco),
+      hora_atraque = COALESCE(NULLIF($8,'')::time, hora_atraque),
+      direccion_recogida = COALESCE(NULLIF($9,''), direccion_recogida),
+      direccion_destino = COALESCE(NULLIF($10,''), direccion_destino),
+      notas_cliente = COALESCE(NULLIF($11,''), notas_cliente),
+      categoria_id = COALESCE($12, categoria_id),
+      precio_estimado = COALESCE($13, precio_estimado)
+     WHERE id = $14`,
+    [fecha||null, hora||null, num_pasajeros||null,
+     tipo_llegada||null, numero_vuelo||null, hora_llegada_vuelo||null,
+     nombre_barco||null, hora_atraque||null,
+     direccion_recogida||null, direccion_destino||null, notas_cliente||null,
+     categoria_id ? parseInt(categoria_id) : null,
+     precio_estimado ? parseFloat(precio_estimado) : null,
+     r.id]
+  );
+
+  // Actualizar extras si cambiaron
+  if (extrasChanged && Array.isArray(extras)) {
+    await pool.query('DELETE FROM reservas_extras WHERE reserva_id = $1', [r.id]);
+    for (const ex of extras) {
+      await pool.query(
+        'INSERT INTO reservas_extras (reserva_id, extra_id, precio_en_reserva) VALUES ($1, $2, $3)',
+        [r.id, ex.extra_id, ex.precio]
+      );
+    }
+  }
+
+  // Registrar en historial
+  const textoHistorial = '✏️ Modificación solicitada por el cliente:\n' + (cambios.length ? cambios.join('\n') : 'Sin cambios detectados');
+  await pool.query(
+    'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
+    [r.id, 'admin', textoHistorial]
+  );
+
+  // Notificar al equipo
+  try {
+    const emails = await obtenerEmailsNotificacion();
+    for (const em of emails) {
+      await enviarEmail({
+        to: em,
+        subject: '✏️ Modificación solicitada — ' + r.numero_reserva,
+        html: `<p>El cliente <strong>${r.nombre_cliente}</strong> ha solicitado modificaciones en la reserva <strong>${r.numero_reserva}</strong>.</p>
+               <p><strong>Cambios:</strong></p>
+               <ul>${cambios.map(c => '<li>' + c + '</li>').join('')}</ul>
+               <p>Accede al panel de administración para revisar y aprobar.</p>`
+      });
+    }
+  } catch(e) { console.warn('Error notificando modificación al equipo:', e.message); }
+
+  res.json({ ok: true });
+}));
+
+// ─── Portal cliente: cancelar reserva ────────────────────────────────────────
+app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+
+  const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+  if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
+  const emailCliente = req.session.clienteEmail || emailResult.rows[0].email_cliente;
+
+  const { reserva_id } = req.body;
+  const reservaQ = await pool.query(
+    'SELECT * FROM reservas WHERE id = $1 AND LOWER(email_cliente) = LOWER($2) AND archivada = FALSE',
+    [reserva_id, emailCliente]
+  );
+  if (!reservaQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = reservaQ.rows[0];
+
+  if (['completada', 'cancelada'].includes(r.estado)) {
+    return res.status(400).json({ error: 'Esta reserva no se puede cancelar.' });
+  }
+
+  await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', ['cancelada', r.id]);
+
+  await pool.query(
+    'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
+    [r.id, 'admin', '❌ Reserva cancelada por el cliente.']
+  );
+
+  // Notificar al equipo
+  try {
+    const emails = await obtenerEmailsNotificacion();
+    for (const em of emails) {
+      await enviarEmail({
+        to: em,
+        subject: '❌ Cancelación de reserva — ' + r.numero_reserva,
+        html: `<p>El cliente <strong>${r.nombre_cliente}</strong> ha cancelado la reserva <strong>${r.numero_reserva}</strong>.</p>
+               <p>Ruta: ${r.origen || '—'} → ${r.destino || '—'}</p>
+               <p>Fecha: ${r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—'}</p>`
+      });
+    }
+  } catch(e) { console.warn('Error notificando cancelación:', e.message); }
+
+  // Confirmar al cliente
+  try {
+    await enviarEmail({
+      to: r.email_cliente,
+      subject: 'Tu reserva ' + r.numero_reserva + ' ha sido cancelada',
+      html: `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+             <p>Tu reserva <strong>${r.numero_reserva}</strong> (${r.origen || '—'} → ${r.destino || '—'}) ha sido cancelada correctamente.</p>
+             <p>Si tienes alguna duda, puedes contactarnos por WhatsApp.</p>`
+    });
+  } catch(e) { console.warn('Error enviando email cancelación al cliente:', e.message); }
+
+  res.json({ ok: true });
+}));
+
+// ─── Admin: aprobar modificación de reserva ───────────────────────────────────
+app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(async (req, res) => {
+  const reservaQ = await pool.query('SELECT * FROM reservas WHERE id = $1', [req.params.id]);
+  if (!reservaQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = reservaQ.rows[0];
+
+  // Volver a confirmada (o pendiente si no tiene chofer)
+  const nuevoEstado = r.conductor_id ? 'confirmada' : 'pendiente';
+  await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', [nuevoEstado, r.id]);
+
+  await pool.query(
+    'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
+    [r.id, 'admin', '✅ Modificación aprobada por el equipo.']
+  );
+
+  // Notificar al cliente
+  try {
+    const actualizada = await pool.query(
+      `SELECT r.*, cv.nombre AS categoria_nombre FROM reservas r
+       LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id WHERE r.id = $1`,
+      [r.id]
+    );
+    const ra = actualizada.rows[0];
+    const extrasQ = await pool.query(
+      `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
+       JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`, [r.id]
+    );
+    const fechaViaje = ra.fecha ? new Date(ra.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+    const lineas = [
+      '<strong>Ruta:</strong> ' + (ra.origen || '—') + ' → ' + (ra.destino || '—'),
+      '<strong>Fecha:</strong> ' + fechaViaje,
+      '<strong>Hora:</strong> ' + (ra.hora ? ra.hora.slice(0,5) : '—'),
+      '<strong>Pasajeros:</strong> ' + (ra.num_pasajeros || '—'),
+      '<strong>Categoría:</strong> ' + (ra.categoria_nombre || '—'),
+    ];
+    if (ra.direccion_recogida) lineas.push('<strong>Recogida:</strong> ' + ra.direccion_recogida);
+    if (ra.direccion_destino) lineas.push('<strong>Destino:</strong> ' + ra.direccion_destino);
+    if (ra.numero_vuelo) lineas.push('<strong>Vuelo:</strong> ' + ra.numero_vuelo + (ra.hora_llegada_vuelo ? ' · Llegada ' + ra.hora_llegada_vuelo.slice(0,5) : ''));
+    if (ra.nombre_barco) lineas.push('<strong>Barco:</strong> ' + ra.nombre_barco + (ra.hora_atraque ? ' · Atraque ' + ra.hora_atraque.slice(0,5) : ''));
+    if (extrasQ.rows.length) lineas.push('<strong>Extras:</strong> ' + extrasQ.rows.map(e => e.nombre + ' (' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €)').join(', '));
+
+    await enviarEmail({
+      to: ra.email_cliente,
+      subject: '✅ Tu modificación ha sido aprobada — ' + ra.numero_reserva,
+      html: `<p>Hola <strong>${ra.nombre_cliente}</strong>,</p>
+             <p>Hemos revisado y aprobado los cambios en tu reserva <strong>${ra.numero_reserva}</strong>.</p>
+             <div style="background:#f5f0ea;border-radius:8px;padding:14px 18px;font-size:14px;line-height:2;margin:12px 0;">${lineas.join('<br>')}</div>
+             <p>Accede a tu portal para ver todos los detalles:<br>
+             <a href="${BASE_URL}/mi-reserva" style="color:#C1502E;">${BASE_URL}/mi-reserva</a></p>`
+    });
+  } catch(e) { console.warn('Error enviando email aprobación:', e.message); }
+
+  res.json({ ok: true, nuevo_estado: nuevoEstado });
+}));
+
 // ─── Admin: mensajes de una reserva ──────────────────────────────────────────
 // Admin: editar datos de una reserva
 app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
   const { fecha, hora, num_pasajeros, direccion_recogida, direccion_destino,
-          numero_vuelo, hora_llegada_vuelo, nombre_barco, hora_atraque, notas_cliente } = req.body;
+          numero_vuelo, hora_llegada_vuelo, nombre_barco, hora_atraque, notas_cliente,
+          categoria_id, extras } = req.body;
 
   const actual = await pool.query('SELECT * FROM reservas WHERE id = $1', [req.params.id]);
   if (!actual.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
   const r = actual.rows[0];
 
+  // ── Validar cambio de categoría ──────────────────────────────────────────
+  let nuevoPrecio = null;
+  let categoriaNombreNueva = null;
+  if (categoria_id && parseInt(categoria_id) !== r.categoria_id) {
+    // Verificar que existe precio para ruta × categoría nueva
+    const precioQ = await pool.query(
+      'SELECT precio FROM rutas_precios WHERE ruta_id = $1 AND categoria_id = $2',
+      [r.ruta_id, categoria_id]
+    );
+    if (!precioQ.rows.length) {
+      const catQ = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [categoria_id]);
+      const nombreCat = catQ.rows.length ? catQ.rows[0].nombre : 'seleccionada';
+      return res.json({ ok: false, error: 'La categoría "' + nombreCat + '" no tiene precio configurado para esta ruta. Añádelo primero en la sección Precios.' });
+    }
+    nuevoPrecio = precioQ.rows[0].precio;
+    const catQ = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [categoria_id]);
+    categoriaNombreNueva = catQ.rows.length ? catQ.rows[0].nombre : '';
+  }
+
+  // ── Detectar cambios de campos básicos ──────────────────────────────────
   const cambios = [];
   if (fecha && fecha !== (r.fecha ? r.fecha.toISOString().slice(0,10) : '')) cambios.push('Fecha: ' + (r.fecha ? r.fecha.toISOString().slice(0,10) : '—') + ' → ' + fecha);
   if (hora && hora !== (r.hora ? r.hora.slice(0,5) : '')) cambios.push('Hora: ' + (r.hora ? r.hora.slice(0,5) : '—') + ' → ' + hora);
@@ -5101,7 +5387,23 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
   if (nombre_barco && nombre_barco !== (r.nombre_barco || '')) cambios.push('Barco: ' + (r.nombre_barco || '—') + ' → ' + nombre_barco);
   if (hora_atraque && hora_atraque !== (r.hora_atraque ? r.hora_atraque.slice(0,5) : '')) cambios.push('Hora atraque: ' + (r.hora_atraque ? r.hora_atraque.slice(0,5) : '—') + ' → ' + hora_atraque);
   if (notas_cliente && notas_cliente !== (r.notas_cliente || '')) cambios.push('Notas: actualizadas');
+  if (categoriaNombreNueva) {
+    const catActualQ = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [r.categoria_id]);
+    const catActualNombre = catActualQ.rows.length ? catActualQ.rows[0].nombre : '—';
+    cambios.push('Categoría: ' + catActualNombre + ' → ' + categoriaNombreNueva + ' (' + parseFloat(nuevoPrecio).toFixed(2) + ' €)');
+  }
 
+  // ── Detectar cambios de extras ───────────────────────────────────────────
+  const extrasActualesQ = await pool.query(
+    'SELECT extra_id FROM reservas_extras WHERE reserva_id = $1 ORDER BY extra_id',
+    [req.params.id]
+  );
+  const idsActuales = extrasActualesQ.rows.map(function(e) { return e.extra_id; }).sort();
+  const idsNuevos = Array.isArray(extras) ? extras.map(function(e) { return e.extra_id; }).sort() : idsActuales;
+  const extrasChanged = JSON.stringify(idsActuales) !== JSON.stringify(idsNuevos);
+
+  // ── Actualizar campos básicos ────────────────────────────────────────────
+  const catIdFinal = (categoria_id && parseInt(categoria_id) !== r.categoria_id) ? parseInt(categoria_id) : null;
   await pool.query(
     `UPDATE reservas SET
       fecha = COALESCE($1::date, fecha),
@@ -5113,16 +5415,37 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
       hora_llegada_vuelo = COALESCE(NULLIF($7,'')::time, hora_llegada_vuelo),
       nombre_barco = COALESCE(NULLIF($8,''), nombre_barco),
       hora_atraque = COALESCE(NULLIF($9,'')::time, hora_atraque),
-      notas_cliente = COALESCE(NULLIF($10,''), notas_cliente)
-     WHERE id = $11`,
+      notas_cliente = COALESCE(NULLIF($10,''), notas_cliente),
+      categoria_id = COALESCE($11, categoria_id),
+      precio_estimado = COALESCE($12, precio_estimado)
+     WHERE id = $13`,
     [fecha||null, hora||null, num_pasajeros||null,
      direccion_recogida||null, direccion_destino||null,
      numero_vuelo||null, hora_llegada_vuelo||null,
      nombre_barco||null, hora_atraque||null,
-     notas_cliente||null, req.params.id]
+     notas_cliente||null,
+     catIdFinal, nuevoPrecio,
+     req.params.id]
   );
 
-  // Leer reserva actualizada para el resumen
+  // ── Actualizar extras si cambiaron ──────────────────────────────────────
+  if (extrasChanged && Array.isArray(extras)) {
+    await pool.query('DELETE FROM reservas_extras WHERE reserva_id = $1', [req.params.id]);
+    for (const ex of extras) {
+      await pool.query(
+        'INSERT INTO reservas_extras (reserva_id, extra_id, precio_en_reserva) VALUES ($1, $2, $3)',
+        [req.params.id, ex.extra_id, ex.precio]
+      );
+    }
+    // Descripción del cambio de extras
+    const nombresQ = await pool.query('SELECT id, nombre FROM extras WHERE id = ANY($1)', [idsNuevos.length ? idsNuevos : [0]]);
+    const nombresMap = {};
+    nombresQ.rows.forEach(function(e) { nombresMap[e.id] = e.nombre; });
+    const desc = idsNuevos.length ? idsNuevos.map(function(id) { return nombresMap[id] || id; }).join(', ') : 'ninguno';
+    cambios.push('Extras: ' + desc);
+  }
+
+  // ── Leer reserva actualizada ─────────────────────────────────────────────
   const actualizada = await pool.query(
     `SELECT r.*, cv.nombre AS categoria_nombre
      FROM reservas r
@@ -5131,6 +5454,13 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
     [req.params.id]
   );
   const ra = actualizada.rows[0];
+
+  // ── Extras finales para el email ─────────────────────────────────────────
+  const extrasFinalesQ = await pool.query(
+    `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`,
+    [req.params.id]
+  );
+  const extrasFin = extrasFinalesQ.rows;
 
   if (cambios.length && ra) {
     // Registrar en historial
@@ -5149,11 +5479,13 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
         '<strong>Hora de recogida:</strong> ' + (ra.hora ? ra.hora.slice(0,5) : '—'),
         '<strong>Pasajeros:</strong> ' + (ra.num_pasajeros || '—'),
         '<strong>Categoría:</strong> ' + (ra.categoria_nombre || '—'),
+        '<strong>Precio estimado:</strong> ' + (ra.precio_estimado ? parseFloat(ra.precio_estimado).toFixed(2) + ' €' : '—'),
       ];
       if (ra.direccion_recogida) lineas.push('<strong>Dirección de recogida:</strong> ' + ra.direccion_recogida);
       if (ra.direccion_destino) lineas.push('<strong>Dirección de destino:</strong> ' + ra.direccion_destino);
       if (ra.numero_vuelo) lineas.push('<strong>Vuelo:</strong> ' + ra.numero_vuelo + (ra.hora_llegada_vuelo ? ' · Llegada ' + ra.hora_llegada_vuelo.slice(0,5) : ''));
       if (ra.nombre_barco) lineas.push('<strong>Barco:</strong> ' + ra.nombre_barco + (ra.hora_atraque ? ' · Atraque ' + ra.hora_atraque.slice(0,5) : ''));
+      if (extrasFin.length) lineas.push('<strong>Extras:</strong> ' + extrasFin.map(function(e) { return e.nombre + ' (' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €)'; }).join(', '));
       if (ra.notas_cliente) lineas.push('<strong>Notas:</strong> ' + ra.notas_cliente);
 
       await enviarEmail({
