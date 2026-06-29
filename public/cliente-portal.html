@@ -158,7 +158,7 @@
         var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '—';
         var hora = r.hora ? r.hora.slice(0,5) : '—';
         var esHistorial = r.es_historial;
-        var dotClass = esHistorial ? 'dot-historial' : (r.estado === 'pendiente' ? 'dot-pendiente' : 'dot-activa');
+        var dotClass = esHistorial ? 'dot-historial' : (r.estado === 'pendiente' ? 'dot-pendiente' : r.estado === 'modificacion_pendiente' ? 'dot-pendiente' : 'dot-activa');
         var etiqueta = esHistorial ? '<span class="etiqueta-seccion etiqueta-historial">Realizado</span>' : '<span class="etiqueta-seccion etiqueta-activa">Activo</span>';
         return '<div class="reserva-card' + (esHistorial ? ' historial' : '') + '" id="card-' + i + '">' +
           '<div class="reserva-resumen" onclick="toggleDetalle(' + i + ')">' +
@@ -179,7 +179,7 @@
     }
 
     function renderDetalle(r, i) {
-      var estadoBadge = { pendiente: '🟡 Pendiente', confirmada: '🟢 Confirmada', completada: '✅ Completada', cancelada: '🔴 Cancelada' };
+      var estadoBadge = { pendiente: '🟡 Pendiente', confirmada: '🟢 Confirmada', completada: '✅ Completada', cancelada: '🔴 Cancelada', modificacion_pendiente: '🟠 Modificación pendiente' };
       var extrasHTML = r.extras && r.extras.length ? r.extras.map(function(e) { return e.nombre + ' (+' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €)'; }).join(', ') : '—';
       var html = '<div class="dato-fila">' +
         '<div><strong>Estado</strong>' + (estadoBadge[r.estado] || r.estado) + '</div>' +
@@ -212,23 +212,12 @@
 
       // Solo si no es historial: modificar y mensajes
       if (!r.es_historial) {
-        html += '<div class="seccion-titulo">Modificar datos</div>';
-        if (!r.noshow.puede_modificar) {
-          html += '<p style="color:#5a6c79;font-size:14px;">El plazo de modificación ha vencido. Usa el canal de mensajes para cualquier incidencia.</p>';
-        } else {
-          html += '<label class="label-mod">Hora de recogida</label>' +
-            '<input type="time" class="campo-mod" id="mod-hora-' + i + '" value="' + (r.hora ? r.hora.slice(0,5) : '') + '">' +
-            '<label class="label-mod">Número de vuelo</label>' +
-            '<input type="text" class="campo-mod" id="mod-vuelo-' + i + '" value="' + (r.numero_vuelo || '') + '" placeholder="Ej: IB3456">' +
-            '<label class="label-mod">Dirección de recogida</label>' +
-            '<input type="text" class="campo-mod" id="mod-recogida-' + i + '" value="' + (r.direccion_recogida || '') + '">' +
-            '<label class="label-mod">Dirección de destino</label>' +
-            '<input type="text" class="campo-mod" id="mod-destino-' + i + '" value="' + (r.direccion_destino || '') + '">' +
-            '<label class="label-mod">Notas adicionales</label>' +
-            '<textarea class="campo-mod" id="mod-notas-' + i + '" rows="2">' + (r.notas_cliente || '') + '</textarea>' +
-            '<button class="secundario" onclick="guardarModificaciones(' + i + ',' + r.id + ')">Guardar cambios</button>' +
-            '<div id="aviso-mod-' + i + '" style="display:none;font-size:13px;margin-top:8px;"></div>';
-        }
+        html += '<div class="seccion-titulo">Gestionar reserva</div>';
+        html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
+          '<a href="/modificar-reserva?pnr=' + r.numero_reserva + '" class="secundario" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">✏️ Modificar reserva</a>' +
+          '<button class="secundario" style="background:#fdf2f2;border-color:#f5c6cb;color:#842029;" onclick="cancelarReserva(' + r.id + ', \'' + r.numero_reserva + '\', ' + i + ')">❌ Cancelar reserva</button>' +
+          '</div>';
+        html += '<div id="aviso-cancelar-' + i + '" style="display:none;font-size:13px;margin-bottom:12px;"></div>';
 
         html += '<div class="seccion-titulo">Mensajes al equipo</div>' +
           '<div id="hilo-' + i + '" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>' +
@@ -250,23 +239,26 @@
       }
     }
 
-    async function guardarModificaciones(i, reservaId) {
-      var datos = {
-        hora: document.getElementById('mod-hora-' + i) ? document.getElementById('mod-hora-' + i).value : null,
-        numero_vuelo: document.getElementById('mod-vuelo-' + i) ? document.getElementById('mod-vuelo-' + i).value : null,
-        direccion_recogida: document.getElementById('mod-recogida-' + i) ? document.getElementById('mod-recogida-' + i).value : null,
-        direccion_destino: document.getElementById('mod-destino-' + i) ? document.getElementById('mod-destino-' + i).value : null,
-        notas_cliente: document.getElementById('mod-notas-' + i) ? document.getElementById('mod-notas-' + i).value : null,
-        reserva_id: reservaId
-      };
-      var av = document.getElementById('aviso-mod-' + i);
-      var r = await fetch('/api/cliente/modificar', {
-        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(datos)
+    async function cancelarReserva(reservaId, pnr, i) {
+      var av = document.getElementById('aviso-cancelar-' + i);
+      if (!confirm('¿Seguro que quieres cancelar la reserva ' + pnr + '? Esta acción no se puede deshacer.')) return;
+      var r = await fetch('/api/cliente/cancelar', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reserva_id: reservaId })
       });
       var d = await r.json();
-      av.style.display = 'block';
-      av.style.color = d.ok ? '#2e7d32' : '#842029';
-      av.textContent = d.ok ? '✅ Cambios guardados.' : (d.error || 'Error al guardar.');
+      if (d.ok) {
+        av.style.display = 'block'; av.style.color = '#2e7d32';
+        av.textContent = '✅ Reserva cancelada. Recibirás un email de confirmación.';
+        setTimeout(function() { cargarPortal(); }, 2000);
+      } else {
+        av.style.display = 'block'; av.style.color = '#842029';
+        av.textContent = d.error || 'Error al cancelar.';
+      }
+    }
+
+    async function guardarModificaciones(i, reservaId) {
+      // Función mantenida por compatibilidad — ya no se usa en el nuevo flujo
     }
 
     async function cargarMensajes(i, reservaId) {

@@ -673,6 +673,12 @@ table.tabla-precios input {
             <div style="margin-top:0.75rem;"><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Dirección de recogida</label><input type="text" id="edit-recogida" class="campo" style="height:34px;font-size:0.82rem;width:100%;"></div>
             <div style="margin-top:0.5rem;"><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Dirección de destino</label><input type="text" id="edit-destino" class="campo" style="height:34px;font-size:0.82rem;width:100%;"></div>
             <div style="margin-top:0.5rem;"><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Notas</label><textarea id="edit-notas" class="campo" rows="2" style="font-size:0.82rem;width:100%;resize:vertical;"></textarea></div>
+            <div style="margin-top:0.75rem;"><label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:3px;">Categoría de vehículo</label><select id="edit-categoria" class="campo" style="height:34px;font-size:0.82rem;width:100%;"><option value="">— Sin cambiar —</option></select></div>
+            <div style="margin-top:0.75rem;">
+              <label style="font-size:0.78rem;font-weight:600;color:#666;display:block;margin-bottom:6px;">Extras</label>
+              <div id="edit-extras-lista" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+              <div id="edit-extras-vacio" style="font-size:0.78rem;color:#aaa;display:none;">No hay extras disponibles.</div>
+            </div>
             <div style="margin-top:0.75rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
               <button class="boton-primario" style="font-size:0.82rem;" onclick="guardarEdicionReserva()">💾 Guardar cambios</button>
               <span style="font-size:0.78rem;color:#888;">Los cambios quedan registrados en el historial.</span>
@@ -700,6 +706,7 @@ table.tabla-precios input {
         </div>
 
         <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <button id="btn-aprobar-modificacion" class="boton-primario" style="font-size:0.82rem;display:none;" onclick="aprobarModificacion()">✅ Aprobar modificación</button>
           <button class="boton-costa" style="font-size:0.82rem;" onclick="archivarDesdeDetalle()">📦 Archivar</button>
           <button class="boton-peligro" style="font-size:0.82rem;" onclick="borrarDesdeDetalle()">🗑 Borrar reserva</button>
           <button class="boton-costa" style="font-size:0.82rem;" onclick="cerrarDetalleReserva()">Cerrar</button>
@@ -4004,6 +4011,12 @@ function abrirDetalleReserva(id, sinScroll) {
         btnLiberar.style.display = 'none';
       }
 
+      // Botón aprobar modificación
+      var btnAprobar = document.getElementById('btn-aprobar-modificacion');
+      if (btnAprobar) {
+        btnAprobar.style.display = r.estado === 'modificacion_pendiente' ? 'inline-block' : 'none';
+      }
+
       // Scroll suave solo cuando el usuario pulsa Ver, no en recargas automáticas
       if (!sinScroll) {
         setTimeout(function() {
@@ -4071,7 +4084,50 @@ function rellenarCamposEdicion(r) {
   if (er) er.value = r.direccion_recogida || '';
   if (ed) ed.value = r.direccion_destino || '';
   if (en2) en2.value = r.notas_cliente || '';
-  // Asegurarse de que el panel empieza cerrado
+
+  // Cargar categorías en el selector
+  var selCat = document.getElementById('edit-categoria');
+  if (selCat) {
+    fetch('/admin/categorias')
+      .then(function(res) { return res.json(); })
+      .then(function(d) {
+        selCat.innerHTML = '<option value="">— Sin cambiar —</option>';
+        (d.categorias || []).forEach(function(c) {
+          var opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.nombre;
+          if (r.categoria_id && c.id === r.categoria_id) opt.selected = true;
+          selCat.appendChild(opt);
+        });
+      });
+  }
+
+  // Cargar extras con checkboxes
+  var listaExtras = document.getElementById('edit-extras-lista');
+  var vaciExtras = document.getElementById('edit-extras-vacio');
+  if (listaExtras) {
+    var extrasActivos = (r.extras || []).map(function(e) { return e.extra_id || e.id; });
+    fetch('/admin/extras')
+      .then(function(res) { return res.json(); })
+      .then(function(d) {
+        var todos = (d.extras || []).filter(function(e) { return e.activo; });
+        if (!todos.length) {
+          listaExtras.innerHTML = '';
+          if (vaciExtras) vaciExtras.style.display = 'block';
+          return;
+        }
+        if (vaciExtras) vaciExtras.style.display = 'none';
+        listaExtras.innerHTML = todos.map(function(e) {
+          var marcado = extrasActivos.indexOf(e.id) !== -1;
+          return '<label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;background:#fff;border:1px solid var(--gris-borde);border-radius:6px;padding:5px 10px;cursor:pointer;">' +
+            '<input type="checkbox" data-extra-id="' + e.id + '" data-extra-precio="' + e.precio + '" ' + (marcado ? 'checked' : '') + '>' +
+            e.nombre + ' <span style="color:var(--texto-muted);font-size:0.78rem;">(' + parseFloat(e.precio).toFixed(2) + ' €)</span>' +
+            '</label>';
+        }).join('');
+      });
+  }
+
+  // Panel empieza cerrado
   var panel = document.getElementById('panel-edicion-reserva');
   var icono = document.getElementById('icono-edicion');
   if (panel) panel.style.display = 'none';
@@ -4081,6 +4137,18 @@ function rellenarCamposEdicion(r) {
 function guardarEdicionReserva() {
   if (!reservaDetalleId) return;
   var av = document.getElementById('aviso-edicion-reserva');
+
+  // Recoger extras marcados
+  var checkboxes = document.querySelectorAll('#edit-extras-lista input[type="checkbox"]');
+  var extras = [];
+  checkboxes.forEach(function(cb) {
+    if (cb.checked) {
+      extras.push({ extra_id: parseInt(cb.dataset.extraId), precio: parseFloat(cb.dataset.extraPrecio) });
+    }
+  });
+
+  var catVal = document.getElementById('edit-categoria') ? document.getElementById('edit-categoria').value : '';
+
   var datos = {
     fecha: document.getElementById('edit-fecha').value || null,
     hora: document.getElementById('edit-hora').value || null,
@@ -4091,8 +4159,13 @@ function guardarEdicionReserva() {
     hora_atraque: document.getElementById('edit-hora-atraque').value || null,
     direccion_recogida: document.getElementById('edit-recogida').value || null,
     direccion_destino: document.getElementById('edit-destino').value || null,
-    notas_cliente: document.getElementById('edit-notas').value || null
+    notas_cliente: document.getElementById('edit-notas').value || null,
+    categoria_id: catVal ? parseInt(catVal) : null,
+    extras: extras
   };
+
+  if (av) { av.style.display = 'block'; av.style.color = '#888'; av.textContent = 'Guardando…'; }
+
   fetch('/admin/reservas/' + reservaDetalleId + '/editar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -4332,6 +4405,25 @@ function enviarEmailVoucher() {
     .catch(function() {
       av.innerHTML = '<div class="aviso-error">❌ Error de conexión.</div>';
     });
+}
+
+function aprobarModificacion() {
+  if (!reservaDetalleId) return;
+  var av = document.getElementById('aviso-edicion-reserva');
+  if (!confirm('¿Aprobar la modificación solicitada por el cliente? Se notificará al cliente por email.')) return;
+  fetch('/admin/reservas/' + reservaDetalleId + '/aprobar-modificacion', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok) {
+      if (av) { av.style.display = 'block'; av.style.color = 'green'; av.textContent = '✅ Modificación aprobada y cliente notificado.'; }
+      abrirDetalleReserva(reservaDetalleId, true);
+    } else {
+      if (av) { av.style.display = 'block'; av.style.color = 'var(--rojo)'; av.textContent = d.error || 'Error al aprobar.'; }
+    }
+  });
 }
 
 function archivarDesdeDetalle() {
