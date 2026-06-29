@@ -808,9 +808,11 @@ async function initSchema() {
       reserva_id INT NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,
       autor TEXT NOT NULL DEFAULT 'admin',
       mensaje TEXT NOT NULL,
+      leido BOOLEAN DEFAULT FALSE,
       creado_en TIMESTAMP DEFAULT NOW()
     );
   `);
+  await pool.query(`ALTER TABLE reservas_mensajes_chofer ADD COLUMN IF NOT EXISTS leido BOOLEAN DEFAULT FALSE`);
 
   // Configuración de contacto público
   await pool.query(`
@@ -2807,7 +2809,11 @@ app.get('/chofer/mis-reservas', requireChofer, asyncHandler(async (req, res) => 
   const result = await pool.query(
     `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino,
             r.nombre_cliente, r.num_pasajeros, r.estado, r.deposito_pagado,
-            cv.nombre AS categoria_nombre
+            r.numero_vuelo, r.hora_llegada_vuelo, r.nombre_barco, r.hora_atraque,
+            r.direccion_recogida, r.direccion_destino, r.notas_cliente,
+            cv.nombre AS categoria_nombre,
+            (SELECT COUNT(*) FROM reservas_mensajes_chofer rmc
+             WHERE rmc.reserva_id = r.id AND rmc.autor = 'admin' AND rmc.leido = FALSE) AS mensajes_nuevos
      FROM reservas r
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
      WHERE r.conductor_id = $1
@@ -2817,6 +2823,28 @@ app.get('/chofer/mis-reservas', requireChofer, asyncHandler(async (req, res) => 
     [req.session.choferId]
   );
   res.json({ nombre: req.session.choferNombre, reservas: result.rows });
+}));
+
+app.get('/chofer/mensajes/:reservaId', requireChofer, asyncHandler(async (req, res) => {
+  // Verificar que la reserva pertenece a este chofer
+  const check = await pool.query(
+    'SELECT id FROM reservas WHERE id = $1 AND conductor_id = $2',
+    [req.params.reservaId, req.session.choferId]
+  );
+  if (!check.rows.length) return res.status(403).json({ error: 'No autorizado.' });
+
+  const result = await pool.query(
+    'SELECT id, autor, mensaje, leido, creado_en FROM reservas_mensajes_chofer WHERE reserva_id = $1 ORDER BY creado_en ASC',
+    [req.params.reservaId]
+  );
+
+  // Marcar como leídos
+  await pool.query(
+    "UPDATE reservas_mensajes_chofer SET leido = TRUE WHERE reserva_id = $1 AND autor = 'admin'",
+    [req.params.reservaId]
+  );
+
+  res.json({ mensajes: result.rows });
 }));
 
 app.get('/chofer/cartel/:id', requireChofer, asyncHandler(async (req, res) => {
