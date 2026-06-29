@@ -5789,6 +5789,9 @@ async function generarFacturaWord(reservaId) {
     [reservaId]
   );
 
+  const totalExtras = extras.reduce((s, e) => s + parseFloat(e.precio_en_reserva), 0);
+  const totalFactura = (parseFloat(r.precio_estimado) || 0) + totalExtras;
+
   let numeroFactura;
   if (facturaExistente.rows.length) {
     numeroFactura = facturaExistente.rows[0].numero_factura;
@@ -5800,8 +5803,6 @@ async function generarFacturaWord(reservaId) {
     const anio = new Date().getFullYear();
     numeroFactura = 'TGC-' + anio + '-' + String(num).padStart(4, '0');
 
-    const totalExtras = extras.reduce((s, e) => s + parseFloat(e.precio_en_reserva), 0);
-    const totalFactura = (parseFloat(r.precio_estimado) || 0) + totalExtras;
     await pool.query(
       'INSERT INTO facturas (reserva_id, numero_factura, importe_total) VALUES ($1, $2, $3)',
       [reservaId, numeroFactura, totalFactura]
