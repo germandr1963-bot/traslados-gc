@@ -5081,6 +5081,40 @@ app.get('/api/cliente/mensajes', asyncHandler(async (req, res) => {
 }));
 
 // ─── Admin: mensajes de una reserva ──────────────────────────────────────────
+// Admin: responder al cliente
+app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, res) => {
+  const { mensaje } = req.body;
+  if (!mensaje || !mensaje.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
+
+  await pool.query(
+    'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
+    [req.params.id, 'admin', mensaje.trim()]
+  );
+
+  // Notificar al cliente por email
+  try {
+    const reserva = await pool.query(
+      'SELECT nombre_cliente, email_cliente, numero_reserva FROM reservas WHERE id = $1',
+      [req.params.id]
+    );
+    if (reserva.rows.length) {
+      const r = reserva.rows[0];
+      await enviarEmail({
+        to: r.email_cliente,
+        subject: '💬 Tienes un mensaje sobre tu reserva ' + r.numero_reserva,
+        html: `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+               <p>El equipo de Traslados GC te ha enviado un mensaje sobre tu reserva <strong>${r.numero_reserva}</strong>:</p>
+               <blockquote style="border-left:3px solid #C1502E;padding-left:12px;color:#333;margin:16px 0;">${mensaje.trim().replace(/\n/g,'<br>')}</blockquote>
+               <p>Accede a tu portal para ver el hilo completo y responder:<br>
+               <a href="${BASE_URL}/mi-reserva" style="color:#C1502E;">${BASE_URL}/mi-reserva</a></p>`
+      });
+    }
+  } catch(e) { console.warn('Error enviando email al cliente:', e.message); }
+
+  res.json({ ok: true });
+}));
+
+// Admin: mensajes del cliente
 app.get('/admin/reservas/:id/mensajes', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, autor, mensaje, leido, creado_en FROM reservas_mensajes WHERE reserva_id = $1 ORDER BY creado_en ASC',
