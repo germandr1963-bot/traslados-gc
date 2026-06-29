@@ -5783,20 +5783,30 @@ async function generarFacturaWord(reservaId) {
   const cfgQ = await pool.query('SELECT * FROM configuracion_facturacion WHERE id = 1');
   const cfg = cfgQ.rows[0] || {};
 
-  // Número de factura correlativo
-  await pool.query('UPDATE configuracion_facturacion SET contador_facturas = contador_facturas + 1 WHERE id = 1');
-  const cntQ = await pool.query('SELECT contador_facturas FROM configuracion_facturacion WHERE id = 1');
-  const num = cntQ.rows[0].contador_facturas;
-  const anio = new Date().getFullYear();
-  const numeroFactura = 'TGC-' + anio + '-' + String(num).padStart(4, '0');
-
-  // Guardar referencia en BD
-  const totalExtras = extras.reduce((s, e) => s + parseFloat(e.precio_en_reserva), 0);
-  const totalFactura = (parseFloat(r.precio_estimado) || 0) + totalExtras;
-  await pool.query(
-    'INSERT INTO facturas (reserva_id, numero_factura, importe_total) VALUES ($1, $2, $3)',
-    [reservaId, numeroFactura, totalFactura]
+  // Si ya existe factura para esta reserva, reutilizar el número
+  const facturaExistente = await pool.query(
+    'SELECT numero_factura FROM facturas WHERE reserva_id = $1 ORDER BY generada_en ASC LIMIT 1',
+    [reservaId]
   );
+
+  let numeroFactura;
+  if (facturaExistente.rows.length) {
+    numeroFactura = facturaExistente.rows[0].numero_factura;
+  } else {
+    // Número correlativo nuevo
+    await pool.query('UPDATE configuracion_facturacion SET contador_facturas = contador_facturas + 1 WHERE id = 1');
+    const cntQ = await pool.query('SELECT contador_facturas FROM configuracion_facturacion WHERE id = 1');
+    const num = cntQ.rows[0].contador_facturas;
+    const anio = new Date().getFullYear();
+    numeroFactura = 'TGC-' + anio + '-' + String(num).padStart(4, '0');
+
+    const totalExtras = extras.reduce((s, e) => s + parseFloat(e.precio_en_reserva), 0);
+    const totalFactura = (parseFloat(r.precio_estimado) || 0) + totalExtras;
+    await pool.query(
+      'INSERT INTO facturas (reserva_id, numero_factura, importe_total) VALUES ($1, $2, $3)',
+      [reservaId, numeroFactura, totalFactura]
+    );
+  }
 
   const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
   const fechaFactura = new Date().toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'});
