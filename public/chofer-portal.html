@@ -5,6 +5,63 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Chofer — Traslados GC</title>
   <link rel="stylesheet" href="/estilos-chofer.css">
+  <style>
+    .filtros-barra {
+      display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;
+    }
+    .filtro-btn {
+      padding:7px 16px; border-radius:20px; border:1px solid var(--borde);
+      background:#fff; font-size:13px; cursor:pointer; font-weight:500;
+      color:#5a6c79;
+    }
+    .filtro-btn.activo { background:var(--costa); color:#fff; border-color:var(--costa); }
+    .reserva-card {
+      border:1px solid var(--borde); border-radius:12px;
+      margin-bottom:12px; overflow:hidden; background:#fff;
+    }
+    .reserva-card-cabecera {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px 16px; cursor:pointer; gap:10px;
+    }
+    .reserva-card-cabecera:hover { background:#f9f8f6; }
+    .reserva-pnr {
+      font-family:monospace; font-size:14px; font-weight:700;
+      color:var(--costa); flex-shrink:0;
+    }
+    .reserva-resumen { flex:1; min-width:0; }
+    .reserva-ruta { font-size:14px; font-weight:600; color:#1C1815; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .reserva-meta { font-size:12px; color:#5a6c79; margin-top:2px; }
+    .reserva-badges { display:flex; gap:6px; align-items:center; flex-shrink:0; }
+    .badge-msg {
+      background:#e65100; color:#fff; border-radius:10px;
+      padding:2px 8px; font-size:11px; font-weight:700;
+    }
+    .reserva-chevron { color:#aaa; font-size:14px; flex-shrink:0; }
+    .reserva-cuerpo { display:none; padding:16px; border-top:1px solid var(--borde); background:#fafaf8; }
+    .reserva-cuerpo.abierto { display:block; }
+    .detalle-fila { font-size:13px; color:#333; margin-bottom:6px; }
+    .detalle-fila strong { color:#1C1815; }
+    .seccion-label {
+      font-size:12px; font-weight:700; color:#888; letter-spacing:0.5px;
+      text-transform:uppercase; margin:14px 0 8px;
+    }
+    .hilo-mensajes {
+      display:flex; flex-direction:column; gap:8px;
+      max-height:220px; overflow-y:auto; margin-bottom:10px;
+    }
+    .msg-burbuja {
+      border-radius:8px; padding:9px 13px; font-size:13px; line-height:1.5;
+    }
+    .msg-equipo { background:#e8f5e9; border:1px solid #c8e6c9; }
+    .msg-equipo .msg-autor { font-weight:600; color:#2e7d32; font-size:12px; margin-bottom:3px; }
+    .msg-sin { font-size:13px; color:#aaa; text-align:center; padding:10px 0; }
+    .boton-cartel {
+      background:var(--costa); color:#fff; border:none; border-radius:8px;
+      padding:10px 20px; font-size:13px; font-weight:700; cursor:pointer; width:100%;
+      margin-top:10px;
+    }
+    .boton-cartel:disabled { opacity:0.5; cursor:not-allowed; }
+  </style>
 </head>
 <body>
   <header class="app">
@@ -23,7 +80,14 @@
       <div class="tarjeta" id="ficha-vehiculo"></div>
 
       <div class="tarjeta">
-        <h2 style="margin-top:0">Reservas</h2>
+        <h2 style="margin-top:0">Mis reservas</h2>
+
+        <div class="filtros-barra">
+          <button class="filtro-btn activo" id="filtro-todas" onclick="aplicarFiltro('todas')">Todas</button>
+          <button class="filtro-btn" id="filtro-hoy" onclick="aplicarFiltro('hoy')">Hoy</button>
+          <button class="filtro-btn" id="filtro-proximas" onclick="aplicarFiltro('proximas')">Próximas</button>
+        </div>
+
         <div id="lista-reservas"><p style="color:#5a6c79;font-size:14px">Cargando...</p></div>
       </div>
 
@@ -32,6 +96,9 @@
   </main>
 
   <script>
+    var todasLasReservas = [];
+    var filtroActual = 'todas';
+
     const TEXTOS_ESTADO = {
       pendiente: 'Tu solicitud está en revisión. Te avisaremos cuando la administración apruebe tu cuenta.',
       aprobado: 'Tu cuenta está aprobada. Ya formas parte de la plataforma.',
@@ -63,6 +130,143 @@
         '<p style="font-size:0.88rem">' + (TEXTOS_FOTO[conductor.foto_estado || 'sin_foto']) + '</p>' +
         '<label for="archivo-foto" style="margin-top:10px">📷 ' + (conductor.foto ? 'Cambiar' : 'Subir') + ' foto de carné (será revisada por la administración antes de mostrarse)</label>' +
         '<input type="file" id="archivo-foto" accept="image/*" onchange="subirFoto(this)">';
+      await cargarReservas();
+    }
+
+    async function cargarReservas() {
+      const r = await fetch('/chofer/mis-reservas');
+      if (!r.ok) return;
+      const data = await r.json();
+      todasLasReservas = data.reservas || [];
+      renderizarReservas();
+    }
+
+    function aplicarFiltro(filtro) {
+      filtroActual = filtro;
+      document.querySelectorAll('.filtro-btn').forEach(function(b) { b.classList.remove('activo'); });
+      document.getElementById('filtro-' + filtro).classList.add('activo');
+      renderizarReservas();
+    }
+
+    function renderizarReservas() {
+      var hoy = new Date(); hoy.setHours(0,0,0,0);
+      var manana = new Date(hoy); manana.setDate(manana.getDate() + 1);
+
+      var reservas = todasLasReservas.filter(function(r) {
+        if (!r.fecha) return filtroActual === 'todas';
+        var f = new Date(r.fecha); f.setHours(0,0,0,0);
+        if (filtroActual === 'hoy') return f.getTime() === hoy.getTime();
+        if (filtroActual === 'proximas') return f >= manana;
+        return true;
+      });
+
+      var lista = document.getElementById('lista-reservas');
+      if (!reservas.length) {
+        lista.innerHTML = '<p style="color:#5a6c79;font-size:14px;text-align:center;padding:20px 0">No hay reservas para este filtro.</p>';
+        return;
+      }
+
+      lista.innerHTML = reservas.map(function(r) {
+        var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long'}) : '—';
+        var hora = r.hora ? r.hora.slice(0,5) : '—';
+        var tieneMsg = parseInt(r.mensajes_nuevos) > 0;
+
+        var llegada = '';
+        if (r.numero_vuelo) llegada = '✈️ Vuelo ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · Llegada ' + r.hora_llegada_vuelo.slice(0,5) : '');
+        else if (r.nombre_barco) llegada = '🚢 ' + r.nombre_barco + (r.hora_atraque ? ' · Atraque ' + r.hora_atraque.slice(0,5) : '');
+
+        return '<div class="reserva-card" id="card-' + r.id + '">' +
+          '<div class="reserva-card-cabecera" onclick="toggleReserva(' + r.id + ')">' +
+            '<span class="reserva-pnr">' + r.numero_reserva + '</span>' +
+            '<div class="reserva-resumen">' +
+              '<div class="reserva-ruta">' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
+              '<div class="reserva-meta">📅 ' + fecha + ' · ' + hora + 'h · ' + (r.num_pasajeros||'—') + ' pax</div>' +
+            '</div>' +
+            '<div class="reserva-badges">' +
+              (tieneMsg ? '<span class="badge-msg">💬 ' + r.mensajes_nuevos + '</span>' : '') +
+            '</div>' +
+            '<span class="reserva-chevron" id="chev-' + r.id + '">▼</span>' +
+          '</div>' +
+          '<div class="reserva-cuerpo" id="cuerpo-' + r.id + '">' +
+            '<div class="detalle-fila"><strong>Ruta:</strong> ' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
+            '<div class="detalle-fila"><strong>Fecha:</strong> ' + fecha + '</div>' +
+            '<div class="detalle-fila"><strong>Hora de recogida:</strong> ' + hora + '</div>' +
+            '<div class="detalle-fila"><strong>Pasajeros:</strong> ' + (r.num_pasajeros||'—') + '</div>' +
+            '<div class="detalle-fila"><strong>Categoría:</strong> ' + (r.categoria_nombre||'—') + '</div>' +
+            (r.nombre_cliente ? '<div class="detalle-fila"><strong>Cliente:</strong> ' + r.nombre_cliente + '</div>' : '') +
+            (llegada ? '<div class="detalle-fila">' + llegada + '</div>' : '') +
+            (r.direccion_recogida ? '<div class="detalle-fila"><strong>Recogida:</strong> ' + r.direccion_recogida + '</div>' : '') +
+            (r.direccion_destino ? '<div class="detalle-fila"><strong>Destino:</strong> ' + r.direccion_destino + '</div>' : '') +
+            (r.notas_cliente ? '<div class="detalle-fila"><strong>Notas:</strong> ' + r.notas_cliente + '</div>' : '') +
+
+            '<div class="seccion-label">Mensajes del equipo</div>' +
+            '<div class="hilo-mensajes" id="hilo-' + r.id + '"><div class="msg-sin">Cargando...</div></div>' +
+
+            '<button class="boton-cartel" id="btn-cartel-' + r.id + '" onclick="descargarCartel(' + r.id + ',\'' + r.numero_reserva + '\')">📄 Descargar cartel</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function toggleReserva(id) {
+      var cuerpo = document.getElementById('cuerpo-' + id);
+      var chev = document.getElementById('chev-' + id);
+      var abierto = cuerpo.classList.contains('abierto');
+      if (abierto) {
+        cuerpo.classList.remove('abierto');
+        chev.textContent = '▼';
+      } else {
+        cuerpo.classList.add('abierto');
+        chev.textContent = '▲';
+        cargarMensajesChofer(id);
+      }
+    }
+
+    function cargarMensajesChofer(reservaId) {
+      var hilo = document.getElementById('hilo-' + reservaId);
+      fetch('/chofer/mensajes/' + reservaId)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (!d.mensajes || !d.mensajes.length) {
+            hilo.innerHTML = '<div class="msg-sin">Sin mensajes del equipo para esta reserva.</div>';
+            // Quitar badge
+            var card = document.getElementById('card-' + reservaId);
+            if (card) { var b = card.querySelector('.badge-msg'); if (b) b.remove(); }
+            return;
+          }
+          hilo.innerHTML = d.mensajes.map(function(m) {
+            var fecha = new Date(m.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+            return '<div class="msg-burbuja msg-equipo">' +
+              '<div class="msg-autor">👨‍💼 Equipo · ' + fecha + '</div>' +
+              '<div>' + m.mensaje.replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n').join('<br>') + '</div>' +
+            '</div>';
+          }).join('');
+          hilo.scrollTop = hilo.scrollHeight;
+          // Quitar badge tras leer
+          var card = document.getElementById('card-' + reservaId);
+          if (card) { var b = card.querySelector('.badge-msg'); if (b) b.remove(); }
+        })
+        .catch(function() {
+          hilo.innerHTML = '<div class="msg-sin">Error al cargar mensajes.</div>';
+        });
+    }
+
+    function descargarCartel(reservaId, pnr) {
+      var btn = document.getElementById('btn-cartel-' + reservaId);
+      btn.textContent = 'Generando...'; btn.disabled = true;
+      fetch('/chofer/cartel/' + reservaId)
+        .then(function(r) { if (!r.ok) throw new Error(); return r.blob(); })
+        .then(function(blob) {
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a'); a.href = url;
+          a.download = 'cartel-' + pnr + '.docx'; a.click();
+          URL.revokeObjectURL(url);
+          btn.textContent = '📄 Descargar cartel'; btn.disabled = false;
+        })
+        .catch(function() {
+          btn.textContent = '❌ Error'; btn.disabled = false;
+          setTimeout(function() { btn.textContent = '📄 Descargar cartel'; }, 2000);
+        });
     }
 
     function subirFoto(entrada) {
@@ -98,50 +302,7 @@
       window.location.href = '/chofer/login';
     }
 
-    async function cargarReservas() {
-      const r = await fetch('/chofer/mis-reservas');
-      if (!r.ok) return;
-      const data = await r.json();
-      const lista = document.getElementById('lista-reservas');
-      if (!data.reservas || !data.reservas.length) {
-        lista.innerHTML = '<p style="color:#5a6c79;font-size:14px;text-align:center;padding:20px 0">No tienes reservas asignadas próximamente.</p>';
-        return;
-      }
-      lista.innerHTML = data.reservas.map(function(r) {
-        var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '—';
-        var hora = r.hora ? r.hora.slice(0,5) : '—';
-        return '<div style="border:1px solid var(--borde);border-radius:10px;padding:16px;margin-bottom:12px;background:#fafaf8">' +
-          '<div style="font-family:monospace;font-size:15px;font-weight:700;color:var(--costa);margin-bottom:6px">' + r.numero_reserva + '</div>' +
-          '<div style="font-size:15px;font-weight:600;margin-bottom:6px">' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
-          '<div style="font-size:13px;color:#5a6c79;margin-bottom:2px">📅 ' + fecha + ' · ' + hora + 'h</div>' +
-          '<div style="font-size:13px;color:#5a6c79;margin-bottom:2px">👤 ' + (r.nombre_cliente||'—') + ' · ' + (r.num_pasajeros||'—') + ' pasajeros</div>' +
-          '<div style="font-size:13px;color:#5a6c79;margin-bottom:12px">🚗 ' + (r.categoria_nombre||'—') + '</div>' +
-          '<button id="btn-cartel-' + r.id + '" onclick="descargarCartel(' + r.id + ',\'' + r.numero_reserva + '\')" ' +
-          'style="background:var(--costa);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer">📄 Descargar cartel</button>' +
-        '</div>';
-      }).join('');
-    }
-
-    function descargarCartel(reservaId, pnr) {
-      var btn = document.getElementById('btn-cartel-' + reservaId);
-      btn.textContent = 'Generando...'; btn.disabled = true;
-      fetch('/chofer/cartel/' + reservaId)
-        .then(function(r) { if (!r.ok) throw new Error(); return r.blob(); })
-        .then(function(blob) {
-          var url = URL.createObjectURL(blob);
-          var a = document.createElement('a'); a.href = url;
-          a.download = 'cartel-' + pnr + '.docx'; a.click();
-          URL.revokeObjectURL(url);
-          btn.textContent = '📄 Descargar cartel'; btn.disabled = false;
-        })
-        .catch(function() {
-          btn.textContent = '❌ Error'; btn.disabled = false;
-          setTimeout(function() { btn.textContent = '📄 Descargar cartel'; }, 2000);
-        });
-    }
-
     mostrarPanel();
-    cargarReservas();
   </script>
 </body>
 </html>

@@ -215,9 +215,9 @@
         html += '<div class="seccion-titulo">Gestionar reserva</div>';
         html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">' +
           '<a href="/modificar-reserva?pnr=' + r.numero_reserva + '" style="text-decoration:none;flex:1;min-width:140px;">' +
-            '<div style="border:2px solid #e65100;border-radius:10px;padding:12px 16px;text-align:center;background:#fff8f0;cursor:pointer;">' +
+            '<div style="border:2px solid #1565c0;border-radius:10px;padding:12px 16px;text-align:center;background:#e3f2fd;cursor:pointer;">' +
               '<div style="font-size:20px;margin-bottom:4px;">✏️</div>' +
-              '<div style="font-size:13px;font-weight:600;color:#e65100;">Modificar reserva</div>' +
+              '<div style="font-size:13px;font-weight:600;color:#1565c0;">Modificar reserva</div>' +
               '<div style="font-size:11px;color:#888;margin-top:2px;">Cambia fecha, extras, categoría…</div>' +
             '</div>' +
           '</a>' +
@@ -231,11 +231,23 @@
           '</div>';
         html += '<div id="aviso-cancelar-' + i + '" style="display:none;font-size:13px;margin-bottom:12px;"></div>';
 
-        html += '<div class="seccion-titulo">Mensajes al equipo</div>' +
-          '<div id="hilo-' + i + '" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;"></div>' +
-          '<textarea class="campo-mod" id="msg-' + i + '" rows="2" placeholder="Escribe tu mensaje…"></textarea>' +
-          '<button class="secundario" onclick="enviarMensaje(' + i + ',' + r.id + ')">Enviar mensaje</button>' +
-          '<div id="aviso-msg-' + i + '" style="display:none;font-size:13px;margin-top:8px;"></div>';
+        // Mensajes — colapsado por defecto
+        var numMsg = r.mensajes_sin_leer || 0;
+        html += '<div style="border:1px solid var(--borde-suave);border-radius:10px;overflow:hidden;margin-bottom:12px;">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:#f9f7f4;" onclick="toggleMensajes(' + i + ',' + r.id + ')">' +
+            '<span style="font-size:13px;font-weight:600;color:var(--texto-oscuro);">💬 Mensajes del equipo' +
+              (numMsg > 0 ? ' <span style="background:#C1502E;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:6px;">' + numMsg + ' nuevos</span>' : '') +
+            '</span>' +
+            '<span id="chev-msg-' + i + '" style="color:#aaa;font-size:13px;">▼</span>' +
+          '</div>' +
+          '<div id="bloque-mensajes-' + i + '" style="display:none;padding:14px 16px;border-top:1px solid var(--borde-suave);">' +
+            '<div id="hilo-cliente-' + i + '" style="display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto;margin-bottom:10px;"></div>' +
+            '<div id="sin-msg-' + i + '" style="font-size:13px;color:#aaa;text-align:center;padding:8px 0;display:none;">Sin mensajes aún.</div>' +
+            '<textarea id="texto-msg-' + i + '" rows="2" placeholder="Escribe un mensaje al equipo…" style="width:100%;border:1px solid var(--borde-suave);border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>' +
+            '<button onclick="enviarMensajeCliente(' + i + ',' + r.id + ')" style="margin-top:6px;background:var(--terracota);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;">Enviar mensaje</button>' +
+            '<div id="aviso-msg-' + i + '" style="display:none;font-size:12px;margin-top:6px;"></div>' +
+          '</div>' +
+        '</div>';
       }
 
       return html;
@@ -246,8 +258,64 @@
       var chev = document.getElementById('chev-' + i);
       var abierto = detalle.classList.toggle('visible');
       chev.classList.toggle('abierto', abierto);
-      if (abierto && !reservasData[i].es_historial) {
-        cargarMensajes(i, reservasData[i].id);
+    }
+
+    function toggleMensajes(i, reservaId) {
+      var bloque = document.getElementById('bloque-mensajes-' + i);
+      var chev = document.getElementById('chev-msg-' + i);
+      var abierto = bloque.style.display !== 'none';
+      if (abierto) {
+        bloque.style.display = 'none';
+        chev.textContent = '▼';
+      } else {
+        bloque.style.display = 'block';
+        chev.textContent = '▲';
+        cargarMensajesCliente(i, reservaId);
+      }
+    }
+
+    function cargarMensajesCliente(i, reservaId) {
+      var hilo = document.getElementById('hilo-cliente-' + i);
+      var sinMsg = document.getElementById('sin-msg-' + i);
+      fetch('/api/cliente/mensajes?reserva_id=' + reservaId)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (!d.mensajes || !d.mensajes.length) {
+            hilo.innerHTML = '';
+            if (sinMsg) sinMsg.style.display = 'block';
+            return;
+          }
+          if (sinMsg) sinMsg.style.display = 'none';
+          hilo.innerHTML = d.mensajes.map(function(m) {
+            var fecha = new Date(m.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+            var esEquipo = m.autor === 'admin';
+            return '<div style="background:' + (esEquipo ? '#e8f5e9' : '#fff3e0') + ';border:1px solid ' + (esEquipo ? '#c8e6c9' : '#ffe0b2') + ';border-radius:8px;padding:9px 13px;font-size:13px;">' +
+              '<div style="font-weight:600;color:' + (esEquipo ? '#2e7d32' : '#e65100') + ';font-size:12px;margin-bottom:3px;">' +
+              (esEquipo ? '👨‍💼 Equipo' : '👤 Tú') + ' · ' + fecha + '</div>' +
+              '<div>' + m.mensaje.replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n').join('<br>') + '</div>' +
+            '</div>';
+          }).join('');
+          hilo.scrollTop = hilo.scrollHeight;
+        });
+    }
+
+    async function enviarMensajeCliente(i, reservaId) {
+      var campo = document.getElementById('texto-msg-' + i);
+      var av = document.getElementById('aviso-msg-' + i);
+      var texto = campo ? campo.value.trim() : '';
+      if (!texto) return;
+      var r = await fetch('/api/cliente/mensaje', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reserva_id: reservaId, mensaje: texto })
+      });
+      var d = await r.json();
+      if (d.ok) {
+        campo.value = '';
+        if (av) { av.style.display = 'block'; av.style.color = '#2e7d32'; av.textContent = '✅ Mensaje enviado.'; setTimeout(function() { av.style.display = 'none'; }, 3000); }
+        cargarMensajesCliente(i, reservaId);
+      } else {
+        if (av) { av.style.display = 'block'; av.style.color = '#c62828'; av.textContent = d.error || 'Error al enviar.'; }
       }
     }
 
@@ -271,45 +339,6 @@
 
     async function guardarModificaciones(i, reservaId) {
       // Función mantenida por compatibilidad — ya no se usa en el nuevo flujo
-    }
-
-    async function cargarMensajes(i, reservaId) {
-      var r = await fetch('/api/cliente/mensajes?reserva_id=' + reservaId);
-      if (!r.ok) return;
-      var d = await r.json();
-      var hilo = document.getElementById('hilo-' + i);
-      if (!hilo) return;
-      if (!d.mensajes || !d.mensajes.length) { hilo.innerHTML = ''; return; }
-      hilo.innerHTML = d.mensajes.map(function(m) {
-        var fecha = new Date(m.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
-        var esCliente = m.autor === 'cliente';
-        return '<div class="mensaje-burbuja ' + (esCliente ? 'msg-cliente' : 'msg-equipo') + '">' +
-          '<strong style="color:' + (esCliente ? '#e65100' : '#2e7d32') + ';font-size:12px;">' + (esCliente ? '👤 Tú' : '👨‍💼 Equipo') + '</strong>' +
-          '<span style="color:#999;font-size:11px;margin-left:8px;">' + fecha + '</span>' +
-          '<p style="margin:4px 0 0;font-size:13px;">' + m.mensaje.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') + '</p>' +
-          '</div>';
-      }).join('');
-    }
-
-    async function enviarMensaje(i, reservaId) {
-      var texto = document.getElementById('msg-' + i).value.trim();
-      var av = document.getElementById('aviso-msg-' + i);
-      if (!texto) { av.style.display='block'; av.style.color='#842029'; av.textContent='Escribe un mensaje antes de enviar.'; return; }
-      var r = await fetch('/api/cliente/mensaje', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ mensaje: texto, reserva_id: reservaId })
-      });
-      var d = await r.json();
-      av.style.display = 'block';
-      if (d.ok) {
-        av.style.color = '#2e7d32';
-        av.textContent = '✅ Mensaje enviado.';
-        document.getElementById('msg-' + i).value = '';
-        cargarMensajes(i, reservaId);
-      } else {
-        av.style.color = '#842029';
-        av.textContent = d.error || 'Error al enviar.';
-      }
     }
 
     async function cerrarSesion() {
