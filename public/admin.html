@@ -3938,6 +3938,7 @@ function abrirDetalleReserva(id, sinScroll) {
 
       // Mensajes del cliente
       cargarMensajesAdmin(id);
+      iniciarRefrescoMensajes(id);
 
       // Estado del depósito
       var depEl = document.getElementById('deposito-estado-admin');
@@ -3989,6 +3990,8 @@ function enviarRespuestaCliente() {
 }
 
 // ─── Mensajes del cliente (admin) ─────────────────────────────────────────────
+var _intervaloMensajes = null;
+
 function cargarMensajesAdmin(reservaId) {
   fetch('/admin/reservas/' + reservaId + '/mensajes')
     .then(function(r) { return r.json(); })
@@ -4010,7 +4013,19 @@ function cargarMensajesAdmin(reservaId) {
           '<p style="margin:4px 0 0;color:#333;">' + m.mensaje.replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n').join('<br>') + '</p>' +
           '</div>';
       }).join('');
+      hilo.scrollTop = hilo.scrollHeight;
     });
+}
+
+function iniciarRefrescoMensajes(reservaId) {
+  if (_intervaloMensajes) clearInterval(_intervaloMensajes);
+  _intervaloMensajes = setInterval(function() {
+    if (reservaDetalleId) cargarMensajesAdmin(reservaDetalleId);
+  }, 15000);
+}
+
+function detenerRefrescoMensajes() {
+  if (_intervaloMensajes) { clearInterval(_intervaloMensajes); _intervaloMensajes = null; }
 }
 
 // ─── Liberar depósito (admin) ──────────────────────────────────────────────────
@@ -4035,6 +4050,7 @@ function liberarDeposito() {
 function cerrarDetalleReserva() {
   document.getElementById('detalle-reserva').classList.add('oculto');
   reservaDetalleId = null;
+  detenerRefrescoMensajes();
 }
 
 function cambiarEstadoReserva(id, nuevoEstado) {
