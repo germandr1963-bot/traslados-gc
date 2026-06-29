@@ -814,6 +814,35 @@ async function initSchema() {
   `);
   await pool.query(`ALTER TABLE reservas_mensajes_chofer ADD COLUMN IF NOT EXISTS leido BOOLEAN DEFAULT FALSE`);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS configuracion_facturacion (
+      id SERIAL PRIMARY KEY,
+      razon_social TEXT DEFAULT '',
+      nif TEXT DEFAULT '',
+      direccion TEXT DEFAULT '',
+      codigo_postal TEXT DEFAULT '',
+      ciudad TEXT DEFAULT '',
+      email TEXT DEFAULT '',
+      telefono TEXT DEFAULT '',
+      contador_facturas INT DEFAULT 0,
+      actualizado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+  await pool.query(`
+    INSERT INTO configuracion_facturacion (id)
+    SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM configuracion_facturacion WHERE id = 1)
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS facturas (
+      id SERIAL PRIMARY KEY,
+      reserva_id INT NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,
+      numero_factura TEXT NOT NULL,
+      importe_total NUMERIC(10,2),
+      generada_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
   // Configuración de contacto público
   await pool.query(`
     CREATE TABLE IF NOT EXISTS configuracion_contacto (
@@ -5675,8 +5704,17 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
 
   await pool.query('UPDATE reservas SET deposito_liberado = TRUE WHERE id = $1', [req.params.id]);
 
-  // Email al cliente avisando de la liberación
+  // Generar factura
+  let facturaBuffer = null;
+  let numeroFactura = null;
   try {
+    const resultado = await generarFacturaWord(req.params.id);
+    if (resultado) { facturaBuffer = resultado.buffer; numeroFactura = resultado.numeroFactura; }
+  } catch(e) { console.warn('Error generando factura:', e.message); }
+
+  // Email al cliente con factura adjunta
+  try {
+    const adjunto = facturaBuffer ? { filename: 'factura-' + r.numero_reserva + '.docx', content: facturaBuffer } : null;
     await enviarEmail({
       to: r.email_cliente,
       subject: '✅ Tu depósito ha sido liberado — ' + r.numero_reserva,
@@ -5698,10 +5736,12 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
             <strong>✅ Tu depósito de garantía ha sido liberado.</strong><br>
             <span style="font-size:13px;margin-top:6px;display:block;">El importe retenido para la reserva <span class="pnr">${r.numero_reserva}</span> ha quedado libre en tu tarjeta. El proceso bancario puede tardar entre 5 y 10 días hábiles según tu entidad.</span>
           </div>
+          ${facturaBuffer ? '<p style="font-size:13px;color:#5b5347;">Adjuntamos la factura del servicio <strong>' + (numeroFactura || '') + '</strong> para tus registros.</p>' : ''}
           <p style="font-size:13px;color:#5b5347;">Gracias por viajar con Traslados GC. Esperamos verte de nuevo.</p>
         </div>
         <div class="footer">Traslados GC · Gran Canaria</div>
-      </div></body></html>`
+      </div></body></html>`,
+      ...(adjunto ? { adjunto } : {})
     });
   } catch(e) { console.warn('Error enviando email liberación depósito:', e.message); }
 
@@ -5716,6 +5756,179 @@ app.post('/admin/contacto', requireAdmin, asyncHandler(async (req, res) => {
     [telefono||'', whatsapp||'', email||'', direccion||'', horario||'', emails_notificacion||'']
   );
   res.json({ ok: true });
+}));
+
+// ─── Helper: generar factura Word ────────────────────────────────────────────
+async function generarFacturaWord(reservaId) {
+  const reservaQ = await pool.query(
+    `SELECT r.*, cv.nombre AS categoria_nombre
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     WHERE r.id = $1`,
+    [reservaId]
+  );
+  if (!reservaQ.rows.length) return null;
+  const r = reservaQ.rows[0];
+
+  const extrasQ = await pool.query(
+    `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
+     JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`,
+    [reservaId]
+  );
+  const extras = extrasQ.rows;
+
+  const cfgQ = await pool.query('SELECT * FROM configuracion_facturacion WHERE id = 1');
+  const cfg = cfgQ.rows[0] || {};
+
+  // Número de factura correlativo
+  await pool.query('UPDATE configuracion_facturacion SET contador_facturas = contador_facturas + 1 WHERE id = 1');
+  const cntQ = await pool.query('SELECT contador_facturas FROM configuracion_facturacion WHERE id = 1');
+  const num = cntQ.rows[0].contador_facturas;
+  const anio = new Date().getFullYear();
+  const numeroFactura = 'TGC-' + anio + '-' + String(num).padStart(4, '0');
+
+  // Guardar referencia en BD
+  const totalExtras = extras.reduce((s, e) => s + parseFloat(e.precio_en_reserva), 0);
+  const totalFactura = (parseFloat(r.precio_estimado) || 0) + totalExtras;
+  await pool.query(
+    'INSERT INTO facturas (reserva_id, numero_factura, importe_total) VALUES ($1, $2, $3)',
+    [reservaId, numeroFactura, totalFactura]
+  );
+
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+  const fechaFactura = new Date().toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'});
+
+  const linea = (texto, negrita = false, tamaño = 22) => new Paragraph({
+    children: [new TextRun({ text: texto, bold: negrita, size: tamaño, font: 'Calibri' })]
+  });
+
+  const lineaDoble = (label, valor) => new Paragraph({
+    children: [
+      new TextRun({ text: label + ': ', bold: true, size: 22, font: 'Calibri' }),
+      new TextRun({ text: valor || '—', size: 22, font: 'Calibri' })
+    ]
+  });
+
+  const separador = () => new Paragraph({
+    children: [new TextRun({ text: '─'.repeat(60), size: 18, color: 'AAAAAA', font: 'Calibri' })],
+    spacing: { before: 80, after: 80 }
+  });
+
+  const filaImporte = (concepto, importe) => new Paragraph({
+    children: [
+      new TextRun({ text: concepto, size: 22, font: 'Calibri' }),
+      new TextRun({ text: '    ' + parseFloat(importe).toFixed(2) + ' €', bold: true, size: 22, font: 'Calibri' })
+    ],
+    spacing: { before: 40 }
+  });
+
+  const parrafos = [
+    // Cabecera empresa
+    new Paragraph({
+      children: [new TextRun({ text: cfg.razon_social || 'Traslados GC', bold: true, size: 36, font: 'Calibri', color: '1C1815' })],
+      spacing: { after: 60 }
+    }),
+    linea(cfg.nif ? 'NIF: ' + cfg.nif : '', false, 20),
+    linea(cfg.direccion || '', false, 20),
+    linea([cfg.codigo_postal, cfg.ciudad].filter(Boolean).join(' '), false, 20),
+    linea(cfg.email || '', false, 20),
+    linea(cfg.telefono || '', false, 20),
+    separador(),
+
+    // Título factura
+    new Paragraph({
+      children: [new TextRun({ text: 'FACTURA', bold: true, size: 40, font: 'Calibri', color: 'C1502E' })],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 120, after: 120 }
+    }),
+
+    // Datos factura
+    lineaDoble('Nº Factura', numeroFactura),
+    lineaDoble('Fecha', fechaFactura),
+    separador(),
+
+    // Datos cliente
+    new Paragraph({
+      children: [new TextRun({ text: 'DATOS DEL CLIENTE', bold: true, size: 24, font: 'Calibri', color: '555555' })],
+      spacing: { before: 80, after: 60 }
+    }),
+    lineaDoble('Nombre', r.nombre_cliente),
+    lineaDoble('Email', r.email_cliente),
+    lineaDoble('Teléfono', r.telefono_cliente),
+    separador(),
+
+    // Datos reserva
+    new Paragraph({
+      children: [new TextRun({ text: 'DETALLE DEL SERVICIO', bold: true, size: 24, font: 'Calibri', color: '555555' })],
+      spacing: { before: 80, after: 60 }
+    }),
+    lineaDoble('PNR / Nº Reserva', r.numero_reserva),
+    lineaDoble('Ruta', (r.origen || '—') + ' → ' + (r.destino || '—')),
+    lineaDoble('Fecha del traslado', fechaViaje),
+    lineaDoble('Hora', r.hora ? r.hora.slice(0,5) : '—'),
+    lineaDoble('Pasajeros', String(r.num_pasajeros || '—')),
+    lineaDoble('Categoría', r.categoria_nombre || '—'),
+    ...(r.numero_vuelo ? [lineaDoble('Vuelo', r.numero_vuelo)] : []),
+    ...(r.nombre_barco ? [lineaDoble('Barco', r.nombre_barco)] : []),
+    separador(),
+
+    // Importes
+    new Paragraph({
+      children: [new TextRun({ text: 'IMPORTES', bold: true, size: 24, font: 'Calibri', color: '555555' })],
+      spacing: { before: 80, after: 60 }
+    }),
+    filaImporte('Traslado (' + (r.categoria_nombre || '—') + ')', r.precio_estimado || 0),
+    ...extras.map(e => filaImporte('Extra: ' + e.nombre, e.precio_en_reserva)),
+    separador(),
+    new Paragraph({
+      children: [
+        new TextRun({ text: 'TOTAL: ', bold: true, size: 28, font: 'Calibri' }),
+        new TextRun({ text: totalFactura.toFixed(2) + ' €', bold: true, size: 28, font: 'Calibri', color: 'C1502E' })
+      ],
+      spacing: { before: 80 }
+    }),
+    separador(),
+    linea('Gracias por viajar con nosotros.', false, 20),
+  ];
+
+  const doc = new Document({ sections: [{ children: parrafos }] });
+  const buffer = await Packer.toBuffer(doc);
+  return { buffer, numeroFactura };
+}
+
+// ─── Admin: configuración de facturación ─────────────────────────────────────
+app.get('/admin/facturacion', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT * FROM configuracion_facturacion WHERE id = 1');
+  res.json({ facturacion: result.rows[0] || {} });
+}));
+
+app.post('/admin/facturacion', requireAdmin, asyncHandler(async (req, res) => {
+  const { razon_social, nif, direccion, codigo_postal, ciudad, email, telefono } = req.body;
+  await pool.query(
+    `UPDATE configuracion_facturacion SET
+      razon_social=$1, nif=$2, direccion=$3, codigo_postal=$4,
+      ciudad=$5, email=$6, telefono=$7, actualizado_en=NOW()
+     WHERE id=1`,
+    [razon_social||'', nif||'', direccion||'', codigo_postal||'', ciudad||'', email||'', telefono||'']
+  );
+  res.json({ ok: true });
+}));
+
+// ─── Admin: descargar factura de una reserva ──────────────────────────────────
+app.get('/admin/reservas/:id/factura', requireAdmin, asyncHandler(async (req, res) => {
+  const reservaQ = await pool.query('SELECT numero_reserva FROM reservas WHERE id = $1', [req.params.id]);
+  if (!reservaQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const pnr = reservaQ.rows[0].numero_reserva;
+
+  // Ver si ya existe factura generada
+  const facturaQ = await pool.query('SELECT numero_factura FROM facturas WHERE reserva_id = $1 ORDER BY generada_en DESC LIMIT 1', [req.params.id]);
+
+  const resultado = await generarFacturaWord(req.params.id);
+  if (!resultado) return res.status(500).json({ error: 'Error generando factura.' });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  res.setHeader('Content-Disposition', 'attachment; filename="factura-' + pnr + '.docx"');
+  res.send(resultado.buffer);
 }));
 
 // ─── Arranque ─────────────────────────────────────────────────────────────────
