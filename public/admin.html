@@ -597,6 +597,11 @@ table.tabla-precios input {
 
       <!-- Panel de detalle -->
       <div id="detalle-reserva" class="oculto" style="margin-top:2rem;border:1px solid var(--gris-borde);border-radius:12px;padding:1.5rem;background:#fff;">
+        <div id="bloque-modificacion-pendiente" style="display:none;background:#fff3e0;border:2px solid #e65100;border-radius:8px;padding:14px 18px;margin-bottom:1rem;">
+          <p style="font-size:0.85rem;font-weight:700;color:#e65100;margin:0 0 6px 0;">⚠️ Modificación pendiente de revisión</p>
+          <p style="font-size:0.82rem;color:#5a3e00;margin:0 0 8px 0;">El cliente ha solicitado cambios en esta reserva. Revisa el historial de mensajes para ver el detalle, y pulsa <strong>Aprobar modificación</strong> cuando hayas revisado.</p>
+          <p style="font-size:0.8rem;color:#888;margin:0;">💡 Si el cambio afecta al vehículo, reasigna el chofer antes de aprobar.</p>
+        </div>
         <h2 id="detalle-titulo" style="font-size:1.1rem;margin:0 0 1rem 0;"></h2>
         <div id="detalle-contenido"></div>
 
@@ -4011,11 +4016,11 @@ function abrirDetalleReserva(id, sinScroll) {
         btnLiberar.style.display = 'none';
       }
 
-      // Botón aprobar modificación
+      // Botón y bloque aprobar modificación
       var btnAprobar = document.getElementById('btn-aprobar-modificacion');
-      if (btnAprobar) {
-        btnAprobar.style.display = r.estado === 'modificacion_pendiente' ? 'inline-block' : 'none';
-      }
+      var bloqueModif = document.getElementById('bloque-modificacion-pendiente');
+      if (btnAprobar) btnAprobar.style.display = r.estado === 'modificacion_pendiente' ? 'inline-block' : 'none';
+      if (bloqueModif) bloqueModif.style.display = r.estado === 'modificacion_pendiente' ? 'block' : 'none';
 
       // Scroll suave solo cuando el usuario pulsa Ver, no en recargas automáticas
       if (!sinScroll) {
