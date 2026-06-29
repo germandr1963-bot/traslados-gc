@@ -5094,13 +5094,13 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
   if (fecha && fecha !== (r.fecha ? r.fecha.toISOString().slice(0,10) : '')) cambios.push('Fecha: ' + (r.fecha ? r.fecha.toISOString().slice(0,10) : '—') + ' → ' + fecha);
   if (hora && hora !== (r.hora ? r.hora.slice(0,5) : '')) cambios.push('Hora: ' + (r.hora ? r.hora.slice(0,5) : '—') + ' → ' + hora);
   if (num_pasajeros && parseInt(num_pasajeros) !== r.num_pasajeros) cambios.push('Pasajeros: ' + (r.num_pasajeros || '—') + ' → ' + num_pasajeros);
-  if (direccion_recogida !== undefined && direccion_recogida !== (r.direccion_recogida || '')) cambios.push('Recogida: ' + (r.direccion_recogida || '—') + ' → ' + (direccion_recogida || '—'));
-  if (direccion_destino !== undefined && direccion_destino !== (r.direccion_destino || '')) cambios.push('Destino: ' + (r.direccion_destino || '—') + ' → ' + (direccion_destino || '—'));
-  if (numero_vuelo !== undefined && numero_vuelo !== (r.numero_vuelo || '')) cambios.push('Vuelo: ' + (r.numero_vuelo || '—') + ' → ' + (numero_vuelo || '—'));
-  if (hora_llegada_vuelo !== undefined && hora_llegada_vuelo !== (r.hora_llegada_vuelo ? r.hora_llegada_vuelo.slice(0,5) : '')) cambios.push('Hora vuelo: ' + (r.hora_llegada_vuelo ? r.hora_llegada_vuelo.slice(0,5) : '—') + ' → ' + (hora_llegada_vuelo || '—'));
-  if (nombre_barco !== undefined && nombre_barco !== (r.nombre_barco || '')) cambios.push('Barco: ' + (r.nombre_barco || '—') + ' → ' + (nombre_barco || '—'));
-  if (hora_atraque !== undefined && hora_atraque !== (r.hora_atraque ? r.hora_atraque.slice(0,5) : '')) cambios.push('Hora atraque: ' + (r.hora_atraque ? r.hora_atraque.slice(0,5) : '—') + ' → ' + (hora_atraque || '—'));
-  if (notas_cliente !== undefined && notas_cliente !== (r.notas_cliente || '')) cambios.push('Notas: actualizadas');
+  if (direccion_recogida && direccion_recogida !== (r.direccion_recogida || '')) cambios.push('Recogida: ' + (r.direccion_recogida || '—') + ' → ' + direccion_recogida);
+  if (direccion_destino && direccion_destino !== (r.direccion_destino || '')) cambios.push('Destino: ' + (r.direccion_destino || '—') + ' → ' + direccion_destino);
+  if (numero_vuelo && numero_vuelo !== (r.numero_vuelo || '')) cambios.push('Vuelo: ' + (r.numero_vuelo || '—') + ' → ' + numero_vuelo);
+  if (hora_llegada_vuelo && hora_llegada_vuelo !== (r.hora_llegada_vuelo ? r.hora_llegada_vuelo.slice(0,5) : '')) cambios.push('Hora vuelo: ' + (r.hora_llegada_vuelo ? r.hora_llegada_vuelo.slice(0,5) : '—') + ' → ' + hora_llegada_vuelo);
+  if (nombre_barco && nombre_barco !== (r.nombre_barco || '')) cambios.push('Barco: ' + (r.nombre_barco || '—') + ' → ' + nombre_barco);
+  if (hora_atraque && hora_atraque !== (r.hora_atraque ? r.hora_atraque.slice(0,5) : '')) cambios.push('Hora atraque: ' + (r.hora_atraque ? r.hora_atraque.slice(0,5) : '—') + ' → ' + hora_atraque);
+  if (notas_cliente && notas_cliente !== (r.notas_cliente || '')) cambios.push('Notas: actualizadas');
 
   await pool.query(
     `UPDATE reservas SET
