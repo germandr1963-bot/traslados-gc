@@ -329,9 +329,15 @@
       if (!fotoRegistro) { mostrarError(msg, 'Debes subir una foto de carné.'); return; }
 
       var marcaVal = document.getElementById('r-marca').value;
+      if (!marcaVal) { mostrarError(msg, 'Selecciona la marca de tu vehículo.'); return; }
       var marcaTexto = marcaVal === 'nueva' ? document.getElementById('r-marca-nueva').value.trim() : (document.getElementById('r-marca').selectedOptions[0] || {}).text || '';
+      if (marcaVal === 'nueva' && !marcaTexto) { mostrarError(msg, 'Escribe el nombre de la marca de tu vehículo.'); return; }
+
       var modeloVal = document.getElementById('r-modelo').value;
+      if (!modeloVal) { mostrarError(msg, 'Selecciona el modelo de tu vehículo.'); return; }
       var modeloTexto = modeloVal === 'nuevo' ? document.getElementById('r-modelo-nuevo').value.trim() : (document.getElementById('r-modelo').selectedOptions[0] || {}).text || '';
+      if (modeloVal === 'nuevo' && !modeloTexto) { mostrarError(msg, 'Escribe el nombre del modelo de tu vehículo.'); return; }
+
       var obs = document.getElementById('r-observaciones').value.trim();
       if (categoriaSeleccionada === 'otra') obs = obs ? '[Otro vehículo] ' + obs : '[Otro vehículo]';
 
