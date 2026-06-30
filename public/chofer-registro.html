@@ -240,6 +240,10 @@
       document.getElementById('pestana-registro').classList.toggle('activa', cual === 'registro');
     }
 
+    if (new URLSearchParams(window.location.search).get('modo') === 'alta') {
+      mostrarPestana('registro');
+    }
+
     function iniciarSesion() {
       var email = document.getElementById('login-email').value.trim();
       var password = document.getElementById('login-password').value;
