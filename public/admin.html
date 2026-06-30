@@ -1446,56 +1446,187 @@ function editarNombreConductor(id, actual) {
   }).then(function () { cargarConductores(); });
 }
 
-function campoFicha(etiqueta, idCampo, valor) {
+function campoFicha(etiqueta, idCampo, valor, tipo) {
   return '<label class="etiqueta" style="margin:0;white-space:nowrap">' + etiqueta + '</label>' +
-    '<input class="campo" id="f-' + idCampo + '" type="text" value="' + escapar(valor == null ? '' : String(valor)) + '">';
+    '<input class="campo" id="f-' + idCampo + '" type="' + (tipo || 'text') + '" value="' + escapar(valor == null ? '' : String(valor)) + '">';
+}
+
+function opcionesMarcaFicha(valorActual) {
+  var norm = (valorActual || '').trim().toLowerCase();
+  var encontrada = norm ? catalogoConductorCache.marcas.find(function (m) { return m.nombre.trim().toLowerCase() === norm; }) : null;
+  var marcaIdActual = encontrada ? encontrada.id : null;
+  var esOtra = !!(valorActual && !encontrada);
+  var opts = '<option value="">— Selecciona la marca —</option>' +
+    catalogoConductorCache.marcas.map(function (m) {
+      return '<option value="' + m.id + '"' + (m.id === marcaIdActual ? ' selected' : '') + '>' + escapar(m.nombre) + '</option>';
+    }).join('') +
+    '<option value="__nueva"' + (esOtra ? ' selected' : '') + '>➕ Otra marca</option>';
+  return { opts: opts, marcaIdActual: marcaIdActual, esOtra: esOtra };
+}
+
+function opcionesModeloFicha(marcaIdActual, valorActual) {
+  var marca = marcaIdActual ? catalogoConductorCache.marcas.find(function (m) { return m.id === marcaIdActual; }) : null;
+  var norm = (valorActual || '').trim().toLowerCase();
+  var encontrado = (marca && norm) ? marca.modelos.find(function (mo) { return mo.nombre.trim().toLowerCase() === norm; }) : null;
+  var esOtra = !!(valorActual && !encontrado);
+  var opts = '<option value="">' + (marca ? '— Selecciona el modelo —' : '— Selecciona primero la marca —') + '</option>' +
+    (marca ? marca.modelos.map(function (mo) {
+      return '<option value="' + mo.id + '"' + (mo.id === (encontrado ? encontrado.id : null) ? ' selected' : '') + '>' + escapar(mo.nombre) + '</option>';
+    }).join('') : '') +
+    '<option value="__nuevo"' + (esOtra ? ' selected' : '') + '>➕ Otro modelo</option>';
+  return { opts: opts, esOtra: esOtra };
+}
+
+var ISLAS_CANARIAS = ['Gran Canaria', 'Tenerife', 'Lanzarote', 'Fuerteventura', 'La Palma', 'La Gomera', 'El Hierro'];
+
+function opcionesIslaFicha(valorActual) {
+  var encontrada = ISLAS_CANARIAS.find(function (i) { return i.toLowerCase() === (valorActual || '').trim().toLowerCase(); });
+  var lista = encontrada ? ISLAS_CANARIAS : (valorActual ? [valorActual].concat(ISLAS_CANARIAS) : ISLAS_CANARIAS);
+  return '<option value="">— Selecciona la isla —</option>' +
+    lista.map(function (i) {
+      return '<option value="' + escapar(i) + '"' + (i.toLowerCase() === (valorActual || '').trim().toLowerCase() ? ' selected' : '') + '>' + escapar(i) + '</option>';
+    }).join('');
 }
 
 function verFichaConductor(id) {
-  fetch('/admin/conductores/' + id + '/ficha').then(function (r) { return r.json(); }).then(function (c) {
-    var ficha = document.getElementById('ficha-conductor');
-    ficha.classList.remove('oculto');
-    ficha.innerHTML = '' +
-      '<h2 style="margin-top:0">📋 Expediente: ' + escapar(c.nombre) + ' <span style="font-size:0.8rem;color:#5a6c79;font-weight:400">(modifica lo que necesites y pulsa Guardar)</span></h2>' +
-      (c.foto ? '<img src="' + c.foto + '" alt="Foto" style="width:100px;height:100px;object-fit:cover;border-radius:50%;float:right;margin-left:12px;border:2px solid var(--gris-borde)">' : '') +
-      '<div style="display:grid;grid-template-columns:max-content 1fr max-content 1fr;gap:8px 12px;margin-top:18px;align-items:center">' +
-        campoFicha('Nombre completo', 'nombre', c.nombre) +
-        campoFicha('Documento (DNI/NIE)', 'documento', c.documento) +
-        campoFicha('Teléfono', 'telefono', c.telefono) +
-        campoFicha('Email', 'email', c.email) +
-        campoFicha('Dirección', 'direccion', c.direccion) +
-        campoFicha('Código postal', 'cp', c.cp) +
-        campoFicha('Municipio', 'municipio', c.municipio) +
-        campoFicha('Municipio de la licencia', 'municipio_licencia', c.municipio_licencia) +
-        campoFicha('Nº de licencia', 'numero_licencia', c.numero_licencia) +
-        campoFicha('Central de flota', 'central_flota', c.central_flota) +
-        campoFicha('Marca del vehículo', 'vehiculo_marca', c.vehiculo_marca) +
-        campoFicha('Modelo', 'vehiculo_modelo', c.vehiculo_modelo) +
-        campoFicha('Matrícula', 'matricula', c.matricula) +
-        campoFicha('Nº de taxi', 'numero_taxi', c.numero_taxi) +
-        campoFicha('Plazas', 'plazas', c.plazas) +
-        campoFicha('Isla', 'isla', c.isla) +
-      '</div>' +
-      '<p style="margin-top:4px;font-size:13px">' +
-        '<strong>Categoría:</strong> ' + escapar(c.categoria || '—') + ' · ' +
-        '<strong>Foto de carné:</strong> ' + ETIQUETAS_FOTO_CONDUCTOR[c.foto_estado || 'sin_foto'] +
-        (c.foto_motivo ? '<br><em>Motivo del rechazo: ' + escapar(c.foto_motivo) + '</em>' : '') +
-      '</p>' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
-        '<button class="boton-primario" onclick="guardarFichaConductor(' + c.id + ')">💾 Guardar cambios</button>' +
-        ((c.foto_estado === 'pendiente' || c.foto_estado === 'rechazada') ? '<button class="boton-costa" onclick="decidirFotoConductor(' + c.id + ', \'aprobar\')">✅ Aprobar foto</button>' : '') +
-        ((c.foto_estado === 'pendiente' || c.foto_estado === 'aprobada') ? '<button class="boton-peligro" onclick="decidirFotoConductor(' + c.id + ', \'rechazar\')">❌ Rechazar foto</button>' : '') +
-        '<button class="boton-secundario" onclick="document.getElementById(\'ficha-conductor\').classList.add(\'oculto\')">Cerrar ficha</button>' +
-      '</div>';
-    ficha.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  function pintar() {
+    fetch('/admin/conductores/' + id + '/ficha').then(function (r) { return r.json(); }).then(function (c) {
+      var ficha = document.getElementById('ficha-conductor');
+      ficha.classList.remove('oculto');
+      var marcaInfo = opcionesMarcaFicha(c.vehiculo_marca);
+      var modeloInfo = opcionesModeloFicha(marcaInfo.marcaIdActual, c.vehiculo_modelo);
+      ficha.innerHTML = '' +
+        '<h2 style="margin-top:0">📋 Expediente: ' + escapar(c.nombre) + ' <span style="font-size:0.8rem;color:#5a6c79;font-weight:400">(modifica lo que necesites y pulsa Guardar)</span></h2>' +
+        (c.foto ? '<img src="' + c.foto + '" alt="Foto" style="width:100px;height:100px;object-fit:cover;border-radius:50%;float:right;margin-left:12px;border:2px solid var(--gris-borde)">' : '') +
+        '<div style="display:grid;grid-template-columns:max-content 1fr max-content 1fr;gap:8px 12px;margin-top:18px;align-items:center">' +
+          campoFicha('Nombre completo', 'nombre', c.nombre) +
+          campoFicha('Documento (DNI/NIE)', 'documento', c.documento) +
+          campoFicha('Teléfono', 'telefono', c.telefono) +
+          campoFicha('Email', 'email', c.email) +
+          campoFicha('Dirección', 'direccion', c.direccion) +
+          campoFicha('Código postal', 'cp', c.cp) +
+          campoFicha('Municipio', 'municipio', c.municipio) +
+          campoFicha('Municipio de la licencia', 'municipio_licencia', c.municipio_licencia) +
+          campoFicha('Nº de licencia', 'numero_licencia', c.numero_licencia) +
+          campoFicha('Central de flota (opcional)', 'central_flota', c.central_flota) +
+          '<label class="etiqueta" style="margin:0;white-space:nowrap">Marca del vehículo</label>' +
+          '<select class="campo" id="f-vehiculo_marca" onchange="cambioMarcaFicha()">' + marcaInfo.opts + '</select>' +
+          '<label class="etiqueta" style="margin:0;white-space:nowrap">Modelo</label>' +
+          '<select class="campo" id="f-vehiculo_modelo">' + modeloInfo.opts + '</select>' +
+          campoFicha('Matrícula', 'matricula', c.matricula) +
+          campoFicha('Nº de taxi', 'numero_taxi', c.numero_taxi) +
+          campoFicha('Plazas', 'plazas', c.plazas, 'number') +
+          '<label class="etiqueta" style="margin:0;white-space:nowrap">Isla</label>' +
+          '<select class="campo" id="f-isla">' + opcionesIslaFicha(c.isla) + '</select>' +
+        '</div>' +
+        '<div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap">' +
+          '<div id="f-vehiculo_marca-nueva-caja" class="' + (marcaInfo.esOtra ? '' : 'oculto') + '" style="flex:1;min-width:200px">' +
+            '<label class="etiqueta">Nombre de la marca nueva</label>' +
+            '<input class="campo" id="f-vehiculo_marca-nueva" type="text" value="' + escapar(marcaInfo.esOtra ? c.vehiculo_marca : '') + '">' +
+          '</div>' +
+          '<div id="f-vehiculo_modelo-nuevo-caja" class="' + (modeloInfo.esOtra ? '' : 'oculto') + '" style="flex:1;min-width:200px">' +
+            '<label class="etiqueta">Nombre del modelo nuevo</label>' +
+            '<input class="campo" id="f-vehiculo_modelo-nuevo" type="text" value="' + escapar(modeloInfo.esOtra ? c.vehiculo_modelo : '') + '">' +
+          '</div>' +
+        '</div>' +
+        '<p style="margin-top:10px;font-size:13px">' +
+          '<strong>Categoría:</strong> ' + escapar(c.categoria || '—') + ' · ' +
+          '<strong>Foto de carné:</strong> ' + ETIQUETAS_FOTO_CONDUCTOR[c.foto_estado || 'sin_foto'] +
+          (c.foto_motivo ? '<br><em>Motivo del rechazo: ' + escapar(c.foto_motivo) + '</em>' : '') +
+        '</p>' +
+        '<div id="aviso-ficha-conductor" style="display:none;margin-top:8px;font-size:0.85rem;"></div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+          '<button class="boton-primario" onclick="guardarFichaConductor(' + c.id + ')">💾 Guardar cambios</button>' +
+          ((c.foto_estado === 'pendiente' || c.foto_estado === 'rechazada') ? '<button class="boton-costa" onclick="decidirFotoConductor(' + c.id + ', \'aprobar\')">✅ Aprobar foto</button>' : '') +
+          ((c.foto_estado === 'pendiente' || c.foto_estado === 'aprobada') ? '<button class="boton-peligro" onclick="decidirFotoConductor(' + c.id + ', \'rechazar\')">❌ Rechazar foto</button>' : '') +
+          '<button class="boton-secundario" onclick="document.getElementById(\'ficha-conductor\').classList.add(\'oculto\')">Cerrar ficha</button>' +
+        '</div>';
+      ficha.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
+  if (catalogoConductorCache) { pintar(); return; }
+  fetch('/admin/catalogo-vehiculos').then(function (r) { return r.json(); }).then(function (datos) {
+    catalogoConductorCache = datos;
+    pintar();
   });
 }
 
+function cambioMarcaFicha() {
+  var marcaVal = document.getElementById('f-vehiculo_marca').value;
+  var esNueva = marcaVal === '__nueva';
+  document.getElementById('f-vehiculo_marca-nueva-caja').classList.toggle('oculto', !esNueva);
+  var marcaId = (!esNueva && marcaVal) ? parseInt(marcaVal, 10) : null;
+  var info = opcionesModeloFicha(marcaId, '');
+  document.getElementById('f-vehiculo_modelo').innerHTML = info.opts;
+  document.getElementById('f-vehiculo_modelo-nuevo-caja').classList.add('oculto');
+}
+
 function guardarFichaConductor(id) {
-  var campos = ['nombre', 'documento', 'telefono', 'email', 'direccion', 'cp', 'municipio', 'municipio_licencia',
-    'numero_licencia', 'central_flota', 'vehiculo_marca', 'vehiculo_modelo', 'matricula', 'numero_taxi', 'plazas', 'isla'];
+  var avFicha = document.getElementById('aviso-ficha-conductor');
+  avFicha.style.display = 'none';
+
+  document.querySelectorAll('#ficha-conductor .campo-obligatorio-vacio').forEach(function (el) {
+    el.classList.remove('campo-obligatorio-vacio');
+  });
+
+  var camposTexto = ['nombre', 'documento', 'telefono', 'email', 'direccion', 'cp', 'municipio',
+    'municipio_licencia', 'numero_licencia', 'matricula', 'numero_taxi', 'plazas'];
   var datos = {};
-  campos.forEach(function (campo) { datos[campo] = document.getElementById('f-' + campo).value; });
+  var faltan = false;
+  var primerFaltante = null;
+
+  camposTexto.forEach(function (campo) {
+    var el = document.getElementById('f-' + campo);
+    var val = el.value.trim();
+    datos[campo] = val;
+    if (!val) {
+      el.classList.add('campo-obligatorio-vacio');
+      faltan = true;
+      if (!primerFaltante) primerFaltante = el;
+    }
+  });
+
+  datos.central_flota = document.getElementById('f-central_flota').value.trim();
+
+  var islaEl = document.getElementById('f-isla');
+  datos.isla = islaEl.value;
+  if (!datos.isla) { islaEl.classList.add('campo-obligatorio-vacio'); faltan = true; if (!primerFaltante) primerFaltante = islaEl; }
+
+  var marcaEl = document.getElementById('f-vehiculo_marca');
+  var marcaVal = marcaEl.value;
+  if (!marcaVal) {
+    marcaEl.classList.add('campo-obligatorio-vacio'); faltan = true; if (!primerFaltante) primerFaltante = marcaEl;
+    datos.vehiculo_marca = '';
+  } else if (marcaVal === '__nueva') {
+    var marcaNuevaEl = document.getElementById('f-vehiculo_marca-nueva');
+    datos.vehiculo_marca = marcaNuevaEl.value.trim();
+    if (!datos.vehiculo_marca) { marcaNuevaEl.classList.add('campo-obligatorio-vacio'); faltan = true; if (!primerFaltante) primerFaltante = marcaNuevaEl; }
+  } else {
+    datos.vehiculo_marca = (marcaEl.selectedOptions[0] || {}).text || '';
+  }
+
+  var modeloEl = document.getElementById('f-vehiculo_modelo');
+  var modeloVal = modeloEl.value;
+  if (!modeloVal) {
+    modeloEl.classList.add('campo-obligatorio-vacio'); faltan = true; if (!primerFaltante) primerFaltante = modeloEl;
+    datos.vehiculo_modelo = '';
+  } else if (modeloVal === '__nuevo') {
+    var modeloNuevoEl = document.getElementById('f-vehiculo_modelo-nuevo');
+    datos.vehiculo_modelo = modeloNuevoEl.value.trim();
+    if (!datos.vehiculo_modelo) { modeloNuevoEl.classList.add('campo-obligatorio-vacio'); faltan = true; if (!primerFaltante) primerFaltante = modeloNuevoEl; }
+  } else {
+    datos.vehiculo_modelo = (modeloEl.selectedOptions[0] || {}).text || '';
+  }
+
+  if (faltan) {
+    avFicha.style.display = 'block';
+    avFicha.innerHTML = '<div class="aviso-error">Completa los campos marcados en rosa.</div>';
+    if (primerFaltante) primerFaltante.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  if (!confirm('¿Seguro que quieres guardar estos cambios en la ficha de ' + datos.nombre + '?')) return;
+
   fetch('/admin/conductores/' + id + '/editar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1506,10 +1637,12 @@ function guardarFichaConductor(id) {
       cargarConductores();
       verFichaConductor(id);
     } else {
-      alert(respuesta.error);
+      avFicha.style.display = 'block';
+      avFicha.innerHTML = '<div class="aviso-error">' + respuesta.error + '</div>';
     }
   });
 }
+
 
 function decidirFotoConductor(id, accion) {
   var motivo = null;

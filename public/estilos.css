@@ -113,6 +113,11 @@ input, select, button {
   font-size: 13px;
 }
 
+.campo-obligatorio-vacio {
+  border-color: var(--rojo-error) !important;
+  background: var(--rojo-error-fondo) !important;
+}
+
 .etiqueta {
   font-size: 12px;
   color: var(--texto-muted);
