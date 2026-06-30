@@ -77,6 +77,14 @@
     .mensaje.ok { display: block; background: var(--verde-ok-fondo); color: var(--verde-ok); border: 1px solid #a8dece; padding: 20px; text-align: center; }
 
     .nota-final { font-size: 12px; color: var(--texto-muted); text-align: center; margin-top: 10px; line-height: 1.6; }
+
+    .campo-obligatorio-vacio {
+      border-color: var(--rojo-error) !important;
+      background: var(--rojo-error-fondo) !important;
+    }
+    .cat-opcion.campo-obligatorio-vacio, .cat-otra.campo-obligatorio-vacio {
+      border-width: 2px;
+    }
   </style>
 </head>
 <body>
@@ -112,13 +120,13 @@
         <h2>Datos personales</h2>
         <label for="r-nombre">Nombre completo *</label>
         <input id="r-nombre" type="text" autocomplete="name" placeholder="Tu nombre y apellidos">
-        <label for="r-documento">Documento de identidad (DNI/NIE)</label>
+        <label for="r-documento">Documento de identidad (DNI/NIE) *</label>
         <input id="r-documento" type="text" placeholder="00000000A">
-        <label for="r-direccion">Dirección</label>
+        <label for="r-direccion">Dirección *</label>
         <input id="r-direccion" type="text" placeholder="Calle, número">
-        <label for="r-cp">Código postal</label>
+        <label for="r-cp">Código postal *</label>
         <input id="r-cp" type="text" placeholder="35001">
-        <label for="r-municipio">Municipio</label>
+        <label for="r-municipio">Municipio *</label>
         <input id="r-municipio" type="text" placeholder="Las Palmas de Gran Canaria">
         <label for="r-email">Email *</label>
         <input id="r-email" type="email" autocomplete="email" placeholder="tu@email.com">
@@ -130,9 +138,9 @@
         <input id="r-password2" type="password" autocomplete="new-password">
 
         <h2>Licencia de taxi</h2>
-        <label for="r-municipio-licencia">Municipio de la licencia municipal</label>
+        <label for="r-municipio-licencia">Municipio de la licencia municipal *</label>
         <input id="r-municipio-licencia" type="text" placeholder="Las Palmas de Gran Canaria">
-        <label for="r-numero-licencia">Número de la licencia municipal</label>
+        <label for="r-numero-licencia">Número de la licencia municipal *</label>
         <input id="r-numero-licencia" type="text" placeholder="LPA-0001">
 
         <h2>Categoría de vehículo</h2>
@@ -144,15 +152,15 @@
         </div>
 
         <h2>Vehículo</h2>
-        <label for="r-marca">Marca</label>
+        <label for="r-marca">Marca *</label>
         <select id="r-marca" onchange="cambioMarca()"><option value="">Cargando...</option></select>
         <input id="r-marca-nueva" type="text" class="oculto" placeholder="Escribe la marca" style="margin-top:8px">
-        <label for="r-modelo">Modelo</label>
+        <label for="r-modelo">Modelo *</label>
         <select id="r-modelo" onchange="cambioModelo()"><option value="">— Selecciona primero la marca —</option></select>
         <input id="r-modelo-nuevo" type="text" class="oculto" placeholder="Escribe el modelo" style="margin-top:8px">
-        <label for="r-matricula">Matrícula</label>
+        <label for="r-matricula">Matrícula *</label>
         <input id="r-matricula" type="text" placeholder="1234 ABC">
-        <label for="r-numero-taxi">Número de taxi</label>
+        <label for="r-numero-taxi">Número de taxi *</label>
         <input id="r-numero-taxi" type="text" placeholder="Ej.: 154">
         <label for="r-plazas">Plazas para pasajeros</label>
         <select id="r-plazas">
@@ -176,7 +184,7 @@
         <input id="r-central-flota" type="text" placeholder="Nombre de la central, si perteneces a una">
 
         <h2>Foto de carné de conducir</h2>
-        <label>Sube una foto tuya (opcional, se revisará antes de aparecer en los vouchers)</label>
+        <label>Sube una foto tuya (obligatoria; nuestro equipo la revisará y aprobará antes de que aparezca en los vouchers)</label>
         <input id="r-foto-input" type="file" accept="image/*" onchange="previsualizarFotoRegistro()" style="margin-top:6px">
         <img id="r-foto-preview" style="max-width:120px;border-radius:8px;margin-top:8px;display:none">
 
@@ -312,31 +320,84 @@
       msg.scrollIntoView({ behavior:'smooth', block:'center' });
     }
 
+    function limpiarErroresCampos() {
+      document.querySelectorAll('.campo-obligatorio-vacio').forEach(function(el) {
+        el.classList.remove('campo-obligatorio-vacio');
+      });
+    }
+
     function registrarse() {
-      var nombre = document.getElementById('r-nombre').value.trim();
-      var email = document.getElementById('r-email').value.trim();
-      var telefono = document.getElementById('r-telefono').value.trim();
-      var password = document.getElementById('r-password').value;
-      var password2 = document.getElementById('r-password2').value;
-      var privacidad = document.getElementById('acepta-privacidad').checked;
       var msg = document.getElementById('mensaje-registro');
       msg.style.display = 'none';
+      limpiarErroresCampos();
 
-      if (!nombre || !email || !telefono) { mostrarError(msg, 'Nombre, email y teléfono son obligatorios.'); return; }
-      if (!password || password.length < 6) { mostrarError(msg, 'La contraseña debe tener al menos 6 caracteres.'); return; }
-      if (password !== password2) { mostrarError(msg, 'Las contraseñas no coinciden.'); return; }
+      var faltan = false;
+      var primerFaltante = null;
+      function marcar(el) {
+        if (!el) return;
+        el.classList.add('campo-obligatorio-vacio');
+        faltan = true;
+        if (!primerFaltante) primerFaltante = el;
+      }
+      function chequearTexto(id) {
+        var el = document.getElementById(id);
+        var val = el.value.trim();
+        if (!val) marcar(el);
+        return val;
+      }
+
+      var nombre = chequearTexto('r-nombre');
+      var documento = chequearTexto('r-documento');
+      var direccion = chequearTexto('r-direccion');
+      var cp = chequearTexto('r-cp');
+      var municipio = chequearTexto('r-municipio');
+      var email = chequearTexto('r-email');
+      var telefono = chequearTexto('r-telefono');
+      var password = chequearTexto('r-password');
+      var password2 = chequearTexto('r-password2');
+      var municipioLicencia = chequearTexto('r-municipio-licencia');
+      var numeroLicencia = chequearTexto('r-numero-licencia');
+      var matricula = chequearTexto('r-matricula');
+      var numeroTaxi = chequearTexto('r-numero-taxi');
+
+      var gridCategorias = document.getElementById('categorias-grid');
+      gridCategorias.classList.remove('campo-obligatorio-vacio');
+      if (!categoriaSeleccionada) { gridCategorias.classList.add('campo-obligatorio-vacio'); faltan = true; if (!primerFaltante) primerFaltante = gridCategorias; }
+
+      var marcaEl = document.getElementById('r-marca');
+      var marcaVal = marcaEl.value;
+      var marcaTexto = '';
+      if (!marcaVal) {
+        marcar(marcaEl);
+      } else if (marcaVal === 'nueva') {
+        marcaTexto = chequearTexto('r-marca-nueva');
+      } else {
+        marcaTexto = (marcaEl.selectedOptions[0] || {}).text || '';
+      }
+
+      var modeloEl = document.getElementById('r-modelo');
+      var modeloVal = modeloEl.value;
+      var modeloTexto = '';
+      if (!modeloVal) {
+        marcar(modeloEl);
+      } else if (modeloVal === 'nuevo') {
+        modeloTexto = chequearTexto('r-modelo-nuevo');
+      } else {
+        modeloTexto = (modeloEl.selectedOptions[0] || {}).text || '';
+      }
+
+      if (!fotoRegistro) marcar(document.getElementById('r-foto-input'));
+
+      if (faltan) {
+        mostrarError(msg, 'Completa los campos marcados en rosa.');
+        primerFaltante.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      if (password.length < 6) { marcar(document.getElementById('r-password')); mostrarError(msg, 'La contraseña debe tener al menos 6 caracteres.'); return; }
+      if (password !== password2) { marcar(document.getElementById('r-password2')); mostrarError(msg, 'Las contraseñas no coinciden.'); return; }
+      var privacidad = document.getElementById('acepta-privacidad').checked;
       if (!privacidad) { mostrarError(msg, 'Debes aceptar la Política de Privacidad.'); return; }
-      if (!fotoRegistro) { mostrarError(msg, 'Debes subir una foto de carné.'); return; }
-
-      var marcaVal = document.getElementById('r-marca').value;
-      if (!marcaVal) { mostrarError(msg, 'Selecciona la marca de tu vehículo.'); return; }
-      var marcaTexto = marcaVal === 'nueva' ? document.getElementById('r-marca-nueva').value.trim() : (document.getElementById('r-marca').selectedOptions[0] || {}).text || '';
-      if (marcaVal === 'nueva' && !marcaTexto) { mostrarError(msg, 'Escribe el nombre de la marca de tu vehículo.'); return; }
-
-      var modeloVal = document.getElementById('r-modelo').value;
-      if (!modeloVal) { mostrarError(msg, 'Selecciona el modelo de tu vehículo.'); return; }
-      var modeloTexto = modeloVal === 'nuevo' ? document.getElementById('r-modelo-nuevo').value.trim() : (document.getElementById('r-modelo').selectedOptions[0] || {}).text || '';
-      if (modeloVal === 'nuevo' && !modeloTexto) { mostrarError(msg, 'Escribe el nombre del modelo de tu vehículo.'); return; }
 
       var obs = document.getElementById('r-observaciones').value.trim();
       if (categoriaSeleccionada === 'otra') obs = obs ? '[Otro vehículo] ' + obs : '[Otro vehículo]';
@@ -348,17 +409,13 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre: nombre, email: email, telefono: telefono, password: password,
-          documento: document.getElementById('r-documento').value.trim(),
-          direccion: document.getElementById('r-direccion').value.trim(),
-          cp: document.getElementById('r-cp').value.trim(),
-          municipio: document.getElementById('r-municipio').value.trim(),
-          municipio_licencia: document.getElementById('r-municipio-licencia').value.trim(),
-          numero_licencia: document.getElementById('r-numero-licencia').value.trim(),
+          documento: documento, direccion: direccion, cp: cp, municipio: municipio,
+          municipio_licencia: municipioLicencia, numero_licencia: numeroLicencia,
           central_flota: document.getElementById('r-central-flota').value.trim(),
           categoria_id: categoriaSeleccionada !== 'otra' ? categoriaSeleccionada : null,
           vehiculo_marca: marcaTexto, vehiculo_modelo: modeloTexto,
-          matricula: document.getElementById('r-matricula').value.trim(),
-          numero_taxi: document.getElementById('r-numero-taxi').value.trim(),
+          matricula: matricula,
+          numero_taxi: numeroTaxi,
           plazas: document.getElementById('r-plazas').value,
           isla: document.getElementById('r-isla').value,
           foto: fotoRegistro,
