@@ -78,6 +78,8 @@
 
     .nota-final { font-size: 12px; color: var(--texto-muted); text-align: center; margin-top: 10px; line-height: 1.6; }
 
+    .enlace { display: block; text-align: center; font-size: 13px; color: var(--terracota); text-decoration: underline; cursor: pointer; margin-top: 12px; }
+
     .cat-opcion.campo-obligatorio-vacio, .cat-otra.campo-obligatorio-vacio {
       border-width: 2px;
     }
@@ -92,10 +94,10 @@
 
   <main>
     <h1>Área de choferes</h1>
-    <p class="sub">Regístrate con tu vehículo. Tu cuenta será revisada y aprobada por el equipo antes de poder recibir servicios.</p>
+    <p class="sub" id="texto-intro">Regístrate con tu vehículo. Tu cuenta será revisada y aprobada por el equipo antes de poder recibir servicios.</p>
 
     <div class="tarjeta" style="max-width:520px">
-      <div class="pestanas">
+      <div class="pestanas" id="selector-pestanas">
         <button id="pestana-login" class="activa" onclick="mostrarPestana('login')">Iniciar sesión</button>
         <button id="pestana-registro" onclick="mostrarPestana('registro')">Registrarme</button>
       </div>
@@ -108,6 +110,17 @@
         <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••">
         <button class="principal" onclick="iniciarSesion()">Entrar</button>
         <div id="mensaje-login" class="mensaje"></div>
+        <span class="enlace" onclick="mostrarRecuperar()">¿Olvidaste tu contraseña?</span>
+      </div>
+
+      <!-- RECUPERAR CONTRASEÑA -->
+      <div id="formulario-recuperar" class="oculto">
+        <p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px">Te enviaremos una contraseña provisional a tu email.</p>
+        <label for="rec-email">Email</label>
+        <input id="rec-email" type="email" placeholder="tu@email.com">
+        <button class="principal" onclick="recuperarPassword()">Enviar contraseña provisional</button>
+        <div id="mensaje-recuperar" class="mensaje"></div>
+        <span class="enlace" onclick="mostrarSoloLogin()">← Volver al acceso</span>
       </div>
 
       <!-- REGISTRO -->
@@ -242,7 +255,10 @@
 
     if (new URLSearchParams(window.location.search).get('modo') === 'alta') {
       mostrarPestana('registro');
+    } else {
+      document.getElementById('texto-intro').textContent = 'Accede a tu portal de chofer.';
     }
+    document.getElementById('selector-pestanas').style.display = 'none';
 
     function iniciarSesion() {
       var email = document.getElementById('login-email').value.trim();
@@ -259,8 +275,45 @@
         .catch(function() { msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error'; });
     }
 
+    function mostrarRecuperar() {
+      document.getElementById('formulario-login').classList.add('oculto');
+      document.getElementById('formulario-recuperar').classList.remove('oculto');
+    }
+
+    function mostrarSoloLogin() {
+      document.getElementById('formulario-recuperar').classList.add('oculto');
+      document.getElementById('formulario-login').classList.remove('oculto');
+    }
+
+    function recuperarPassword() {
+      var email = document.getElementById('rec-email').value.trim();
+      var msg = document.getElementById('mensaje-recuperar');
+      msg.className = 'mensaje'; msg.style.display = 'none';
+      if (!email) { msg.textContent = 'Indica tu email.'; msg.className = 'mensaje error'; return; }
+      var btn = document.querySelector('#formulario-recuperar button.principal');
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      fetch('/chofer/recuperar-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          btn.disabled = false; btn.textContent = 'Enviar contraseña provisional';
+          if (d.error) { msg.textContent = d.error; msg.className = 'mensaje error'; return; }
+          msg.textContent = 'Te hemos enviado una contraseña provisional. Revisa tu email.';
+          msg.className = 'mensaje ok';
+          setTimeout(function() {
+            document.getElementById('login-email').value = email;
+            mostrarSoloLogin();
+          }, 3000);
+        })
+        .catch(function() {
+          btn.disabled = false; btn.textContent = 'Enviar contraseña provisional';
+          msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error';
+        });
+    }
+
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && !document.getElementById('formulario-login').classList.contains('oculto')) iniciarSesion();
+      if (e.key !== 'Enter') return;
+      if (!document.getElementById('formulario-login').classList.contains('oculto')) iniciarSesion();
+      else if (!document.getElementById('formulario-recuperar').classList.contains('oculto')) recuperarPassword();
     });
 
     fetch('/api/categorias')

@@ -114,7 +114,19 @@
       <label for="login-pwd">Contraseña</label>
       <input type="password" id="login-pwd" placeholder="Tu contraseña">
       <button class="boton" id="btn-login" onclick="hacerLogin()">Entrar</button>
-      <span class="enlace" onclick="mostrarSolicitar()">¿Primera vez? Accede con tu número de reserva</span>
+      <span class="enlace" onclick="mostrarSolicitar()">¿Primera vez? Accede con tu número de reserva</span><br>
+      <span class="enlace" onclick="mostrarRecuperar()">¿Olvidaste tu contraseña?</span>
+    </div>
+
+    <!-- PANTALLA RECUPERAR CONTRASEÑA -->
+    <div id="pantalla-recuperar" class="oculto">
+      <p style="font-size:13px;color:#666;margin-bottom:20px;">Te enviaremos una contraseña provisional al email con el que reservaste.</p>
+      <div id="error-recuperar" class="error"></div>
+      <div id="ok-recuperar" class="ok"></div>
+      <label for="rec-email">Tu email</label>
+      <input type="email" id="rec-email" placeholder="El email con el que reservaste">
+      <button class="boton" id="btn-recuperar" onclick="recuperarPassword()">Enviar contraseña provisional</button>
+      <span class="enlace" onclick="mostrarLogin()">← Volver al acceso</span>
     </div>
 
     <!-- PANTALLA SOLICITAR CONTRASEÑA -->
@@ -147,6 +159,7 @@
         if (!document.getElementById('pantalla-login').classList.contains('oculto')) hacerLogin();
         else if (!document.getElementById('pantalla-solicitar').classList.contains('oculto')) solicitarAcceso();
         else if (!document.getElementById('pantalla-cambiar').classList.contains('oculto')) cambiarPassword();
+        else if (!document.getElementById('pantalla-recuperar').classList.contains('oculto')) recuperarPassword();
       }
     });
 
@@ -154,18 +167,58 @@
       document.getElementById('pantalla-login').classList.remove('oculto');
       document.getElementById('pantalla-solicitar').classList.add('oculto');
       document.getElementById('pantalla-cambiar').classList.add('oculto');
+      document.getElementById('pantalla-recuperar').classList.add('oculto');
     }
 
     function mostrarSolicitar() {
       document.getElementById('pantalla-login').classList.add('oculto');
       document.getElementById('pantalla-solicitar').classList.remove('oculto');
       document.getElementById('pantalla-cambiar').classList.add('oculto');
+      document.getElementById('pantalla-recuperar').classList.add('oculto');
     }
 
     function mostrarCambiar() {
       document.getElementById('pantalla-login').classList.add('oculto');
       document.getElementById('pantalla-solicitar').classList.add('oculto');
       document.getElementById('pantalla-cambiar').classList.remove('oculto');
+      document.getElementById('pantalla-recuperar').classList.add('oculto');
+    }
+
+    function mostrarRecuperar() {
+      document.getElementById('pantalla-login').classList.add('oculto');
+      document.getElementById('pantalla-solicitar').classList.add('oculto');
+      document.getElementById('pantalla-cambiar').classList.add('oculto');
+      document.getElementById('pantalla-recuperar').classList.remove('oculto');
+    }
+
+    function recuperarPassword() {
+      var email = document.getElementById('rec-email').value.trim();
+      var btn = document.getElementById('btn-recuperar');
+      ocultarError('error-recuperar');
+      document.getElementById('ok-recuperar').style.display = 'none';
+      if (!email) { mostrarError('error-recuperar', 'Indica tu email.'); return; }
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      fetch('/api/cliente/recuperar-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        btn.disabled = false; btn.textContent = 'Enviar contraseña provisional';
+        if (d.error) { mostrarError('error-recuperar', d.error); return; }
+        var ok = document.getElementById('ok-recuperar');
+        ok.textContent = 'Te hemos enviado una contraseña provisional. Revisa tu email.';
+        ok.style.display = 'block';
+        setTimeout(function() {
+          document.getElementById('login-email').value = email;
+          mostrarLogin();
+        }, 3000);
+      })
+      .catch(function() {
+        mostrarError('error-recuperar', 'Error de conexión. Inténtalo de nuevo.');
+        btn.disabled = false; btn.textContent = 'Enviar contraseña provisional';
+      });
     }
 
     function mostrarError(id, texto) {
