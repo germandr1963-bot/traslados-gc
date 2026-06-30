@@ -115,10 +115,10 @@
 
       <!-- RECUPERAR CONTRASEÑA -->
       <div id="formulario-recuperar" class="oculto">
-        <p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px">Te enviaremos una contraseña provisional a tu email.</p>
+        <p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px">Te enviaremos un enlace a tu email para crear una nueva contraseña.</p>
         <label for="rec-email">Email</label>
         <input id="rec-email" type="email" placeholder="tu@email.com">
-        <button class="principal" onclick="recuperarPassword()">Enviar contraseña provisional</button>
+        <button class="principal" onclick="recuperarPassword()">Enviar enlace de recuperación</button>
         <div id="mensaje-recuperar" class="mensaje"></div>
         <span class="enlace" onclick="mostrarSoloLogin()">← Volver al acceso</span>
       </div>
@@ -295,9 +295,9 @@
       fetch('/chofer/recuperar-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) })
         .then(function(r) { return r.json(); })
         .then(function(d) {
-          btn.disabled = false; btn.textContent = 'Enviar contraseña provisional';
+          btn.disabled = false; btn.textContent = 'Enviar enlace de recuperación';
           if (d.error) { msg.textContent = d.error; msg.className = 'mensaje error'; return; }
-          msg.textContent = 'Te hemos enviado una contraseña provisional. Revisa tu email.';
+          msg.textContent = 'Te hemos enviado a tu email registrado el acceso de recuperación.';
           msg.className = 'mensaje ok';
           setTimeout(function() {
             document.getElementById('login-email').value = email;
@@ -305,7 +305,7 @@
           }, 3000);
         })
         .catch(function() {
-          btn.disabled = false; btn.textContent = 'Enviar contraseña provisional';
+          btn.disabled = false; btn.textContent = 'Enviar enlace de recuperación';
           msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error';
         });
     }

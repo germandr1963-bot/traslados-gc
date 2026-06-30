@@ -120,12 +120,12 @@
 
     <!-- PANTALLA RECUPERAR CONTRASEÑA -->
     <div id="pantalla-recuperar" class="oculto">
-      <p style="font-size:13px;color:#666;margin-bottom:20px;">Te enviaremos una contraseña provisional al email con el que reservaste.</p>
+      <p style="font-size:13px;color:#666;margin-bottom:20px;">Te enviaremos un enlace a tu email para crear una nueva contraseña.</p>
       <div id="error-recuperar" class="error"></div>
       <div id="ok-recuperar" class="ok"></div>
       <label for="rec-email">Tu email</label>
       <input type="email" id="rec-email" placeholder="El email con el que reservaste">
-      <button class="boton" id="btn-recuperar" onclick="recuperarPassword()">Enviar contraseña provisional</button>
+      <button class="boton" id="btn-recuperar" onclick="recuperarPassword()">Enviar enlace de recuperación</button>
       <span class="enlace" onclick="mostrarLogin()">← Volver al acceso</span>
     </div>
 
@@ -205,10 +205,10 @@
       })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        btn.disabled = false; btn.textContent = 'Enviar contraseña provisional';
+        btn.disabled = false; btn.textContent = 'Enviar enlace de recuperación';
         if (d.error) { mostrarError('error-recuperar', d.error); return; }
         var ok = document.getElementById('ok-recuperar');
-        ok.textContent = 'Te hemos enviado una contraseña provisional. Revisa tu email.';
+        ok.textContent = 'Te hemos enviado a tu email registrado el acceso de recuperación.';
         ok.style.display = 'block';
         setTimeout(function() {
           document.getElementById('login-email').value = email;
@@ -217,7 +217,7 @@
       })
       .catch(function() {
         mostrarError('error-recuperar', 'Error de conexión. Inténtalo de nuevo.');
-        btn.disabled = false; btn.textContent = 'Enviar contraseña provisional';
+        btn.disabled = false; btn.textContent = 'Enviar enlace de recuperación';
       });
     }
 
