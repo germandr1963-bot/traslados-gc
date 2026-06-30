@@ -917,7 +917,7 @@ async function obtenerEmailsNotificacion() {
 
 // ─── Helper: generar contraseña provisional ───────────────────────────────────
 function generarPasswordProvisional() {
-  return '123456';
+  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 async function resolverVehiculo(marca_id, marca_nueva, modelo_id, modelo_nuevo) {
@@ -2836,6 +2836,62 @@ app.post('/chofer/login', asyncHandler(async (req, res) => {
 
   req.session.choferId = chofer.id;
   req.session.choferNombre = chofer.nombre;
+  res.json({ ok: true });
+}));
+
+// Recuperar contraseña del chofer (en cualquier momento)
+app.post('/chofer/recuperar-password', asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Indica tu email.' });
+
+  const result = await pool.query(
+    'SELECT id, nombre, email FROM conductores WHERE LOWER(email) = LOWER($1)',
+    [email.trim()]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'No encontramos ninguna cuenta de chofer con ese email.' });
+  const chofer = result.rows[0];
+
+  const pwd = generarPasswordProvisional();
+  const hash = await bcrypt.hash(pwd, 10);
+  await pool.query('UPDATE conductores SET password_hash = $1 WHERE id = $2', [hash, chofer.id]);
+
+  const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+  await enviarEmail({
+    to: chofer.email,
+    subject: 'Recupera tu contraseña — Traslados GC',
+    html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <div style="max-width:600px;margin:0 auto;padding:40px 16px">
+    <div style="background:#1C1815;padding:28px 32px;border-radius:12px 12px 0 0;text-align:center">
+      <h1 style="color:#D9A441;margin:0;font-size:22px;letter-spacing:1px">Traslados GC</h1>
+    </div>
+    <div style="background:#ffffff;padding:36px 32px;border-radius:0 0 12px 12px;border:1px solid #e1dcd0;border-top:none">
+      <h2 style="color:#2A211B;font-size:20px;margin:0 0 16px">Hola, ${chofer.nombre}</h2>
+      <p style="color:#2A211B;font-size:16px;line-height:1.7;margin:0 0 16px">
+        Has solicitado recuperar el acceso a tu portal de chofer. Aquí tienes una contraseña provisional:
+      </p>
+      <div style="background:#f9f7f4;border:1px solid #e1dcd0;border-radius:8px;padding:16px 20px;margin:0 0 20px;text-align:center">
+        <div style="font-size:12px;color:#5b5347;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Contraseña provisional</div>
+        <div style="font-family:monospace;font-size:24px;font-weight:700;color:#1C1815;letter-spacing:4px">${pwd}</div>
+      </div>
+      <p style="color:#5b5347;font-size:14px;line-height:1.7;margin:0 0 24px">
+        Puedes cambiarla por una propia en cualquier momento desde tu portal.
+      </p>
+      <div style="text-align:center;margin:28px 0">
+        <a href="${BASE_URL}/chofer/registro"
+           style="background:#C1502E;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">
+          Acceder a mi portal
+        </a>
+      </div>
+      <p style="color:#5b5347;font-size:12px;line-height:1.6;margin:24px 0 0;border-top:1px solid #e1dcd0;padding-top:20px">
+        Si no has solicitado esto, contáctanos; tu contraseña anterior ha dejado de funcionar.
+      </p>
+    </div>
+    <p style="text-align:center;color:#b5a99a;font-size:12px;margin-top:20px">Traslados GC · Gran Canaria</p>
+  </div>
+</body></html>`
+  });
+
   res.json({ ok: true });
 }));
 
@@ -5029,6 +5085,63 @@ app.post('/api/cliente/cambiar-password', asyncHandler(async (req, res) => {
     'UPDATE reservas SET cliente_password_hash = $1, cliente_primer_acceso = FALSE WHERE id = $2',
     [hash, req.session.clienteReservaId]
   );
+  res.json({ ok: true });
+}));
+
+// Recuperar contraseña (en cualquier momento, no solo la primera vez)
+app.post('/api/cliente/recuperar-password', asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Indica tu email.' });
+
+  const result = await pool.query(
+    `SELECT id, nombre_cliente, email_cliente
+     FROM reservas
+     WHERE LOWER(email_cliente) = LOWER($1) AND cliente_password_hash IS NOT NULL
+     ORDER BY creado_en DESC LIMIT 1`,
+    [email.trim()]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'No encontramos ninguna cuenta con ese email.' });
+  const reserva = result.rows[0];
+
+  const pwd = generarPasswordProvisional();
+  const hash = await bcrypt.hash(pwd, 10);
+  await pool.query(
+    'UPDATE reservas SET cliente_password_hash = $1, cliente_primer_acceso = TRUE WHERE id = $2',
+    [hash, reserva.id]
+  );
+
+  const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+  await enviarEmail({
+    to: reserva.email_cliente,
+    subject: 'Recupera tu contraseña — Traslados GC',
+    html: `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <style>
+      body{margin:0;padding:0;background:#f5f5f5;}
+      .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+      .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #C1502E;}
+      .body{padding:28px 24px;}
+      .pwd-box{background:#ECE6D8;border-radius:8px;padding:16px 20px;margin:20px 0;text-align:center;}
+      .pwd{font-family:monospace;font-size:24px;font-weight:700;color:#1C1815;letter-spacing:4px;}
+      .boton{display:inline-block;background:#C1502E;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0;}
+      .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}
+    </style></head><body>
+    <div class="wrapper">
+      <div class="header"><h1 style="color:#D9A441;margin:0;font-size:20px;">Traslados GC</h1></div>
+      <div class="body">
+        <p>Hola <strong>${reserva.nombre_cliente}</strong>,</p>
+        <p>Has solicitado recuperar el acceso a tu cuenta. Aquí tienes una contraseña provisional:</p>
+        <div class="pwd-box">
+          <div style="font-size:12px;color:#5b5347;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Contraseña provisional</div>
+          <div class="pwd">${pwd}</div>
+        </div>
+        <p style="font-size:13px;color:#5b5347;">Al entrar con ella se te pedirá que la cambies por una propia.</p>
+        <div style="text-align:center;"><a href="${BASE_URL}/mi-reserva" class="boton">Ir a Mi Reserva</a></div>
+        <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado esto, ignora este mensaje; tu contraseña anterior dejará de funcionar, así que si crees que alguien más lo ha pedido, contáctanos.</p>
+      </div>
+      <div class="footer">Traslados GC · Gran Canaria</div>
+    </div></body></html>`
+  });
+
   res.json({ ok: true });
 }));
 
