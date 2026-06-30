@@ -5839,7 +5839,19 @@ app.get('/admin/whatsapp-texto', requireAdmin, asyncHandler(async (req, res) => 
     '¿Aceptas este servicio? Responde SÍ o NO.\n' +
     'El primero en confirmar queda asignado.';
 
-  res.json({ ok: true, texto });
+  res.json({
+    ok: true,
+    texto,
+    datos: {
+      pnr: r.numero_reserva,
+      origen: r.origen || '—',
+      destino: r.destino || '—',
+      fecha,
+      hora,
+      pasajeros: r.num_pasajeros || '—',
+      categoria: r.categoria_nombre || '—'
+    }
+  });
 }));
 
 app.get('/admin/choferes-whatsapp', requireAdmin, asyncHandler(async (req, res) => {
@@ -5850,10 +5862,10 @@ app.get('/admin/choferes-whatsapp', requireAdmin, asyncHandler(async (req, res) 
 }));
 
 app.post('/admin/whatsapp-config', requireAdmin, asyncHandler(async (req, res) => {
-  const { whatsapp, wa_grupo_choferes } = req.body;
+  const { whatsapp } = req.body;
   await pool.query(
-    'UPDATE configuracion_contacto SET whatsapp = $1, wa_grupo_choferes = $2, actualizado_en = NOW() WHERE id = 1',
-    [whatsapp || '', wa_grupo_choferes || '']
+    'UPDATE configuracion_contacto SET whatsapp = $1, actualizado_en = NOW() WHERE id = 1',
+    [whatsapp || '']
   );
   res.json({ ok: true });
 }));
