@@ -299,7 +299,7 @@
 
     async function cerrarSesion() {
       await fetch('/chofer/logout', { method: 'POST' });
-      window.location.href = '/chofer/login';
+      window.location.href = '/';
     }
 
     mostrarPanel();
