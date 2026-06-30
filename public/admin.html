@@ -1458,7 +1458,7 @@ function verFichaConductor(id) {
     ficha.innerHTML = '' +
       '<h2 style="margin-top:0">📋 Expediente: ' + escapar(c.nombre) + ' <span style="font-size:0.8rem;color:#5a6c79;font-weight:400">(modifica lo que necesites y pulsa Guardar)</span></h2>' +
       (c.foto ? '<img src="' + c.foto + '" alt="Foto" style="width:100px;height:100px;object-fit:cover;border-radius:50%;float:right;margin-left:12px;border:2px solid var(--gris-borde)">' : '') +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0 16px;margin-top:18px">' +
         campoFicha('Nombre completo', 'nombre', c.nombre) +
         campoFicha('Documento (DNI/NIE)', 'documento', c.documento) +
         campoFicha('Teléfono', 'telefono', c.telefono) +
