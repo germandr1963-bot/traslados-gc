@@ -7,6 +7,7 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
+const crypto = require('crypto');
 const ExcelJS = require('exceljs');
 const { medirPxTitulo, medirPxDescripcion } = require('./medidor-pixeles');
 
@@ -862,6 +863,19 @@ async function initSchema() {
   `);
   await pool.query(`ALTER TABLE configuracion_contacto ADD COLUMN IF NOT EXISTS emails_notificacion TEXT DEFAULT ''`);
   await pool.query(`ALTER TABLE configuracion_contacto ADD COLUMN IF NOT EXISTS wa_grupo_choferes TEXT DEFAULT ''`);
+
+  // Enlaces de recuperación de contraseña (clientes y choferes)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tokens_recuperacion (
+      id SERIAL PRIMARY KEY,
+      tipo TEXT NOT NULL,
+      referencia_id INT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      usado BOOLEAN DEFAULT FALSE,
+      expira_en TIMESTAMP NOT NULL,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
 
   // ─── Reservas × Extras ────────────────────────────────────────────────────
   await pool.query(`
@@ -2848,14 +2862,19 @@ app.post('/chofer/recuperar-password', asyncHandler(async (req, res) => {
     'SELECT id, nombre, email FROM conductores WHERE LOWER(email) = LOWER($1)',
     [email.trim()]
   );
-  if (!result.rows.length) return res.status(404).json({ error: 'No encontramos ninguna cuenta de chofer con ese email.' });
+  // Por seguridad, respondemos ok igual exista o no la cuenta
+  if (!result.rows.length) return res.json({ ok: true });
   const chofer = result.rows[0];
 
-  const pwd = generarPasswordProvisional();
-  const hash = await bcrypt.hash(pwd, 10);
-  await pool.query('UPDATE conductores SET password_hash = $1 WHERE id = $2', [hash, chofer.id]);
+  const token = crypto.randomBytes(32).toString('hex');
+  const expira = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+  await pool.query(
+    'INSERT INTO tokens_recuperacion (tipo, referencia_id, token, expira_en) VALUES ($1,$2,$3,$4)',
+    ['chofer', chofer.id, token, expira]
+  );
 
   const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+  const enlace = `${BASE_URL}/restablecer-password?token=${token}&tipo=chofer`;
   await enviarEmail({
     to: chofer.email,
     subject: 'Recupera tu contraseña — Traslados GC',
@@ -2868,23 +2887,19 @@ app.post('/chofer/recuperar-password', asyncHandler(async (req, res) => {
     <div style="background:#ffffff;padding:36px 32px;border-radius:0 0 12px 12px;border:1px solid #e1dcd0;border-top:none">
       <h2 style="color:#2A211B;font-size:20px;margin:0 0 16px">Hola, ${chofer.nombre}</h2>
       <p style="color:#2A211B;font-size:16px;line-height:1.7;margin:0 0 16px">
-        Has solicitado recuperar el acceso a tu portal de chofer. Aquí tienes una contraseña provisional:
-      </p>
-      <div style="background:#f9f7f4;border:1px solid #e1dcd0;border-radius:8px;padding:16px 20px;margin:0 0 20px;text-align:center">
-        <div style="font-size:12px;color:#5b5347;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Contraseña provisional</div>
-        <div style="font-family:monospace;font-size:24px;font-weight:700;color:#1C1815;letter-spacing:4px">${pwd}</div>
-      </div>
-      <p style="color:#5b5347;font-size:14px;line-height:1.7;margin:0 0 24px">
-        Puedes cambiarla por una propia en cualquier momento desde tu portal.
+        Has solicitado recuperar el acceso a tu portal de chofer. Pulsa el botón para elegir una contraseña nueva:
       </p>
       <div style="text-align:center;margin:28px 0">
-        <a href="${BASE_URL}/chofer/registro"
+        <a href="${enlace}"
            style="background:#C1502E;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">
-          Acceder a mi portal
+          Crear nueva contraseña
         </a>
       </div>
+      <p style="color:#5b5347;font-size:13px;line-height:1.6;margin:0 0 0">
+        Este enlace caduca en 1 hora y solo se puede usar una vez. Tu contraseña actual sigue funcionando hasta que la cambies desde aquí.
+      </p>
       <p style="color:#5b5347;font-size:12px;line-height:1.6;margin:24px 0 0;border-top:1px solid #e1dcd0;padding-top:20px">
-        Si no has solicitado esto, contáctanos; tu contraseña anterior ha dejado de funcionar.
+        Si no has solicitado esto, ignora este mensaje — no se cambiará nada.
       </p>
     </div>
     <p style="text-align:center;color:#b5a99a;font-size:12px;margin-top:20px">Traslados GC · Gran Canaria</p>
@@ -4977,6 +4992,35 @@ app.get('/mi-reserva', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'mi-reserva.html'));
 });
 
+app.get('/restablecer-password', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'restablecer-password.html'));
+});
+
+app.post('/api/restablecer-password', asyncHandler(async (req, res) => {
+  const { token, password_nueva } = req.body;
+  if (!token) return res.status(400).json({ error: 'Enlace no válido.' });
+  if (!password_nueva || password_nueva.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+
+  const result = await pool.query(
+    'SELECT * FROM tokens_recuperacion WHERE token = $1 AND usado = FALSE AND expira_en > NOW()',
+    [token]
+  );
+  if (!result.rows.length) return res.status(400).json({ error: 'Este enlace no es válido o ha caducado. Solicita uno nuevo.' });
+  const fila = result.rows[0];
+
+  const hash = await bcrypt.hash(password_nueva, 10);
+  if (fila.tipo === 'cliente') {
+    await pool.query('UPDATE reservas SET cliente_password_hash = $1, cliente_primer_acceso = FALSE WHERE id = $2', [hash, fila.referencia_id]);
+  } else if (fila.tipo === 'chofer') {
+    await pool.query('UPDATE conductores SET password_hash = $1 WHERE id = $2', [hash, fila.referencia_id]);
+  } else {
+    return res.status(400).json({ error: 'Enlace no válido.' });
+  }
+
+  await pool.query('UPDATE tokens_recuperacion SET usado = TRUE WHERE id = $1', [fila.id]);
+  res.json({ ok: true });
+}));
+
 app.get('/cliente/portal', (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.redirect('/mi-reserva');
   res.sendFile(path.join(__dirname, 'public', 'cliente-portal.html'));
@@ -5100,17 +5144,19 @@ app.post('/api/cliente/recuperar-password', asyncHandler(async (req, res) => {
      ORDER BY creado_en DESC LIMIT 1`,
     [email.trim()]
   );
-  if (!result.rows.length) return res.status(404).json({ error: 'No encontramos ninguna cuenta con ese email.' });
+  // Por seguridad, respondemos ok igual exista o no la cuenta (no revelamos si el email está registrado)
+  if (!result.rows.length) return res.json({ ok: true });
   const reserva = result.rows[0];
 
-  const pwd = generarPasswordProvisional();
-  const hash = await bcrypt.hash(pwd, 10);
+  const token = crypto.randomBytes(32).toString('hex');
+  const expira = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
   await pool.query(
-    'UPDATE reservas SET cliente_password_hash = $1, cliente_primer_acceso = TRUE WHERE id = $2',
-    [hash, reserva.id]
+    'INSERT INTO tokens_recuperacion (tipo, referencia_id, token, expira_en) VALUES ($1,$2,$3,$4)',
+    ['cliente', reserva.id, token, expira]
   );
 
   const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+  const enlace = `${BASE_URL}/restablecer-password?token=${token}&tipo=cliente`;
   await enviarEmail({
     to: reserva.email_cliente,
     subject: 'Recupera tu contraseña — Traslados GC',
@@ -5120,8 +5166,6 @@ app.post('/api/cliente/recuperar-password', asyncHandler(async (req, res) => {
       .wrapper{max-width:600px;margin:0 auto;background:#fff;}
       .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #C1502E;}
       .body{padding:28px 24px;}
-      .pwd-box{background:#ECE6D8;border-radius:8px;padding:16px 20px;margin:20px 0;text-align:center;}
-      .pwd{font-family:monospace;font-size:24px;font-weight:700;color:#1C1815;letter-spacing:4px;}
       .boton{display:inline-block;background:#C1502E;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0;}
       .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}
     </style></head><body>
@@ -5129,14 +5173,10 @@ app.post('/api/cliente/recuperar-password', asyncHandler(async (req, res) => {
       <div class="header"><h1 style="color:#D9A441;margin:0;font-size:20px;">Traslados GC</h1></div>
       <div class="body">
         <p>Hola <strong>${reserva.nombre_cliente}</strong>,</p>
-        <p>Has solicitado recuperar el acceso a tu cuenta. Aquí tienes una contraseña provisional:</p>
-        <div class="pwd-box">
-          <div style="font-size:12px;color:#5b5347;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Contraseña provisional</div>
-          <div class="pwd">${pwd}</div>
-        </div>
-        <p style="font-size:13px;color:#5b5347;">Al entrar con ella se te pedirá que la cambies por una propia.</p>
-        <div style="text-align:center;"><a href="${BASE_URL}/mi-reserva" class="boton">Ir a Mi Reserva</a></div>
-        <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado esto, ignora este mensaje; tu contraseña anterior dejará de funcionar, así que si crees que alguien más lo ha pedido, contáctanos.</p>
+        <p>Has solicitado recuperar el acceso a tu cuenta. Pulsa el botón para elegir una contraseña nueva:</p>
+        <div style="text-align:center;"><a href="${enlace}" class="boton">Crear nueva contraseña</a></div>
+        <p style="font-size:13px;color:#5b5347;">Este enlace caduca en 1 hora y solo se puede usar una vez. Tu contraseña actual sigue funcionando hasta que la cambies desde aquí.</p>
+        <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado esto, simplemente ignora este mensaje — no se cambiará nada.</p>
       </div>
       <div class="footer">Traslados GC · Gran Canaria</div>
     </div></body></html>`
