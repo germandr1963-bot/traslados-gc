@@ -1406,7 +1406,7 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   }
   const hash = await bcrypt.hash(d.password, 10);
   const foto = d.foto || null;
-  const fotoEstado = foto ? 'aprobada' : 'sin_foto';
+  const fotoEstado = foto ? 'pendiente' : 'sin_foto';
   try {
     const result = await pool.query(
       `INSERT INTO conductores
@@ -1425,7 +1425,49 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
         d.isla || 'Gran Canaria', foto, fotoEstado
       ]
     );
-    res.json({ ok: true, id: result.rows[0].id });
+    const nuevoId = result.rows[0].id;
+
+    try {
+      await enviarEmail({
+        to: d.email.toLowerCase().trim(),
+        subject: '¡Bienvenido a Traslados GC! Tus datos de acceso',
+        html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <div style="max-width:600px;margin:0 auto;padding:40px 16px">
+    <div style="background:#1C1815;padding:28px 32px;border-radius:12px 12px 0 0;text-align:center">
+      <h1 style="color:#D9A441;margin:0;font-size:22px;letter-spacing:1px">Traslados GC</h1>
+    </div>
+    <div style="background:#ffffff;padding:36px 32px;border-radius:0 0 12px 12px;border:1px solid #e1dcd0;border-top:none">
+      <h2 style="color:#2A211B;font-size:20px;margin:0 0 16px">¡Hola, ${d.nombre.trim()}!</h2>
+      <p style="color:#2A211B;font-size:16px;line-height:1.7;margin:0 0 16px">
+        Te hemos dado de alta en nuestra flota de choferes. Ya puedes acceder a tu portal con estos datos:
+      </p>
+      <div style="background:#f9f7f4;border:1px solid #e1dcd0;border-radius:8px;padding:16px 20px;margin:0 0 20px">
+        <p style="margin:0 0 6px;font-size:14px;color:#5b5347"><strong>Usuario (email):</strong> ${d.email.toLowerCase().trim()}</p>
+        <p style="margin:0;font-size:14px;color:#5b5347"><strong>Contraseña provisional:</strong> ${d.password}</p>
+      </div>
+      <p style="color:#5b5347;font-size:15px;line-height:1.7;margin:0 0 24px">
+        En tu portal encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil.
+      </p>
+      <div style="text-align:center;margin:28px 0">
+        <a href="https://traslados-gc.onrender.com/chofer/login"
+           style="background:#C1502E;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">
+          Acceder a mi portal
+        </a>
+      </div>
+      <p style="color:#5b5347;font-size:14px;line-height:1.6;margin:24px 0 0;border-top:1px solid #e1dcd0;padding-top:20px">
+        Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!
+      </p>
+    </div>
+    <p style="text-align:center;color:#b5a99a;font-size:12px;margin-top:20px">Traslados GC · Gran Canaria</p>
+  </div>
+</body></html>`
+      });
+    } catch (err) {
+      console.warn('Error enviando email de bienvenida (alta manual de conductor):', err.message);
+    }
+
+    res.json({ ok: true, id: nuevoId });
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ error: 'Ese email ya está registrado.' });
     throw err;
