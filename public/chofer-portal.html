@@ -79,6 +79,14 @@
 
       <div class="tarjeta" id="ficha-vehiculo"></div>
 
+      <div class="reserva-card" id="tarjeta-mi-perfil">
+        <div class="reserva-card-cabecera" onclick="toggleMiPerfil()">
+          <div class="reserva-resumen"><span class="reserva-ruta">👤 Mi perfil</span></div>
+          <span class="reserva-chevron" id="mi-perfil-chevron">▼</span>
+        </div>
+        <div class="reserva-cuerpo" id="mi-perfil-cuerpo"></div>
+      </div>
+
       <div class="tarjeta">
         <h2 style="margin-top:0">Mis reservas</h2>
 
@@ -130,6 +138,7 @@
         '<p style="font-size:0.88rem">' + (TEXTOS_FOTO[conductor.foto_estado || 'sin_foto']) + '</p>' +
         '<label for="archivo-foto" style="margin-top:10px">📷 ' + (conductor.foto ? 'Cambiar' : 'Subir') + ' foto de carné (será revisada por la administración antes de mostrarse)</label>' +
         '<input type="file" id="archivo-foto" accept="image/*" onchange="subirFoto(this)">';
+      pintarMiPerfil(conductor);
       await cargarReservas();
     }
 
@@ -295,6 +304,174 @@
         imagen.src = evento.target.result;
       };
       lector.readAsDataURL(archivo);
+    }
+
+    function escapar(texto) {
+      var div = document.createElement('div');
+      div.textContent = (texto === null || texto === undefined) ? '' : texto;
+      return div.innerHTML;
+    }
+
+    var catalogoPerfilCache = null;
+    var conductorActual = null;
+
+    function toggleMiPerfil() {
+      document.getElementById('mi-perfil-cuerpo').classList.toggle('abierto');
+      var abierto = document.getElementById('mi-perfil-cuerpo').classList.contains('abierto');
+      document.getElementById('mi-perfil-chevron').textContent = abierto ? '▲' : '▼';
+    }
+
+    function opcionesMarcaPerfil(valorActual) {
+      var norm = (valorActual || '').trim().toLowerCase();
+      var encontrada = norm ? catalogoPerfilCache.find(function (m) { return m.nombre.trim().toLowerCase() === norm; }) : null;
+      var marcaIdActual = encontrada ? encontrada.id : null;
+      var esOtra = !!(valorActual && !encontrada);
+      var opts = '<option value="">— Selecciona la marca —</option>' +
+        catalogoPerfilCache.map(function (m) {
+          return '<option value="' + m.id + '"' + (m.id === marcaIdActual ? ' selected' : '') + '>' + escapar(m.nombre) + '</option>';
+        }).join('') +
+        '<option value="__nueva"' + (esOtra ? ' selected' : '') + '>➕ Otra marca</option>';
+      return { opts: opts, marcaIdActual: marcaIdActual, esOtra: esOtra };
+    }
+
+    function opcionesModeloPerfil(marcaIdActual, valorActual) {
+      var marca = marcaIdActual ? catalogoPerfilCache.find(function (m) { return m.id === marcaIdActual; }) : null;
+      var norm = (valorActual || '').trim().toLowerCase();
+      var encontrado = (marca && norm) ? marca.modelos.find(function (mo) { return mo.nombre.trim().toLowerCase() === norm; }) : null;
+      var esOtra = !!(valorActual && !encontrado);
+      var opts = '<option value="">' + (marca ? '— Selecciona el modelo —' : '— Selecciona primero la marca —') + '</option>' +
+        (marca ? marca.modelos.map(function (mo) {
+          return '<option value="' + mo.id + '"' + (mo.id === (encontrado ? encontrado.id : null) ? ' selected' : '') + '>' + escapar(mo.nombre) + '</option>';
+        }).join('') : '') +
+        '<option value="__nuevo"' + (esOtra ? ' selected' : '') + '>➕ Otro modelo</option>';
+      return { opts: opts, esOtra: esOtra };
+    }
+
+    function cambioMarcaPerfil() {
+      var marcaVal = document.getElementById('p-vehiculo_marca').value;
+      var esNueva = marcaVal === '__nueva';
+      document.getElementById('p-vehiculo_marca-nueva-caja').classList.toggle('oculto', !esNueva);
+      var marcaId = (!esNueva && marcaVal) ? parseInt(marcaVal, 10) : null;
+      var info = opcionesModeloPerfil(marcaId, '');
+      document.getElementById('p-vehiculo_modelo').innerHTML = info.opts;
+      document.getElementById('p-vehiculo_modelo-nuevo-caja').classList.add('oculto');
+    }
+
+    function cambioModeloPerfil() {
+      var modeloVal = document.getElementById('p-vehiculo_modelo').value;
+      var esNuevo = modeloVal === '__nuevo';
+      var caja = document.getElementById('p-vehiculo_modelo-nuevo-caja');
+      caja.classList.toggle('oculto', !esNuevo);
+      if (esNuevo) document.getElementById('p-vehiculo_modelo-nuevo').value = '';
+    }
+
+    function campoPerfil(etiqueta, id, valor) {
+      return '<label class="etiqueta" style="display:block;margin-top:10px">' + etiqueta + '</label>' +
+        '<input class="campo" id="p-' + id + '" type="text" value="' + escapar(valor == null ? '' : valor) + '" style="width:100%;box-sizing:border-box">';
+    }
+
+    function pintarMiPerfil(conductor) {
+      conductorActual = conductor;
+      var cuerpo = document.getElementById('mi-perfil-cuerpo');
+
+      if (!conductor.permitir_edicion_ficha) {
+        cuerpo.innerHTML =
+          '<p style="font-size:13px;color:#5a6c79">Si deseas modificar algún dato de tu ficha (teléfono, dirección, vehículo, etc.), solicita a la administración que te habilite la edición. Una vez habilitada, podrás hacer tus cambios y guardarlos; al guardar, la edición se desactiva de nuevo hasta la próxima vez que la necesites.</p>' +
+          (conductor.cambios_pendientes ? '<p style="font-size:13px;color:#e65100;font-weight:600">🕐 Tienes cambios enviados esperando la aprobación de la administración.</p>' : '');
+        return;
+      }
+
+      if (conductor.cambios_pendientes) {
+        cuerpo.innerHTML = '<p style="font-size:13px;color:#e65100;font-weight:600">🕐 Ya has enviado cambios y están esperando la aprobación de la administración. Cuando se resuelvan, podrás volver a editar.</p>';
+        return;
+      }
+
+      function pintarFormulario() {
+        var marcaInfo = opcionesMarcaPerfil(conductor.vehiculo_marca);
+        var modeloInfo = opcionesModeloPerfil(marcaInfo.marcaIdActual, conductor.vehiculo_modelo);
+        cuerpo.innerHTML =
+          '<p style="font-size:13px;color:#5a6c79;margin-top:0">Modifica lo que necesites. Nombre y documento no se pueden cambiar aquí. Al guardar, los cambios quedan pendientes de aprobación por la administración.</p>' +
+          campoPerfil('Teléfono', 'telefono', conductor.telefono) +
+          campoPerfil('Email', 'email', conductor.email) +
+          campoPerfil('Dirección', 'direccion', conductor.direccion) +
+          campoPerfil('Código postal', 'cp', conductor.cp) +
+          campoPerfil('Municipio', 'municipio', conductor.municipio) +
+          campoPerfil('Central de flota (opcional)', 'central_flota', conductor.central_flota) +
+          '<label class="etiqueta" style="display:block;margin-top:10px">Marca del vehículo</label>' +
+          '<select class="campo" id="p-vehiculo_marca" onchange="cambioMarcaPerfil()" style="width:100%;box-sizing:border-box">' + marcaInfo.opts + '</select>' +
+          '<div id="p-vehiculo_marca-nueva-caja" class="' + (marcaInfo.esOtra ? '' : 'oculto') + '" style="margin-top:8px">' +
+            '<label class="etiqueta">Nombre de la marca nueva</label>' +
+            '<input class="campo" id="p-vehiculo_marca-nueva" type="text" value="' + escapar(marcaInfo.esOtra ? conductor.vehiculo_marca : '') + '" style="width:100%;box-sizing:border-box">' +
+          '</div>' +
+          '<label class="etiqueta" style="display:block;margin-top:10px">Modelo</label>' +
+          '<select class="campo" id="p-vehiculo_modelo" onchange="cambioModeloPerfil()" style="width:100%;box-sizing:border-box">' + modeloInfo.opts + '</select>' +
+          '<div id="p-vehiculo_modelo-nuevo-caja" class="' + (modeloInfo.esOtra ? '' : 'oculto') + '" style="margin-top:8px">' +
+            '<label class="etiqueta">Escribe el nombre del modelo nuevo</label>' +
+            '<input class="campo" id="p-vehiculo_modelo-nuevo" type="text" placeholder="Escribir aquí" value="' + escapar(modeloInfo.esOtra ? conductor.vehiculo_modelo : '') + '" style="width:100%;box-sizing:border-box">' +
+          '</div>' +
+          campoPerfil('Matrícula', 'matricula', conductor.matricula) +
+          campoPerfil('Nº de taxi', 'numero_taxi', conductor.numero_taxi) +
+          campoPerfil('Plazas', 'plazas', conductor.plazas) +
+          campoPerfil('Isla', 'isla', conductor.isla) +
+          '<div id="aviso-mi-perfil" style="display:none;margin-top:10px;font-size:13px"></div>' +
+          '<button class="boton-cartel" style="margin-top:14px" onclick="guardarMiPerfil()">💾 Guardar cambios</button>';
+      }
+
+      if (catalogoPerfilCache) { pintarFormulario(); return; }
+      fetch('/api/marcas-vehiculos').then(function (r) { return r.json(); }).then(function (marcas) {
+        catalogoPerfilCache = marcas;
+        pintarFormulario();
+      });
+    }
+
+    async function guardarMiPerfil() {
+      var aviso = document.getElementById('aviso-mi-perfil');
+      aviso.style.display = 'none';
+
+      var datos = {
+        telefono: document.getElementById('p-telefono').value.trim(),
+        email: document.getElementById('p-email').value.trim(),
+        direccion: document.getElementById('p-direccion').value.trim(),
+        cp: document.getElementById('p-cp').value.trim(),
+        municipio: document.getElementById('p-municipio').value.trim(),
+        central_flota: document.getElementById('p-central_flota').value.trim(),
+        matricula: document.getElementById('p-matricula').value.trim(),
+        numero_taxi: document.getElementById('p-numero_taxi').value.trim(),
+        plazas: document.getElementById('p-plazas').value.trim(),
+        isla: document.getElementById('p-isla').value.trim()
+      };
+
+      var marcaVal = document.getElementById('p-vehiculo_marca').value;
+      if (marcaVal === '__nueva') {
+        datos.vehiculo_marca = document.getElementById('p-vehiculo_marca-nueva').value.trim();
+      } else {
+        var marcaEl = document.getElementById('p-vehiculo_marca');
+        datos.vehiculo_marca = (marcaEl.selectedOptions[0] || {}).text || '';
+      }
+
+      var modeloVal = document.getElementById('p-vehiculo_modelo').value;
+      if (modeloVal === '__nuevo') {
+        datos.vehiculo_modelo = document.getElementById('p-vehiculo_modelo-nuevo').value.trim();
+      } else {
+        var modeloEl = document.getElementById('p-vehiculo_modelo');
+        datos.vehiculo_modelo = (modeloEl.selectedOptions[0] || {}).text || '';
+      }
+
+      if (!confirm('¿Enviar estos cambios para que la administración los apruebe?')) return;
+
+      const r = await fetch('/chofer/mi-perfil', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos)
+      });
+      const respuesta = await r.json();
+      if (respuesta.ok) {
+        alert('Cambios enviados. Quedan pendientes de aprobación por la administración. ✓');
+        mostrarPanel();
+      } else {
+        aviso.style.display = 'block';
+        aviso.innerHTML = '<span style="color:#c0392b">' + respuesta.error + '</span>';
+      }
     }
 
     async function cerrarSesion() {
