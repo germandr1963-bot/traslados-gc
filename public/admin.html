@@ -1534,6 +1534,10 @@ function verFichaConductor(id) {
           '<strong>Foto de carné:</strong> ' + ETIQUETAS_FOTO_CONDUCTOR[c.foto_estado || 'sin_foto'] +
           (c.foto_motivo ? '<br><em>Motivo del rechazo: ' + escapar(c.foto_motivo) + '</em>' : '') +
         '</p>' +
+        '<label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:0.9rem;cursor:pointer">' +
+          '<input type="checkbox" id="f-permitir_edicion_ficha"' + (c.permitir_edicion_ficha ? ' checked' : '') + '> ' +
+          'Permitir que el chofer edite su ficha' +
+        '</label>' +
         '<div id="aviso-ficha-conductor" style="display:none;margin-top:8px;font-size:0.85rem;"></div>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
           '<button class="boton-primario" onclick="guardarFichaConductor(' + c.id + ')">💾 Guardar cambios</button>' +
@@ -1587,6 +1591,7 @@ function guardarFichaConductor(id) {
   });
 
   datos.central_flota = document.getElementById('f-central_flota').value.trim();
+  datos.permitir_edicion_ficha = document.getElementById('f-permitir_edicion_ficha').checked;
 
   var islaEl = document.getElementById('f-isla');
   datos.isla = islaEl.value;
