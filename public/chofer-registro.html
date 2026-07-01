@@ -106,7 +106,7 @@
   </header>
 
   <main>
-    <h1>Área de choferes</h1>
+    <h1 id="titulo-pagina">Acceso a choferes</h1>
     <p class="sub" id="texto-intro">Regístrate con tu vehículo. Tu cuenta será revisada y aprobada por el equipo antes de poder recibir servicios.</p>
 
     <div class="tarjeta" style="max-width:520px">
@@ -268,6 +268,7 @@
 
     if (window.location.pathname.endsWith('/alta')) {
       mostrarPestana('registro');
+      document.getElementById('titulo-pagina').textContent = 'Alta choferes';
     } else {
       document.getElementById('texto-intro').textContent = 'Accede a tu portal de chofer.';
     }
