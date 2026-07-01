@@ -2867,7 +2867,7 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
 
 app.get('/chofer/login', (req, res) => {
   if (req.session && req.session.choferId) return res.redirect('/chofer/portal');
-  res.sendFile(path.join(__dirname, 'public', 'chofer-login.html'));
+  res.sendFile(path.join(__dirname, 'public', 'chofer-registro.html'));
 });
 
 app.get('/chofer/portal', (req, res) => {
