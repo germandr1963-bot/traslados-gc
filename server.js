@@ -2919,7 +2919,7 @@ app.get('/chofer/me', requireChofer, asyncHandler(async (req, res) => {
     `SELECT c.id, c.nombre, c.email, c.telefono, c.documento, c.direccion, c.cp, c.municipio,
             c.municipio_licencia, c.numero_licencia, c.central_flota,
             c.vehiculo_marca, c.vehiculo_modelo, c.matricula, c.numero_taxi, c.plazas, c.isla,
-            c.estado, c.foto, c.foto_estado, c.foto_motivo,
+            c.estado, c.foto, c.foto_estado, c.foto_motivo, c.permitir_edicion_ficha, c.cambios_pendientes,
             cat.nombre AS categoria
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
@@ -2928,6 +2928,46 @@ app.get('/chofer/me', requireChofer, asyncHandler(async (req, res) => {
   );
   if (!result.rows.length) return res.status(404).json({ error: 'No encontrado.' });
   res.json({ conductor: result.rows[0] });
+}));
+
+app.post('/chofer/mi-perfil', requireChofer, asyncHandler(async (req, res) => {
+  const actual = await pool.query('SELECT * FROM conductores WHERE id = $1', [req.session.choferId]);
+  if (!actual.rows.length) return res.status(404).json({ error: 'No encontrado.' });
+  const c = actual.rows[0];
+
+  if (!c.permitir_edicion_ficha) {
+    return res.status(403).json({ error: 'No tienes permiso activo para editar tu ficha. Solicítalo a la administración.' });
+  }
+
+  const camposPermitidos = ['telefono', 'direccion', 'cp', 'municipio', 'central_flota',
+    'vehiculo_marca', 'vehiculo_modelo', 'matricula', 'numero_taxi', 'plazas', 'isla', 'email'];
+  const etiquetas = {
+    telefono: 'Teléfono', direccion: 'Dirección', cp: 'Código postal', municipio: 'Municipio',
+    central_flota: 'Central de flota', vehiculo_marca: 'Marca', vehiculo_modelo: 'Modelo',
+    matricula: 'Matrícula', numero_taxi: 'Nº de taxi', plazas: 'Plazas', isla: 'Isla', email: 'Email'
+  };
+
+  const propuesta = {};
+  for (const campo of camposPermitidos) {
+    if (req.body[campo] === undefined) continue;
+    let nuevo = String(req.body[campo]).trim();
+    if (campo === 'email') nuevo = nuevo.toLowerCase();
+    if (campo === 'matricula') nuevo = nuevo.toUpperCase();
+    const actualValor = c[campo] == null ? '' : String(c[campo]).trim();
+    if (nuevo !== actualValor) {
+      propuesta[campo] = { etiqueta: etiquetas[campo], anterior: actualValor, nuevo: nuevo };
+    }
+  }
+
+  if (Object.keys(propuesta).length === 0) {
+    return res.status(400).json({ error: 'No hay ningún cambio que enviar.' });
+  }
+
+  await pool.query(
+    'UPDATE conductores SET cambios_pendientes = $1, permitir_edicion_ficha = FALSE WHERE id = $2',
+    [JSON.stringify(propuesta), req.session.choferId]
+  );
+  res.json({ ok: true });
 }));
 
 app.post('/chofer/foto', requireChofer, asyncHandler(async (req, res) => {
