@@ -9,21 +9,32 @@
   <style>
     header.app {
       background: var(--charcoal);
-      padding: 12px 20px;
-      display: flex;
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      justify-content: space-between;
       border-bottom: 3px solid var(--terracota);
     }
     header.app .marca {
       font-family: 'Big Shoulders Display', sans-serif;
-      font-size: 20px;
+      font-size: 28px;
+      font-weight: 500;
       color: var(--texto-claro);
-      letter-spacing: 1px;
+      letter-spacing: 2px;
       text-decoration: none;
+      text-align: center;
+      justify-self: center;
     }
     header.app a.nav { color: rgba(255,255,255,0.65); text-decoration: none; font-size: 14px; }
     header.app a.nav:hover { color: #fff; }
+    header.app a.nav.izquierda { justify-self: start; }
+    header.app a.nav.derecha { justify-self: end; }
+
+    @media (max-width: 560px) {
+      header.app { padding: 12px 14px; }
+      header.app .marca { font-size: 19px; letter-spacing: 1px; }
+      header.app a.nav { font-size: 12px; }
+    }
 
     main { max-width: 920px; margin: 0 auto; padding: 28px 20px 60px; }
 
@@ -88,8 +99,9 @@
 <body>
 
   <header class="app">
-    <a href="/" class="marca">Traslados · GC</a>
-    <a href="/contacto" class="nav">Contacto</a>
+    <a href="/" class="nav izquierda">Inicio</a>
+    <a href="/" class="marca">TRASLADOS · GC</a>
+    <a href="/contacto" class="nav derecha">Contacto</a>
   </header>
 
   <main>
