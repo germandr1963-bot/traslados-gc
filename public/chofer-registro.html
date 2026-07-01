@@ -39,6 +39,14 @@
     main { max-width: 920px; margin: 0 auto; padding: 28px 20px 60px; text-align: center; }
     main .tarjeta { text-align: left; margin: 0 auto; }
 
+    .etiqueta-pagina {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 14px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--terracota);
+      margin-bottom: 8px;
+    }
     h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: 26px; color: var(--texto-oscuro); margin-bottom: 6px; }
     h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 15px; color: var(--terracota); margin: 20px 0 6px; letter-spacing: 0.5px; }
     p.sub { color: var(--texto-muted); margin-bottom: 20px; font-size: 14px; line-height: 1.6; }
@@ -106,7 +114,7 @@
   </header>
 
   <main>
-    <h1>Área de choferes</h1>
+    <p class="etiqueta-pagina" id="etiqueta-pagina">Acceso a choferes</p>
     <p class="sub" id="texto-intro">Regístrate con tu vehículo. Tu cuenta será revisada y aprobada por el equipo antes de poder recibir servicios.</p>
 
     <div class="tarjeta" style="max-width:520px">
@@ -268,8 +276,10 @@
 
     if (new URLSearchParams(window.location.search).get('modo') === 'alta') {
       mostrarPestana('registro');
+      document.getElementById('etiqueta-pagina').textContent = 'Alta de chofer';
     } else {
       document.getElementById('texto-intro').textContent = 'Accede a tu portal de chofer.';
+      document.getElementById('etiqueta-pagina').textContent = 'Acceso a choferes';
     }
     document.getElementById('selector-pestanas').style.display = 'none';
 
