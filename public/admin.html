@@ -4971,33 +4971,14 @@ function enviarEmailConfirmacion() {
 
 function enviarWhatsappChofer() {
   var r = reservaDetalleData;
-  if (!r) return;
-  fetch('/admin/contacto-info')
+  if (!r || !reservaDetalleId) return;
+  fetch('/admin/reservas/' + reservaDetalleId + '/whatsapp-cartel')
     .then(function(res) { return res.json(); })
-    .then(function(cfg) {
-      var numeroEmpresa = (cfg.whatsapp || '').replace(/[^0-9]/g, '');
-      if (!numeroEmpresa) { alert('Configura el número de WhatsApp en la sección Contacto.'); return; }
-
-      var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '—';
-      var hora = r.hora ? r.hora.slice(0,5) : '—';
-      var precio = r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : 'A consultar';
-
-      var msg = '🚗 *TRASLADOS GC — Reserva ' + r.numero_reserva + '*\n\n' +
-        '📍 *Ruta:* ' + (r.origen || '—') + ' → ' + (r.destino || '—') + '\n' +
-        '📅 *Fecha:* ' + fecha + '\n' +
-        '🕐 *Hora recogida:* ' + hora + '\n' +
-        '👥 *Pasajeros:* ' + (r.num_pasajeros || '—') + '\n' +
-        '🚙 *Categoría:* ' + (r.categoria_nombre || '—') + '\n' +
-        '💶 *Precio base:* ' + precio + '\n';
-
-      if (r.numero_vuelo) msg += '✈️ *Vuelo:* ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · Llegada ' + r.hora_llegada_vuelo.slice(0,5) : '') + '\n';
-      if (r.nombre_barco) msg += '🚢 *Barco:* ' + r.nombre_barco + (r.hora_atraque ? ' · Atraque ' + r.hora_atraque.slice(0,5) : '') + '\n';
-      if (r.direccion_recogida) msg += '📌 *Recogida:* ' + r.direccion_recogida + '\n';
-      if (r.direccion_destino) msg += '📌 *Destino:* ' + r.direccion_destino + '\n';
-
-      msg += '\n¿Aceptas este servicio? Responde *SÍ* o *NO*. El primero en confirmar se asigna.';
-
-      var url = 'https://wa.me/' + numeroEmpresa + '?text=' + encodeURIComponent(msg);
+    .then(function(d) {
+      if (d.error) { alert(d.error); return; }
+      var msg = 'Hola ' + d.nombre + ', aquí tienes el cartel de recogida para la reserva ' +
+        d.numero_reserva + ':\n' + d.url;
+      var url = 'https://wa.me/' + d.telefono + '?text=' + encodeURIComponent(msg);
       window.open(url, '_blank');
     });
 }
