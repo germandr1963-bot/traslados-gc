@@ -139,6 +139,12 @@ async function cargarIdiomasCache() {
 // URL base del sitio — se usa para construir canonical y hreflang
 const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
 
+// Firma para enlaces de descarga del cartel sin necesidad de login (usada por WhatsApp)
+function firmarCartel(reservaId) {
+  return crypto.createHmac('sha256', process.env.SESSION_SECRET || 'cambia-este-secreto')
+    .update(String(reservaId)).digest('hex').slice(0, 20);
+}
+
 // ─── Sistema de traducción de la interfaz de la web ──────────────────────────
 // Caché en memoria de todos los textos fijos y sus traducciones, para no
 // consultar la base de datos en cada visita. Se recarga al arrancar el
@@ -4737,6 +4743,37 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
   } catch(err) {
     res.status(500).json({ error: 'Error enviando cartel: ' + err.message });
   }
+}));
+
+app.get('/admin/reservas/:id/whatsapp-cartel', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT r.numero_reserva, r.conductor_id, c.nombre AS conductor_nombre, c.telefono AS conductor_telefono
+     FROM reservas r LEFT JOIN conductores c ON c.id = r.conductor_id WHERE r.id = $1`,
+    [req.params.id]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const d = result.rows[0];
+  if (!d.conductor_id) return res.status(400).json({ error: 'No hay chofer asignado en esta reserva.' });
+  if (!d.conductor_telefono) return res.status(400).json({ error: 'Este chofer no tiene teléfono registrado.' });
+
+  const firma = firmarCartel(req.params.id);
+  res.json({
+    nombre: d.conductor_nombre,
+    telefono: d.conductor_telefono.replace(/[^0-9]/g, ''),
+    numero_reserva: d.numero_reserva,
+    url: BASE_URL + '/cartel-descarga/' + req.params.id + '/' + firma
+  });
+}));
+
+app.get('/cartel-descarga/:id/:firma', asyncHandler(async (req, res) => {
+  if (req.params.firma !== firmarCartel(req.params.id)) {
+    return res.status(403).send('Enlace no válido o caducado.');
+  }
+  const cartel = await generarCartelChofer(req.params.id);
+  if (!cartel) return res.status(404).send('Cartel no disponible.');
+  res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  res.set('Content-Disposition', 'attachment; filename="cartel-' + req.params.id + '.docx"');
+  res.send(cartel.buffer);
 }));
 
 // ─── Admin: extras ────────────────────────────────────────────────────────────
