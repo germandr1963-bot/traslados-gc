@@ -822,6 +822,10 @@ table.tabla-precios input {
       <p class="subtitulo">Información que aparecerá en la página de contacto de la web.</p>
       <div class="tarjeta">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+          <div style="grid-column:1/-1;">
+            <label class="etiqueta">Nombre de la Empresa</label>
+            <input type="text" id="contacto-nombre-empresa" class="campo" placeholder="Traslados GC">
+          </div>
           <div>
             <label class="etiqueta">Teléfono</label>
             <input type="text" id="contacto-telefono" class="campo" placeholder="+34 600 000 000">
@@ -3433,6 +3437,7 @@ function cargarContacto() {
   fetch('/api/contacto')
     .then(function(r) { return r.json(); })
     .then(function(d) {
+      document.getElementById('contacto-nombre-empresa').value = d.nombre_empresa || '';
       document.getElementById('contacto-telefono').value = d.telefono || '';
       document.getElementById('contacto-whatsapp').value = d.whatsapp || '';
       document.getElementById('contacto-email').value = d.email || '';
@@ -3448,6 +3453,7 @@ function guardarContacto() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      nombre_empresa: document.getElementById('contacto-nombre-empresa').value.trim(),
       telefono: document.getElementById('contacto-telefono').value.trim(),
       whatsapp: document.getElementById('contacto-whatsapp').value.trim(),
       email: document.getElementById('contacto-email').value.trim(),

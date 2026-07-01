@@ -7,47 +7,62 @@
   <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="estilos.css">
   <style>
-    body { background: var(--charcoal); color: var(--texto-claro); min-height: 100vh; }
-    .cabecera {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 20px 32px; max-width: 900px; margin: 0 auto;
+    body { background: var(--gris-fondo); color: var(--texto-oscuro); min-height: 100vh; }
+    header.app {
+      background: var(--charcoal);
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      border-bottom: 3px solid var(--terracota);
     }
-    .logo { font-family: 'Big Shoulders Display', sans-serif; font-size: 20px; color: var(--texto-claro); text-decoration: none; letter-spacing: 1px; }
-    .nav-links a { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 13px; margin-left: 24px; transition: color 0.2s; }
-    .nav-links a:hover, .nav-links a.activo { color: var(--terracota); }
-    .contenido { max-width: 700px; margin: 0 auto; padding: 40px 24px 80px; }
+    header.app .marca {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--texto-claro);
+      letter-spacing: 2px;
+      text-decoration: none;
+      text-align: center;
+      justify-self: center;
+    }
+    header.app a.nav { color: rgba(255,255,255,0.65); text-decoration: none; font-size: 14px; }
+    header.app a.nav:hover { color: #fff; }
+    header.app a.nav.izquierda { justify-self: start; }
+    header.app a.nav.derecha { justify-self: end; }
+    @media (max-width: 560px) {
+      header.app { padding: 12px 14px; }
+      header.app .marca { font-size: 19px; letter-spacing: 1px; }
+      header.app a.nav { font-size: 12px; }
+    }
+    .contenido { max-width: 700px; margin: 0 auto; padding: 40px 24px 80px; text-align: center; }
     h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: clamp(32px, 6vw, 52px); margin-bottom: 12px; }
     h1 span { color: var(--terracota); }
-    .subtitulo { color: rgba(255,255,255,0.55); font-size: 15px; margin-bottom: 48px; line-height: 1.6; }
-    .tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .subtitulo { color: var(--texto-muted); font-size: 15px; margin-bottom: 48px; line-height: 1.6; }
+    .tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; text-align: center; }
     .tarjeta-contacto {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
+      background: #fff;
+      border: 1px solid var(--gris-borde);
       border-radius: 14px;
       padding: 24px 20px;
       text-align: center;
     }
     .icono { font-size: 28px; margin-bottom: 12px; }
-    .etiqueta { font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
-    .valor { font-size: 15px; font-weight: 500; color: var(--texto-claro); }
-    .valor a { color: var(--oro); text-decoration: none; }
+    .etiqueta { font-size: 11px; color: var(--texto-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+    .valor { font-size: 15px; font-weight: 500; color: var(--texto-oscuro); }
+    .valor a { color: var(--terracota); text-decoration: none; }
     .valor a:hover { text-decoration: underline; }
-    .vacio { color: rgba(255,255,255,0.3); font-size: 13px; }
-    .btn-volver { display: inline-flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.5); font-size: 13px; text-decoration: none; margin-bottom: 32px; transition: color 0.2s; }
-    .btn-volver:hover { color: var(--texto-claro); }
-    @media (max-width: 600px) { .cabecera { padding: 16px; } .contenido { padding: 24px 16px 60px; } }
+    .vacio { color: var(--texto-muted); font-size: 13px; }
+    @media (max-width: 600px) { .contenido { padding: 24px 16px 60px; } }
   </style>
 </head>
 <body>
-  <div class="cabecera">
-    <a href="/" class="logo">Traslados · GC</a>
-    <nav class="nav-links">
-      <a href="/chofer/registro">Alta choferes</a>
-      <a href="/contacto" class="activo">Contacto</a>
-    </nav>
-  </div>
+  <header class="app">
+    <a href="/" class="nav izquierda">Inicio</a>
+    <a href="/" class="marca">TRASLADOS · GC</a>
+    <a href="/contacto" class="nav derecha">Contacto</a>
+  </header>
   <div class="contenido">
-    <a href="/" class="btn-volver">← Volver</a>
     <h1>Estamos aquí<br>para <span>ayudarte</span></h1>
     <p class="subtitulo">Ponte en contacto con nosotros para cualquier consulta sobre tu traslado en Gran Canaria.</p>
     <div class="tarjetas" id="tarjetas-contacto">
@@ -57,6 +72,7 @@
   <script>
     fetch('/api/contacto').then(function(r) { return r.json(); }).then(function(d) {
       var tarjetas = [];
+      if (d.nombre_empresa) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">🏢</div><div class="etiqueta">Empresa</div><div class="valor">' + d.nombre_empresa + '</div></div>');
       if (d.telefono) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">📞</div><div class="etiqueta">Teléfono</div><div class="valor"><a href="tel:' + d.telefono + '">' + d.telefono + '</a></div></div>');
       if (d.whatsapp) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">💬</div><div class="etiqueta">WhatsApp</div><div class="valor"><a href="https://wa.me/' + d.whatsapp.replace(/\s|\+/g,'') + '" target="_blank">' + d.whatsapp + '</a></div></div>');
       if (d.email) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">✉️</div><div class="etiqueta">Email</div><div class="valor"><a href="mailto:' + d.email + '">' + d.email + '</a></div></div>');
