@@ -1471,7 +1471,7 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
         En tu portal encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil.
       </p>
       <div style="text-align:center;margin:28px 0">
-        <a href="https://traslados-gc.onrender.com/chofer/login"
+        <a href="https://traslados-gc.onrender.com/chofer/acceso"
            style="background:#C1502E;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">
           Acceder a mi portal
         </a>
@@ -1527,7 +1527,7 @@ app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req,
         Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.
       </p>
       <div style="text-align:center;margin:28px 0">
-        <a href="https://traslados-gc.onrender.com/chofer/login"
+        <a href="https://traslados-gc.onrender.com/chofer/acceso"
            style="background:#C1502E;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">
           Acceder a mi portal
         </a>
@@ -2794,7 +2794,11 @@ app.get('/api/contacto', asyncHandler(async (req, res) => {
 
 // ─── Registro público de choferes ─────────────────────────────────────────────
 
-app.get('/chofer/registro', (req, res) => {
+app.get('/chofer/acceso', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'chofer-registro.html'));
+});
+
+app.get('/chofer/acceso/alta', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'chofer-registro.html'));
 });
 
@@ -2871,13 +2875,8 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
 
 // ─── Portal del chofer ───────────────────────────────────────────────────────
 
-app.get('/chofer/login', (req, res) => {
-  if (req.session && req.session.choferId) return res.redirect('/chofer/portal');
-  res.sendFile(path.join(__dirname, 'public', 'chofer-registro.html'));
-});
-
 app.get('/chofer/portal', (req, res) => {
-  if (!req.session || !req.session.choferId) return res.redirect('/chofer/login');
+  if (!req.session || !req.session.choferId) return res.redirect('/chofer/acceso');
   res.sendFile(path.join(__dirname, 'public', 'chofer-portal.html'));
 });
 
