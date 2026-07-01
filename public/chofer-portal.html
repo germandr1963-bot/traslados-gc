@@ -132,7 +132,7 @@
 
     async function mostrarPanel() {
       const r = await fetch('/chofer/me');
-      if (!r.ok) { window.location.href = '/chofer/login'; return; }
+      if (!r.ok) { window.location.href = '/chofer/acceso'; return; }
       const { conductor } = await r.json();
       document.getElementById('saludo').textContent = 'Hola, ' + conductor.nombre;
       document.getElementById('texto-estado').innerHTML =

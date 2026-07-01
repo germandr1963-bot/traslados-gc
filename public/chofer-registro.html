@@ -266,7 +266,7 @@
       document.getElementById('pestana-registro').classList.toggle('activa', cual === 'registro');
     }
 
-    if (new URLSearchParams(window.location.search).get('modo') === 'alta') {
+    if (window.location.pathname.endsWith('/alta')) {
       mostrarPestana('registro');
     } else {
       document.getElementById('texto-intro').textContent = 'Accede a tu portal de chofer.';
