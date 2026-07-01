@@ -49,25 +49,11 @@
     h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: 26px; color: var(--texto-oscuro); margin-bottom: 20px; }
     .card {
       background: #fff;
-      border-radius: 16px;
-      padding: 40px 36px;
+      border: 1px solid var(--gris-borde);
+      border-radius: 12px;
+      padding: 20px;
       width: 100%;
-      max-width: 400px;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.1);
-    }
-    .logo { text-align: center; margin-bottom: 32px; }
-    .logo h1 { font-size: 22px; color: #C1502E; font-weight: 700; letter-spacing: 1px; margin-bottom: 0; }
-    .logo p { font-size: 13px; color: #888; margin-top: 4px; }
-    .logo .badge {
-      display: inline-block;
-      background: #f5f0ea;
-      color: #6b5c44;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 10px;
-      margin-top: 8px;
-      letter-spacing: 0.5px;
+      max-width: 520px;
     }
     label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 5px; }
     input {
@@ -127,7 +113,6 @@
       text-decoration: underline;
     }
     .oculto { display: none; }
-    @media (max-width: 420px) { .card { padding: 28px 20px; } }
   </style>
 </head>
 <body>
@@ -139,11 +124,6 @@
   <main>
   <h1>Mi Reserva</h1>
   <div class="card">
-    <div class="logo">
-      <h1>TRASLADOS GC</h1>
-      <p>Gran Canaria</p>
-      <span class="badge">📋 Portal del Cliente</span>
-    </div>
 
     <!-- PANTALLA LOGIN -->
     <div id="pantalla-login">
