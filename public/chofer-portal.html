@@ -87,6 +87,23 @@
         <div class="reserva-cuerpo" id="mi-perfil-cuerpo"></div>
       </div>
 
+      <div class="reserva-card" id="tarjeta-cambiar-password">
+        <div class="reserva-card-cabecera" onclick="toggleCambiarPassword()">
+          <div class="reserva-resumen"><span class="reserva-ruta">🔒 Cambiar contraseña</span></div>
+          <span class="reserva-chevron" id="cambiar-password-chevron">▼</span>
+        </div>
+        <div class="reserva-cuerpo" id="cambiar-password-cuerpo">
+          <label class="etiqueta" style="display:block">Contraseña actual</label>
+          <input class="campo" id="pw-actual" type="password" style="width:100%;box-sizing:border-box">
+          <label class="etiqueta" style="display:block;margin-top:10px">Contraseña nueva</label>
+          <input class="campo" id="pw-nueva" type="password" style="width:100%;box-sizing:border-box">
+          <label class="etiqueta" style="display:block;margin-top:10px">Repite la contraseña nueva</label>
+          <input class="campo" id="pw-nueva-repetir" type="password" style="width:100%;box-sizing:border-box">
+          <div id="aviso-pw" style="display:none;margin-top:10px;font-size:13px"></div>
+          <button class="secundario" style="margin-top:14px" onclick="cambiarPasswordChofer()">Cambiar contraseña</button>
+        </div>
+      </div>
+
       <div class="tarjeta">
         <h2 style="margin-top:0">Mis reservas</h2>
 
@@ -97,18 +114,6 @@
         </div>
 
         <div id="lista-reservas"><p style="color:#5a6c79;font-size:14px">Cargando...</p></div>
-      </div>
-
-      <div class="tarjeta">
-        <h2 style="margin-top:0">🔒 Cambiar contraseña</h2>
-        <label class="etiqueta" style="display:block">Contraseña actual</label>
-        <input class="campo" id="pw-actual" type="password" style="width:100%;box-sizing:border-box">
-        <label class="etiqueta" style="display:block;margin-top:10px">Contraseña nueva</label>
-        <input class="campo" id="pw-nueva" type="password" style="width:100%;box-sizing:border-box">
-        <label class="etiqueta" style="display:block;margin-top:10px">Repite la contraseña nueva</label>
-        <input class="campo" id="pw-nueva-repetir" type="password" style="width:100%;box-sizing:border-box">
-        <div id="aviso-pw" style="display:none;margin-top:10px;font-size:13px"></div>
-        <button class="secundario" style="margin-top:14px" onclick="cambiarPasswordChofer()">Cambiar contraseña</button>
       </div>
 
       <button class="secundario" onclick="cerrarSesion()">Cerrar sesión</button>
@@ -331,6 +336,12 @@
       document.getElementById('mi-perfil-cuerpo').classList.toggle('abierto');
       var abierto = document.getElementById('mi-perfil-cuerpo').classList.contains('abierto');
       document.getElementById('mi-perfil-chevron').textContent = abierto ? '▲' : '▼';
+    }
+
+    function toggleCambiarPassword() {
+      document.getElementById('cambiar-password-cuerpo').classList.toggle('abierto');
+      var abierto = document.getElementById('cambiar-password-cuerpo').classList.contains('abierto');
+      document.getElementById('cambiar-password-chevron').textContent = abierto ? '▲' : '▼';
     }
 
     function opcionesMarcaPerfil(valorActual) {
