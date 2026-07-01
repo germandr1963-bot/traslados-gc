@@ -3008,6 +3008,26 @@ app.post('/chofer/mi-perfil', requireChofer, asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+app.post('/chofer/cambiar-password', requireChofer, asyncHandler(async (req, res) => {
+  const { password_actual, password_nueva } = req.body;
+  if (!password_actual || !password_nueva) {
+    return res.status(400).json({ error: 'Introduce la contraseña actual y la nueva.' });
+  }
+  if (password_nueva.length < 6) {
+    return res.status(400).json({ error: 'La contraseña nueva debe tener al menos 6 caracteres.' });
+  }
+
+  const result = await pool.query('SELECT password_hash FROM conductores WHERE id = $1', [req.session.choferId]);
+  if (!result.rows.length) return res.status(404).json({ error: 'No encontrado.' });
+
+  const ok = await bcrypt.compare(password_actual, result.rows[0].password_hash);
+  if (!ok) return res.status(401).json({ error: 'La contraseña actual no es correcta.' });
+
+  const hash = await bcrypt.hash(password_nueva, 10);
+  await pool.query('UPDATE conductores SET password_hash = $1 WHERE id = $2', [hash, req.session.choferId]);
+  res.json({ ok: true });
+}));
+
 app.post('/chofer/foto', requireChofer, asyncHandler(async (req, res) => {
   const { foto } = req.body;
   if (!foto) return res.status(400).json({ error: 'No se recibió foto.' });
