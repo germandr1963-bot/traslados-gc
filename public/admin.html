@@ -1512,7 +1512,7 @@ function verFichaConductor(id) {
           '<label class="etiqueta" style="margin:0;white-space:nowrap">Marca del vehículo</label>' +
           '<select class="campo" id="f-vehiculo_marca" onchange="cambioMarcaFicha()">' + marcaInfo.opts + '</select>' +
           '<label class="etiqueta" style="margin:0;white-space:nowrap">Modelo</label>' +
-          '<select class="campo" id="f-vehiculo_modelo">' + modeloInfo.opts + '</select>' +
+          '<select class="campo" id="f-vehiculo_modelo" onchange="cambioModeloFicha()">' + modeloInfo.opts + '</select>' +
           campoFicha('Matrícula', 'matricula', c.matricula) +
           campoFicha('Nº de taxi', 'numero_taxi', c.numero_taxi) +
           campoFicha('Plazas', 'plazas', c.plazas, 'number') +
@@ -1563,6 +1563,14 @@ function cambioMarcaFicha() {
   var info = opcionesModeloFicha(marcaId, '');
   document.getElementById('f-vehiculo_modelo').innerHTML = info.opts;
   document.getElementById('f-vehiculo_modelo-nuevo-caja').classList.add('oculto');
+}
+
+function cambioModeloFicha() {
+  var modeloVal = document.getElementById('f-vehiculo_modelo').value;
+  var esNuevo = modeloVal === '__nuevo';
+  var caja = document.getElementById('f-vehiculo_modelo-nuevo-caja');
+  caja.classList.toggle('oculto', !esNuevo);
+  if (esNuevo) document.getElementById('f-vehiculo_modelo-nuevo').value = '';
 }
 
 function guardarFichaConductor(id) {
