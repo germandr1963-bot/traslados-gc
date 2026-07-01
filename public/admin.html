@@ -636,18 +636,6 @@ table.tabla-precios input {
           <div id="aviso-chofer-detalle" style="display:none;margin-top:0.5rem;font-size:0.82rem;"></div>
           <p id="nota-email-auto" style="font-size:0.78rem;color:#888;margin:0.5rem 0 0 0;">📧 Al guardar se enviará automáticamente el email de confirmación con el enlace de pago al cliente.</p>
 
-          <!-- Reenviar cartel al chofer -->
-          <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--gris-borde);">
-            <button class="boton-costa" style="font-size:0.82rem;" onclick="reenviarCartelChofer()">📄 Reenviar cartel al chofer</button>
-            <div id="aviso-cartel-chofer" style="display:none;margin-top:0.4rem;font-size:0.82rem;"></div>
-          </div>
-
-          <!-- WhatsApp al chofer -->
-          <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--gris-borde);">
-            <button class="boton-costa" style="font-size:0.82rem;background:#e7f9ee;border-color:#25D366;color:#128C7E;" onclick="enviarWhatsappChofer()">📱 Enviar por WhatsApp</button>
-            <p style="font-size:0.75rem;color:#888;margin:4px 0 0;">Abre WhatsApp con los datos de la reserva para enviar al chofer.</p>
-          </div>
-
           <!-- Chat con el chofer -->
           <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--gris-borde);">
             <p style="font-size:0.82rem;font-weight:600;margin:0 0 8px 0;">💬 Comunicación con el chofer</p>
@@ -656,6 +644,20 @@ table.tabla-precios input {
             <textarea id="campo-mensaje-chofer" rows="2" placeholder="Escribe un mensaje al chofer…" style="width:100%;border:1px solid var(--gris-borde);border-radius:6px;padding:8px 10px;font-size:0.82rem;font-family:inherit;resize:vertical;margin-top:4px;"></textarea>
             <button class="boton-costa" style="font-size:0.82rem;margin-top:6px;" onclick="enviarMensajeChofer()">📨 Enviar al chofer</button>
             <div id="aviso-mensaje-chofer" style="display:none;font-size:0.82rem;margin-top:6px;"></div>
+          </div>
+        </div>
+
+        <!-- Reenviar cartel al chofer: módulo aparte, debajo de Asignar chofer -->
+        <div style="margin-top:1rem;padding:1rem;border:1px solid var(--gris-borde);border-radius:8px;background:#f9f7f4;">
+          <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">📄 Reenviar cartel al chofer</p>
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+            <div style="flex:1;min-width:160px;border:1px solid var(--gris-borde);border-radius:8px;padding:0.75rem;text-align:center;">
+              <button class="boton-costa" style="font-size:0.82rem;width:100%;" onclick="reenviarCartelChofer()">📧 Vía E-mail</button>
+              <div id="aviso-cartel-chofer" style="display:none;margin-top:0.4rem;font-size:0.78rem;"></div>
+            </div>
+            <div style="flex:1;min-width:160px;border:1px solid var(--gris-borde);border-radius:8px;padding:0.75rem;text-align:center;">
+              <button class="boton-costa" style="font-size:0.82rem;width:100%;background:#e7f9ee;border-color:#25D366;color:#128C7E;" onclick="enviarWhatsappChofer()">📱 Vía WhatsApp</button>
+            </div>
           </div>
         </div>
 
