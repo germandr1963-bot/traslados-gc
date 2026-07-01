@@ -4987,7 +4987,7 @@ function enviarWhatsappChofer() {
 
 function reenviarCartelChofer() {
   if (!reservaDetalleId) return;
-  var av = document.getElementById('aviso-email-reserva');
+  var av = document.getElementById('aviso-cartel-chofer');
   av.style.display = 'block';
   av.innerHTML = '<div class="aviso-ok">📄 Enviando cartel al chofer...</div>';
   fetch('/admin/reservas/' + reservaDetalleId + '/reenviar-cartel', { method: 'POST' })
