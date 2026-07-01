@@ -1378,6 +1378,7 @@ function cargarConductores() {
         '</td>' +
         '<td>' +
           '<span class="insignia ' + (c.estado === 'aprobado' ? 'insignia-ok' : (c.estado === 'suspendido' ? 'insignia-suspendido' : 'insignia-pendiente')) + '">' + c.estado.toUpperCase() + '</span>' +
+          (c.cambios_pendientes ? '<br><span class="insignia" style="background:#e65100;color:#fff;margin-top:4px;display:inline-block">🕐 Cambios pendientes</span>' : '') +
         '</td>' +
         '<td>' +
           '<button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;margin-right:4px" onclick="verFichaConductor(' + c.id + ')">📋 Ficha</button>' +
@@ -1488,6 +1489,42 @@ function opcionesIslaFicha(valorActual) {
     }).join('');
 }
 
+function bloqueCambiosPendientes(c) {
+  var filas = Object.keys(c.cambios_pendientes).map(function (campo) {
+    var cambio = c.cambios_pendientes[campo];
+    return '<div style="font-size:13px;margin-bottom:4px">' +
+      '<strong>' + escapar(cambio.etiqueta) + ':</strong> ' +
+      '<span style="color:#c0392b;text-decoration:line-through">' + escapar(cambio.anterior || '—') + '</span>' +
+      ' → <span style="color:#2e7d32;font-weight:600">' + escapar(cambio.nuevo || '—') + '</span>' +
+      '</div>';
+  }).join('');
+  return '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:14px;margin-bottom:16px">' +
+    '<p style="margin:0 0 8px;font-weight:700;color:#e65100">🕐 El chofer propone estos cambios:</p>' +
+    filas +
+    '<div style="margin-top:10px;display:flex;gap:8px">' +
+      '<button class="boton-costa" onclick="decidirCambiosPendientes(' + c.id + ', \'aprobar\')">✅ Aprobar</button>' +
+      '<button class="boton-peligro" onclick="decidirCambiosPendientes(' + c.id + ', \'rechazar\')">❌ Rechazar</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function decidirCambiosPendientes(id, accion) {
+  if (accion === 'aprobar' && !confirm('¿Aprobar estos cambios? Se aplicarán a la ficha del chofer.')) return;
+  if (accion === 'rechazar' && !confirm('¿Rechazar estos cambios? Se descartarán.')) return;
+  fetch('/admin/conductores/' + id + '/cambios/decidir', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accion: accion })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      cargarConductores();
+      verFichaConductor(id);
+    } else {
+      alert(respuesta.error);
+    }
+  });
+}
+
 function verFichaConductor(id) {
   function pintar() {
     fetch('/admin/conductores/' + id + '/ficha').then(function (r) { return r.json(); }).then(function (c) {
@@ -1497,6 +1534,7 @@ function verFichaConductor(id) {
       var modeloInfo = opcionesModeloFicha(marcaInfo.marcaIdActual, c.vehiculo_modelo);
       ficha.innerHTML = '' +
         '<h2 style="margin-top:0">📋 Expediente: ' + escapar(c.nombre) + ' <span style="font-size:0.8rem;color:#5a6c79;font-weight:400">(modifica lo que necesites y pulsa Guardar)</span></h2>' +
+        (c.cambios_pendientes ? bloqueCambiosPendientes(c) : '') +
         (c.foto ? '<img src="' + c.foto + '" alt="Foto" style="width:100px;height:100px;object-fit:cover;border-radius:50%;float:right;margin-left:12px;border:2px solid var(--gris-borde)">' : '') +
         '<div style="display:grid;grid-template-columns:max-content 1fr max-content 1fr;gap:8px 12px;margin-top:18px;align-items:center">' +
           campoFicha('Nombre completo', 'nombre', c.nombre) +
