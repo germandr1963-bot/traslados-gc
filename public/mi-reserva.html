@@ -4,16 +4,46 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Reserva — Traslados GC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/estilos.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background: #1C1815;
+      font-family: 'Public Sans', 'Segoe UI', Arial, sans-serif;
+      background: var(--gris-fondo);
       min-height: 100vh;
-      display: flex;
+    }
+    header.app {
+      background: var(--charcoal);
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
+      border-bottom: 3px solid var(--terracota);
+    }
+    header.app .marca {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--texto-claro);
+      letter-spacing: 2px;
+      text-decoration: none;
+      text-align: center;
+      justify-self: center;
+    }
+    header.app a.nav { color: rgba(255,255,255,0.65); text-decoration: none; font-size: 14px; }
+    header.app a.nav:hover { color: #fff; }
+    header.app a.nav.izquierda { justify-self: start; }
+    header.app a.nav.derecha { justify-self: end; }
+    @media (max-width: 560px) {
+      header.app { padding: 12px 14px; }
+      header.app .marca { font-size: 19px; letter-spacing: 1px; }
+      header.app a.nav { font-size: 12px; }
+    }
+    main {
+      display: flex;
       justify-content: center;
-      padding: 20px;
+      padding: 40px 20px 60px;
     }
     .card {
       background: #fff;
@@ -21,7 +51,7 @@
       padding: 40px 36px;
       width: 100%;
       max-width: 400px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.1);
     }
     .logo { text-align: center; margin-bottom: 32px; }
     .logo h1 { font-size: 22px; color: #C1502E; font-weight: 700; letter-spacing: 1px; }
@@ -99,8 +129,13 @@
   </style>
 </head>
 <body>
+  <header class="app">
+    <a href="/" class="nav izquierda">Inicio</a>
+    <a href="/" class="marca">TRASLADOS · GC</a>
+    <a href="/contacto" class="nav derecha">Contacto</a>
+  </header>
+  <main>
   <div class="card">
-    <a href="/" style="display:block;text-align:center;font-size:12px;color:#aaa;text-decoration:none;margin-bottom:14px;">← Volver a la página de inicio</a>
     <div class="logo">
       <h1>TRASLADOS GC</h1>
       <p>Gran Canaria</p>
@@ -153,6 +188,7 @@
       <button class="boton" id="btn-cambiar" onclick="cambiarPassword()">Guardar y entrar</button>
     </div>
   </div>
+  </main>
 
   <script>
     document.addEventListener('keydown', function(e) {
