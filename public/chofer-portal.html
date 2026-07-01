@@ -370,6 +370,10 @@
         '<input class="campo" id="p-' + id + '" type="text" value="' + escapar(valor == null ? '' : valor) + '" style="width:100%;box-sizing:border-box">';
     }
 
+    function filaSoloLectura(etiqueta, valor) {
+      return '<div style="font-size:13px;margin-top:8px"><strong>' + etiqueta + ':</strong> ' + escapar(valor || '—') + '</div>';
+    }
+
     function pintarMiPerfil(conductor) {
       conductorActual = conductor;
       var cuerpo = document.getElementById('mi-perfil-cuerpo');
@@ -377,7 +381,24 @@
       if (!conductor.permitir_edicion_ficha) {
         cuerpo.innerHTML =
           '<p style="font-size:13px;color:#5a6c79">Si deseas modificar algún dato de tu ficha (teléfono, dirección, vehículo, etc.), solicita a la administración que te habilite la edición. Una vez habilitada, podrás hacer tus cambios y guardarlos; al guardar, la edición se desactiva de nuevo hasta la próxima vez que la necesites.</p>' +
-          (conductor.cambios_pendientes ? '<p style="font-size:13px;color:#e65100;font-weight:600">🕐 Tienes cambios enviados esperando la aprobación de la administración.</p>' : '');
+          (conductor.cambios_pendientes ? '<p style="font-size:13px;color:#e65100;font-weight:600">🕐 Tienes cambios enviados esperando la aprobación de la administración.</p>' : '') +
+          '<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--borde)">' +
+            '<p style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;margin:0 0 4px">Tus datos actuales</p>' +
+            filaSoloLectura('Nombre', conductor.nombre) +
+            filaSoloLectura('Documento', conductor.documento) +
+            filaSoloLectura('Teléfono', conductor.telefono) +
+            filaSoloLectura('Email', conductor.email) +
+            filaSoloLectura('Dirección', conductor.direccion) +
+            filaSoloLectura('Código postal', conductor.cp) +
+            filaSoloLectura('Municipio', conductor.municipio) +
+            filaSoloLectura('Central de flota', conductor.central_flota) +
+            filaSoloLectura('Marca', conductor.vehiculo_marca) +
+            filaSoloLectura('Modelo', conductor.vehiculo_modelo) +
+            filaSoloLectura('Matrícula', conductor.matricula) +
+            filaSoloLectura('Nº de taxi', conductor.numero_taxi) +
+            filaSoloLectura('Plazas', conductor.plazas) +
+            filaSoloLectura('Isla', conductor.isla) +
+          '</div>';
         return;
       }
 
