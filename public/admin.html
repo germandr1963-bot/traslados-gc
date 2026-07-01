@@ -1525,8 +1525,8 @@ function verFichaConductor(id) {
             '<input class="campo" id="f-vehiculo_marca-nueva" type="text" value="' + escapar(marcaInfo.esOtra ? c.vehiculo_marca : '') + '">' +
           '</div>' +
           '<div id="f-vehiculo_modelo-nuevo-caja" class="' + (modeloInfo.esOtra ? '' : 'oculto') + '" style="flex:1;min-width:200px">' +
-            '<label class="etiqueta">Nombre del modelo nuevo</label>' +
-            '<input class="campo" id="f-vehiculo_modelo-nuevo" type="text" value="' + escapar(modeloInfo.esOtra ? c.vehiculo_modelo : '') + '">' +
+            '<label class="etiqueta">Escribe el nombre del modelo nuevo</label>' +
+            '<input class="campo" id="f-vehiculo_modelo-nuevo" type="text" placeholder="Escribir aquí" value="' + escapar(modeloInfo.esOtra ? c.vehiculo_modelo : '') + '">' +
           '</div>' +
         '</div>' +
         '<p style="margin-top:10px;font-size:13px">' +
