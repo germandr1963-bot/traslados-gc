@@ -1387,6 +1387,7 @@ app.get('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT c.id, c.nombre, c.email, c.telefono, c.vehiculo_marca, c.vehiculo_modelo, c.matricula,
             c.numero_taxi, c.plazas, c.isla, c.tipo, c.estado, c.foto_estado, c.permite_contacto, c.creado_en,
+            c.cambios_pendientes,
             cat.nombre AS categoria
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
@@ -1562,6 +1563,7 @@ app.get('/admin/conductores/:id/ficha', requireAdmin, asyncHandler(async (req, r
             c.municipio_licencia, c.numero_licencia, c.central_flota,
             c.vehiculo_marca, c.vehiculo_modelo, c.matricula, c.numero_taxi, c.plazas, c.isla,
             c.tipo, c.estado, c.foto, c.foto_estado, c.foto_motivo, c.creado_en, c.permitir_edicion_ficha,
+            c.cambios_pendientes,
             cat.nombre AS categoria
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
@@ -1599,6 +1601,42 @@ app.post('/admin/conductores/:id/editar', requireAdmin, asyncHandler(async (req,
   valores.push(req.params.id);
   try {
     await pool.query(`UPDATE conductores SET ${cambios.join(', ')} WHERE id = $${valores.length}`, valores);
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ error: 'Ese email ya lo usa otro conductor.' });
+    throw err;
+  }
+}));
+
+app.post('/admin/conductores/:id/cambios/decidir', requireAdmin, asyncHandler(async (req, res) => {
+  const { accion } = req.body;
+  if (accion !== 'aprobar' && accion !== 'rechazar') {
+    return res.status(400).json({ error: 'Acción no válida.' });
+  }
+
+  const actual = await pool.query('SELECT cambios_pendientes FROM conductores WHERE id = $1', [req.params.id]);
+  if (!actual.rows.length) return res.status(404).json({ error: 'Conductor no encontrado.' });
+  const propuesta = actual.rows[0].cambios_pendientes;
+  if (!propuesta) return res.status(400).json({ error: 'Este conductor no tiene cambios pendientes.' });
+
+  if (accion === 'rechazar') {
+    await pool.query('UPDATE conductores SET cambios_pendientes = NULL WHERE id = $1', [req.params.id]);
+    return res.json({ ok: true });
+  }
+
+  const campos = Object.keys(propuesta);
+  const cambios = [];
+  const valores = [];
+  for (const campo of campos) {
+    valores.push(propuesta[campo].nuevo);
+    cambios.push(`${campo} = $${valores.length}`);
+  }
+  valores.push(req.params.id);
+  try {
+    await pool.query(
+      `UPDATE conductores SET ${cambios.join(', ')}, cambios_pendientes = NULL WHERE id = $${valores.length}`,
+      valores
+    );
     res.json({ ok: true });
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ error: 'Ese email ya lo usa otro conductor.' });
