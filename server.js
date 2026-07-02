@@ -1393,7 +1393,7 @@ app.get('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT c.id, c.nombre, c.email, c.telefono, c.vehiculo_marca, c.vehiculo_modelo, c.matricula,
             c.numero_taxi, c.plazas, c.isla, c.tipo, c.estado, c.foto_estado, c.permite_contacto, c.creado_en,
-            c.cambios_pendientes,
+            c.cambios_pendientes, c.disponible_hoy,
             cat.nombre AS categoria
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
@@ -2971,6 +2971,7 @@ app.get('/chofer/me', requireChofer, asyncHandler(async (req, res) => {
             c.municipio_licencia, c.numero_licencia, c.central_flota,
             c.vehiculo_marca, c.vehiculo_modelo, c.matricula, c.numero_taxi, c.plazas, c.isla,
             c.estado, c.foto, c.foto_estado, c.foto_motivo, c.permitir_edicion_ficha, c.cambios_pendientes,
+            c.disponible_hoy,
             cat.nombre AS categoria
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
@@ -2979,6 +2980,12 @@ app.get('/chofer/me', requireChofer, asyncHandler(async (req, res) => {
   );
   if (!result.rows.length) return res.status(404).json({ error: 'No encontrado.' });
   res.json({ conductor: result.rows[0] });
+}));
+
+app.post('/chofer/disponibilidad', requireChofer, asyncHandler(async (req, res) => {
+  const disponible = req.body.disponible_hoy === true;
+  await pool.query('UPDATE conductores SET disponible_hoy = $1 WHERE id = $2', [disponible, req.session.choferId]);
+  res.json({ ok: true, disponible_hoy: disponible });
 }));
 
 app.post('/chofer/mi-perfil', requireChofer, asyncHandler(async (req, res) => {
