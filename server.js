@@ -1137,10 +1137,10 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       origen, destino, tipo_llegada,
       numero_vuelo, hora_llegada_vuelo,
       nombre_barco, hora_atraque,
-      num_pasajeros, notas_cliente
+      num_pasajeros, notas_cliente, estado_aviso_whatsapp
     )
      VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, 'pendiente',
-             $10, $11, $12, $13, $14, $15, $16, $17, $18)
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, 'pendiente')
      RETURNING id`,
     [
       numeroReserva, categoria_id, fecha, horaGuardar,
