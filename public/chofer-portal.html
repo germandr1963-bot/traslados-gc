@@ -77,6 +77,11 @@
       </div>
       <p class="sub" id="texto-estado"></p>
 
+      <div class="tarjeta" style="display:flex;align-items:center;gap:10px;padding:14px 16px">
+        <input type="checkbox" id="chk-disponible-hoy" onchange="cambiarDisponibilidad(this.checked)" style="width:18px;height:18px">
+        <label for="chk-disponible-hoy" style="margin:0;font-size:14px;font-weight:600;cursor:pointer">Disponible hoy</label>
+      </div>
+
       <div class="tarjeta" id="ficha-vehiculo"></div>
 
       <div class="reserva-card" id="tarjeta-mi-perfil">
@@ -130,6 +135,16 @@
       suspendido: 'Tu cuenta está suspendida. Contacta con la administración.'
     };
 
+    function cambiarDisponibilidad(disponible) {
+      fetch('/chofer/disponibilidad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disponible_hoy: disponible })
+      }).catch(function() {
+        alert('No se pudo guardar el cambio. Comprueba tu conexión e inténtalo de nuevo.');
+      });
+    }
+
     async function mostrarPanel() {
       const r = await fetch('/chofer/me');
       if (!r.ok) { window.location.href = '/chofer/acceso'; return; }
@@ -138,6 +153,7 @@
       document.getElementById('texto-estado').innerHTML =
         '<span class="etiqueta ' + conductor.estado + '">' + conductor.estado.toUpperCase() + '</span> ' +
         TEXTOS_ESTADO[conductor.estado];
+      document.getElementById('chk-disponible-hoy').checked = conductor.disponible_hoy !== false;
       const TEXTOS_FOTO = {
         sin_foto: '📷 Aún no has subido tu foto de carné.',
         pendiente: '🕐 Tu foto está pendiente de revisión por la administración.',
