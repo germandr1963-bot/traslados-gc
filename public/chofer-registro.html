@@ -86,7 +86,7 @@
 
     .mensaje { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13px; display: none; line-height: 1.5; }
     .mensaje.error { display: block; background: var(--rojo-error-fondo); color: var(--rojo-error); border: 1px solid #e8b4a8; }
-    .mensaje.ok { display: block; background: var(--verde-ok-fondo); color: var(--verde-ok); border: 1px solid #a8dece; padding: 20px; text-align: center; }
+    .mensaje.ok { display: block; background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; padding: 10px 14px; margin-top: 0; margin-bottom: 16px; text-align: left; }
 
     .nota-final { font-size: 12px; color: var(--texto-muted); text-align: center; margin-top: 10px; line-height: 1.6; }
 
@@ -130,10 +130,10 @@
       <!-- RECUPERAR CONTRASEÑA -->
       <div id="formulario-recuperar" class="oculto">
         <p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px">Te enviaremos un enlace a tu email para crear una nueva contraseña.</p>
+        <div id="mensaje-recuperar" class="mensaje"></div>
         <label for="rec-email">Email</label>
         <input id="rec-email" type="email" placeholder="tu@email.com">
         <button class="principal" onclick="recuperarPassword()">Enviar enlace de recuperación</button>
-        <div id="mensaje-recuperar" class="mensaje"></div>
         <span class="enlace" onclick="mostrarSoloLogin()">← Volver al acceso</span>
       </div>
 
