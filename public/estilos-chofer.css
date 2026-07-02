@@ -9,14 +9,14 @@
    ============================================================ */
 
 :root {
-  --atlantico: #0A2A43;
-  --costa: #10808F;
-  --luminoso: #F5B82E;
-  --niebla: #F4F7F9;
-  --tinta: #1B2B38;
-  --borde: #DCE4EA;
-  --peligro: #C0392B;
-  --exito: #1E8E5A;
+  --atlantico: #1C1815;
+  --costa: #C1502E;
+  --luminoso: #D9A441;
+  --niebla: #F6F4EF;
+  --tinta: #2A211B;
+  --borde: #E1DCD0;
+  --peligro: #8a2424;
+  --exito: #085041;
   --radio: 12px;
 }
 
