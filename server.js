@@ -6486,6 +6486,27 @@ app.get('/admin/reservas/:id/factura', requireAdmin, asyncHandler(async (req, re
   res.send(resultado.buffer);
 }));
 
+// ─── Puente WhatsApp (OpenWA, en el PC de Germán) ──────────────────────────────
+function requierePuenteWhatsapp(req, res, next) {
+  const llave = req.headers['x-llave-puente'];
+  if (!llave || llave !== process.env.LLAVE_PUENTE_WHATSAPP) {
+    return res.status(401).json({ error: 'Llave incorrecta.' });
+  }
+  next();
+}
+
+app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino,
+            cv.nombre AS categoria_nombre
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     WHERE r.estado_aviso_whatsapp = 'pendiente'
+     ORDER BY r.id ASC`
+  );
+  res.json(result.rows);
+}));
+
 // ─── Arranque ─────────────────────────────────────────────────────────────────
 initSchema()
   .then(function () {
