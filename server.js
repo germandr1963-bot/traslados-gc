@@ -6501,6 +6501,15 @@ function requierePuenteWhatsapp(req, res, next) {
   next();
 }
 
+app.get('/api/whatsapp/choferes-disponibles', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, nombre, telefono FROM conductores
+     WHERE estado = 'aprobado' AND disponible_hoy IS NOT FALSE
+     ORDER BY nombre`
+  );
+  res.json(result.rows);
+}));
+
 app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino,
