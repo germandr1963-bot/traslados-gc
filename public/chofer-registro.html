@@ -316,16 +316,17 @@
       var email = document.getElementById('rec-email').value.trim();
       var msg = document.getElementById('mensaje-recuperar');
       msg.className = 'mensaje'; msg.style.display = 'none';
-      if (!email) { msg.textContent = 'Indica tu email.'; msg.className = 'mensaje error'; return; }
+      if (!email) { msg.textContent = 'Indica tu email.'; msg.className = 'mensaje error'; msg.style.display = 'block'; return; }
       var btn = document.querySelector('#formulario-recuperar button.principal');
       btn.disabled = true; btn.textContent = 'Enviando...';
       fetch('/chofer/recuperar-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) })
         .then(function(r) { return r.json(); })
         .then(function(d) {
           btn.disabled = false; btn.textContent = 'Enviar enlace de recuperación';
-          if (d.error) { msg.textContent = d.error; msg.className = 'mensaje error'; return; }
+          if (d.error) { msg.textContent = d.error; msg.className = 'mensaje error'; msg.style.display = 'block'; return; }
           msg.textContent = 'Te hemos enviado a tu email registrado el acceso de recuperación.';
           msg.className = 'mensaje ok';
+          msg.style.display = 'block';
           setTimeout(function() {
             document.getElementById('login-email').value = email;
             mostrarSoloLogin();
@@ -333,7 +334,7 @@
         })
         .catch(function() {
           btn.disabled = false; btn.textContent = 'Enviar enlace de recuperación';
-          msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error';
+          msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error'; msg.style.display = 'block';
         });
     }
 
