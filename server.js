@@ -2794,6 +2794,14 @@ app.get('/api/contacto', asyncHandler(async (req, res) => {
 
 // ─── Registro público de choferes ─────────────────────────────────────────────
 
+app.get('/rutas', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'rutas.html'));
+});
+
+app.get('/flota', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'flota.html'));
+});
+
 app.get('/chofer/acceso', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'chofer-registro.html'));
 });
