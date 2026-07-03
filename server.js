@@ -749,6 +749,10 @@ async function initSchema() {
       creado_en TIMESTAMP DEFAULT NOW()
     );
   `);
+  await pool.query(`ALTER TABLE extras ADD COLUMN IF NOT EXISTS bloque TEXT DEFAULT 'F'`);
+  await pool.query(`ALTER TABLE extras ADD COLUMN IF NOT EXISTS orden INT DEFAULT 0`);
+  await pool.query(`ALTER TABLE extras ADD COLUMN IF NOT EXISTS tipo_seleccion TEXT DEFAULT 'checkbox'`);
+  await pool.query(`ALTER TABLE extras ADD COLUMN IF NOT EXISTS notas_chofer TEXT`);
 
   // Dos extras de ejemplo (solo se insertan si la tabla está vacía)
   await pool.query(`
@@ -758,6 +762,46 @@ async function initSchema() {
       ('Transporte de bicicleta', 10.00)
     ) AS v(nombre, precio)
     WHERE NOT EXISTS (SELECT 1 FROM extras LIMIT 1);
+  `);
+
+  // Catálogo de extras por bloques (A-F). Solo se insertan los que no existan
+  // ya por nombre, así que es seguro volver a desplegar sin duplicar nada.
+  await pool.query(`
+    INSERT INTO extras (nombre, bloque, orden, tipo_seleccion, notas_chofer, precio, activo)
+    SELECT v.nombre, v.bloque, v.orden, v.tipo_seleccion, v.notas_chofer, 0, FALSE
+    FROM (VALUES
+      ('Traigo mi propio asiento de seguridad', 'A', 1, 'contador', 'El conductor solo espera a que el cliente lo instale'),
+      ('Silla bebé — hasta 13 kg (menores de 1 año)', 'A', 2, 'contador', 'Grupo 0 homologado'),
+      ('Silla infantil — 9 a 18 kg (hasta 4 años)', 'A', 3, 'contador', 'Grupo 1-2 homologado'),
+      ('Silla infantil — 15 a 25 kg (4 a 7 años)', 'A', 4, 'contador', 'Grupo 2-3 homologado'),
+      ('Alzador/Booster — 22 a 36 kg (6 a 12 años)', 'A', 5, 'contador', 'Grupo 3 homologado'),
+      ('Mascota pequeña en transportín', 'B', 1, 'checkbox', 'Gato, perro pequeño, conejo...'),
+      ('Mascota grande con arnés homologado', 'B', 2, 'checkbox', 'Perro mediano o grande'),
+      ('Tabla de surf / bodyboard', 'C', 1, 'checkbox', 'Habitual en playas de Gran Canaria y Tenerife'),
+      ('Tabla de windsurf / kitesurf', 'C', 2, 'checkbox', 'Medidas grandes — solo Minivan'),
+      ('Bicicleta', 'C', 3, 'checkbox', 'Solo Minivan con espacio habilitado'),
+      ('Patinete eléctrico plegable', 'C', 4, 'checkbox', 'Cabe en la mayoría de vehículos'),
+      ('Esquís / Snowboard', 'C', 5, 'checkbox', 'Solo Confort y Minivan'),
+      ('Bolsa de palos de golf', 'C', 6, 'checkbox', 'Muy frecuente en el sur de Gran Canaria'),
+      ('Equipo de buceo (botellas y aletas)', 'C', 7, 'checkbox', 'Habitual en zonas costeras'),
+      ('Maleta extra grande adicional', 'D', 1, 'checkbox', 'Más allá de la que corresponde por plaza'),
+      ('Bulto voluminoso', 'D', 2, 'checkbox', 'Caja grande, árbol, mueble pequeño... a criterio del conductor'),
+      ('Carrito de bebé plegable', 'D', 3, 'checkbox', 'Generalmente incluido sin coste'),
+      ('Silla de ruedas plegable (manual)', 'D', 4, 'checkbox', 'Ver también Bloque E'),
+      ('Viajo con silla de ruedas manual', 'E', 1, 'checkbox', 'El conductor ayuda a plegar y cargar'),
+      ('Viajo con silla de ruedas eléctrica', 'E', 2, 'checkbox', 'Requiere furgoneta adaptada con rampa'),
+      ('Necesito asistencia para subir/bajar del vehículo', 'E', 3, 'checkbox', 'Sin silla, pero con dificultad de movilidad'),
+      ('Viajo con andador o muletas', 'E', 4, 'checkbox', 'Espacio adicional para el accesorio'),
+      ('Agua embotellada a bordo', 'F', 1, 'checkbox', 'Muy valorado en rutas largas y aeropuerto'),
+      ('Cargador de móvil disponible', 'F', 2, 'checkbox', 'USB / USB-C'),
+      ('WiFi a bordo', 'F', 3, 'checkbox', 'El conductor indica si dispone de él'),
+      ('Aire acondicionado garantizado', 'F', 4, 'checkbox', 'Importante en el verano canario'),
+      ('Viaje en silencio (sin conversación)', 'F', 5, 'checkbox', 'Muy solicitado en traslados nocturnos'),
+      ('Conductor con letrero en llegadas', 'F', 6, 'checkbox', 'Para recogidas en aeropuerto o puerto'),
+      ('Seguimiento de vuelo — espero si hay retraso', 'F', 7, 'checkbox', 'Sin coste adicional por retraso'),
+      ('Recogida en puerto / muelle (cruceros)', 'F', 8, 'checkbox', 'Muy relevante en Las Palmas y Arrecife')
+    ) AS v(nombre, bloque, orden, tipo_seleccion, notas_chofer)
+    WHERE NOT EXISTS (SELECT 1 FROM extras e WHERE e.nombre = v.nombre);
   `);
 
   // ─── Reservas ─────────────────────────────────────────────────────────────
@@ -1089,7 +1133,7 @@ app.get('/api/categorias-publicas', asyncHandler(async (req, res) => {
 
 app.get('/api/extras-publicos', asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, nombre, precio FROM extras WHERE activo = TRUE ORDER BY id'
+    'SELECT id, nombre, precio, bloque, orden, tipo_seleccion FROM extras WHERE activo = TRUE ORDER BY bloque, orden, id'
   );
   res.json(result.rows);
 }));
@@ -4828,31 +4872,40 @@ app.get('/cartel-descarga/:id/:firma', asyncHandler(async (req, res) => {
 // ─── Admin: extras ────────────────────────────────────────────────────────────
 app.get('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, nombre, precio, activo FROM extras ORDER BY id'
+    'SELECT id, nombre, precio, activo, bloque, orden, tipo_seleccion, notas_chofer FROM extras ORDER BY bloque, orden, id'
   );
   res.json({ extras: result.rows });
 }));
 
 app.post('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
-  const { nombre, precio } = req.body;
+  const { nombre, precio, bloque, orden, tipo_seleccion, notas_chofer } = req.body;
   if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
   const p = parseFloat(precio);
   if (isNaN(p) || p < 0) return res.status(400).json({ error: 'El precio no es válido.' });
   await pool.query(
-    'INSERT INTO extras (nombre, precio) VALUES ($1, $2)',
-    [nombre.trim(), p]
+    'INSERT INTO extras (nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, activo) VALUES ($1, $2, $3, $4, $5, $6, FALSE)',
+    [nombre.trim(), p, (bloque || 'F').trim(), parseInt(orden, 10) || 0,
+     (tipo_seleccion || 'checkbox').trim(), notas_chofer ? notas_chofer.trim() : null]
   );
   res.json({ ok: true });
 }));
 
 app.post('/admin/extras/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
-  const { nombre, precio } = req.body;
+  const { nombre, precio, bloque, orden, tipo_seleccion, notas_chofer } = req.body;
   if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
   const p = parseFloat(precio);
   if (isNaN(p) || p < 0) return res.status(400).json({ error: 'El precio no es válido.' });
   await pool.query(
-    'UPDATE extras SET nombre = $1, precio = $2 WHERE id = $3',
-    [nombre.trim(), p, req.params.id]
+    `UPDATE extras SET nombre = $1, precio = $2,
+       bloque = COALESCE(NULLIF($3, ''), bloque),
+       orden = COALESCE($4, orden),
+       tipo_seleccion = COALESCE(NULLIF($5, ''), tipo_seleccion),
+       notas_chofer = COALESCE($6, notas_chofer)
+     WHERE id = $7`,
+    [nombre.trim(), p, (bloque || '').trim(),
+     (orden !== undefined && orden !== null && orden !== '') ? parseInt(orden, 10) : null,
+     (tipo_seleccion || '').trim(), notas_chofer !== undefined ? (notas_chofer ? notas_chofer.trim() : '') : null,
+     req.params.id]
   );
   res.json({ ok: true });
 }));
