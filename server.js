@@ -753,6 +753,10 @@ async function initSchema() {
   await pool.query(`ALTER TABLE extras ADD COLUMN IF NOT EXISTS orden INT DEFAULT 0`);
   await pool.query(`ALTER TABLE extras ADD COLUMN IF NOT EXISTS tipo_seleccion TEXT DEFAULT 'checkbox'`);
   await pool.query(`ALTER TABLE extras ADD COLUMN IF NOT EXISTS notas_chofer TEXT`);
+  await pool.query(`ALTER TABLE extras ADD COLUMN IF NOT EXISTS depende_chofer BOOLEAN DEFAULT TRUE`);
+  // Corrección: este extra no depende de lo que tenga el chofer, es solo un
+  // aviso del cliente. Se corrige aquí por si ya se había desplegado antes.
+  await pool.query(`UPDATE extras SET depende_chofer = FALSE WHERE nombre = 'Traigo mi propio asiento de seguridad'`);
 
   // Dos extras de ejemplo (solo se insertan si la tabla está vacía)
   await pool.query(`
@@ -767,40 +771,40 @@ async function initSchema() {
   // Catálogo de extras por bloques (A-F). Solo se insertan los que no existan
   // ya por nombre, así que es seguro volver a desplegar sin duplicar nada.
   await pool.query(`
-    INSERT INTO extras (nombre, bloque, orden, tipo_seleccion, notas_chofer, precio, activo)
-    SELECT v.nombre, v.bloque, v.orden, v.tipo_seleccion, v.notas_chofer, 0, FALSE
+    INSERT INTO extras (nombre, bloque, orden, tipo_seleccion, notas_chofer, precio, activo, depende_chofer)
+    SELECT v.nombre, v.bloque, v.orden, v.tipo_seleccion, v.notas_chofer, 0, FALSE, v.depende_chofer
     FROM (VALUES
-      ('Traigo mi propio asiento de seguridad', 'A', 1, 'contador', 'El conductor solo espera a que el cliente lo instale'),
-      ('Silla bebé — hasta 13 kg (menores de 1 año)', 'A', 2, 'contador', 'Grupo 0 homologado'),
-      ('Silla infantil — 9 a 18 kg (hasta 4 años)', 'A', 3, 'contador', 'Grupo 1-2 homologado'),
-      ('Silla infantil — 15 a 25 kg (4 a 7 años)', 'A', 4, 'contador', 'Grupo 2-3 homologado'),
-      ('Alzador/Booster — 22 a 36 kg (6 a 12 años)', 'A', 5, 'contador', 'Grupo 3 homologado'),
-      ('Mascota pequeña en transportín', 'B', 1, 'checkbox', 'Gato, perro pequeño, conejo...'),
-      ('Mascota grande con arnés homologado', 'B', 2, 'checkbox', 'Perro mediano o grande'),
-      ('Tabla de surf / bodyboard', 'C', 1, 'checkbox', 'Habitual en playas de Gran Canaria y Tenerife'),
-      ('Tabla de windsurf / kitesurf', 'C', 2, 'checkbox', 'Medidas grandes — solo Minivan'),
-      ('Bicicleta', 'C', 3, 'checkbox', 'Solo Minivan con espacio habilitado'),
-      ('Patinete eléctrico plegable', 'C', 4, 'checkbox', 'Cabe en la mayoría de vehículos'),
-      ('Esquís / Snowboard', 'C', 5, 'checkbox', 'Solo Confort y Minivan'),
-      ('Bolsa de palos de golf', 'C', 6, 'checkbox', 'Muy frecuente en el sur de Gran Canaria'),
-      ('Equipo de buceo (botellas y aletas)', 'C', 7, 'checkbox', 'Habitual en zonas costeras'),
-      ('Maleta extra grande adicional', 'D', 1, 'checkbox', 'Más allá de la que corresponde por plaza'),
-      ('Bulto voluminoso', 'D', 2, 'checkbox', 'Caja grande, árbol, mueble pequeño... a criterio del conductor'),
-      ('Carrito de bebé plegable', 'D', 3, 'checkbox', 'Generalmente incluido sin coste'),
-      ('Silla de ruedas plegable (manual)', 'D', 4, 'checkbox', 'Ver también Bloque E'),
-      ('Viajo con silla de ruedas manual', 'E', 1, 'checkbox', 'El conductor ayuda a plegar y cargar'),
-      ('Viajo con silla de ruedas eléctrica', 'E', 2, 'checkbox', 'Requiere furgoneta adaptada con rampa'),
-      ('Necesito asistencia para subir/bajar del vehículo', 'E', 3, 'checkbox', 'Sin silla, pero con dificultad de movilidad'),
-      ('Viajo con andador o muletas', 'E', 4, 'checkbox', 'Espacio adicional para el accesorio'),
-      ('Agua embotellada a bordo', 'F', 1, 'checkbox', 'Muy valorado en rutas largas y aeropuerto'),
-      ('Cargador de móvil disponible', 'F', 2, 'checkbox', 'USB / USB-C'),
-      ('WiFi a bordo', 'F', 3, 'checkbox', 'El conductor indica si dispone de él'),
-      ('Aire acondicionado garantizado', 'F', 4, 'checkbox', 'Importante en el verano canario'),
-      ('Viaje en silencio (sin conversación)', 'F', 5, 'checkbox', 'Muy solicitado en traslados nocturnos'),
-      ('Conductor con letrero en llegadas', 'F', 6, 'checkbox', 'Para recogidas en aeropuerto o puerto'),
-      ('Seguimiento de vuelo — espero si hay retraso', 'F', 7, 'checkbox', 'Sin coste adicional por retraso'),
-      ('Recogida en puerto / muelle (cruceros)', 'F', 8, 'checkbox', 'Muy relevante en Las Palmas y Arrecife')
-    ) AS v(nombre, bloque, orden, tipo_seleccion, notas_chofer)
+      ('Traigo mi propio asiento de seguridad', 'A', 1, 'contador', 'El conductor solo espera a que el cliente lo instale', FALSE),
+      ('Silla bebé — hasta 13 kg (menores de 1 año)', 'A', 2, 'contador', 'Grupo 0 homologado', TRUE),
+      ('Silla infantil — 9 a 18 kg (hasta 4 años)', 'A', 3, 'contador', 'Grupo 1-2 homologado', TRUE),
+      ('Silla infantil — 15 a 25 kg (4 a 7 años)', 'A', 4, 'contador', 'Grupo 2-3 homologado', TRUE),
+      ('Alzador/Booster — 22 a 36 kg (6 a 12 años)', 'A', 5, 'contador', 'Grupo 3 homologado', TRUE),
+      ('Mascota pequeña en transportín', 'B', 1, 'checkbox', 'Gato, perro pequeño, conejo...', TRUE),
+      ('Mascota grande con arnés homologado', 'B', 2, 'checkbox', 'Perro mediano o grande', TRUE),
+      ('Tabla de surf / bodyboard', 'C', 1, 'checkbox', 'Habitual en playas de Gran Canaria y Tenerife', TRUE),
+      ('Tabla de windsurf / kitesurf', 'C', 2, 'checkbox', 'Medidas grandes — solo Minivan', TRUE),
+      ('Bicicleta', 'C', 3, 'checkbox', 'Solo Minivan con espacio habilitado', TRUE),
+      ('Patinete eléctrico plegable', 'C', 4, 'checkbox', 'Cabe en la mayoría de vehículos', TRUE),
+      ('Esquís / Snowboard', 'C', 5, 'checkbox', 'Solo Confort y Minivan', TRUE),
+      ('Bolsa de palos de golf', 'C', 6, 'checkbox', 'Muy frecuente en el sur de Gran Canaria', TRUE),
+      ('Equipo de buceo (botellas y aletas)', 'C', 7, 'checkbox', 'Habitual en zonas costeras', TRUE),
+      ('Maleta extra grande adicional', 'D', 1, 'checkbox', 'Más allá de la que corresponde por plaza', TRUE),
+      ('Bulto voluminoso', 'D', 2, 'checkbox', 'Caja grande, árbol, mueble pequeño... a criterio del conductor', TRUE),
+      ('Carrito de bebé plegable', 'D', 3, 'checkbox', 'Generalmente incluido sin coste', TRUE),
+      ('Silla de ruedas plegable (manual)', 'D', 4, 'checkbox', 'Ver también Bloque E', TRUE),
+      ('Viajo con silla de ruedas manual', 'E', 1, 'checkbox', 'El conductor ayuda a plegar y cargar', TRUE),
+      ('Viajo con silla de ruedas eléctrica', 'E', 2, 'checkbox', 'Requiere furgoneta adaptada con rampa', TRUE),
+      ('Necesito asistencia para subir/bajar del vehículo', 'E', 3, 'checkbox', 'Sin silla, pero con dificultad de movilidad', TRUE),
+      ('Viajo con andador o muletas', 'E', 4, 'checkbox', 'Espacio adicional para el accesorio', TRUE),
+      ('Agua embotellada a bordo', 'F', 1, 'checkbox', 'Muy valorado en rutas largas y aeropuerto', TRUE),
+      ('Cargador de móvil disponible', 'F', 2, 'checkbox', 'USB / USB-C', TRUE),
+      ('WiFi a bordo', 'F', 3, 'checkbox', 'El conductor indica si dispone de él', TRUE),
+      ('Aire acondicionado garantizado', 'F', 4, 'checkbox', 'Importante en el verano canario', TRUE),
+      ('Viaje en silencio (sin conversación)', 'F', 5, 'checkbox', 'Muy solicitado en traslados nocturnos', TRUE),
+      ('Conductor con letrero en llegadas', 'F', 6, 'checkbox', 'Para recogidas en aeropuerto o puerto', TRUE),
+      ('Seguimiento de vuelo — espero si hay retraso', 'F', 7, 'checkbox', 'Sin coste adicional por retraso', TRUE),
+      ('Recogida en puerto / muelle (cruceros)', 'F', 8, 'checkbox', 'Muy relevante en Las Palmas y Arrecife', TRUE)
+    ) AS v(nombre, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer)
     WHERE NOT EXISTS (SELECT 1 FROM extras e WHERE e.nombre = v.nombre);
   `);
 
@@ -4872,26 +4876,26 @@ app.get('/cartel-descarga/:id/:firma', asyncHandler(async (req, res) => {
 // ─── Admin: extras ────────────────────────────────────────────────────────────
 app.get('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, nombre, precio, activo, bloque, orden, tipo_seleccion, notas_chofer FROM extras ORDER BY bloque, orden, id'
+    'SELECT id, nombre, precio, activo, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer FROM extras ORDER BY depende_chofer DESC, bloque, orden, id'
   );
   res.json({ extras: result.rows });
 }));
 
 app.post('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
-  const { nombre, precio, bloque, orden, tipo_seleccion, notas_chofer } = req.body;
+  const { nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer } = req.body;
   if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
   const p = parseFloat(precio);
   if (isNaN(p) || p < 0) return res.status(400).json({ error: 'El precio no es válido.' });
   await pool.query(
-    'INSERT INTO extras (nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, activo) VALUES ($1, $2, $3, $4, $5, $6, FALSE)',
+    'INSERT INTO extras (nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer, activo) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE)',
     [nombre.trim(), p, (bloque || 'F').trim(), parseInt(orden, 10) || 0,
-     (tipo_seleccion || 'checkbox').trim(), notas_chofer ? notas_chofer.trim() : null]
+     (tipo_seleccion || 'checkbox').trim(), notas_chofer ? notas_chofer.trim() : null, depende_chofer !== false]
   );
   res.json({ ok: true });
 }));
 
 app.post('/admin/extras/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
-  const { nombre, precio, bloque, orden, tipo_seleccion, notas_chofer } = req.body;
+  const { nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer } = req.body;
   if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
   const p = parseFloat(precio);
   if (isNaN(p) || p < 0) return res.status(400).json({ error: 'El precio no es válido.' });
@@ -4900,12 +4904,13 @@ app.post('/admin/extras/:id/editar', requireAdmin, asyncHandler(async (req, res)
        bloque = COALESCE(NULLIF($3, ''), bloque),
        orden = COALESCE($4, orden),
        tipo_seleccion = COALESCE(NULLIF($5, ''), tipo_seleccion),
-       notas_chofer = COALESCE($6, notas_chofer)
-     WHERE id = $7`,
+       notas_chofer = COALESCE($6, notas_chofer),
+       depende_chofer = $7
+     WHERE id = $8`,
     [nombre.trim(), p, (bloque || '').trim(),
      (orden !== undefined && orden !== null && orden !== '') ? parseInt(orden, 10) : null,
      (tipo_seleccion || '').trim(), notas_chofer !== undefined ? (notas_chofer ? notas_chofer.trim() : '') : null,
-     req.params.id]
+     depende_chofer !== false, req.params.id]
   );
   res.json({ ok: true });
 }));
