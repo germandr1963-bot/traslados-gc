@@ -990,7 +990,13 @@ table.tabla-precios input {
         <button class="boton-primario" onclick="abrirFormularioExtra(null)">+ Añadir extra</button>
       </div>
 
-      <div id="bloques-extras"></div>
+      <h2 style="margin-bottom:4px;">Extras del chofer</h2>
+      <p class="subtitulo" style="margin-top:0;">Dependen de lo que ese chofer tenga en su coche.</p>
+      <div id="bloques-extras-chofer"></div>
+
+      <h2 style="margin-bottom:4px;margin-top:24px;">Extras de los clientes</h2>
+      <p class="subtitulo" style="margin-top:0;">El cliente solo avisa de algo — no depende de si el chofer lo tiene.</p>
+      <div id="bloques-extras-cliente"></div>
 
       <!-- Modal formulario extra -->
       <div id="modal-extra" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
@@ -999,6 +1005,13 @@ table.tabla-precios input {
           <div style="margin-bottom:12px;">
             <label class="etiqueta">Nombre del extra</label>
             <input type="text" id="extra-nombre" class="campo" placeholder="Ej: Silla de seguridad para niños">
+          </div>
+          <div style="margin-bottom:12px;">
+            <label class="etiqueta">¿Depende del chofer?</label>
+            <select id="extra-depende-chofer" class="campo">
+              <option value="si">Sí — el chofer debe tenerlo en su coche</option>
+              <option value="no">No — es solo un aviso del cliente</option>
+            </select>
           </div>
           <div style="margin-bottom:12px;">
             <label class="etiqueta">Bloque</label>
@@ -5115,47 +5128,52 @@ var NOMBRES_BLOQUE_EXTRA = {
 };
 var ORDEN_BLOQUES_EXTRA = ['A', 'B', 'C', 'D', 'E', 'F'];
 
+function pintarBloquesExtras(lista, contenedorId) {
+  var cont = document.getElementById(contenedorId);
+  if (!lista.length) {
+    cont.innerHTML = '<p style="color:var(--texto-muted);padding:12px 0;">Nada aquí todavía.</p>';
+    return;
+  }
+  var porBloque = {};
+  lista.forEach(function (ex) {
+    var b = ex.bloque || 'F';
+    porBloque[b] = porBloque[b] || [];
+    porBloque[b].push(ex);
+  });
+  var bloques = Object.keys(porBloque).sort(function (a, b) {
+    var ia = ORDEN_BLOQUES_EXTRA.indexOf(a); if (ia === -1) ia = 99;
+    var ib = ORDEN_BLOQUES_EXTRA.indexOf(b); if (ib === -1) ib = 99;
+    return ia - ib;
+  });
+  cont.innerHTML = bloques.map(function (b) {
+    var filas = porBloque[b].map(function (ex) {
+      return '<tr>' +
+        '<td>' + ex.nombre + (ex.notas_chofer ? '<div style="font-size:11px;color:var(--texto-muted);">' + ex.notas_chofer + '</div>' : '') + '</td>' +
+        '<td>' + (ex.tipo_seleccion === 'contador' ? 'Contador' : 'Casilla') + '</td>' +
+        '<td>' + Number(ex.precio).toFixed(2) + ' €</td>' +
+        '<td><span class="' + (ex.activo ? 'insignia-ok' : 'insignia-suspendido') + '">' + (ex.activo ? 'Publicado' : 'Borrador') + '</span></td>' +
+        '<td>' +
+          '<button class="boton-costa" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="abrirFormularioExtra(' + ex.id + ')">✏️ Editar</button>' +
+          '<button class="boton-secundario" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="toggleActivoExtra(' + ex.id + ',' + ex.activo + ')">' + (ex.activo ? '⏸ Pasar a borrador' : '▶ Publicar') + '</button>' +
+          '<button class="boton-peligro" style="font-size:12px;padding:4px 10px;" onclick="eliminarExtra(' + ex.id + ')">🗑️</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+    return '<div class="tarjeta" style="margin-bottom:16px;">' +
+      '<h3 style="margin-top:0;">' + (NOMBRES_BLOQUE_EXTRA[b] || b) + '</h3>' +
+      '<table class="tabla-admin"><thead><tr><th>Nombre</th><th>Tipo</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr></thead>' +
+      '<tbody>' + filas + '</tbody></table>' +
+    '</div>';
+  }).join('');
+}
+
 function cargarExtras() {
   fetch('/admin/extras')
     .then(function (r) { return r.json(); })
     .then(function (data) {
       extrasCache = data.extras;
-      var cont = document.getElementById('bloques-extras');
-      if (!extrasCache.length) {
-        cont.innerHTML = '<p style="color:var(--texto-muted);padding:20px;">No hay extras definidos todavía.</p>';
-        return;
-      }
-      var porBloque = {};
-      extrasCache.forEach(function (ex) {
-        var b = ex.bloque || 'F';
-        porBloque[b] = porBloque[b] || [];
-        porBloque[b].push(ex);
-      });
-      var bloques = Object.keys(porBloque).sort(function (a, b) {
-        var ia = ORDEN_BLOQUES_EXTRA.indexOf(a); if (ia === -1) ia = 99;
-        var ib = ORDEN_BLOQUES_EXTRA.indexOf(b); if (ib === -1) ib = 99;
-        return ia - ib;
-      });
-      cont.innerHTML = bloques.map(function (b) {
-        var filas = porBloque[b].map(function (ex) {
-          return '<tr>' +
-            '<td>' + ex.nombre + (ex.notas_chofer ? '<div style="font-size:11px;color:var(--texto-muted);">' + ex.notas_chofer + '</div>' : '') + '</td>' +
-            '<td>' + (ex.tipo_seleccion === 'contador' ? 'Contador' : 'Casilla') + '</td>' +
-            '<td>' + Number(ex.precio).toFixed(2) + ' €</td>' +
-            '<td><span class="' + (ex.activo ? 'insignia-ok' : 'insignia-suspendido') + '">' + (ex.activo ? 'Publicado' : 'Borrador') + '</span></td>' +
-            '<td>' +
-              '<button class="boton-costa" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="abrirFormularioExtra(' + ex.id + ')">✏️ Editar</button>' +
-              '<button class="boton-secundario" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="toggleActivoExtra(' + ex.id + ',' + ex.activo + ')">' + (ex.activo ? '⏸ Pasar a borrador' : '▶ Publicar') + '</button>' +
-              '<button class="boton-peligro" style="font-size:12px;padding:4px 10px;" onclick="eliminarExtra(' + ex.id + ')">🗑️</button>' +
-            '</td>' +
-          '</tr>';
-        }).join('');
-        return '<div class="tarjeta" style="margin-bottom:16px;">' +
-          '<h3 style="margin-top:0;">' + (NOMBRES_BLOQUE_EXTRA[b] || b) + '</h3>' +
-          '<table class="tabla-admin"><thead><tr><th>Nombre</th><th>Tipo</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr></thead>' +
-          '<tbody>' + filas + '</tbody></table>' +
-        '</div>';
-      }).join('');
+      pintarBloquesExtras(extrasCache.filter(function (e) { return e.depende_chofer; }), 'bloques-extras-chofer');
+      pintarBloquesExtras(extrasCache.filter(function (e) { return !e.depende_chofer; }), 'bloques-extras-cliente');
     });
 }
 
@@ -5165,6 +5183,7 @@ function abrirFormularioExtra(id) {
   if (id === null) {
     document.getElementById('modal-extra-titulo').textContent = 'Nuevo extra';
     document.getElementById('extra-nombre').value = '';
+    document.getElementById('extra-depende-chofer').value = 'si';
     document.getElementById('extra-bloque').value = 'A';
     document.getElementById('extra-tipo').value = 'checkbox';
     document.getElementById('extra-precio').value = '';
@@ -5173,6 +5192,7 @@ function abrirFormularioExtra(id) {
     var ex = extrasCache.find(function (e) { return e.id === id; });
     document.getElementById('modal-extra-titulo').textContent = 'Editar extra';
     document.getElementById('extra-nombre').value = ex.nombre;
+    document.getElementById('extra-depende-chofer').value = ex.depende_chofer ? 'si' : 'no';
     document.getElementById('extra-bloque').value = ex.bloque || 'F';
     document.getElementById('extra-tipo').value = ex.tipo_seleccion || 'checkbox';
     document.getElementById('extra-precio').value = ex.precio;
@@ -5188,6 +5208,7 @@ function cerrarModalExtra() {
 
 function guardarExtra() {
   var nombre = document.getElementById('extra-nombre').value.trim();
+  var dependeChofer = document.getElementById('extra-depende-chofer').value === 'si';
   var bloque = document.getElementById('extra-bloque').value;
   var tipo_seleccion = document.getElementById('extra-tipo').value;
   var precio = parseFloat(document.getElementById('extra-precio').value);
@@ -5199,7 +5220,7 @@ function guardarExtra() {
   fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nombre: nombre, precio: precio, bloque: bloque, tipo_seleccion: tipo_seleccion, notas_chofer: notas_chofer })
+    body: JSON.stringify({ nombre: nombre, precio: precio, bloque: bloque, tipo_seleccion: tipo_seleccion, notas_chofer: notas_chofer, depende_chofer: dependeChofer })
   }).then(function (r) { return r.json(); }).then(function (d) {
     if (d.ok) {
       cerrarModalExtra();
