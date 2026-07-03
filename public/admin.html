@@ -984,23 +984,13 @@ table.tabla-precios input {
 
     <div id="seccion-extras" class="oculto">
       <h1>Extras del traslado</h1>
-      <p class="subtitulo">Define los servicios adicionales que el cliente puede seleccionar al reservar. El precio se suma al precio estimado del traslado.</p>
+      <p class="subtitulo">Catálogo interno de todo lo que se podría ofrecer. Un extra nuevo queda como <strong>borrador</strong> (no lo ve el cliente) hasta que lo publiques a mano.</p>
 
       <div class="tarjeta" style="margin-bottom:20px;">
         <button class="boton-primario" onclick="abrirFormularioExtra(null)">+ Añadir extra</button>
       </div>
 
-      <table class="tabla-admin">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Precio</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="tabla-extras"></tbody>
-      </table>
+      <div id="bloques-extras"></div>
 
       <!-- Modal formulario extra -->
       <div id="modal-extra" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
@@ -1010,12 +1000,34 @@ table.tabla-precios input {
             <label class="etiqueta">Nombre del extra</label>
             <input type="text" id="extra-nombre" class="campo" placeholder="Ej: Silla de seguridad para niños">
           </div>
-          <div style="margin-bottom:20px;">
-            <label class="etiqueta">Precio (€)</label>
+          <div style="margin-bottom:12px;">
+            <label class="etiqueta">Bloque</label>
+            <select id="extra-bloque" class="campo">
+              <option value="A">Retención infantil</option>
+              <option value="B">Mascotas</option>
+              <option value="C">Material deportivo</option>
+              <option value="D">Equipaje especial</option>
+              <option value="E">Accesibilidad y movilidad reducida</option>
+              <option value="F">Comodidades y servicios premium</option>
+            </select>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label class="etiqueta">Tipo de selección</label>
+            <select id="extra-tipo" class="campo">
+              <option value="checkbox">Casilla (sí / no)</option>
+              <option value="contador">Contador (cantidad)</option>
+            </select>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label class="etiqueta">Precio (€) — 0 = gratis</label>
             <input type="number" id="extra-precio" class="campo" step="0.01" min="0" placeholder="0.00" style="width:140px;">
           </div>
+          <div style="margin-bottom:20px;">
+            <label class="etiqueta">Nota para el chofer (opcional)</label>
+            <input type="text" id="extra-notas" class="campo" placeholder="Ej: Grupo 0 homologado">
+          </div>
           <div style="display:flex;gap:10px;">
-            <button class="boton-primario" onclick="guardarExtra()">💾 Guardar</button>
+            <button class="boton-primario" onclick="guardarExtra()">💾 Guardar (queda en borrador)</button>
             <button class="boton-secundario" onclick="cerrarModalExtra()">Cancelar</button>
           </div>
           <div id="extra-msg" style="margin-top:10px;font-size:13px;"></div>
@@ -5097,27 +5109,52 @@ function borrarDesdeDetalle() {
 var extrasCache = [];
 var extraEditandoId = null;
 
+var NOMBRES_BLOQUE_EXTRA = {
+  A: 'Retención infantil', B: 'Mascotas', C: 'Material deportivo',
+  D: 'Equipaje especial', E: 'Accesibilidad y movilidad reducida', F: 'Comodidades y servicios premium'
+};
+var ORDEN_BLOQUES_EXTRA = ['A', 'B', 'C', 'D', 'E', 'F'];
+
 function cargarExtras() {
   fetch('/admin/extras')
     .then(function (r) { return r.json(); })
     .then(function (data) {
       extrasCache = data.extras;
-      var tbody = document.getElementById('tabla-extras');
+      var cont = document.getElementById('bloques-extras');
       if (!extrasCache.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--texto-muted);padding:20px;">No hay extras definidos todavía.</td></tr>';
+        cont.innerHTML = '<p style="color:var(--texto-muted);padding:20px;">No hay extras definidos todavía.</p>';
         return;
       }
-      tbody.innerHTML = extrasCache.map(function (ex) {
-        return '<tr>' +
-          '<td>' + ex.nombre + '</td>' +
-          '<td>' + Number(ex.precio).toFixed(2) + ' €</td>' +
-          '<td><span class="' + (ex.activo ? 'insignia-ok' : 'insignia-suspendido') + '">' + (ex.activo ? 'Activo' : 'Inactivo') + '</span></td>' +
-          '<td>' +
-            '<button class="boton-costa" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="abrirFormularioExtra(' + ex.id + ')">✏️ Editar</button>' +
-            '<button class="boton-secundario" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="toggleActivoExtra(' + ex.id + ',' + ex.activo + ')">' + (ex.activo ? '⏸ Desactivar' : '▶ Activar') + '</button>' +
-            '<button class="boton-peligro" style="font-size:12px;padding:4px 10px;" onclick="eliminarExtra(' + ex.id + ')">🗑️</button>' +
-          '</td>' +
-        '</tr>';
+      var porBloque = {};
+      extrasCache.forEach(function (ex) {
+        var b = ex.bloque || 'F';
+        porBloque[b] = porBloque[b] || [];
+        porBloque[b].push(ex);
+      });
+      var bloques = Object.keys(porBloque).sort(function (a, b) {
+        var ia = ORDEN_BLOQUES_EXTRA.indexOf(a); if (ia === -1) ia = 99;
+        var ib = ORDEN_BLOQUES_EXTRA.indexOf(b); if (ib === -1) ib = 99;
+        return ia - ib;
+      });
+      cont.innerHTML = bloques.map(function (b) {
+        var filas = porBloque[b].map(function (ex) {
+          return '<tr>' +
+            '<td>' + ex.nombre + (ex.notas_chofer ? '<div style="font-size:11px;color:var(--texto-muted);">' + ex.notas_chofer + '</div>' : '') + '</td>' +
+            '<td>' + (ex.tipo_seleccion === 'contador' ? 'Contador' : 'Casilla') + '</td>' +
+            '<td>' + Number(ex.precio).toFixed(2) + ' €</td>' +
+            '<td><span class="' + (ex.activo ? 'insignia-ok' : 'insignia-suspendido') + '">' + (ex.activo ? 'Publicado' : 'Borrador') + '</span></td>' +
+            '<td>' +
+              '<button class="boton-costa" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="abrirFormularioExtra(' + ex.id + ')">✏️ Editar</button>' +
+              '<button class="boton-secundario" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="toggleActivoExtra(' + ex.id + ',' + ex.activo + ')">' + (ex.activo ? '⏸ Pasar a borrador' : '▶ Publicar') + '</button>' +
+              '<button class="boton-peligro" style="font-size:12px;padding:4px 10px;" onclick="eliminarExtra(' + ex.id + ')">🗑️</button>' +
+            '</td>' +
+          '</tr>';
+        }).join('');
+        return '<div class="tarjeta" style="margin-bottom:16px;">' +
+          '<h3 style="margin-top:0;">' + (NOMBRES_BLOQUE_EXTRA[b] || b) + '</h3>' +
+          '<table class="tabla-admin"><thead><tr><th>Nombre</th><th>Tipo</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr></thead>' +
+          '<tbody>' + filas + '</tbody></table>' +
+        '</div>';
       }).join('');
     });
 }
@@ -5128,12 +5165,18 @@ function abrirFormularioExtra(id) {
   if (id === null) {
     document.getElementById('modal-extra-titulo').textContent = 'Nuevo extra';
     document.getElementById('extra-nombre').value = '';
+    document.getElementById('extra-bloque').value = 'A';
+    document.getElementById('extra-tipo').value = 'checkbox';
     document.getElementById('extra-precio').value = '';
+    document.getElementById('extra-notas').value = '';
   } else {
     var ex = extrasCache.find(function (e) { return e.id === id; });
     document.getElementById('modal-extra-titulo').textContent = 'Editar extra';
     document.getElementById('extra-nombre').value = ex.nombre;
+    document.getElementById('extra-bloque').value = ex.bloque || 'F';
+    document.getElementById('extra-tipo').value = ex.tipo_seleccion || 'checkbox';
     document.getElementById('extra-precio').value = ex.precio;
+    document.getElementById('extra-notas').value = ex.notas_chofer || '';
   }
   document.getElementById('modal-extra').classList.remove('oculto');
 }
@@ -5145,7 +5188,10 @@ function cerrarModalExtra() {
 
 function guardarExtra() {
   var nombre = document.getElementById('extra-nombre').value.trim();
+  var bloque = document.getElementById('extra-bloque').value;
+  var tipo_seleccion = document.getElementById('extra-tipo').value;
   var precio = parseFloat(document.getElementById('extra-precio').value);
+  var notas_chofer = document.getElementById('extra-notas').value.trim();
   var msg = document.getElementById('extra-msg');
   if (!nombre) { msg.textContent = 'El nombre es obligatorio.'; return; }
   if (isNaN(precio) || precio < 0) { msg.textContent = 'El precio debe ser un número positivo.'; return; }
@@ -5153,7 +5199,7 @@ function guardarExtra() {
   fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nombre: nombre, precio: precio })
+    body: JSON.stringify({ nombre: nombre, precio: precio, bloque: bloque, tipo_seleccion: tipo_seleccion, notas_chofer: notas_chofer })
   }).then(function (r) { return r.json(); }).then(function (d) {
     if (d.ok) {
       cerrarModalExtra();
