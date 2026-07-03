@@ -76,6 +76,34 @@ async function enviarEmailConAdjunto({ to, subject, html, adjunto }) {
   return true;
 }
 
+// Genera un email con el mismo estilo visual que el de confirmación de
+// reserva, para avisos cortos de una sola línea (sin respuesta, cancelación).
+function plantillaEmailSimple(nombreCliente, mensaje, numeroReserva) {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <style>
+    body{margin:0;padding:0;background:#f5f5f5;}
+    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+    .header{background:#2c2c2c;padding:24px;text-align:center;}
+    .body{padding:28px 24px;}
+    .pnr{font-family:monospace;font-size:18px;font-weight:700;color:#C1502E;letter-spacing:2px;}
+    .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
+    @media(max-width:480px){.body{padding:16px;}}
+  </style></head><body>
+  <div class="wrapper">
+    <div class="header">
+      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
+      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+    </div>
+    <div class="body">
+      <p>Hola <strong>${nombreCliente}</strong>,</p>
+      <p>${mensaje}</p>
+      <p style="font-size:13px;color:#888;">Número de reserva: <span class="pnr">${numeroReserva}</span></p>
+    </div>
+    <div class="footer">Traslados GC · Gran Canaria</div>
+  </div></body></html>`;
+}
+
 const PORT = process.env.PORT || 3000;
 
 // Motor de plantillas EJS para las páginas de ruta renderizadas en servidor
@@ -1198,6 +1226,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
           Pasajeros: ${num_pasajeros || '—'}
         </div>
         <p style="font-size:13px;color:#888;">Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.</p>
+        <p style="font-size:13px;color:#888;">El plazo máximo para confirmarte un chofer es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.</p>
       </div>
       <div class="footer">Traslados GC · Gran Canaria</div>
     </div></body></html>`;
@@ -6513,6 +6542,7 @@ app.get('/api/whatsapp/choferes-disponibles', requierePuenteWhatsapp, asyncHandl
 app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino,
+            r.nombre_cliente, r.telefono_cliente,
             cv.nombre AS categoria_nombre
      FROM reservas r
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
@@ -6522,13 +6552,116 @@ app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandle
   res.json(result.rows);
 }));
 
+// Reservas que llevan 15 minutos o más avisadas a los choferes sin que nadie
+// haya aceptado todavía. El puente las usa para avisar al cliente de que
+// seguimos buscando chofer.
+app.get('/api/whatsapp/reservas-15min-sin-respuesta', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.telefono_cliente, r.email_cliente
+     FROM reservas r
+     WHERE r.estado_aviso_whatsapp = 'enviado'
+       AND r.whatsapp_aviso_enviado_en IS NOT NULL
+       AND r.whatsapp_aviso_enviado_en <= NOW() - INTERVAL '15 minutes'
+     ORDER BY r.id ASC`
+  );
+  res.json(result.rows);
+}));
+
+// Reservas que llevan 24 horas desde su creación sin que ningún chofer haya
+// aceptado. El puente las usa para avisar al cliente de la cancelación.
+app.get('/api/whatsapp/reservas-24h-sin-respuesta', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.telefono_cliente, r.email_cliente
+     FROM reservas r
+     WHERE r.estado_aviso_whatsapp IN ('enviado', 'sin_respuesta')
+       AND r.creado_en <= NOW() - INTERVAL '24 hours'
+       AND r.estado NOT IN ('cancelada', 'completada')
+     ORDER BY r.id ASC`
+  );
+  res.json(result.rows);
+}));
+
 // El puente avisa que ya mandó el WhatsApp a los choferes de esta reserva,
 // para que no se les vuelva a mandar si vuelve a preguntar.
 app.post('/api/whatsapp/marcar-enviado/:id', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   await pool.query(
-    `UPDATE reservas SET estado_aviso_whatsapp = 'enviado' WHERE id = $1`,
+    `UPDATE reservas SET estado_aviso_whatsapp = 'enviado', whatsapp_aviso_enviado_en = NOW() WHERE id = $1`,
     [req.params.id]
   );
+  res.json({ ok: true });
+}));
+
+// El puente ya avisó al cliente por WhatsApp de que seguimos buscando chofer
+// (15 min sin respuesta). Aquí mandamos el email equivalente al cliente y
+// avisamos también al admin por si quiere intervenir a mano.
+app.post('/api/whatsapp/marcar-sin-respuesta/:id', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const reserva = await pool.query(
+    `UPDATE reservas SET estado_aviso_whatsapp = 'sin_respuesta'
+     WHERE id = $1 AND estado_aviso_whatsapp = 'enviado'
+     RETURNING numero_reserva, nombre_cliente, email_cliente`,
+    [req.params.id]
+  );
+  if (!reserva.rows.length) return res.json({ ok: true, ya_marcada: true });
+
+  const { numero_reserva, nombre_cliente, email_cliente } = reserva.rows[0];
+
+  try {
+    await enviarEmail({
+      to: email_cliente,
+      subject: 'Seguimos gestionando tu traslado — ' + numero_reserva,
+      html: plantillaEmailSimple(
+        nombre_cliente,
+        'Seguimos gestionando tu solicitud de traslado. Aún no hemos podido confirmar chofer, pero continuamos buscando disponibilidad. Te avisaremos en cuanto tengamos una respuesta.',
+        numero_reserva
+      )
+    });
+  } catch (err) {
+    console.warn('Error enviando email de "sin respuesta" al cliente:', err.message);
+  }
+
+  try {
+    const destinatarios = await obtenerEmailsNotificacion();
+    for (const em of destinatarios) {
+      await enviarEmail({
+        to: em,
+        subject: 'Reserva ' + numero_reserva + ' sin respuesta de choferes (15 min)',
+        html: '<p>La reserva <strong>' + numero_reserva + '</strong> lleva 15 minutos avisada a los choferes disponibles sin que nadie haya aceptado. Puede que quieras buscar chofer manualmente desde el panel de administración.</p>'
+      });
+    }
+  } catch (err) {
+    console.warn('Error enviando email de aviso al admin:', err.message);
+  }
+
+  res.json({ ok: true });
+}));
+
+// El puente ya avisó al cliente por WhatsApp de la cancelación (24h sin
+// respuesta). Aquí cancelamos la reserva y mandamos el email equivalente.
+app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const reserva = await pool.query(
+    `UPDATE reservas SET estado = 'cancelada', estado_aviso_whatsapp = 'cancelada_sin_respuesta'
+     WHERE id = $1 AND estado NOT IN ('cancelada', 'completada')
+     RETURNING numero_reserva, nombre_cliente, email_cliente`,
+    [req.params.id]
+  );
+  if (!reserva.rows.length) return res.json({ ok: true, ya_cancelada: true });
+
+  const { numero_reserva, nombre_cliente, email_cliente } = reserva.rows[0];
+
+  try {
+    await enviarEmail({
+      to: email_cliente,
+      subject: 'Tu reserva ' + numero_reserva + ' ha sido anulada',
+      html: plantillaEmailSimple(
+        nombre_cliente,
+        'Lamentamos informarte que no hemos podido confirmar un chofer disponible para tu traslado en la fecha solicitada, por lo que hemos anulado la reserva. Puedes enviarnos una nueva solicitud más adelante; con gusto intentaremos ayudarte si tenemos disponibilidad.',
+        numero_reserva
+      )
+    });
+  } catch (err) {
+    console.warn('Error enviando email de cancelación al cliente:', err.message);
+  }
+
   res.json({ ok: true });
 }));
 
