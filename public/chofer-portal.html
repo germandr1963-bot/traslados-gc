@@ -76,6 +76,9 @@
         <button class="secundario" style="margin:0;padding:8px 18px" onclick="mostrarPanel()">🔄 Actualizar</button>
       </div>
       <p class="sub" id="texto-estado"></p>
+      <div id="aviso-extras-pendientes" style="display:none;background:#fdecea;border:1px solid #c62828;color:#c62828;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;margin-bottom:14px;cursor:pointer;" onclick="irAMisExtras()">
+        ⚠️ Tienes extras pendientes por aprobar. Revisa y ajusta.
+      </div>
 
       <div class="tarjeta" style="display:flex;align-items:center;gap:10px;padding:14px 16px">
         <input type="checkbox" id="chk-disponible-hoy" onchange="cambiarDisponibilidad(this.checked)" style="width:18px;height:18px">
@@ -90,6 +93,17 @@
           <span class="reserva-chevron" id="mi-perfil-chevron">▼</span>
         </div>
         <div class="reserva-cuerpo" id="mi-perfil-cuerpo"></div>
+      </div>
+
+      <div class="reserva-card" id="tarjeta-mis-extras">
+        <div class="reserva-card-cabecera" onclick="toggleMisExtras()">
+          <div class="reserva-resumen"><span class="reserva-ruta">🧩 Mis extras</span></div>
+          <span class="reserva-badges">
+            <span id="badge-extras-pendientes" class="badge-msg" style="display:none;background:#c62828;">Pendiente por aprobar</span>
+            <span class="reserva-chevron" id="mis-extras-chevron">▼</span>
+          </span>
+        </div>
+        <div class="reserva-cuerpo" id="mis-extras-cuerpo"></div>
       </div>
 
       <div class="reserva-card" id="tarjeta-cambiar-password">
@@ -173,6 +187,88 @@
         '<input type="file" id="archivo-foto" accept="image/*" onchange="subirFoto(this)">';
       pintarMiPerfil(conductor);
       await cargarReservas();
+      await cargarExtrasChofer();
+    }
+
+    var NOMBRES_BLOQUE_EXTRA_CHOFER = {
+      A: 'Retención infantil', B: 'Mascotas', C: 'Material deportivo',
+      D: 'Equipaje especial', E: 'Accesibilidad y movilidad reducida', F: 'Comodidades y servicios premium'
+    };
+    var ORDEN_BLOQUES_EXTRA_CHOFER = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+    function toggleMisExtras() {
+      document.getElementById('mis-extras-cuerpo').classList.toggle('abierto');
+      var abierto = document.getElementById('mis-extras-cuerpo').classList.contains('abierto');
+      document.getElementById('mis-extras-chevron').textContent = abierto ? '▲' : '▼';
+    }
+
+    function irAMisExtras() {
+      var cuerpo = document.getElementById('mis-extras-cuerpo');
+      if (!cuerpo.classList.contains('abierto')) toggleMisExtras();
+      cuerpo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    async function cargarExtrasChofer() {
+      const r = await fetch('/chofer/extras');
+      if (!r.ok) return;
+      const data = await r.json();
+      document.getElementById('aviso-extras-pendientes').style.display = data.pendientes > 0 ? 'block' : 'none';
+      document.getElementById('badge-extras-pendientes').style.display = data.pendientes > 0 ? 'inline-block' : 'none';
+      pintarExtrasChofer(data.extras || []);
+    }
+
+    function pintarExtrasChofer(lista) {
+      var cuerpo = document.getElementById('mis-extras-cuerpo');
+      if (!lista.length) {
+        cuerpo.innerHTML = '<p style="color:#5a6c79;font-size:13px">De momento no hay extras publicados.</p>';
+        return;
+      }
+      var porBloque = {};
+      lista.forEach(function (ex) {
+        var b = ex.bloque || 'F';
+        porBloque[b] = porBloque[b] || [];
+        porBloque[b].push(ex);
+      });
+      var bloques = Object.keys(porBloque).sort(function (a, b) {
+        var ia = ORDEN_BLOQUES_EXTRA_CHOFER.indexOf(a); if (ia === -1) ia = 99;
+        var ib = ORDEN_BLOQUES_EXTRA_CHOFER.indexOf(b); if (ib === -1) ib = 99;
+        return ia - ib;
+      });
+      cuerpo.innerHTML = '<p style="font-size:12px;color:#5a6c79;margin-top:0">El precio de pago lo fija la administración; tú solo decides si lo ofreces.</p>' +
+        bloques.map(function (b) {
+          var filas = porBloque[b].map(function (ex) {
+            var estado = ex.estado || 'no_ofrece';
+            var pendiente = ex.estado === null;
+            return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #eee;">' +
+              '<div style="flex:1;min-width:160px;">' +
+                '<div style="font-size:13px;font-weight:600;">' + escapar(ex.nombre) + (pendiente ? ' <span style="color:#c62828;font-size:11px;">· pendiente</span>' : '') + '</div>' +
+                (ex.notas_chofer ? '<div style="font-size:11px;color:#5a6c79;">' + escapar(ex.notas_chofer) + '</div>' : '') +
+              '</div>' +
+              '<select class="campo" style="width:auto;" onchange="guardarExtraChofer(' + ex.id + ', this.value)">' +
+                '<option value="no_ofrece"' + (estado === 'no_ofrece' ? ' selected' : '') + '>No lo ofrezco</option>' +
+                '<option value="gratis"' + (estado === 'gratis' ? ' selected' : '') + '>Sí, gratis</option>' +
+                '<option value="pago"' + (estado === 'pago' ? ' selected' : '') + '>Sí, de pago (' + Number(ex.precio).toFixed(2) + ' €)</option>' +
+              '</select>' +
+            '</div>';
+          }).join('');
+          return '<div style="margin-bottom:16px;">' +
+            '<div style="font-size:13px;font-weight:700;color:var(--costa);margin-bottom:4px;">' + (NOMBRES_BLOQUE_EXTRA_CHOFER[b] || b) + '</div>' +
+            filas +
+          '</div>';
+        }).join('');
+    }
+
+    function guardarExtraChofer(extraId, estado) {
+      fetch('/chofer/extras/' + extraId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: estado })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.ok) cargarExtrasChofer();
+        else alert(d.error || 'No se pudo guardar el cambio.');
+      }).catch(function () {
+        alert('No se pudo guardar el cambio. Comprueba tu conexión e inténtalo de nuevo.');
+      });
     }
 
     async function cargarReservas() {
