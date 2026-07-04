@@ -781,6 +781,7 @@ async function initSchema() {
       ('Alzador/Booster — 22 a 36 kg (6 a 12 años)', 'A', 5, 'contador', 'Grupo 3 homologado', TRUE),
       ('Mascota pequeña en transportín', 'B', 1, 'checkbox', 'Gato, perro pequeño, conejo...', TRUE),
       ('Mascota grande con arnés homologado', 'B', 2, 'checkbox', 'Perro mediano o grande', TRUE),
+      ('Perro guía', 'B', 3, 'checkbox', 'Puede viajar suelto/con arnés junto al pasajero', TRUE),
       ('Tabla de surf / bodyboard', 'C', 1, 'checkbox', 'Habitual en playas de Gran Canaria y Tenerife', TRUE),
       ('Tabla de windsurf / kitesurf', 'C', 2, 'checkbox', 'Medidas grandes — solo Minivan', TRUE),
       ('Bicicleta', 'C', 3, 'checkbox', 'Solo Minivan con espacio habilitado', TRUE),
@@ -792,6 +793,7 @@ async function initSchema() {
       ('Bulto voluminoso', 'D', 2, 'checkbox', 'Caja grande, árbol, mueble pequeño... a criterio del conductor', TRUE),
       ('Carrito de bebé plegable', 'D', 3, 'checkbox', 'Generalmente incluido sin coste', TRUE),
       ('Silla de ruedas plegable (manual)', 'D', 4, 'checkbox', 'Ver también Bloque E', TRUE),
+      ('Instrumento musical grande', 'D', 5, 'checkbox', 'Guitarra, violonchelo, etc. — a criterio del conductor', TRUE),
       ('Viajo con silla de ruedas manual', 'E', 1, 'checkbox', 'El conductor ayuda a plegar y cargar', TRUE),
       ('Viajo con silla de ruedas eléctrica', 'E', 2, 'checkbox', 'Requiere furgoneta adaptada con rampa', TRUE),
       ('Necesito asistencia para subir/bajar del vehículo', 'E', 3, 'checkbox', 'Sin silla, pero con dificultad de movilidad', TRUE),
@@ -803,9 +805,36 @@ async function initSchema() {
       ('Viaje en silencio (sin conversación)', 'F', 5, 'checkbox', 'Muy solicitado en traslados nocturnos', TRUE),
       ('Conductor con letrero en llegadas', 'F', 6, 'checkbox', 'Para recogidas en aeropuerto o puerto', TRUE),
       ('Seguimiento de vuelo — espero si hay retraso', 'F', 7, 'checkbox', 'Sin coste adicional por retraso', TRUE),
-      ('Recogida en puerto / muelle (cruceros)', 'F', 8, 'checkbox', 'Muy relevante en Las Palmas y Arrecife', TRUE)
+      ('Recogida en puerto / muelle (cruceros)', 'F', 8, 'checkbox', 'Muy relevante en Las Palmas y Arrecife', TRUE),
+      ('Nevera/refrigeración a bordo', 'F', 9, 'checkbox', 'Para alimentos o medicinas que requieren frío', TRUE)
     ) AS v(nombre, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer)
     WHERE NOT EXISTS (SELECT 1 FROM extras e WHERE e.nombre = v.nombre);
+  `);
+
+  // ─── Avisos de reserva (Grupo B: información pura, sin precio, el chofer ──
+  // no decide nada, solo se entera). Distinto de "extras": no filtra choferes.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS avisos_reserva (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      nota_interna TEXT,
+      orden INT DEFAULT 0,
+      activo BOOLEAN DEFAULT TRUE,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  // Avisos de ejemplo ya acordados. Solo se insertan los que no existan ya
+  // por nombre, así que es seguro volver a desplegar sin duplicar nada.
+  await pool.query(`
+    INSERT INTO avisos_reserva (nombre, nota_interna, orden, activo)
+    SELECT v.nombre, v.nota_interna, v.orden, FALSE
+    FROM (VALUES
+      ('Soy ciego', 'Ayuda mínima al subir/bajar del vehículo', 1),
+      ('Soy mudo, pero puedo oír', '', 2),
+      ('Solo puedo comunicarme por texto', '', 3)
+    ) AS v(nombre, nota_interna, orden)
+    WHERE NOT EXISTS (SELECT 1 FROM avisos_reserva a WHERE a.nombre = v.nombre);
   `);
 
   // ─── Reservas ─────────────────────────────────────────────────────────────
@@ -4926,6 +4955,45 @@ app.post('/admin/extras/:id/eliminar', requireAdmin, asyncHandler(async (req, re
     return res.status(400).json({ error: 'Este extra está asociado a una o más reservas y no se puede eliminar.' });
   }
   await pool.query('DELETE FROM extras WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// ─── Admin: avisos de reserva (Grupo B — información pura, sin precio) ───────
+app.get('/admin/avisos', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, nombre, nota_interna, orden, activo FROM avisos_reserva ORDER BY orden, id'
+  );
+  res.json({ avisos: result.rows });
+}));
+
+app.post('/admin/avisos', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, nota_interna, orden } = req.body;
+  if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
+  await pool.query(
+    'INSERT INTO avisos_reserva (nombre, nota_interna, orden, activo) VALUES ($1, $2, $3, FALSE)',
+    [nombre.trim(), nota_interna ? nota_interna.trim() : null, parseInt(orden, 10) || 0]
+  );
+  res.json({ ok: true });
+}));
+
+app.post('/admin/avisos/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, nota_interna, orden } = req.body;
+  if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
+  await pool.query(
+    'UPDATE avisos_reserva SET nombre = $1, nota_interna = $2, orden = COALESCE($3, orden) WHERE id = $4',
+    [nombre.trim(), nota_interna ? nota_interna.trim() : null,
+     (orden !== undefined && orden !== null && orden !== '') ? parseInt(orden, 10) : null, req.params.id]
+  );
+  res.json({ ok: true });
+}));
+
+app.post('/admin/avisos/:id/activo', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE avisos_reserva SET activo = $1 WHERE id = $2', [!!req.body.activo, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/avisos/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM avisos_reserva WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
 
