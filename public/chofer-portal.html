@@ -234,22 +234,23 @@
         var ib = ORDEN_BLOQUES_EXTRA_CHOFER.indexOf(b); if (ib === -1) ib = 99;
         return ia - ib;
       });
-      cuerpo.innerHTML = '<p style="font-size:12px;color:#5a6c79;margin-top:0">El precio de pago lo fija la administración; tú solo decides si lo ofreces.</p>' +
+      cuerpo.innerHTML = '<p style="font-size:12px;font-weight:700;color:#1C1815;margin:0 0 14px;">El precio de pago lo fija la administración; tú solo decides si lo ofreces.</p>' +
         bloques.map(function (b) {
           var filas = porBloque[b].map(function (ex) {
             var estado = ex.estado || 'no_ofrece';
             var pendiente = ex.estado === null;
-            var insignia;
-            if (pendiente) {
-              insignia = '<span style="background:#fdecea;color:#c62828;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">Pendiente</span>';
-            } else if (estado === 'no_ofrece') {
-              insignia = '<span style="background:#eee;color:#666;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">No ofrecido</span>';
-            } else {
-              insignia = '<span style="background:#e6f4ea;color:#1e7e34;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">En línea</span>';
-            }
-            return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #eee;">' +
+            var TEXTOS_ESTADO_EXTRA = {
+              no_ofrece: 'No lo ofrezco',
+              gratis: 'Gratis',
+              pago: 'De pago — ' + Number(ex.precio).toFixed(2) + ' €'
+            };
+            var insignia = pendiente
+              ? '<span style="background:#fdecea;color:#c62828;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;">🔴 Pendiente</span>'
+              : '<span style="background:#e6f4ea;color:#1e7e34;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;">🟢 Guardado (' + TEXTOS_ESTADO_EXTRA[estado] + ')</span>';
+            return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #eee;">' +
+              insignia +
               '<div style="flex:1;min-width:160px;">' +
-                '<div style="font-size:13px;font-weight:600;">' + escapar(ex.nombre) + ' ' + insignia + '</div>' +
+                '<div style="font-size:13px;font-weight:600;">' + escapar(ex.nombre) + '</div>' +
                 (ex.notas_chofer ? '<div style="font-size:11px;color:#5a6c79;">' + escapar(ex.notas_chofer) + '</div>' : '') +
               '</div>' +
               '<select class="campo" id="extra-sel-' + ex.id + '" style="width:auto;">' +
