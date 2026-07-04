@@ -4557,6 +4557,7 @@ function abrirDetalleReserva(id, sinScroll) {
           '<tr><th>Teléfono</th><td>' + r.telefono_cliente + '</td></tr>' +
           '<tr><th>Email</th><td>' + r.email_cliente + '</td></tr>' +
           '<tr><th>Fecha de reserva</th><td>' + recibida + '</td></tr>' +
+          (r.es_para_otra_persona ? '<tr><th>Viaja</th><td>👤 ' + (r.nombre_pasajero_otro || '—') + ' · 📱 ' + (r.telefono_pasajero_otro || '—') + ' <span style="color:#888;font-size:12px;">(pedido para otra persona)</span></td></tr>' : '') +
           // — DETALLES DEL VIAJE —
           '<tr><td colspan="2" style="background:#f5f0ea;font-size:0.75rem;font-weight:700;color:#888;letter-spacing:0.05em;padding:6px 10px;">VIAJE</td></tr>' +
           '<tr><th>Fecha y hora</th><td>' + fecha + ' a las ' + (r.hora ? r.hora.slice(0,5) : '—') + '</td></tr>' +

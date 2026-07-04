@@ -372,6 +372,25 @@
         <div class="aviso-campo" id="err-contacto-nombre">Campo obligatorio</div>
       </div>
 
+      <div class="campo-grupo" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="es-para-otra-persona" onchange="toggleOtraPersona(this.checked)" style="width:18px;height:18px;flex-shrink:0;">
+        <label for="es-para-otra-persona" style="margin:0;cursor:pointer;">Reserva para otra persona</label>
+      </div>
+
+      <div id="bloque-otra-persona" class="bloque-oculto">
+        <div class="campo-grupo">
+          <label>Nombre y apellido de quien viaja *</label>
+          <input type="text" id="otra-persona-nombre" placeholder="Nombre y apellido">
+          <div class="aviso-campo" id="err-otra-persona-nombre">Campo obligatorio</div>
+        </div>
+        <div class="campo-grupo">
+          <label>Teléfono de quien viaja *</label>
+          <input type="tel" id="otra-persona-telefono" placeholder="600 000 000">
+          <div class="aviso-campo" id="err-otra-persona-telefono">Introduce un número válido</div>
+          <div style="font-size:12px;color:var(--texto-muted);margin-top:4px;">Solo para que el chofer pueda avisarle si está esperando y no le ve.</div>
+        </div>
+      </div>
+
       <div class="campo-grupo">
         <label>Teléfono (con código de país) *</label>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -667,6 +686,16 @@ function validarPaso2() {
   return ok;
 }
 
+function toggleOtraPersona(marcado) {
+  document.getElementById('bloque-otra-persona').classList.toggle('bloque-oculto', !marcado);
+  if (!marcado) {
+    document.getElementById('otra-persona-nombre').value = '';
+    document.getElementById('otra-persona-telefono').value = '';
+    document.getElementById('err-otra-persona-nombre').style.display = 'none';
+    document.getElementById('err-otra-persona-telefono').style.display = 'none';
+  }
+}
+
 // ── Resumen y envío ─────────────────────────────────────────────────────────
 function mostrarResumen() {
   var nombre = document.getElementById('contacto-nombre').value.trim();
@@ -678,6 +707,16 @@ function mostrarResumen() {
   document.getElementById('err-telefono').style.display = telValido ? 'none' : 'block';
   document.getElementById('err-email').style.display = emailValido ? 'none' : 'block';
   if (!nombre || !telValido || !emailValido) return;
+
+  var esOtraPersona = document.getElementById('es-para-otra-persona').checked;
+  var otraNombre = document.getElementById('otra-persona-nombre').value.trim();
+  var otraTelNum = document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'');
+  if (esOtraPersona) {
+    var otraTelValido = otraTelNum.length >= 7 && /^\d+$/.test(otraTelNum);
+    document.getElementById('err-otra-persona-nombre').style.display = otraNombre ? 'none' : 'block';
+    document.getElementById('err-otra-persona-telefono').style.display = otraTelValido ? 'none' : 'block';
+    if (!otraNombre || !otraTelValido) return;
+  }
 
   var fecha = document.getElementById('fecha').value;
   var fechaTexto = new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric',month:'long',year:'numeric'});
@@ -703,6 +742,7 @@ function mostrarResumen() {
     (extrasSeleccionados.length ? '<strong>Extras:</strong> ' + extrasSeleccionados.map(function(e){ return e.nombre + ' (' + Number(e.precio).toFixed(2) + ' €)'; }).join(', ') + '<br>' : '') +
     '<strong>Pasajero:</strong> ' + pasajero + '<br>' +
     (document.getElementById('bloque-pasaporte').style.display !== 'none' ? '<strong>Pasaporte/DNI:</strong> ' + document.getElementById('pasajero-pasaporte').value.trim() + '<br>' : '') +
+    (esOtraPersona ? '<strong>Viaja:</strong> ' + otraNombre + ' · ' + otraTelNum + ' (para otra persona)<br>' : '') +
     '<strong>Contacto:</strong> ' + nombre + ' · ' + tel + ' · ' + email;
 
   document.getElementById('resumen-final-contenido').innerHTML = html;
@@ -744,6 +784,9 @@ function confirmarEnvio() {
     nombre_cliente: document.getElementById('contacto-nombre').value.trim(),
     telefono_cliente: tel,
     email_cliente: document.getElementById('contacto-email').value.trim(),
+    es_para_otra_persona: document.getElementById('es-para-otra-persona').checked,
+    nombre_pasajero_otro: document.getElementById('otra-persona-nombre').value.trim(),
+    telefono_pasajero_otro: document.getElementById('otra-persona-telefono').value.trim(),
     extras: extrasSeleccionados.map(function(e){ return { id: e.id, precio: e.precio }; })
   };
 
