@@ -998,6 +998,33 @@ table.tabla-precios input {
       <p class="subtitulo" style="margin-top:0;">El cliente solo avisa de algo — no depende de si el chofer lo tiene.</p>
       <div id="bloques-extras-cliente"></div>
 
+      <h2 style="margin-bottom:4px;margin-top:32px;">Avisos informativos</h2>
+      <p class="subtitulo" style="margin-top:0;">Información pura para el chofer (ej: "Soy ciego"). Sin precio, no depende de que el chofer marque nada.</p>
+      <div class="tarjeta" style="margin-bottom:12px;">
+        <button class="boton-primario" onclick="abrirFormularioAviso(null)">+ Añadir aviso</button>
+      </div>
+      <div id="lista-avisos"></div>
+
+      <!-- Modal formulario aviso -->
+      <div id="modal-aviso" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
+        <div class="tarjeta" style="width:100%;max-width:420px;position:relative;">
+          <h3 style="margin-top:0;" id="modal-aviso-titulo">Nuevo aviso</h3>
+          <div style="margin-bottom:12px;">
+            <label class="etiqueta">Aviso visible al chofer</label>
+            <input type="text" id="aviso-nombre" class="campo" placeholder="Ej: Soy ciego">
+          </div>
+          <div style="margin-bottom:20px;">
+            <label class="etiqueta">Nota interna (opcional, solo la ves tú)</label>
+            <input type="text" id="aviso-nota" class="campo" placeholder="Ej: Ayuda mínima al subir/bajar">
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="boton-primario" onclick="guardarAviso()">💾 Guardar (queda en borrador)</button>
+            <button class="boton-secundario" onclick="cerrarModalAviso()">Cancelar</button>
+          </div>
+          <div id="aviso-msg" style="margin-top:10px;font-size:13px;"></div>
+        </div>
+      </div>
+
       <!-- Modal formulario extra -->
       <div id="modal-extra" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
         <div class="tarjeta" style="width:100%;max-width:420px;position:relative;">
@@ -1114,7 +1141,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
     if (boton.dataset.seccion === 'cotizaciones') cargarCotizaciones();
     if (boton.dataset.seccion === 'reservas') cargarReservas();
-    if (boton.dataset.seccion === 'extras') cargarExtras();
+    if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); }
   });
 });
 
@@ -5174,6 +5201,102 @@ function cargarExtras() {
       extrasCache = data.extras;
       pintarBloquesExtras(extrasCache.filter(function (e) { return e.depende_chofer; }), 'bloques-extras-chofer');
       pintarBloquesExtras(extrasCache.filter(function (e) { return !e.depende_chofer; }), 'bloques-extras-cliente');
+    });
+}
+
+var avisosCache = [];
+var avisoEditandoId = null;
+
+function pintarAvisos(lista) {
+  var cont = document.getElementById('lista-avisos');
+  if (!lista.length) {
+    cont.innerHTML = '<p style="color:var(--texto-muted);padding:12px 0;">Nada aquí todavía.</p>';
+    return;
+  }
+  var filas = lista.map(function (a) {
+    return '<tr>' +
+      '<td>' + a.nombre + '</td>' +
+      '<td>' + (a.nota_interna ? '<span style="font-size:11px;color:var(--texto-muted);">' + a.nota_interna + '</span>' : '—') + '</td>' +
+      '<td><span class="' + (a.activo ? 'insignia-ok' : 'insignia-suspendido') + '">' + (a.activo ? 'Publicado' : 'Borrador') + '</span></td>' +
+      '<td>' +
+        '<button class="boton-costa" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="abrirFormularioAviso(' + a.id + ')">✏️ Editar</button>' +
+        '<button class="boton-secundario" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="toggleActivoAviso(' + a.id + ',' + a.activo + ')">' + (a.activo ? '⏸ Pasar a borrador' : '▶ Publicar') + '</button>' +
+        '<button class="boton-peligro" style="font-size:12px;padding:4px 10px;" onclick="eliminarAviso(' + a.id + ')">🗑️</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+  cont.innerHTML = '<div class="tarjeta"><table class="tabla-admin"><thead><tr><th>Aviso visible al chofer</th><th>Nota interna</th><th>Estado</th><th>Acciones</th></tr></thead>' +
+    '<tbody>' + filas + '</tbody></table></div>';
+}
+
+function cargarAvisos() {
+  fetch('/admin/avisos')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      avisosCache = data.avisos;
+      pintarAvisos(avisosCache);
+    });
+}
+
+function abrirFormularioAviso(id) {
+  avisoEditandoId = id;
+  document.getElementById('aviso-msg').textContent = '';
+  if (id === null) {
+    document.getElementById('modal-aviso-titulo').textContent = 'Nuevo aviso';
+    document.getElementById('aviso-nombre').value = '';
+    document.getElementById('aviso-nota').value = '';
+  } else {
+    var a = avisosCache.find(function (x) { return x.id === id; });
+    document.getElementById('modal-aviso-titulo').textContent = 'Editar aviso';
+    document.getElementById('aviso-nombre').value = a.nombre;
+    document.getElementById('aviso-nota').value = a.nota_interna || '';
+  }
+  document.getElementById('modal-aviso').classList.remove('oculto');
+}
+
+function cerrarModalAviso() {
+  document.getElementById('modal-aviso').classList.add('oculto');
+  avisoEditandoId = null;
+}
+
+function guardarAviso() {
+  var nombre = document.getElementById('aviso-nombre').value.trim();
+  var nota_interna = document.getElementById('aviso-nota').value.trim();
+  var msg = document.getElementById('aviso-msg');
+  if (!nombre) { msg.textContent = 'El nombre es obligatorio.'; return; }
+  var url = avisoEditandoId ? '/admin/avisos/' + avisoEditandoId + '/editar' : '/admin/avisos';
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre: nombre, nota_interna: nota_interna })
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (d.ok) {
+      cerrarModalAviso();
+      cargarAvisos();
+    } else {
+      msg.textContent = d.error || 'Error al guardar.';
+    }
+  });
+}
+
+function toggleActivoAviso(id, activo) {
+  fetch('/admin/avisos/' + id + '/activo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo: !activo })
+  }).then(function () { cargarAvisos(); });
+}
+
+function eliminarAviso(id) {
+  if (!confirm('¿Eliminar este aviso? Esta acción no se puede deshacer.')) return;
+  fetch('/admin/avisos/' + id + '/eliminar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.ok) {
+        cargarAvisos();
+      } else {
+        alert(d.error || 'No se pudo eliminar.');
+      }
     });
 }
 
