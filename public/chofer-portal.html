@@ -239,9 +239,17 @@
           var filas = porBloque[b].map(function (ex) {
             var estado = ex.estado || 'no_ofrece';
             var pendiente = ex.estado === null;
+            var insignia;
+            if (pendiente) {
+              insignia = '<span style="background:#fdecea;color:#c62828;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">Pendiente</span>';
+            } else if (estado === 'no_ofrece') {
+              insignia = '<span style="background:#eee;color:#666;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">No ofrecido</span>';
+            } else {
+              insignia = '<span style="background:#e6f4ea;color:#1e7e34;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">En línea</span>';
+            }
             return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #eee;">' +
               '<div style="flex:1;min-width:160px;">' +
-                '<div style="font-size:13px;font-weight:600;">' + escapar(ex.nombre) + (pendiente ? ' <span style="color:#c62828;font-size:11px;">· pendiente</span>' : '') + '</div>' +
+                '<div style="font-size:13px;font-weight:600;">' + escapar(ex.nombre) + ' ' + insignia + '</div>' +
                 (ex.notas_chofer ? '<div style="font-size:11px;color:#5a6c79;">' + escapar(ex.notas_chofer) + '</div>' : '') +
               '</div>' +
               '<select class="campo" id="extra-sel-' + ex.id + '" style="width:auto;">' +
@@ -249,7 +257,7 @@
                 '<option value="gratis"' + (estado === 'gratis' ? ' selected' : '') + '>Sí, gratis</option>' +
                 '<option value="pago"' + (estado === 'pago' ? ' selected' : '') + '>Sí, de pago (' + Number(ex.precio).toFixed(2) + ' €)</option>' +
               '</select>' +
-              '<button class="secundario" style="padding:6px 12px;font-size:12px;" onclick="guardarExtraChofer(' + ex.id + ', document.getElementById(\'extra-sel-' + ex.id + '\').value)">Guardar</button>' +
+              '<button style="padding:6px 12px;font-size:12px;border-radius:6px;border:1px solid #ccc;background:#f4f4f2;color:#333;cursor:pointer;" onclick="guardarExtraChofer(' + ex.id + ', document.getElementById(\'extra-sel-' + ex.id + '\').value)">Guardar</button>' +
             '</div>';
           }).join('');
           return '<div style="margin-bottom:16px;">' +
