@@ -894,7 +894,10 @@ async function initSchema() {
       ADD COLUMN IF NOT EXISTS direccion_recogida TEXT,
       ADD COLUMN IF NOT EXISTS direccion_destino TEXT,
       ADD COLUMN IF NOT EXISTS notas_cliente TEXT,
-      ADD COLUMN IF NOT EXISTS pasaporte_dni TEXT
+      ADD COLUMN IF NOT EXISTS pasaporte_dni TEXT,
+      ADD COLUMN IF NOT EXISTS es_para_otra_persona BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS nombre_pasajero_otro TEXT,
+      ADD COLUMN IF NOT EXISTS telefono_pasajero_otro TEXT
   `);
 
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email_confirmacion_enviado BOOLEAN DEFAULT FALSE`);
@@ -1201,11 +1204,15 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     nombre_barco, hora_atraque,
     num_pasajeros, notas,
     nombre_cliente, telefono_cliente, email_cliente,
+    es_para_otra_persona, nombre_pasajero_otro, telefono_pasajero_otro,
     extras
   } = req.body;
 
   if (!origen || !destino || !categoria_id || !fecha || !nombre_cliente || !telefono_cliente || !email_cliente) {
     return res.status(400).json({ error: 'Faltan datos obligatorios.' });
+  }
+  if (es_para_otra_persona && (!nombre_pasajero_otro || !nombre_pasajero_otro.trim() || !telefono_pasajero_otro || !telefono_pasajero_otro.trim())) {
+    return res.status(400).json({ error: 'Falta el nombre o el teléfono de la persona que viaja.' });
   }
 
   // Generar número de reserva tipo PNR: TGC-XXX999
@@ -1245,6 +1252,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     tipo_llegada === 'puerto' && nombre_barco ? 'Barco: ' + nombre_barco : null,
     tipo_llegada === 'puerto' && hora_atraque ? 'Hora atraque: ' + hora_atraque : null,
     num_pasajeros ? 'Pasajeros: ' + num_pasajeros : null,
+    es_para_otra_persona ? 'Reserva hecha por ' + nombre_cliente.trim() + ' para otra persona: ' + nombre_pasajero_otro.trim() + ' (tel. ' + telefono_pasajero_otro.trim() + ')' : null,
     notas || null
   ].filter(Boolean).join(' | ');
 
@@ -1256,10 +1264,12 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       origen, destino, tipo_llegada,
       numero_vuelo, hora_llegada_vuelo,
       nombre_barco, hora_atraque,
-      num_pasajeros, notas_cliente, estado_aviso_whatsapp
+      num_pasajeros, notas_cliente, estado_aviso_whatsapp,
+      es_para_otra_persona, nombre_pasajero_otro, telefono_pasajero_otro
     )
      VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, 'pendiente',
-             $10, $11, $12, $13, $14, $15, $16, $17, $18, 'pendiente')
+             $10, $11, $12, $13, $14, $15, $16, $17, $18, 'pendiente',
+             $19, $20, $21)
      RETURNING id`,
     [
       numeroReserva, categoria_id, fecha, horaGuardar,
@@ -1268,7 +1278,10 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       origen || null, destino || null, tipo_llegada || null,
       numero_vuelo || null, hora_llegada_vuelo || null,
       nombre_barco || null, hora_atraque || null,
-      num_pasajeros || null, notas || null
+      num_pasajeros || null, notas || null,
+      !!es_para_otra_persona,
+      es_para_otra_persona ? nombre_pasajero_otro.trim() : null,
+      es_para_otra_persona ? telefono_pasajero_otro.trim() : null
     ]
   );
 
@@ -4423,8 +4436,13 @@ async function generarCartelChofer(reservaId) {
   if (!result.rows.length) return null;
   const r = result.rows[0];
 
-  // Extraer solo nombre y primer apellido en mayúsculas
-  const partes = (r.nombre_cliente || '').trim().split(/\s+/);
+  // Extraer solo nombre y primer apellido en mayúsculas. Si la reserva es
+  // para otra persona, el cartel lleva el nombre de quien viaja, no el de
+  // quien hizo y paga la reserva.
+  const nombreParaCartel = (r.es_para_otra_persona && r.nombre_pasajero_otro)
+    ? r.nombre_pasajero_otro
+    : r.nombre_cliente;
+  const partes = (nombreParaCartel || '').trim().split(/\s+/);
   const nombreCartel = (partes.length >= 2
     ? partes[0] + ' ' + partes[1]
     : partes[0] || ''
