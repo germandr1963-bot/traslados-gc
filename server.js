@@ -837,6 +837,20 @@ async function initSchema() {
     WHERE NOT EXISTS (SELECT 1 FROM avisos_reserva a WHERE a.nombre = v.nombre);
   `);
 
+  // ─── Decisión del chofer sobre cada extra (No lo ofrezco / Gratis / Pago) ──
+  // No existe fila = el chofer aún no lo ha revisado (queda "pendiente" en su
+  // portal). En cuanto guarda una decisión sobre un extra, se crea la fila.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS conductor_extras (
+      id SERIAL PRIMARY KEY,
+      conductor_id INT NOT NULL REFERENCES conductores(id) ON DELETE CASCADE,
+      extra_id INT NOT NULL REFERENCES extras(id) ON DELETE CASCADE,
+      estado TEXT NOT NULL DEFAULT 'no_ofrece' CHECK (estado IN ('no_ofrece', 'gratis', 'pago')),
+      actualizado_en TIMESTAMP DEFAULT NOW(),
+      UNIQUE (conductor_id, extra_id)
+    );
+  `);
+
   // ─── Reservas ─────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS reservas (
@@ -3092,6 +3106,37 @@ app.post('/chofer/disponibilidad', requireChofer, asyncHandler(async (req, res) 
   const disponible = req.body.disponible_hoy === true;
   await pool.query('UPDATE conductores SET disponible_hoy = $1 WHERE id = $2', [disponible, req.session.choferId]);
   res.json({ ok: true, disponible_hoy: disponible });
+}));
+
+// Extras: el chofer ve el catálogo publicado (Grupo A) y su decisión actual
+// para cada uno. Si no hay fila en conductor_extras, ese extra cuenta como
+// "pendiente por revisar" — de ahí sale el aviso en su portal.
+app.get('/chofer/extras', requireChofer, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT e.id, e.nombre, e.bloque, e.orden, e.tipo_seleccion, e.precio, e.notas_chofer,
+            ce.estado
+     FROM extras e
+     LEFT JOIN conductor_extras ce ON ce.extra_id = e.id AND ce.conductor_id = $1
+     WHERE e.activo = TRUE AND e.depende_chofer = TRUE
+     ORDER BY e.bloque, e.orden, e.id`,
+    [req.session.choferId]
+  );
+  const pendientes = result.rows.filter(function (r) { return r.estado === null; }).length;
+  res.json({ extras: result.rows, pendientes: pendientes });
+}));
+
+app.post('/chofer/extras/:extraId', requireChofer, asyncHandler(async (req, res) => {
+  const estado = req.body.estado;
+  if (['no_ofrece', 'gratis', 'pago'].indexOf(estado) === -1) {
+    return res.status(400).json({ error: 'Estado no válido.' });
+  }
+  await pool.query(
+    `INSERT INTO conductor_extras (conductor_id, extra_id, estado, actualizado_en)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (conductor_id, extra_id) DO UPDATE SET estado = $3, actualizado_en = NOW()`,
+    [req.session.choferId, req.params.extraId, estado]
+  );
+  res.json({ ok: true });
 }));
 
 app.post('/chofer/mi-perfil', requireChofer, asyncHandler(async (req, res) => {
