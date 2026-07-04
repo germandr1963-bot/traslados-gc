@@ -244,11 +244,12 @@
                 '<div style="font-size:13px;font-weight:600;">' + escapar(ex.nombre) + (pendiente ? ' <span style="color:#c62828;font-size:11px;">· pendiente</span>' : '') + '</div>' +
                 (ex.notas_chofer ? '<div style="font-size:11px;color:#5a6c79;">' + escapar(ex.notas_chofer) + '</div>' : '') +
               '</div>' +
-              '<select class="campo" style="width:auto;" onchange="guardarExtraChofer(' + ex.id + ', this.value)">' +
+              '<select class="campo" id="extra-sel-' + ex.id + '" style="width:auto;">' +
                 '<option value="no_ofrece"' + (estado === 'no_ofrece' ? ' selected' : '') + '>No lo ofrezco</option>' +
                 '<option value="gratis"' + (estado === 'gratis' ? ' selected' : '') + '>Sí, gratis</option>' +
                 '<option value="pago"' + (estado === 'pago' ? ' selected' : '') + '>Sí, de pago (' + Number(ex.precio).toFixed(2) + ' €)</option>' +
               '</select>' +
+              '<button class="secundario" style="padding:6px 12px;font-size:12px;" onclick="guardarExtraChofer(' + ex.id + ', document.getElementById(\'extra-sel-' + ex.id + '\').value)">Guardar</button>' +
             '</div>';
           }).join('');
           return '<div style="margin-bottom:16px;">' +
