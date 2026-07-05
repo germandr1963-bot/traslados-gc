@@ -376,6 +376,48 @@
       <button id="ver-precio" class="boton-primario" style="padding:10px 40px;">Ver precio</button>
     </div>
     <div id="resultado-precio">Elige una ruta y categoría para ver el precio</div>
+    <div style="text-align:center;margin-top:16px;">
+      <button onclick="abrirFormCotizacion()" style="background:none;border:none;color:#6b5c44;cursor:pointer;font-size:0.9rem;text-decoration:underline;">¿No encuentras tu ruta? Pídenos precio →</button>
+    </div>
+  </div>
+
+  <!-- Modal de cotización (clonado de la portada) -->
+  <div id="modal-cotizacion" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;">
+    <div style="background:#fff;border-radius:12px;padding:1.5rem;max-width:440px;width:90%;margin:auto;position:relative;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+        <h2 style="font-size:1.1rem;margin:0;color:#2c2c2c;">Solicitar precio</h2>
+        <button onclick="cerrarFormCotizacion()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888;padding:0 4px;line-height:1;">✕</button>
+      </div>
+      <p style="font-size:0.85rem;color:#888;margin:0 0 1.25rem 0;">Te respondemos por email con los precios disponibles.</p>
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        <div>
+          <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;">Origen *</label>
+          <input type="text" id="cotiz-origen" class="campo" placeholder="Ej: Las Palmas de Gran Canaria">
+        </div>
+        <div>
+          <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;">Destino *</label>
+          <input type="text" id="cotiz-destino" class="campo" placeholder="Ej: Puerto de Mogán">
+        </div>
+        <div style="display:flex;gap:0.75rem;">
+          <div style="flex:1;">
+            <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;">Fecha aproximada</label>
+            <input type="date" id="cotiz-fecha" class="campo">
+          </div>
+          <div style="flex:1;">
+            <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;">Nº pasajeros</label>
+            <input type="number" id="cotiz-pax" class="campo" min="1" max="16" placeholder="1">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;">Tu email *</label>
+          <input type="email" id="cotiz-email" class="campo" placeholder="tunombre@email.com">
+        </div>
+        <div id="cotiz-error" style="color:#e07b5a;font-size:0.82rem;display:none;"></div>
+        <div id="cotiz-ok" style="color:#2d7a4f;font-size:0.85rem;display:none;text-align:center;padding:0.75rem;background:#d1e7dd;border-radius:6px;"></div>
+        <button id="btn-enviar-cotizacion" onclick="enviarCotizacion()" class="boton-primario" style="width:100%;margin-top:0.5rem;">Enviar solicitud</button>
+        <button id="btn-cancelar-cotizacion" onclick="cerrarFormCotizacion()" style="width:100%;background:#f5f0ea;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:0.9rem;padding:0.6rem;">Cancelar</button>
+      </div>
+    </div>
   </div>
 
   <!-- Tarjeta resumen -->
@@ -700,8 +742,8 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
   if (!paramOrigen || !paramDestino || !paramCategoriaId) {
     document.getElementById('panel-ruta').style.display = 'block';
     document.querySelectorAll('.paso').forEach(function(p){ p.style.display = 'none'; });
-    cargarRutasPanel();
-    cargarCategoriasPanel();
+    cargarRutas();
+    cargarCategorias();
     return;
   }
 
@@ -836,6 +878,7 @@ var rutasDisponibles = [];
 var categoriasDisponibles = [];
 
 function poblarSelect(select, valores) {
+  select.innerHTML = '<option value="">Selecciona</option>';
   valores.forEach(function (v) {
     var opt = document.createElement('option');
     opt.value = v;
@@ -844,7 +887,7 @@ function poblarSelect(select, valores) {
   });
 }
 
-function cargarRutasPanel() {
+function cargarRutas() {
   fetch('/api/rutas').then(function (r) { return r.json(); }).then(function (rutas) {
     rutasDisponibles = rutas;
     var origenes = Array.from(new Set(rutas.map(function (r) { return r.origen; })));
@@ -857,9 +900,10 @@ function cargarRutasPanel() {
   });
 }
 
-function cargarCategoriasPanel() {
+function cargarCategorias() {
   fetch('/api/categorias').then(function (r) { return r.json(); }).then(function (categorias) {
     categoriasDisponibles = categorias;
+    // No cargamos todas de golpe — se filtran al elegir ruta
     actualizarCategoriasSegunRuta();
   });
 }
@@ -870,15 +914,18 @@ function actualizarCategoriasSegunRuta() {
   var select = document.getElementById('categoria');
   var valorActual = select.value;
 
+  // Buscar la ruta seleccionada (en ambas direcciones)
   var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; })
           || rutasDisponibles.find(function (r) { return r.origen === hastaVal && r.destino === desdeVal; });
 
   select.innerHTML = '<option value="">Selecciona</option>';
 
   if (!ruta || !desdeVal || !hastaVal) {
+    // Sin ruta seleccionada — no mostrar categorías
     return;
   }
 
+  // Filtrar solo las categorías que tienen precio para esta ruta
   var categoriasRuta = categoriasDisponibles.filter(function (c) {
     return ruta.categorias_con_precio && ruta.categorias_con_precio.indexOf(c.id) !== -1;
   });
@@ -891,12 +938,13 @@ function actualizarCategoriasSegunRuta() {
     select.appendChild(opt);
   });
 
+  // Limpiar resultado si la categoría ya no es válida
   if (valorActual && !categoriasRuta.find(function(c) { return String(c.id) === String(valorActual); })) {
     document.getElementById('resultado-precio').innerHTML = '';
   }
 }
 
-function verPrecioPanel() {
+function verPrecio() {
   var desdeVal = document.getElementById('desde').value;
   var hastaVal = document.getElementById('hasta').value;
   var categoriaId = document.getElementById('categoria').value;
@@ -912,6 +960,7 @@ function verPrecioPanel() {
   var categoriaSelect = document.getElementById('categoria');
   var categoriaTexto = categoriaSelect.options[categoriaSelect.selectedIndex].text;
 
+  // Buscar datos de la categoría (foto, pax, maletas)
   var catData = categoriasDisponibles.find(function (c) { return String(c.id) === String(categoriaId); });
 
   if (!ruta) {
@@ -943,7 +992,7 @@ function verPrecioPanel() {
         ? '<span class="precio precio-grande" style="font-size:22px;">A consultar</span>'
         : '<span class="precio precio-grande">' + Number(data.precio).toFixed(0) + ' €</span>';
 
-      var botonHtml = '<button class="boton-reservar" onclick="continuarConRuta()">Reservar este traslado →</button>';
+      var botonHtml = '<button class="boton-reservar" onclick="irAReserva()">Reservar este traslado →</button>';
 
       resultado.innerHTML =
         '<div class="tarjeta-resultado">' +
@@ -963,7 +1012,7 @@ function verPrecioPanel() {
     });
 }
 
-function continuarConRuta() {
+function irAReserva() {
   var desde = document.getElementById('desde').value;
   var hasta = document.getElementById('hasta').value;
   var categoriaId = document.getElementById('categoria').value;
@@ -971,9 +1020,99 @@ function continuarConRuta() {
   window.location.href = '/reserva?' + params.toString();
 }
 
-if (document.getElementById('ver-precio')) {
-  document.getElementById('ver-precio').addEventListener('click', verPrecioPanel);
+document.getElementById('ver-precio').addEventListener('click', verPrecio);
+
+function abrirFormCotizacion() {
+  var modal = document.getElementById('modal-cotizacion');
+  modal.style.display = 'flex';
+  // Siempre limpio al abrir
+  document.getElementById('cotiz-origen').value = '';
+  document.getElementById('cotiz-destino').value = '';
+  document.getElementById('cotiz-fecha').value = '';
+  document.getElementById('cotiz-pax').value = '';
+  document.getElementById('cotiz-email').value = '';
+  document.getElementById('cotiz-error').style.display = 'none';
+  document.getElementById('cotiz-ok').style.display = 'none';
+  var btnEnviar = document.getElementById('btn-enviar-cotizacion');
+  var btnCancelar = document.getElementById('btn-cancelar-cotizacion');
+  if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = 'Enviar solicitud'; btnEnviar.style.display = ''; }
+  if (btnCancelar) btnCancelar.textContent = 'Cancelar';
 }
+
+function cerrarFormCotizacion() {
+  document.getElementById('modal-cotizacion').style.display = 'none';
+  // Restaurar botones para próxima vez
+  var btnEnviar = document.getElementById('btn-enviar-cotizacion');
+  var btnCancelar = document.getElementById('btn-cancelar-cotizacion');
+  if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = 'Enviar solicitud'; btnEnviar.style.display = ''; }
+  if (btnCancelar) btnCancelar.textContent = 'Cancelar';
+  document.getElementById('cotiz-origen').value = '';
+  document.getElementById('cotiz-destino').value = '';
+  document.getElementById('cotiz-fecha').value = '';
+  document.getElementById('cotiz-pax').value = '';
+  document.getElementById('cotiz-email').value = '';
+  document.getElementById('cotiz-error').style.display = 'none';
+  document.getElementById('cotiz-ok').style.display = 'none';
+}
+
+function enviarCotizacion() {
+  var origen  = document.getElementById('cotiz-origen').value.trim();
+  var destino = document.getElementById('cotiz-destino').value.trim();
+  var email   = document.getElementById('cotiz-email').value.trim();
+  var fecha   = document.getElementById('cotiz-fecha').value;
+  var pax     = document.getElementById('cotiz-pax').value;
+  var err     = document.getElementById('cotiz-error');
+  var ok      = document.getElementById('cotiz-ok');
+
+  err.style.display = 'none';
+  ok.style.display = 'none';
+
+  if (!origen || !destino || !email) {
+    err.textContent = 'Por favor rellena origen, destino y email.';
+    err.style.display = 'block';
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    err.textContent = 'El email no es válido.';
+    err.style.display = 'block';
+    return;
+  }
+
+  // Deshabilitar botón para evitar doble envío
+  var btnEnviar = document.getElementById('btn-enviar-cotizacion');
+  var btnCancelar = document.getElementById('btn-cancelar-cotizacion');
+  if (btnEnviar) { btnEnviar.disabled = true; btnEnviar.textContent = 'Enviando...'; }
+
+  fetch('/api/cotizaciones', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ origen: origen, destino: destino, fecha_aproximada: fecha || null, num_pasajeros: pax ? Number(pax) : null, email_cliente: email })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) {
+      err.textContent = data.error;
+      err.style.display = 'block';
+      if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = 'Enviar solicitud'; }
+      return;
+    }
+    // Ocultar botones y mostrar mensaje de éxito
+    if (btnEnviar) btnEnviar.style.display = 'none';
+    if (btnCancelar) btnCancelar.textContent = 'Cerrar';
+    ok.innerHTML = '<strong>✔ Solicitud enviada</strong><br>Te responderemos a <strong>' + email + '</strong> en breve.';
+    ok.style.display = 'block';
+  })
+  .catch(function() {
+    err.textContent = 'Error de conexión. Inténtalo de nuevo.';
+    err.style.display = 'block';
+    if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = 'Enviar solicitud'; }
+  });
+}
+
+// Cerrar modal al pulsar fuera
+document.getElementById('modal-cotizacion').addEventListener('click', function(e) {
+  if (e.target === this) cerrarFormCotizacion();
+});
 
 // ── Extras ──────────────────────────────────────────────────────────────────
 function toggleExtra(id) {
