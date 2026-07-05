@@ -165,6 +165,178 @@
 .mensaje-ok .icono { font-size:52px; margin-bottom:18px; }
 .mensaje-ok h2 { font-family:'Big Shoulders Display',sans-serif; font-size:28px; margin-bottom:10px; color:var(--texto-oscuro); }
 .mensaje-ok p { font-size:14px; color:var(--texto-muted); max-width:420px; margin:0 auto; line-height:1.7; }
+
+/* Panel de ruta (espejo del buscador de la portada, solo si se llega sin ruta) */
+.panel-busqueda {
+  background: var(--piedra);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 28px;
+}
+.fila-busqueda {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.fila-busqueda select.campo,
+.fila-busqueda .campo {
+  height: auto;
+  min-height: 40px;
+  white-space: normal;
+  word-break: break-word;
+  padding: 8px 10px;
+}
+#resultado-precio {
+  font-size: 14px;
+  color: var(--texto-muted);
+  min-height: 26px;
+}
+.resultado-vacio {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  color: var(--texto-oscuro);
+}
+.tarjeta-resultado {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  background: var(--charcoal-2);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.tarjeta-resultado-foto {
+  width: 150px;
+  height: auto;
+  align-self: stretch;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #fff;
+  flex-shrink: 0;
+  padding: 8px;
+}
+.tarjeta-resultado-foto-placeholder {
+  width: 150px;
+  align-self: stretch;
+  border-radius: 8px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  flex-shrink: 0;
+}
+.tarjeta-resultado-info {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+.tarjeta-resultado-nombre {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-size: 20px;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+.tarjeta-resultado-datos {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.tarjeta-resultado-dato {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: rgba(242,237,228,0.85);
+  background: rgba(255,255,255,0.07);
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+.tarjeta-resultado-dato svg {
+  flex-shrink: 0;
+}
+.tarjeta-resultado-precio-bloque {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 140px;
+}
+.precio-grande {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 36px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+.badge-aproximado {
+  background: var(--oro);
+  color: var(--oro-texto);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 20px;
+  letter-spacing: 0.2px;
+}
+.tarjeta-resultado-nota {
+  font-size: 11px;
+  color: rgba(242,237,228,0.45);
+  margin-top: 2px;
+  line-height: 1.5;
+  text-align: right;
+  max-width: 180px;
+}
+.boton-reservar {
+  background: var(--terracota);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 13px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+  margin-left: auto;
+}
+.boton-reservar:hover {
+  background: var(--terracota-oscuro);
+}
+@media (max-width: 600px) {
+  .fila-busqueda { grid-template-columns: 1fr; }
+  .tarjeta-resultado {
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+  }
+  .tarjeta-resultado-foto,
+  .tarjeta-resultado-foto-placeholder {
+    width: 100%;
+    height: 160px;
+  }
+  .tarjeta-resultado-precio-bloque {
+    align-items: flex-start;
+    min-width: unset;
+    width: 100%;
+  }
+  .tarjeta-resultado-nota { text-align: left; max-width: 100%; }
+  .boton-reservar {
+    width: 100%;
+    margin-left: 0;
+    text-align: center;
+  }
+  .precio-grande { font-size: 28px; }
+}
 </style>
 </head>
 <body>
@@ -178,6 +350,28 @@
 <div class="contenedor">
   <h1 class="titular" style="font-size:26px;margin-bottom:6px;">Solicitar traslado</h1>
   <p style="font-size:14px;color:var(--texto-muted);margin-bottom:22px;">Rellena los datos y te confirmamos disponibilidad en menos de 24 horas.</p>
+
+  <!-- Panel de ruta (solo si se llega sin ruta elegida) -->
+  <div class="panel-busqueda" id="panel-ruta" style="display:none;">
+    <div class="fila-busqueda">
+      <div>
+        <label class="etiqueta">Desde</label>
+        <select id="desde" class="campo" onchange="actualizarCategoriasSegunRuta()" size="1"><option value="">Selecciona origen</option></select>
+      </div>
+      <div>
+        <label class="etiqueta">Hasta</label>
+        <select id="hasta" class="campo" onchange="actualizarCategoriasSegunRuta()" size="1"><option value="">Selecciona destino</option></select>
+      </div>
+      <div>
+        <label class="etiqueta">Categoría</label>
+        <select id="categoria" class="campo"><option value="">Cargando...</option></select>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:10px;">
+      <button id="ver-precio" class="boton-primario" style="padding:10px 40px;">Ver precio</button>
+    </div>
+    <div id="resultado-precio">Elige una ruta y categoría para ver el precio</div>
+  </div>
 
   <!-- Tarjeta resumen -->
   <div class="tarjeta-traslado" id="tarjeta-traslado" style="display:none;">
@@ -372,25 +566,6 @@
         <div class="aviso-campo" id="err-contacto-nombre">Campo obligatorio</div>
       </div>
 
-      <div class="campo-grupo" style="display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="es-para-otra-persona" onchange="toggleOtraPersona(this.checked)" style="width:18px;height:18px;flex-shrink:0;">
-        <label for="es-para-otra-persona" style="margin:0;cursor:pointer;">Reserva para otra persona</label>
-      </div>
-
-      <div id="bloque-otra-persona" class="bloque-oculto">
-        <div class="campo-grupo">
-          <label>Nombre y apellido de quien viaja *</label>
-          <input type="text" id="otra-persona-nombre" placeholder="Nombre y apellido">
-          <div class="aviso-campo" id="err-otra-persona-nombre">Campo obligatorio</div>
-        </div>
-        <div class="campo-grupo">
-          <label>Teléfono de quien viaja *</label>
-          <input type="tel" id="otra-persona-telefono" placeholder="600 000 000">
-          <div class="aviso-campo" id="err-otra-persona-telefono">Introduce un número válido</div>
-          <div style="font-size:12px;color:var(--texto-muted);margin-top:4px;">Solo para que el chofer pueda avisarle si está esperando y no le ve.</div>
-        </div>
-      </div>
-
       <div class="campo-grupo">
         <label>Teléfono (con código de país) *</label>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -421,6 +596,50 @@
         <label>Email *</label>
         <input type="email" id="contacto-email" placeholder="tu@email.com">
         <div class="aviso-campo" id="err-email">Introduce un email válido</div>
+      </div>
+
+      <div class="campo-grupo" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="es-para-otra-persona" onchange="toggleOtraPersona(this.checked)" style="width:18px;height:18px;flex-shrink:0;">
+        <label for="es-para-otra-persona" style="margin:0;cursor:pointer;">Reserva para otra persona</label>
+      </div>
+
+      <div id="bloque-otra-persona" class="bloque-oculto">
+        <div class="campo-grupo">
+          <label>Nombre y apellido de quien viaja *</label>
+          <input type="text" id="otra-persona-nombre" placeholder="Nombre y apellido">
+          <div class="aviso-campo" id="err-otra-persona-nombre">Campo obligatorio</div>
+          <div style="font-size:12px;color:var(--texto-muted);margin-top:4px;">Es el nombre que llevará el cartel del conductor.</div>
+        </div>
+        <div class="campo-grupo">
+          <label>Teléfono de quien viaja (con código de país) *</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="otra-persona-prefijo" style="width:120px;flex-shrink:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 8px;font-family:inherit;font-size:14px;">
+              <option value="+34">🇪🇸 +34</option>
+              <option value="+44">🇬🇧 +44</option>
+              <option value="+49">🇩🇪 +49</option>
+              <option value="+46">🇸🇪 +46</option>
+              <option value="+47">🇳🇴 +47</option>
+              <option value="+31">🇳🇱 +31</option>
+              <option value="+39">🇮🇹 +39</option>
+              <option value="+33">🇫🇷 +33</option>
+              <option value="+358">🇫🇮 +358</option>
+              <option value="+7">🇷🇺 +7</option>
+              <option value="+1">🇺🇸 +1</option>
+              <option value="+351">🇵🇹 +351</option>
+              <option value="+32">🇧🇪 +32</option>
+              <option value="+41">🇨🇭 +41</option>
+              <option value="+43">🇦🇹 +43</option>
+              <option value="+48">🇵🇱 +48</option>
+            </select>
+            <input type="tel" id="otra-persona-telefono" placeholder="600 000 000" style="flex:1;min-width:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 12px;font-family:inherit;font-size:14px;">
+          </div>
+          <div class="aviso-campo" id="err-otra-persona-telefono">Introduce un número válido</div>
+        </div>
+        <div class="campo-grupo">
+          <label>Email de quien viaja *</label>
+          <input type="email" id="otra-persona-email" placeholder="email@ejemplo.com">
+          <div class="aviso-campo" id="err-otra-persona-email">Introduce un email válido</div>
+        </div>
       </div>
 
       <div id="resumen-final" style="display:none;">
@@ -484,6 +703,16 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
 
 // ── Inicialización ──────────────────────────────────────────────────────────
 (function init() {
+  // Sin ruta elegida (p. ej. llegando desde "+ Nueva reserva"):
+  // mostrar el panel de ruta y ocultar el formulario hasta que elija
+  if (!paramOrigen || !paramDestino || !paramCategoriaId) {
+    document.getElementById('panel-ruta').style.display = 'block';
+    document.querySelectorAll('.paso').forEach(function(p){ p.style.display = 'none'; });
+    cargarRutasPanel();
+    cargarCategoriasPanel();
+    return;
+  }
+
   // Tarjeta resumen
   if (paramOrigen && paramDestino) {
     document.getElementById('tbl-origen').textContent = paramOrigen;
@@ -596,6 +825,150 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
 })();
 
 function mostrar(id) { document.getElementById(id).style.display = 'block'; }
+
+// ── Panel de ruta (espejo del buscador de la portada) ───────────────────────
+var rutasDisponibles = [];
+var categoriasDisponibles = [];
+
+function poblarSelect(select, valores) {
+  valores.forEach(function (v) {
+    var opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v;
+    select.appendChild(opt);
+  });
+}
+
+function cargarRutasPanel() {
+  fetch('/api/rutas').then(function (r) { return r.json(); }).then(function (rutas) {
+    rutasDisponibles = rutas;
+    var origenes = Array.from(new Set(rutas.map(function (r) { return r.origen; })));
+    var destinos = Array.from(new Set(rutas.map(function (r) { return r.destino; })));
+    poblarSelect(document.getElementById('desde'), origenes);
+    poblarSelect(document.getElementById('hasta'), destinos);
+    if (rutas.length === 0) {
+      document.getElementById('resultado-precio').textContent = 'Aún no hay rutas cargadas';
+    }
+  });
+}
+
+function cargarCategoriasPanel() {
+  fetch('/api/categorias').then(function (r) { return r.json(); }).then(function (categorias) {
+    categoriasDisponibles = categorias;
+    actualizarCategoriasSegunRuta();
+  });
+}
+
+function actualizarCategoriasSegunRuta() {
+  var desdeVal = document.getElementById('desde').value;
+  var hastaVal = document.getElementById('hasta').value;
+  var select = document.getElementById('categoria');
+  var valorActual = select.value;
+
+  var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; })
+          || rutasDisponibles.find(function (r) { return r.origen === hastaVal && r.destino === desdeVal; });
+
+  select.innerHTML = '<option value="">Selecciona</option>';
+
+  if (!ruta || !desdeVal || !hastaVal) {
+    return;
+  }
+
+  var categoriasRuta = categoriasDisponibles.filter(function (c) {
+    return ruta.categorias_con_precio && ruta.categorias_con_precio.indexOf(c.id) !== -1;
+  });
+
+  categoriasRuta.forEach(function (c) {
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.nombre + ' (' + c.capacidad_pasajeros + ' pax)';
+    if (String(c.id) === String(valorActual)) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  if (valorActual && !categoriasRuta.find(function(c) { return String(c.id) === String(valorActual); })) {
+    document.getElementById('resultado-precio').innerHTML = '';
+  }
+}
+
+function verPrecioPanel() {
+  var desdeVal = document.getElementById('desde').value;
+  var hastaVal = document.getElementById('hasta').value;
+  var categoriaId = document.getElementById('categoria').value;
+  var resultado = document.getElementById('resultado-precio');
+
+  if (!desdeVal || !hastaVal || !categoriaId) {
+    resultado.innerHTML = '<div class="resultado-vacio">Elige una ruta y categoría para ver el precio</div>';
+    return;
+  }
+
+  var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; })
+          || rutasDisponibles.find(function (r) { return r.origen === hastaVal && r.destino === desdeVal; });
+  var categoriaSelect = document.getElementById('categoria');
+  var categoriaTexto = categoriaSelect.options[categoriaSelect.selectedIndex].text;
+
+  var catData = categoriasDisponibles.find(function (c) { return String(c.id) === String(categoriaId); });
+
+  if (!ruta) {
+    resultado.innerHTML = '<div class="resultado-vacio">Ruta a consultar — contáctanos</div>';
+    return;
+  }
+
+  fetch('/api/precio?ruta_id=' + ruta.id + '&categoria_id=' + categoriaId)
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var fotoHtml = catData && catData.foto
+        ? '<img class="tarjeta-resultado-foto" src="' + catData.foto + '" alt="' + (catData.nombre || '') + '">'
+        : '<div class="tarjeta-resultado-foto-placeholder">🚗</div>';
+
+      var paxHtml = catData
+        ? '<div class="tarjeta-resultado-dato">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D9A441" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
+            catData.capacidad_pasajeros + ' pasajeros' +
+          '</div>' +
+          (catData.capacidad_maletas
+            ? '<div class="tarjeta-resultado-dato">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D9A441" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>' +
+                catData.capacidad_maletas + ' maletas' +
+              '</div>'
+            : '')
+        : '';
+
+      var precioHtml = data.a_consultar
+        ? '<span class="precio precio-grande" style="font-size:22px;">A consultar</span>'
+        : '<span class="precio precio-grande">' + Number(data.precio).toFixed(0) + ' €</span>';
+
+      var botonHtml = '<button class="boton-reservar" onclick="continuarConRuta()">Reservar este traslado →</button>';
+
+      resultado.innerHTML =
+        '<div class="tarjeta-resultado">' +
+          fotoHtml +
+          '<div class="tarjeta-resultado-info">' +
+            '<div class="tarjeta-resultado-nombre">' + (catData ? catData.nombre : categoriaTexto) + '</div>' +
+            '<div class="tarjeta-resultado-datos">' + paxHtml + '</div>' +
+          '</div>' +
+          '<div class="tarjeta-resultado-precio-bloque">' +
+            precioHtml +
+            '<span class="badge-aproximado">precio aproximado</span>' +
+            '<div class="tarjeta-resultado-nota">El precio final lo determina<br>el taxímetro del conductor.</div>' +
+          '</div>' +
+          botonHtml +
+        '</div>' +
+        '<p style="text-align:center;font-size:0.82rem;color:#6b5c44;margin:12px 0 0 0;">Para ver el precio de otras categorías, selecciónala y pulsa Ver precio.</p>';
+    });
+}
+
+function continuarConRuta() {
+  var desde = document.getElementById('desde').value;
+  var hasta = document.getElementById('hasta').value;
+  var categoriaId = document.getElementById('categoria').value;
+  var params = new URLSearchParams({ desde: desde, hasta: hasta, categoria_id: categoriaId });
+  window.location.href = '/reserva?' + params.toString();
+}
+
+if (document.getElementById('ver-precio')) {
+  document.getElementById('ver-precio').addEventListener('click', verPrecioPanel);
+}
 
 // ── Extras ──────────────────────────────────────────────────────────────────
 function toggleExtra(id) {
@@ -711,8 +1084,11 @@ function toggleOtraPersona(marcado) {
   if (!marcado) {
     document.getElementById('otra-persona-nombre').value = '';
     document.getElementById('otra-persona-telefono').value = '';
+    document.getElementById('otra-persona-prefijo').value = '+34';
+    document.getElementById('otra-persona-email').value = '';
     document.getElementById('err-otra-persona-nombre').style.display = 'none';
     document.getElementById('err-otra-persona-telefono').style.display = 'none';
+    document.getElementById('err-otra-persona-email').style.display = 'none';
   }
 }
 
@@ -731,11 +1107,15 @@ function mostrarResumen() {
   var esOtraPersona = document.getElementById('es-para-otra-persona').checked;
   var otraNombre = document.getElementById('otra-persona-nombre').value.trim();
   var otraTelNum = document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'');
+  var otraTel = document.getElementById('otra-persona-prefijo').value + ' ' + otraTelNum;
+  var otraEmail = document.getElementById('otra-persona-email').value.trim();
   if (esOtraPersona) {
     var otraTelValido = otraTelNum.length >= 7 && /^\d+$/.test(otraTelNum);
+    var otraEmailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(otraEmail);
     document.getElementById('err-otra-persona-nombre').style.display = otraNombre ? 'none' : 'block';
     document.getElementById('err-otra-persona-telefono').style.display = otraTelValido ? 'none' : 'block';
-    if (!otraNombre || !otraTelValido) return;
+    document.getElementById('err-otra-persona-email').style.display = otraEmailValido ? 'none' : 'block';
+    if (!otraNombre || !otraTelValido || !otraEmailValido) return;
   }
 
   var fecha = document.getElementById('fecha').value;
@@ -762,7 +1142,7 @@ function mostrarResumen() {
     (extrasSeleccionados.length ? '<strong>Extras:</strong> ' + extrasSeleccionados.map(function(e){ return e.nombre + ' (' + Number(e.precio).toFixed(2) + ' €)'; }).join(', ') + '<br>' : '') +
     '<strong>Pasajero:</strong> ' + pasajero + '<br>' +
     (document.getElementById('bloque-pasaporte').style.display !== 'none' ? '<strong>Pasaporte/DNI:</strong> ' + document.getElementById('pasajero-pasaporte').value.trim() + '<br>' : '') +
-    (esOtraPersona ? '<strong>Viaja:</strong> ' + otraNombre + ' · ' + otraTelNum + ' (para otra persona)<br>' : '') +
+    (esOtraPersona ? '<strong>Viaja:</strong> ' + otraNombre + ' · ' + otraTel + ' · ' + otraEmail + ' (para otra persona)<br>' : '') +
     '<strong>Contacto:</strong> ' + nombre + ' · ' + tel + ' · ' + email;
 
   document.getElementById('resumen-final-contenido').innerHTML = html;
@@ -806,7 +1186,10 @@ function confirmarEnvio() {
     email_cliente: document.getElementById('contacto-email').value.trim(),
     es_para_otra_persona: document.getElementById('es-para-otra-persona').checked,
     nombre_pasajero_otro: document.getElementById('otra-persona-nombre').value.trim(),
-    telefono_pasajero_otro: document.getElementById('otra-persona-telefono').value.trim(),
+    telefono_pasajero_otro: document.getElementById('es-para-otra-persona').checked
+      ? document.getElementById('otra-persona-prefijo').value + ' ' + document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'')
+      : '',
+    email_pasajero_otro: document.getElementById('otra-persona-email').value.trim(),
     extras: extrasSeleccionados.map(function(e){ return { id: e.id, precio: e.precio }; })
   };
 
