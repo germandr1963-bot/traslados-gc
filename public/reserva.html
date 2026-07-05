@@ -536,6 +536,15 @@
         <div class="aviso-campo" id="err-email">Introduce un email válido</div>
       </div>
 
+      <!-- Pasaporte del cliente: solo en recogidas en aeropuerto o puerto, y solo si viaja él -->
+      <div id="bloque-pasaporte" class="bloque-oculto">
+        <div class="campo-grupo">
+          <label>Número de pasaporte o DNI *</label>
+          <input type="text" id="pasajero-pasaporte" placeholder="Ej: ABC123456">
+          <div class="aviso-campo" id="err-pasajero-pasaporte">Campo obligatorio</div>
+        </div>
+      </div>
+
       <div class="campo-grupo" style="display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="es-para-otra-persona" onchange="toggleOtraPersona(this.checked)" style="width:18px;height:18px;flex-shrink:0;">
         <label for="es-para-otra-persona" style="margin:0;cursor:pointer;">Yo no viajo — la reserva es para otra persona</label>
@@ -555,6 +564,13 @@
           </div>
         </div>
         <div style="font-size:12px;color:var(--texto-muted);margin:-6px 0 12px;">El cartel del conductor llevará este nombre.</div>
+        <div id="bloque-pasaporte-otra" class="bloque-oculto">
+          <div class="campo-grupo">
+            <label>Número de pasaporte o DNI de quien viaja *</label>
+            <input type="text" id="otra-persona-pasaporte" placeholder="Ej: ABC123456">
+            <div class="aviso-campo" id="err-otra-persona-pasaporte">Campo obligatorio</div>
+          </div>
+        </div>
         <div class="campo-grupo">
           <label>Teléfono de quien viaja (con código de país) *</label>
           <div style="display:flex;gap:8px;align-items:center;">
@@ -584,15 +600,6 @@
           <label>Email de quien viaja *</label>
           <input type="email" id="otra-persona-email" placeholder="email@ejemplo.com">
           <div class="aviso-campo" id="err-otra-persona-email">Introduce un email válido</div>
-        </div>
-      </div>
-
-      <!-- Pasaporte: solo en recogidas en aeropuerto o puerto (origen) -->
-      <div id="bloque-pasaporte" class="bloque-oculto">
-        <div class="campo-grupo">
-          <label>Número de pasaporte o DNI de quien viaja *</label>
-          <input type="text" id="pasajero-pasaporte" placeholder="Ej: ABC123456">
-          <div class="aviso-campo" id="err-pasajero-pasaporte">Campo obligatorio</div>
         </div>
       </div>
 
@@ -723,6 +730,7 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
   // Campos del paso 2 según tipo de trayecto
   if (origenEsAero || origenEsPuerto) {
     mostrar('bloque-pasaporte');
+    mostrar('bloque-pasaporte-otra');
   }
 
   // Fecha mínima hoy
@@ -1082,25 +1090,38 @@ function validarPaso2() {
     document.getElementById('err-otra-persona-email').style.display = otraEmailValido2 ? 'none' : 'block';
     if (!pNombre || !pApellidos || !otraTelValido2 || !otraEmailValido2) ok = false;
   }
-  // Pasaporte/DNI: solo en recogidas en aeropuerto o puerto
+  // Pasaporte/DNI: solo en recogidas en aeropuerto o puerto — del cliente o de quien viaja
   if (origenEsAero || origenEsPuerto) {
-    var pasaporte = document.getElementById('pasajero-pasaporte').value.trim();
-    document.getElementById('err-pasajero-pasaporte').style.display = pasaporte ? 'none' : 'block';
-    if (!pasaporte) ok = false;
+    if (document.getElementById('es-para-otra-persona').checked) {
+      var pasaporteOtra = document.getElementById('otra-persona-pasaporte').value.trim();
+      document.getElementById('err-otra-persona-pasaporte').style.display = pasaporteOtra ? 'none' : 'block';
+      if (!pasaporteOtra) ok = false;
+    } else {
+      var pasaporte = document.getElementById('pasajero-pasaporte').value.trim();
+      document.getElementById('err-pasajero-pasaporte').style.display = pasaporte ? 'none' : 'block';
+      if (!pasaporte) ok = false;
+    }
   }
   return ok;
 }
 
 function toggleOtraPersona(marcado) {
   document.getElementById('bloque-otra-persona').classList.toggle('bloque-oculto', !marcado);
+  // El pasaporte del cliente solo se muestra si viaja él (y la recogida es en aeropuerto/puerto)
+  if (origenEsAero || origenEsPuerto) {
+    document.getElementById('bloque-pasaporte').style.display = marcado ? 'none' : 'block';
+    if (marcado) document.getElementById('err-pasajero-pasaporte').style.display = 'none';
+  }
   if (!marcado) {
     document.getElementById('pasajero-nombre').value = '';
     document.getElementById('pasajero-apellidos').value = '';
+    document.getElementById('otra-persona-pasaporte').value = '';
     document.getElementById('otra-persona-telefono').value = '';
     document.getElementById('otra-persona-prefijo').value = '+34';
     document.getElementById('otra-persona-email').value = '';
     document.getElementById('err-pasajero-nombre').style.display = 'none';
     document.getElementById('err-pasajero-apellidos').style.display = 'none';
+    document.getElementById('err-otra-persona-pasaporte').style.display = 'none';
     document.getElementById('err-otra-persona-telefono').style.display = 'none';
     document.getElementById('err-otra-persona-email').style.display = 'none';
   }
@@ -1143,7 +1164,7 @@ function mostrarResumen() {
     (precioEstimado ? '<strong>Precio estimado:</strong> ' + Number(precioEstimado).toFixed(0) + ' €<br>' : '') +
     (extrasSeleccionados.length ? '<strong>Extras:</strong> ' + extrasSeleccionados.map(function(e){ return e.nombre + ' (' + Number(e.precio).toFixed(2) + ' €)'; }).join(', ') + '<br>' : '') +
     '<strong>Pasajero:</strong> ' + pasajero + '<br>' +
-    (document.getElementById('bloque-pasaporte').style.display !== 'none' ? '<strong>Pasaporte/DNI:</strong> ' + document.getElementById('pasajero-pasaporte').value.trim() + '<br>' : '') +
+    ((origenEsAero || origenEsPuerto) ? '<strong>Pasaporte/DNI:</strong> ' + (esOtraPersona ? document.getElementById('otra-persona-pasaporte').value.trim() : document.getElementById('pasajero-pasaporte').value.trim()) + '<br>' : '') +
     (esOtraPersona ? '<strong>Reserva para otra persona</strong> — contacto de quien viaja: ' + otraTel + ' · ' + otraEmail + '<br>' : '') +
     '<strong>Contacto:</strong> ' + nombre + ' · ' + tel + ' · ' + email;
 
@@ -1183,7 +1204,11 @@ function confirmarEnvio() {
     pasajero_nombre: document.getElementById('es-para-otra-persona').checked
       ? document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim()
       : document.getElementById('contacto-nombre').value.trim(),
-    pasaporte_dni: (origenEsAero || origenEsPuerto) ? document.getElementById('pasajero-pasaporte').value.trim() : '',
+    pasaporte_dni: (origenEsAero || origenEsPuerto)
+      ? (document.getElementById('es-para-otra-persona').checked
+          ? document.getElementById('otra-persona-pasaporte').value.trim()
+          : document.getElementById('pasajero-pasaporte').value.trim())
+      : '',
     notas: document.getElementById('pasajero-notas').value.trim(),
     nombre_cliente: document.getElementById('contacto-nombre').value.trim(),
     telefono_cliente: tel,
