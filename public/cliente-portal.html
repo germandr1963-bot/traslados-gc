@@ -125,7 +125,10 @@
     <section id="zona-portal">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px">
         <h1 id="saludo" style="margin:0">Mis reservas</h1>
-        <button class="secundario" style="margin:0;padding:8px 18px" onclick="cargarPortal()">🔄 Actualizar</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <a href="/reserva" class="secundario" style="margin:0;padding:8px 18px;text-decoration:none;display:inline-flex;align-items:center;">+ Nueva reserva</a>
+          <button class="secundario" style="margin:0;padding:8px 18px" onclick="cargarPortal()">🔄 Actualizar</button>
+        </div>
       </div>
       <p class="sub" id="subtitulo"></p>
 

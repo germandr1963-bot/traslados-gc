@@ -297,20 +297,42 @@
     </div>
     <div class="paso-cuerpo" id="cuerpo-2">
 
-      <div class="dos-columnas">
-        <div class="campo-grupo">
-          <label>Nombre *</label>
-          <input type="text" id="pasajero-nombre" placeholder="Nombre">
-          <div class="aviso-campo" id="err-pasajero-nombre">Campo obligatorio</div>
-        </div>
-        <div class="campo-grupo">
-          <label>Apellidos *</label>
-          <input type="text" id="pasajero-apellidos" placeholder="Apellidos">
-          <div class="aviso-campo" id="err-pasajero-apellidos">Campo obligatorio</div>
+      <div class="campo-grupo">
+        <label>¿Quién viaja? *</label>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:4px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;font-weight:400;">
+            <input type="radio" name="modo-pasajero" id="modo-mismo" value="mismo" checked onchange="toggleModoPasajero()" style="width:16px;height:16px;">
+            Viajo yo mismo
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;font-weight:400;">
+            <input type="radio" name="modo-pasajero" id="modo-otro" value="otro" onchange="toggleModoPasajero()" style="width:16px;height:16px;">
+            Viaja otro pasajero
+          </label>
         </div>
       </div>
 
-      <!-- Pasaporte: solo si toca aeropuerto o puerto -->
+      <div id="bloque-datos-pasajero" class="bloque-oculto">
+        <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;line-height:1.5;">Indique los datos reales de la persona que viaja: con este nombre se emite el cartel de recogida, el bono de reserva y la factura.</p>
+        <div class="dos-columnas">
+          <div class="campo-grupo">
+            <label>Nombre *</label>
+            <input type="text" id="pasajero-nombre" placeholder="Nombre">
+            <div class="aviso-campo" id="err-pasajero-nombre">Campo obligatorio</div>
+          </div>
+          <div class="campo-grupo">
+            <label>Apellidos *</label>
+            <input type="text" id="pasajero-apellidos" placeholder="Apellidos">
+            <div class="aviso-campo" id="err-pasajero-apellidos">Campo obligatorio</div>
+          </div>
+        </div>
+        <div class="campo-grupo">
+          <label>Teléfono de quien viaja (opcional)</label>
+          <input type="tel" id="pasajero-telefono" placeholder="600 000 000">
+          <div style="font-size:12px;color:var(--texto-muted);margin-top:4px;">Solo para que el chofer pueda avisarle si está esperando y no le ve.</div>
+        </div>
+      </div>
+
+      <!-- Pasaporte: solo si toca aeropuerto o puerto, da igual quién viaje -->
       <div id="bloque-pasaporte" class="bloque-oculto">
         <div class="campo-grupo">
           <label>Número de pasaporte o DNI *</label>
@@ -370,25 +392,6 @@
         <label>Nombre de contacto *</label>
         <input type="text" id="contacto-nombre" placeholder="Nombre y apellidos">
         <div class="aviso-campo" id="err-contacto-nombre">Campo obligatorio</div>
-      </div>
-
-      <div class="campo-grupo" style="display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="es-para-otra-persona" onchange="toggleOtraPersona(this.checked)" style="width:18px;height:18px;flex-shrink:0;">
-        <label for="es-para-otra-persona" style="margin:0;cursor:pointer;">Reserva para otra persona</label>
-      </div>
-
-      <div id="bloque-otra-persona" class="bloque-oculto">
-        <div class="campo-grupo">
-          <label>Nombre y apellido de quien viaja *</label>
-          <input type="text" id="otra-persona-nombre" placeholder="Nombre y apellido">
-          <div class="aviso-campo" id="err-otra-persona-nombre">Campo obligatorio</div>
-        </div>
-        <div class="campo-grupo">
-          <label>Teléfono de quien viaja *</label>
-          <input type="tel" id="otra-persona-telefono" placeholder="600 000 000">
-          <div class="aviso-campo" id="err-otra-persona-telefono">Introduce un número válido</div>
-          <div style="font-size:12px;color:var(--texto-muted);margin-top:4px;">Solo para que el chofer pueda avisarle si está esperando y no le ve.</div>
-        </div>
       </div>
 
       <div class="campo-grupo">
@@ -573,6 +576,26 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
       '</div>';
     }).join('');
   });
+
+  // Si el cliente ya tiene sesión abierta, prellenar sus datos de contacto
+  fetch('/api/cliente/sesion').then(function(r){ return r.json(); }).then(function(s){
+    if (!s.autenticado) return;
+    fetch('/api/cliente/mis-datos').then(function(r){ return r.json(); }).then(function(d){
+      if (!d.nombre_cliente) return;
+      document.getElementById('contacto-nombre').value = d.nombre_cliente;
+      document.getElementById('contacto-email').value = d.email_cliente;
+      var tel = (d.telefono_cliente || '').trim();
+      var partes = tel.split(' ');
+      if (partes.length > 1 && partes[0].indexOf('+') === 0) {
+        var prefijoSel = document.getElementById('telefono-prefijo');
+        var existe = Array.from(prefijoSel.options).some(function(o){ return o.value === partes[0]; });
+        if (existe) prefijoSel.value = partes[0];
+        document.getElementById('telefono-numero').value = partes.slice(1).join(' ');
+      } else {
+        document.getElementById('telefono-numero').value = tel;
+      }
+    });
+  });
 })();
 
 function mostrar(id) { document.getElementById(id).style.display = 'block'; }
@@ -671,13 +694,19 @@ function validarPaso1() {
   return ok;
 }
 
+function esViajaOtro() {
+  return document.getElementById('modo-otro').checked;
+}
+
 function validarPaso2() {
   var ok = true;
-  var nombre = document.getElementById('pasajero-nombre').value.trim();
-  var apellidos = document.getElementById('pasajero-apellidos').value.trim();
-  document.getElementById('err-pasajero-nombre').style.display = nombre ? 'none' : 'block';
-  document.getElementById('err-pasajero-apellidos').style.display = apellidos ? 'none' : 'block';
-  if (!nombre || !apellidos) ok = false;
+  if (esViajaOtro()) {
+    var nombre = document.getElementById('pasajero-nombre').value.trim();
+    var apellidos = document.getElementById('pasajero-apellidos').value.trim();
+    document.getElementById('err-pasajero-nombre').style.display = nombre ? 'none' : 'block';
+    document.getElementById('err-pasajero-apellidos').style.display = apellidos ? 'none' : 'block';
+    if (!nombre || !apellidos) ok = false;
+  }
   if (tocaAeropuerto || tocaPuerto) {
     var pasaporte = document.getElementById('pasajero-pasaporte').value.trim();
     document.getElementById('err-pasajero-pasaporte').style.display = pasaporte ? 'none' : 'block';
@@ -686,13 +715,15 @@ function validarPaso2() {
   return ok;
 }
 
-function toggleOtraPersona(marcado) {
-  document.getElementById('bloque-otra-persona').classList.toggle('bloque-oculto', !marcado);
-  if (!marcado) {
-    document.getElementById('otra-persona-nombre').value = '';
-    document.getElementById('otra-persona-telefono').value = '';
-    document.getElementById('err-otra-persona-nombre').style.display = 'none';
-    document.getElementById('err-otra-persona-telefono').style.display = 'none';
+function toggleModoPasajero() {
+  var otro = esViajaOtro();
+  document.getElementById('bloque-datos-pasajero').classList.toggle('bloque-oculto', !otro);
+  if (!otro) {
+    document.getElementById('pasajero-nombre').value = '';
+    document.getElementById('pasajero-apellidos').value = '';
+    document.getElementById('pasajero-telefono').value = '';
+    document.getElementById('err-pasajero-nombre').style.display = 'none';
+    document.getElementById('err-pasajero-apellidos').style.display = 'none';
   }
 }
 
@@ -708,14 +739,13 @@ function mostrarResumen() {
   document.getElementById('err-email').style.display = emailValido ? 'none' : 'block';
   if (!nombre || !telValido || !emailValido) return;
 
-  var esOtraPersona = document.getElementById('es-para-otra-persona').checked;
-  var otraNombre = document.getElementById('otra-persona-nombre').value.trim();
-  var otraTelNum = document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'');
+  var esOtraPersona = esViajaOtro();
   if (esOtraPersona) {
-    var otraTelValido = otraTelNum.length >= 7 && /^\d+$/.test(otraTelNum);
-    document.getElementById('err-otra-persona-nombre').style.display = otraNombre ? 'none' : 'block';
-    document.getElementById('err-otra-persona-telefono').style.display = otraTelValido ? 'none' : 'block';
-    if (!otraNombre || !otraTelValido) return;
+    var pNombre = document.getElementById('pasajero-nombre').value.trim();
+    var pApellidos = document.getElementById('pasajero-apellidos').value.trim();
+    document.getElementById('err-pasajero-nombre').style.display = pNombre ? 'none' : 'block';
+    document.getElementById('err-pasajero-apellidos').style.display = pApellidos ? 'none' : 'block';
+    if (!pNombre || !pApellidos) return;
   }
 
   var fecha = document.getElementById('fecha').value;
@@ -723,7 +753,9 @@ function mostrarResumen() {
   var horaTexto = origenEsAero ? 'Llegada vuelo: ' + document.getElementById('hora-llegada-vuelo').value
     : origenEsPuerto ? 'Atraque: ' + document.getElementById('hora-atraque').value
     : document.getElementById('hora-recogida').value;
-  var pasajero = document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim();
+  var pasajero = esOtraPersona
+    ? (document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim())
+    : nombre;
   var tel = document.getElementById('telefono-prefijo').value + ' ' + telNum;
   var dirDestino = (!destinoEsAero && !destinoEsPuerto) ? document.getElementById('direccion-destino').value.trim() : '';
   var dirOrigen = (!origenEsAero && !origenEsPuerto) ? document.getElementById('direccion-origen').value.trim() : '';
@@ -742,7 +774,7 @@ function mostrarResumen() {
     (extrasSeleccionados.length ? '<strong>Extras:</strong> ' + extrasSeleccionados.map(function(e){ return e.nombre + ' (' + Number(e.precio).toFixed(2) + ' €)'; }).join(', ') + '<br>' : '') +
     '<strong>Pasajero:</strong> ' + pasajero + '<br>' +
     (document.getElementById('bloque-pasaporte').style.display !== 'none' ? '<strong>Pasaporte/DNI:</strong> ' + document.getElementById('pasajero-pasaporte').value.trim() + '<br>' : '') +
-    (esOtraPersona ? '<strong>Viaja:</strong> ' + otraNombre + ' · ' + otraTelNum + ' (para otra persona)<br>' : '') +
+    (esOtraPersona ? '<strong>Viaja:</strong> ' + pasajero + (document.getElementById('pasajero-telefono').value.trim() ? ' · ' + document.getElementById('pasajero-telefono').value.trim() : '') + ' (para otra persona)<br>' : '') +
     '<strong>Contacto:</strong> ' + nombre + ' · ' + tel + ' · ' + email;
 
   document.getElementById('resumen-final-contenido').innerHTML = html;
@@ -778,15 +810,14 @@ function confirmarEnvio() {
     nombre_barco: origenEsPuerto ? document.getElementById('barco-llegada').value.trim() : '',
     hora_atraque: origenEsPuerto ? document.getElementById('hora-atraque').value : '',
     num_pasajeros: document.getElementById('num-pasajeros').value,
-    pasajero_nombre: document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim(),
-    pasajero_pasaporte: (tocaAeropuerto || tocaPuerto) ? document.getElementById('pasajero-pasaporte').value.trim() : '',
+    pasaporte_dni: (tocaAeropuerto || tocaPuerto) ? document.getElementById('pasajero-pasaporte').value.trim() : '',
     notas: document.getElementById('pasajero-notas').value.trim(),
     nombre_cliente: document.getElementById('contacto-nombre').value.trim(),
     telefono_cliente: tel,
     email_cliente: document.getElementById('contacto-email').value.trim(),
-    es_para_otra_persona: document.getElementById('es-para-otra-persona').checked,
-    nombre_pasajero_otro: document.getElementById('otra-persona-nombre').value.trim(),
-    telefono_pasajero_otro: document.getElementById('otra-persona-telefono').value.trim(),
+    es_para_otra_persona: esViajaOtro(),
+    nombre_pasajero_otro: esViajaOtro() ? (document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim()) : '',
+    telefono_pasajero_otro: esViajaOtro() ? document.getElementById('pasajero-telefono').value.trim() : '',
     extras: extrasSeleccionados.map(function(e){ return { id: e.id, precio: e.precio }; })
   };
 
