@@ -897,7 +897,8 @@ async function initSchema() {
       ADD COLUMN IF NOT EXISTS pasaporte_dni TEXT,
       ADD COLUMN IF NOT EXISTS es_para_otra_persona BOOLEAN DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS nombre_pasajero_otro TEXT,
-      ADD COLUMN IF NOT EXISTS telefono_pasajero_otro TEXT
+      ADD COLUMN IF NOT EXISTS telefono_pasajero_otro TEXT,
+      ADD COLUMN IF NOT EXISTS email_pasajero_otro TEXT
   `);
 
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email_confirmacion_enviado BOOLEAN DEFAULT FALSE`);
@@ -1205,6 +1206,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     num_pasajeros, notas,
     nombre_cliente, telefono_cliente, email_cliente,
     es_para_otra_persona, nombre_pasajero_otro, telefono_pasajero_otro,
+    email_pasajero_otro,
     pasaporte_dni,
     extras
   } = req.body;
@@ -1256,7 +1258,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     tipo_llegada === 'puerto' && nombre_barco ? 'Barco: ' + nombre_barco : null,
     tipo_llegada === 'puerto' && hora_atraque ? 'Hora atraque: ' + hora_atraque : null,
     num_pasajeros ? 'Pasajeros: ' + num_pasajeros : null,
-    es_para_otra_persona ? 'Reserva hecha por ' + nombre_cliente.trim() + ' para otra persona: ' + nombre_pasajero_otro.trim() + ' (tel. ' + telefono_pasajero_otro.trim() + ')' : null,
+    es_para_otra_persona ? 'Reserva hecha por ' + nombre_cliente.trim() + ' para otra persona: ' + nombre_pasajero_otro.trim() + ' (tel. ' + (telefono_pasajero_otro || '').trim() + (email_pasajero_otro && email_pasajero_otro.trim() ? ', email ' + email_pasajero_otro.trim() : '') + ')' : null,
     notas || null
   ].filter(Boolean).join(' | ');
 
@@ -1270,11 +1272,12 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       nombre_barco, hora_atraque,
       num_pasajeros, notas_cliente, estado_aviso_whatsapp,
       es_para_otra_persona, nombre_pasajero_otro, telefono_pasajero_otro,
+      email_pasajero_otro,
       pasaporte_dni
     )
      VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, 'pendiente',
              $10, $11, $12, $13, $14, $15, $16, $17, $18, 'pendiente',
-             $19, $20, $21, $22)
+             $19, $20, $21, $22, $23)
      RETURNING id`,
     [
       numeroReserva, categoria_id, fecha, horaGuardar,
@@ -1287,6 +1290,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       !!es_para_otra_persona,
       es_para_otra_persona ? nombre_pasajero_otro.trim() : null,
       (es_para_otra_persona && telefono_pasajero_otro && telefono_pasajero_otro.trim()) ? telefono_pasajero_otro.trim() : null,
+      (es_para_otra_persona && email_pasajero_otro && email_pasajero_otro.trim()) ? email_pasajero_otro.trim() : null,
       pasaporte_dni ? pasaporte_dni.trim() : null
     ]
   );
