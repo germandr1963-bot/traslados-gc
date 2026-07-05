@@ -525,6 +525,45 @@
         <textarea id="pasajero-notas" placeholder="Equipaje especial, necesidades particulares..."></textarea>
       </div>
 
+      <div class="campo-grupo" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="es-para-otra-persona" onchange="toggleOtraPersona(this.checked)" style="width:18px;height:18px;flex-shrink:0;">
+        <label for="es-para-otra-persona" style="margin:0;cursor:pointer;">Yo no viajo — la reserva es para otra persona</label>
+      </div>
+
+      <div id="bloque-otra-persona" class="bloque-oculto">
+        <div style="font-size:13px;color:var(--texto-muted);margin-bottom:12px;line-height:1.6;">Los datos de arriba (nombre, apellidos y documento) deben ser los de la <strong>persona que viaja</strong> — su nombre irá en el cartel del conductor.</div>
+        <div class="campo-grupo">
+          <label>Teléfono de quien viaja (con código de país) *</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="otra-persona-prefijo" style="width:120px;flex-shrink:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 8px;font-family:inherit;font-size:14px;">
+              <option value="+34">🇪🇸 +34</option>
+              <option value="+44">🇬🇧 +44</option>
+              <option value="+49">🇩🇪 +49</option>
+              <option value="+46">🇸🇪 +46</option>
+              <option value="+47">🇳🇴 +47</option>
+              <option value="+31">🇳🇱 +31</option>
+              <option value="+39">🇮🇹 +39</option>
+              <option value="+33">🇫🇷 +33</option>
+              <option value="+358">🇫🇮 +358</option>
+              <option value="+7">🇷🇺 +7</option>
+              <option value="+1">🇺🇸 +1</option>
+              <option value="+351">🇵🇹 +351</option>
+              <option value="+32">🇧🇪 +32</option>
+              <option value="+41">🇨🇭 +41</option>
+              <option value="+43">🇦🇹 +43</option>
+              <option value="+48">🇵🇱 +48</option>
+            </select>
+            <input type="tel" id="otra-persona-telefono" placeholder="600 000 000" style="flex:1;min-width:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 12px;font-family:inherit;font-size:14px;">
+          </div>
+          <div class="aviso-campo" id="err-otra-persona-telefono">Introduce un número válido</div>
+        </div>
+        <div class="campo-grupo">
+          <label>Email de quien viaja *</label>
+          <input type="email" id="otra-persona-email" placeholder="email@ejemplo.com">
+          <div class="aviso-campo" id="err-otra-persona-email">Introduce un email válido</div>
+        </div>
+      </div>
+
       <button class="boton-siguiente" onclick="siguientePaso(2)">Continuar →</button>
     </div>
   </div>
@@ -601,50 +640,6 @@
         <label>Email *</label>
         <input type="email" id="contacto-email" placeholder="tu@email.com">
         <div class="aviso-campo" id="err-email">Introduce un email válido</div>
-      </div>
-
-      <div class="campo-grupo" style="display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="es-para-otra-persona" onchange="toggleOtraPersona(this.checked)" style="width:18px;height:18px;flex-shrink:0;">
-        <label for="es-para-otra-persona" style="margin:0;cursor:pointer;">Reserva para otra persona</label>
-      </div>
-
-      <div id="bloque-otra-persona" class="bloque-oculto">
-        <div class="campo-grupo">
-          <label>Nombre y apellido de quien viaja *</label>
-          <input type="text" id="otra-persona-nombre" placeholder="Nombre y apellido">
-          <div class="aviso-campo" id="err-otra-persona-nombre">Campo obligatorio</div>
-          <div style="font-size:12px;color:var(--texto-muted);margin-top:4px;">Es el nombre que llevará el cartel del conductor.</div>
-        </div>
-        <div class="campo-grupo">
-          <label>Teléfono de quien viaja (con código de país) *</label>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <select id="otra-persona-prefijo" style="width:120px;flex-shrink:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 8px;font-family:inherit;font-size:14px;">
-              <option value="+34">🇪🇸 +34</option>
-              <option value="+44">🇬🇧 +44</option>
-              <option value="+49">🇩🇪 +49</option>
-              <option value="+46">🇸🇪 +46</option>
-              <option value="+47">🇳🇴 +47</option>
-              <option value="+31">🇳🇱 +31</option>
-              <option value="+39">🇮🇹 +39</option>
-              <option value="+33">🇫🇷 +33</option>
-              <option value="+358">🇫🇮 +358</option>
-              <option value="+7">🇷🇺 +7</option>
-              <option value="+1">🇺🇸 +1</option>
-              <option value="+351">🇵🇹 +351</option>
-              <option value="+32">🇧🇪 +32</option>
-              <option value="+41">🇨🇭 +41</option>
-              <option value="+43">🇦🇹 +43</option>
-              <option value="+48">🇵🇱 +48</option>
-            </select>
-            <input type="tel" id="otra-persona-telefono" placeholder="600 000 000" style="flex:1;min-width:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 12px;font-family:inherit;font-size:14px;">
-          </div>
-          <div class="aviso-campo" id="err-otra-persona-telefono">Introduce un número válido</div>
-        </div>
-        <div class="campo-grupo">
-          <label>Email de quien viaja *</label>
-          <input type="email" id="otra-persona-email" placeholder="email@ejemplo.com">
-          <div class="aviso-campo" id="err-otra-persona-email">Introduce un email válido</div>
-        </div>
       </div>
 
       <div id="resumen-final" style="display:none;">
@@ -1081,17 +1076,24 @@ function validarPaso2() {
     document.getElementById('err-pasajero-pasaporte').style.display = pasaporte ? 'none' : 'block';
     if (!pasaporte) ok = false;
   }
+  if (document.getElementById('es-para-otra-persona').checked) {
+    var otraTelNum2 = document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'');
+    var otraEmail2 = document.getElementById('otra-persona-email').value.trim();
+    var otraTelValido2 = otraTelNum2.length >= 7 && /^\d+$/.test(otraTelNum2);
+    var otraEmailValido2 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(otraEmail2);
+    document.getElementById('err-otra-persona-telefono').style.display = otraTelValido2 ? 'none' : 'block';
+    document.getElementById('err-otra-persona-email').style.display = otraEmailValido2 ? 'none' : 'block';
+    if (!otraTelValido2 || !otraEmailValido2) ok = false;
+  }
   return ok;
 }
 
 function toggleOtraPersona(marcado) {
   document.getElementById('bloque-otra-persona').classList.toggle('bloque-oculto', !marcado);
   if (!marcado) {
-    document.getElementById('otra-persona-nombre').value = '';
     document.getElementById('otra-persona-telefono').value = '';
     document.getElementById('otra-persona-prefijo').value = '+34';
     document.getElementById('otra-persona-email').value = '';
-    document.getElementById('err-otra-persona-nombre').style.display = 'none';
     document.getElementById('err-otra-persona-telefono').style.display = 'none';
     document.getElementById('err-otra-persona-email').style.display = 'none';
   }
@@ -1110,17 +1112,15 @@ function mostrarResumen() {
   if (!nombre || !telValido || !emailValido) return;
 
   var esOtraPersona = document.getElementById('es-para-otra-persona').checked;
-  var otraNombre = document.getElementById('otra-persona-nombre').value.trim();
   var otraTelNum = document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'');
   var otraTel = document.getElementById('otra-persona-prefijo').value + ' ' + otraTelNum;
   var otraEmail = document.getElementById('otra-persona-email').value.trim();
   if (esOtraPersona) {
     var otraTelValido = otraTelNum.length >= 7 && /^\d+$/.test(otraTelNum);
     var otraEmailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(otraEmail);
-    document.getElementById('err-otra-persona-nombre').style.display = otraNombre ? 'none' : 'block';
     document.getElementById('err-otra-persona-telefono').style.display = otraTelValido ? 'none' : 'block';
     document.getElementById('err-otra-persona-email').style.display = otraEmailValido ? 'none' : 'block';
-    if (!otraNombre || !otraTelValido || !otraEmailValido) return;
+    if (!otraTelValido || !otraEmailValido) return;
   }
 
   var fecha = document.getElementById('fecha').value;
@@ -1147,7 +1147,7 @@ function mostrarResumen() {
     (extrasSeleccionados.length ? '<strong>Extras:</strong> ' + extrasSeleccionados.map(function(e){ return e.nombre + ' (' + Number(e.precio).toFixed(2) + ' €)'; }).join(', ') + '<br>' : '') +
     '<strong>Pasajero:</strong> ' + pasajero + '<br>' +
     (document.getElementById('bloque-pasaporte').style.display !== 'none' ? '<strong>Pasaporte/DNI:</strong> ' + document.getElementById('pasajero-pasaporte').value.trim() + '<br>' : '') +
-    (esOtraPersona ? '<strong>Viaja:</strong> ' + otraNombre + ' · ' + otraTel + ' · ' + otraEmail + ' (para otra persona)<br>' : '') +
+    (esOtraPersona ? '<strong>Reserva para otra persona</strong> — contacto de quien viaja: ' + otraTel + ' · ' + otraEmail + '<br>' : '') +
     '<strong>Contacto:</strong> ' + nombre + ' · ' + tel + ' · ' + email;
 
   document.getElementById('resumen-final-contenido').innerHTML = html;
@@ -1190,7 +1190,9 @@ function confirmarEnvio() {
     telefono_cliente: tel,
     email_cliente: document.getElementById('contacto-email').value.trim(),
     es_para_otra_persona: document.getElementById('es-para-otra-persona').checked,
-    nombre_pasajero_otro: document.getElementById('otra-persona-nombre').value.trim(),
+    nombre_pasajero_otro: document.getElementById('es-para-otra-persona').checked
+      ? document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim()
+      : '',
     telefono_pasajero_otro: document.getElementById('es-para-otra-persona').checked
       ? document.getElementById('otra-persona-prefijo').value + ' ' + document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'')
       : '',
