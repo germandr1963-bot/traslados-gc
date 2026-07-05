@@ -172,10 +172,15 @@
   border-radius: 12px;
   padding: 18px 20px;
   margin-bottom: 28px;
+  /* Más ancho que el formulario para que las rutas largas se lean bien */
+  width: min(940px, calc(100vw - 48px));
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
 }
 .fila-busqueda {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -663,7 +668,7 @@
         <div id="numero-reserva-mostrar" style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--texto-oscuro);letter-spacing:2px;"></div>
         <div style="font-size:11px;color:var(--texto-muted);margin-top:6px;">Guarda este número — lo recibirás también por email</div>
       </div>
-      <a href="/" style="display:inline-block;margin-top:10px;background:var(--terracota);color:#fff;padding:12px 32px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;">Volver al inicio</a>
+      <a href="/" id="link-final-inicio" style="display:inline-block;margin-top:10px;background:var(--terracota);color:#fff;padding:12px 32px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;">Volver al inicio</a>
     </div>
   </div>
 
@@ -1292,9 +1297,28 @@ document.addEventListener('click', function(e) {
 
 function reiniciarFormulario() {
   if (confirm('¿Seguro que quieres comenzar de nuevo? Se perderán los datos introducidos.')) {
-    window.location.href = '/';
+    window.location.href = clienteConSesion ? '/reserva' : '/';
   }
 }
+
+// ── Navegación según sesión ─────────────────────────────────────────────────
+// Si el cliente tiene la sesión abierta, todo lo devuelve a su panel,
+// nunca a la web pública. La única salida es "Cerrar sesión" en el panel.
+var clienteConSesion = false;
+fetch('/api/cliente/sesion').then(function(r){ return r.json(); }).then(function(s){
+  if (!s.autenticado) return;
+  clienteConSesion = true;
+  var volver = document.querySelector('.boton-volver');
+  if (volver) {
+    volver.textContent = '← Volver a mi panel';
+    volver.href = '/cliente/portal';
+  }
+  var linkFinal = document.getElementById('link-final-inicio');
+  if (linkFinal) {
+    linkFinal.textContent = 'Volver a mi panel';
+    linkFinal.href = '/cliente/portal';
+  }
+});
 </script>
 
 </body>
