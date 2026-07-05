@@ -1205,14 +1205,18 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     num_pasajeros, notas,
     nombre_cliente, telefono_cliente, email_cliente,
     es_para_otra_persona, nombre_pasajero_otro, telefono_pasajero_otro,
+    pasaporte_dni,
     extras
   } = req.body;
 
   if (!origen || !destino || !categoria_id || !fecha || !nombre_cliente || !telefono_cliente || !email_cliente) {
     return res.status(400).json({ error: 'Faltan datos obligatorios.' });
   }
-  if (es_para_otra_persona && (!nombre_pasajero_otro || !nombre_pasajero_otro.trim() || !telefono_pasajero_otro || !telefono_pasajero_otro.trim())) {
-    return res.status(400).json({ error: 'Falta el nombre o el teléfono de la persona que viaja.' });
+  if (es_para_otra_persona && (!nombre_pasajero_otro || !nombre_pasajero_otro.trim())) {
+    return res.status(400).json({ error: 'Falta el nombre de la persona que viaja.' });
+  }
+  if ((tipo_llegada === 'aeropuerto' || tipo_llegada === 'puerto') && (!pasaporte_dni || !pasaporte_dni.trim())) {
+    return res.status(400).json({ error: 'Falta el número de pasaporte o DNI del pasajero.' });
   }
 
   // Generar número de reserva tipo PNR: TGC-XXX999
@@ -1265,11 +1269,12 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       numero_vuelo, hora_llegada_vuelo,
       nombre_barco, hora_atraque,
       num_pasajeros, notas_cliente, estado_aviso_whatsapp,
-      es_para_otra_persona, nombre_pasajero_otro, telefono_pasajero_otro
+      es_para_otra_persona, nombre_pasajero_otro, telefono_pasajero_otro,
+      pasaporte_dni
     )
      VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, 'pendiente',
              $10, $11, $12, $13, $14, $15, $16, $17, $18, 'pendiente',
-             $19, $20, $21)
+             $19, $20, $21, $22)
      RETURNING id`,
     [
       numeroReserva, categoria_id, fecha, horaGuardar,
@@ -1281,7 +1286,8 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       num_pasajeros || null, notas || null,
       !!es_para_otra_persona,
       es_para_otra_persona ? nombre_pasajero_otro.trim() : null,
-      es_para_otra_persona ? telefono_pasajero_otro.trim() : null
+      (es_para_otra_persona && telefono_pasajero_otro && telefono_pasajero_otro.trim()) ? telefono_pasajero_otro.trim() : null,
+      pasaporte_dni ? pasaporte_dni.trim() : null
     ]
   );
 
@@ -5575,6 +5581,24 @@ app.get('/api/cliente/sesion', (req, res) => {
     res.json({ autenticado: false });
   }
 });
+
+// Datos de contacto del cliente logueado (para prellenar el formulario de nueva reserva)
+app.get('/api/cliente/mis-datos', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+  const emailCliente = req.session.clienteEmail;
+  const result = await pool.query(
+    `SELECT nombre_cliente, telefono_cliente, email_cliente
+     FROM reservas WHERE LOWER(email_cliente) = LOWER($1)
+     ORDER BY fecha DESC, hora DESC LIMIT 1`,
+    [emailCliente]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'No encontrado.' });
+  res.json({
+    nombre_cliente: result.rows[0].nombre_cliente,
+    telefono_cliente: result.rows[0].telefono_cliente,
+    email_cliente: result.rows[0].email_cliente
+  });
+}));
 
 // Datos completos de las reservas para el portal
 app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
