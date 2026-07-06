@@ -837,6 +837,38 @@ async function initSchema() {
     WHERE NOT EXISTS (SELECT 1 FROM avisos_reserva a WHERE a.nombre = v.nombre);
   `);
 
+  // ─── Preferencias del pasajero (Grupo G — siempre gratuitas) ───────────────
+  // El cliente las marca en su perfil; el chofer las ve al aceptar el viaje.
+  // No filtran choferes ni requieren equipamiento (eso sería un Extra).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS preferencias_catalogo (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      opciones TEXT NOT NULL,
+      orden INT DEFAULT 0,
+      activo BOOLEAN DEFAULT TRUE,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  // Preferencias G1–G8 acordadas. Solo se insertan las que no existan ya
+  // por nombre, así que es seguro volver a desplegar sin duplicar nada.
+  await pool.query(`
+    INSERT INTO preferencias_catalogo (nombre, opciones, orden, activo)
+    SELECT v.nombre, v.opciones, v.orden, FALSE
+    FROM (VALUES
+      ('Temperatura en el vehículo', 'Fresco / Normal / Caliente', 1),
+      ('Música', 'Sin música / Música suave / Lo que el conductor ponga', 2),
+      ('Conversación', 'Viaje en silencio / Conversación bienvenida / Sin preferencia', 3),
+      ('Estilo de conducción', 'Tranquila / Normal / Sin preferencia', 4),
+      ('Me mareo con facilidad', 'Sí — por favor conduce con suavidad / No', 5),
+      ('Ruta preferida', 'Más rápida aunque tenga peaje / Sin peaje aunque tarde más / Sin preferencia', 6),
+      ('Ayuda con el equipaje', 'Sí, lo agradezco / No hace falta', 7),
+      ('Necesito un momento para acomodarme antes de arrancar', 'Sí / No', 8)
+    ) AS v(nombre, opciones, orden)
+    WHERE NOT EXISTS (SELECT 1 FROM preferencias_catalogo p WHERE p.nombre = v.nombre);
+  `);
+
   // ─── Decisión del chofer sobre cada extra (No lo ofrezco / Gratis / Pago) ──
   // No existe fila = el chofer aún no lo ha revisado (queda "pendiente" en su
   // portal). En cuanto guarda una decisión sobre un extra, se crea la fila.
@@ -5067,6 +5099,47 @@ app.post('/admin/avisos/:id/activo', requireAdmin, asyncHandler(async (req, res)
 
 app.post('/admin/avisos/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM avisos_reserva WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// ─── Admin: preferencias del pasajero (Grupo G — siempre gratuitas) ──────────
+app.get('/admin/preferencias', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, nombre, opciones, orden, activo FROM preferencias_catalogo ORDER BY orden, id'
+  );
+  res.json({ preferencias: result.rows });
+}));
+
+app.post('/admin/preferencias', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, opciones, orden } = req.body;
+  if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
+  if (!opciones || !opciones.trim()) return res.status(400).json({ error: 'Las opciones son obligatorias.' });
+  await pool.query(
+    'INSERT INTO preferencias_catalogo (nombre, opciones, orden, activo) VALUES ($1, $2, $3, FALSE)',
+    [nombre.trim(), opciones.trim(), parseInt(orden, 10) || 0]
+  );
+  res.json({ ok: true });
+}));
+
+app.post('/admin/preferencias/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, opciones, orden } = req.body;
+  if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
+  if (!opciones || !opciones.trim()) return res.status(400).json({ error: 'Las opciones son obligatorias.' });
+  await pool.query(
+    'UPDATE preferencias_catalogo SET nombre = $1, opciones = $2, orden = COALESCE($3, orden) WHERE id = $4',
+    [nombre.trim(), opciones.trim(),
+     (orden !== undefined && orden !== null && orden !== '') ? parseInt(orden, 10) : null, req.params.id]
+  );
+  res.json({ ok: true });
+}));
+
+app.post('/admin/preferencias/:id/activo', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE preferencias_catalogo SET activo = $1 WHERE id = $2', [!!req.body.activo, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/preferencias/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM preferencias_catalogo WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
 
