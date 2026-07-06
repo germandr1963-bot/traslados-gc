@@ -48,7 +48,10 @@
 .traslado-cat { font-size:11px; color:rgba(255,255,255,0.35); margin-top:4px; }
 
 /* Pasos */
-.paso { margin-bottom:10px; border:1px solid var(--gris-borde); border-radius:12px; overflow:hidden; }
+.paso { margin-bottom:10px; border:1px solid var(--gris-borde); border-radius:12px; overflow:visible; }
+.paso-cabecera { border-radius:11px; }
+.paso:has(.paso-cuerpo.visible) .paso-cabecera { border-radius:11px 11px 0 0; }
+.paso-cuerpo { border-radius:0 0 11px 11px; }
 .paso-cabecera {
   display:flex; align-items:center; gap:14px;
   padding:16px 20px; background:#fff;
@@ -69,7 +72,7 @@
 .paso-cuerpo.visible { display:block; }
 
 /* Campos */
-.campo-grupo { margin-bottom:14px; }
+.campo-grupo { margin-bottom:14px; position:relative; }
 .campo-grupo label { font-size:12px; color:var(--texto-muted); display:block; margin-bottom:5px; }
 .campo-grupo input,
 .campo-grupo select,
@@ -172,15 +175,15 @@
   border-radius: 12px;
   padding: 18px 20px;
   margin-bottom: 28px;
-  /* Más ancho que el formulario para que las rutas largas se lean bien */
-  width: min(940px, calc(100vw - 48px));
+  /* Mismo ancho efectivo que el panel de la portada (hero-overlay 900px − 64px de padding) */
+  width: min(836px, calc(100vw - 48px));
   position: relative;
   left: 50%;
   transform: translateX(-50%);
 }
 .fila-busqueda {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -1428,26 +1431,37 @@ function buscarDireccion(campo) {
 
   clearTimeout(nominatimTimers[campo]);
   nominatimTimers[campo] = setTimeout(function() {
-    var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&accept-language=es' +
-      '&countrycodes=es&viewbox=-18.6,29.6,-13.0,27.2&bounded=1&q=' + encodeURIComponent(texto);
+    var base = 'https://nominatim.openstreetmap.org/search?format=json&limit=8&accept-language=es' +
+      '&countrycodes=es&viewbox=-18.6,29.6,-13.0,27.2&bounded=1&q=';
+    // Municipio de la ruta para acotar la búsqueda (origen o destino según el campo)
+    var municipio = campo === 'origen' ? (paramOrigen || '') : (paramDestino || '');
 
-    fetch(url, { headers: { 'Accept-Language': 'es' } })
+    function pintar(resultados) {
+      lista.innerHTML = '';
+      if (!resultados.length) { lista.style.display = 'none'; return; }
+      resultados.forEach(function(r) {
+        var nombre = r.display_name.split(',').slice(0, 4).join(',').trim();
+        var div = document.createElement('div');
+        div.className = 'sugerencia-item';
+        div.textContent = nombre;
+        div.onclick = function() {
+          input.value = nombre;
+          lista.style.display = 'none';
+        };
+        lista.appendChild(div);
+      });
+      lista.style.display = 'block';
+    }
+
+    // 1º: búsqueda acotada al municipio; 2º: si no hay nada, se amplía a Canarias
+    fetch(base + encodeURIComponent(municipio ? texto + ', ' + municipio : texto), { headers: { 'Accept-Language': 'es' } })
       .then(function(r){ return r.json(); })
       .then(function(resultados) {
-        lista.innerHTML = '';
-        if (!resultados.length) { lista.style.display = 'none'; return; }
-        resultados.forEach(function(r) {
-          var nombre = r.display_name.split(',').slice(0, 4).join(',').trim();
-          var div = document.createElement('div');
-          div.className = 'sugerencia-item';
-          div.textContent = nombre;
-          div.onclick = function() {
-            input.value = nombre;
-            lista.style.display = 'none';
-          };
-          lista.appendChild(div);
-        });
-        lista.style.display = 'block';
+        if (resultados.length || !municipio) { pintar(resultados); return; }
+        fetch(base + encodeURIComponent(texto), { headers: { 'Accept-Language': 'es' } })
+          .then(function(r){ return r.json(); })
+          .then(pintar)
+          .catch(function(){ lista.style.display = 'none'; });
       })
       .catch(function(){ lista.style.display = 'none'; });
   }, 400);
