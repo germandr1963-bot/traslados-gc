@@ -6,6 +6,17 @@
   <title>Mi Reserva — Traslados GC</title>
   <link rel="stylesheet" href="/estilos-chofer.css">
   <style>
+    .pref-pill {
+      border: 1px solid var(--borde);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 13px;
+      background: transparent;
+      color: var(--tinta);
+      cursor: pointer;
+      font-family: inherit;
+      line-height: 1.4;
+    }
     .reserva-card {
       border: 1px solid var(--borde);
       border-radius: 12px;
@@ -131,6 +142,22 @@
         </div>
       </div>
       <p class="sub" id="subtitulo"></p>
+
+      <!-- Preferencias del pasajero (Grupo G) -->
+      <div id="seccion-preferencias" style="display:none;background:#fff;border:1px solid var(--borde);border-radius:12px;padding:18px 20px;margin-top:16px;">
+        <h2 style="margin:0 0 2px;font-size:19px;">Preferencias del pasajero</h2>
+        <p style="margin:0 0 6px;font-size:12px;color:var(--tinta);opacity:0.65;">Siempre gratuitas · El conductor las ve al aceptar tu viaje · Puedes cambiarlas cuando quieras</p>
+        <div id="lista-preferencias-cliente"></div>
+        <div style="border-top:1px solid var(--borde);padding:12px 0 0;margin-top:4px;">
+          <div style="font-size:14px;font-weight:600;margin-bottom:8px;">Sugerencias para añadir</div>
+          <textarea id="sugerencia-preferencia" rows="2" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;resize:vertical;" placeholder="Escribe aquí una preferencia que te gustaría que existiera…"></textarea>
+          <div style="font-size:11px;color:var(--tinta);opacity:0.55;margin-top:4px;">Tu sugerencia llega al equipo — si se aprueba, aparecerá para todos los clientes.</div>
+        </div>
+        <div style="margin-top:12px;display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span id="preferencias-msg" style="font-size:12px;"></span>
+          <button onclick="guardarPreferenciasCliente()" style="background:var(--costa);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;">Guardar mis preferencias</button>
+        </div>
+      </div>
 
       <div id="lista-reservas" style="margin-top:20px;"></div>
     </section>
@@ -357,6 +384,96 @@
     }
 
     cargarPortal();
+    cargarPreferenciasCliente();
+
+    // ── Preferencias del pasajero (Grupo G) ──
+    var preferenciasSeleccion = {};
+
+    function cargarPreferenciasCliente() {
+      fetch('/api/cliente/preferencias')
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          if (!data.preferencias || !data.preferencias.length) return;
+          preferenciasSeleccion = {};
+          var cont = document.getElementById('lista-preferencias-cliente');
+          cont.innerHTML = data.preferencias.map(function(p){
+            if (p.elegida) preferenciasSeleccion[p.id] = p.elegida;
+            var pills = p.opciones.split('/').map(function(op){
+              op = op.trim();
+              return '<button type="button" class="pref-pill" data-pref="' + p.id + '" data-opcion="' + op.replace(/"/g,'&quot;') + '" onclick="togglePreferencia(this)">' + op + '</button>';
+            }).join('');
+            return '<div style="border-top:1px solid var(--borde);padding:12px 0;">' +
+              '<div style="font-size:14px;font-weight:600;margin-bottom:8px;">' + p.nombre + '</div>' +
+              '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + pills + '</div>' +
+            '</div>';
+          }).join('');
+          pintarSeleccionPreferencias();
+          document.getElementById('seccion-preferencias').style.display = 'block';
+        })
+        .catch(function(){});
+    }
+
+    function togglePreferencia(btn) {
+      var pid = btn.dataset.pref;
+      var op = btn.dataset.opcion;
+      if (preferenciasSeleccion[pid] === op) {
+        delete preferenciasSeleccion[pid];
+      } else {
+        preferenciasSeleccion[pid] = op;
+      }
+      pintarSeleccionPreferencias();
+    }
+
+    function pintarSeleccionPreferencias() {
+      document.querySelectorAll('.pref-pill').forEach(function(b){
+        var marcado = preferenciasSeleccion[b.dataset.pref] === b.dataset.opcion;
+        b.style.background = marcado ? 'var(--costa)' : 'transparent';
+        b.style.color = marcado ? '#fff' : '';
+        b.style.borderColor = marcado ? 'var(--costa)' : '';
+      });
+    }
+
+    function guardarPreferenciasCliente() {
+      var msg = document.getElementById('preferencias-msg');
+      msg.textContent = 'Guardando…';
+      msg.style.color = '';
+      var selecciones = Object.keys(preferenciasSeleccion).map(function(pid){
+        return { preferencia_id: pid, opcion: preferenciasSeleccion[pid] };
+      });
+      var texto = document.getElementById('sugerencia-preferencia').value.trim();
+      fetch('/api/cliente/preferencias', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selecciones: selecciones })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d.ok) {
+          msg.textContent = d.error || 'No se pudo guardar.';
+          msg.style.color = 'var(--peligro)';
+          return;
+        }
+        if (texto) {
+          return fetch('/api/cliente/preferencias/sugerencia', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ texto: texto })
+          })
+          .then(function(r){ return r.json(); })
+          .then(function(d2){
+            if (d2.ok) document.getElementById('sugerencia-preferencia').value = '';
+            msg.textContent = '✓ Preferencias guardadas' + (d2.ok ? ' y sugerencia enviada' : '');
+            msg.style.color = 'var(--exito)';
+          });
+        }
+        msg.textContent = '✓ Preferencias guardadas';
+        msg.style.color = 'var(--exito)';
+      })
+      .catch(function(){
+        msg.textContent = 'Error de conexión. Inténtalo de nuevo.';
+        msg.style.color = 'var(--peligro)';
+      });
+    }
   </script>
 </body>
 </html>
