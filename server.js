@@ -891,6 +891,13 @@ async function initSchema() {
       creado_en TIMESTAMP DEFAULT NOW()
     );
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS preferencias_visibilidad_cliente (
+      email_cliente TEXT PRIMARY KEY,
+      visibles BOOLEAN DEFAULT TRUE,
+      actualizado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
 
   // ─── Decisión del chofer sobre cada extra (No lo ofrezco / Gratis / Pago) ──
   // No existe fila = el chofer aún no lo ha revisado (queda "pendiente" en su
@@ -5699,13 +5706,29 @@ app.get('/api/cliente/preferencias', asyncHandler(async (req, res) => {
   const mias = await pool.query(
     'SELECT preferencia_id, opcion FROM preferencias_cliente WHERE email_cliente = $1', [email]
   );
+  const vis = await pool.query(
+    'SELECT visibles FROM preferencias_visibilidad_cliente WHERE email_cliente = $1', [email]
+  );
   const elegidas = {};
   mias.rows.forEach(m => { elegidas[m.preferencia_id] = m.opcion; });
   res.json({
+    visibles: vis.rows.length ? vis.rows[0].visibles : true,
     preferencias: cat.rows.map(p => ({
       id: p.id, nombre: p.nombre, opciones: p.opciones, elegida: elegidas[p.id] || null
     }))
   });
+}));
+
+app.post('/api/cliente/preferencias/visibilidad', asyncHandler(async (req, res) => {
+  const email = await emailClienteSesion(req);
+  if (!email) return res.status(401).json({ error: 'No autenticado.' });
+  await pool.query(
+    `INSERT INTO preferencias_visibilidad_cliente (email_cliente, visibles)
+     VALUES ($1, $2)
+     ON CONFLICT (email_cliente) DO UPDATE SET visibles = $2, actualizado_en = NOW()`,
+    [email, !!req.body.visibles]
+  );
+  res.json({ ok: true });
 }));
 
 app.post('/api/cliente/preferencias', asyncHandler(async (req, res) => {
