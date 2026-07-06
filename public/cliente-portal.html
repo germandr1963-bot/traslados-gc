@@ -9,7 +9,7 @@
     .pref-pill {
       border: 1px solid var(--borde);
       border-radius: 20px;
-      padding: 6px 14px;
+      padding: 5px 12px;
       font-size: 13px;
       background: transparent;
       color: var(--tinta);
@@ -17,6 +17,12 @@
       font-family: inherit;
       line-height: 1.4;
     }
+    .switch-pref { position: relative; display: inline-block; width: 42px; height: 24px; flex-shrink: 0; }
+    .switch-pref input { opacity: 0; width: 0; height: 0; }
+    .switch-pref-bola { position: absolute; inset: 0; background: #cfc9bd; border-radius: 24px; transition: background 0.2s; cursor: pointer; }
+    .switch-pref-bola:before { content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: left 0.2s; }
+    .switch-pref input:checked + .switch-pref-bola { background: var(--costa); }
+    .switch-pref input:checked + .switch-pref-bola:before { left: 21px; }
     .reserva-card {
       border: 1px solid var(--borde);
       border-radius: 12px;
@@ -144,18 +150,37 @@
       <p class="sub" id="subtitulo"></p>
 
       <!-- Preferencias del pasajero (Grupo G) -->
-      <div id="seccion-preferencias" style="display:none;background:#fff;border:1px solid var(--borde);border-radius:12px;padding:18px 20px;margin-top:16px;">
-        <h2 style="margin:0 0 2px;font-size:19px;">Preferencias del pasajero</h2>
-        <p style="margin:0 0 6px;font-size:12px;color:var(--tinta);opacity:0.65;">Siempre gratuitas · El conductor las ve al aceptar tu viaje · Puedes cambiarlas cuando quieras</p>
-        <div id="lista-preferencias-cliente"></div>
-        <div style="border-top:1px solid var(--borde);padding:12px 0 0;margin-top:4px;">
-          <div style="font-size:14px;font-weight:600;margin-bottom:8px;">Sugerencias para añadir</div>
-          <textarea id="sugerencia-preferencia" rows="2" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;resize:vertical;" placeholder="Escribe aquí una preferencia que te gustaría que existiera…"></textarea>
-          <div style="font-size:11px;color:var(--tinta);opacity:0.55;margin-top:4px;">Tu sugerencia llega al equipo — si se aprueba, aparecerá para todos los clientes.</div>
+      <div id="seccion-preferencias" style="display:none;background:#fff;border:1px solid var(--borde);border-radius:12px;margin-top:16px;overflow:hidden;">
+        <div onclick="toggleSeccionPreferencias()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;cursor:pointer;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h2 style="margin:0;font-size:17px;">Preferencias del pasajero</h2>
+            <span id="preferencias-resumen" style="font-size:12px;background:var(--niebla);border:1px solid var(--borde);border-radius:20px;padding:3px 10px;"></span>
+          </div>
+          <span id="preferencias-flecha" style="font-size:12px;opacity:0.6;">▼</span>
         </div>
-        <div style="margin-top:12px;display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;">
-          <span id="preferencias-msg" style="font-size:12px;"></span>
-          <button onclick="guardarPreferenciasCliente()" style="background:var(--costa);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;">Guardar mis preferencias</button>
+        <div id="cuerpo-preferencias" style="display:none;padding:0 20px 16px;">
+          <p style="margin:0 0 10px;font-size:13px;line-height:1.6;opacity:0.8;">Configúralas una sola vez: en cada viaje, tu conductor las verá y las tendrá en cuenta. Son siempre gratuitas y puedes cambiarlas cuando quieras. ¿Echas en falta alguna? Propónnosla abajo y la valoraremos para añadirla.</p>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;margin-bottom:8px;background:var(--niebla);">
+            <div style="flex:1;min-width:200px;">
+              <div style="font-size:13px;font-weight:600;">Mostrar mis preferencias al conductor</div>
+              <div id="visibilidad-nota" style="font-size:11px;opacity:0.6;line-height:1.5;"></div>
+            </div>
+            <label class="switch-pref"><input type="checkbox" id="switch-visibilidad" onchange="cambiarVisibilidadPreferencias(this.checked)"><span class="switch-pref-bola"></span></label>
+          </div>
+
+          <p style="margin:0 0 2px;font-size:11.5px;opacity:0.6;">Toca una opción para marcarla y vuelve a tocarla para quitarla. El conductor solo ve lo que tengas marcado.</p>
+          <div id="lista-preferencias-cliente"></div>
+
+          <div style="border-top:1px solid var(--borde);padding:10px 0 0;margin-top:2px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px;">¿Quieres proponer una preferencia nueva?</div>
+            <textarea id="sugerencia-preferencia" rows="2" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;resize:vertical;" placeholder="Escribe aquí la preferencia que te gustaría que existiera…"></textarea>
+            <div style="font-size:11px;opacity:0.55;margin-top:3px;">Nos llega solo a nosotros para valorarla — el conductor no lo ve. Si se aprueba, aparecerá para todos los clientes.</div>
+          </div>
+          <div style="margin-top:10px;display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span id="preferencias-msg" style="font-size:12px;"></span>
+            <button onclick="guardarPreferenciasCliente()" style="background:var(--costa);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;">Guardar mis preferencias</button>
+          </div>
         </div>
       </div>
 
@@ -402,15 +427,64 @@
               op = op.trim();
               return '<button type="button" class="pref-pill" data-pref="' + p.id + '" data-opcion="' + op.replace(/"/g,'&quot;') + '" onclick="togglePreferencia(this)">' + op + '</button>';
             }).join('');
-            return '<div style="border-top:1px solid var(--borde);padding:12px 0;">' +
-              '<div style="font-size:14px;font-weight:600;margin-bottom:8px;">' + p.nombre + '</div>' +
-              '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + pills + '</div>' +
+            return '<div style="border-top:1px solid var(--borde);padding:8px 0;">' +
+              '<div style="font-size:13.5px;font-weight:600;margin-bottom:5px;">' + p.nombre + '</div>' +
+              '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + pills + '</div>' +
             '</div>';
           }).join('');
+          document.getElementById('switch-visibilidad').checked = data.visibles !== false;
+          actualizarNotaVisibilidad();
           pintarSeleccionPreferencias();
+          actualizarResumenPreferencias();
           document.getElementById('seccion-preferencias').style.display = 'block';
         })
         .catch(function(){});
+    }
+
+    function toggleSeccionPreferencias() {
+      var cuerpo = document.getElementById('cuerpo-preferencias');
+      var abierto = cuerpo.style.display !== 'none';
+      cuerpo.style.display = abierto ? 'none' : 'block';
+      document.getElementById('preferencias-flecha').textContent = abierto ? '▼' : '▲';
+    }
+
+    function actualizarResumenPreferencias() {
+      var resumen = document.getElementById('preferencias-resumen');
+      if (!document.getElementById('switch-visibilidad').checked) {
+        resumen.textContent = 'Ocultas al conductor';
+        return;
+      }
+      var n = Object.keys(preferenciasSeleccion).length;
+      resumen.textContent = n === 0 ? 'Sin marcar' : (n === 1 ? '1 marcada' : n + ' marcadas');
+    }
+
+    function actualizarNotaVisibilidad() {
+      var activo = document.getElementById('switch-visibilidad').checked;
+      document.getElementById('visibilidad-nota').textContent = activo
+        ? 'Activado — el conductor verá lo que tengas marcado.'
+        : 'Desactivado — el conductor no verá ninguna. Quedan guardadas por si quieres activarlas más tarde.';
+    }
+
+    function cambiarVisibilidadPreferencias(visibles) {
+      actualizarNotaVisibilidad();
+      actualizarResumenPreferencias();
+      var msg = document.getElementById('preferencias-msg');
+      fetch('/api/cliente/preferencias/visibilidad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibles: visibles })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.ok) {
+          msg.textContent = visibles ? '✓ Preferencias visibles para el conductor' : '✓ Preferencias ocultas al conductor';
+          msg.style.color = 'var(--exito)';
+        }
+      })
+      .catch(function(){
+        msg.textContent = 'Error de conexión. Inténtalo de nuevo.';
+        msg.style.color = 'var(--peligro)';
+      });
     }
 
     function togglePreferencia(btn) {
@@ -422,6 +496,7 @@
         preferenciasSeleccion[pid] = op;
       }
       pintarSeleccionPreferencias();
+      actualizarResumenPreferencias();
     }
 
     function pintarSeleccionPreferencias() {
