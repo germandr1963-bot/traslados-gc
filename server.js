@@ -869,6 +869,29 @@ async function initSchema() {
     WHERE NOT EXISTS (SELECT 1 FROM preferencias_catalogo p WHERE p.nombre = v.nombre);
   `);
 
+  // Preferencias elegidas por cada cliente (anclado a su email, que es su
+  // identidad entre reservas) y sugerencias de preferencias nuevas que envía
+  // el cliente para que el admin las apruebe o no.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS preferencias_cliente (
+      id SERIAL PRIMARY KEY,
+      email_cliente TEXT NOT NULL,
+      preferencia_id INT NOT NULL REFERENCES preferencias_catalogo(id) ON DELETE CASCADE,
+      opcion TEXT NOT NULL,
+      actualizado_en TIMESTAMP DEFAULT NOW(),
+      UNIQUE (email_cliente, preferencia_id)
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS preferencias_sugerencias (
+      id SERIAL PRIMARY KEY,
+      email_cliente TEXT,
+      texto TEXT NOT NULL,
+      estado TEXT DEFAULT 'pendiente',
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
   // ─── Decisión del chofer sobre cada extra (No lo ofrezco / Gratis / Pago) ──
   // No existe fila = el chofer aún no lo ha revisado (queda "pendiente" en su
   // portal). En cuanto guarda una decisión sobre un extra, se crea la fila.
@@ -5658,6 +5681,66 @@ app.get('/api/cliente/sesion', (req, res) => {
     res.json({ autenticado: false });
   }
 });
+
+// ─── Preferencias del pasajero (Grupo G): el cliente ve y guarda las suyas ───
+// Ayudante: email del cliente con sesión abierta (su identidad entre reservas)
+async function emailClienteSesion(req) {
+  if (!req.session || !req.session.clienteReservaId) return null;
+  const r = await pool.query('SELECT LOWER(email_cliente) AS email FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+  return r.rows.length ? r.rows[0].email : null;
+}
+
+app.get('/api/cliente/preferencias', asyncHandler(async (req, res) => {
+  const email = await emailClienteSesion(req);
+  if (!email) return res.status(401).json({ error: 'No autenticado.' });
+  const cat = await pool.query(
+    'SELECT id, nombre, opciones FROM preferencias_catalogo WHERE activo = TRUE ORDER BY orden, id'
+  );
+  const mias = await pool.query(
+    'SELECT preferencia_id, opcion FROM preferencias_cliente WHERE email_cliente = $1', [email]
+  );
+  const elegidas = {};
+  mias.rows.forEach(m => { elegidas[m.preferencia_id] = m.opcion; });
+  res.json({
+    preferencias: cat.rows.map(p => ({
+      id: p.id, nombre: p.nombre, opciones: p.opciones, elegida: elegidas[p.id] || null
+    }))
+  });
+}));
+
+app.post('/api/cliente/preferencias', asyncHandler(async (req, res) => {
+  const email = await emailClienteSesion(req);
+  if (!email) return res.status(401).json({ error: 'No autenticado.' });
+  const selecciones = Array.isArray(req.body.selecciones) ? req.body.selecciones : [];
+  // Solo se aceptan opciones que existan tal cual en el catálogo publicado
+  const cat = await pool.query('SELECT id, opciones FROM preferencias_catalogo WHERE activo = TRUE');
+  const validas = {};
+  cat.rows.forEach(p => { validas[p.id] = p.opciones.split('/').map(o => o.trim()); });
+  await pool.query('DELETE FROM preferencias_cliente WHERE email_cliente = $1', [email]);
+  for (const s of selecciones) {
+    const pid = parseInt(s.preferencia_id, 10);
+    const opcion = (s.opcion || '').trim();
+    if (!validas[pid] || validas[pid].indexOf(opcion) === -1) continue;
+    await pool.query(
+      `INSERT INTO preferencias_cliente (email_cliente, preferencia_id, opcion)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (email_cliente, preferencia_id) DO UPDATE SET opcion = $3, actualizado_en = NOW()`,
+      [email, pid, opcion]
+    );
+  }
+  res.json({ ok: true });
+}));
+
+app.post('/api/cliente/preferencias/sugerencia', asyncHandler(async (req, res) => {
+  const email = await emailClienteSesion(req);
+  if (!email) return res.status(401).json({ error: 'No autenticado.' });
+  const texto = (req.body.texto || '').trim().slice(0, 500);
+  if (!texto) return res.status(400).json({ error: 'Escribe tu sugerencia.' });
+  await pool.query(
+    'INSERT INTO preferencias_sugerencias (email_cliente, texto) VALUES ($1, $2)', [email, texto]
+  );
+  res.json({ ok: true });
+}));
 
 // Datos de contacto del cliente logueado (para prellenar el formulario de nueva reserva)
 app.get('/api/cliente/mis-datos', asyncHandler(async (req, res) => {
