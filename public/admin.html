@@ -1005,6 +1005,33 @@ table.tabla-precios input {
       </div>
       <div id="lista-avisos"></div>
 
+      <h2 style="margin-bottom:4px;margin-top:32px;">Preferencias del pasajero</h2>
+      <p class="subtitulo" style="margin-top:0;">Siempre gratuitas. El cliente las marca en su perfil y el conductor las ve al aceptar el viaje. No requieren nada del chofer — si algo exige equipamiento, es un Extra.</p>
+      <div class="tarjeta" style="margin-bottom:12px;">
+        <button class="boton-primario" onclick="abrirFormularioPreferencia(null)">+ Añadir preferencia</button>
+      </div>
+      <div id="lista-preferencias"></div>
+
+      <!-- Modal formulario preferencia -->
+      <div id="modal-preferencia" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
+        <div class="tarjeta" style="width:100%;max-width:420px;position:relative;">
+          <h3 style="margin-top:0;" id="modal-preferencia-titulo">Nueva preferencia</h3>
+          <div style="margin-bottom:12px;">
+            <label class="etiqueta">Preferencia visible al cliente</label>
+            <input type="text" id="preferencia-nombre" class="campo" placeholder="Ej: Temperatura en el vehículo">
+          </div>
+          <div style="margin-bottom:20px;">
+            <label class="etiqueta">Opciones (separadas con /)</label>
+            <input type="text" id="preferencia-opciones" class="campo" placeholder="Ej: Fresco / Normal / Caliente">
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="boton-primario" onclick="guardarPreferencia()">💾 Guardar (queda en borrador)</button>
+            <button class="boton-secundario" onclick="cerrarModalPreferencia()">Cancelar</button>
+          </div>
+          <div id="preferencia-msg" style="margin-top:10px;font-size:13px;"></div>
+        </div>
+      </div>
+
       <!-- Modal formulario aviso -->
       <div id="modal-aviso" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
         <div class="tarjeta" style="width:100%;max-width:420px;position:relative;">
@@ -1141,7 +1168,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
     if (boton.dataset.seccion === 'cotizaciones') cargarCotizaciones();
     if (boton.dataset.seccion === 'reservas') cargarReservas();
-    if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); }
+    if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); cargarPreferencias(); }
   });
 });
 
@@ -5295,6 +5322,103 @@ function eliminarAviso(id) {
     .then(function (d) {
       if (d.ok) {
         cargarAvisos();
+      } else {
+        alert(d.error || 'No se pudo eliminar.');
+      }
+    });
+}
+
+var preferenciasCache = [];
+var preferenciaEditandoId = null;
+
+function pintarPreferencias(lista) {
+  var cont = document.getElementById('lista-preferencias');
+  if (!lista.length) {
+    cont.innerHTML = '<p style="color:var(--texto-muted);padding:12px 0;">Nada aquí todavía.</p>';
+    return;
+  }
+  var filas = lista.map(function (p) {
+    return '<tr>' +
+      '<td>' + p.nombre + '</td>' +
+      '<td><span style="font-size:11px;color:var(--texto-muted);">' + p.opciones + '</span></td>' +
+      '<td><span class="' + (p.activo ? 'insignia-ok' : 'insignia-suspendido') + '">' + (p.activo ? 'Publicado' : 'Borrador') + '</span></td>' +
+      '<td>' +
+        '<button class="boton-costa" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="abrirFormularioPreferencia(' + p.id + ')">✏️ Editar</button>' +
+        '<button class="boton-secundario" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="toggleActivoPreferencia(' + p.id + ',' + p.activo + ')">' + (p.activo ? '⏸ Pasar a borrador' : '▶ Publicar') + '</button>' +
+        '<button class="boton-peligro" style="font-size:12px;padding:4px 10px;" onclick="eliminarPreferencia(' + p.id + ')">🗑️</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+  cont.innerHTML = '<div class="tarjeta"><table class="tabla-admin"><thead><tr><th>Preferencia</th><th>Opciones</th><th>Estado</th><th>Acciones</th></tr></thead>' +
+    '<tbody>' + filas + '</tbody></table></div>';
+}
+
+function cargarPreferencias() {
+  fetch('/admin/preferencias')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      preferenciasCache = data.preferencias;
+      pintarPreferencias(preferenciasCache);
+    });
+}
+
+function abrirFormularioPreferencia(id) {
+  preferenciaEditandoId = id;
+  document.getElementById('preferencia-msg').textContent = '';
+  if (id === null) {
+    document.getElementById('modal-preferencia-titulo').textContent = 'Nueva preferencia';
+    document.getElementById('preferencia-nombre').value = '';
+    document.getElementById('preferencia-opciones').value = '';
+  } else {
+    var p = preferenciasCache.find(function (x) { return x.id === id; });
+    document.getElementById('modal-preferencia-titulo').textContent = 'Editar preferencia';
+    document.getElementById('preferencia-nombre').value = p.nombre;
+    document.getElementById('preferencia-opciones').value = p.opciones;
+  }
+  document.getElementById('modal-preferencia').classList.remove('oculto');
+}
+
+function cerrarModalPreferencia() {
+  document.getElementById('modal-preferencia').classList.add('oculto');
+  preferenciaEditandoId = null;
+}
+
+function guardarPreferencia() {
+  var nombre = document.getElementById('preferencia-nombre').value.trim();
+  var opciones = document.getElementById('preferencia-opciones').value.trim();
+  var msg = document.getElementById('preferencia-msg');
+  if (!nombre) { msg.textContent = 'El nombre es obligatorio.'; return; }
+  if (!opciones) { msg.textContent = 'Las opciones son obligatorias.'; return; }
+  var url = preferenciaEditandoId ? '/admin/preferencias/' + preferenciaEditandoId + '/editar' : '/admin/preferencias';
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre: nombre, opciones: opciones })
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (d.ok) {
+      cerrarModalPreferencia();
+      cargarPreferencias();
+    } else {
+      msg.textContent = d.error || 'Error al guardar.';
+    }
+  });
+}
+
+function toggleActivoPreferencia(id, activo) {
+  fetch('/admin/preferencias/' + id + '/activo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo: !activo })
+  }).then(function () { cargarPreferencias(); });
+}
+
+function eliminarPreferencia(id) {
+  if (!confirm('¿Eliminar esta preferencia? Esta acción no se puede deshacer.')) return;
+  fetch('/admin/preferencias/' + id + '/eliminar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.ok) {
+        cargarPreferencias();
       } else {
         alert(d.error || 'No se pudo eliminar.');
       }
