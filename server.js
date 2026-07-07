@@ -851,20 +851,29 @@ async function initSchema() {
     );
   `);
 
-  // Preferencias G1–G8 acordadas. Solo se insertan las que no existan ya
+  // Migración única a los textos definitivos con iconos (solo actúa si la
+  // preferencia aún tiene el texto antiguo, para no pisar ediciones del admin)
+  await pool.query(`UPDATE preferencias_catalogo SET opciones = '❄️ Fresco (20–21 °C · 68–70 °F) / 🍃 Normal (22–23 °C · 71–74 °F) / 🔥 Cálido (24–25 °C · 75–77 °F) / ⚙️ Otra (Especificar)' WHERE nombre = 'Temperatura en el vehículo' AND opciones = 'Fresco / Normal / Caliente'`);
+  await pool.query(`UPDATE preferencias_catalogo SET nombre = 'Ambiente musical', opciones = '🔇 Viajar en silencio / 🎵 Música suave de fondo / 📻 Lo que el conductor prefiera / 🎸 Prefiero poner mi propia música' WHERE nombre = 'Música'`);
+  await pool.query(`UPDATE preferencias_catalogo SET opciones = '🤫 Prefiero viajar en silencio y descansar / 💬 Abierto a conversar / 🤷‍♂️ Sin preferencia · Lo que surja' WHERE nombre = 'Conversación' AND opciones = 'Viaje en silencio / Conversación bienvenida / Sin preferencia'`);
+  await pool.query(`UPDATE preferencias_catalogo SET opciones = '🐢 Conducción suave y relajada / ⚡ Eficiente y ágil (respetando las normas) / 🤷‍♂️ Sin preferencia' WHERE nombre = 'Estilo de conducción' AND opciones = 'Tranquila / Normal / Sin preferencia'`);
+  await pool.query(`UPDATE preferencias_catalogo SET nombre = 'Sensibilidad al movimiento', opciones = '🤢 Me mareo con facilidad (Conducción extra suave) / 👍 No suelo marearme' WHERE nombre = 'Me mareo con facilidad'`);
+  await pool.query(`UPDATE preferencias_catalogo SET opciones = '🧳 Sí, llevo equipaje y agradecería ayuda / 🎒 No es necesario, viajo ligero' WHERE nombre = 'Ayuda con el equipaje' AND opciones = 'Sí, lo agradezco / No hace falta'`);
+  await pool.query(`UPDATE preferencias_catalogo SET nombre = 'Inicio del trayecto', opciones = '⏱️ Necesito un momento para acomodarme antes de arrancar / 🚗 Listo para arrancar de inmediato' WHERE nombre = 'Necesito un momento para acomodarme antes de arrancar'`);
+
+  // Preferencias acordadas. Solo se insertan las que no existan ya
   // por nombre, así que es seguro volver a desplegar sin duplicar nada.
   await pool.query(`
     INSERT INTO preferencias_catalogo (nombre, opciones, orden, activo)
     SELECT v.nombre, v.opciones, v.orden, FALSE
     FROM (VALUES
-      ('Temperatura en el vehículo', 'Fresco / Normal / Caliente', 1),
-      ('Música', 'Sin música / Música suave / Lo que el conductor ponga', 2),
-      ('Conversación', 'Viaje en silencio / Conversación bienvenida / Sin preferencia', 3),
-      ('Estilo de conducción', 'Tranquila / Normal / Sin preferencia', 4),
-      ('Me mareo con facilidad', 'Sí — por favor conduce con suavidad / No', 5),
-      ('Ruta preferida', 'Más rápida aunque tenga peaje / Sin peaje aunque tarde más / Sin preferencia', 6),
-      ('Ayuda con el equipaje', 'Sí, lo agradezco / No hace falta', 7),
-      ('Necesito un momento para acomodarme antes de arrancar', 'Sí / No', 8)
+      ('Temperatura en el vehículo', '❄️ Fresco (20–21 °C · 68–70 °F) / 🍃 Normal (22–23 °C · 71–74 °F) / 🔥 Cálido (24–25 °C · 75–77 °F) / ⚙️ Otra (Especificar)', 1),
+      ('Ambiente musical', '🔇 Viajar en silencio / 🎵 Música suave de fondo / 📻 Lo que el conductor prefiera / 🎸 Prefiero poner mi propia música', 2),
+      ('Conversación', '🤫 Prefiero viajar en silencio y descansar / 💬 Abierto a conversar / 🤷‍♂️ Sin preferencia · Lo que surja', 3),
+      ('Estilo de conducción', '🐢 Conducción suave y relajada / ⚡ Eficiente y ágil (respetando las normas) / 🤷‍♂️ Sin preferencia', 4),
+      ('Sensibilidad al movimiento', '🤢 Me mareo con facilidad (Conducción extra suave) / 👍 No suelo marearme', 5),
+      ('Ayuda con el equipaje', '🧳 Sí, llevo equipaje y agradecería ayuda / 🎒 No es necesario, viajo ligero', 6),
+      ('Inicio del trayecto', '⏱️ Necesito un momento para acomodarme antes de arrancar / 🚗 Listo para arrancar de inmediato', 7)
     ) AS v(nombre, opciones, orden)
     WHERE NOT EXISTS (SELECT 1 FROM preferencias_catalogo p WHERE p.nombre = v.nombre);
   `);
@@ -878,10 +887,12 @@ async function initSchema() {
       email_cliente TEXT NOT NULL,
       preferencia_id INT NOT NULL REFERENCES preferencias_catalogo(id) ON DELETE CASCADE,
       opcion TEXT NOT NULL,
+      detalle TEXT,
       actualizado_en TIMESTAMP DEFAULT NOW(),
       UNIQUE (email_cliente, preferencia_id)
     );
   `);
+  await pool.query(`ALTER TABLE preferencias_cliente ADD COLUMN IF NOT EXISTS detalle TEXT`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS preferencias_sugerencias (
       id SERIAL PRIMARY KEY,
@@ -5704,17 +5715,19 @@ app.get('/api/cliente/preferencias', asyncHandler(async (req, res) => {
     'SELECT id, nombre, opciones FROM preferencias_catalogo WHERE activo = TRUE ORDER BY orden, id'
   );
   const mias = await pool.query(
-    'SELECT preferencia_id, opcion FROM preferencias_cliente WHERE email_cliente = $1', [email]
+    'SELECT preferencia_id, opcion, detalle FROM preferencias_cliente WHERE email_cliente = $1', [email]
   );
   const vis = await pool.query(
     'SELECT visibles FROM preferencias_visibilidad_cliente WHERE email_cliente = $1', [email]
   );
   const elegidas = {};
-  mias.rows.forEach(m => { elegidas[m.preferencia_id] = m.opcion; });
+  mias.rows.forEach(m => { elegidas[m.preferencia_id] = { opcion: m.opcion, detalle: m.detalle }; });
   res.json({
     visibles: vis.rows.length ? vis.rows[0].visibles : true,
     preferencias: cat.rows.map(p => ({
-      id: p.id, nombre: p.nombre, opciones: p.opciones, elegida: elegidas[p.id] || null
+      id: p.id, nombre: p.nombre, opciones: p.opciones,
+      elegida: elegidas[p.id] ? elegidas[p.id].opcion : null,
+      detalle: elegidas[p.id] ? elegidas[p.id].detalle : null
     }))
   });
 }));
@@ -5744,11 +5757,12 @@ app.post('/api/cliente/preferencias', asyncHandler(async (req, res) => {
     const pid = parseInt(s.preferencia_id, 10);
     const opcion = (s.opcion || '').trim();
     if (!validas[pid] || validas[pid].indexOf(opcion) === -1) continue;
+    const detalle = (s.detalle || '').toString().trim().slice(0, 120) || null;
     await pool.query(
-      `INSERT INTO preferencias_cliente (email_cliente, preferencia_id, opcion)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (email_cliente, preferencia_id) DO UPDATE SET opcion = $3, actualizado_en = NOW()`,
-      [email, pid, opcion]
+      `INSERT INTO preferencias_cliente (email_cliente, preferencia_id, opcion, detalle)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (email_cliente, preferencia_id) DO UPDATE SET opcion = $3, detalle = $4, actualizado_en = NOW()`,
+      [email, pid, opcion, detalle]
     );
   }
   res.json({ ok: true });
