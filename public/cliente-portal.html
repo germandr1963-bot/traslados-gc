@@ -140,6 +140,7 @@
 
   <main>
     <section id="zona-portal">
+      <div style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--costa);font-weight:700;margin-bottom:2px;">Portal del cliente</div>
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px">
         <h1 id="saludo" style="margin:0">Mis reservas</h1>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -148,6 +149,34 @@
         </div>
       </div>
       <p class="sub" id="subtitulo"></p>
+
+      <!-- Mis datos -->
+      <div id="seccion-mis-datos" style="background:#fff;border:1px solid var(--borde);border-radius:12px;margin-top:16px;overflow:hidden;">
+        <div onclick="toggleSeccionMisDatos()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;cursor:pointer;">
+          <h2 style="margin:0;font-size:17px;">Mis datos</h2>
+          <span id="mis-datos-flecha" style="font-size:12px;opacity:0.6;">▼</span>
+        </div>
+        <div id="cuerpo-mis-datos" style="display:none;padding:0 20px 16px;">
+          <p style="margin:0 0 10px;font-size:13px;line-height:1.6;opacity:0.8;">Con estos datos rellenamos tus reservas y te enviamos tus documentos. Mantenlos al día, con tu nombre y apellidos completos.</p>
+          <div style="margin-bottom:10px;">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Nombre y apellidos</label>
+            <input type="text" id="mis-datos-nombre" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;">
+          </div>
+          <div style="margin-bottom:10px;">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Teléfono (con código de país)</label>
+            <input type="tel" id="mis-datos-telefono" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;">
+          </div>
+          <div style="margin-bottom:12px;">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Email</label>
+            <input type="email" id="mis-datos-email" readonly style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:var(--niebla);opacity:0.8;">
+            <div style="font-size:11px;opacity:0.55;margin-top:3px;">Tu email es tu identificador de acceso y de tu historial — para cambiarlo, contáctanos.</div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span id="mis-datos-msg" style="font-size:12px;"></span>
+            <button onclick="guardarMisDatos()" style="background:var(--costa);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;">Guardar mis datos</button>
+          </div>
+        </div>
+      </div>
 
       <!-- Preferencias del pasajero (Grupo G) -->
       <div id="seccion-preferencias" style="display:none;background:#fff;border:1px solid var(--borde);border-radius:12px;margin-top:16px;overflow:hidden;">
@@ -417,6 +446,64 @@
 
     cargarPortal();
     cargarPreferenciasCliente();
+    cargarMisDatos();
+
+    // ── Mis datos ──
+    function cargarMisDatos() {
+      fetch('/api/cliente/mis-datos')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (d.error) return;
+          document.getElementById('mis-datos-nombre').value = d.nombre_cliente || '';
+          document.getElementById('mis-datos-telefono').value = d.telefono_cliente || '';
+          document.getElementById('mis-datos-email').value = d.email_cliente || '';
+        })
+        .catch(function(){});
+    }
+
+    function toggleSeccionMisDatos() {
+      var cuerpo = document.getElementById('cuerpo-mis-datos');
+      var abierto = cuerpo.style.display !== 'none';
+      cuerpo.style.display = abierto ? 'none' : 'block';
+      document.getElementById('mis-datos-flecha').textContent = abierto ? '▼' : '▲';
+    }
+
+    function guardarMisDatos() {
+      var msg = document.getElementById('mis-datos-msg');
+      var nombre = document.getElementById('mis-datos-nombre').value.trim();
+      var telefono = document.getElementById('mis-datos-telefono').value.trim();
+      if (!nombre) {
+        msg.textContent = 'El nombre es obligatorio.';
+        msg.style.color = 'var(--peligro)';
+        return;
+      }
+      if (telefono.replace(/[^\d]/g, '').length < 7) {
+        msg.textContent = 'Introduce un teléfono válido.';
+        msg.style.color = 'var(--peligro)';
+        return;
+      }
+      msg.textContent = 'Guardando…';
+      msg.style.color = '';
+      fetch('/api/cliente/mis-datos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombre, telefono: telefono })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.ok) {
+          msg.textContent = '✓ Datos guardados';
+          msg.style.color = 'var(--exito)';
+        } else {
+          msg.textContent = d.error || 'No se pudo guardar.';
+          msg.style.color = 'var(--peligro)';
+        }
+      })
+      .catch(function(){
+        msg.textContent = 'Error de conexión. Inténtalo de nuevo.';
+        msg.style.color = 'var(--peligro)';
+      });
+    }
 
     // ── Preferencias del pasajero (Grupo G) ──
     var preferenciasSeleccion = {};
