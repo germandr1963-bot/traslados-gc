@@ -171,15 +171,22 @@
 
           <p style="margin:0 0 2px;font-size:11.5px;opacity:0.6;">Toca una opción para marcarla y vuelve a tocarla para quitarla. El conductor solo ve lo que tengas marcado.</p>
           <div id="lista-preferencias-cliente"></div>
-
-          <div style="border-top:1px solid var(--borde);padding:10px 0 0;margin-top:2px;">
-            <div style="font-size:13px;font-weight:600;margin-bottom:6px;">¿Quieres proponer una preferencia nueva?</div>
-            <textarea id="sugerencia-preferencia" rows="2" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;resize:vertical;" placeholder="Escribe aquí la preferencia que te gustaría que existiera…"></textarea>
-            <div style="font-size:11px;opacity:0.55;margin-top:3px;">Nos llega solo a nosotros para valorarla — el conductor no lo ve. Si se aprueba, aparecerá para todos los clientes.</div>
-          </div>
           <div style="margin-top:10px;display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;">
             <span id="preferencias-msg" style="font-size:12px;"></span>
             <button onclick="guardarPreferenciasCliente()" style="background:var(--costa);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;">Guardar mis preferencias</button>
+          </div>
+
+          <div id="bloque-sugerencia" style="margin-top:14px;border:1px solid var(--borde);border-radius:10px;background:var(--niebla);padding:12px 14px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px;">¿Quieres proponer una preferencia nueva?</div>
+            <div style="font-size:11px;opacity:0.6;margin-bottom:8px;">Nos llega solo a nosotros para valorarla — el conductor no lo ve. Si se aprueba, aparecerá para todos los clientes.</div>
+            <div id="sugerencia-formulario">
+              <textarea id="sugerencia-preferencia" rows="2" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;resize:vertical;background:#fff;" placeholder="Escribe aquí la preferencia que te gustaría que existiera…"></textarea>
+              <div style="margin-top:8px;display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span id="sugerencia-msg" style="font-size:12px;"></span>
+                <button class="secundario" style="margin:0;padding:6px 14px;font-size:12.5px;" onclick="enviarSugerenciaPreferencia()">Enviar</button>
+              </div>
+            </div>
+            <div id="sugerencia-gracias" style="display:none;font-size:13px;line-height:1.6;color:var(--exito);">✓ Tu sugerencia ha sido enviada. La analizaremos y la valoraremos para añadirla a la lista. Muchas gracias — siempre a tu servicio.</div>
           </div>
         </div>
       </div>
@@ -413,6 +420,7 @@
 
     // ── Preferencias del pasajero (Grupo G) ──
     var preferenciasSeleccion = {};
+    var preferenciasDetalle = {};
 
     function cargarPreferenciasCliente() {
       fetch('/api/cliente/preferencias')
@@ -420,18 +428,39 @@
         .then(function(data){
           if (!data.preferencias || !data.preferencias.length) return;
           preferenciasSeleccion = {};
+          preferenciasDetalle = {};
           var cont = document.getElementById('lista-preferencias-cliente');
           cont.innerHTML = data.preferencias.map(function(p){
             if (p.elegida) preferenciasSeleccion[p.id] = p.elegida;
+            if (p.detalle) preferenciasDetalle[p.id] = p.detalle;
             var pills = p.opciones.split('/').map(function(op){
               op = op.trim();
               return '<button type="button" class="pref-pill" data-pref="' + p.id + '" data-opcion="' + op.replace(/"/g,'&quot;') + '" onclick="togglePreferencia(this)">' + op + '</button>';
             }).join('');
+            var detalleHtml = '';
+            if (p.opciones.indexOf('(Especificar)') !== -1) {
+              var esTemperatura = p.nombre.indexOf('Temperatura') !== -1;
+              var controlHtml;
+              if (esTemperatura) {
+                var opts = '<option value="">Elige la temperatura</option>';
+                for (var t = 16; t <= 28; t++) { opts += '<option value="' + t + ' °C">' + t + ' °C</option>'; }
+                controlHtml = '<select onchange="guardarDetallePreferencia(' + p.id + ', this.value)" style="border:1px solid var(--borde);border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#fff;">' + opts + '</select>';
+              } else {
+                controlHtml = '<input type="text" onchange="guardarDetallePreferencia(' + p.id + ', this.value)" placeholder="Especifica…" style="border:1px solid var(--borde);border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#fff;width:100%;max-width:280px;">';
+              }
+              detalleHtml = '<div id="detalle-pref-' + p.id + '" style="display:none;margin-top:6px;">' + controlHtml + '</div>';
+            }
             return '<div style="border-top:1px solid var(--borde);padding:8px 0;">' +
               '<div style="font-size:13.5px;font-weight:600;margin-bottom:5px;">' + p.nombre + '</div>' +
               '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + pills + '</div>' +
+              detalleHtml +
             '</div>';
           }).join('');
+          // Restaurar los detalles guardados en sus controles
+          Object.keys(preferenciasDetalle).forEach(function(pid){
+            var el = document.querySelector('#detalle-pref-' + pid + ' select, #detalle-pref-' + pid + ' input');
+            if (el) el.value = preferenciasDetalle[pid];
+          });
           document.getElementById('switch-visibilidad').checked = data.visibles !== false;
           actualizarNotaVisibilidad();
           pintarSeleccionPreferencias();
@@ -439,6 +468,10 @@
           document.getElementById('seccion-preferencias').style.display = 'block';
         })
         .catch(function(){});
+    }
+
+    function guardarDetallePreferencia(pid, valor) {
+      preferenciasDetalle[pid] = valor.trim();
     }
 
     function toggleSeccionPreferencias() {
@@ -506,6 +539,12 @@
         b.style.color = marcado ? '#fff' : '';
         b.style.borderColor = marcado ? 'var(--costa)' : '';
       });
+      // El campo "Especificar" solo se muestra si su opción está marcada
+      document.querySelectorAll('[id^="detalle-pref-"]').forEach(function(div){
+        var pid = div.id.replace('detalle-pref-', '');
+        var opcion = preferenciasSeleccion[pid] || '';
+        div.style.display = opcion.indexOf('(Especificar)') !== -1 ? 'block' : 'none';
+      });
     }
 
     function guardarPreferenciasCliente() {
@@ -513,9 +552,12 @@
       msg.textContent = 'Guardando…';
       msg.style.color = '';
       var selecciones = Object.keys(preferenciasSeleccion).map(function(pid){
-        return { preferencia_id: pid, opcion: preferenciasSeleccion[pid] };
+        var sel = { preferencia_id: pid, opcion: preferenciasSeleccion[pid] };
+        if (sel.opcion.indexOf('(Especificar)') !== -1 && preferenciasDetalle[pid]) {
+          sel.detalle = preferenciasDetalle[pid];
+        }
+        return sel;
       });
-      var texto = document.getElementById('sugerencia-preferencia').value.trim();
       fetch('/api/cliente/preferencias', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -528,21 +570,39 @@
           msg.style.color = 'var(--peligro)';
           return;
         }
-        if (texto) {
-          return fetch('/api/cliente/preferencias/sugerencia', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ texto: texto })
-          })
-          .then(function(r){ return r.json(); })
-          .then(function(d2){
-            if (d2.ok) document.getElementById('sugerencia-preferencia').value = '';
-            msg.textContent = '✓ Preferencias guardadas' + (d2.ok ? ' y sugerencia enviada' : '');
-            msg.style.color = 'var(--exito)';
-          });
-        }
         msg.textContent = '✓ Preferencias guardadas';
         msg.style.color = 'var(--exito)';
+      })
+      .catch(function(){
+        msg.textContent = 'Error de conexión. Inténtalo de nuevo.';
+        msg.style.color = 'var(--peligro)';
+      });
+    }
+
+    function enviarSugerenciaPreferencia() {
+      var msg = document.getElementById('sugerencia-msg');
+      var texto = document.getElementById('sugerencia-preferencia').value.trim();
+      if (!texto) {
+        msg.textContent = 'Escribe tu sugerencia antes de enviarla.';
+        msg.style.color = 'var(--peligro)';
+        return;
+      }
+      msg.textContent = 'Enviando…';
+      msg.style.color = '';
+      fetch('/api/cliente/preferencias/sugerencia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: texto })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.ok) {
+          document.getElementById('sugerencia-formulario').style.display = 'none';
+          document.getElementById('sugerencia-gracias').style.display = 'block';
+        } else {
+          msg.textContent = d.error || 'No se pudo enviar.';
+          msg.style.color = 'var(--peligro)';
+        }
       })
       .catch(function(){
         msg.textContent = 'Error de conexión. Inténtalo de nuevo.';
