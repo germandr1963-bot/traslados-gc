@@ -909,6 +909,27 @@ async function initSchema() {
       actualizado_en TIMESTAMP DEFAULT NOW()
     );
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS preferencias_reserva (
+      id SERIAL PRIMARY KEY,
+      reserva_id INT NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,
+      nombre TEXT NOT NULL,
+      opcion TEXT NOT NULL,
+      detalle TEXT
+    );
+  `);
+
+  // Datos propios del cliente (editables desde "Mis datos" en su portal).
+  // Tienen prioridad sobre los datos de su última reserva y alimentan el
+  // autorrelleno del formulario. Las reservas ya hechas no se reescriben.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS clientes_datos (
+      email_cliente TEXT PRIMARY KEY,
+      nombre TEXT,
+      telefono TEXT,
+      actualizado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
 
   // ─── Decisión del chofer sobre cada extra (No lo ofrezco / Gratis / Pago) ──
   // No existe fila = el chofer aún no lo ha revisado (queda "pendiente" en su
@@ -1369,6 +1390,31 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
   );
 
   const reservaId = reserva.rows[0].id;
+
+  // Copia de las preferencias del pasajero (Grupo G) en esta reserva:
+  // instantánea de lo que el cliente tiene marcado en este momento.
+  // Solo si tiene sesión abierta y su interruptor de visibilidad está activo.
+  try {
+    const emailPref = await emailClienteSesion(req);
+    if (emailPref) {
+      const visPref = await pool.query(
+        'SELECT visibles FROM preferencias_visibilidad_cliente WHERE email_cliente = $1', [emailPref]
+      );
+      const prefsVisibles = visPref.rows.length ? visPref.rows[0].visibles : true;
+      if (prefsVisibles) {
+        await pool.query(
+          `INSERT INTO preferencias_reserva (reserva_id, nombre, opcion, detalle)
+           SELECT $1, c.nombre, pc.opcion, pc.detalle
+           FROM preferencias_cliente pc
+           JOIN preferencias_catalogo c ON c.id = pc.preferencia_id AND c.activo = TRUE
+           WHERE pc.email_cliente = $2`,
+          [reservaId, emailPref]
+        );
+      }
+    }
+  } catch (e) {
+    console.error('No se pudieron copiar las preferencias en la reserva:', e);
+  }
 
   // Guardar extras seleccionados
   if (Array.isArray(extras) && extras.length > 0) {
@@ -3320,7 +3366,8 @@ app.post('/chofer/logout', (req, res) => {
 app.get('/chofer/mis-reservas', requireChofer, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino,
-            r.nombre_cliente, r.num_pasajeros, r.estado, r.deposito_pagado,
+            CASE WHEN r.es_para_otra_persona THEN r.nombre_pasajero_otro ELSE r.nombre_cliente END AS nombre_cliente,
+            r.num_pasajeros, r.estado, r.deposito_pagado,
             r.numero_vuelo, r.hora_llegada_vuelo, r.nombre_barco, r.hora_atraque,
             r.direccion_recogida, r.direccion_destino, r.notas_cliente,
             cv.nombre AS categoria_nombre,
@@ -3334,7 +3381,24 @@ app.get('/chofer/mis-reservas', requireChofer, asyncHandler(async (req, res) => 
      ORDER BY r.fecha ASC, r.hora ASC`,
     [req.session.choferId]
   );
-  res.json({ nombre: req.session.choferNombre, reservas: result.rows });
+  // Preferencias del pasajero de cada reserva (copia guardada al reservar)
+  const ids = result.rows.map(r => r.id);
+  const prefsPorReserva = {};
+  if (ids.length) {
+    const prefs = await pool.query(
+      'SELECT reserva_id, nombre, opcion, detalle FROM preferencias_reserva WHERE reserva_id = ANY($1) ORDER BY id',
+      [ids]
+    );
+    prefs.rows.forEach(p => {
+      (prefsPorReserva[p.reserva_id] = prefsPorReserva[p.reserva_id] || []).push(
+        { nombre: p.nombre, opcion: p.opcion, detalle: p.detalle }
+      );
+    });
+  }
+  res.json({
+    nombre: req.session.choferNombre,
+    reservas: result.rows.map(r => Object.assign({}, r, { preferencias: prefsPorReserva[r.id] || [] }))
+  });
 }));
 
 app.get('/chofer/mensajes/:reservaId', requireChofer, asyncHandler(async (req, res) => {
@@ -5184,6 +5248,25 @@ app.post('/admin/preferencias/:id/eliminar', requireAdmin, asyncHandler(async (r
   res.json({ ok: true });
 }));
 
+// ─── Admin: sugerencias de preferencias enviadas por los clientes ────────────
+app.get('/admin/preferencias-sugerencias', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, email_cliente, texto, estado, creado_en FROM preferencias_sugerencias ORDER BY creado_en DESC'
+  );
+  res.json({ sugerencias: result.rows });
+}));
+
+app.post('/admin/preferencias-sugerencias/:id/estado', requireAdmin, asyncHandler(async (req, res) => {
+  const estado = req.body.estado === 'revisada' ? 'revisada' : 'pendiente';
+  await pool.query('UPDATE preferencias_sugerencias SET estado = $1 WHERE id = $2', [estado, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/preferencias-sugerencias/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM preferencias_sugerencias WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
 // ─── Ajustes globales de SEO ──────────────────────────────────────────────────
 app.get('/admin/seo/ajustes-globales', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
@@ -5783,18 +5866,38 @@ app.post('/api/cliente/preferencias/sugerencia', asyncHandler(async (req, res) =
 app.get('/api/cliente/mis-datos', asyncHandler(async (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
   const emailCliente = req.session.clienteEmail;
+  // Prioridad: datos guardados por el propio cliente; si no hay, su última reserva
+  const propios = await pool.query(
+    'SELECT nombre, telefono FROM clientes_datos WHERE email_cliente = LOWER($1)', [emailCliente]
+  );
   const result = await pool.query(
     `SELECT nombre_cliente, telefono_cliente, email_cliente
      FROM reservas WHERE LOWER(email_cliente) = LOWER($1)
      ORDER BY fecha DESC, hora DESC LIMIT 1`,
     [emailCliente]
   );
-  if (!result.rows.length) return res.status(404).json({ error: 'No encontrado.' });
+  if (!result.rows.length && !propios.rows.length) return res.status(404).json({ error: 'No encontrado.' });
   res.json({
-    nombre_cliente: result.rows[0].nombre_cliente,
-    telefono_cliente: result.rows[0].telefono_cliente,
-    email_cliente: result.rows[0].email_cliente
+    nombre_cliente: (propios.rows.length && propios.rows[0].nombre) || (result.rows.length ? result.rows[0].nombre_cliente : ''),
+    telefono_cliente: (propios.rows.length && propios.rows[0].telefono) || (result.rows.length ? result.rows[0].telefono_cliente : ''),
+    email_cliente: result.rows.length ? result.rows[0].email_cliente : emailCliente
   });
+}));
+
+app.post('/api/cliente/mis-datos', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+  const emailCliente = (req.session.clienteEmail || '').toLowerCase();
+  if (!emailCliente) return res.status(401).json({ error: 'No autenticado.' });
+  const nombre = (req.body.nombre || '').trim().slice(0, 120);
+  const telefono = (req.body.telefono || '').trim().slice(0, 40);
+  if (!nombre) return res.status(400).json({ error: 'El nombre es obligatorio.' });
+  if (telefono.replace(/[^\d]/g, '').length < 7) return res.status(400).json({ error: 'Introduce un teléfono válido.' });
+  await pool.query(
+    `INSERT INTO clientes_datos (email_cliente, nombre, telefono) VALUES ($1, $2, $3)
+     ON CONFLICT (email_cliente) DO UPDATE SET nombre = $2, telefono = $3, actualizado_en = NOW()`,
+    [emailCliente, nombre, telefono]
+  );
+  res.json({ ok: true });
 }));
 
 // Datos completos de las reservas para el portal
