@@ -336,12 +336,20 @@
             '<span class="reserva-chevron" id="chev-' + r.id + '">▼</span>' +
           '</div>' +
           '<div class="reserva-cuerpo" id="cuerpo-' + r.id + '">' +
+            (r.nombre_cliente ? '<div class="detalle-fila"><strong>Cliente:</strong> ' + r.nombre_cliente + '</div>' : '') +
+            (r.preferencias && r.preferencias.length
+              ? '<div style="border:1px solid var(--borde);background:var(--niebla);border-radius:8px;padding:8px 12px;margin:6px 0;">' +
+                  '<div style="font-weight:600;font-size:13px;margin-bottom:4px;">Preferencias del pasajero</div>' +
+                  r.preferencias.map(function(p){
+                    return '<div style="font-size:13px;line-height:1.6;">' + p.nombre + ': <strong>' + p.opcion + (p.detalle ? ' — ' + p.detalle : '') + '</strong></div>';
+                  }).join('') +
+                '</div>'
+              : '') +
             '<div class="detalle-fila"><strong>Ruta:</strong> ' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
             '<div class="detalle-fila"><strong>Fecha:</strong> ' + fecha + '</div>' +
             '<div class="detalle-fila"><strong>Hora de recogida:</strong> ' + hora + '</div>' +
             '<div class="detalle-fila"><strong>Pasajeros:</strong> ' + (r.num_pasajeros||'—') + '</div>' +
             '<div class="detalle-fila"><strong>Categoría:</strong> ' + (r.categoria_nombre||'—') + '</div>' +
-            (r.nombre_cliente ? '<div class="detalle-fila"><strong>Cliente:</strong> ' + r.nombre_cliente + '</div>' : '') +
             (llegada ? '<div class="detalle-fila">' + llegada + '</div>' : '') +
             (r.direccion_recogida ? '<div class="detalle-fila"><strong>Recogida:</strong> ' + r.direccion_recogida + '</div>' : '') +
             (r.direccion_destino ? '<div class="detalle-fila"><strong>Destino:</strong> ' + r.direccion_destino + '</div>' : '') +

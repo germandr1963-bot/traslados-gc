@@ -443,16 +443,19 @@
               var controlHtml;
               if (esTemperatura) {
                 var opts = '<option value="">Elige la temperatura</option>';
-                for (var t = 16; t <= 28; t++) { opts += '<option value="' + t + ' °C">' + t + ' °C</option>'; }
+                for (var t = 16; t <= 28; t++) {
+                  var f = Math.round(t * 9 / 5 + 32);
+                  opts += '<option value="' + t + ' °C · ' + f + ' °F">' + t + ' °C · ' + f + ' °F</option>';
+                }
                 controlHtml = '<select onchange="guardarDetallePreferencia(' + p.id + ', this.value)" style="border:1px solid var(--borde);border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#fff;">' + opts + '</select>';
               } else {
                 controlHtml = '<input type="text" onchange="guardarDetallePreferencia(' + p.id + ', this.value)" placeholder="Especifica…" style="border:1px solid var(--borde);border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#fff;width:100%;max-width:280px;">';
               }
               detalleHtml = '<div id="detalle-pref-' + p.id + '" style="display:none;margin-top:6px;">' + controlHtml + '</div>';
             }
-            return '<div style="border-top:1px solid var(--borde);padding:8px 0;">' +
-              '<div style="font-size:13.5px;font-weight:600;margin-bottom:5px;">' + p.nombre + '</div>' +
-              '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + pills + '</div>' +
+            return '<div style="border-top:1px solid var(--borde);padding:5px 0;">' +
+              '<div style="font-size:13.5px;font-weight:600;margin-bottom:2px;">' + p.nombre + '</div>' +
+              '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + pills + '</div>' +
               detalleHtml +
             '</div>';
           }).join('');

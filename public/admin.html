@@ -1012,6 +1012,10 @@ table.tabla-precios input {
       </div>
       <div id="lista-preferencias"></div>
 
+      <h2 style="margin-bottom:4px;margin-top:32px;">Sugerencias de preferencias</h2>
+      <p class="subtitulo" style="margin-top:0;">Propuestas enviadas por los clientes desde su panel. Para convertir una en preferencia real, usa "+ Añadir preferencia".</p>
+      <div id="lista-sugerencias-preferencias"></div>
+
       <!-- Modal formulario preferencia -->
       <div id="modal-preferencia" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
         <div class="tarjeta" style="width:100%;max-width:420px;position:relative;">
@@ -1168,7 +1172,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
     if (boton.dataset.seccion === 'cotizaciones') cargarCotizaciones();
     if (boton.dataset.seccion === 'reservas') cargarReservas();
-    if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); cargarPreferencias(); }
+    if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); cargarPreferencias(); cargarSugerenciasPreferencias(); }
   });
 });
 
@@ -5419,6 +5423,55 @@ function eliminarPreferencia(id) {
     .then(function (d) {
       if (d.ok) {
         cargarPreferencias();
+      } else {
+        alert(d.error || 'No se pudo eliminar.');
+      }
+    });
+}
+
+function cargarSugerenciasPreferencias() {
+  fetch('/admin/preferencias-sugerencias')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var cont = document.getElementById('lista-sugerencias-preferencias');
+      if (!data.sugerencias.length) {
+        cont.innerHTML = '<p style="color:var(--texto-muted);padding:12px 0;">Nada aquí todavía.</p>';
+        return;
+      }
+      var filas = data.sugerencias.map(function (s) {
+        var fecha = s.creado_en ? new Date(s.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', year:'numeric'}) : '—';
+        var revisada = s.estado === 'revisada';
+        return '<tr>' +
+          '<td style="white-space:nowrap;">' + fecha + '</td>' +
+          '<td>' + (s.email_cliente || '—') + '</td>' +
+          '<td>' + s.texto + '</td>' +
+          '<td><span class="' + (revisada ? 'insignia-ok' : 'insignia-suspendido') + '">' + (revisada ? 'Revisada' : 'Pendiente') + '</span></td>' +
+          '<td>' +
+            '<button class="boton-secundario" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="cambiarEstadoSugerencia(' + s.id + ',\'' + (revisada ? 'pendiente' : 'revisada') + '\')">' + (revisada ? '↩ Pendiente' : '✔ Revisada') + '</button>' +
+            '<button class="boton-peligro" style="font-size:12px;padding:4px 10px;" onclick="eliminarSugerenciaPreferencia(' + s.id + ')">🗑️</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+      cont.innerHTML = '<div class="tarjeta"><table class="tabla-admin"><thead><tr><th>Fecha</th><th>Cliente</th><th>Sugerencia</th><th>Estado</th><th>Acciones</th></tr></thead>' +
+        '<tbody>' + filas + '</tbody></table></div>';
+    });
+}
+
+function cambiarEstadoSugerencia(id, estado) {
+  fetch('/admin/preferencias-sugerencias/' + id + '/estado', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ estado: estado })
+  }).then(function () { cargarSugerenciasPreferencias(); });
+}
+
+function eliminarSugerenciaPreferencia(id) {
+  if (!confirm('¿Eliminar esta sugerencia? Esta acción no se puede deshacer.')) return;
+  fetch('/admin/preferencias-sugerencias/' + id + '/eliminar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.ok) {
+        cargarSugerenciasPreferencias();
       } else {
         alert(d.error || 'No se pudo eliminar.');
       }
