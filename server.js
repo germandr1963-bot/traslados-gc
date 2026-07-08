@@ -5787,6 +5787,10 @@ app.get('/api/cliente/sesion', (req, res) => {
 // Ayudante: email del cliente con sesión abierta (su identidad entre reservas)
 async function emailClienteSesion(req) {
   if (!req.session || !req.session.clienteReservaId) return null;
+  // El email siempre se guarda en sesión al hacer login; no depende de que
+  // la reserva de acceso siga existiendo en la base de datos.
+  if (req.session.clienteEmail) return req.session.clienteEmail.toLowerCase();
+  // Fallback para sesiones antiguas sin clienteEmail en sesión
   const r = await pool.query('SELECT LOWER(email_cliente) AS email FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
   return r.rows.length ? r.rows[0].email : null;
 }
@@ -5904,10 +5908,10 @@ app.post('/api/cliente/mis-datos', asyncHandler(async (req, res) => {
 app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
 
-  // Obtener email del cliente desde la reserva de acceso
-  const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
-  if (!emailResult.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
-  const emailCliente = req.session.clienteEmail || emailResult.rows[0].email_cliente;
+  // El email vive en la sesión desde el login; no depende de que la reserva
+  // de acceso siga existiendo (puede haber sido eliminada del admin).
+  const emailCliente = req.session.clienteEmail;
+  if (!emailCliente) return res.status(401).json({ error: 'Sesión caducada, vuelve a entrar.' });
 
   // Todas las reservas de ese email
   const result = await pool.query(
@@ -5963,9 +5967,9 @@ app.post('/api/cliente/modificar', asyncHandler(async (req, res) => {
 
   const reservaId = req.body.reserva_id || req.session.clienteReservaId;
 
-  // Verificar que la reserva pertenece al email del cliente
-  const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
-  const emailCliente = req.session.clienteEmail || (emailResult.rows[0] ? emailResult.rows[0].email_cliente : null);
+  // El email lo leemos de la sesión directamente — no de la reserva de acceso
+  // (que puede haber sido eliminada desde el admin).
+  const emailCliente = req.session.clienteEmail;
 
   const reserva = await pool.query(
     'SELECT fecha, hora, estado, email_cliente FROM reservas WHERE id = $1',
