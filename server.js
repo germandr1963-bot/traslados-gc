@@ -1393,9 +1393,11 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
 
   // Copia de las preferencias del pasajero (Grupo G) en esta reserva:
   // instantánea de lo que el cliente tiene marcado en este momento.
-  // Solo si tiene sesión abierta y su interruptor de visibilidad está activo.
+  // Funciona tanto si la sesión es de portal (clienteEmail) como de reserva (clienteReservaId).
   try {
-    const emailPref = await emailClienteSesion(req);
+    const emailPref = req.session && req.session.clienteEmail
+      ? req.session.clienteEmail.toLowerCase()
+      : await emailClienteSesion(req);
     if (emailPref) {
       const visPref = await pool.query(
         'SELECT visibles FROM preferencias_visibilidad_cliente WHERE email_cliente = $1', [emailPref]
