@@ -1017,6 +1017,15 @@ async function initSchema() {
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_devolucion_pendiente BOOLEAN DEFAULT FALSE`);
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS whatsapp_mensajes_pendientes (
+      id SERIAL PRIMARY KEY,
+      telefono TEXT NOT NULL,
+      texto TEXT NOT NULL,
+      enviado BOOLEAN DEFAULT FALSE,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS reservas_mensajes (
       id SERIAL PRIMARY KEY,
       reserva_id INT NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,
@@ -6282,10 +6291,10 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
       if (choferQ.rows.length && choferQ.rows[0].telefono) {
         const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
         const textoChofer = '\u274c Cancelaci\u00f3n de reserva\nReserva: ' + r.numero_reserva + '\nRuta: ' + (r.origen || '\u2014') + ' \u2192 ' + (r.destino || '\u2014') + '\nFecha: ' + fechaTexto + ' \u00b7 ' + (r.hora ? r.hora.slice(0, 5) : '\u2014') + '\n\nEsta reserva ha sido cancelada por el cliente. Queda liberada de tu agenda.';
-        await fetch('http://localhost:' + (process.env.PORT_PUENTE || '3001') + '/api/interno/whatsapp', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Llave-Puente': process.env.LLAVE_PUENTE_WHATSAPP || '' },
-          body: JSON.stringify({ telefono: choferQ.rows[0].telefono, texto: textoChofer })
-        }).catch(function() {});
+        await pool.query(
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+          [choferQ.rows[0].telefono, textoChofer]
+        );
       }
     } catch(e) { console.warn('Error notificando cancelaci\u00f3n al chofer:', e.message); }
   }
@@ -7088,6 +7097,18 @@ function requierePuenteWhatsapp(req, res, next) {
   }
   next();
 }
+
+app.get('/api/whatsapp/mensajes-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, telefono, texto FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
+  );
+  res.json(result.rows);
+}));
+
+app.post('/api/whatsapp/mensajes-pendientes/:id/enviado', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE whatsapp_mensajes_pendientes SET enviado = TRUE WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
 
 app.get('/api/whatsapp/choferes-disponibles', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
