@@ -1015,6 +1015,7 @@ async function initSchema() {
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_password_hash TEXT`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_primer_acceso BOOLEAN DEFAULT TRUE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_devolucion_pendiente BOOLEAN DEFAULT FALSE`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS reservas_mensajes (
       id SERIAL PRIMARY KEY,
@@ -5939,7 +5940,7 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
             r.numero_vuelo, r.hora_llegada_vuelo, r.nombre_barco, r.hora_atraque,
             r.tipo_llegada, r.direccion_recogida, r.direccion_destino,
             r.notas_cliente, r.pasaporte_dni,
-            r.estado, r.deposito_pagado, r.deposito_liberado,
+            r.estado, r.deposito_pagado, r.deposito_liberado, r.deposito_devolucion_pendiente,
             r.precio_estimado,
             r.email_confirmacion_enviado, r.email_voucher_enviado,
             cv.nombre AS categoria_nombre,
@@ -6270,6 +6271,26 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
 
   await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', ['cancelada', r.id]);
 
+  const devolucionPendiente = r.deposito_pagado && !fueraDePlazo;
+  if (devolucionPendiente) {
+    await pool.query('UPDATE reservas SET deposito_devolucion_pendiente = TRUE WHERE id = $1', [r.id]);
+  }
+
+  if (r.conductor_id) {
+    try {
+      const choferQ = await pool.query('SELECT nombre, telefono FROM conductores WHERE id = $1', [r.conductor_id]);
+      if (choferQ.rows.length && choferQ.rows[0].telefono) {
+        const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+        const textoChofer = '\u274c Cancelaci\u00f3n de reserva\nReserva: ' + r.numero_reserva + '\nRuta: ' + (r.origen || '\u2014') + ' \u2192 ' + (r.destino || '\u2014') + '\nFecha: ' + fechaTexto + ' \u00b7 ' + (r.hora ? r.hora.slice(0, 5) : '\u2014') + '\n\nEsta reserva ha sido cancelada por el cliente. Queda liberada de tu agenda.';
+        await fetch('http://localhost:' + (process.env.PORT_PUENTE || '3001') + '/api/interno/whatsapp', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Llave-Puente': process.env.LLAVE_PUENTE_WHATSAPP || '' },
+          body: JSON.stringify({ telefono: choferQ.rows[0].telefono, texto: textoChofer })
+        }).catch(function() {});
+      }
+    } catch(e) { console.warn('Error notificando cancelaci\u00f3n al chofer:', e.message); }
+  }
+
+
   await pool.query(
     'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
     [r.id, 'admin', '❌ Reserva cancelada por el cliente.']
@@ -6291,15 +6312,17 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
 
   // Confirmar al cliente
   try {
-    const avisoNoshow = fueraDePlazo
-      ? '<p style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:10px 14px;font-size:13px;color:#856404;">⚠️ La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía podría ser retenido según nuestra política de cancelación.</p>'
+    const avisoDeposito = r.deposito_pagado
+      ? (fueraDePlazo
+          ? '<p style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:10px 14px;font-size:13px;color:#856404;">⚠️ La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía podría ser retenido según nuestra política de cancelación.</p>'
+          : '<p style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:10px 14px;font-size:13px;color:#2e7d32;">✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.</p>')
       : '<p style="color:#2e7d32;font-size:13px;">✅ La cancelación se ha realizado dentro del plazo establecido.</p>';
     await enviarEmail({
       to: r.email_cliente,
       subject: 'Tu reserva ' + r.numero_reserva + ' ha sido cancelada',
       html: `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
              <p>Tu reserva <strong>${r.numero_reserva}</strong> (${r.origen || '—'} → ${r.destino || '—'}) ha sido cancelada correctamente.</p>
-             ${avisoNoshow}
+             ${avisoDeposito}
              <p>Si tienes alguna duda, puedes contactarnos por WhatsApp.</p>`
     });
   } catch(e) { console.warn('Error enviando email cancelación al cliente:', e.message); }
