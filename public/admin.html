@@ -4671,6 +4671,10 @@ function abrirDetalleReserva(id, sinScroll) {
       if (r.deposito_liberado) {
         depEl.innerHTML = '<span style="color:#2d7a4f;font-weight:600;">✅ Depósito ya liberado y notificado al cliente.</span>';
         btnLiberar.style.display = 'none';
+      } else if (r.deposito_devolucion_pendiente) {
+        depEl.innerHTML = '<span style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:6px 12px;font-size:13px;color:#856404;display:inline-block;">⚠️ Devolución de garantía pendiente. El cliente canceló en plazo — procesa la devolución en Stripe y marca como devuelta.</span>';
+        btnLiberar.innerHTML = '✅ Marcar garantía como devuelta';
+        btnLiberar.style.display = 'inline-block';
       } else if (r.deposito_pagado) {
         depEl.innerHTML = '<span style="color:#856404;">🔒 Depósito retenido — ' + (r.deposito_importe || '—') + ' €. Pulsa el botón cuando el servicio esté completado y quieras liberar la retención.</span>';
         btnLiberar.style.display = 'inline-block';
