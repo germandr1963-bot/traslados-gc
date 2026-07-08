@@ -3386,6 +3386,7 @@ app.get('/chofer/mis-reservas', requireChofer, asyncHandler(async (req, res) => 
   // Preferencias del pasajero de cada reserva (copia guardada al reservar)
   const ids = result.rows.map(r => r.id);
   const prefsPorReserva = {};
+  const extrasPorReserva = {};
   if (ids.length) {
     const prefs = await pool.query(
       'SELECT reserva_id, nombre, opcion, detalle FROM preferencias_reserva WHERE reserva_id = ANY($1) ORDER BY id',
@@ -3396,10 +3397,26 @@ app.get('/chofer/mis-reservas', requireChofer, asyncHandler(async (req, res) => 
         { nombre: p.nombre, opcion: p.opcion, detalle: p.detalle }
       );
     });
+    const extras = await pool.query(
+      `SELECT re.reserva_id, e.nombre, re.precio_en_reserva
+       FROM reservas_extras re
+       JOIN extras e ON e.id = re.extra_id
+       WHERE re.reserva_id = ANY($1)
+       ORDER BY e.bloque, e.orden`,
+      [ids]
+    );
+    extras.rows.forEach(e => {
+      (extrasPorReserva[e.reserva_id] = extrasPorReserva[e.reserva_id] || []).push(
+        { nombre: e.nombre, precio: e.precio_en_reserva }
+      );
+    });
   }
   res.json({
     nombre: req.session.choferNombre,
-    reservas: result.rows.map(r => Object.assign({}, r, { preferencias: prefsPorReserva[r.id] || [] }))
+    reservas: result.rows.map(r => Object.assign({}, r, {
+      preferencias: prefsPorReserva[r.id] || [],
+      extras: extrasPorReserva[r.id] || []
+    }))
   });
 }));
 
@@ -7052,7 +7069,8 @@ function requierePuenteWhatsapp(req, res, next) {
 app.get('/api/whatsapp/choferes-disponibles', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT id, nombre, telefono FROM conductores
-     WHERE estado = 'aprobado' AND disponible_hoy IS NOT FALSE
+     WHERE estado = 'aprobado'
+       AND disponible_hoy = TRUE
      ORDER BY nombre`
   );
   res.json(result.rows);
