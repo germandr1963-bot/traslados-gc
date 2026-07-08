@@ -346,6 +346,16 @@
                   }).join('') +
                 '</div>'
               : '') +
+            (r.extras && r.extras.length
+              ? '<div class="detalle-fila"><strong>Extras solicitados:</strong>' +
+                  r.extras.map(function(e){
+                    var precio = parseFloat(e.precio);
+                    var precioTexto = (!precio || precio === 0) ? 'Incluido' : '+' + precio.toFixed(2) + ' €';
+                    return '<div style="margin:3px 0 3px 8px;font-size:13px;"><strong>' + e.nombre + '</strong>' +
+                      ' <span style="color:#6b5c44;font-size:12px;">(' + precioTexto + ')</span></div>';
+                  }).join('') +
+                '</div>'
+              : '') +
             '<div class="detalle-fila"><strong>Ruta:</strong> ' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
             '<div class="detalle-fila"><strong>Fecha:</strong> ' + fecha + '</div>' +
             '<div class="detalle-fila"><strong>Hora de recogida:</strong> ' + hora + '</div>' +
