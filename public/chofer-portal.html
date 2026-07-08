@@ -339,10 +339,11 @@
           '<div class="reserva-cuerpo" id="cuerpo-' + r.id + '">' +
             (r.nombre_cliente ? '<div class="detalle-fila"><strong>Cliente:</strong> ' + r.nombre_cliente + '</div>' : '') +
             (r.preferencias && r.preferencias.length
-              ? '<div class="detalle-fila"><strong>Preferencias del cliente:</strong> ' +
+              ? '<div class="detalle-fila"><strong>Preferencias del cliente:</strong>' +
                   r.preferencias.map(function(p){
-                    return p.opcion + (p.detalle ? ' — ' + p.detalle : '');
-                  }).join(', ') +
+                    return '<div style="margin:3px 0 3px 8px;font-size:13px;"><span style="color:#6b5c44;">' + p.nombre + ':</span> ' +
+                      '<strong>' + p.opcion + (p.detalle ? ' — ' + p.detalle : '') + '</strong></div>';
+                  }).join('') +
                 '</div>'
               : '') +
             '<div class="detalle-fila"><strong>Ruta:</strong> ' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
