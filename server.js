@@ -5603,6 +5603,121 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
 }));
 
 
+// ─── Admin: listado de clientes ──────────────────────────────────────────────
+app.get('/admin/clientes', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT email_cliente, nombre, telefono FROM clientes_datos ORDER BY actualizado_en DESC'
+  );
+  res.json(result.rows);
+}));
+
+// ─── Admin: listado de equipo (choferes) ─────────────────────────────────────
+app.get('/admin/equipo', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT nombre, email, telefono FROM conductores WHERE activo = TRUE ORDER BY nombre ASC'
+  );
+  res.json(result.rows);
+}));
+
+// ─── Admin: enviar comunicado a clientes ─────────────────────────────────────
+app.post('/admin/comunicado/clientes', requireAdmin, asyncHandler(async (req, res) => {
+  const { destinatarios, email, whatsapp, asunto, mensaje } = req.body;
+  if (!mensaje) return res.status(400).json({ error: 'El mensaje es obligatorio.' });
+
+  // Si no hay destinatarios seleccionados, enviamos a todos
+  let lista;
+  if (Array.isArray(destinatarios) && destinatarios.length > 0) {
+    const result = await pool.query(
+      'SELECT email_cliente, nombre, telefono FROM clientes_datos WHERE email_cliente = ANY($1)',
+      [destinatarios]
+    );
+    lista = result.rows;
+  } else {
+    const result = await pool.query('SELECT email_cliente, nombre, telefono FROM clientes_datos');
+    lista = result.rows;
+  }
+
+  if (!lista.length) return res.status(400).json({ error: 'No hay destinatarios.' });
+
+  const errores = [];
+  for (const cliente of lista) {
+    if (email) {
+      try {
+        await enviarEmail({
+          to: cliente.email_cliente,
+          subject: asunto,
+          html: `<!DOCTYPE html><html><head><meta charset="utf-8">
+          <style>body{margin:0;padding:0;background:#f5f5f5;}.wrapper{max-width:600px;margin:0 auto;background:#fff;}
+          .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #C1502E;}
+          .body{padding:28px 24px;font-family:sans-serif;font-size:15px;color:#1C1815;white-space:pre-wrap;}
+          .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}</style>
+          </head><body><div class="wrapper">
+          <div class="header"><h1 style="color:#D9A441;margin:0;font-size:20px;">Traslados GC</h1></div>
+          <div class="body"><p>Hola ${cliente.nombre || ''},</p><p>${mensaje}</p></div>
+          <div class="footer">Traslados GC · Gran Canaria</div>
+          </div></body></html>`
+        });
+      } catch(e) { errores.push(cliente.email_cliente); }
+    }
+    if (whatsapp && cliente.telefono) {
+      try {
+        await enviarWhatsApp(cliente.telefono, mensaje);
+      } catch(e) { /* WhatsApp no bloquea el envío general */ }
+    }
+  }
+
+  res.json({ ok: true, enviados: lista.length, errores: errores.length });
+}));
+
+// ─── Admin: enviar comunicado al equipo (choferes) ───────────────────────────
+app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res) => {
+  const { destinatarios, email, whatsapp, asunto, mensaje } = req.body;
+  if (!mensaje) return res.status(400).json({ error: 'El mensaje es obligatorio.' });
+
+  let lista;
+  if (Array.isArray(destinatarios) && destinatarios.length > 0) {
+    const result = await pool.query(
+      'SELECT nombre, email, telefono FROM conductores WHERE email = ANY($1) AND activo = TRUE',
+      [destinatarios]
+    );
+    lista = result.rows;
+  } else {
+    const result = await pool.query('SELECT nombre, email, telefono FROM conductores WHERE activo = TRUE');
+    lista = result.rows;
+  }
+
+  if (!lista.length) return res.status(400).json({ error: 'No hay destinatarios.' });
+
+  const errores = [];
+  for (const chofer of lista) {
+    if (email) {
+      try {
+        await enviarEmail({
+          to: chofer.email,
+          subject: asunto,
+          html: `<!DOCTYPE html><html><head><meta charset="utf-8">
+          <style>body{margin:0;padding:0;background:#f5f5f5;}.wrapper{max-width:600px;margin:0 auto;background:#fff;}
+          .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #C1502E;}
+          .body{padding:28px 24px;font-family:sans-serif;font-size:15px;color:#1C1815;white-space:pre-wrap;}
+          .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}</style>
+          </head><body><div class="wrapper">
+          <div class="header"><h1 style="color:#D9A441;margin:0;font-size:20px;">Traslados GC</h1></div>
+          <div class="body"><p>Hola ${chofer.nombre || ''},</p><p>${mensaje}</p></div>
+          <div class="footer">Traslados GC · Gran Canaria</div>
+          </div></body></html>`
+        });
+      } catch(e) { errores.push(chofer.email); }
+    }
+    if (whatsapp && chofer.telefono) {
+      try {
+        await enviarWhatsApp(chofer.telefono, mensaje);
+      } catch(e) { /* WhatsApp no bloquea el envío general */ }
+    }
+  }
+
+  res.json({ ok: true, enviados: lista.length, errores: errores.length });
+}));
+
 // ─── Admin: guardar emails de notificación ───────────────────────────────────
 app.post('/admin/notificaciones', requireAdmin, asyncHandler(async (req, res) => {
   const { emails_notificacion } = req.body;
