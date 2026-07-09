@@ -6330,7 +6330,8 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
       to: r.email_cliente,
       subject: 'Tu reserva ' + r.numero_reserva + ' ha sido cancelada',
       html: `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-             <p>Tu reserva <strong>${r.numero_reserva}</strong> (${r.origen || '—'} → ${r.destino || '—'}) ha sido cancelada correctamente.</p>
+             <p>Tu reserva <strong>${r.numero_reserva}</strong> ha sido cancelada correctamente.</p>
+             <p><strong>Origen:</strong> ${r.origen || '—'}<br><strong>Destino:</strong> ${r.destino || '—'}</p>
              ${avisoDeposito}
              <p>Si tienes alguna duda, puedes contactarnos por WhatsApp.</p>`
     });
