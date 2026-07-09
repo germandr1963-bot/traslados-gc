@@ -5614,7 +5614,7 @@ app.get('/admin/clientes', requireAdmin, asyncHandler(async (req, res) => {
 // ─── Admin: listado de equipo (choferes) ─────────────────────────────────────
 app.get('/admin/equipo', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT nombre, email, telefono FROM conductores WHERE activo = TRUE ORDER BY nombre ASC'
+    'SELECT nombre, email, telefono FROM conductores ORDER BY nombre ASC'
   );
   res.json(result.rows);
 }));
@@ -5661,7 +5661,10 @@ app.post('/admin/comunicado/clientes', requireAdmin, asyncHandler(async (req, re
     }
     if (whatsapp && cliente.telefono) {
       try {
-        await enviarWhatsApp(cliente.telefono, mensaje);
+        await pool.query(
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+          [cliente.telefono, mensaje]
+        );
       } catch(e) { /* WhatsApp no bloquea el envío general */ }
     }
   }
@@ -5710,7 +5713,10 @@ app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res)
     }
     if (whatsapp && chofer.telefono) {
       try {
-        await enviarWhatsApp(chofer.telefono, mensaje);
+        await pool.query(
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+          [chofer.telefono, mensaje]
+        );
       } catch(e) { /* WhatsApp no bloquea el envío general */ }
     }
   }
