@@ -5614,7 +5614,7 @@ app.get('/admin/clientes', requireAdmin, asyncHandler(async (req, res) => {
 // ─── Admin: listado de equipo (choferes) ─────────────────────────────────────
 app.get('/admin/equipo', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT nombre, email, telefono FROM conductores ORDER BY nombre ASC'
+    "SELECT nombre, email, telefono FROM conductores WHERE estado = 'aprobado' ORDER BY nombre ASC"
   );
   res.json(result.rows);
 }));
@@ -5680,12 +5680,12 @@ app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res)
   let lista;
   if (Array.isArray(destinatarios) && destinatarios.length > 0) {
     const result = await pool.query(
-      'SELECT nombre, email, telefono FROM conductores WHERE email = ANY($1) AND activo = TRUE',
+      "SELECT nombre, email, telefono FROM conductores WHERE email = ANY($1) AND estado = 'aprobado'",
       [destinatarios]
     );
     lista = result.rows;
   } else {
-    const result = await pool.query('SELECT nombre, email, telefono FROM conductores WHERE activo = TRUE');
+    const result = await pool.query("SELECT nombre, email, telefono FROM conductores WHERE estado = 'aprobado' ORDER BY nombre ASC");
     lista = result.rows;
   }
 
