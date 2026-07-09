@@ -927,6 +927,7 @@ async function initSchema() {
       email_cliente TEXT PRIMARY KEY,
       nombre TEXT,
       telefono TEXT,
+      password_hash TEXT,
       actualizado_en TIMESTAMP DEFAULT NOW()
     );
   `);
@@ -1012,6 +1013,7 @@ async function initSchema() {
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email_voucher_enviado BOOLEAN DEFAULT FALSE`);
 
   // ─── Portal del cliente ───────────────────────────────────────────────────
+  await pool.query(`ALTER TABLE clientes_datos ADD COLUMN IF NOT EXISTS password_hash TEXT`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_password_hash TEXT`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_primer_acceso BOOLEAN DEFAULT TRUE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
@@ -5624,6 +5626,16 @@ app.post('/api/restablecer-password', asyncHandler(async (req, res) => {
   const hash = await bcrypt.hash(password_nueva, 10);
   if (fila.tipo === 'cliente') {
     await pool.query('UPDATE reservas SET cliente_password_hash = $1, cliente_primer_acceso = FALSE WHERE id = $2', [hash, fila.referencia_id]);
+    // Guardar también en clientes_datos para que la cuenta sea permanente
+    const rEmail = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [fila.referencia_id]);
+    if (rEmail.rows.length) {
+      await pool.query(
+        `INSERT INTO clientes_datos (email_cliente, password_hash)
+         VALUES ($1, $2)
+         ON CONFLICT (email_cliente) DO UPDATE SET password_hash = $2, actualizado_en = NOW()`,
+        [rEmail.rows[0].email_cliente.toLowerCase(), hash]
+      );
+    }
   } else if (fila.tipo === 'chofer') {
     await pool.query('UPDATE conductores SET password_hash = $1 WHERE id = $2', [hash, fila.referencia_id]);
   } else {
@@ -5709,13 +5721,35 @@ app.post('/api/cliente/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email y contraseña son obligatorios.' });
 
-  // Buscar cualquier reserva activa del cliente con ese email que tenga contraseña
+  const emailNorm = email.trim().toLowerCase();
+
+  // 1. Buscar primero en clientes_datos (cuenta permanente, independiente de reservas)
+  const cdResult = await pool.query(
+    `SELECT email_cliente, nombre, password_hash FROM clientes_datos WHERE LOWER(email_cliente) = $1 AND password_hash IS NOT NULL`,
+    [emailNorm]
+  );
+
+  if (cdResult.rows.length) {
+    const cliente = cdResult.rows[0];
+    const ok = await bcrypt.compare(password, cliente.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Contraseña incorrecta.' });
+
+    // Sesión: usamos email como identificador principal (sin depender de reserva)
+    req.session.clienteReservaId = 'cuenta_' + emailNorm;
+    req.session.clientePnr = null;
+    req.session.clienteEmail = cliente.email_cliente;
+    return req.session.save(function(err) {
+      res.json({ ok: true, primer_acceso: false });
+    });
+  }
+
+  // 2. Compatibilidad: buscar en reservas (clientes que aún no tienen cuenta permanente)
   const result = await pool.query(
     `SELECT id, nombre_cliente, email_cliente, cliente_password_hash, cliente_primer_acceso
      FROM reservas
-     WHERE LOWER(email_cliente) = LOWER($1) AND cliente_password_hash IS NOT NULL
+     WHERE LOWER(email_cliente) = $1 AND cliente_password_hash IS NOT NULL
      ORDER BY creado_en DESC LIMIT 1`,
-    [email.trim()]
+    [emailNorm]
   );
   if (!result.rows.length) return res.status(404).json({ error: 'No encontramos una cuenta con ese email. Si es tu primera vez, usa el acceso con número de reserva.' });
   const reserva = result.rows[0];
@@ -5737,11 +5771,26 @@ app.post('/api/cliente/cambiar-password', asyncHandler(async (req, res) => {
   const { password_nueva } = req.body;
   if (!password_nueva || password_nueva.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
 
+  const emailCliente = (req.session.clienteEmail || '').toLowerCase();
   const hash = await bcrypt.hash(password_nueva, 10);
+
+  // Guardar en clientes_datos (cuenta permanente)
   await pool.query(
-    'UPDATE reservas SET cliente_password_hash = $1, cliente_primer_acceso = FALSE WHERE id = $2',
-    [hash, req.session.clienteReservaId]
+    `INSERT INTO clientes_datos (email_cliente, password_hash)
+     VALUES ($1, $2)
+     ON CONFLICT (email_cliente) DO UPDATE SET password_hash = $2, actualizado_en = NOW()`,
+    [emailCliente, hash]
   );
+
+  // Si la sesión viene de una reserva (no de cuenta permanente), actualizar también la reserva
+  const reservaId = req.session.clienteReservaId;
+  if (reservaId && !String(reservaId).startsWith('cuenta_')) {
+    await pool.query(
+      'UPDATE reservas SET cliente_password_hash = $1, cliente_primer_acceso = FALSE WHERE id = $2',
+      [hash, reservaId]
+    );
+  }
+
   res.json({ ok: true });
 }));
 
@@ -6106,9 +6155,14 @@ app.get('/api/cliente/datos-modificacion', asyncHandler(async (req, res) => {
   const pnr = req.query.pnr;
   if (!pnr) return res.status(400).json({ error: 'PNR requerido.' });
 
-  const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
-  if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
-  const emailCliente = req.session.clienteEmail || emailResult.rows[0].email_cliente;
+  // Si la sesión es de cuenta permanente, el email está directo en la sesión
+  let emailCliente = req.session.clienteEmail || null;
+  if (!emailCliente) {
+    const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+    if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
+    emailCliente = emailResult.rows[0].email_cliente;
+  }
+  if (!emailCliente) return res.status(401).json({ error: 'No autenticado.' });
 
   const result = await pool.query(
     `SELECT r.*, cv.nombre AS categoria_nombre, cv.id AS categoria_id_actual
@@ -6139,9 +6193,14 @@ app.get('/api/cliente/datos-modificacion', asyncHandler(async (req, res) => {
 app.post('/api/cliente/modificar-completo', asyncHandler(async (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
 
-  const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
-  if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
-  const emailCliente = req.session.clienteEmail || emailResult.rows[0].email_cliente;
+  // Si la sesión es de cuenta permanente, el email está directo en la sesión
+  let emailCliente = req.session.clienteEmail || null;
+  if (!emailCliente) {
+    const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+    if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
+    emailCliente = emailResult.rows[0].email_cliente;
+  }
+  if (!emailCliente) return res.status(401).json({ error: 'No autenticado.' });
 
   const { pnr, fecha, hora, num_pasajeros, tipo_llegada, numero_vuelo, hora_llegada_vuelo,
           nombre_barco, hora_atraque, direccion_recogida, direccion_destino,
@@ -6257,9 +6316,14 @@ app.post('/api/cliente/modificar-completo', asyncHandler(async (req, res) => {
 app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
 
-  const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
-  if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
-  const emailCliente = req.session.clienteEmail || emailResult.rows[0].email_cliente;
+  // Si la sesión es de cuenta permanente, el email está directo en la sesión
+  let emailCliente = req.session.clienteEmail || null;
+  if (!emailCliente) {
+    const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+    if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
+    emailCliente = emailResult.rows[0].email_cliente;
+  }
+  if (!emailCliente) return res.status(401).json({ error: 'No autenticado.' });
 
   const { reserva_id } = req.body;
   const reservaQ = await pool.query(
@@ -7031,9 +7095,14 @@ app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, re
 // ─── Portal cliente: descargar factura ───────────────────────────────────────
 app.get('/api/cliente/factura/:reservaId', asyncHandler(async (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
-  const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
-  if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
-  const emailCliente = req.session.clienteEmail || emailResult.rows[0].email_cliente;
+  // Si la sesión es de cuenta permanente, el email está directo en la sesión
+  let emailCliente = req.session.clienteEmail || null;
+  if (!emailCliente) {
+    const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+    if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
+    emailCliente = emailResult.rows[0].email_cliente;
+  }
+  if (!emailCliente) return res.status(401).json({ error: 'No autenticado.' });
 
   const reservaQ = await pool.query(
     'SELECT id, numero_reserva FROM reservas WHERE id = $1 AND LOWER(email_cliente) = LOWER($2)',
