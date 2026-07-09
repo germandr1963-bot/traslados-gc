@@ -161,6 +161,8 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="cotizaciones">Cotizaciones <span id="badge-cotiz" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">0</span></button>
       <button class="item-menu" data-seccion="reservas">Reservas</button>
       <button class="item-menu" data-seccion="notificaciones">Notificaciones</button>
+      <button class="item-menu" data-seccion="clientes">Clientes</button>
+      <button class="item-menu" data-seccion="equipo">Equipo</button>
     </div>
     <button id="boton-salir" style="margin-top:16px;opacity:0.5;width:100%;">Cerrar sesión</button>
   </div>
@@ -982,6 +984,88 @@ table.tabla-precios input {
       </div>
     </div>
 
+    <div id="seccion-clientes" class="oculto">
+      <h1>Clientes</h1>
+      <p class="subtitulo">Clientes registrados en la plataforma.</p>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;">
+        <input type="text" id="filtro-clientes" class="campo" placeholder="Buscar por nombre, email o teléfono…" style="max-width:320px;" oninput="filtrarClientes()">
+        <button class="boton-primario" onclick="abrirComunicadoClientes()">Enviar comunicado</button>
+      </div>
+      <table class="tabla-admin">
+        <thead><tr><th><input type="checkbox" id="check-todos-clientes" onchange="toggleTodosClientes(this)"></th><th>Nombre</th><th>Email</th><th>Teléfono</th></tr></thead>
+        <tbody id="tabla-clientes"></tbody>
+      </table>
+      <div id="aviso-clientes" style="display:none;margin-top:12px;"></div>
+
+      <!-- Panel comunicado clientes -->
+      <div id="panel-comunicado-clientes" style="display:none;margin-top:24px;" class="tarjeta">
+        <h2 style="font-size:1rem;margin:0 0 16px 0;">Nuevo comunicado</h2>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Destinatarios</label>
+          <span id="resumen-destinatarios-clientes" style="font-size:13px;color:#5b5347;"></span>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Canal</label>
+          <label style="font-size:13px;margin-right:16px;"><input type="checkbox" id="canal-email-clientes" checked> Email</label>
+          <label style="font-size:13px;"><input type="checkbox" id="canal-whatsapp-clientes"> WhatsApp</label>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Asunto <span style="font-weight:400;color:#999;">(solo email)</span></label>
+          <input type="text" id="asunto-comunicado-clientes" class="campo" placeholder="Asunto del email…">
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Mensaje</label>
+          <textarea id="mensaje-comunicado-clientes" class="campo" rows="5" placeholder="Escribe el mensaje…" style="resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="boton-primario" onclick="enviarComunicadoClientes()">Enviar</button>
+          <button class="boton-secundario" onclick="cerrarComunicadoClientes()">Cancelar</button>
+        </div>
+        <div id="aviso-envio-clientes" style="display:none;margin-top:10px;"></div>
+      </div>
+    </div>
+
+    <div id="seccion-equipo" class="oculto">
+      <h1>Equipo</h1>
+      <p class="subtitulo">Choferes registrados en la plataforma.</p>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;">
+        <input type="text" id="filtro-equipo" class="campo" placeholder="Buscar por nombre, email o teléfono…" style="max-width:320px;" oninput="filtrarEquipo()">
+        <button class="boton-primario" onclick="abrirComunicadoEquipo()">Enviar comunicado</button>
+      </div>
+      <table class="tabla-admin">
+        <thead><tr><th><input type="checkbox" id="check-todos-equipo" onchange="toggleTodosEquipo(this)"></th><th>Nombre</th><th>Email</th><th>Teléfono</th></tr></thead>
+        <tbody id="tabla-equipo"></tbody>
+      </table>
+      <div id="aviso-equipo" style="display:none;margin-top:12px;"></div>
+
+      <!-- Panel comunicado equipo -->
+      <div id="panel-comunicado-equipo" style="display:none;margin-top:24px;" class="tarjeta">
+        <h2 style="font-size:1rem;margin:0 0 16px 0;">Nuevo comunicado</h2>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Destinatarios</label>
+          <span id="resumen-destinatarios-equipo" style="font-size:13px;color:#5b5347;"></span>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Canal</label>
+          <label style="font-size:13px;margin-right:16px;"><input type="checkbox" id="canal-email-equipo" checked> Email</label>
+          <label style="font-size:13px;"><input type="checkbox" id="canal-whatsapp-equipo"> WhatsApp</label>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Asunto <span style="font-weight:400;color:#999;">(solo email)</span></label>
+          <input type="text" id="asunto-comunicado-equipo" class="campo" placeholder="Asunto del email…">
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Mensaje</label>
+          <textarea id="mensaje-comunicado-equipo" class="campo" rows="5" placeholder="Escribe el mensaje…" style="resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="boton-primario" onclick="enviarComunicadoEquipo()">Enviar</button>
+          <button class="boton-secundario" onclick="cerrarComunicadoEquipo()">Cancelar</button>
+        </div>
+        <div id="aviso-envio-equipo" style="display:none;margin-top:10px;"></div>
+      </div>
+    </div>
+
     <div id="seccion-extras" class="oculto">
       <h1>Extras del traslado</h1>
       <p class="subtitulo">Catálogo interno de todo lo que se podría ofrecer. Un extra nuevo queda como <strong>borrador</strong> (no lo ve el cliente) hasta que lo publiques a mano.</p>
@@ -1156,7 +1240,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
@@ -1173,6 +1257,8 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'cotizaciones') cargarCotizaciones();
     if (boton.dataset.seccion === 'reservas') cargarReservas();
     if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); cargarPreferencias(); cargarSugerenciasPreferencias(); }
+    if (boton.dataset.seccion === 'clientes') cargarClientes();
+    if (boton.dataset.seccion === 'equipo') cargarEquipo();
   });
 });
 
@@ -3449,6 +3535,179 @@ function guardarTarifario() {
 
 // ─── Extras ───────────────────────────────────────────────────────────────────
 // ─── Notificaciones de reservas ───────────────────────────────────────────────
+// ─── CLIENTES ─────────────────────────────────────────────────────────────────
+var _clientesData = [];
+
+function cargarClientes() {
+  fetch('/admin/clientes')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _clientesData = data;
+      renderTablaClientes(data);
+    });
+}
+
+function renderTablaClientes(lista) {
+  var tbody = document.getElementById('tabla-clientes');
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;padding:20px;">No hay clientes registrados aún.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map(function(c) {
+    return '<tr>' +
+      '<td><input type="checkbox" class="check-cliente" value="' + c.email_cliente + '"></td>' +
+      '<td>' + (c.nombre || '—') + '</td>' +
+      '<td>' + c.email_cliente + '</td>' +
+      '<td>' + (c.telefono || '—') + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+function filtrarClientes() {
+  var q = document.getElementById('filtro-clientes').value.toLowerCase();
+  var filtrados = _clientesData.filter(function(c) {
+    return (c.nombre || '').toLowerCase().includes(q) ||
+           c.email_cliente.toLowerCase().includes(q) ||
+           (c.telefono || '').toLowerCase().includes(q);
+  });
+  renderTablaClientes(filtrados);
+}
+
+function toggleTodosClientes(cb) {
+  document.querySelectorAll('.check-cliente').forEach(function(c) { c.checked = cb.checked; });
+}
+
+function abrirComunicadoClientes() {
+  var seleccionados = Array.from(document.querySelectorAll('.check-cliente:checked')).map(function(c) { return c.value; });
+  var total = seleccionados.length || _clientesData.length;
+  var resumen = seleccionados.length
+    ? seleccionados.length + ' cliente(s) seleccionado(s)'
+    : 'Todos los clientes (' + _clientesData.length + ')';
+  document.getElementById('resumen-destinatarios-clientes').textContent = resumen;
+  document.getElementById('panel-comunicado-clientes').style.display = 'block';
+  document.getElementById('panel-comunicado-clientes').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cerrarComunicadoClientes() {
+  document.getElementById('panel-comunicado-clientes').style.display = 'none';
+  document.getElementById('asunto-comunicado-clientes').value = '';
+  document.getElementById('mensaje-comunicado-clientes').value = '';
+  var av = document.getElementById('aviso-envio-clientes');
+  av.style.display = 'none';
+}
+
+function enviarComunicadoClientes() {
+  var seleccionados = Array.from(document.querySelectorAll('.check-cliente:checked')).map(function(c) { return c.value; });
+  var email = document.getElementById('canal-email-clientes').checked;
+  var whatsapp = document.getElementById('canal-whatsapp-clientes').checked;
+  var asunto = document.getElementById('asunto-comunicado-clientes').value.trim();
+  var mensaje = document.getElementById('mensaje-comunicado-clientes').value.trim();
+  var av = document.getElementById('aviso-envio-clientes');
+  if (!email && !whatsapp) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Selecciona al menos un canal.'; return; }
+  if (!mensaje) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Escribe un mensaje.'; return; }
+  if (email && !asunto) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='El asunto es obligatorio para email.'; return; }
+  av.style.display='block'; av.style.color='#5b5347'; av.textContent='Enviando…';
+  fetch('/admin/comunicado/clientes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ destinatarios: seleccionados, email: email, whatsapp: whatsapp, asunto: asunto, mensaje: mensaje })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      av.style.color = '#27ae60';
+      av.textContent = 'Comunicado enviado correctamente.';
+    } else {
+      av.style.color = '#c0392b';
+      av.textContent = d.error || 'Error al enviar.';
+    }
+  });
+}
+
+// ─── EQUIPO ───────────────────────────────────────────────────────────────────
+var _equipoData = [];
+
+function cargarEquipo() {
+  fetch('/admin/equipo')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _equipoData = data;
+      renderTablaEquipo(data);
+    });
+}
+
+function renderTablaEquipo(lista) {
+  var tbody = document.getElementById('tabla-equipo');
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;padding:20px;">No hay choferes registrados aún.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map(function(c) {
+    return '<tr>' +
+      '<td><input type="checkbox" class="check-equipo" value="' + c.email + '"></td>' +
+      '<td>' + (c.nombre || '—') + '</td>' +
+      '<td>' + c.email + '</td>' +
+      '<td>' + (c.telefono || '—') + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+function filtrarEquipo() {
+  var q = document.getElementById('filtro-equipo').value.toLowerCase();
+  var filtrados = _equipoData.filter(function(c) {
+    return (c.nombre || '').toLowerCase().includes(q) ||
+           c.email.toLowerCase().includes(q) ||
+           (c.telefono || '').toLowerCase().includes(q);
+  });
+  renderTablaEquipo(filtrados);
+}
+
+function toggleTodosEquipo(cb) {
+  document.querySelectorAll('.check-equipo').forEach(function(c) { c.checked = cb.checked; });
+}
+
+function abrirComunicadoEquipo() {
+  var seleccionados = Array.from(document.querySelectorAll('.check-equipo:checked')).map(function(c) { return c.value; });
+  var resumen = seleccionados.length
+    ? seleccionados.length + ' chofer(es) seleccionado(s)'
+    : 'Todo el equipo (' + _equipoData.length + ')';
+  document.getElementById('resumen-destinatarios-equipo').textContent = resumen;
+  document.getElementById('panel-comunicado-equipo').style.display = 'block';
+  document.getElementById('panel-comunicado-equipo').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cerrarComunicadoEquipo() {
+  document.getElementById('panel-comunicado-equipo').style.display = 'none';
+  document.getElementById('asunto-comunicado-equipo').value = '';
+  document.getElementById('mensaje-comunicado-equipo').value = '';
+  var av = document.getElementById('aviso-envio-equipo');
+  av.style.display = 'none';
+}
+
+function enviarComunicadoEquipo() {
+  var seleccionados = Array.from(document.querySelectorAll('.check-equipo:checked')).map(function(c) { return c.value; });
+  var email = document.getElementById('canal-email-equipo').checked;
+  var whatsapp = document.getElementById('canal-whatsapp-equipo').checked;
+  var asunto = document.getElementById('asunto-comunicado-equipo').value.trim();
+  var mensaje = document.getElementById('mensaje-comunicado-equipo').value.trim();
+  var av = document.getElementById('aviso-envio-equipo');
+  if (!email && !whatsapp) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Selecciona al menos un canal.'; return; }
+  if (!mensaje) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Escribe un mensaje.'; return; }
+  if (email && !asunto) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='El asunto es obligatorio para email.'; return; }
+  av.style.display='block'; av.style.color='#5b5347'; av.textContent='Enviando…';
+  fetch('/admin/comunicado/equipo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ destinatarios: seleccionados, email: email, whatsapp: whatsapp, asunto: asunto, mensaje: mensaje })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      av.style.color = '#27ae60';
+      av.textContent = 'Comunicado enviado correctamente.';
+    } else {
+      av.style.color = '#c0392b';
+      av.textContent = d.error || 'Error al enviar.';
+    }
+  });
+}
+
 var _emailsNotif = [];
 
 function cargarNotificaciones() {
