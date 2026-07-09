@@ -1403,6 +1403,21 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
 
   const reservaId = reserva.rows[0].id;
 
+  // Guardar cliente en clientes_datos (sin sobrescribir datos si ya existen)
+  try {
+    await pool.query(
+      `INSERT INTO clientes_datos (email_cliente, nombre, telefono)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (email_cliente) DO UPDATE
+         SET nombre = COALESCE(NULLIF(clientes_datos.nombre, ''), EXCLUDED.nombre),
+             telefono = COALESCE(NULLIF(clientes_datos.telefono, ''), EXCLUDED.telefono),
+             actualizado_en = NOW()`,
+      [email_cliente.trim().toLowerCase(), nombre_cliente.trim(), telefono_cliente.trim()]
+    );
+  } catch (e) {
+    console.error('No se pudo guardar el cliente en clientes_datos:', e);
+  }
+
   // Copia de las preferencias del pasajero (Grupo G) en esta reserva:
   // instantánea de lo que el cliente tiene marcado en este momento.
   // Funciona tanto si la sesión es de portal (clienteEmail) como de reserva (clienteReservaId).
