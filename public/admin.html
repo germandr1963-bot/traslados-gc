@@ -987,6 +987,7 @@ table.tabla-precios input {
     <div id="seccion-clientes" class="oculto">
       <h1>Clientes</h1>
       <p class="subtitulo">Clientes registrados en la plataforma.</p>
+      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="cargarClientes()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;">
         <input type="text" id="filtro-clientes" class="campo" placeholder="Buscar por nombre, email o teléfono…" style="max-width:320px;" oninput="filtrarClientes()">
         <button class="boton-primario" onclick="abrirComunicadoClientes()">Enviar comunicado</button>
@@ -1028,6 +1029,7 @@ table.tabla-precios input {
     <div id="seccion-equipo" class="oculto">
       <h1>Equipo</h1>
       <p class="subtitulo">Choferes registrados en la plataforma.</p>
+      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="cargarEquipo()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;">
         <input type="text" id="filtro-equipo" class="campo" placeholder="Buscar por nombre, email o teléfono…" style="max-width:320px;" oninput="filtrarEquipo()">
         <button class="boton-primario" onclick="abrirComunicadoEquipo()">Enviar comunicado</button>
