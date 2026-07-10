@@ -250,10 +250,11 @@
         var hora = r.hora ? r.hora.slice(0,5) : '—';
         var esHistorial = r.es_historial;
         var dotClass = esHistorial ? 'dot-historial' : (r.estado === 'cancelada' ? 'dot-historial' : r.estado === 'pendiente' ? 'dot-pendiente' : r.estado === 'modificacion_pendiente' ? 'dot-pendiente' : 'dot-activa');
+        var dotHTML = r.estado === 'completada' ? '<span style="font-size:14px;line-height:1;flex-shrink:0;">✅</span>' : '<div class="estado-dot ' + dotClass + '"></div>';
         var etiqueta = esHistorial ? '<span class="etiqueta-seccion etiqueta-historial">Realizado</span>' : '<span class="etiqueta-seccion etiqueta-activa">Activo</span>';
         return '<div class="reserva-card' + (esHistorial ? ' historial' : '') + '" id="card-' + i + '">' +
           '<div class="reserva-resumen" onclick="toggleDetalle(' + i + ')">' +
-            '<div class="estado-dot ' + dotClass + '"></div>' +
+            dotHTML +
             '<div class="reserva-info">' +
               '<div class="reserva-pnr">' + r.numero_reserva + '</div>' +
               '<div class="reserva-ruta">' + (r.origen || '—') + ' → ' + (r.destino || '—') + '</div>' +
