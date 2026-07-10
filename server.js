@@ -3675,17 +3675,6 @@ app.get('/admin/valoraciones', requireAdmin, asyncHandler(async (req, res) => {
   res.json({ valoraciones: rows });
 }));
 
-// ─── Admin: eliminar valoraciones ────────────────────────────────────────────
-app.delete('/admin/valoraciones/:id', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query('DELETE FROM valoraciones WHERE id = $1', [req.params.id]);
-  res.json({ ok: true });
-}));
-
-app.delete('/admin/valoraciones', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query('DELETE FROM valoraciones');
-  res.json({ ok: true });
-}));
-
 // ─── Admin: configuración no-show ────────────────────────────────────────────
 
 // Obtener toda la configuración (general + temporadas)
