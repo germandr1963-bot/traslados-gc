@@ -1122,6 +1122,16 @@ async function initSchema() {
     );
   `);
 
+  // ─── URLs cortas para WhatsApp ────────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS url_cortas (
+      id SERIAL PRIMARY KEY,
+      codigo TEXT NOT NULL UNIQUE,
+      token_valoracion TEXT NOT NULL,
+      creado_en TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
   // ─── Valoraciones ─────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS valoraciones (
@@ -3483,6 +3493,16 @@ app.get('/chofer/mensajes/:reservaId', requireChofer, asyncHandler(async (req, r
   res.json({ mensajes: result.rows });
 }));
 
+// ─── Redirección URL corta ────────────────────────────────────────────────────
+app.get('/v/:codigo', asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT token_valoracion FROM url_cortas WHERE codigo = $1',
+    [req.params.codigo]
+  );
+  if (!result.rows.length) return res.status(404).send('Enlace no válido.');
+  res.redirect(`${BASE_URL}/valorar?token=${result.rows[0].token_valoracion}`);
+}));
+
 // ─── Chofer: marcar servicio como completado ──────────────────────────────────
 app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (req, res) => {
   // Verificar que la reserva pertenece a este chofer y está confirmada
@@ -3499,6 +3519,21 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   // Generar token único de valoración
   const token = crypto.randomBytes(32).toString('hex');
 
+  // Generar código corto para WhatsApp (6 caracteres hex)
+  let codigo = crypto.randomBytes(3).toString('hex');
+  try {
+    await pool.query(
+      'INSERT INTO url_cortas (codigo, token_valoracion) VALUES ($1, $2)',
+      [codigo, token]
+    );
+  } catch(e) {
+    codigo = crypto.randomBytes(4).toString('hex');
+    await pool.query(
+      'INSERT INTO url_cortas (codigo, token_valoracion) VALUES ($1, $2)',
+      [codigo, token]
+    );
+  }
+
   // Actualizar estado y guardar token
   await pool.query(
     `UPDATE reservas SET estado = 'completada', completada_en = NOW(), token_valoracion = $1 WHERE id = $2`,
@@ -3506,6 +3541,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   );
 
   const enlace = `${BASE_URL}/valorar?token=${token}`;
+  const enlaceCorto = `${BASE_URL}/v/${codigo}`;
   const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
 
   // Email al cliente
@@ -3550,7 +3586,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
 
   // WhatsApp al cliente
   if (r.telefono_cliente) {
-    const textoWa = `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen} → ${r.destino}) ha finalizado.\n\n¿Nos cuentas cómo fue? Tu opinión nos ayuda a mejorar:\n${enlace}`;
+    const textoWa = `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen} → ${r.destino}) ha finalizado.\n\n¿Nos cuentas cómo fue? Tu opinión nos ayuda a mejorar:\n${enlaceCorto}`;
     try {
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
