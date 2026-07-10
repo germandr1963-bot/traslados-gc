@@ -6110,20 +6110,23 @@ app.get('/api/cliente/mis-datos', asyncHandler(async (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
   const emailCliente = req.session.clienteEmail;
   // Prioridad: datos guardados por el propio cliente; si no hay, su última reserva
+  const emailNorm = (emailCliente || '').toLowerCase().trim();
   const propios = await pool.query(
-    'SELECT nombre, telefono FROM clientes_datos WHERE email_cliente = LOWER($1)', [emailCliente]
+    'SELECT nombre, telefono FROM clientes_datos WHERE LOWER(email_cliente) = $1', [emailNorm]
   );
   const result = await pool.query(
     `SELECT nombre_cliente, telefono_cliente, email_cliente
-     FROM reservas WHERE LOWER(email_cliente) = LOWER($1)
+     FROM reservas WHERE LOWER(email_cliente) = $1
      ORDER BY fecha DESC, hora DESC LIMIT 1`,
-    [emailCliente]
+    [emailNorm]
   );
   if (!result.rows.length && !propios.rows.length) return res.status(404).json({ error: 'No encontrado.' });
+  const nombreFinal = (propios.rows.length && propios.rows[0].nombre) || (result.rows.length ? result.rows[0].nombre_cliente : '');
+  console.log('[mis-datos] email:', emailNorm, '| clientes_datos nombre:', propios.rows[0] && propios.rows[0].nombre, '| reserva nombre:', result.rows[0] && result.rows[0].nombre_cliente, '| devuelve:', nombreFinal);
   res.json({
-    nombre_cliente: (propios.rows.length && propios.rows[0].nombre) || (result.rows.length ? result.rows[0].nombre_cliente : ''),
+    nombre_cliente: nombreFinal,
     telefono_cliente: (propios.rows.length && propios.rows[0].telefono) || (result.rows.length ? result.rows[0].telefono_cliente : ''),
-    email_cliente: result.rows.length ? result.rows[0].email_cliente : emailCliente
+    email_cliente: result.rows.length ? result.rows[0].email_cliente : emailNorm
   });
 }));
 
@@ -6197,7 +6200,14 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
     });
   }));
 
-  res.json({ reservas, nombre: result.rows.length ? result.rows[0].nombre_cliente : '' });
+  // Coger el nombre de clientes_datos (lo que el cliente tiene en Mis datos)
+  const nombreCliente = await pool.query(
+    'SELECT nombre FROM clientes_datos WHERE LOWER(email_cliente) = LOWER($1)',
+    [emailCliente]
+  );
+  const nombre = (nombreCliente.rows.length && nombreCliente.rows[0].nombre)
+    || (result.rows.length ? result.rows[0].nombre_cliente : '');
+  res.json({ reservas, nombre });
 }));
 
 // Modificar datos de la reserva (cliente)
