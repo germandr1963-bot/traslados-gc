@@ -82,9 +82,9 @@
     }
     .reserva-detalle.visible { display: block; }
     .dato-fila {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
       font-size: 14px;
       margin-bottom: 16px;
     }
@@ -285,7 +285,7 @@
       if (extrasACobrar.length) {
         extrasHTML += '<div style="margin:8px 0 2px 0;font-size:13px;font-weight:600;color:#856404;">A pagar al conductor al final del servicio:</div>';
         extrasHTML += extrasACobrar.map(function(e) {
-          return '<div style="font-size:13px;margin:2px 0 2px 8px;display:flex;justify-content:space-between;gap:12px;"><span>💰 ' + e.nombre + '</span><strong style="white-space:nowrap;">' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €</strong></div>';
+          return '<div style="font-size:13px;margin:2px 0 2px 8px;">💰 ' + e.nombre + ' — <strong>' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €</strong></div>';
         }).join('');
         extrasHTML += '<div style="margin-top:10px;padding:8px 14px;background:#fff8e1;border:1px solid #D9A441;border-radius:6px;font-size:13px;color:#1C1815;">' +
           '<strong>💰 Total a pagar al conductor: ' + totalExtras.toFixed(2) + ' €</strong> — ' +
@@ -298,11 +298,11 @@
         '<div><strong>Categoría</strong>' + (r.categoria_nombre || '—') + '</div>' +
         '<div><strong>Pasajeros</strong>' + (r.num_pasajeros || '—') + '</div>' +
         '<div><strong>Precio estimado</strong>' + (r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—') + '</div>' +
-        (r.direccion_recogida ? '<div style="grid-column:span 2"><strong>Dirección de recogida</strong>' + r.direccion_recogida + '</div>' : '') +
-        (r.direccion_destino ? '<div style="grid-column:span 2"><strong>Dirección de destino</strong>' + r.direccion_destino + '</div>' : '') +
+        (r.direccion_recogida ? '<div style=""><strong>Dirección de recogida</strong>' + r.direccion_recogida + '</div>' : '') +
+        (r.direccion_destino ? '<div style=""><strong>Dirección de destino</strong>' + r.direccion_destino + '</div>' : '') +
         (r.numero_vuelo ? '<div><strong>Vuelo</strong>' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · ' + r.hora_llegada_vuelo.slice(0,5) : '') + '</div>' : '') +
         (r.nombre_barco ? '<div><strong>Barco</strong>' + r.nombre_barco + (r.hora_atraque ? ' · ' + r.hora_atraque.slice(0,5) : '') + '</div>' : '') +
-        (r.extras && r.extras.length ? '<div style="grid-column:span 2"><strong>Extras solicitados</strong>' + extrasHTML + '</div>' : '') +
+        (r.extras && r.extras.length ? '<div style=""><strong>Extras solicitados</strong>' + extrasHTML + '</div>' : '') +
         '</div>';
 
       // Conductor si está asignado y pagado
