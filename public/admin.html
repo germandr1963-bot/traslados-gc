@@ -3685,8 +3685,8 @@ function cargarValoraciones() {
       var mediaServ = (ch.sumaServ / ch.total).toFixed(1);
       return '<tr>' +
         '<td><strong>' + escapar(nombre) + '</strong></td>' +
-        '<td style="color:#D9A441;"><strong>★ ' + mediaCond + '</strong></td>' +
-        '<td style="color:#D9A441;"><strong>★ ' + mediaServ + '</strong></td>' +
+        '<td style="color:#D9A441;"><strong>&#9733; ' + mediaCond + '</strong></td>' +
+        '<td style="color:#D9A441;"><strong>&#9733; ' + mediaServ + '</strong></td>' +
         '<td>' + ch.total + '</td>' +
       '</tr>';
     }).join('');
@@ -3701,8 +3701,8 @@ function cargarValoraciones() {
         '<td style="font-size:12px;color:#888;">' + fecha + '</td>' +
         '<td>' + escapar(v.nombre_cliente || '—') + '</td>' +
         '<td>' + escapar(v.nombre_chofer || '—') + '</td>' +
-        '<td style="color:#D9A441;letter-spacing:2px;">' + '★'.repeat(ec) + '<span style="color:#C9D4DC;">' + '☆'.repeat(5 - ec) + '</span></td>' +
-        '<td style="color:#D9A441;letter-spacing:2px;">' + '★'.repeat(es) + '<span style="color:#C9D4DC;">' + '☆'.repeat(5 - es) + '</span></td>' +
+        '<td style="color:#D9A441;letter-spacing:2px;">' + '&#9733;'.repeat(ec) + '<span style="color:#C9D4DC;">' + '&#9734;'.repeat(5 - ec) + '</span></td>' +
+        '<td style="color:#D9A441;letter-spacing:2px;">' + '&#9733;'.repeat(es) + '<span style="color:#C9D4DC;">' + '&#9734;'.repeat(5 - es) + '</span></td>' +
         '<td style="font-size:13px;color:#555;white-space:normal;max-width:280px;">' + escapar(v.comentario || '') + '</td>' +
         '<td><button class="boton-peligro" style="margin-top:0;padding:5px 10px;font-size:0.78rem;" onclick="eliminarValoracion(' + v.id + ')">🗑</button></td>' +
       '</tr>';
@@ -3743,8 +3743,7 @@ function exportarValoraciones() {
       limpiar(v.comentario || '')
     ].join(';'));
   });
-  var blob = new Blob(['﻿' + filas.join('
-')], { type: 'text/csv;charset=utf-8' });
+  var blob = new Blob(['\ufeff' + filas.join('\n')], { type: 'text/csv;charset=utf-8' });
   var enlace = document.createElement('a');
   enlace.href = URL.createObjectURL(blob);
   enlace.download = 'valoraciones-traslados-gc.csv';
@@ -4788,7 +4787,7 @@ function cargarReservas(mantenerDetalle) {
     .then(function(data) {
       var cuerpo = document.getElementById('cuerpo-reservas');
       document.getElementById('check-todas-reservas').checked = false;
-      actualizarCabecerасОрден();
+      actualizarCabeceraOrden();
       if (!data.reservas || data.reservas.length === 0) {
         cuerpo.innerHTML = '<tr><td colspan="13" style="text-align:center;color:#aaa;padding:2rem;">No hay reservas con estos filtros.</td></tr>';
         return;
@@ -4830,7 +4829,7 @@ function cargarReservas(mantenerDetalle) {
     });
 }
 
-function actualizarCabecerасОрден() {
+function actualizarCabeceraOrden() {
   document.querySelectorAll('.th-ordenable').forEach(function(th) {
     var icono = th.querySelector('.icono-orden-col');
     if (!icono) return;
