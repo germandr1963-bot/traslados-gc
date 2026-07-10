@@ -88,7 +88,7 @@
       font-size: 14px;
       margin-bottom: 16px;
     }
-    .dato-fila div strong { display: block; font-size: 11px; color: #5a6c79; font-weight: 600; text-transform: uppercase; margin-bottom: 2px; }
+    .dato-fila div strong { display: inline; font-size: 14px; color: #1C1815; font-weight: 700; text-transform: none; margin-bottom: 0; margin-right: 4px; }
     .seccion-titulo {
       font-size: 13px;
       font-weight: 700;
@@ -294,15 +294,15 @@
       }
 
       var html = '<div class="dato-fila">' +
-        '<div><strong>Estado</strong>' + (estadoBadge[r.estado] || r.estado) + '</div>' +
-        '<div><strong>Categoría</strong>' + (r.categoria_nombre || '—') + '</div>' +
-        '<div><strong>Pasajeros</strong>' + (r.num_pasajeros || '—') + '</div>' +
-        '<div><strong>Precio estimado</strong>' + (r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—') + '</div>' +
-        (r.direccion_recogida ? '<div style=""><strong>Dirección de recogida</strong>' + r.direccion_recogida + '</div>' : '') +
-        (r.direccion_destino ? '<div style=""><strong>Dirección de destino</strong>' + r.direccion_destino + '</div>' : '') +
-        (r.numero_vuelo ? '<div><strong>Vuelo</strong>' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · ' + r.hora_llegada_vuelo.slice(0,5) : '') + '</div>' : '') +
-        (r.nombre_barco ? '<div><strong>Barco</strong>' + r.nombre_barco + (r.hora_atraque ? ' · ' + r.hora_atraque.slice(0,5) : '') + '</div>' : '') +
-        (r.extras && r.extras.length ? '<div style=""><strong>Extras solicitados</strong>' + extrasHTML + '</div>' : '') +
+        '<div><strong>Estado:</strong> ' + (estadoBadge[r.estado] || r.estado) + '</div>' +
+        '<div><strong>Categoría:</strong> ' + (r.categoria_nombre || '—') + '</div>' +
+        '<div><strong>Pasajeros:</strong> ' + (r.num_pasajeros || '—') + '</div>' +
+        '<div><strong>Precio estimado:</strong> ' + (r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—') + '</div>' +
+        (r.direccion_recogida ? '<div><strong>Dirección de recogida:</strong> ' + r.direccion_recogida + '</div>' : '') +
+        (r.direccion_destino ? '<div><strong>Dirección de destino:</strong> ' + r.direccion_destino + '</div>' : '') +
+        (r.numero_vuelo ? '<div><strong>Vuelo:</strong> ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · Llegada ' + r.hora_llegada_vuelo.slice(0,5) : '') + '</div>' : '') +
+        (r.nombre_barco ? '<div><strong>Barco:</strong> ' + r.nombre_barco + (r.hora_atraque ? ' · Atraque ' + r.hora_atraque.slice(0,5) : '') + '</div>' : '') +
+        (r.extras && r.extras.length ? '<div><strong>Extras solicitados:</strong><br>' + extrasHTML + '</div>' : '') +
         '</div>';
 
       // Conductor si está asignado y pagado
