@@ -1069,28 +1069,24 @@ table.tabla-precios input {
       </div>
     </div>
 
-
     <div id="seccion-valoraciones" class="oculto">
       <h1>Valoraciones</h1>
       <p class="subtitulo">Opiniones de los clientes sobre sus traslados completados.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
-        <button class="boton-costa" onclick="cargarValoraciones()" style="font-size:0.85rem;">🔄 Actualizar</button>
-        <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="exportarValoraciones()">⬇ Exportar CSV</button>
-        <button class="boton-peligro" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="eliminarTodasValoraciones()">🗑 Eliminar todas</button>
-      </div>
-
-      <h2 style="margin-bottom:8px;">Media por chofer</h2>
-      <div class="tabla-envoltura" style="margin-bottom:28px;">
-        <table class="tabla-admin">
-          <thead><tr><th>Chofer</th><th>⭐ Conductor</th><th>⭐ Servicio</th><th>Total valoraciones</th></tr></thead>
-          <tbody id="tabla-media-choferes"></tbody>
-        </table>
-      </div>
-
-      <h2 style="margin-bottom:8px;">Últimas valoraciones</h2>
+      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="cargarValoraciones()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
+      <div id="resumen-choferes-valoraciones" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;"></div>
       <div class="tabla-envoltura">
         <table class="tabla-admin">
-          <thead><tr><th>PNR</th><th>Fecha</th><th>Cliente</th><th>Chofer</th><th>⭐ Conductor</th><th>⭐ Servicio</th><th>Comentario</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>PNR</th>
+              <th>Cliente</th>
+              <th>Chofer</th>
+              <th>⭐ Conductor</th>
+              <th>⭐ Servicio</th>
+              <th>Comentario</th>
+            </tr>
+          </thead>
           <tbody id="tabla-valoraciones"></tbody>
         </table>
       </div>
@@ -3659,96 +3655,55 @@ var _equipoData = [];
 
 function cargarValoraciones() {
   fetch('/admin/valoraciones').then(function(r) { return r.json(); }).then(function(d) {
-    var cuerpoValoraciones = document.getElementById('tabla-valoraciones');
-    var cuerpoMedia = document.getElementById('tabla-media-choferes');
-
+    var cuerpo = document.getElementById('tabla-valoraciones');
+    var aviso = document.getElementById('aviso-valoraciones');
+    var resumen = document.getElementById('resumen-choferes-valoraciones');
     if (!d.valoraciones || !d.valoraciones.length) {
-      cuerpoValoraciones.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:16px;">Todavía no hay valoraciones.</td></tr>';
-      cuerpoMedia.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;padding:12px;">Sin datos.</td></tr>';
-      _ultimasValoraciones = [];
+      cuerpo.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;">No hay valoraciones todavía.</td></tr>';
+      resumen.innerHTML = '';
       return;
     }
-    _ultimasValoraciones = d.valoraciones;
+    aviso.style.display = 'none';
 
-    // Tabla media por chofer
+    // Calcular media y total por chofer
     var porChofer = {};
     d.valoraciones.forEach(function(v) {
       var nombre = v.nombre_chofer || 'Sin asignar';
-      if (!porChofer[nombre]) porChofer[nombre] = { total: 0, sumaCond: 0, sumaServ: 0 };
+      if (!porChofer[nombre]) porChofer[nombre] = { total: 0, sumaConductor: 0, sumaServicio: 0 };
       porChofer[nombre].total++;
-      porChofer[nombre].sumaCond += v.estrellas_conductor || 0;
-      porChofer[nombre].sumaServ += v.estrellas_servicio || 0;
+      porChofer[nombre].sumaConductor += v.estrellas_conductor || 0;
+      porChofer[nombre].sumaServicio += v.estrellas_servicio || 0;
     });
-    cuerpoMedia.innerHTML = Object.keys(porChofer).map(function(nombre) {
-      var ch = porChofer[nombre];
-      var mediaCond = (ch.sumaCond / ch.total).toFixed(1);
-      var mediaServ = (ch.sumaServ / ch.total).toFixed(1);
-      return '<tr>' +
-        '<td><strong>' + escapar(nombre) + '</strong></td>' +
-        '<td style="color:#D9A441;"><strong>★ ' + mediaCond + '</strong></td>' +
-        '<td style="color:#D9A441;"><strong>★ ' + mediaServ + '</strong></td>' +
-        '<td>' + ch.total + '</td>' +
-      '</tr>';
+    resumen.innerHTML = Object.keys(porChofer).map(function(nombre) {
+      var d = porChofer[nombre];
+      var mediaCond = (d.sumaConductor / d.total).toFixed(1);
+      var mediaServ = (d.sumaServicio / d.total).toFixed(1);
+      return '<div style="background:#fff;border:1px solid #E1DCD0;border-radius:10px;padding:14px 18px;min-width:180px;">' +
+        '<div style="font-weight:700;font-size:14px;color:#1C1815;margin-bottom:6px;">' + escapar(nombre) + '</div>' +
+        '<div style="font-size:13px;color:#5a4a3a;">Valoraciones: <strong>' + d.total + '</strong></div>' +
+        '<div style="font-size:13px;color:#D9A441;">★ Conductor: <strong>' + mediaCond + '</strong></div>' +
+        '<div style="font-size:13px;color:#D9A441;">★ Servicio: <strong>' + mediaServ + '</strong></div>' +
+      '</div>';
     }).join('');
 
-    // Tabla valoraciones individuales
-    cuerpoValoraciones.innerHTML = d.valoraciones.map(function(v) {
-      var fecha = v.creado_en ? new Date(v.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', year:'numeric'}) + ' ' + new Date(v.creado_en).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'}) : '—';
-      var ec = v.estrellas_conductor || 0;
-      var es = v.estrellas_servicio || 0;
+    // Tabla de valoraciones
+    var estrellas = function(n) { return n ? '★'.repeat(n) + '☆'.repeat(5 - n) : '—'; };
+    cuerpo.innerHTML = d.valoraciones.map(function(v) {
+      var fecha = v.creado_en ? new Date(v.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', year:'numeric'}) : '—';
       return '<tr>' +
-        '<td><strong style="font-family:monospace;color:#C1502E;">' + escapar(v.numero_reserva || '—') + '</strong></td>' +
         '<td style="font-size:12px;color:#888;">' + fecha + '</td>' +
+        '<td><strong style="font-family:monospace;">' + escapar(v.numero_reserva || '—') + '</strong></td>' +
         '<td>' + escapar(v.nombre_cliente || '—') + '</td>' +
         '<td>' + escapar(v.nombre_chofer || '—') + '</td>' +
-        '<td style="color:#D9A441;letter-spacing:2px;">' + '★'.repeat(ec) + '<span style="color:#C9D4DC;">' + '☆'.repeat(5 - ec) + '</span></td>' +
-        '<td style="color:#D9A441;letter-spacing:2px;">' + '★'.repeat(es) + '<span style="color:#C9D4DC;">' + '☆'.repeat(5 - es) + '</span></td>' +
-        '<td style="font-size:13px;color:#555;white-space:normal;max-width:280px;">' + escapar(v.comentario || '') + '</td>' +
-        '<td><button class="boton-peligro" style="margin-top:0;padding:5px 10px;font-size:0.78rem;" onclick="eliminarValoracion(' + v.id + ')">🗑</button></td>' +
+        '<td style="color:#D9A441;letter-spacing:2px;">' + estrellas(v.estrellas_conductor) + '</td>' +
+        '<td style="color:#D9A441;letter-spacing:2px;">' + estrellas(v.estrellas_servicio) + '</td>' +
+        '<td style="font-size:13px;color:#555;">' + escapar(v.comentario || '—') + '</td>' +
       '</tr>';
     }).join('');
   }).catch(function() {
     document.getElementById('aviso-valoraciones').style.display = 'block';
     document.getElementById('aviso-valoraciones').textContent = 'Error al cargar valoraciones.';
   });
-}
-
-var _ultimasValoraciones = [];
-
-function eliminarValoracion(id) {
-  if (!confirm('¿Eliminar esta valoración?')) return;
-  fetch('/admin/valoraciones/' + id, { method: 'DELETE' })
-    .then(function() { cargarValoraciones(); });
-}
-
-function eliminarTodasValoraciones() {
-  if (!confirm('⚠️ Vas a eliminar TODAS las valoraciones. Esta acción no se puede deshacer.')) return;
-  if (!confirm('Última confirmación: ¿borrar TODAS las valoraciones?')) return;
-  fetch('/admin/valoraciones', { method: 'DELETE' })
-    .then(function() { cargarValoraciones(); });
-}
-
-function exportarValoraciones() {
-  if (!_ultimasValoraciones.length) { alert('No hay valoraciones que exportar.'); return; }
-  var limpiar = function(t) { return '"' + String(t == null ? '' : t).replace(/"/g, '""') + '"'; };
-  var filas = [['PNR', 'Fecha', 'Cliente', 'Chofer', 'Estrellas conductor', 'Estrellas servicio', 'Comentario'].join(';')];
-  _ultimasValoraciones.forEach(function(v) {
-    filas.push([
-      limpiar(v.numero_reserva || ''),
-      limpiar(v.creado_en ? new Date(v.creado_en).toLocaleDateString('es-ES') : ''),
-      limpiar(v.nombre_cliente || ''),
-      limpiar(v.nombre_chofer || ''),
-      v.estrellas_conductor || '',
-      v.estrellas_servicio || '',
-      limpiar(v.comentario || '')
-    ].join(';'));
-  });
-  var blob = new Blob(['﻿' + filas.join('
-')], { type: 'text/csv;charset=utf-8' });
-  var enlace = document.createElement('a');
-  enlace.href = URL.createObjectURL(blob);
-  enlace.download = 'valoraciones-traslados-gc.csv';
-  enlace.click();
 }
 
 function cargarEquipo() {
