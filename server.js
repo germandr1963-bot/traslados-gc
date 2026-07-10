@@ -1122,6 +1122,20 @@ async function initSchema() {
     );
   `);
 
+  // ─── Valoraciones ─────────────────────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS valoraciones (
+      id SERIAL PRIMARY KEY,
+      reserva_id INTEGER UNIQUE REFERENCES reservas(id) ON DELETE CASCADE,
+      estrellas_conductor INTEGER CHECK (estrellas_conductor BETWEEN 1 AND 5),
+      estrellas_servicio INTEGER CHECK (estrellas_servicio BETWEEN 1 AND 5),
+      comentario TEXT,
+      creado_en TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS token_valoracion TEXT UNIQUE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS completada_en TIMESTAMPTZ`);
+
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
     await pool.query(
@@ -3467,6 +3481,131 @@ app.get('/chofer/mensajes/:reservaId', requireChofer, asyncHandler(async (req, r
   );
 
   res.json({ mensajes: result.rows });
+}));
+
+// ─── Chofer: marcar servicio como completado ──────────────────────────────────
+app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (req, res) => {
+  // Verificar que la reserva pertenece a este chofer y está confirmada
+  const check = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
+            r.origen, r.destino, r.fecha
+     FROM reservas r
+     WHERE r.id = $1 AND r.conductor_id = $2 AND r.estado = 'confirmada'`,
+    [req.params.id, req.session.choferId]
+  );
+  if (!check.rows.length) return res.status(400).json({ error: 'No se puede completar esta reserva.' });
+  const r = check.rows[0];
+
+  // Generar token único de valoración
+  const token = crypto.randomBytes(32).toString('hex');
+
+  // Actualizar estado y guardar token
+  await pool.query(
+    `UPDATE reservas SET estado = 'completada', completada_en = NOW(), token_valoracion = $1 WHERE id = $2`,
+    [token, r.id]
+  );
+
+  const enlace = `${BASE_URL}/valorar?token=${token}`;
+  const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+
+  // Email al cliente
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <style>
+    body{margin:0;padding:0;background:#F6F4EF;}
+    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+    .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #D9A441;}
+    .body{padding:28px;}
+    .ruta-box{background:#ECE6D8;border-radius:8px;padding:14px 18px;margin:16px 0;}
+    .boton{display:inline-block;background:#C1502E;color:#fff;padding:13px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;margin-top:10px;}
+    .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}
+    @media(max-width:480px){.body{padding:16px;}}
+  </style></head><body>
+  <div class="wrapper">
+    <div class="header">
+      <h1 style="color:#D9A441;margin:0;font-size:20px;letter-spacing:1px;">TRASLADOS GC</h1>
+      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+    </div>
+    <div class="body">
+      <p>Hola, <strong>${r.nombre_cliente}</strong>,</p>
+      <p>Tu traslado ha concluido. Nos gustaría saber cómo fue tu experiencia.</p>
+      <div class="ruta-box">
+        <strong>${r.origen} → ${r.destino}</strong><br>
+        <span style="font-size:13px;color:#888;">Reserva ${r.numero_reserva} · ${fechaTexto}</span>
+      </div>
+      <p>Tu opinión nos ayuda a seguir mejorando el servicio. Solo te llevará un momento.</p>
+      <a href="${enlace}" class="boton">Valorar mi traslado</a>
+      <p style="margin-top:24px;color:#888;font-size:13px;">Si no fuiste tú quien realizó este traslado, puedes ignorar este mensaje.</p>
+    </div>
+    <div class="footer">Traslados GC · Gran Canaria</div>
+  </div></body></html>`;
+
+  try {
+    await enviarEmail({
+      to: r.email_cliente,
+      subject: `¿Cómo fue tu traslado ${r.numero_reserva}?`,
+      html
+    });
+  } catch(e) { console.warn('Error enviando email valoración:', e.message); }
+
+  // WhatsApp al cliente
+  if (r.telefono_cliente) {
+    const textoWa = `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen} → ${r.destino}) ha finalizado.\n\n¿Nos cuentas cómo fue? Tu opinión nos ayuda a mejorar:\n${enlace}`;
+    try {
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [r.telefono_cliente, textoWa]
+      );
+    } catch(e) { console.warn('Error encolando WhatsApp valoración:', e.message); }
+  }
+
+  res.json({ ok: true });
+}));
+
+// ─── Valoración pública (enlace único por token) ──────────────────────────────
+app.get('/valorar', (req, res) => {
+  res.sendFile(__dirname + '/public/valorar.html');
+});
+
+app.get('/api/valoracion/info', asyncHandler(async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).json({ error: 'Token requerido.' });
+  const result = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.origen, r.destino, r.nombre_cliente,
+            (SELECT id FROM valoraciones WHERE reserva_id = r.id) AS ya_valorada
+     FROM reservas r
+     WHERE r.token_valoracion = $1 AND r.estado = 'completada'`,
+    [token]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'Enlace no válido.' });
+  res.json(result.rows[0]);
+}));
+
+app.post('/api/valoracion/enviar', asyncHandler(async (req, res) => {
+  const { token, estrellas_conductor, estrellas_servicio, comentario } = req.body;
+  if (!token) return res.status(400).json({ error: 'Token requerido.' });
+
+  const result = await pool.query(
+    'SELECT id FROM reservas WHERE token_valoracion = $1 AND estado = \'completada\'',
+    [token]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'Enlace no válido.' });
+  const reservaId = result.rows[0].id;
+
+  const ec = parseInt(estrellas_conductor, 10);
+  const es = parseInt(estrellas_servicio, 10);
+  if (!ec || !es || ec < 1 || ec > 5 || es < 1 || es > 5) {
+    return res.status(400).json({ error: 'Las valoraciones deben ser de 1 a 5 estrellas.' });
+  }
+
+  await pool.query(
+    `INSERT INTO valoraciones (reserva_id, estrellas_conductor, estrellas_servicio, comentario)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (reserva_id) DO UPDATE SET estrellas_conductor = $2, estrellas_servicio = $3, comentario = $4`,
+    [reservaId, ec, es, comentario || null]
+  );
+
+  res.json({ ok: true });
 }));
 
 app.get('/chofer/cartel/:id', requireChofer, asyncHandler(async (req, res) => {
