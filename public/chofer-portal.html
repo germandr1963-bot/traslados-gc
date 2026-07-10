@@ -324,6 +324,20 @@
         if (r.numero_vuelo) llegada = '✈️ Vuelo ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · Llegada ' + r.hora_llegada_vuelo.slice(0,5) : '');
         else if (r.nombre_barco) llegada = '🚢 ' + r.nombre_barco + (r.hora_atraque ? ' · Atraque ' + r.hora_atraque.slice(0,5) : '');
 
+        // Semáforo de estado
+        var semaforo = { color: '#aaa', titulo: r.estado || '—' };
+        if (r.estado === 'confirmada') semaforo = { color: '#27ae60', titulo: 'Confirmada' };
+        else if (r.estado === 'pendiente') semaforo = { color: '#f39c12', titulo: 'Pendiente' };
+        else if (r.estado === 'modificacion_pendiente') semaforo = { color: '#e67e22', titulo: 'Modificación pendiente' };
+        else if (r.estado === 'en_curso') semaforo = { color: '#2980b9', titulo: 'En curso' };
+        else if (r.estado === 'cancelada') semaforo = { color: '#e74c3c', titulo: 'Cancelada' };
+        else if (r.estado === 'completada') semaforo = { color: '#7f8c8d', titulo: 'Completada' };
+
+        // Separar extras: incluidos y a cobrar
+        var extrasIncluidos = (r.extras || []).filter(function(e) { return !parseFloat(e.precio) || parseFloat(e.precio) === 0; });
+        var extrasACobrar = (r.extras || []).filter(function(e) { return parseFloat(e.precio) > 0; });
+        var totalACobrar = extrasACobrar.reduce(function(sum, e) { return sum + parseFloat(e.precio); }, 0);
+
         return '<div class="reserva-card" id="card-' + r.id + '">' +
           '<div class="reserva-card-cabecera" onclick="toggleReserva(' + r.id + ')">' +
             '<span class="reserva-pnr">' + r.numero_reserva + '</span>' +
@@ -332,12 +346,22 @@
               '<div class="reserva-meta">📅 ' + fecha + ' · ' + hora + 'h · ' + (r.num_pasajeros||'—') + ' pax</div>' +
             '</div>' +
             '<div class="reserva-badges">' +
+              '<span title="' + semaforo.titulo + '" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + semaforo.color + ';margin-right:6px;vertical-align:middle;"></span>' +
               (tieneMsg ? '<span class="badge-msg">💬 ' + r.mensajes_nuevos + '</span>' : '') +
             '</div>' +
             '<span class="reserva-chevron" id="chev-' + r.id + '">▼</span>' +
           '</div>' +
           '<div class="reserva-cuerpo" id="cuerpo-' + r.id + '">' +
             (r.nombre_cliente ? '<div class="detalle-fila"><strong>Cliente:</strong> ' + r.nombre_cliente + '</div>' : '') +
+            '<div class="detalle-fila"><strong>Fecha:</strong> ' + fecha + '</div>' +
+            '<div class="detalle-fila"><strong>Ruta:</strong> ' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
+            (r.direccion_recogida ? '<div class="detalle-fila"><strong>Dirección de recogida:</strong> ' + r.direccion_recogida + '</div>' : '') +
+            (r.direccion_destino ? '<div class="detalle-fila"><strong>Dirección de destino:</strong> ' + r.direccion_destino + '</div>' : '') +
+            '<div class="detalle-fila"><strong>Hora de recogida:</strong> ' + hora + '</div>' +
+            (llegada ? '<div class="detalle-fila">' + llegada + '</div>' : '') +
+            '<div class="detalle-fila"><strong>Pasajeros:</strong> ' + (r.num_pasajeros||'—') + '</div>' +
+            '<div class="detalle-fila"><strong>Categoría:</strong> ' + (r.categoria_nombre||'—') + '</div>' +
+            (r.notas_cliente ? '<div class="detalle-fila"><strong>Notas del cliente:</strong> ' + r.notas_cliente + '</div>' : '') +
             (r.preferencias && r.preferencias.length
               ? '<div class="detalle-fila"><strong>Preferencias del cliente:</strong>' +
                   r.preferencias.map(function(p){
@@ -346,29 +370,31 @@
                   }).join('') +
                 '</div>'
               : '') +
-            (r.extras && r.extras.length
-              ? '<div class="detalle-fila"><strong>Extras solicitados:</strong>' +
-                  r.extras.map(function(e){
-                    var precio = parseFloat(e.precio);
-                    var precioTexto = (!precio || precio === 0) ? 'Incluido' : '+' + precio.toFixed(2) + ' €';
-                    return '<div style="margin:3px 0 3px 8px;font-size:13px;"><strong>' + e.nombre + '</strong>' +
-                      ' <span style="color:#6b5c44;font-size:12px;">(' + precioTexto + ')</span></div>';
+            (extrasIncluidos.length
+              ? '<div class="detalle-fila"><strong>Extras incluidos:</strong>' +
+                  extrasIncluidos.map(function(e){
+                    return '<div style="margin:3px 0 3px 8px;font-size:13px;">✅ ' + e.nombre + '</div>';
                   }).join('') +
                 '</div>'
               : '') +
-            '<div class="detalle-fila"><strong>Ruta:</strong> ' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
-            '<div class="detalle-fila"><strong>Fecha:</strong> ' + fecha + '</div>' +
-            '<div class="detalle-fila"><strong>Hora de recogida:</strong> ' + hora + '</div>' +
-            '<div class="detalle-fila"><strong>Pasajeros:</strong> ' + (r.num_pasajeros||'—') + '</div>' +
-            '<div class="detalle-fila"><strong>Categoría:</strong> ' + (r.categoria_nombre||'—') + '</div>' +
-            (llegada ? '<div class="detalle-fila">' + llegada + '</div>' : '') +
-            (r.direccion_recogida ? '<div class="detalle-fila"><strong>Recogida:</strong> ' + r.direccion_recogida + '</div>' : '') +
-            (r.direccion_destino ? '<div class="detalle-fila"><strong>Destino:</strong> ' + r.direccion_destino + '</div>' : '') +
-            (r.notas_cliente ? '<div class="detalle-fila"><strong>Notas:</strong> ' + r.notas_cliente + '</div>' : '') +
-
+            (extrasACobrar.length
+              ? '<div class="detalle-fila"><strong>Extras a cobrar al cliente:</strong>' +
+                  extrasACobrar.map(function(e){
+                    return '<div style="margin:3px 0 3px 8px;font-size:13px;">💰 ' + e.nombre + ' — <strong>' + parseFloat(e.precio).toFixed(2) + ' €</strong></div>';
+                  }).join('') +
+                '</div>'
+              : '') +
+            (extrasACobrar.length
+              ? '<div style="margin:20px 0 10px 0;padding:14px;background:#fdf6ec;border:2px solid #D9A441;border-radius:8px;">' +
+                  '<div style="font-size:15px;font-weight:700;color:#1C1815;">Total de extras a cobrar al cliente (aparte del viaje)</div>' +
+                  extrasACobrar.map(function(e){
+                    return '<div style="font-size:13px;margin:4px 0;">· ' + e.nombre + ': ' + parseFloat(e.precio).toFixed(2) + ' €</div>';
+                  }).join('') +
+                  '<div style="font-size:17px;font-weight:800;color:#C1502E;margin-top:8px;">Total a cobrar: ' + totalACobrar.toFixed(2) + ' €</div>' +
+                '</div>'
+              : '') +
             '<div class="seccion-label">Mensajes del equipo</div>' +
             '<div class="hilo-mensajes" id="hilo-' + r.id + '"><div class="msg-sin">Cargando...</div></div>' +
-
             '<button class="boton-cartel" id="btn-cartel-' + r.id + '" onclick="descargarCartel(' + r.id + ',\'' + r.numero_reserva + '\')">📄 Descargar cartel</button>' +
           '</div>' +
         '</div>';
