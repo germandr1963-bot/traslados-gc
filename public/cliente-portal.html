@@ -271,7 +271,28 @@
 
     function renderDetalle(r, i) {
       var estadoBadge = { pendiente: '🟡 Pendiente', confirmada: '🟢 Confirmada', completada: '✅ Completada', cancelada: '🔴 Cancelada', modificacion_pendiente: '🟠 Modificación pendiente' };
-      var extrasHTML = r.extras && r.extras.length ? r.extras.map(function(e) { return e.nombre + ' (+' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €)'; }).join(', ') : '—';
+      var extrasIncluidos = (r.extras || []).filter(function(e) { return !parseFloat(e.precio_en_reserva) || parseFloat(e.precio_en_reserva) === 0; });
+      var extrasACobrar = (r.extras || []).filter(function(e) { return parseFloat(e.precio_en_reserva) > 0; });
+      var totalExtras = extrasACobrar.reduce(function(sum, e) { return sum + parseFloat(e.precio_en_reserva); }, 0);
+
+      var extrasHTML = '';
+      if (extrasIncluidos.length) {
+        extrasHTML += '<div style="margin:4px 0 2px 0;font-size:13px;font-weight:600;color:#2e7d32;">Incluidos en el precio:</div>';
+        extrasHTML += extrasIncluidos.map(function(e) {
+          return '<div style="font-size:13px;margin:2px 0 2px 8px;">✅ ' + e.nombre + '</div>';
+        }).join('');
+      }
+      if (extrasACobrar.length) {
+        extrasHTML += '<div style="margin:8px 0 2px 0;font-size:13px;font-weight:600;color:#856404;">A pagar al conductor al final del servicio:</div>';
+        extrasHTML += extrasACobrar.map(function(e) {
+          return '<div style="font-size:13px;margin:2px 0 2px 8px;">💰 ' + e.nombre + ' — <strong>' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €</strong></div>';
+        }).join('');
+        extrasHTML += '<div style="margin-top:10px;padding:10px 14px;background:#fff8e1;border:1px solid #D9A441;border-radius:6px;font-size:13px;color:#1C1815;">' +
+          '<strong>💰 Total a pagar al conductor: ' + totalExtras.toFixed(2) + ' €</strong><br>' +
+          '<span style="font-size:12px;color:#555;">Este importe se abona directamente al conductor al final del servicio, aparte del precio del traslado según taxímetro.</span>' +
+          '</div>';
+      }
+
       var html = '<div class="dato-fila">' +
         '<div><strong>Estado</strong>' + (estadoBadge[r.estado] || r.estado) + '</div>' +
         '<div><strong>Categoría</strong>' + (r.categoria_nombre || '—') + '</div>' +
@@ -281,7 +302,7 @@
         (r.direccion_destino ? '<div style="grid-column:span 2"><strong>Dirección de destino</strong>' + r.direccion_destino + '</div>' : '') +
         (r.numero_vuelo ? '<div><strong>Vuelo</strong>' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · ' + r.hora_llegada_vuelo.slice(0,5) : '') + '</div>' : '') +
         (r.nombre_barco ? '<div><strong>Barco</strong>' + r.nombre_barco + (r.hora_atraque ? ' · ' + r.hora_atraque.slice(0,5) : '') + '</div>' : '') +
-        (r.extras && r.extras.length ? '<div style="grid-column:span 2"><strong>Extras</strong>' + extrasHTML + '</div>' : '') +
+        (r.extras && r.extras.length ? '<div style="grid-column:span 2"><strong>Extras solicitados</strong>' + extrasHTML + '</div>' : '') +
         '</div>';
 
       // Conductor si está asignado y pagado
