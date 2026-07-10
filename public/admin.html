@@ -163,6 +163,7 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="notificaciones">Notificaciones</button>
       <button class="item-menu" data-seccion="clientes">Clientes</button>
       <button class="item-menu" data-seccion="equipo">Equipo</button>
+      <button class="item-menu" data-seccion="valoraciones">Valoraciones</button>
     </div>
     <button id="boton-salir" style="margin-top:16px;opacity:0.5;width:100%;">Cerrar sesión</button>
   </div>
@@ -1068,6 +1069,30 @@ table.tabla-precios input {
       </div>
     </div>
 
+    <div id="seccion-valoraciones" class="oculto">
+      <h1>Valoraciones</h1>
+      <p class="subtitulo">Opiniones de los clientes sobre sus traslados completados.</p>
+      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="cargarValoraciones()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
+      <div id="resumen-choferes-valoraciones" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;"></div>
+      <div class="tabla-envoltura">
+        <table class="tabla-admin">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>PNR</th>
+              <th>Cliente</th>
+              <th>Chofer</th>
+              <th>⭐ Conductor</th>
+              <th>⭐ Servicio</th>
+              <th>Comentario</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-valoraciones"></tbody>
+        </table>
+      </div>
+      <div id="aviso-valoraciones" style="display:none;margin-top:12px;"></div>
+    </div>
+
     <div id="seccion-extras" class="oculto">
       <h1>Extras del traslado</h1>
       <p class="subtitulo">Catálogo interno de todo lo que se podría ofrecer. Un extra nuevo queda como <strong>borrador</strong> (no lo ve el cliente) hasta que lo publiques a mano.</p>
@@ -1242,7 +1267,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo', 'valoraciones'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
@@ -1261,6 +1286,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); cargarPreferencias(); cargarSugerenciasPreferencias(); }
     if (boton.dataset.seccion === 'clientes') cargarClientes();
     if (boton.dataset.seccion === 'equipo') cargarEquipo();
+    if (boton.dataset.seccion === 'valoraciones') cargarValoraciones();
   });
 });
 
@@ -3626,6 +3652,59 @@ function enviarComunicadoClientes() {
 
 // ─── EQUIPO ───────────────────────────────────────────────────────────────────
 var _equipoData = [];
+
+function cargarValoraciones() {
+  fetch('/admin/valoraciones').then(function(r) { return r.json(); }).then(function(d) {
+    var cuerpo = document.getElementById('tabla-valoraciones');
+    var aviso = document.getElementById('aviso-valoraciones');
+    var resumen = document.getElementById('resumen-choferes-valoraciones');
+    if (!d.valoraciones || !d.valoraciones.length) {
+      cuerpo.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;">No hay valoraciones todavía.</td></tr>';
+      resumen.innerHTML = '';
+      return;
+    }
+    aviso.style.display = 'none';
+
+    // Calcular media y total por chofer
+    var porChofer = {};
+    d.valoraciones.forEach(function(v) {
+      var nombre = v.nombre_chofer || 'Sin asignar';
+      if (!porChofer[nombre]) porChofer[nombre] = { total: 0, sumaConductor: 0, sumaServicio: 0 };
+      porChofer[nombre].total++;
+      porChofer[nombre].sumaConductor += v.estrellas_conductor || 0;
+      porChofer[nombre].sumaServicio += v.estrellas_servicio || 0;
+    });
+    resumen.innerHTML = Object.keys(porChofer).map(function(nombre) {
+      var d = porChofer[nombre];
+      var mediaCond = (d.sumaConductor / d.total).toFixed(1);
+      var mediaServ = (d.sumaServicio / d.total).toFixed(1);
+      return '<div style="background:#fff;border:1px solid #E1DCD0;border-radius:10px;padding:14px 18px;min-width:180px;">' +
+        '<div style="font-weight:700;font-size:14px;color:#1C1815;margin-bottom:6px;">' + escapar(nombre) + '</div>' +
+        '<div style="font-size:13px;color:#5a4a3a;">Valoraciones: <strong>' + d.total + '</strong></div>' +
+        '<div style="font-size:13px;color:#D9A441;">★ Conductor: <strong>' + mediaCond + '</strong></div>' +
+        '<div style="font-size:13px;color:#D9A441;">★ Servicio: <strong>' + mediaServ + '</strong></div>' +
+      '</div>';
+    }).join('');
+
+    // Tabla de valoraciones
+    var estrellas = function(n) { return n ? '★'.repeat(n) + '☆'.repeat(5 - n) : '—'; };
+    cuerpo.innerHTML = d.valoraciones.map(function(v) {
+      var fecha = v.creado_en ? new Date(v.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', year:'numeric'}) : '—';
+      return '<tr>' +
+        '<td style="font-size:12px;color:#888;">' + fecha + '</td>' +
+        '<td><strong style="font-family:monospace;">' + escapar(v.numero_reserva || '—') + '</strong></td>' +
+        '<td>' + escapar(v.nombre_cliente || '—') + '</td>' +
+        '<td>' + escapar(v.nombre_chofer || '—') + '</td>' +
+        '<td style="color:#D9A441;letter-spacing:2px;">' + estrellas(v.estrellas_conductor) + '</td>' +
+        '<td style="color:#D9A441;letter-spacing:2px;">' + estrellas(v.estrellas_servicio) + '</td>' +
+        '<td style="font-size:13px;color:#555;">' + escapar(v.comentario || '—') + '</td>' +
+      '</tr>';
+    }).join('');
+  }).catch(function() {
+    document.getElementById('aviso-valoraciones').style.display = 'block';
+    document.getElementById('aviso-valoraciones').textContent = 'Error al cargar valoraciones.';
+  });
+}
 
 function cargarEquipo() {
   fetch('/admin/equipo')
