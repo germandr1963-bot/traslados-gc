@@ -356,6 +356,11 @@
 </div>
 
 <div class="contenedor">
+  <!-- Banner portal del cliente (solo si hay sesión activa) -->
+  <div id="banner-portal-cliente" style="display:none;background:#f5f0ea;border:1px solid #d4c4b0;border-radius:10px;padding:14px 20px;margin-bottom:22px;">
+    <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C1502E;font-weight:700;margin-bottom:2px;">Portal del cliente</div>
+    <div id="banner-nombre-cliente" style="font-size:18px;font-weight:700;color:#1C1815;"></div>
+  </div>
   <h1 class="titular" style="font-size:26px;margin-bottom:6px;">Solicitar traslado</h1>
   <p style="font-size:14px;color:var(--texto-muted);margin-bottom:22px;">Rellena los datos y te confirmamos disponibilidad en menos de 24 horas.</p>
 
@@ -841,11 +846,18 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
     }).join('');
   });
 
-  // Si el cliente ya tiene sesión abierta, prellenar sus datos de contacto
+  // Si el cliente ya tiene sesión abierta, prellenar sus datos de contacto y mostrar banner
   fetch('/api/cliente/sesion').then(function(r){ return r.json(); }).then(function(s){
     if (!s.autenticado) return;
     fetch('/api/cliente/mis-datos').then(function(r){ return r.json(); }).then(function(d){
       if (!d.nombre_cliente) return;
+      // Mostrar banner portal del cliente
+      var banner = document.getElementById('banner-portal-cliente');
+      var nombreBanner = document.getElementById('banner-nombre-cliente');
+      if (banner && nombreBanner) {
+        nombreBanner.textContent = d.nombre_cliente;
+        banner.style.display = 'block';
+      }
       document.getElementById('contacto-nombre').value = d.nombre_cliente;
       document.getElementById('contacto-email').value = d.email_cliente;
       var tel = (d.telefono_cliente || '').trim();
