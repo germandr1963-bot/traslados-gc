@@ -55,12 +55,19 @@
     .msg-equipo { background:#e8f5e9; border:1px solid #c8e6c9; }
     .msg-equipo .msg-autor { font-weight:600; color:#2e7d32; font-size:12px; margin-bottom:3px; }
     .msg-sin { font-size:13px; color:#aaa; text-align:center; padding:10px 0; }
+    .botones-reserva {
+      display:flex; gap:10px; margin-top:14px;
+    }
     .boton-cartel {
-      background:var(--costa); color:#fff; border:none; border-radius:8px;
-      padding:10px 20px; font-size:13px; font-weight:700; cursor:pointer; width:100%;
-      margin-top:10px;
+      background:#888; color:#fff; border:none; border-radius:8px;
+      padding:10px 20px; font-size:13px; font-weight:700; cursor:pointer; flex:1;
     }
     .boton-cartel:disabled { opacity:0.5; cursor:not-allowed; }
+    .boton-completar {
+      background:var(--costa); color:#fff; border:none; border-radius:8px;
+      padding:10px 20px; font-size:13px; font-weight:700; cursor:pointer; flex:1;
+    }
+    .boton-completar:disabled { opacity:0.5; cursor:not-allowed; }
   </style>
 </head>
 <body>
@@ -395,7 +402,12 @@
               : '') +
             '<div class="seccion-label">Mensajes del equipo</div>' +
             '<div class="hilo-mensajes" id="hilo-' + r.id + '"><div class="msg-sin">Cargando...</div></div>' +
-            '<button class="boton-cartel" id="btn-cartel-' + r.id + '" onclick="descargarCartel(' + r.id + ',\'' + r.numero_reserva + '\')">📄 Descargar cartel</button>' +
+            '<div class="botones-reserva">' +
+              '<button class="boton-cartel" id="btn-cartel-' + r.id + '" onclick="descargarCartel(' + r.id + ',\'' + r.numero_reserva + '\')">📄 Descargar cartel</button>' +
+              (r.estado === 'confirmada'
+                ? '<button class="boton-completar" id="btn-completar-' + r.id + '" onclick="marcarCompletada(' + r.id + ')">🏁 Servicio terminado</button>'
+                : '') +
+            '</div>' +
           '</div>' +
         '</div>';
       }).join('');
@@ -441,6 +453,27 @@
         })
         .catch(function() {
           hilo.innerHTML = '<div class="msg-sin">Error al cargar mensajes.</div>';
+        });
+    }
+
+    function marcarCompletada(reservaId) {
+      if (!confirm('¿Confirmas que el servicio ha finalizado? Se notificará al cliente para que valore el traslado.')) return;
+      var btn = document.getElementById('btn-completar-' + reservaId);
+      btn.textContent = 'Procesando...'; btn.disabled = true;
+      fetch('/chofer/reservas/' + reservaId + '/completar', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.ok) {
+            btn.textContent = '✅ Completado';
+            btn.style.background = '#085041';
+          } else {
+            alert(d.error || 'Error al completar el servicio.');
+            btn.textContent = '🏁 Servicio terminado'; btn.disabled = false;
+          }
+        })
+        .catch(function() {
+          alert('Error de conexión.');
+          btn.textContent = '🏁 Servicio terminado'; btn.disabled = false;
         });
     }
 

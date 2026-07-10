@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Valora tu traslado — Traslados GC</title>
+  <style>
+    :root {
+      --charcoal: #1C1815;
+      --terracota: #C1502E;
+      --oro: #D9A441;
+      --piedra: #ECE6D8;
+      --fondo: #F6F4EF;
+      --borde: #E1DCD0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--fondo);
+      color: #2A211B;
+      min-height: 100vh;
+    }
+    header {
+      background: var(--charcoal);
+      border-bottom: 3px solid var(--oro);
+      padding: 14px 20px;
+      text-align: center;
+      color: #fff;
+      font-weight: 700;
+      letter-spacing: 1px;
+      font-size: 15px;
+    }
+    header span { color: var(--oro); }
+    main {
+      max-width: 480px;
+      margin: 40px auto;
+      padding: 0 16px 60px;
+    }
+    .tarjeta {
+      background: #fff;
+      border: 1px solid var(--borde);
+      border-radius: 12px;
+      padding: 28px 24px;
+    }
+    h1 {
+      font-size: 1.3rem;
+      color: var(--charcoal);
+      margin-bottom: 6px;
+    }
+    .ruta-box {
+      background: var(--piedra);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 14px 0 20px;
+      font-size: 14px;
+      color: #5a4a3a;
+    }
+    .ruta-box strong { display: block; font-size: 15px; color: var(--charcoal); margin-bottom: 2px; }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--charcoal);
+      margin: 18px 0 8px;
+    }
+    .fila-estrellas {
+      display: flex;
+      gap: 6px;
+    }
+    .fila-estrellas span {
+      font-size: 2rem;
+      cursor: pointer;
+      color: #ccc;
+      line-height: 1;
+      transition: color 0.1s;
+    }
+    .fila-estrellas span.encendida { color: var(--oro); }
+    textarea {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid var(--borde);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 80px;
+      margin-top: 8px;
+    }
+    textarea:focus { outline: 2px solid var(--terracota); border-color: var(--terracota); }
+    .botones {
+      display: flex;
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .btn-enviar {
+      flex: 2;
+      background: var(--terracota);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 13px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-enviar:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-omitir {
+      flex: 1;
+      background: transparent;
+      border: 2px solid var(--borde);
+      border-radius: 8px;
+      padding: 13px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #888;
+      cursor: pointer;
+    }
+    .mensaje { margin-top: 16px; padding: 12px 14px; border-radius: 8px; font-size: 14px; display: none; }
+    .mensaje.error { display: block; background: #FBEAE7; color: #8a2424; }
+    .mensaje.ok { display: block; background: #E6F4EC; color: #085041; }
+    #zona-gracias { display: none; text-align: center; padding: 10px 0; }
+    #zona-gracias h2 { color: var(--charcoal); margin-bottom: 10px; font-size: 1.3rem; }
+    #zona-gracias p { color: #5a6c79; font-size: 14px; }
+    #zona-error { display: none; text-align: center; padding: 10px 0; }
+    #zona-error p { color: #8a2424; font-size: 14px; }
+    #zona-cargando { text-align: center; color: #888; font-size: 14px; padding: 20px 0; }
+  </style>
+</head>
+<body>
+  <header>TRASLADOS <span>GC</span></header>
+  <main>
+    <div class="tarjeta">
+      <div id="zona-cargando">Cargando...</div>
+
+      <div id="zona-formulario" style="display:none">
+        <h1>¿Qué tal tu traslado? 🚖</h1>
+        <p style="font-size:14px;color:#5a6c79;margin-top:4px;">Tu valoración es opcional y nos ayuda a mejorar.</p>
+        <div class="ruta-box">
+          <strong id="info-ruta">—</strong>
+          <span id="info-pnr" style="font-size:12px;color:#888;"></span>
+        </div>
+
+        <label>Tu conductor</label>
+        <div class="fila-estrellas" id="estrellas-conductor"></div>
+
+        <label>El servicio</label>
+        <div class="fila-estrellas" id="estrellas-servicio"></div>
+
+        <label for="comentario">Comentario (opcional)</label>
+        <textarea id="comentario" maxlength="500" placeholder="Cuéntanos tu experiencia"></textarea>
+
+        <div id="msg-error" class="mensaje error"></div>
+
+        <div class="botones">
+          <button class="btn-omitir" onclick="omitir()">Omitir</button>
+          <button class="btn-enviar" id="btn-enviar" onclick="enviarValoracion()">Enviar valoración</button>
+        </div>
+      </div>
+
+      <div id="zona-gracias">
+        <p style="font-size:2rem;margin-bottom:10px;">🙏</p>
+        <h2>¡Gracias por tu valoración!</h2>
+        <p>Tu opinión nos ayuda a seguir mejorando el servicio.</p>
+      </div>
+
+      <div id="zona-error">
+        <p>Este enlace no es válido o ya ha sido utilizado.</p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    var token = new URLSearchParams(window.location.search).get('token');
+    var estrellas = { conductor: 0, servicio: 0 };
+    var reservaId = null;
+
+    function pintarEstrellas(cual) {
+      var fila = document.getElementById('estrellas-' + cual);
+      fila.innerHTML = '';
+      for (var n = 1; n <= 5; n++) {
+        var estrella = document.createElement('span');
+        estrella.textContent = '★';
+        if (n <= estrellas[cual]) estrella.className = 'encendida';
+        (function(num, c) {
+          estrella.onclick = function() { estrellas[c] = num; pintarEstrellas(c); };
+        })(n, cual);
+        fila.appendChild(estrella);
+      }
+    }
+
+    function mostrarError(msg) {
+      var el = document.getElementById('msg-error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function omitir() {
+      document.getElementById('zona-formulario').style.display = 'none';
+      document.getElementById('zona-gracias').style.display = 'block';
+    }
+
+    async function enviarValoracion() {
+      if (!estrellas.conductor || !estrellas.servicio) {
+        mostrarError('Marca las estrellas del conductor y del servicio (o pulsa Omitir).');
+        return;
+      }
+      var btn = document.getElementById('btn-enviar');
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      try {
+        var r = await fetch('/api/valoracion/enviar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: token,
+            estrellas_conductor: estrellas.conductor,
+            estrellas_servicio: estrellas.servicio,
+            comentario: document.getElementById('comentario').value
+          })
+        });
+        var d = await r.json();
+        if (d.ok) {
+          document.getElementById('zona-formulario').style.display = 'none';
+          document.getElementById('zona-gracias').style.display = 'block';
+        } else {
+          mostrarError(d.error || 'Error al enviar la valoración.');
+          btn.disabled = false; btn.textContent = 'Enviar valoración';
+        }
+      } catch(e) {
+        mostrarError('Error de conexión. Inténtalo de nuevo.');
+        btn.disabled = false; btn.textContent = 'Enviar valoración';
+      }
+    }
+
+    // Cargar info del traslado al entrar
+    (async function() {
+      if (!token) {
+        document.getElementById('zona-cargando').style.display = 'none';
+        document.getElementById('zona-error').style.display = 'block';
+        return;
+      }
+      try {
+        var r = await fetch('/api/valoracion/info?token=' + token);
+        var d = await r.json();
+        if (!r.ok || !d.numero_reserva) {
+          document.getElementById('zona-cargando').style.display = 'none';
+          document.getElementById('zona-error').style.display = 'block';
+          return;
+        }
+        if (d.ya_valorada) {
+          document.getElementById('zona-cargando').style.display = 'none';
+          document.getElementById('zona-gracias').style.display = 'block';
+          return;
+        }
+        document.getElementById('info-ruta').textContent = d.origen + ' → ' + d.destino;
+        document.getElementById('info-pnr').textContent = 'Reserva ' + d.numero_reserva;
+        pintarEstrellas('conductor');
+        pintarEstrellas('servicio');
+        document.getElementById('zona-cargando').style.display = 'none';
+        document.getElementById('zona-formulario').style.display = 'block';
+      } catch(e) {
+        document.getElementById('zona-cargando').style.display = 'none';
+        document.getElementById('zona-error').style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>
