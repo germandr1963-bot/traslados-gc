@@ -4558,6 +4558,30 @@ async function generarHtmlVoucher(reservaId) {
   const r = result.rows[0];
   const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
 
+  // Extras de la reserva
+  const extrasResult = await pool.query(
+    `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
+     JOIN extras e ON e.id = re.extra_id
+     WHERE re.reserva_id = $1 ORDER BY e.bloque, e.orden`,
+    [reservaId]
+  );
+  const extrasReserva = extrasResult.rows;
+  const extrasIncluidos = extrasReserva.filter(e => !parseFloat(e.precio_en_reserva) || parseFloat(e.precio_en_reserva) === 0);
+  const extrasACobrar = extrasReserva.filter(e => parseFloat(e.precio_en_reserva) > 0);
+  const totalExtras = extrasACobrar.reduce((sum, e) => sum + parseFloat(e.precio_en_reserva), 0);
+
+  const extrasHtml = extrasReserva.length ? `
+    <br><strong>Extras:</strong>
+    ${extrasIncluidos.map(e => `<br>&nbsp;&nbsp;· ${e.nombre} <span style="color:#2e7d32;font-size:12px;">(incluido)</span>`).join('')}
+    ${extrasACobrar.map(e => `<br>&nbsp;&nbsp;· ${e.nombre} <span style="color:#856404;font-size:12px;">(${parseFloat(e.precio_en_reserva).toFixed(2)} € — a pagar al conductor al final del servicio)</span>`).join('')}
+  ` : '';
+
+  const totalExtrasHtml = extrasACobrar.length ? `
+    <div style="background:#fff8e1;border:1px solid #D9A441;border-radius:6px;padding:10px 14px;margin-top:12px;font-size:13px;color:#1C1815;">
+      <strong>💰 Total de extras a pagar al conductor: ${totalExtras.toFixed(2)} €</strong><br>
+      <span style="font-size:12px;color:#555;">Este importe se abona directamente al conductor al final del servicio, aparte del precio del traslado.</span>
+    </div>` : '';
+
   // Fecha límite de cancelación gratuita para el voucher
   const _cfgNoshowVoucher = await obtenerConfigNoshow(r.fecha);
   const _fechaLimiteVoucher = calcularFechaCancelacion(new Date(r.fecha), r.hora, _cfgNoshowVoucher.horas_cancelacion);
@@ -4605,8 +4629,9 @@ async function generarHtmlVoucher(reservaId) {
           <strong>Fecha:</strong> ${fechaViaje}<br>
           <strong>Hora:</strong> ${r.hora ? r.hora.slice(0,5) : '—'}<br>
           <strong>Categoría:</strong> ${r.categoria_nombre || '—'}<br>
-          <strong>Pasajeros:</strong> ${r.num_pasajeros || '—'}${r.direccion_recogida ? '<br><strong>Dirección de recogida:</strong> ' + r.direccion_recogida : ''}${r.direccion_destino ? '<br><strong>Dirección de destino:</strong> ' + r.direccion_destino : ''}${r.numero_vuelo ? '<br><strong>Vuelo:</strong> ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · Llegada ' + r.hora_llegada_vuelo.slice(0,5) : '') : ''}${r.nombre_barco ? '<br><strong>Barco:</strong> ' + r.nombre_barco + (r.hora_atraque ? ' · Atraque ' + r.hora_atraque.slice(0,5) : '') : ''}${r.notas_cliente ? '<br><strong>Notas:</strong> ' + r.notas_cliente : ''}
+          <strong>Pasajeros:</strong> ${r.num_pasajeros || '—'}${r.direccion_recogida ? '<br><strong>Dirección de recogida:</strong> ' + r.direccion_recogida : ''}${r.direccion_destino ? '<br><strong>Dirección de destino:</strong> ' + r.direccion_destino : ''}${r.numero_vuelo ? '<br><strong>Vuelo:</strong> ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · Llegada ' + r.hora_llegada_vuelo.slice(0,5) : '') : ''}${r.nombre_barco ? '<br><strong>Barco:</strong> ' + r.nombre_barco + (r.hora_atraque ? ' · Atraque ' + r.hora_atraque.slice(0,5) : '') : ''}${r.notas_cliente ? '<br><strong>Notas:</strong> ' + r.notas_cliente : ''}${extrasHtml}
         </div>
+        ${totalExtrasHtml}
       </div>
       <p style="font-size:13px;color:#888;">Muestra este voucher a tu conductor al inicio del servicio. El precio final será el que marque el taxímetro.</p>
       <div style="background:#fff3cd;border-radius:6px;padding:10px 14px;margin-top:14px;font-size:12px;color:#856404;">
