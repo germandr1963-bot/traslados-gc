@@ -3660,6 +3660,21 @@ app.get('/chofer/cartel/:id', requireChofer, asyncHandler(async (req, res) => {
   res.send(cartel.buffer);
 }));
 
+// ─── Admin: valoraciones ─────────────────────────────────────────────────────
+app.get('/admin/valoraciones', requireAdmin, asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT va.id, va.estrellas_conductor, va.estrellas_servicio, va.comentario, va.creado_en,
+            r.numero_reserva, r.nombre_cliente,
+            c.nombre AS nombre_chofer
+     FROM valoraciones va
+     JOIN reservas r ON r.id = va.reserva_id
+     LEFT JOIN conductores c ON c.id = r.conductor_id
+     ORDER BY va.creado_en DESC
+     LIMIT 100`
+  );
+  res.json({ valoraciones: rows });
+}));
+
 // ─── Admin: configuración no-show ────────────────────────────────────────────
 
 // Obtener toda la configuración (general + temporadas)
