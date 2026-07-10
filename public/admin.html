@@ -1082,7 +1082,7 @@ table.tabla-precios input {
       <h2 style="margin-bottom:8px;">Media por chofer</h2>
       <div class="tabla-envoltura" style="margin-bottom:28px;">
         <table class="tabla-admin" style="font-size:0.82rem;">
-          <thead><tr><th>Chofer</th><th style="white-space:nowrap;width:90px;">⭐ Conductor</th><th style="white-space:nowrap;width:90px;">⭐ Servicio</th><th style="width:60px;">Total</th></tr></thead>
+          <thead><tr><th style="text-align:left;">Chofer</th><th style="text-align:left;white-space:nowrap;width:110px;">⭐ Conductor</th><th style="text-align:left;white-space:nowrap;width:110px;">⭐ Servicio</th><th style="text-align:left;width:60px;">Total</th></tr></thead>
           <tbody id="tabla-media-choferes"></tbody>
         </table>
       </div>
@@ -1090,7 +1090,7 @@ table.tabla-precios input {
       <h2 style="margin-bottom:8px;">Últimas valoraciones</h2>
       <div class="tabla-envoltura">
         <table class="tabla-admin" style="font-size:0.82rem;">
-          <thead><tr><th style="width:90px;">PNR</th><th style="width:100px;">Fecha</th><th>Cliente</th><th>Chofer</th><th style="width:90px;">⭐ Conductor</th><th style="width:90px;">⭐ Servicio</th><th>Comentario</th><th style="width:30px;"></th></tr></thead>
+          <thead><tr><th style="width:90px;">PNR</th><th style="width:100px;">Fecha</th><th>Cliente</th><th style="text-align:left;">Chofer</th><th style="text-align:left;width:100px;">⭐ Conductor</th><th style="text-align:left;width:100px;">⭐ Servicio</th><th style="min-width:180px;">Comentario</th><th style="width:30px;"></th></tr></thead>
           <tbody id="tabla-valoraciones"></tbody>
         </table>
       </div>
@@ -3685,9 +3685,9 @@ function cargarValoraciones() {
       var mediaServ = (ch.sumaServ / ch.total).toFixed(1);
       return '<tr>' +
         '<td><strong>' + escapar(nombre) + '</strong></td>' +
-        '<td style="color:#D9A441;"><strong>&#9733; ' + mediaCond + '</strong></td>' +
-        '<td style="color:#D9A441;"><strong>&#9733; ' + mediaServ + '</strong></td>' +
-        '<td>' + ch.total + '</td>' +
+        '<td style="color:#D9A441;text-align:left;"><strong>&#9733; ' + mediaCond + '</strong></td>' +
+        '<td style="color:#D9A441;text-align:left;"><strong>&#9733; ' + mediaServ + '</strong></td>' +
+        '<td style="text-align:left;">' + ch.total + '</td>' +
       '</tr>';
     }).join('');
 
@@ -3701,9 +3701,9 @@ function cargarValoraciones() {
         '<td style="font-size:12px;color:#888;">' + fecha + '</td>' +
         '<td>' + escapar(v.nombre_cliente || '—') + '</td>' +
         '<td>' + escapar(v.nombre_chofer || '—') + '</td>' +
-        '<td style="color:#D9A441;letter-spacing:2px;">' + '&#9733;'.repeat(ec) + '<span style="color:#C9D4DC;">' + '&#9734;'.repeat(5 - ec) + '</span></td>' +
-        '<td style="color:#D9A441;letter-spacing:2px;">' + '&#9733;'.repeat(es) + '<span style="color:#C9D4DC;">' + '&#9734;'.repeat(5 - es) + '</span></td>' +
-        '<td style="font-size:13px;color:#555;white-space:normal;max-width:280px;">' + escapar(v.comentario || '') + '</td>' +
+        '<td style="color:#D9A441;letter-spacing:2px;text-align:left;">' + '&#9733;'.repeat(ec) + '<span style="color:#C9D4DC;">' + '&#9734;'.repeat(5 - ec) + '</span></td>' +
+        '<td style="color:#D9A441;letter-spacing:2px;text-align:left;">' + '&#9733;'.repeat(es) + '<span style="color:#C9D4DC;">' + '&#9734;'.repeat(5 - es) + '</span></td>' +
+        '<td style="font-size:13px;color:#555;white-space:normal;min-width:180px;word-break:break-word;">' + escapar(v.comentario || '') + '</td>' +
         '<td><button class="boton-peligro" style="margin-top:0;padding:5px 10px;font-size:0.78rem;" onclick="eliminarValoracion(' + v.id + ')">🗑</button></td>' +
       '</tr>';
     }).join('');
