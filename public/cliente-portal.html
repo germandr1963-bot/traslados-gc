@@ -234,7 +234,7 @@
       if (!r.ok) { window.location.href = '/mi-reserva'; return; }
       var d = await r.json();
       reservasData = d.reservas || [];
-      document.getElementById('saludo').textContent = 'Hola, ' + (d.nombre ? d.nombre.split(' ')[0] : '');
+      document.getElementById('saludo').textContent = 'Hola, ' + (d.nombre ? d.nombre.trim().split(/\s+/).slice(0,2).join(' ') : '');
       document.getElementById('subtitulo').textContent = reservasData.length + ' reserva' + (reservasData.length !== 1 ? 's' : '') + ' encontrada' + (reservasData.length !== 1 ? 's' : '');
       renderLista();
     }
