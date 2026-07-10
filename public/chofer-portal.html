@@ -340,14 +340,14 @@
 
         return '<div class="reserva-card" id="card-' + r.id + '">' +
           '<div class="reserva-card-cabecera" onclick="toggleReserva(' + r.id + ')">' +
+            '<span title="' + semaforo.titulo + '" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + semaforo.color + ';margin-right:8px;vertical-align:middle;"></span>' +
             '<span class="reserva-pnr">' + r.numero_reserva + '</span>' +
             '<div class="reserva-resumen">' +
               '<div class="reserva-ruta">' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
               '<div class="reserva-meta">📅 ' + fecha + ' · ' + hora + 'h · ' + (r.num_pasajeros||'—') + ' pax</div>' +
             '</div>' +
             '<div class="reserva-badges">' +
-              '<span title="' + semaforo.titulo + '" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + semaforo.color + ';margin-right:6px;vertical-align:middle;"></span>' +
-              (tieneMsg ? '<span class="badge-msg">💬 ' + r.mensajes_nuevos + '</span>' : '') +
+                (tieneMsg ? '<span class="badge-msg">💬 ' + r.mensajes_nuevos + '</span>' : '') +
             '</div>' +
             '<span class="reserva-chevron" id="chev-' + r.id + '">▼</span>' +
           '</div>' +
