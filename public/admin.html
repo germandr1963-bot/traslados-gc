@@ -988,7 +988,10 @@ table.tabla-precios input {
     <div id="seccion-clientes" class="oculto">
       <h1>Clientes</h1>
       <p class="subtitulo">Clientes registrados en la plataforma.</p>
-      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="cargarClientes()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;">
+        <button class="boton-costa" onclick="cargarClientes()" style="font-size:0.85rem;">🔄 Actualizar</button>
+        <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="exportarClientes()">⬇ Exportar CSV</button>
+      </div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;">
         <input type="text" id="filtro-clientes" class="campo" placeholder="Buscar por nombre, email o teléfono…" style="max-width:320px;" oninput="filtrarClientes()">
         <button class="boton-primario" onclick="abrirComunicadoClientes()">Enviar comunicado</button>
@@ -1082,15 +1085,15 @@ table.tabla-precios input {
       <h2 style="margin-bottom:8px;">Media por chofer</h2>
       <div class="tabla-envoltura" style="margin-bottom:28px;">
         <table class="tabla-admin" style="font-size:0.82rem;">
-          <thead><tr><th style="text-align:left;">Chofer</th><th style="text-align:left;white-space:nowrap;width:110px;">⭐ Conductor</th><th style="text-align:left;white-space:nowrap;width:110px;">⭐ Servicio</th><th style="text-align:left;width:60px;">Total</th></tr></thead>
+          <thead><tr><th style="text-align:left;min-width:200px;">Chofer</th><th style="text-align:left;white-space:nowrap;width:100px;">⭐ Conductor</th><th style="text-align:left;white-space:nowrap;width:100px;">⭐ Servicio</th><th style="text-align:left;width:60px;">Total</th></tr></thead>
           <tbody id="tabla-media-choferes"></tbody>
         </table>
       </div>
 
       <h2 style="margin-bottom:8px;">Últimas valoraciones</h2>
       <div class="tabla-envoltura">
-        <table class="tabla-admin" style="font-size:0.82rem;">
-          <thead><tr><th style="width:90px;">PNR</th><th style="width:100px;">Fecha</th><th>Cliente</th><th style="text-align:left;">Chofer</th><th style="text-align:left;width:100px;">⭐ Conductor</th><th style="text-align:left;width:100px;">⭐ Servicio</th><th style="min-width:180px;">Comentario</th><th style="width:30px;"></th></tr></thead>
+        <table class="tabla-admin" style="font-size:0.82rem;table-layout:auto;width:100%;">
+          <thead><tr><th style="width:80px;">PNR</th><th style="width:95px;">Fecha</th><th style="width:130px;">Cliente</th><th style="text-align:left;width:130px;">Chofer</th><th style="text-align:left;width:90px;">⭐ Conductor</th><th style="text-align:left;width:90px;">⭐ Servicio</th><th style="text-align:left;">Comentario</th><th style="width:80px;text-align:center;"></th></tr></thead>
           <tbody id="tabla-valoraciones"></tbody>
         </table>
       </div>
@@ -3605,6 +3608,24 @@ function filtrarClientes() {
   renderTablaClientes(filtrados);
 }
 
+function exportarClientes() {
+  if (!_clientesData || !_clientesData.length) { alert('No hay clientes que exportar.'); return; }
+  var limpiar = function(t) { return '"' + String(t == null ? '' : t).replace(/"/g, '""') + '"'; };
+  var filas = [['Nombre', 'Email', 'Teléfono'].join(';')];
+  _clientesData.forEach(function(c) {
+    filas.push([
+      limpiar(c.nombre || ''),
+      limpiar(c.email_cliente || ''),
+      limpiar(c.telefono || '')
+    ].join(';'));
+  });
+  var blob = new Blob(['\ufeff' + filas.join('\n')], { type: 'text/csv;charset=utf-8' });
+  var enlace = document.createElement('a');
+  enlace.href = URL.createObjectURL(blob);
+  enlace.download = 'clientes-traslados-gc.csv';
+  enlace.click();
+}
+
 function toggleTodosClientes(cb) {
   document.querySelectorAll('.check-cliente').forEach(function(c) { c.checked = cb.checked; });
 }
@@ -3684,10 +3705,10 @@ function cargarValoraciones() {
       var mediaCond = (ch.sumaCond / ch.total).toFixed(1);
       var mediaServ = (ch.sumaServ / ch.total).toFixed(1);
       return '<tr>' +
-        '<td><strong>' + escapar(nombre) + '</strong></td>' +
-        '<td style="color:#D9A441;text-align:left;"><strong>&#9733; ' + mediaCond + '</strong></td>' +
-        '<td style="color:#D9A441;text-align:left;"><strong>&#9733; ' + mediaServ + '</strong></td>' +
-        '<td style="text-align:left;">' + ch.total + '</td>' +
+        '<td style="text-align:left;"><strong>' + escapar(nombre) + '</strong></td>' +
+        '<td style="color:#D9A441;text-align:left;padding-left:8px;"><strong>&#9733; ' + mediaCond + '</strong></td>' +
+        '<td style="color:#D9A441;text-align:left;padding-left:8px;"><strong>&#9733; ' + mediaServ + '</strong></td>' +
+        '<td style="text-align:left;padding-left:8px;">' + ch.total + '</td>' +
       '</tr>';
     }).join('');
 
@@ -3703,8 +3724,8 @@ function cargarValoraciones() {
         '<td>' + escapar(v.nombre_chofer || '—') + '</td>' +
         '<td style="color:#D9A441;letter-spacing:2px;text-align:left;">' + '&#9733;'.repeat(ec) + '<span style="color:#C9D4DC;">' + '&#9734;'.repeat(5 - ec) + '</span></td>' +
         '<td style="color:#D9A441;letter-spacing:2px;text-align:left;">' + '&#9733;'.repeat(es) + '<span style="color:#C9D4DC;">' + '&#9734;'.repeat(5 - es) + '</span></td>' +
-        '<td style="font-size:13px;color:#555;white-space:normal;min-width:180px;word-break:break-word;">' + escapar(v.comentario || '') + '</td>' +
-        '<td><button class="boton-peligro" style="margin-top:0;padding:5px 10px;font-size:0.78rem;" onclick="eliminarValoracion(' + v.id + ')">🗑</button></td>' +
+        '<td style="font-size:13px;color:#555;white-space:normal;word-break:break-word;">' + escapar(v.comentario || '') + '</td>' +
+        '<td style="text-align:center;"><button class="boton-peligro" style="margin-top:0;padding:5px 12px;font-size:0.78rem;white-space:nowrap;" onclick="eliminarValoracion(' + v.id + ')">✕ Eliminar</button></td>' +
       '</tr>';
     }).join('');
   }).catch(function() {
@@ -3716,7 +3737,7 @@ function cargarValoraciones() {
 var _ultimasValoraciones = [];
 
 function eliminarValoracion(id) {
-  if (!confirm('¿Eliminar esta valoración?')) return;
+  if (!confirm('¿Estás seguro de que deseas eliminar esta valoración?\n\nEsta acción no se puede deshacer.')) return;
   fetch('/admin/valoraciones/' + id, { method: 'DELETE' })
     .then(function() { cargarValoraciones(); });
 }
