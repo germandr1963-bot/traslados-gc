@@ -1084,8 +1084,8 @@ table.tabla-precios input {
 
       <h2 style="margin-bottom:8px;">Media por chofer</h2>
       <div class="tabla-envoltura" style="margin-bottom:28px;">
-        <table class="tabla-admin" style="font-size:0.82rem;">
-          <thead><tr><th style="text-align:left;min-width:200px;">Chofer</th><th style="text-align:left;white-space:nowrap;width:100px;">⭐ Conductor</th><th style="text-align:left;white-space:nowrap;width:100px;">⭐ Servicio</th><th style="text-align:left;width:60px;">Total</th></tr></thead>
+        <table class="tabla-admin" style="font-size:0.82rem;width:auto;min-width:420px;">
+          <thead><tr><th style="text-align:left;width:220px;">Chofer</th><th style="text-align:left;white-space:nowrap;width:110px;padding-left:24px;">⭐ Conductor</th><th style="text-align:left;white-space:nowrap;width:110px;padding-left:24px;">⭐ Servicio</th><th style="text-align:left;width:60px;padding-left:24px;">Total</th></tr></thead>
           <tbody id="tabla-media-choferes"></tbody>
         </table>
       </div>
@@ -3705,10 +3705,10 @@ function cargarValoraciones() {
       var mediaCond = (ch.sumaCond / ch.total).toFixed(1);
       var mediaServ = (ch.sumaServ / ch.total).toFixed(1);
       return '<tr>' +
-        '<td style="text-align:left;"><strong>' + escapar(nombre) + '</strong></td>' +
-        '<td style="color:#D9A441;text-align:left;padding-left:8px;"><strong>&#9733; ' + mediaCond + '</strong></td>' +
-        '<td style="color:#D9A441;text-align:left;padding-left:8px;"><strong>&#9733; ' + mediaServ + '</strong></td>' +
-        '<td style="text-align:left;padding-left:8px;">' + ch.total + '</td>' +
+        '<td style="text-align:left;width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><strong>' + escapar(nombre) + '</strong></td>' +
+        '<td style="color:#D9A441;text-align:left;padding-left:24px;"><strong>&#9733; ' + mediaCond + '</strong></td>' +
+        '<td style="color:#D9A441;text-align:left;padding-left:24px;"><strong>&#9733; ' + mediaServ + '</strong></td>' +
+        '<td style="text-align:left;padding-left:24px;">' + ch.total + '</td>' +
       '</tr>';
     }).join('');
 
