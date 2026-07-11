@@ -140,7 +140,10 @@
 
   <main>
     <section id="zona-portal">
-      <div style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--costa);font-weight:700;margin-bottom:2px;">Portal del cliente</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+        <div style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--costa);font-weight:700;">Portal del cliente</div>
+        <button id="btn-idioma-cabecera" onclick="irAIdioma()" style="background:none;border:none;cursor:pointer;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--costa);font-weight:700;padding:0;font-family:inherit;">ESPAÑOL ✱</button>
+      </div>
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px">
         <h1 id="saludo" style="margin:0">Mis reservas</h1>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -153,7 +156,10 @@
       <!-- Mis datos -->
       <div id="seccion-mis-datos" style="background:#fff;border:1px solid var(--borde);border-radius:12px;margin-top:16px;overflow:hidden;">
         <div onclick="toggleSeccionMisDatos()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;cursor:pointer;">
-          <h2 style="margin:0;font-size:17px;">Mis datos</h2>
+          <div>
+            <h2 style="margin:0;font-size:17px;">Mis datos</h2>
+            <div style="font-size:11px;color:var(--costa);margin-top:2px;">✱ Aquí puedes cambiar tu idioma de comunicación</div>
+          </div>
           <span id="mis-datos-flecha" style="font-size:12px;opacity:0.6;">▼</span>
         </div>
         <div id="cuerpo-mis-datos" style="display:none;padding:0 20px 16px;">
@@ -480,6 +486,21 @@
     cargarPreferenciasCliente();
     cargarMisDatos();
 
+    // ── Idioma cabecera ──
+    function actualizarBtnIdioma(codigo, nombre) {
+      var btn = document.getElementById('btn-idioma-cabecera');
+      if (btn) btn.textContent = (nombre || codigo || 'ESPAÑOL').toUpperCase() + ' ✱';
+    }
+
+    function irAIdioma() {
+      var cuerpo = document.getElementById('cuerpo-mis-datos');
+      if (cuerpo.style.display === 'none') {
+        cuerpo.style.display = 'block';
+        document.getElementById('mis-datos-flecha').textContent = '▲';
+      }
+      document.getElementById('seccion-mis-datos').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     // ── Mis datos ──
     function cargarMisDatos() {
       // Cargar idiomas activos primero, luego los datos del cliente
@@ -498,7 +519,12 @@
           document.getElementById('mis-datos-nombre').value = d.nombre_cliente || '';
           document.getElementById('mis-datos-telefono').value = d.telefono_cliente || '';
           document.getElementById('mis-datos-email').value = d.email_cliente || '';
-          document.getElementById('mis-datos-idioma').value = d.idioma || 'es';
+          var idiomaGuardado = d.idioma || 'es';
+          document.getElementById('mis-datos-idioma').value = idiomaGuardado;
+          // Actualizar botón cabecera con el nombre del idioma seleccionado
+          var selIdioma = document.getElementById('mis-datos-idioma');
+          var nombreIdioma = selIdioma.options[selIdioma.selectedIndex] ? selIdioma.options[selIdioma.selectedIndex].text : idiomaGuardado;
+          actualizarBtnIdioma(idiomaGuardado, nombreIdioma);
         })
         .catch(function(){});
     }
@@ -536,6 +562,9 @@
         if (d.ok) {
           msg.textContent = '✓ Datos guardados';
           msg.style.color = 'var(--exito)';
+          var selIdioma = document.getElementById('mis-datos-idioma');
+          var nombreIdioma = selIdioma.options[selIdioma.selectedIndex] ? selIdioma.options[selIdioma.selectedIndex].text : '';
+          actualizarBtnIdioma(selIdioma.value, nombreIdioma);
         } else {
           msg.textContent = d.error || 'No se pudo guardar.';
           msg.style.color = 'var(--peligro)';
