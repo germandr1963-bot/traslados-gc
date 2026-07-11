@@ -1014,6 +1014,7 @@ async function initSchema() {
 
   // ─── Portal del cliente ───────────────────────────────────────────────────
   await pool.query(`ALTER TABLE clientes_datos ADD COLUMN IF NOT EXISTS password_hash TEXT`);
+  await pool.query(`ALTER TABLE clientes_datos ADD COLUMN IF NOT EXISTS idioma VARCHAR(5) DEFAULT 'es'`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_password_hash TEXT`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_primer_acceso BOOLEAN DEFAULT TRUE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
@@ -1272,6 +1273,13 @@ app.get('/admin/sesion', (req, res) => {
 app.get('/api/categorias', asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas, foto FROM categorias_vehiculos WHERE disponible = TRUE ORDER BY orden, nombre'
+  );
+  res.json(result.rows);
+}));
+
+app.get('/api/idiomas-activos', asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo'
   );
   res.json(result.rows);
 }));
@@ -6313,7 +6321,7 @@ app.get('/api/cliente/mis-datos', asyncHandler(async (req, res) => {
   // Prioridad: datos guardados por el propio cliente; si no hay, su última reserva
   const emailNorm = (emailCliente || '').toLowerCase().trim();
   const propios = await pool.query(
-    'SELECT nombre, telefono FROM clientes_datos WHERE LOWER(email_cliente) = $1', [emailNorm]
+    'SELECT nombre, telefono, idioma FROM clientes_datos WHERE LOWER(email_cliente) = $1', [emailNorm]
   );
   const result = await pool.query(
     `SELECT nombre_cliente, telefono_cliente, email_cliente
@@ -6327,7 +6335,8 @@ app.get('/api/cliente/mis-datos', asyncHandler(async (req, res) => {
   res.json({
     nombre_cliente: nombreFinal,
     telefono_cliente: (propios.rows.length && propios.rows[0].telefono) || (result.rows.length ? result.rows[0].telefono_cliente : ''),
-    email_cliente: result.rows.length ? result.rows[0].email_cliente : emailNorm
+    email_cliente: result.rows.length ? result.rows[0].email_cliente : emailNorm,
+    idioma: (propios.rows.length && propios.rows[0].idioma) || 'es'
   });
 }));
 
@@ -6337,12 +6346,13 @@ app.post('/api/cliente/mis-datos', asyncHandler(async (req, res) => {
   if (!emailCliente) return res.status(401).json({ error: 'No autenticado.' });
   const nombre = (req.body.nombre || '').trim().slice(0, 120);
   const telefono = (req.body.telefono || '').trim().slice(0, 40);
+  const idioma = (req.body.idioma || 'es').trim().slice(0, 5);
   if (!nombre) return res.status(400).json({ error: 'El nombre es obligatorio.' });
   if (telefono.replace(/[^\d]/g, '').length < 7) return res.status(400).json({ error: 'Introduce un teléfono válido.' });
   await pool.query(
-    `INSERT INTO clientes_datos (email_cliente, nombre, telefono) VALUES ($1, $2, $3)
-     ON CONFLICT (email_cliente) DO UPDATE SET nombre = $2, telefono = $3, actualizado_en = NOW()`,
-    [emailCliente, nombre, telefono]
+    `INSERT INTO clientes_datos (email_cliente, nombre, telefono, idioma) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (email_cliente) DO UPDATE SET nombre = $2, telefono = $3, idioma = $4, actualizado_en = NOW()`,
+    [emailCliente, nombre, telefono, idioma]
   );
   res.json({ ok: true });
 }));
