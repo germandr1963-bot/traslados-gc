@@ -171,6 +171,10 @@
             <input type="email" id="mis-datos-email" readonly style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:var(--niebla);opacity:0.8;">
             <div style="font-size:11px;opacity:0.55;margin-top:3px;">Tu email es tu identificador de acceso y de tu historial — para cambiarlo, contáctanos.</div>
           </div>
+          <div style="margin-bottom:12px;">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Idioma de comunicación</label>
+            <select id="mis-datos-idioma" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;"><option value="es">Cargando…</option></select>
+          </div>
           <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;">
             <span id="mis-datos-msg" style="font-size:12px;"></span>
             <button onclick="guardarMisDatos()" style="background:var(--costa);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;">Guardar mis datos</button>
@@ -478,13 +482,23 @@
 
     // ── Mis datos ──
     function cargarMisDatos() {
-      fetch('/api/cliente/mis-datos')
+      // Cargar idiomas activos primero, luego los datos del cliente
+      fetch('/api/idiomas-activos')
         .then(function(r){ return r.json(); })
+        .then(function(idiomas){
+          var sel = document.getElementById('mis-datos-idioma');
+          sel.innerHTML = idiomas.map(function(i){
+            return '<option value="' + i.codigo + '">' + i.nombre + '</option>';
+          }).join('');
+          // Ahora cargar datos del cliente y seleccionar su idioma guardado
+          return fetch('/api/cliente/mis-datos').then(function(r){ return r.json(); });
+        })
         .then(function(d){
           if (d.error) return;
           document.getElementById('mis-datos-nombre').value = d.nombre_cliente || '';
           document.getElementById('mis-datos-telefono').value = d.telefono_cliente || '';
           document.getElementById('mis-datos-email').value = d.email_cliente || '';
+          document.getElementById('mis-datos-idioma').value = d.idioma || 'es';
         })
         .catch(function(){});
     }
@@ -515,7 +529,7 @@
       fetch('/api/cliente/mis-datos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre: nombre, telefono: telefono })
+        body: JSON.stringify({ nombre: nombre, telefono: telefono, idioma: document.getElementById('mis-datos-idioma').value || 'es' })
       })
       .then(function(r){ return r.json(); })
       .then(function(d){
