@@ -203,6 +203,7 @@ table.tabla-admin th {
 table.tabla-admin td {
   padding: 8px 10px;
   border-bottom: 1px solid var(--gris-borde);
+  text-align: left;
 }
 
 .admin-shell {
