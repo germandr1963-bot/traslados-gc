@@ -176,6 +176,23 @@ function firmarCartel(reservaId) {
     .update(String(reservaId)).digest('hex').slice(0, 20);
 }
 
+async function generarCodigoCorto(tipo, reservaId, tokenValoracion) {
+  let codigo = crypto.randomBytes(3).toString('hex');
+  try {
+    await pool.query(
+      'INSERT INTO url_cortas (codigo, tipo, reserva_id, token_valoracion) VALUES ($1, $2, $3, $4)',
+      [codigo, tipo, reservaId || null, tokenValoracion || null]
+    );
+  } catch(e) {
+    codigo = crypto.randomBytes(4).toString('hex');
+    await pool.query(
+      'INSERT INTO url_cortas (codigo, tipo, reserva_id, token_valoracion) VALUES ($1, $2, $3, $4)',
+      [codigo, tipo, reservaId || null, tokenValoracion || null]
+    );
+  }
+  return codigo;
+}
+
 // ─── Sistema de traducción de la interfaz de la web ──────────────────────────
 // Caché en memoria de todos los textos fijos y sus traducciones, para no
 // consultar la base de datos en cada visita. Se recarga al arrancar el
@@ -1132,10 +1149,14 @@ async function initSchema() {
     CREATE TABLE IF NOT EXISTS url_cortas (
       id SERIAL PRIMARY KEY,
       codigo TEXT NOT NULL UNIQUE,
-      token_valoracion TEXT NOT NULL,
+      token_valoracion TEXT,
+      tipo TEXT DEFAULT 'valoracion',
+      reserva_id INTEGER,
       creado_en TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+  await pool.query(`ALTER TABLE url_cortas ADD COLUMN IF NOT EXISTS tipo TEXT DEFAULT 'valoracion'`);
+  await pool.query(`ALTER TABLE url_cortas ADD COLUMN IF NOT EXISTS reserva_id INTEGER`);
 
   // ─── Valoraciones ─────────────────────────────────────────────────────────
   await pool.query(`
@@ -3508,11 +3529,21 @@ app.get('/chofer/mensajes/:reservaId', requireChofer, asyncHandler(async (req, r
 // ─── Redirección URL corta ────────────────────────────────────────────────────
 app.get('/v/:codigo', asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT token_valoracion FROM url_cortas WHERE codigo = $1',
+    'SELECT token_valoracion, tipo, reserva_id FROM url_cortas WHERE codigo = $1',
     [req.params.codigo]
   );
   if (!result.rows.length) return res.status(404).send('Enlace no válido.');
-  res.redirect(`${BASE_URL}/valorar?token=${result.rows[0].token_valoracion}`);
+  const row = result.rows[0];
+  const tipo = row.tipo || 'valoracion';
+  if (tipo === 'cartel') {
+    const firma = firmarCartel(row.reserva_id);
+    return res.redirect(`${BASE_URL}/cartel-descarga/${row.reserva_id}/${firma}`);
+  }
+  if (tipo === 'factura') {
+    const firma = firmarFactura(row.reserva_id);
+    return res.redirect(`${BASE_URL}/factura-descarga/${row.reserva_id}/${firma}`);
+  }
+  res.redirect(`${BASE_URL}/valorar?token=${row.token_valoracion}`);
 }));
 
 // ─── Chofer: marcar servicio como completado ──────────────────────────────────
@@ -5487,8 +5518,8 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
     const choferQ = await pool.query('SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]);
     if (choferQ.rows.length && choferQ.rows[0].telefono) {
       try {
-        const firmaCartel = firmarCartel(req.params.id);
-        const urlCartel = BASE_URL + '/cartel-descarga/' + req.params.id + '/' + firmaCartel;
+        const codigoCartel = await generarCodigoCorto('cartel', req.params.id, null);
+        const urlCartel = `${BASE_URL}/v/${codigoCartel}`;
         const textoWa = `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe reenviamos el cartel de recogida para la reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}).\n\nDescárgalo aquí:\n${urlCartel}`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
@@ -5526,8 +5557,8 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
     });
     if (r.telefono_cliente) {
       try {
-        const firmaFact = firmarFactura(req.params.id);
-        const urlFactura = BASE_URL + '/factura-descarga/' + req.params.id + '/' + firmaFact;
+        const codigoFactura = await generarCodigoCorto('factura', req.params.id, null);
+        const urlFactura = `${BASE_URL}/v/${codigoFactura}`;
         const textoWa = `Hola, ${r.nombre_cliente} 👋\n\nTe enviamos la factura ${resultado.numeroFactura} correspondiente a tu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}).\n\nDescárgala aquí:\n${urlFactura}`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
