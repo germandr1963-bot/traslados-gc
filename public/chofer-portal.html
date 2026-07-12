@@ -68,6 +68,11 @@
       padding:10px 20px; font-size:13px; font-weight:700; cursor:pointer; flex:1;
     }
     .boton-completar:disabled { opacity:0.5; cursor:not-allowed; }
+    .boton-noshow {
+      background:#6a0000; color:#fff; border:none; border-radius:8px;
+      padding:10px 20px; font-size:13px; font-weight:700; cursor:pointer; flex:1;
+    }
+    .boton-noshow:disabled { opacity:0.5; cursor:not-allowed; }
   </style>
 </head>
 <body>
@@ -405,7 +410,8 @@
             '<div class="botones-reserva">' +
               '<button class="boton-cartel" id="btn-cartel-' + r.id + '" onclick="descargarCartel(' + r.id + ',\'' + r.numero_reserva + '\')">📄 Descargar cartel</button>' +
               (r.estado === 'confirmada'
-                ? '<button class="boton-completar" id="btn-completar-' + r.id + '" onclick="marcarCompletada(' + r.id + ')">🏁 Servicio terminado</button>'
+                ? '<button class="boton-completar" id="btn-completar-' + r.id + '" onclick="marcarCompletada(' + r.id + ')">🏁 Servicio terminado</button>' +
+                  '<button class="boton-noshow" id="btn-noshow-' + r.id + '" onclick="reportarNoShow(' + r.id + ')">🚫 No se presentó</button>'
                 : '') +
             '</div>' +
           '</div>' +
@@ -474,6 +480,29 @@
         .catch(function() {
           alert('Error de conexión.');
           btn.textContent = '🏁 Servicio terminado'; btn.disabled = false;
+        });
+    }
+
+    function reportarNoShow(reservaId) {
+      if (!confirm('¿Confirmas que el cliente no se ha presentado?\n\nSe retendrá el depósito y se notificará al cliente automáticamente.')) return;
+      var btn = document.getElementById('btn-noshow-' + reservaId);
+      var btnCompletar = document.getElementById('btn-completar-' + reservaId);
+      btn.textContent = 'Procesando...'; btn.disabled = true;
+      fetch('/chofer/reservas/' + reservaId + '/no-show', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.ok) {
+            btn.textContent = '🚫 No-show registrado';
+            btn.style.background = '#6a0000';
+            if (btnCompletar) { btnCompletar.style.display = 'none'; }
+          } else {
+            alert(d.error || 'Error al registrar no-show.');
+            btn.textContent = '🚫 No se presentó'; btn.disabled = false;
+          }
+        })
+        .catch(function() {
+          alert('Error de conexión.');
+          btn.textContent = '🚫 No se presentó'; btn.disabled = false;
         });
     }
 

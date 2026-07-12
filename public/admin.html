@@ -4833,7 +4833,7 @@ function cargarReservas(mantenerDetalle) {
           '<td style="text-align:right;">' + (viaje ? viaje.toFixed(2) + ' €' : '—') + '</td>' +
           '<td style="text-align:right;">' + (extras ? extras.toFixed(2) + ' €' : '—') + '</td>' +
           '<td style="text-align:right;font-weight:600;">' + (total ? total.toFixed(2) + ' €' : '—') + '</td>' +
-          '<td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td>' +
+          '<td><span class="badge-estado-reserva badge-' + r.estado + '">' + (r.estado === 'no_show' ? '🚫 No-show' : r.estado) + '</span></td>' +
           '<td>' + (function() {
             if (r.deposito_retenido_noshow) return '<span style="color:#c62828;font-weight:600;font-size:0.8rem;">🔒 No-show</span>';
             if (r.deposito_liberado) return '<span style="color:#2d7a4f;font-weight:600;font-size:0.8rem;">✅ Devuelto</span>';
@@ -4995,7 +4995,7 @@ function abrirDetalleReserva(id, sinScroll) {
         '<table class="tabla-admin" style="margin-bottom:0;">' +
           // — DATOS DEL CLIENTE —
           '<tr><td colspan="2" style="background:#f5f0ea;font-size:0.75rem;font-weight:700;color:#888;letter-spacing:0.05em;padding:6px 10px;">CLIENTE</td></tr>' +
-          '<tr><th style="width:180px">Estado</th><td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td></tr>' +
+          '<tr><th style="width:180px">Estado</th><td><span class="badge-estado-reserva badge-' + r.estado + '">' + (r.estado === 'no_show' ? '🚫 No-show' : r.estado) + '</span></td></tr>' +
           '<tr><th>Nombre</th><td>' + r.nombre_cliente + '</td></tr>' +
           '<tr><th>Teléfono</th><td>' + r.telefono_cliente + '</td></tr>' +
           '<tr><th>Email</th><td>' + r.email_cliente + '</td></tr>' +

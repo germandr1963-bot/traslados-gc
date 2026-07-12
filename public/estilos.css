@@ -314,6 +314,7 @@ table.tabla-precios input[type="number"] {
 .badge-confirmada { background: #d1e7dd; color: #0f5132; }
 .badge-completada { background: #cfe2ff; color: #084298; }
 .badge-cancelada  { background: #f8d7da; color: #842029; }
+.badge-no_show    { background: #f8d7da; color: #6a0000; font-weight: 700; }
 .badge-modificacion_pendiente { background: #ffe5cc; color: #7a3e00; }
 
 .boton-filtro-reserva.activo-filtro-periodo {
