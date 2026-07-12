@@ -683,6 +683,7 @@ table.tabla-precios input {
               <span id="badge-voucher" style="display:none;background:#2d7a4f;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.7rem;">✔ Enviado</span>
             </button>
             <button class="boton-costa" style="font-size:0.82rem;" onclick="reenviarEnlacePago()">🔗 Reenviar enlace de pago</button>
+            <button class="boton-costa" style="font-size:0.82rem;" onclick="reenviarFacturaCliente()">📄 Reenviar factura</button>
           </div>
           <div id="aviso-email-reserva" style="display:none;margin-top:0.75rem;font-size:0.82rem;"></div>
         </div>
@@ -5555,6 +5556,26 @@ function reenviarEnlacePago() {
         return;
       }
       av.innerHTML = '<div class="aviso-ok">✔ Enlace de pago reenviado al cliente.</div>';
+      setTimeout(function() { av.style.display = 'none'; }, 3000);
+    })
+    .catch(function() {
+      av.innerHTML = '<div class="aviso-error">❌ Error de conexión.</div>';
+    });
+}
+
+function reenviarFacturaCliente() {
+  if (!reservaDetalleId) return;
+  var av = document.getElementById('aviso-email-reserva');
+  av.style.display = 'block';
+  av.innerHTML = '<div class="aviso-ok">📄 Generando y enviando factura...</div>';
+  fetch('/admin/reservas/' + reservaDetalleId + '/reenviar-factura-cliente', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        av.innerHTML = '<div class="aviso-error">❌ ' + data.error + '</div>';
+        return;
+      }
+      av.innerHTML = '<div class="aviso-ok">✔ Factura enviada al cliente por email.</div>';
       setTimeout(function() { av.style.display = 'none'; }, 3000);
     })
     .catch(function() {
