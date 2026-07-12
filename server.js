@@ -5487,7 +5487,9 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
     const choferQ = await pool.query('SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]);
     if (choferQ.rows.length && choferQ.rows[0].telefono) {
       try {
-        const textoWa = `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe reenviamos el cartel de recogida para la reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}).\n\nPuedes descargarlo también desde tu portal de chofer.`;
+        const firmaCartel = firmarCartel(req.params.id);
+        const urlCartel = BASE_URL + '/cartel-descarga/' + req.params.id + '/' + firmaCartel;
+        const textoWa = `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe reenviamos el cartel de recogida para la reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}).\n\nDescárgalo aquí:\n${urlCartel}`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
           [choferQ.rows[0].telefono, textoWa]
@@ -5524,7 +5526,9 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
     });
     if (r.telefono_cliente) {
       try {
-        const textoWa = `Hola, ${r.nombre_cliente} 👋\n\nTe enviamos por email la factura ${resultado.numeroFactura} correspondiente a tu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}).\n\nGracias por viajar con Traslados GC 🙏`;
+        const firmaFact = firmarFactura(req.params.id);
+        const urlFactura = BASE_URL + '/factura-descarga/' + req.params.id + '/' + firmaFact;
+        const textoWa = `Hola, ${r.nombre_cliente} 👋\n\nTe enviamos la factura ${resultado.numeroFactura} correspondiente a tu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}).\n\nDescárgala aquí:\n${urlFactura}`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
           [r.telefono_cliente, textoWa]
@@ -5561,11 +5565,27 @@ app.get('/cartel-descarga/:id/:firma', asyncHandler(async (req, res) => {
   if (req.params.firma !== firmarCartel(req.params.id)) {
     return res.status(403).send('Enlace no válido o caducado.');
   }
-  const cartel = await generarCartelChofer(req.params.id);
+  const cartel = await generarCartelPDF(req.params.id);
   if (!cartel) return res.status(404).send('Cartel no disponible.');
-  res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-  res.set('Content-Disposition', 'attachment; filename="cartel-' + req.params.id + '.docx"');
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'attachment; filename="cartel-' + req.params.id + '.pdf"');
   res.send(cartel.buffer);
+}));
+
+function firmarFactura(reservaId) {
+  return crypto.createHmac('sha256', process.env.SESSION_SECRET || 'cambia-este-secreto')
+    .update('factura-' + String(reservaId)).digest('hex').slice(0, 20);
+}
+
+app.get('/factura-descarga/:id/:firma', asyncHandler(async (req, res) => {
+  if (req.params.firma !== firmarFactura(req.params.id)) {
+    return res.status(403).send('Enlace no válido o caducado.');
+  }
+  const resultado = await generarFacturaPDF(req.params.id);
+  if (!resultado) return res.status(404).send('Factura no disponible.');
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'attachment; filename="factura-' + req.params.id + '.pdf"');
+  res.send(resultado.buffer);
 }));
 
 // ─── Admin: extras ────────────────────────────────────────────────────────────
