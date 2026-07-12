@@ -4836,7 +4836,7 @@ function cargarReservas(mantenerDetalle) {
           '<td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td>' +
           '<td>' + (function() {
             if (r.deposito_retenido_noshow) return '<span style="color:#c62828;font-weight:600;font-size:0.8rem;">🔒 No-show</span>';
-            if (r.deposito_liberado) return '<span style="color:#2d7a4f;font-weight:600;font-size:0.8rem;">✅ Devuelta</span>';
+            if (r.deposito_liberado) return '<span style="color:#2d7a4f;font-weight:600;font-size:0.8rem;">✅ Devuelto</span>';
             if (r.deposito_devolucion_pendiente) return '<span style="color:#856404;font-weight:600;font-size:0.8rem;">⚠️ Dev. pendiente</span>';
             if (r.deposito_pagado) return '<span style="color:#2d7a4f;font-weight:600;font-size:0.8rem;">💳 Retenido</span>';
             return '<span style="color:#aaa;font-size:0.8rem;">⏳ Pendiente</span>';
@@ -5086,17 +5086,17 @@ function abrirDetalleReserva(id, sinScroll) {
         btnLiberar.style.display = 'none';
         if (btnNoshow) btnNoshow.style.display = 'none';
       } else if (r.deposito_liberado) {
-        depEl.innerHTML = '<span style="background:#f0faf5;border:1px solid #a8dfc2;border-radius:6px;padding:6px 12px;font-size:13px;color:#2d7a4f;display:inline-block;font-weight:600;">✅ Garantía devuelta. Email y WhatsApp enviados al cliente.</span>';
+        depEl.innerHTML = '<span style="background:#f0faf5;border:1px solid #a8dfc2;border-radius:6px;padding:6px 12px;font-size:13px;color:#2d7a4f;display:inline-block;font-weight:600;">✅ Depósito devuelto. Email y WhatsApp enviados al cliente.</span>';
         btnLiberar.style.display = 'none';
         if (btnNoshow) btnNoshow.style.display = 'none';
       } else if (r.deposito_devolucion_pendiente) {
-        depEl.innerHTML = '<span style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:6px 12px;font-size:13px;color:#856404;display:inline-block;">⚠️ Devolución pendiente. El cliente canceló en plazo — procesa la devolución en Stripe y marca como devuelta.</span>';
-        btnLiberar.innerHTML = '✅ Marcar garantía como devuelta';
+        depEl.innerHTML = '<span style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:6px 12px;font-size:13px;color:#856404;display:inline-block;">⚠️ Devolución pendiente. El cliente canceló en plazo — procesa la devolución en Stripe y marca como devuelto.</span>';
+        btnLiberar.innerHTML = '✅ Marcar depósito como devuelto';
         btnLiberar.style.display = 'inline-block';
         if (btnNoshow) btnNoshow.style.display = 'none';
       } else if (r.deposito_pagado) {
         depEl.innerHTML = '<span style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:6px 12px;font-size:13px;color:#2d7a4f;display:inline-block;font-weight:600;">💳 Depósito retenido — ' + (r.deposito_importe || '—') + ' €. Pulsa el botón cuando el servicio esté completado.</span>';
-        btnLiberar.innerHTML = '✅ Marcar garantía como devuelta';
+        btnLiberar.innerHTML = '✅ Marcar depósito como devuelto';
         btnLiberar.style.display = 'inline-block';
         if (btnNoshow) btnNoshow.style.display = 'inline-block';
       } else {
@@ -5381,7 +5381,7 @@ function liberarDeposito() {
       if (d.ok) {
         document.getElementById('btn-liberar-deposito').style.display = 'none';
         document.getElementById('btn-retener-noshow').style.display = 'none';
-        document.getElementById('deposito-estado-admin').innerHTML = '<span style="background:#f0faf5;border:1px solid #a8dfc2;border-radius:6px;padding:6px 12px;font-size:13px;color:#2d7a4f;display:inline-block;font-weight:600;">✅ Garantía devuelta. Email y WhatsApp enviados al cliente.</span>';
+        document.getElementById('deposito-estado-admin').innerHTML = '<span style="background:#f0faf5;border:1px solid #a8dfc2;border-radius:6px;padding:6px 12px;font-size:13px;color:#2d7a4f;display:inline-block;font-weight:600;">✅ Depósito devuelto. Email y WhatsApp enviados al cliente.</span>';
         av.style.display = 'none';
       } else {
         av.textContent = d.error || 'Error al liberar depósito.';
