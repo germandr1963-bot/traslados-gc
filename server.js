@@ -4395,7 +4395,7 @@ app.get('/admin/reservas', requireAdmin, asyncHandler(async (req, res) => {
     `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.nombre_cliente,
             r.telefono_cliente, r.email_cliente, r.precio_estimado,
             r.notas, r.estado, r.creado_en, r.archivada,
-            r.conductor_id, r.deposito_pagado,
+            r.conductor_id, r.deposito_pagado, r.deposito_liberado, r.deposito_devolucion_pendiente, r.deposito_retenido_noshow,
             cv.nombre AS categoria_nombre,
             c.nombre AS conductor_nombre,
             COALESCE((
