@@ -654,13 +654,8 @@ table.tabla-precios input {
         <div style="margin-top:1rem;padding:1rem;border:1px solid var(--gris-borde);border-radius:8px;background:#f9f7f4;">
           <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">📄 Reenviar cartel al chofer</p>
           <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-            <div style="flex:1;min-width:160px;border:1px solid var(--gris-borde);border-radius:8px;padding:0.75rem;text-align:center;">
-              <button class="boton-costa" style="font-size:0.82rem;width:100%;" onclick="reenviarCartelChofer()">📧 Vía E-mail</button>
-              <div id="aviso-cartel-chofer" style="display:none;margin-top:0.4rem;font-size:0.78rem;"></div>
-            </div>
-            <div style="flex:1;min-width:160px;border:1px solid var(--gris-borde);border-radius:8px;padding:0.75rem;text-align:center;">
-              <button class="boton-costa" style="font-size:0.82rem;width:100%;background:#e7f9ee;border-color:#25D366;color:#128C7E;" onclick="enviarWhatsappChofer()">📱 Vía WhatsApp</button>
-            </div>
+            <button class="boton-costa" style="font-size:0.82rem;" onclick="reenviarCartelChofer()">📄 Reenviar cartel (email + WhatsApp)</button>
+            <div id="aviso-cartel-chofer" style="display:none;margin-top:0.4rem;font-size:0.78rem;"></div>
           </div>
         </div>
 
