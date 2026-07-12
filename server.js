@@ -7594,9 +7594,10 @@ async function generarFacturaPDF(reservaId) {
     };
 
     const lineaDoble = (label, valor) => {
+      const yAntes = doc.y;
       doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815').text(label + ': ', 50, y, { continued: true, width: W });
-      doc.font('Helvetica').fillColor('#333333').text(valor || '—');
-      y += 16;
+      doc.font('Helvetica').fillColor('#333333').text(valor || '—', { width: W });
+      y = doc.y + 4;
     };
 
     const separador = () => {
