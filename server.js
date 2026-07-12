@@ -3607,6 +3607,81 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   res.json({ ok: true });
 }));
 
+// ─── Chofer: reportar no-show ─────────────────────────────────────────────────
+app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req, res) => {
+  const check = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
+            r.origen, r.destino, r.fecha, r.deposito_pagado, r.deposito_importe
+     FROM reservas r
+     WHERE r.id = $1 AND r.conductor_id = $2 AND r.estado = 'confirmada'`,
+    [req.params.id, req.session.choferId]
+  );
+  if (!check.rows.length) return res.status(400).json({ error: 'No se puede reportar no-show para esta reserva.' });
+  const r = check.rows[0];
+
+  // Actualizar estado y depósito
+  await pool.query(
+    `UPDATE reservas SET estado = 'no_show', deposito_retenido_noshow = TRUE WHERE id = $1`,
+    [r.id]
+  );
+
+  const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+  const importe = r.deposito_importe || '10';
+
+  // Email al cliente
+  try {
+    await enviarEmail({
+      to: r.email_cliente,
+      subject: '🔒 Depósito retenido por no-show — ' + r.numero_reserva,
+      html: `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <style>
+        body{margin:0;padding:0;background:#f5f0ea;font-family:'Helvetica Neue',Arial,sans-serif;}
+        .wrapper{max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
+        .header{background:#1C1815;padding:28px 32px;text-align:center;border-bottom:4px solid #C1502E;}
+        .header h1{color:#D9A441;margin:0;font-size:22px;letter-spacing:1px;font-weight:700;}
+        .body{padding:32px;}
+        .caja-aviso{background:#fdecea;border:1px solid #f5b8b8;border-radius:10px;padding:20px 24px;margin:20px 0;}
+        .caja-aviso .titulo{font-size:16px;font-weight:700;color:#c62828;margin-bottom:8px;}
+        .caja-aviso .texto{font-size:14px;color:#7a1e1e;line-height:1.6;}
+        .datos{background:#f9f7f4;border-radius:8px;padding:16px 20px;margin:20px 0;font-size:14px;color:#3a3330;line-height:1.9;}
+        .datos strong{color:#1C1815;}
+        .despedida{font-size:14px;color:#5b5347;line-height:1.7;margin-top:20px;}
+        .footer{background:#ECE6D8;padding:18px 32px;text-align:center;font-size:12px;color:#888;line-height:1.6;}
+      </style></head><body>
+      <div class="wrapper">
+        <div class="header"><h1>Traslados · GC</h1></div>
+        <div class="body">
+          <p style="font-size:17px;color:#1C1815;">Hola, <strong>${r.nombre_cliente}</strong> 👋</p>
+          <div class="caja-aviso">
+            <div class="titulo">🔒 Depósito retenido por no-show</div>
+            <div class="texto">Lamentamos informarte de que tu traslado <strong>${r.numero_reserva}</strong> (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTexto} no pudo realizarse al no haberse presentado en el punto de recogida.<br><br>De acuerdo con nuestra política de reservas, el depósito de garantía de ${importe} € ha sido retenido por no-show.</div>
+          </div>
+          <div class="datos">
+            <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
+            <strong>Fecha del servicio:</strong> ${fechaTexto}<br>
+            <strong>Reserva:</strong> <span style="font-family:monospace;">${r.numero_reserva}</span>
+          </div>
+          <p class="despedida">Si crees que ha habido un error, no dudes en contactarnos.<br><br>Un saludo cordial,<br><strong>El equipo de Traslados GC</strong></p>
+        </div>
+        <div class="footer">Traslados GC · Gran Canaria<br>Este email es una notificación automática de nuestra política de reservas.</div>
+      </div></body></html>`
+    });
+  } catch(e) { console.warn('Error enviando email no-show:', e.message); }
+
+  // WhatsApp al cliente
+  if (r.telefono_cliente) {
+    try {
+      const textoWa = `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) no pudo realizarse al no presentarse en el punto de recogida. El depósito de garantía ha sido retenido según nuestra política de reservas.\n\nSi crees que ha habido un error, contáctanos. Un saludo 🙏`;
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [r.telefono_cliente, textoWa]
+      );
+    } catch(e) { console.warn('Error encolando WhatsApp no-show:', e.message); }
+  }
+
+  res.json({ ok: true });
+}));
+
 // ─── Valoración pública (enlace único por token) ──────────────────────────────
 app.get('/valorar', (req, res) => {
   res.sendFile(__dirname + '/public/valorar.html');
@@ -4547,7 +4622,7 @@ app.get('/admin/reservas/:id', requireAdmin, asyncHandler(async (req, res) => {
 
 app.post('/admin/reservas/:id/estado', requireAdmin, asyncHandler(async (req, res) => {
   const { estado } = req.body;
-  const estadosValidos = ['pendiente', 'confirmada', 'completada', 'cancelada', 'modificacion_pendiente'];
+  const estadosValidos = ['pendiente', 'confirmada', 'completada', 'cancelada', 'modificacion_pendiente', 'no_show'];
   if (!estadosValidos.includes(estado)) return res.status(400).json({ error: 'Estado no válido' });
   await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', [estado, req.params.id]);
   res.json({ ok: true });
