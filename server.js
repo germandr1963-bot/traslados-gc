@@ -1019,6 +1019,7 @@ async function initSchema() {
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_primer_acceso BOOLEAN DEFAULT TRUE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_devolucion_pendiente BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_retenido_noshow BOOLEAN DEFAULT FALSE`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS whatsapp_mensajes_pendientes (
       id SERIAL PRIMARY KEY,
@@ -6373,7 +6374,7 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
             r.numero_vuelo, r.hora_llegada_vuelo, r.nombre_barco, r.hora_atraque,
             r.tipo_llegada, r.direccion_recogida, r.direccion_destino,
             r.notas_cliente, r.pasaporte_dni,
-            r.estado, r.deposito_pagado, r.deposito_liberado, r.deposito_devolucion_pendiente,
+            r.estado, r.deposito_pagado, r.deposito_liberado, r.deposito_devolucion_pendiente, r.deposito_retenido_noshow,
             r.precio_estimado,
             r.email_confirmacion_enviado, r.email_voucher_enviado,
             cv.nombre AS categoria_nombre,
@@ -7213,6 +7214,71 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
         [r.telefono_cliente, textoWa]
       );
     } catch(e) { console.warn('Error encolando WhatsApp liberación depósito:', e.message); }
+  }
+
+  res.json({ ok: true });
+}));
+
+// Admin: retener depósito por no-show
+app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async (req, res) => {
+  const reserva = await pool.query('SELECT * FROM reservas WHERE id = $1', [req.params.id]);
+  if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = reserva.rows[0];
+
+  await pool.query('UPDATE reservas SET deposito_retenido_noshow = TRUE WHERE id = $1', [req.params.id]);
+
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+  const importe = r.deposito_importe || '10';
+
+  // Email al cliente
+  try {
+    await enviarEmail({
+      to: r.email_cliente,
+      subject: '🔒 Depósito retenido por no-show — ' + r.numero_reserva,
+      html: `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <style>
+        body{margin:0;padding:0;background:#f5f0ea;font-family:'Helvetica Neue',Arial,sans-serif;}
+        .wrapper{max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
+        .header{background:#1C1815;padding:28px 32px;text-align:center;border-bottom:4px solid #C1502E;}
+        .header h1{color:#D9A441;margin:0;font-size:22px;letter-spacing:1px;font-weight:700;}
+        .body{padding:32px;}
+        .caja-aviso{background:#fdecea;border:1px solid #f5b8b8;border-radius:10px;padding:20px 24px;margin:20px 0;}
+        .caja-aviso .titulo{font-size:16px;font-weight:700;color:#c62828;margin-bottom:8px;}
+        .caja-aviso .texto{font-size:14px;color:#7a1e1e;line-height:1.6;}
+        .datos{background:#f9f7f4;border-radius:8px;padding:16px 20px;margin:20px 0;font-size:14px;color:#3a3330;line-height:1.9;}
+        .datos strong{color:#1C1815;}
+        .despedida{font-size:14px;color:#5b5347;line-height:1.7;margin-top:20px;}
+        .footer{background:#ECE6D8;padding:18px 32px;text-align:center;font-size:12px;color:#888;line-height:1.6;}
+      </style></head><body>
+      <div class="wrapper">
+        <div class="header"><h1>Traslados · GC</h1></div>
+        <div class="body">
+          <p style="font-size:17px;color:#1C1815;">Hola, <strong>${r.nombre_cliente}</strong> 👋</p>
+          <div class="caja-aviso">
+            <div class="titulo">🔒 Depósito retenido por no-show</div>
+            <div class="texto">Lamentamos informarte de que tu traslado <strong>${r.numero_reserva}</strong> (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaViaje} no pudo realizarse al no haberse presentado en el punto de recogida.<br><br>De acuerdo con nuestra política de reservas, el depósito de garantía de ${importe} € ha sido retenido por no-show.</div>
+          </div>
+          <div class="datos">
+            <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
+            <strong>Fecha del servicio:</strong> ${fechaViaje}<br>
+            <strong>Reserva:</strong> <span style="font-family:monospace;">${r.numero_reserva}</span>
+          </div>
+          <p class="despedida">Si crees que ha habido un error, no dudes en contactarnos.<br><br>Un saludo cordial,<br><strong>El equipo de Traslados GC</strong></p>
+        </div>
+        <div class="footer">Traslados GC · Gran Canaria<br>Este email es una notificación automática de nuestra política de reservas.</div>
+      </div></body></html>`
+    });
+  } catch(e) { console.warn('Error enviando email no-show:', e.message); }
+
+  // WhatsApp al cliente
+  if (r.telefono_cliente) {
+    try {
+      const textoWa = `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) no pudo realizarse al no presentarse en el punto de recogida. El depósito de garantía ha sido retenido según nuestra política de reservas.\n\nSi crees que ha habido un error, contáctanos. Un saludo 🙏`;
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [r.telefono_cliente, textoWa]
+      );
+    } catch(e) { console.warn('Error encolando WhatsApp no-show:', e.message); }
   }
 
   res.json({ ok: true });
