@@ -10,6 +10,9 @@ const path = require('path');
 const crypto = require('crypto');
 const ExcelJS = require('exceljs');
 const { medirPxTitulo, medirPxDescripcion } = require('./medidor-pixeles');
+const fs = require('fs');
+const os = require('os');
+const { execSync } = require('child_process');
 
 const app = express();
 
@@ -3739,9 +3742,10 @@ app.get('/chofer/cartel/:id', requireChofer, asyncHandler(async (req, res) => {
   const cartel = await generarCartelChofer(req.params.id);
   if (!cartel) return res.status(404).json({ error: 'No se pudo generar el cartel.' });
 
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-  res.setHeader('Content-Disposition', 'attachment; filename="cartel-' + req.params.id + '.docx"');
-  res.send(cartel.buffer);
+  const pdfBuffer = await docxToPdf(cartel.buffer);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="cartel-' + req.params.id + '.pdf"');
+  res.send(pdfBuffer);
 }));
 
 // ─── Admin: valoraciones ─────────────────────────────────────────────────────
@@ -4927,6 +4931,21 @@ async function generarHtmlVoucher(reservaId) {
   </div></body></html>`;
 }
 
+// ─── Helper: convertir buffer .docx a buffer .pdf con LibreOffice ─────────────
+async function docxToPdf(docxBuffer) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'traslados-'));
+  const docxPath = path.join(tmpDir, 'documento.docx');
+  const pdfPath = path.join(tmpDir, 'documento.pdf');
+  try {
+    fs.writeFileSync(docxPath, docxBuffer);
+    execSync(`libreoffice --headless --convert-to pdf --outdir "${tmpDir}" "${docxPath}"`, { timeout: 30000 });
+    const pdfBuffer = fs.readFileSync(pdfPath);
+    return pdfBuffer;
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch(e) {}
+  }
+}
+
 // ─── Helper: generar cartel Word para el chofer ───────────────────────────────
 async function generarCartelChofer(reservaId) {
   const result = await pool.query(
@@ -5101,14 +5120,15 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
           });
           await pool.query('UPDATE reservas SET email_voucher_enviado = TRUE WHERE id = $1', [reservaId]);
         }
-        // Enviar cartel Word al chofer
+        // Enviar cartel PDF al chofer
         const cartel = await generarCartelChofer(reservaId);
         if (cartel && cartel.conductor_email) {
+          const cartelPdf = await docxToPdf(cartel.buffer);
           await enviarEmailConAdjunto({
             to: cartel.conductor_email,
             subject: 'Cartel de recogida — ' + r.numero_reserva,
             html: '<p>Hola ' + (cartel.conductor_nombre || '') + ',</p><p>Adjuntamos el cartel de recogida para tu próximo servicio. Imprímelo y úsalo para identificar a tu cliente.</p><p>Reserva: <strong>' + r.numero_reserva + '</strong></p>',
-            adjunto: { filename: 'cartel-' + r.numero_reserva + '.docx', content: cartel.buffer }
+            adjunto: { filename: 'cartel-' + r.numero_reserva + '.pdf', content: cartelPdf }
           });
         }
       } catch(emailErr) {
@@ -5429,7 +5449,7 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
       to: cartel.conductor_email,
       subject: 'Cartel de recogida — ' + r.numero_reserva,
       html: '<p>Hola ' + (cartel.conductor_nombre || '') + ',</p><p>Adjuntamos el cartel de recogida para tu próximo servicio.</p><p>Reserva: <strong>' + r.numero_reserva + '</strong></p>',
-      adjunto: { filename: 'cartel-' + r.numero_reserva + '.docx', content: cartel.buffer }
+      adjunto: { filename: 'cartel-' + r.numero_reserva + '.pdf', content: await docxToPdf(cartel.buffer) }
     });
     res.json({ ok: true });
   } catch(err) {
@@ -7195,17 +7215,20 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
 
   await pool.query('UPDATE reservas SET deposito_liberado = TRUE WHERE id = $1', [req.params.id]);
 
-  // Generar factura
+  // Generar factura PDF
   let facturaBuffer = null;
   let numeroFactura = null;
   try {
     const resultado = await generarFacturaWord(req.params.id);
-    if (resultado) { facturaBuffer = resultado.buffer; numeroFactura = resultado.numeroFactura; }
+    if (resultado) {
+      facturaBuffer = await docxToPdf(resultado.buffer);
+      numeroFactura = resultado.numeroFactura;
+    }
   } catch(e) { console.warn('Error generando factura:', e.message); }
 
   // Email elegante al cliente con factura adjunta
   try {
-    const adjunto = facturaBuffer ? { filename: 'factura-' + r.numero_reserva + '.docx', content: facturaBuffer } : null;
+    const adjunto = facturaBuffer ? { filename: 'factura-' + r.numero_reserva + '.pdf', content: facturaBuffer } : null;
     const fnEmail = adjunto ? enviarEmailConAdjunto : enviarEmail;
     const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
     await fnEmail({
@@ -7634,7 +7657,7 @@ app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, re
     html: `<p>Hola <strong>${f.nombre_cliente}</strong>,</p>
            <p>Adjuntamos la factura <strong>${f.numero_factura}</strong> correspondiente a tu reserva <strong>${f.numero_reserva}</strong>.</p>
            <p>Gracias por viajar con Traslados GC.</p>`,
-    adjunto: { filename: 'factura-' + f.numero_reserva + '.docx', content: resultado.buffer }
+    adjunto: { filename: 'factura-' + f.numero_reserva + '.pdf', content: await docxToPdf(resultado.buffer) }
   });
 
   res.json({ ok: true });
@@ -7667,9 +7690,10 @@ app.get('/api/cliente/factura/:reservaId', asyncHandler(async (req, res) => {
   const resultado = await generarFacturaWord(req.params.reservaId);
   if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
 
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-  res.setHeader('Content-Disposition', 'attachment; filename="factura-' + reservaQ.rows[0].numero_reserva + '.docx"');
-  res.send(resultado.buffer);
+  const pdfFactura = await docxToPdf(resultado.buffer);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="factura-' + reservaQ.rows[0].numero_reserva + '.pdf"');
+  res.send(pdfFactura);
 }));
 
 // ─── Admin: configuración de facturación ─────────────────────────────────────
@@ -7702,9 +7726,10 @@ app.get('/admin/reservas/:id/factura', requireAdmin, asyncHandler(async (req, re
   const resultado = await generarFacturaWord(req.params.id);
   if (!resultado) return res.status(500).json({ error: 'Error generando factura.' });
 
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-  res.setHeader('Content-Disposition', 'attachment; filename="factura-' + pnr + '.docx"');
-  res.send(resultado.buffer);
+  const pdfFacturaAdmin = await docxToPdf(resultado.buffer);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="factura-' + pnr + '.pdf"');
+  res.send(pdfFacturaAdmin);
 }));
 
 // ─── Puente WhatsApp (OpenWA, en el PC de Germán) ──────────────────────────────
