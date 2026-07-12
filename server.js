@@ -7204,6 +7204,17 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
     }
   } catch(e) { console.warn('Error enviando email gracias al chofer:', e.message); }
 
+  // WhatsApp al cliente
+  if (r.telefono_cliente) {
+    try {
+      const textoWa = `Hola, ${r.nombre_cliente} 👋\n\nEl depósito de garantía de tu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) ha sido liberado. El importe quedará disponible en tu tarjeta en un plazo de 5 a 10 días hábiles según tu entidad bancaria.\n\nUn saludo, el equipo de Traslados GC 🙏`;
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [r.telefono_cliente, textoWa]
+      );
+    } catch(e) { console.warn('Error encolando WhatsApp liberación depósito:', e.message); }
+  }
+
   res.json({ ok: true });
 }));
 
