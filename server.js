@@ -5457,6 +5457,34 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
   }
 }));
 
+// Admin: reenviar factura al cliente
+app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHandler(async (req, res) => {
+  const reservaQ = await pool.query('SELECT * FROM reservas WHERE id = $1', [req.params.id]);
+  if (!reservaQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = reservaQ.rows[0];
+  if (!r.email_cliente) return res.status(400).json({ error: 'El cliente no tiene email registrado.' });
+
+  const facturaQ = await pool.query('SELECT id FROM facturas WHERE reserva_id = $1 ORDER BY generada_en DESC LIMIT 1', [req.params.id]);
+  if (!facturaQ.rows.length) return res.status(400).json({ error: 'No hay factura generada para esta reserva.' });
+
+  try {
+    const resultado = await generarFacturaWord(req.params.id);
+    if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
+    const pdfBuffer = await docxToPdf(resultado.buffer);
+    await enviarEmailConAdjunto({
+      to: r.email_cliente,
+      subject: '📄 Factura ' + resultado.numeroFactura + ' — Reserva ' + r.numero_reserva,
+      html: `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+             <p>Adjuntamos la factura <strong>${resultado.numeroFactura}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p>
+             <p>Gracias por viajar con Traslados GC.</p>`,
+      adjunto: { filename: 'factura-' + r.numero_reserva + '.pdf', content: pdfBuffer }
+    });
+    res.json({ ok: true });
+  } catch(err) {
+    res.status(500).json({ error: 'Error enviando factura: ' + err.message });
+  }
+}));
+
 app.get('/admin/reservas/:id/whatsapp-cartel', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT r.numero_reserva, r.conductor_id, c.nombre AS conductor_nombre, c.telefono AS conductor_telefono
