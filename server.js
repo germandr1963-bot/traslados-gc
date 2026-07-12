@@ -6859,6 +6859,20 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
     });
   } catch(e) { console.warn('Error enviando email cancelación al cliente:', e.message); }
 
+  // WhatsApp al cliente
+  if (r.telefono_cliente) {
+    try {
+      const fechaTextoWa = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+      const textoWa = fueraDePlazo
+        ? `Hola, ${r.nombre_cliente} 👋\n\nTu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTextoWa} ha sido cancelada.\n\n⚠️ La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía podría ser retenido según nuestra política de cancelación.\n\nSi tienes alguna duda, contáctanos. Un saludo 🙏`
+        : `Hola, ${r.nombre_cliente} 👋\n\nTu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTextoWa} ha sido cancelada correctamente.\n\n✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.\n\nUn saludo 🙏`;
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [r.telefono_cliente, textoWa]
+      );
+    } catch(e) { console.warn('Error encolando WhatsApp cancelación:', e.message); }
+  }
+
   res.json({ ok: true, fuera_de_plazo: fueraDePlazo });
 }));
 
