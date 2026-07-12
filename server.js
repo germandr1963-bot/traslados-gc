@@ -1157,6 +1157,7 @@ async function initSchema() {
   `);
   await pool.query(`ALTER TABLE url_cortas ADD COLUMN IF NOT EXISTS tipo TEXT DEFAULT 'valoracion'`);
   await pool.query(`ALTER TABLE url_cortas ADD COLUMN IF NOT EXISTS reserva_id INTEGER`);
+  await pool.query(`ALTER TABLE url_cortas ALTER COLUMN token_valoracion DROP NOT NULL`);
 
   // ─── Valoraciones ─────────────────────────────────────────────────────────
   await pool.query(`
