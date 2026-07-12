@@ -735,6 +735,7 @@ table.tabla-precios input {
           <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">🔒 Depósito de garantía</p>
           <div id="deposito-estado-admin" style="font-size:0.85rem;color:var(--texto-muted);margin-bottom:0.75rem;"></div>
           <button id="btn-liberar-deposito" class="boton-costa" style="font-size:0.82rem;display:none;" onclick="liberarDeposito()">✅ Marcar depósito como liberado</button>
+          <button id="btn-retener-noshow" class="boton-peligro" style="font-size:0.82rem;display:none;margin-top:0;margin-left:8px;" onclick="retenerNoshow()">🔒 Retener por no-show</button>
           <div id="aviso-deposito-admin" style="display:none;margin-top:0.5rem;font-size:0.82rem;"></div>
         </div>
 
@@ -4833,7 +4834,13 @@ function cargarReservas(mantenerDetalle) {
           '<td style="text-align:right;">' + (extras ? extras.toFixed(2) + ' €' : '—') + '</td>' +
           '<td style="text-align:right;font-weight:600;">' + (total ? total.toFixed(2) + ' €' : '—') + '</td>' +
           '<td><span class="badge-estado-reserva badge-' + r.estado + '">' + r.estado + '</span></td>' +
-          '<td>' + (r.deposito_pagado ? '<span style="color:#2d7a4f;font-weight:600;font-size:0.8rem;">💳 Pagado</span>' : '<span style="color:#aaa;font-size:0.8rem;">Pendiente</span>') + '</td>' +
+          '<td>' + (function() {
+            if (r.deposito_retenido_noshow) return '<span style="color:#c62828;font-weight:600;font-size:0.8rem;">🔒 No-show</span>';
+            if (r.deposito_liberado) return '<span style="color:#2d7a4f;font-weight:600;font-size:0.8rem;">✅ Devuelta</span>';
+            if (r.deposito_devolucion_pendiente) return '<span style="color:#856404;font-weight:600;font-size:0.8rem;">⚠️ Dev. pendiente</span>';
+            if (r.deposito_pagado) return '<span style="color:#2d7a4f;font-weight:600;font-size:0.8rem;">💳 Retenido</span>';
+            return '<span style="color:#aaa;font-size:0.8rem;">⏳ Pendiente</span>';
+          })() + '</td>' +
           '<td style="white-space:nowrap;">' +
             (parseInt(r.mensajes_sin_leer) > 0
               ? '<span data-badge-msg="' + r.id + '" style="display:inline-block;background:#e65100;color:#fff;font-size:0.72rem;font-weight:700;padding:2px 7px;border-radius:10px;margin-right:5px;vertical-align:middle;">💬 ' + r.mensajes_sin_leer + '</span>'
@@ -5073,19 +5080,29 @@ function abrirDetalleReserva(id, sinScroll) {
       // Estado del depósito
       var depEl = document.getElementById('deposito-estado-admin');
       var btnLiberar = document.getElementById('btn-liberar-deposito');
-      if (r.deposito_liberado) {
-        depEl.innerHTML = '<span style="color:#2d7a4f;font-weight:600;">✅ Depósito ya liberado y notificado al cliente.</span>';
+      var btnNoshow = document.getElementById('btn-retener-noshow');
+      if (r.deposito_retenido_noshow) {
+        depEl.innerHTML = '<span style="background:#fdecea;border:1px solid #f5b8b8;border-radius:6px;padding:6px 12px;font-size:13px;color:#c62828;display:inline-block;font-weight:600;">🔒 Retenido por no-show. Email y WhatsApp enviados al cliente.</span>';
         btnLiberar.style.display = 'none';
+        if (btnNoshow) btnNoshow.style.display = 'none';
+      } else if (r.deposito_liberado) {
+        depEl.innerHTML = '<span style="background:#f0faf5;border:1px solid #a8dfc2;border-radius:6px;padding:6px 12px;font-size:13px;color:#2d7a4f;display:inline-block;font-weight:600;">✅ Garantía devuelta. Email y WhatsApp enviados al cliente.</span>';
+        btnLiberar.style.display = 'none';
+        if (btnNoshow) btnNoshow.style.display = 'none';
       } else if (r.deposito_devolucion_pendiente) {
-        depEl.innerHTML = '<span style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:6px 12px;font-size:13px;color:#856404;display:inline-block;">⚠️ Devolución de garantía pendiente. El cliente canceló en plazo — procesa la devolución en Stripe y marca como devuelta.</span>';
+        depEl.innerHTML = '<span style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:6px 12px;font-size:13px;color:#856404;display:inline-block;">⚠️ Devolución pendiente. El cliente canceló en plazo — procesa la devolución en Stripe y marca como devuelta.</span>';
         btnLiberar.innerHTML = '✅ Marcar garantía como devuelta';
         btnLiberar.style.display = 'inline-block';
+        if (btnNoshow) btnNoshow.style.display = 'none';
       } else if (r.deposito_pagado) {
-        depEl.innerHTML = '<span style="color:#856404;">🔒 Depósito retenido — ' + (r.deposito_importe || '—') + ' €. Pulsa el botón cuando el servicio esté completado y quieras liberar la retención.</span>';
+        depEl.innerHTML = '<span style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:6px 12px;font-size:13px;color:#2d7a4f;display:inline-block;font-weight:600;">💳 Depósito retenido — ' + (r.deposito_importe || '—') + ' €. Pulsa el botón cuando el servicio esté completado.</span>';
+        btnLiberar.innerHTML = '✅ Marcar garantía como devuelta';
         btnLiberar.style.display = 'inline-block';
+        if (btnNoshow) btnNoshow.style.display = 'inline-block';
       } else {
-        depEl.innerHTML = '<span style="color:var(--texto-muted);">⏳ Depósito pendiente de pago. No hay nada que liberar aún.</span>';
+        depEl.innerHTML = '<span style="color:var(--texto-muted);">⏳ Pendiente de pago. No hay nada que gestionar aún.</span>';
         btnLiberar.style.display = 'none';
+        if (btnNoshow) btnNoshow.style.display = 'none';
       }
 
       // Botón y bloque aprobar modificación
@@ -5363,10 +5380,30 @@ function liberarDeposito() {
     .then(function(d) {
       if (d.ok) {
         document.getElementById('btn-liberar-deposito').style.display = 'none';
-        document.getElementById('deposito-estado-admin').innerHTML = '<span style="color:#2d7a4f;font-weight:600;">✅ Depósito liberado. Email enviado al cliente.</span>';
+        document.getElementById('btn-retener-noshow').style.display = 'none';
+        document.getElementById('deposito-estado-admin').innerHTML = '<span style="background:#f0faf5;border:1px solid #a8dfc2;border-radius:6px;padding:6px 12px;font-size:13px;color:#2d7a4f;display:inline-block;font-weight:600;">✅ Garantía devuelta. Email y WhatsApp enviados al cliente.</span>';
         av.style.display = 'none';
       } else {
         av.textContent = d.error || 'Error al liberar depósito.';
+        av.style.display = 'block';
+      }
+    });
+}
+
+function retenerNoshow() {
+  if (!reservaDetalleId) return;
+  if (!confirm('¿Estás seguro de que deseas retener el depósito por no-show?\n\nSe notificará al cliente por email y WhatsApp. Esta acción no se puede deshacer.')) return;
+  var av = document.getElementById('aviso-deposito-admin');
+  fetch('/admin/reservas/' + reservaDetalleId + '/retener-noshow', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        document.getElementById('btn-liberar-deposito').style.display = 'none';
+        document.getElementById('btn-retener-noshow').style.display = 'none';
+        document.getElementById('deposito-estado-admin').innerHTML = '<span style="background:#fdecea;border:1px solid #f5b8b8;border-radius:6px;padding:6px 12px;font-size:13px;color:#c62828;display:inline-block;font-weight:600;">🔒 Retenido por no-show. Email y WhatsApp enviados al cliente.</span>';
+        av.style.display = 'none';
+      } else {
+        av.textContent = d.error || 'Error al retener depósito.';
         av.style.display = 'block';
       }
     });
