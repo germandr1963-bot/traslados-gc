@@ -5483,6 +5483,17 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
       html: '<p>Hola ' + (cartel.conductor_nombre || '') + ',</p><p>Adjuntamos el cartel de recogida para tu próximo servicio.</p><p>Reserva: <strong>' + r.numero_reserva + '</strong></p>',
       adjunto: { filename: 'cartel-' + r.numero_reserva + '.pdf', content: (await generarCartelPDF(req.params.id)).buffer }
     });
+    // WhatsApp al chofer
+    const choferQ = await pool.query('SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]);
+    if (choferQ.rows.length && choferQ.rows[0].telefono) {
+      try {
+        const textoWa = `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe reenviamos el cartel de recogida para la reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}).\n\nPuedes descargarlo también desde tu portal de chofer.`;
+        await pool.query(
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+          [choferQ.rows[0].telefono, textoWa]
+        );
+      } catch(e) { console.warn('Error encolando WhatsApp cartel:', e.message); }
+    }
     res.json({ ok: true });
   } catch(err) {
     res.status(500).json({ error: 'Error enviando cartel: ' + err.message });
@@ -5511,6 +5522,15 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
              <p>Gracias por viajar con Traslados GC.</p>`,
       adjunto: { filename: 'factura-' + r.numero_reserva + '.pdf', content: pdfBuffer }
     });
+    if (r.telefono_cliente) {
+      try {
+        const textoWa = `Hola, ${r.nombre_cliente} 👋\n\nTe enviamos por email la factura ${resultado.numeroFactura} correspondiente a tu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}).\n\nGracias por viajar con Traslados GC 🙏`;
+        await pool.query(
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+          [r.telefono_cliente, textoWa]
+        );
+      } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
+    }
     res.json({ ok: true });
   } catch(err) {
     res.status(500).json({ error: 'Error enviando factura: ' + err.message });
