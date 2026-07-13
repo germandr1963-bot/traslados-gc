@@ -3548,86 +3548,13 @@ app.get('/v/:codigo', asyncHandler(async (req, res) => {
   const tipo = row.tipo || 'valoracion';
   if (tipo === 'cartel') {
     const firma = firmarCartel(row.reserva_id);
-    const urlDescarga = `${BASE_URL}/cartel-descarga/${row.reserva_id}/${firma}`;
-    const ogImagen = `${BASE_URL}/og-imagen/cartel`;
-    return res.send(`<!DOCTYPE html><html lang="es"><head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width,initial-scale=1">
-      <title>Cartel de recogida — Traslados GC</title>
-      <meta property="og:title" content="Cartel de recogida — Traslados GC">
-      <meta property="og:description" content="Pulsa para descargar tu cartel de recogida.">
-      <meta property="og:image" content="${ogImagen}">
-      <meta property="og:image:width" content="1200">
-      <meta property="og:image:height" content="630">
-      <meta property="og:site_name" content="Traslados GC">
-      <style>
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:system-ui,sans-serif;background:#F6F4EF;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-        .card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.10);max-width:440px;width:100%;overflow:hidden}
-        .header{background:#1C1815;padding:28px 24px 20px;text-align:center;border-bottom:3px solid #D9A441}
-        .header h1{color:#D9A441;font-size:1.25rem;letter-spacing:1px;margin-bottom:4px}
-        .header p{color:#aaa;font-size:12px}
-        .body{padding:28px 24px}
-        .icon{font-size:3rem;text-align:center;margin-bottom:16px}
-        .body h2{font-size:1.1rem;color:#1C1815;margin-bottom:8px;text-align:center}
-        .body p{font-size:14px;color:#666;text-align:center;margin-bottom:24px}
-        .btn{display:block;background:#C1502E;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:1rem;text-align:center}
-        .btn:hover{background:#a8432500}
-        .footer{background:#ECE6D8;padding:14px;text-align:center;font-size:12px;color:#888}
-      </style>
-    </head><body>
-      <div class="card">
-        <div class="header"><h1>TRASLADOS GC</h1><p>Gran Canaria</p></div>
-        <div class="body">
-          <div class="icon">🪧</div>
-          <h2>Tu cartel de recogida está listo</h2>
-          <p>Pulsa el botón para descargarlo en tu dispositivo.</p>
-          <a href="${urlDescarga}" class="btn">⬇ Descargar cartel</a>
-        </div>
-        <div class="footer">Traslados GC · Gran Canaria</div>
-      </div>
-    </body></html>`);
+    const urlDescarga = encodeURIComponent(`${BASE_URL}/cartel-descarga/${row.reserva_id}/${firma}`);
+    return res.redirect(`${BASE_URL}/ver-cartel.html?url=${urlDescarga}`);
   }
   if (tipo === 'factura') {
     const firma = firmarFactura(row.reserva_id);
-    const urlDescarga = `${BASE_URL}/factura-descarga/${row.reserva_id}/${firma}`;
-    const ogImagen = `${BASE_URL}/og-imagen/factura`;
-    return res.send(`<!DOCTYPE html><html lang="es"><head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width,initial-scale=1">
-      <title>Tu factura — Traslados GC</title>
-      <meta property="og:title" content="Tu factura — Traslados GC">
-      <meta property="og:description" content="Pulsa para descargar tu factura.">
-      <meta property="og:image" content="${ogImagen}">
-      <meta property="og:image:width" content="1200">
-      <meta property="og:image:height" content="630">
-      <meta property="og:site_name" content="Traslados GC">
-      <style>
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:system-ui,sans-serif;background:#F6F4EF;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-        .card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.10);max-width:440px;width:100%;overflow:hidden}
-        .header{background:#1C1815;padding:28px 24px 20px;text-align:center;border-bottom:3px solid #D9A441}
-        .header h1{color:#D9A441;font-size:1.25rem;letter-spacing:1px;margin-bottom:4px}
-        .header p{color:#aaa;font-size:12px}
-        .body{padding:28px 24px}
-        .icon{font-size:3rem;text-align:center;margin-bottom:16px}
-        .body h2{font-size:1.1rem;color:#1C1815;margin-bottom:8px;text-align:center}
-        .body p{font-size:14px;color:#666;text-align:center;margin-bottom:24px}
-        .btn{display:block;background:#C1502E;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:1rem;text-align:center}
-        .footer{background:#ECE6D8;padding:14px;text-align:center;font-size:12px;color:#888}
-      </style>
-    </head><body>
-      <div class="card">
-        <div class="header"><h1>TRASLADOS GC</h1><p>Gran Canaria</p></div>
-        <div class="body">
-          <div class="icon">📄</div>
-          <h2>Tu factura está lista</h2>
-          <p>Pulsa el botón para descargarla en tu dispositivo.</p>
-          <a href="${urlDescarga}" class="btn">⬇ Descargar factura</a>
-        </div>
-        <div class="footer">Traslados GC · Gran Canaria</div>
-      </div>
-    </body></html>`);
+    const urlDescarga = encodeURIComponent(`${BASE_URL}/factura-descarga/${row.reserva_id}/${firma}`);
+    return res.redirect(`${BASE_URL}/ver-factura.html?url=${urlDescarga}`);
   }
   res.redirect(`${BASE_URL}/valorar?token=${row.token_valoracion}`);
 }));
@@ -7699,19 +7626,7 @@ app.get('/og-imagen/:tipo', asyncHandler(async (req, res) => {
   res.send(result.rows[0].imagen);
 }));
 
-// og-valorar.png: sirve desde BD si existe, si no desde el archivo estático
-app.get('/og-valorar.png', asyncHandler(async (req, res) => {
-  const result = await pool.query(
-    'SELECT imagen, tipo_mime FROM whatsapp_imagenes WHERE tipo = $1',
-    ['valoracion']
-  );
-  if (result.rows.length) {
-    res.set('Content-Type', result.rows[0].tipo_mime);
-    res.set('Cache-Control', 'public, max-age=3600');
-    return res.send(result.rows[0].imagen);
-  }
-  res.sendFile(path.join(__dirname, 'public', 'og-valorar.png'));
-}));
+
 
 app.get('/admin/choferes-whatsapp', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
