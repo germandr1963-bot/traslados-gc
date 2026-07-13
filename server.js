@@ -5577,7 +5577,7 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
     if (r.telefono_cliente) {
       try {
         const firma = firmarFactura(req.params.id);
-        const nombreDoc = `factura-${r.numero_reserva}.pdf`;
+        const nombreDoc = `factura-${resultado.numeroFactura}.pdf`;
         const urlDoc = `${BASE_URL}/factura-descarga/${req.params.id}/${firma}/${nombreDoc}`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
