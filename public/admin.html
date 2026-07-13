@@ -3997,7 +3997,7 @@ function copiarTextoWhatsapp() {
   document.getElementById('aviso-wa-copiado').style.display = 'block';
 }
 
-var WA_IMAGENES_ETIQUETAS = { valoracion: 'Valoración', factura: 'Factura', cartel: 'Cartel del chofer' };
+var WA_IMAGENES_ETIQUETAS = { valoracion: 'Valoración' };
 
 function cargarImagenesWhatsapp() {
   var contenedor = document.getElementById('wa-imagenes-lista');
@@ -4008,7 +4008,7 @@ function cargarImagenesWhatsapp() {
     .then(function(d) {
       var guardadas = {};
       (d.imagenes || []).forEach(function(im) { guardadas[im.tipo] = im; });
-      var tipos = ['valoracion', 'factura', 'cartel'];
+      var tipos = ['valoracion'];
       contenedor.innerHTML = tipos.map(function(tipo) {
         var tiene = !!guardadas[tipo];
         var cuando = tiene ? new Date(guardadas[tipo].actualizado_en).toLocaleDateString('es-ES') : null;
