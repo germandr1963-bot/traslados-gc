@@ -962,6 +962,13 @@ table.tabla-precios input {
         </div>
         <div id="aviso-wa-envio" style="display:none;margin-top:10px;font-size:0.85rem;"></div>
       </div>
+
+      <div class="tarjeta" style="margin-bottom:20px;">
+        <h2 style="font-size:1rem;margin:0 0 4px 0;">🖼️ Imágenes de WhatsApp</h2>
+        <p style="font-size:13px;color:var(--texto-muted);margin:0 0 16px;">Imágenes que se muestran como vista previa cuando el cliente recibe un enlace por WhatsApp. Tamaño recomendado: <strong>1200 × 630 px</strong>.</p>
+        <div id="wa-imagenes-lista" style="display:flex;flex-direction:column;gap:20px;"></div>
+        <div id="aviso-wa-imagenes" style="display:none;margin-top:10px;font-size:0.85rem;"></div>
+      </div>
     </div>
 
     <div id="seccion-notificaciones" class="oculto">
@@ -1281,7 +1288,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'configuracion') cargarConfiguracionNoshow();
     if (boton.dataset.seccion === 'contacto') cargarContacto();
     if (boton.dataset.seccion === 'facturacion') cargarFacturacion();
-    if (boton.dataset.seccion === 'whatsapp') cargarConfigWhatsapp();
+    if (boton.dataset.seccion === 'whatsapp') { cargarConfigWhatsapp(); cargarImagenesWhatsapp(); }
     if (boton.dataset.seccion === 'notificaciones') cargarNotificaciones();
     if (boton.dataset.seccion === 'destinos') { cargarDestinos(); cargarSelectorLangDestinos(); }
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
@@ -3988,6 +3995,89 @@ function copiarTextoWhatsapp() {
   campo.select();
   document.execCommand('copy');
   document.getElementById('aviso-wa-copiado').style.display = 'block';
+}
+
+var WA_IMAGENES_ETIQUETAS = { valoracion: 'Valoración', factura: 'Factura', cartel: 'Cartel del chofer' };
+
+function cargarImagenesWhatsapp() {
+  var contenedor = document.getElementById('wa-imagenes-lista');
+  if (!contenedor) return;
+  contenedor.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+  fetch('/admin/whatsapp-imagenes')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var guardadas = {};
+      (d.imagenes || []).forEach(function(im) { guardadas[im.tipo] = im; });
+      var tipos = ['valoracion', 'factura', 'cartel'];
+      contenedor.innerHTML = tipos.map(function(tipo) {
+        var tiene = !!guardadas[tipo];
+        var cuando = tiene ? new Date(guardadas[tipo].actualizado_en).toLocaleDateString('es-ES') : null;
+        return '<div style="border:1px solid var(--gris-borde);border-radius:10px;padding:16px;">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">' +
+            '<div>' +
+              '<strong style="font-size:14px;">' + (WA_IMAGENES_ETIQUETAS[tipo] || tipo) + '</strong>' +
+              (tiene ? '<span style="font-size:12px;color:var(--texto-muted);margin-left:10px;">Actualizada ' + cuando + '</span>' : '<span style="font-size:12px;color:#e07b5a;margin-left:10px;">Sin imagen</span>') +
+            '</div>' +
+            (tiene ? '<a href="/og-imagen/' + tipo + '" target="_blank" style="font-size:12px;color:var(--dorado);">Ver imagen actual ↗</a>' : '') +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+            '<input type="file" id="wa-img-file-' + tipo + '" accept="image/png,image/jpeg,image/webp" style="font-size:13px;flex:1;min-width:0;" onchange="previsualizarImagenWa(\'' + tipo + '\')">' +
+            '<button class="boton-primario" style="font-size:0.82rem;padding:7px 14px;white-space:nowrap;" onclick="guardarImagenWhatsapp(\'' + tipo + '\')">💾 Guardar</button>' +
+          '</div>' +
+          '<div id="wa-img-preview-' + tipo + '" style="margin-top:10px;display:none;">' +
+            '<img id="wa-img-preview-img-' + tipo + '" style="max-width:100%;border-radius:8px;border:1px solid var(--gris-borde);" alt="Vista previa">' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    })
+    .catch(function() {
+      contenedor.innerHTML = '<p style="color:var(--rojo);font-size:13px;">Error cargando imágenes.</p>';
+    });
+}
+
+function previsualizarImagenWa(tipo) {
+  var input = document.getElementById('wa-img-file-' + tipo);
+  var preview = document.getElementById('wa-img-preview-' + tipo);
+  var img = document.getElementById('wa-img-preview-img-' + tipo);
+  if (!input.files || !input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    img.src = e.target.result;
+    preview.style.display = 'block';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function guardarImagenWhatsapp(tipo) {
+  var input = document.getElementById('wa-img-file-' + tipo);
+  var av = document.getElementById('aviso-wa-imagenes');
+  if (!input.files || !input.files[0]) {
+    av.style.display = 'block'; av.style.color = 'var(--rojo)';
+    av.textContent = 'Selecciona una imagen primero.'; return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    av.style.display = 'block'; av.style.color = 'var(--texto-muted)';
+    av.textContent = 'Guardando...';
+    fetch('/admin/whatsapp-imagenes/' + tipo, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imagen: e.target.result })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        av.style.color = 'green'; av.textContent = '✅ Imagen guardada correctamente.';
+        cargarImagenesWhatsapp();
+      } else {
+        av.style.color = 'var(--rojo)'; av.textContent = '❌ ' + (d.error || 'Error guardando la imagen.');
+      }
+    })
+    .catch(function() {
+      av.style.color = 'var(--rojo)'; av.textContent = '❌ Error de conexión.';
+    });
+  };
+  reader.readAsDataURL(input.files[0]);
 }
 
 function cargarChoferesWhatsapp() {
