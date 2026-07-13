@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tu factura — Traslados GC</title>
+  <meta property="og:title" content="Tu factura — Traslados GC">
+  <meta property="og:description" content="Pulsa para descargar tu factura.">
+  <meta property="og:image" content="https://traslados-gc.onrender.com/og-imagen/factura">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="Traslados GC">
+  <style>
+    :root {
+      --charcoal: #1C1815;
+      --terracota: #C1502E;
+      --oro: #D9A441;
+      --piedra: #ECE6D8;
+      --fondo: #F6F4EF;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: var(--fondo); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .card { background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.10); max-width: 440px; width: 100%; overflow: hidden; }
+    .header { background: var(--charcoal); padding: 28px 24px 20px; text-align: center; border-bottom: 3px solid var(--oro); }
+    .header h1 { color: var(--oro); font-size: 1.25rem; letter-spacing: 1px; margin-bottom: 4px; }
+    .header p { color: #aaa; font-size: 12px; }
+    .body { padding: 32px 24px; text-align: center; }
+    .icon { font-size: 3rem; margin-bottom: 16px; }
+    .body h2 { font-size: 1.15rem; color: var(--charcoal); margin-bottom: 8px; }
+    .body p { font-size: 14px; color: #666; margin-bottom: 28px; }
+    .btn { display: block; background: var(--terracota); color: #fff; padding: 15px 28px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 1rem; }
+    .footer { background: var(--piedra); padding: 14px; text-align: center; font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header"><h1>TRASLADOS GC</h1><p>Gran Canaria</p></div>
+    <div class="body">
+      <div class="icon">📄</div>
+      <h2>Tu factura está lista</h2>
+      <p>Pulsa el botón para descargarla en tu dispositivo.</p>
+      <a id="btn-descarga" href="#" class="btn">⬇ Descargar factura</a>
+    </div>
+    <div class="footer">Traslados GC · Gran Canaria</div>
+  </div>
+  <script>
+    var params = new URLSearchParams(window.location.search);
+    var url = params.get('url');
+    if (url) document.getElementById('btn-descarga').href = decodeURIComponent(url);
+  </script>
+</body>
+</html>
