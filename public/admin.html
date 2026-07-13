@@ -923,45 +923,7 @@ table.tabla-precios input {
 
     <div id="seccion-whatsapp" class="oculto">
       <h1>WhatsApp</h1>
-      <p class="subtitulo">Configura el número de la empresa y envía reservas a los choferes por WhatsApp.</p>
 
-      <div class="tarjeta" style="margin-bottom:20px;">
-        <h2 style="font-size:1rem;margin:0 0 1rem 0;">⚙️ Número de la empresa</h2>
-        <div class="campo-grupo">
-          <label class="etiqueta">Número de WhatsApp de la empresa</label>
-          <input type="text" id="wa-numero" class="campo" placeholder="34600000000" style="max-width:260px;">
-          <p style="font-size:12px;color:var(--texto-muted);margin:4px 0 0;">Sin espacios ni símbolos. Ejemplo: 34604819731</p>
-        </div>
-        <button class="boton-primario" style="margin-top:12px;" onclick="guardarConfigWhatsapp()">💾 Guardar</button>
-        <div id="aviso-wa-config" style="display:none;margin-top:10px;font-size:0.85rem;"></div>
-      </div>
-
-      <div class="tarjeta" style="margin-bottom:20px;">
-        <h2 style="font-size:1rem;margin:0 0 4px 0;">📋 Generar texto de la reserva</h2>
-        <p style="font-size:13px;color:var(--texto-muted);margin:0 0 14px;">Introduce el PNR y genera el texto. Ese mismo texto es el que se enviará a cada chofer que elijas más abajo. También lo puedes copiar si lo necesitas para otra cosa.</p>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
-          <input type="text" id="wa-pnr" class="campo" placeholder="PNR — Ej: KXM472" style="max-width:180px;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
-          <button class="boton-primario" onclick="generarTextoWhatsapp()">📋 Generar texto</button>
-        </div>
-        <div id="wa-texto-generado" style="display:none;">
-          <textarea id="wa-texto-contenido" rows="8" readonly style="width:100%;border:1px solid var(--gris-borde);border-radius:8px;padding:12px;font-size:13px;font-family:inherit;resize:none;background:#f9f7f4;box-sizing:border-box;"></textarea>
-          <button class="boton-costa" style="margin-top:8px;font-size:0.82rem;" onclick="copiarTextoWhatsapp()">📋 Copiar texto</button>
-          <div id="aviso-wa-copiado" style="display:none;margin-top:6px;font-size:0.82rem;color:green;">✅ Texto copiado.</div>
-        </div>
-        <div id="aviso-wa-texto" style="display:none;margin-top:10px;font-size:0.85rem;"></div>
-      </div>
-
-      <div class="tarjeta" style="margin-bottom:20px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
-          <h2 style="font-size:1rem;margin:0;">📱 Enviar a choferes</h2>
-          <button class="boton-costa" style="font-size:0.78rem;" onclick="cargarChoferesWhatsapp()">🔄 Actualizar lista</button>
-        </div>
-        <p style="font-size:13px;color:var(--texto-muted);margin:0 0 14px;">Primero genera el texto arriba. Luego pulsa "Enviar" en cada chofer — se abrirá WhatsApp con ese chofer y el mensaje ya escrito. Es uno a uno: no existe forma de mandarlo a todos a la vez sin WhatsApp Business.</p>
-        <div id="wa-lista-choferes" style="display:flex;flex-direction:column;gap:8px;">
-          <p style="color:var(--texto-muted);font-size:13px;">Cargando choferes...</p>
-        </div>
-        <div id="aviso-wa-envio" style="display:none;margin-top:10px;font-size:0.85rem;"></div>
-      </div>
 
       <div class="tarjeta" style="margin-bottom:20px;">
         <h2 style="font-size:1rem;margin:0 0 4px 0;">🖼️ Imágenes de WhatsApp</h2>
@@ -1288,7 +1250,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'configuracion') cargarConfiguracionNoshow();
     if (boton.dataset.seccion === 'contacto') cargarContacto();
     if (boton.dataset.seccion === 'facturacion') cargarFacturacion();
-    if (boton.dataset.seccion === 'whatsapp') { cargarConfigWhatsapp(); cargarImagenesWhatsapp(); }
+    if (boton.dataset.seccion === 'whatsapp') { cargarImagenesWhatsapp(); }
     if (boton.dataset.seccion === 'notificaciones') cargarNotificaciones();
     if (boton.dataset.seccion === 'destinos') { cargarDestinos(); cargarSelectorLangDestinos(); }
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
@@ -3960,43 +3922,6 @@ function guardarContacto() {
   });
 }
 
-var waUltimoGenerado = null;
-
-function cargarConfigWhatsapp() {
-  fetch('/admin/contacto-info')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      document.getElementById('wa-numero').value = (d.whatsapp || '').replace(/[^0-9]/g, '');
-    });
-  cargarChoferesWhatsapp();
-}
-
-function generarTextoWhatsapp() {
-  var pnr = document.getElementById('wa-pnr').value.trim().toUpperCase();
-  var av = document.getElementById('aviso-wa-texto');
-  var bloque = document.getElementById('wa-texto-generado');
-  if (!pnr) { av.style.display='block'; av.style.color='var(--rojo)'; av.textContent='Introduce el PNR de la reserva.'; return; }
-  av.style.display = 'none';
-  bloque.style.display = 'none';
-  waUltimoGenerado = null;
-  fetch('/admin/whatsapp-texto?pnr=' + encodeURIComponent(pnr))
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (!d.ok) { av.style.display='block'; av.style.color='var(--rojo)'; av.textContent=d.error||'Reserva no encontrada.'; return; }
-      document.getElementById('wa-texto-contenido').value = d.texto;
-      document.getElementById('aviso-wa-copiado').style.display = 'none';
-      bloque.style.display = 'block';
-      waUltimoGenerado = d.datos;
-    });
-}
-
-function copiarTextoWhatsapp() {
-  var campo = document.getElementById('wa-texto-contenido');
-  campo.select();
-  document.execCommand('copy');
-  document.getElementById('aviso-wa-copiado').style.display = 'block';
-}
-
 var WA_IMAGENES_ETIQUETAS = { valoracion: 'Valoración' };
 
 function cargarImagenesWhatsapp() {
@@ -4078,83 +4003,6 @@ function guardarImagenWhatsapp(tipo) {
     });
   };
   reader.readAsDataURL(input.files[0]);
-}
-
-function cargarChoferesWhatsapp() {
-  var lista = document.getElementById('wa-lista-choferes');
-  lista.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando choferes...</p>';
-  fetch('/admin/choferes-whatsapp')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      var choferes = d.choferes || [];
-      if (!choferes.length) {
-        lista.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">No hay choferes aprobados con teléfono registrado.</p>';
-        return;
-      }
-      lista.innerHTML = choferes.map(function(c, i) {
-        var numLimpio = (c.telefono || '').replace(/[^0-9]/g, '');
-        var tieneNum = numLimpio.length >= 9;
-        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:#f9f7f4;border:1px solid var(--gris-borde);border-radius:8px;padding:10px 14px;">' +
-          '<div>' +
-            '<span style="font-weight:600;font-size:13px;">' + c.nombre + '</span>' +
-            '<span style="font-size:12px;color:var(--texto-muted);margin-left:10px;">' + (c.telefono || 'Sin teléfono') + '</span>' +
-          '</div>' +
-          '<div style="display:flex;align-items:center;gap:8px;">' +
-            '<input type="text" id="wa-num-extra-' + i + '" class="campo" placeholder="Núm. alternativo (opcional)" style="height:32px;font-size:0.78rem;width:170px;">' +
-            (tieneNum
-              ? '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" onclick="enviarWaChofer(\'' + numLimpio + '\',\'' + c.nombre.replace(/'/g, "\\'") + '\',' + i + ')">📱 Enviar</button>'
-              : '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" onclick="enviarWaChofer(\'\',\'' + c.nombre.replace(/'/g, "\\'") + '\',' + i + ')">📱 Enviar</button>') +
-          '</div>' +
-        '</div>';
-      }).join('');
-    });
-}
-
-function enviarWaChofer(numero, nombre, idx) {
-  var av = document.getElementById('aviso-wa-envio');
-  if (!waUltimoGenerado) {
-    av.style.display = 'block'; av.style.color = 'var(--rojo)';
-    av.textContent = 'Primero genera el texto de la reserva arriba.';
-    return;
-  }
-  var extraInput = document.getElementById('wa-num-extra-' + idx);
-  var numExtra = extraInput ? extraInput.value.trim().replace(/[^0-9]/g, '') : '';
-  var numeroFinal = numExtra || numero;
-  if (!numeroFinal) {
-    av.style.display = 'block'; av.style.color = 'var(--rojo)';
-    av.textContent = 'Este chofer no tiene número registrado. Escribe uno alternativo para enviarle.';
-    return;
-  }
-  if (numeroFinal.length === 9) numeroFinal = '34' + numeroFinal;
-
-  var d = waUltimoGenerado;
-  var msg = '🚗 *TRASLADOS GC — Nueva reserva*\n\n' +
-    'Hola ' + nombre + ', hay una nueva reserva disponible.\n\n' +
-    '📋 PNR: ' + d.pnr + '\n' +
-    '📍 Ruta: ' + d.origen + ' → ' + d.destino + '\n' +
-    '📅 Fecha: ' + d.fecha + '\n' +
-    '🕐 Hora: ' + d.hora + '\n' +
-    '👥 Pasajeros: ' + d.pasajeros + '\n' +
-    '🚙 Categoría: ' + d.categoria + '\n\n' +
-    '¿Aceptas este servicio? Responde *SÍ* o *NO*. El primero en confirmar queda asignado. ¡Gracias!';
-
-  av.style.display = 'none';
-  window.open('https://wa.me/' + numeroFinal + '?text=' + encodeURIComponent(msg), '_blank');
-}
-
-function guardarConfigWhatsapp() {
-  var av = document.getElementById('aviso-wa-config');
-  var num = document.getElementById('wa-numero').value.trim().replace(/[^0-9]/g, '');
-  fetch('/admin/whatsapp-config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ whatsapp: num })
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    av.style.display = 'block';
-    av.style.color = d.ok ? 'green' : 'var(--rojo)';
-    av.textContent = d.ok ? '✅ Configuración guardada.' : (d.error || 'Error al guardar.');
-    setTimeout(function() { av.style.display = 'none'; }, 3000);
-  });
 }
 
 function cargarFacturacion() {
