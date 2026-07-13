@@ -5538,10 +5538,11 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
     if (choferQ.rows.length && choferQ.rows[0].telefono) {
       try {
         const firma = firmarCartel(req.params.id);
-        const urlDoc = `${BASE_URL}/cartel-descarga/${req.params.id}/${firma}`;
+        const nombreDoc = `cartel-${r.numero_reserva}.pdf`;
+        const urlDoc = `${BASE_URL}/cartel-descarga/${req.params.id}/${firma}/${nombreDoc}`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [choferQ.rows[0].telefono, `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe adjuntamos el cartel de recogida para la reserva ${r.numero_reserva}.\n\nTraslados GC`, urlDoc, `cartel-${r.numero_reserva}.pdf`]
+          [choferQ.rows[0].telefono, `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe adjuntamos el cartel de recogida para la reserva ${r.numero_reserva}.\n\nTraslados GC`, urlDoc, nombreDoc]
         );
       } catch(e) { console.warn('Error encolando WhatsApp cartel:', e.message); }
     }
@@ -5576,10 +5577,11 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
     if (r.telefono_cliente) {
       try {
         const firma = firmarFactura(req.params.id);
-        const urlDoc = `${BASE_URL}/factura-descarga/${req.params.id}/${firma}`;
+        const nombreDoc = `factura-${r.numero_reserva}.pdf`;
+        const urlDoc = `${BASE_URL}/factura-descarga/${req.params.id}/${firma}/${nombreDoc}`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`, urlDoc, `factura-${r.numero_reserva}.pdf`]
+          [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`, urlDoc, nombreDoc]
         );
       } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
     }
@@ -5609,13 +5611,13 @@ app.get('/admin/reservas/:id/whatsapp-cartel', requireAdmin, asyncHandler(async 
   });
 }));
 
-app.get('/cartel-descarga/:id/:firma', asyncHandler(async (req, res) => {
+app.get('/cartel-descarga/:id/:firma/:nombre?', asyncHandler(async (req, res) => {
   if (req.params.firma !== firmarCartel(req.params.id)) {
     return res.status(403).send('Enlace no válido o caducado.');
   }
   const cartel = await generarCartelPDF(req.params.id);
   if (!cartel) return res.status(404).send('Cartel no disponible.');
-  const nombreArchivo = 'cartel-' + (cartel.numero_reserva || req.params.id) + '.pdf';
+  const nombreArchivo = req.params.nombre || 'cartel-' + (cartel.numero_reserva || req.params.id) + '.pdf';
   res.set('Content-Type', 'application/pdf');
   res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
   res.send(cartel.buffer);
@@ -5626,13 +5628,13 @@ function firmarFactura(reservaId) {
     .update('factura-' + String(reservaId)).digest('hex').slice(0, 20);
 }
 
-app.get('/factura-descarga/:id/:firma', asyncHandler(async (req, res) => {
+app.get('/factura-descarga/:id/:firma/:nombre?', asyncHandler(async (req, res) => {
   if (req.params.firma !== firmarFactura(req.params.id)) {
     return res.status(403).send('Enlace no válido o caducado.');
   }
   const resultado = await generarFacturaPDF(req.params.id);
   if (!resultado) return res.status(404).send('Factura no disponible.');
-  const nombreArchivo = 'factura-' + (resultado.numero_reserva || req.params.id) + '.pdf';
+  const nombreArchivo = req.params.nombre || 'factura-' + (resultado.numero_reserva || req.params.id) + '.pdf';
   res.set('Content-Type', 'application/pdf');
   res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
   res.send(resultado.buffer);
