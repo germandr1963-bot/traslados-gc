@@ -176,6 +176,11 @@ function firmarCartel(reservaId) {
     .update(String(reservaId)).digest('hex').slice(0, 20);
 }
 
+function firmarVoucher(reservaId) {
+  return crypto.createHmac('sha256', process.env.SESSION_SECRET || 'cambia-este-secreto')
+    .update('voucher-' + String(reservaId)).digest('hex').slice(0, 20);
+}
+
 async function generarCodigoCorto(tipo, reservaId, tokenValoracion) {
   let codigo = crypto.randomBytes(3).toString('hex');
   try {
@@ -4981,6 +4986,126 @@ async function generarHtmlVoucher(reservaId) {
   </div></body></html>`;
 }
 
+// ─── Helper: generar voucher PDF para el cliente ─────────────────────────────
+async function generarVoucherPDF(reservaId) {
+  const result = await pool.query(
+    `SELECT r.*, cv.nombre AS categoria_nombre,
+            c.nombre AS conductor_nombre, c.foto AS conductor_foto, c.foto_estado AS conductor_foto_estado
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     LEFT JOIN conductores c ON c.id = r.conductor_id
+     WHERE r.id = $1`,
+    [reservaId]
+  );
+  if (!result.rows.length) return null;
+  const r = result.rows[0];
+
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+
+  const extrasResult = await pool.query(
+    `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
+     JOIN extras e ON e.id = re.extra_id
+     WHERE re.reserva_id = $1 ORDER BY e.bloque, e.orden`,
+    [reservaId]
+  );
+  const extrasReserva = extrasResult.rows;
+  const extrasIncluidos = extrasReserva.filter(e => !parseFloat(e.precio_en_reserva) || parseFloat(e.precio_en_reserva) === 0);
+  const extrasACobrar = extrasReserva.filter(e => parseFloat(e.precio_en_reserva) > 0);
+  const totalExtras = extrasACobrar.reduce((sum, e) => sum + parseFloat(e.precio_en_reserva), 0);
+
+  const _cfgNoshow = await obtenerConfigNoshow(r.fecha);
+  const _fechaLimite = calcularFechaCancelacion(new Date(r.fecha), r.hora, _cfgNoshow.horas_cancelacion);
+  const _importe = parseFloat(_cfgNoshow.importe_deposito).toFixed(2);
+  const _textoLimite = _fechaLimite.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) +
+    ' a las ' + _fechaLimite.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', layout: 'portrait', margin: 50 });
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), numero_reserva: r.numero_reserva }));
+    doc.on('error', reject);
+
+    const W = doc.page.width - 100;
+    let y = 50;
+
+    const linea = (texto, negrita, tam, color) => {
+      if (!texto) return;
+      tam = tam || 11; color = color || '#1C1815';
+      doc.fontSize(tam).font(negrita ? 'Helvetica-Bold' : 'Helvetica').fillColor(color).text(texto, 50, y, { width: W });
+      y += tam + 6;
+    };
+
+    const lineaDoble = (label, valor) => {
+      doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815').text(label + ': ', 50, y, { continued: true, width: W });
+      doc.font('Helvetica').fillColor('#333333').text(valor || '—', { width: W });
+      y = doc.y + 4;
+    };
+
+    const separador = () => {
+      y += 6;
+      doc.moveTo(50, y).lineTo(50 + W, y).strokeColor('#d4956a').lineWidth(0.5).stroke();
+      y += 10;
+    };
+
+    // Cabecera
+    doc.fontSize(20).font('Helvetica-Bold').fillColor('#C1502E').text('TRASLADOS GC', 50, y, { align: 'center', width: W }); y += 28;
+    doc.fontSize(10).font('Helvetica').fillColor('#888888').text('Gran Canaria', 50, y, { align: 'center', width: W }); y += 20;
+    separador();
+
+    // Título
+    doc.fontSize(16).font('Helvetica-Bold').fillColor('#1C1815').text('VOUCHER DE TRASLADO', 50, y, { align: 'center', width: W }); y += 24;
+    doc.fontSize(22).font('Helvetica-Bold').fillColor('#C1502E').text(r.numero_reserva, 50, y, { align: 'center', width: W }); y += 30;
+    separador();
+
+    // Datos del traslado
+    linea('DATOS DEL TRASLADO', true, 12, '#555555'); y += 4;
+    lineaDoble('Origen', r.origen || '—');
+    lineaDoble('Destino', r.destino || '—');
+    lineaDoble('Fecha', fechaViaje);
+    lineaDoble('Hora', r.hora ? r.hora.slice(0, 5) : '—');
+    lineaDoble('Categoría', r.categoria_nombre || '—');
+    lineaDoble('Pasajeros', String(r.num_pasajeros || '—'));
+    if (r.direccion_recogida) lineaDoble('Dirección de recogida', r.direccion_recogida);
+    if (r.direccion_destino) lineaDoble('Dirección de destino', r.direccion_destino);
+    if (r.numero_vuelo) lineaDoble('Vuelo', r.numero_vuelo + (r.hora_llegada_vuelo ? ' · Llegada ' + r.hora_llegada_vuelo.slice(0, 5) : ''));
+    if (r.nombre_barco) lineaDoble('Barco', r.nombre_barco + (r.hora_atraque ? ' · Atraque ' + r.hora_atraque.slice(0, 5) : ''));
+    if (r.notas_cliente) lineaDoble('Notas', r.notas_cliente);
+
+    if (r.conductor_nombre) {
+      separador();
+      linea('CONDUCTOR ASIGNADO', true, 12, '#555555'); y += 4;
+      lineaDoble('Conductor', r.conductor_nombre);
+    }
+
+    if (extrasReserva.length) {
+      separador();
+      linea('EXTRAS', true, 12, '#555555'); y += 4;
+      extrasIncluidos.forEach(e => lineaDoble(e.nombre, 'Incluido'));
+      extrasACobrar.forEach(e => lineaDoble(e.nombre, parseFloat(e.precio_en_reserva).toFixed(2) + ' € — a pagar al conductor'));
+      if (extrasACobrar.length) {
+        y += 6;
+        doc.fontSize(11).font('Helvetica-Bold').fillColor('#856404')
+          .text('Total extras a pagar al conductor: ' + totalExtras.toFixed(2) + ' €', 50, y, { width: W });
+        y += 18;
+      }
+    }
+
+    separador();
+    // Nota depósito y cancelación
+    doc.fontSize(10).font('Helvetica').fillColor('#0f5132')
+      .text('✔ Depósito recibido. Tu traslado está confirmado.', 50, y, { width: W }); y += 16;
+    doc.fontSize(10).font('Helvetica').fillColor('#856404')
+      .text('⚠ Cancelación gratuita hasta el ' + _textoLimite + '. Después de esa fecha, el depósito de ' + _importe + ' € no será reembolsado.', 50, y, { width: W });
+    y = doc.y + 16;
+
+    doc.fontSize(9).font('Helvetica').fillColor('#888888')
+      .text('Muestra este voucher a tu conductor al inicio del servicio.', 50, y, { align: 'center', width: W });
+
+    doc.end();
+  });
+}
+
 // ─── Helper: generar cartel PDF para el chofer ────────────────────────────────
 async function generarCartelPDF(reservaId) {
   const result = await pool.query(
@@ -5202,6 +5327,18 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
             html: htmlVoucher
           });
           await pool.query('UPDATE reservas SET email_voucher_enviado = TRUE WHERE id = $1', [reservaId]);
+        }
+        // WhatsApp voucher al cliente
+        if (r.telefono_cliente) {
+          try {
+            const firma = firmarVoucher(reservaId);
+            const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
+            const urlDoc = `${BASE_URL}/voucher-descarga/${reservaId}/${firma}/${nombreDoc}`;
+            await pool.query(
+              'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+              [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`, urlDoc, nombreDoc]
+            );
+          } catch(e) { console.warn('Error encolando WhatsApp voucher:', e.message); }
         }
         // Enviar cartel PDF al chofer
         const cartelPdf = await generarCartelPDF(reservaId);
@@ -5511,6 +5648,18 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
     if (!html) return res.status(500).json({ error: 'No se pudo generar el voucher.' });
     await enviarEmail({ to: r.email_cliente, subject: 'Voucher de traslado — ' + r.numero_reserva, html });
     await pool.query('UPDATE reservas SET email_voucher_enviado = TRUE WHERE id = $1', [req.params.id]);
+    // WhatsApp voucher al cliente
+    if (r.telefono_cliente) {
+      try {
+        const firma = firmarVoucher(req.params.id);
+        const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
+        const urlDoc = `${BASE_URL}/voucher-descarga/${req.params.id}/${firma}/${nombreDoc}`;
+        await pool.query(
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+          [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`, urlDoc, nombreDoc]
+        );
+      } catch(e) { console.warn('Error encolando WhatsApp voucher:', e.message); }
+    }
     res.json({ ok: true });
   } catch(err) {
     res.status(500).json({ error: 'Error enviando email: ' + err.message });
@@ -5621,6 +5770,18 @@ app.get('/cartel-descarga/:id/:firma/:nombre?', asyncHandler(async (req, res) =>
   res.set('Content-Type', 'application/pdf');
   res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
   res.send(cartel.buffer);
+}));
+
+app.get('/voucher-descarga/:id/:firma/:nombre?', asyncHandler(async (req, res) => {
+  if (req.params.firma !== firmarVoucher(req.params.id)) {
+    return res.status(403).send('Enlace no válido o caducado.');
+  }
+  const resultado = await generarVoucherPDF(req.params.id);
+  if (!resultado) return res.status(404).send('Voucher no disponible.');
+  const nombreArchivo = req.params.nombre || 'voucher-' + (resultado.numero_reserva || req.params.id) + '.pdf';
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
+  res.send(resultado.buffer);
 }));
 
 function firmarFactura(reservaId) {
