@@ -3793,14 +3793,11 @@ app.get('/chofer/cartel/:id', requireChofer, asyncHandler(async (req, res) => {
   );
   if (!check.rows.length) return res.status(403).json({ error: 'No autorizado.' });
 
-  const cartel = await generarCartelChofer(req.params.id);
+  const cartel = await generarCartelPDF(req.params.id);
   if (!cartel) return res.status(404).json({ error: 'No se pudo generar el cartel.' });
-
-  const cartelPdf = await generarCartelPDF(req.params.id);
-  if (!cartelPdf) return res.status(404).json({ error: 'No se pudo generar el cartel.' });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', 'attachment; filename="cartel-' + req.params.id + '.pdf"');
-  res.send(cartelPdf.buffer);
+  res.send(cartel.buffer);
 }));
 
 // ─── Admin: valoraciones ─────────────────────────────────────────────────────
@@ -5241,73 +5238,6 @@ async function generarCartelPDF(reservaId) {
   });
 }
 
-// ─── Helper: generar cartel Word para el chofer ───────────────────────────────
-async function generarCartelChofer(reservaId) {
-  const result = await pool.query(
-    `SELECT r.*, c.nombre AS conductor_nombre, c.email AS conductor_email
-     FROM reservas r
-     LEFT JOIN conductores c ON c.id = r.conductor_id
-     WHERE r.id = $1`,
-    [reservaId]
-  );
-  if (!result.rows.length) return null;
-  const r = result.rows[0];
-
-  // Extraer solo nombre y primer apellido en mayúsculas. Si la reserva es
-  // para otra persona, el cartel lleva el nombre de quien viaja, no el de
-  // quien hizo y paga la reserva.
-  const nombreParaCartel = (r.es_para_otra_persona && r.nombre_pasajero_otro)
-    ? r.nombre_pasajero_otro
-    : r.nombre_cliente;
-  const partes = (nombreParaCartel || '').trim().split(/\s+/);
-  const nombreCartel = (partes.length >= 2
-    ? partes[0] + ' ' + partes[1]
-    : partes[0] || ''
-  ).toUpperCase();
-
-  const doc = new Document({
-    sections: [{
-      properties: {
-        page: {
-          size: {
-            width: 16838,  // A4 horizontal: 29.7cm
-            height: 11906  // A4 horizontal: 21cm
-          },
-          margin: {
-            top: 720,
-            bottom: 720,
-            left: 1000,
-            right: 1000
-          },
-          verticalAlign: VerticalAlignSection.CENTER
-        }
-      },
-      children: [
-        // Logo pequeño
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 600 },
-          children: [new TextRun({ text: 'TRASLADOS GC', size: 28, color: 'C1502E', bold: true })]
-        }),
-        // Nombre grande centrado
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 0, after: 0 },
-          children: [new TextRun({
-            text: nombreCartel,
-            bold: true,
-            size: 220,
-            color: '1C1815'
-          })]
-        }),
-      ]
-    }]
-  });
-
-  const buffer = await Packer.toBuffer(doc);
-  return { buffer, conductor_email: r.conductor_email, conductor_nombre: r.conductor_nombre };
-}
-
 // ─── Stripe: pagos ────────────────────────────────────────────────────────────
 
 // Crear sesión de pago en Stripe para el depósito de una reserva
@@ -5761,13 +5691,13 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
   if (!r.conductor_id) return res.status(400).json({ error: 'No hay chofer asignado.' });
 
   try {
-    const cartel = await generarCartelChofer(req.params.id);
+    const cartel = await generarCartelPDF(req.params.id);
     if (!cartel || !cartel.conductor_email) return res.status(400).json({ error: 'El chofer no tiene email configurado.' });
     await enviarEmailConAdjunto({
       to: cartel.conductor_email,
       subject: 'Cartel de recogida — ' + r.numero_reserva,
       html: '<p>Hola ' + (cartel.conductor_nombre || '') + ',</p><p>Adjuntamos el cartel de recogida para tu próximo servicio.</p><p>Reserva: <strong>' + r.numero_reserva + '</strong></p>',
-      adjunto: { filename: 'cartel-' + r.numero_reserva + '.pdf', content: (await generarCartelPDF(req.params.id)).buffer }
+      adjunto: { filename: 'cartel-' + r.numero_reserva + '.pdf', content: cartel.buffer }
     });
     // WhatsApp al chofer
     const choferQ = await pool.query('SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]);
@@ -7984,231 +7914,6 @@ async function generarFacturaPDF(reservaId) {
     doc.end();
   });
 }
-// ─── Helper: generar factura Word ────────────────────────────────────────────
-async function generarFacturaWord(reservaId) {
-  const reservaQ = await pool.query(
-    `SELECT r.*, cv.nombre AS categoria_nombre
-     FROM reservas r
-     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
-     WHERE r.id = $1`,
-    [reservaId]
-  );
-  if (!reservaQ.rows.length) return null;
-  const r = reservaQ.rows[0];
-
-  const extrasQ = await pool.query(
-    `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
-     JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`,
-    [reservaId]
-  );
-  const extras = extrasQ.rows;
-
-  const cfgQ = await pool.query('SELECT * FROM configuracion_facturacion WHERE id = 1');
-  const cfg = cfgQ.rows[0] || {};
-
-  // Si ya existe factura para esta reserva, reutilizar el número
-  const facturaExistente = await pool.query(
-    'SELECT numero_factura FROM facturas WHERE reserva_id = $1 ORDER BY generada_en ASC LIMIT 1',
-    [reservaId]
-  );
-
-  const totalExtras = extras.reduce((s, e) => s + parseFloat(e.precio_en_reserva), 0);
-  const totalFactura = (parseFloat(r.precio_estimado) || 0) + totalExtras;
-
-  let numeroFactura;
-  if (facturaExistente.rows.length) {
-    numeroFactura = facturaExistente.rows[0].numero_factura;
-  } else {
-    // Número correlativo nuevo
-    await pool.query('UPDATE configuracion_facturacion SET contador_facturas = contador_facturas + 1 WHERE id = 1');
-    const cntQ = await pool.query('SELECT contador_facturas FROM configuracion_facturacion WHERE id = 1');
-    const num = cntQ.rows[0].contador_facturas;
-    const anio = new Date().getFullYear();
-    numeroFactura = 'TGC-' + anio + '-' + String(num).padStart(4, '0');
-
-    await pool.query(
-      'INSERT INTO facturas (reserva_id, numero_factura, importe_total) VALUES ($1, $2, $3)',
-      [reservaId, numeroFactura, totalFactura]
-    );
-  }
-
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
-  const fechaFactura = new Date().toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'});
-
-  const linea = (texto, negrita = false, tamaño = 22) => new Paragraph({
-    children: [new TextRun({ text: texto, bold: negrita, size: tamaño, font: 'Calibri' })]
-  });
-
-  const lineaDoble = (label, valor) => new Paragraph({
-    children: [
-      new TextRun({ text: label + ': ', bold: true, size: 22, font: 'Calibri' }),
-      new TextRun({ text: valor || '—', size: 22, font: 'Calibri' })
-    ]
-  });
-
-  const separador = () => new Paragraph({
-    children: [new TextRun({ text: '─'.repeat(60), size: 18, color: 'AAAAAA', font: 'Calibri' })],
-    spacing: { before: 80, after: 80 }
-  });
-
-  const filaImporte = (concepto, importe) => new Paragraph({
-    children: [
-      new TextRun({ text: concepto, size: 22, font: 'Calibri' }),
-      new TextRun({ text: '    ' + parseFloat(importe).toFixed(2) + ' €', bold: true, size: 22, font: 'Calibri' })
-    ],
-    spacing: { before: 40 }
-  });
-
-  const parrafos = [
-    // Cabecera empresa
-    new Paragraph({
-      children: [new TextRun({ text: cfg.razon_social || 'Traslados GC', bold: true, size: 36, font: 'Calibri', color: '1C1815' })],
-      spacing: { after: 60 }
-    }),
-    linea(cfg.nif ? 'NIF: ' + cfg.nif : '', false, 20),
-    linea(cfg.direccion || '', false, 20),
-    linea([cfg.codigo_postal, cfg.ciudad].filter(Boolean).join(' '), false, 20),
-    linea(cfg.email || '', false, 20),
-    linea(cfg.telefono || '', false, 20),
-    separador(),
-
-    // Título factura
-    new Paragraph({
-      children: [new TextRun({ text: 'FACTURA', bold: true, size: 40, font: 'Calibri', color: 'C1502E' })],
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 120, after: 120 }
-    }),
-
-    // Datos factura
-    lineaDoble('Nº Factura', numeroFactura),
-    lineaDoble('Fecha', fechaFactura),
-    separador(),
-
-    // Datos cliente
-    new Paragraph({
-      children: [new TextRun({ text: 'DATOS DEL CLIENTE', bold: true, size: 24, font: 'Calibri', color: '555555' })],
-      spacing: { before: 80, after: 60 }
-    }),
-    lineaDoble('Nombre', r.nombre_cliente),
-    lineaDoble('Email', r.email_cliente),
-    lineaDoble('Teléfono', r.telefono_cliente),
-    separador(),
-
-    // Datos reserva
-    new Paragraph({
-      children: [new TextRun({ text: 'DETALLE DEL SERVICIO', bold: true, size: 24, font: 'Calibri', color: '555555' })],
-      spacing: { before: 80, after: 60 }
-    }),
-    lineaDoble('PNR / Nº Reserva', r.numero_reserva),
-    lineaDoble('Ruta', (r.origen || '—') + ' → ' + (r.destino || '—')),
-    lineaDoble('Fecha del traslado', fechaViaje),
-    lineaDoble('Hora', r.hora ? r.hora.slice(0,5) : '—'),
-    lineaDoble('Pasajeros', String(r.num_pasajeros || '—')),
-    lineaDoble('Categoría', r.categoria_nombre || '—'),
-    ...(r.numero_vuelo ? [lineaDoble('Vuelo', r.numero_vuelo)] : []),
-    ...(r.nombre_barco ? [lineaDoble('Barco', r.nombre_barco)] : []),
-    separador(),
-
-    // Importes
-    new Paragraph({
-      children: [new TextRun({ text: 'IMPORTES', bold: true, size: 24, font: 'Calibri', color: '555555' })],
-      spacing: { before: 80, after: 60 }
-    }),
-    filaImporte('Traslado (' + (r.categoria_nombre || '—') + ')', r.precio_estimado || 0),
-    ...extras.map(e => filaImporte('Extra: ' + e.nombre, e.precio_en_reserva)),
-    separador(),
-    new Paragraph({
-      children: [
-        new TextRun({ text: 'TOTAL: ', bold: true, size: 28, font: 'Calibri' }),
-        new TextRun({ text: totalFactura.toFixed(2) + ' €', bold: true, size: 28, font: 'Calibri', color: 'C1502E' })
-      ],
-      spacing: { before: 80 }
-    }),
-    separador(),
-    linea('Gracias por viajar con nosotros.', false, 20),
-  ];
-
-  const doc = new Document({ sections: [{ children: parrafos }] });
-  const buffer = await Packer.toBuffer(doc);
-  return { buffer, numeroFactura };
-}
-
-// ─── Admin: lista de facturas ─────────────────────────────────────────────────
-app.get('/admin/facturas', requireAdmin, asyncHandler(async (req, res) => {
-  const { pnr } = req.query;
-  let query = `SELECT f.id, f.numero_factura, f.importe_total, f.generada_en,
-                      r.numero_reserva, r.nombre_cliente, r.email_cliente, r.id AS reserva_id
-               FROM facturas f
-               JOIN reservas r ON r.id = f.reserva_id`;
-  const params = [];
-  if (pnr && pnr.trim()) {
-    params.push('%' + pnr.trim().toUpperCase() + '%');
-    query += ' WHERE UPPER(r.numero_reserva) LIKE $1';
-  }
-  query += ' ORDER BY f.generada_en DESC LIMIT 100';
-  const result = await pool.query(query, params);
-  res.json({ facturas: result.rows });
-}));
-
-// ─── Admin: reenviar factura al cliente ───────────────────────────────────────
-app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, res) => {
-  const { email_destino } = req.body;
-  const facturaQ = await pool.query(
-    'SELECT f.*, r.email_cliente, r.nombre_cliente, r.numero_reserva FROM facturas f JOIN reservas r ON r.id = f.reserva_id WHERE f.id = $1',
-    [req.params.id]
-  );
-  if (!facturaQ.rows.length) return res.status(404).json({ error: 'Factura no encontrada.' });
-  const f = facturaQ.rows[0];
-  const emailDestino = (email_destino && email_destino.trim()) ? email_destino.trim() : f.email_cliente;
-
-  const resultado = await generarFacturaPDF(f.reserva_id);
-  if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
-
-  await enviarEmailConAdjunto({
-    to: emailDestino,
-    subject: '📄 Factura ' + f.numero_factura + ' — Reserva ' + f.numero_reserva,
-    html: `<p>Hola <strong>${f.nombre_cliente}</strong>,</p>
-           <p>Adjuntamos la factura <strong>${f.numero_factura}</strong> correspondiente a tu reserva <strong>${f.numero_reserva}</strong>.</p>
-           <p>Gracias por viajar con Traslados GC.</p>`,
-    adjunto: { filename: 'factura-' + f.numero_reserva + '.pdf', content: resultado.buffer }
-  });
-
-  res.json({ ok: true });
-}));
-
-// ─── Portal cliente: descargar factura ───────────────────────────────────────
-app.get('/api/cliente/factura/:reservaId', asyncHandler(async (req, res) => {
-  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
-  // Si la sesión es de cuenta permanente, el email está directo en la sesión
-  let emailCliente = req.session.clienteEmail || null;
-  if (!emailCliente) {
-    const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
-    if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
-    emailCliente = emailResult.rows[0].email_cliente;
-  }
-  if (!emailCliente) return res.status(401).json({ error: 'No autenticado.' });
-
-  const reservaQ = await pool.query(
-    'SELECT id, numero_reserva FROM reservas WHERE id = $1 AND LOWER(email_cliente) = LOWER($2)',
-    [req.params.reservaId, emailCliente]
-  );
-  if (!reservaQ.rows.length) return res.status(403).json({ error: 'No autorizado.' });
-
-  const facturaQ = await pool.query(
-    'SELECT id FROM facturas WHERE reserva_id = $1 ORDER BY generada_en DESC LIMIT 1',
-    [req.params.reservaId]
-  );
-  if (!facturaQ.rows.length) return res.status(404).json({ error: 'No hay factura disponible para esta reserva.' });
-
-  const resultado = await generarFacturaWord(req.params.reservaId);
-  if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
-
-  const factPdf = await generarFacturaPDF(req.params.reservaId);
-  if (!factPdf) return res.status(500).json({ error: 'Error generando factura.' });
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', 'attachment; filename="factura-' + reservaQ.rows[0].numero_reserva + '.pdf"');
-  res.send(factPdf.buffer);
-}));
 
 // ─── Admin: configuración de facturación ─────────────────────────────────────
 app.get('/admin/facturacion', requireAdmin, asyncHandler(async (req, res) => {
@@ -8236,9 +7941,6 @@ app.get('/admin/reservas/:id/factura', requireAdmin, asyncHandler(async (req, re
 
   // Ver si ya existe factura generada
   const facturaQ = await pool.query('SELECT numero_factura FROM facturas WHERE reserva_id = $1 ORDER BY generada_en DESC LIMIT 1', [req.params.id]);
-
-  const resultado = await generarFacturaWord(req.params.id);
-  if (!resultado) return res.status(500).json({ error: 'Error generando factura.' });
 
   const factPdfAdmin = await generarFacturaPDF(req.params.id);
   if (!factPdfAdmin) return res.status(500).json({ error: 'Error generando factura.' });
