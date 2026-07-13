@@ -1159,6 +1159,16 @@ async function initSchema() {
   await pool.query(`ALTER TABLE url_cortas ADD COLUMN IF NOT EXISTS reserva_id INTEGER`);
   await pool.query(`ALTER TABLE url_cortas ALTER COLUMN token_valoracion DROP NOT NULL`);
 
+  // ─── Imágenes de WhatsApp ──────────────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS whatsapp_imagenes (
+      tipo TEXT PRIMARY KEY,
+      imagen BYTEA NOT NULL,
+      tipo_mime TEXT NOT NULL DEFAULT 'image/png',
+      actualizado_en TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
   // ─── Valoraciones ─────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS valoraciones (
@@ -3538,11 +3548,86 @@ app.get('/v/:codigo', asyncHandler(async (req, res) => {
   const tipo = row.tipo || 'valoracion';
   if (tipo === 'cartel') {
     const firma = firmarCartel(row.reserva_id);
-    return res.redirect(`${BASE_URL}/cartel-descarga/${row.reserva_id}/${firma}`);
+    const urlDescarga = `${BASE_URL}/cartel-descarga/${row.reserva_id}/${firma}`;
+    const ogImagen = `${BASE_URL}/og-imagen/cartel`;
+    return res.send(`<!DOCTYPE html><html lang="es"><head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>Cartel de recogida — Traslados GC</title>
+      <meta property="og:title" content="Cartel de recogida — Traslados GC">
+      <meta property="og:description" content="Pulsa para descargar tu cartel de recogida.">
+      <meta property="og:image" content="${ogImagen}">
+      <meta property="og:image:width" content="1200">
+      <meta property="og:image:height" content="630">
+      <meta property="og:site_name" content="Traslados GC">
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:system-ui,sans-serif;background:#F6F4EF;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+        .card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.10);max-width:440px;width:100%;overflow:hidden}
+        .header{background:#1C1815;padding:28px 24px 20px;text-align:center;border-bottom:3px solid #D9A441}
+        .header h1{color:#D9A441;font-size:1.25rem;letter-spacing:1px;margin-bottom:4px}
+        .header p{color:#aaa;font-size:12px}
+        .body{padding:28px 24px}
+        .icon{font-size:3rem;text-align:center;margin-bottom:16px}
+        .body h2{font-size:1.1rem;color:#1C1815;margin-bottom:8px;text-align:center}
+        .body p{font-size:14px;color:#666;text-align:center;margin-bottom:24px}
+        .btn{display:block;background:#C1502E;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:1rem;text-align:center}
+        .btn:hover{background:#a8432500}
+        .footer{background:#ECE6D8;padding:14px;text-align:center;font-size:12px;color:#888}
+      </style>
+    </head><body>
+      <div class="card">
+        <div class="header"><h1>TRASLADOS GC</h1><p>Gran Canaria</p></div>
+        <div class="body">
+          <div class="icon">🪧</div>
+          <h2>Tu cartel de recogida está listo</h2>
+          <p>Pulsa el botón para descargarlo en tu dispositivo.</p>
+          <a href="${urlDescarga}" class="btn">⬇ Descargar cartel</a>
+        </div>
+        <div class="footer">Traslados GC · Gran Canaria</div>
+      </div>
+    </body></html>`);
   }
   if (tipo === 'factura') {
     const firma = firmarFactura(row.reserva_id);
-    return res.redirect(`${BASE_URL}/factura-descarga/${row.reserva_id}/${firma}`);
+    const urlDescarga = `${BASE_URL}/factura-descarga/${row.reserva_id}/${firma}`;
+    const ogImagen = `${BASE_URL}/og-imagen/factura`;
+    return res.send(`<!DOCTYPE html><html lang="es"><head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>Tu factura — Traslados GC</title>
+      <meta property="og:title" content="Tu factura — Traslados GC">
+      <meta property="og:description" content="Pulsa para descargar tu factura.">
+      <meta property="og:image" content="${ogImagen}">
+      <meta property="og:image:width" content="1200">
+      <meta property="og:image:height" content="630">
+      <meta property="og:site_name" content="Traslados GC">
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:system-ui,sans-serif;background:#F6F4EF;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+        .card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.10);max-width:440px;width:100%;overflow:hidden}
+        .header{background:#1C1815;padding:28px 24px 20px;text-align:center;border-bottom:3px solid #D9A441}
+        .header h1{color:#D9A441;font-size:1.25rem;letter-spacing:1px;margin-bottom:4px}
+        .header p{color:#aaa;font-size:12px}
+        .body{padding:28px 24px}
+        .icon{font-size:3rem;text-align:center;margin-bottom:16px}
+        .body h2{font-size:1.1rem;color:#1C1815;margin-bottom:8px;text-align:center}
+        .body p{font-size:14px;color:#666;text-align:center;margin-bottom:24px}
+        .btn{display:block;background:#C1502E;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:1rem;text-align:center}
+        .footer{background:#ECE6D8;padding:14px;text-align:center;font-size:12px;color:#888}
+      </style>
+    </head><body>
+      <div class="card">
+        <div class="header"><h1>TRASLADOS GC</h1><p>Gran Canaria</p></div>
+        <div class="body">
+          <div class="icon">📄</div>
+          <h2>Tu factura está lista</h2>
+          <p>Pulsa el botón para descargarla en tu dispositivo.</p>
+          <a href="${urlDescarga}" class="btn">⬇ Descargar factura</a>
+        </div>
+        <div class="footer">Traslados GC · Gran Canaria</div>
+      </div>
+    </body></html>`);
   }
   res.redirect(`${BASE_URL}/valorar?token=${row.token_valoracion}`);
 }));
@@ -7571,6 +7656,59 @@ app.get('/admin/whatsapp-texto', requireAdmin, asyncHandler(async (req, res) => 
       categoria: r.categoria_nombre || '—'
     }
   });
+}));
+
+// ─── Admin: imágenes de WhatsApp ─────────────────────────────────────────────
+// Devuelve los tipos que ya tienen imagen guardada
+app.get('/admin/whatsapp-imagenes', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT tipo, tipo_mime, actualizado_en FROM whatsapp_imagenes ORDER BY tipo');
+  res.json({ imagenes: result.rows });
+}));
+
+// Sube o actualiza la imagen de un tipo concreto (valoracion, factura, cartel)
+app.post('/admin/whatsapp-imagenes/:tipo', requireAdmin, asyncHandler(async (req, res) => {
+  const tipo = req.params.tipo;
+  const tiposPermitidos = ['valoracion', 'factura', 'cartel'];
+  if (!tiposPermitidos.includes(tipo)) return res.status(400).json({ error: 'Tipo no válido.' });
+  const { imagen } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
+  if (imagen.length > 4000000) return res.status(400).json({ error: 'La imagen pesa demasiado (máx. ~3MB).' });
+  const [header, base64] = imagen.split(',');
+  const tipoMime = header.match(/data:([^;]+)/)[1];
+  const buffer = Buffer.from(base64, 'base64');
+  await pool.query(
+    `INSERT INTO whatsapp_imagenes (tipo, imagen, tipo_mime, actualizado_en)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (tipo) DO UPDATE SET imagen = $2, tipo_mime = $3, actualizado_en = NOW()`,
+    [tipo, buffer, tipoMime]
+  );
+  res.json({ ok: true });
+}));
+
+// Sirve la imagen pública para og:image
+app.get('/og-imagen/:tipo', asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT imagen, tipo_mime FROM whatsapp_imagenes WHERE tipo = $1',
+    [req.params.tipo]
+  );
+  if (!result.rows.length) return res.status(404).send('Imagen no disponible.');
+  res.set('Content-Type', result.rows[0].tipo_mime);
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(result.rows[0].imagen);
+}));
+
+// og-valorar.png: sirve desde BD si existe, si no desde el archivo estático
+app.get('/og-valorar.png', asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT imagen, tipo_mime FROM whatsapp_imagenes WHERE tipo = $1',
+    ['valoracion']
+  );
+  if (result.rows.length) {
+    res.set('Content-Type', result.rows[0].tipo_mime);
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.send(result.rows[0].imagen);
+  }
+  res.sendFile(path.join(__dirname, 'public', 'og-valorar.png'));
 }));
 
 app.get('/admin/choferes-whatsapp', requireAdmin, asyncHandler(async (req, res) => {
