@@ -5536,13 +5536,11 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
     const choferQ = await pool.query('SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]);
     if (choferQ.rows.length && choferQ.rows[0].telefono) {
       try {
-        await pool.query('DELETE FROM url_cortas WHERE tipo = $1 AND reserva_id = $2', ['cartel', req.params.id]);
-        const codigoCartel = await generarCodigoCorto('cartel', req.params.id, null);
-        const urlCartel = `${BASE_URL}/v/${codigoCartel}`;
-        const textoWa = `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe reenviamos el cartel de recogida para la reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}).\n\nDescárgalo aquí:\n${urlCartel}`;
+        const firma = firmarCartel(req.params.id);
+        const urlDoc = `${BASE_URL}/cartel-descarga/${req.params.id}/${firma}`;
         await pool.query(
-          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
-          [choferQ.rows[0].telefono, textoWa]
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+          [choferQ.rows[0].telefono, `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe adjuntamos el cartel de recogida para la reserva ${r.numero_reserva}.\n\nTraslados GC`, urlDoc, `cartel-${r.numero_reserva}.pdf`]
         );
       } catch(e) { console.warn('Error encolando WhatsApp cartel:', e.message); }
     }
