@@ -34,7 +34,7 @@ async function enviarEmail({ to, subject, html }) {
       'Authorization': 'Bearer ' + apiKey
     },
     body: JSON.stringify({
-      from: 'Traslados GC <onboarding@resend.dev>',
+      from: 'Traslados GC <noreply@traslados-gc.es>',
       to: [to],
       subject: subject,
       html: html
@@ -54,7 +54,7 @@ async function enviarEmailConAdjunto({ to, subject, html, adjunto }) {
     return false;
   }
   const body = {
-    from: 'Traslados GC <onboarding@resend.dev>',
+    from: 'Traslados GC <noreply@traslados-gc.es>',
     to: [to],
     subject: subject,
     html: html
