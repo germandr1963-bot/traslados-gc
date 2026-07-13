@@ -81,16 +81,25 @@ async function enviarEmailConAdjunto({ to, subject, html, adjunto }) {
 
 // Genera un email con el mismo estilo visual que el de confirmación de
 // reserva, para avisos cortos de una sola línea (sin respuesta, cancelación).
-function plantillaEmailSimple(nombreCliente, mensaje, numeroReserva) {
+// ─── Plantilla corporativa universal para todos los emails ────────────────────
+// Usar siempre esta función — nunca HTML inline con cabecera/pie propios.
+// contenidoHtml: el cuerpo del email (sin cabecera ni pie).
+function plantillaEmail(contenidoHtml) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <style>
     body{margin:0;padding:0;background:#f5f5f5;}
     .wrapper{max-width:600px;margin:0 auto;background:#fff;}
     .header{background:#2c2c2c;padding:24px;text-align:center;}
-    .body{padding:28px 24px;}
-    .pnr{font-family:monospace;font-size:18px;font-weight:700;color:#C1502E;letter-spacing:2px;}
+    .body{padding:28px 24px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#1C1815;line-height:1.6;}
     .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
+    .pnr{font-family:monospace;font-size:20px;font-weight:700;color:#C1502E;letter-spacing:3px;}
+    .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;font-size:14px;line-height:1.8;margin:16px 0;}
+    .caja-verde{background:#d1e7dd;border-radius:6px;padding:10px 16px;margin:16px 0;color:#0f5132;font-size:13px;}
+    .caja-amarilla{background:#fff3cd;border-radius:6px;padding:10px 14px;margin:14px 0;font-size:12px;color:#856404;}
+    .caja-roja{background:#fdecea;border:1px solid #f5b8b8;border-radius:8px;padding:16px 20px;margin:16px 0;color:#7a1e1e;}
+    .boton{display:inline-block;background:#C1502E;color:#fff;padding:13px 30px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;}
+    blockquote{border-left:3px solid #C1502E;padding-left:12px;color:#333;margin:16px 0;}
     @media(max-width:480px){.body{padding:16px;}}
   </style></head><body>
   <div class="wrapper">
@@ -98,13 +107,18 @@ function plantillaEmailSimple(nombreCliente, mensaje, numeroReserva) {
       <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
       <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
     </div>
-    <div class="body">
-      <p>Hola <strong>${nombreCliente}</strong>,</p>
-      <p>${mensaje}</p>
-      <p style="font-size:13px;color:#888;">Número de reserva: <span class="pnr">${numeroReserva}</span></p>
-    </div>
+    <div class="body">${contenidoHtml}</div>
     <div class="footer">Traslados GC · Gran Canaria</div>
   </div></body></html>`;
+}
+
+// Alias para compatibilidad con llamadas existentes
+function plantillaEmailSimple(nombreCliente, mensaje, numeroReserva) {
+  return plantillaEmail(
+    `<p>Hola <strong>${nombreCliente}</strong>,</p>
+     <p>${mensaje}</p>
+     <p style="font-size:13px;color:#888;">Número de reserva: <span class="pnr">${numeroReserva}</span></p>`
+  );
 }
 
 const PORT = process.env.PORT || 3000;
@@ -1536,40 +1550,20 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
   // Email de pre-reserva al cliente
   try {
     const fechaTexto = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
-    const htmlEmail = `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <style>
-      body{margin:0;padding:0;background:#f5f5f5;}
-      .wrapper{max-width:600px;margin:0 auto;background:#fff;}
-      .header{background:#2c2c2c;padding:24px;text-align:center;}
-      .body{padding:28px 24px;}
-      .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
-      .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;font-size:14px;line-height:1.8;}
-      .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
-      @media(max-width:480px){.body{padding:16px;}}
-    </style></head><body>
-    <div class="wrapper">
-      <div class="header">
-        <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
-        <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
-      </div>
-      <div class="body">
-        <p>Hola <strong>${nombre_cliente.trim()}</strong>,</p>
-        <p>Hemos recibido tu solicitud de traslado. Estamos trabajando en ella y en breve recibirás confirmación.</p>
-        <p>Tu número de reserva es:</p>
-        <p style="text-align:center;margin:20px 0;"><span class="pnr">${numeroReserva}</span></p>
-        <div class="info-box">
-          <strong>Detalles de tu solicitud:</strong><br>
-          Origen: ${origen}<br>
-          Destino: ${destino}<br>
-          Fecha: ${fechaTexto}<br>
-          Pasajeros: ${num_pasajeros || '—'}
-        </div>
-        <p style="font-size:13px;color:#888;">Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.</p>
-        <p style="font-size:13px;color:#888;">El plazo máximo para confirmarte un chofer es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.</p>
-      </div>
-      <div class="footer">Traslados GC · Gran Canaria</div>
-    </div></body></html>`;
+    const htmlEmail = plantillaEmail(
+      `<p>Hola <strong>${nombre_cliente.trim()}</strong>,</p>
+       <p>Hemos recibido tu solicitud de traslado. Estamos trabajando en ella y en breve recibirás confirmación.</p>
+       <p>Tu número de reserva es:</p>
+       <p style="text-align:center;margin:20px 0;"><span class="pnr">${numeroReserva}</span></p>
+       <div class="info-box">
+         <strong>Detalles de tu solicitud:</strong><br>
+         Origen: ${origen}<br>
+         Destino: ${destino}<br>
+         Fecha: ${fechaTexto}<br>
+         Pasajeros: ${num_pasajeros || '—'}
+       </div>
+       <p style="font-size:13px;color:#888;">Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.</p>
+       <p style="font-size:13px;color:#888;">El plazo máximo para confirmarte un chofer es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.</p>`);
 
     await enviarEmail({
       to: email_cliente.trim(),
@@ -1821,37 +1815,17 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
       await enviarEmail({
         to: d.email.toLowerCase().trim(),
         subject: '¡Bienvenido a Traslados GC! Tus datos de acceso',
-        html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f4f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
-  <div style="max-width:600px;margin:0 auto;padding:40px 16px">
-    <div style="background:#1C1815;padding:28px 32px;border-radius:12px 12px 0 0;text-align:center">
-      <h1 style="color:#D9A441;margin:0;font-size:22px;letter-spacing:1px">Traslados GC</h1>
-    </div>
-    <div style="background:#ffffff;padding:36px 32px;border-radius:0 0 12px 12px;border:1px solid #e1dcd0;border-top:none">
-      <h2 style="color:#2A211B;font-size:20px;margin:0 0 16px">¡Hola, ${d.nombre.trim()}!</h2>
-      <p style="color:#2A211B;font-size:16px;line-height:1.7;margin:0 0 16px">
-        Te hemos dado de alta en nuestra flota de choferes. Ya puedes acceder a tu portal con estos datos:
-      </p>
-      <div style="background:#f9f7f4;border:1px solid #e1dcd0;border-radius:8px;padding:16px 20px;margin:0 0 20px">
-        <p style="margin:0 0 6px;font-size:14px;color:#5b5347"><strong>Usuario (email):</strong> ${d.email.toLowerCase().trim()}</p>
-        <p style="margin:0;font-size:14px;color:#5b5347"><strong>Contraseña provisional:</strong> ${d.password}</p>
-      </div>
-      <p style="color:#5b5347;font-size:15px;line-height:1.7;margin:0 0 24px">
-        En tu portal encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil.
-      </p>
-      <div style="text-align:center;margin:28px 0">
-        <a href="https://traslados-gc.onrender.com/chofer/acceso"
-           style="background:#C1502E;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">
-          Acceder a mi portal
-        </a>
-      </div>
-      <p style="color:#5b5347;font-size:14px;line-height:1.6;margin:24px 0 0;border-top:1px solid #e1dcd0;padding-top:20px">
-        Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!
-      </p>
-    </div>
-    <p style="text-align:center;color:#b5a99a;font-size:12px;margin-top:20px">Traslados GC · Gran Canaria</p>
-  </div>
-</body></html>`
+        html: plantillaEmail(
+          `<p>Hola <strong>${d.nombre.trim()}</strong>,</p>
+           <p>Te hemos dado de alta en nuestra flota de choferes. Ya puedes acceder a tu portal con estos datos:</p>
+           <div class="info-box">
+             <strong>Usuario (email):</strong> ${d.email.toLowerCase().trim()}<br>
+             <strong>Contraseña provisional:</strong> ${d.password}
+           </div>
+           <p>En tu portal encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil.</p>
+           <p style="text-align:center;margin:24px 0;"><a href="https://traslados-gc.onrender.com/chofer/acceso" class="boton">Acceder a mi portal</a></p>
+           <p style="font-size:13px;color:#5b5347;">Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</p>`
+        )
       });
     } catch (err) {
       console.warn('Error enviando email de bienvenida (alta manual de conductor):', err.message);
@@ -1881,33 +1855,13 @@ app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req,
         await enviarEmail({
           to: email,
           subject: `¡Bienvenido a ${nombreEmpresa}!`,
-          html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f4f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
-  <div style="max-width:600px;margin:0 auto;padding:40px 16px">
-    <div style="background:#1C1815;padding:28px 32px;border-radius:12px 12px 0 0;text-align:center">
-      <h1 style="color:#D9A441;margin:0;font-size:22px;letter-spacing:1px">${nombreEmpresa}</h1>
-    </div>
-    <div style="background:#ffffff;padding:36px 32px;border-radius:0 0 12px 12px;border:1px solid #e1dcd0;border-top:none">
-      <h2 style="color:#2A211B;font-size:20px;margin:0 0 16px">¡Hola, ${nombre}!</h2>
-      <p style="color:#2A211B;font-size:16px;line-height:1.7;margin:0 0 16px">
-        Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de ${nombreEmpresa}.
-      </p>
-      <p style="color:#5b5347;font-size:15px;line-height:1.7;margin:0 0 24px">
-        Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.
-      </p>
-      <div style="text-align:center;margin:28px 0">
-        <a href="https://traslados-gc.onrender.com/chofer/acceso"
-           style="background:#C1502E;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">
-          Acceder a mi portal
-        </a>
-      </div>
-      <p style="color:#5b5347;font-size:14px;line-height:1.6;margin:24px 0 0;border-top:1px solid #e1dcd0;padding-top:20px">
-        Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. Nos alegra tenerte con nosotros — ¡bienvenido al equipo!
-      </p>
-    </div>
-    <p style="text-align:center;color:#b5a99a;font-size:12px;margin-top:20px">${nombreEmpresa} · Gran Canaria</p>
-  </div>
-</body></html>`
+          html: plantillaEmail(
+            `<p>Hola <strong>${nombre}</strong>,</p>
+             <p>Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de Traslados GC.</p>
+             <p>Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.</p>
+             <p style="text-align:center;margin:24px 0;"><a href="https://traslados-gc.onrender.com/chofer/acceso" class="boton">Acceder a mi portal</a></p>
+             <p style="font-size:13px;color:#5b5347;">Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</p>`
+          )
         });
       }
     } catch(err) {
@@ -4930,9 +4884,15 @@ async function generarHtmlVoucher(reservaId) {
   const _textoLimiteVoucher = _fechaLimiteVoucher.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteVoucher.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
 
   // Foto del chofer solo si está aprobada
-  const fotoChoferHtml = (r.conductor_foto && r.conductor_foto_estado === 'aprobada')
+  const slugChofer = r.conductor_nombre
+    ? r.conductor_nombre.trim().toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .split(/\s+/).slice(0, 2).join('-')
+        .replace(/[^a-z0-9-]/g, '') + '-' + r.conductor_id
+    : null;
+  const fotoChoferHtml = (r.conductor_foto && r.conductor_foto_estado === 'aprobada' && slugChofer)
     ? `<div style="text-align:center;margin:16px 0;">
-        <img src="${r.conductor_foto}" alt="Foto del conductor" style="width:90px;height:90px;object-fit:cover;border-radius:50%;border:3px solid #d4956a;">
+        <img src="${BASE_URL}/foto-chofer/${slugChofer}" alt="Foto del conductor" style="width:90px;height:90px;object-fit:cover;border-radius:50%;border:3px solid #d4956a;">
         <p style="margin:6px 0 0 0;font-size:13px;font-weight:600;color:#2c2c2c;">${r.conductor_nombre || ''}</p>
         <p style="margin:2px 0 0 0;font-size:11px;color:#888;">Tu conductor</p>
        </div>`
@@ -7754,6 +7714,23 @@ app.post('/admin/whatsapp-imagenes/:tipo', requireAdmin, asyncHandler(async (req
 }));
 
 // Sirve la imagen pública para og:image
+app.get('/foto-chofer/:slug', asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    "SELECT foto, foto_estado FROM conductores WHERE id = $1",
+    [req.params.slug.split('-').pop()]
+  );
+  if (!result.rows.length || !result.rows[0].foto || result.rows[0].foto_estado !== 'aprobada') {
+    return res.status(404).send('Foto no disponible.');
+  }
+  const foto = result.rows[0].foto;
+  const match = foto.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+  if (!match) return res.status(400).send('Formato no válido.');
+  const buffer = Buffer.from(match[2], 'base64');
+  res.set('Content-Type', match[1]);
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.send(buffer);
+}));
+
 app.get('/og-imagen/:tipo', asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT imagen, tipo_mime FROM whatsapp_imagenes WHERE tipo = $1',
