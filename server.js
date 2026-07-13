@@ -7548,51 +7548,6 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
   res.json({ ok: true });
 }));
 
-// Admin: emails de notificación (guardar)
-app.get('/admin/whatsapp-texto', requireAdmin, asyncHandler(async (req, res) => {
-  const { pnr } = req.query;
-  if (!pnr) return res.json({ ok: false, error: 'PNR requerido.' });
-
-  const result = await pool.query(
-    `SELECT r.numero_reserva, r.origen, r.destino, r.fecha, r.hora, r.num_pasajeros, cv.nombre AS categoria_nombre
-     FROM reservas r
-     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
-     WHERE UPPER(r.numero_reserva) = UPPER($1) AND (r.archivada = FALSE OR r.archivada IS NULL)`,
-    [pnr]
-  );
-
-  if (!result.rows.length) return res.json({ ok: false, error: 'Reserva no encontrada.' });
-  const r = result.rows[0];
-
-  const fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—';
-  const hora = r.hora ? r.hora.slice(0, 5) : '—';
-
-  const texto =
-    '🚗 TRASLADOS GC — Nueva reserva\n\n' +
-    '📋 PNR: ' + r.numero_reserva + '\n' +
-    '📍 Ruta: ' + (r.origen || '—') + ' → ' + (r.destino || '—') + '\n' +
-    '📅 Fecha: ' + fecha + '\n' +
-    '🕐 Hora: ' + hora + '\n' +
-    '👥 Pasajeros: ' + (r.num_pasajeros || '—') + '\n' +
-    '🚙 Categoría: ' + (r.categoria_nombre || '—') + '\n\n' +
-    '¿Aceptas este servicio? Responde SÍ o NO.\n' +
-    'El primero en confirmar queda asignado.';
-
-  res.json({
-    ok: true,
-    texto,
-    datos: {
-      pnr: r.numero_reserva,
-      origen: r.origen || '—',
-      destino: r.destino || '—',
-      fecha,
-      hora,
-      pasajeros: r.num_pasajeros || '—',
-      categoria: r.categoria_nombre || '—'
-    }
-  });
-}));
-
 // ─── Admin: imágenes de WhatsApp ─────────────────────────────────────────────
 // Devuelve los tipos que ya tienen imagen guardada
 app.get('/admin/whatsapp-imagenes', requireAdmin, asyncHandler(async (req, res) => {
@@ -7633,22 +7588,6 @@ app.get('/og-imagen/:tipo', asyncHandler(async (req, res) => {
 }));
 
 
-
-app.get('/admin/choferes-whatsapp', requireAdmin, asyncHandler(async (req, res) => {
-  const result = await pool.query(
-    "SELECT id, nombre, telefono FROM conductores WHERE estado = 'aprobado' ORDER BY nombre"
-  );
-  res.json({ choferes: result.rows });
-}));
-
-app.post('/admin/whatsapp-config', requireAdmin, asyncHandler(async (req, res) => {
-  const { whatsapp } = req.body;
-  await pool.query(
-    'UPDATE configuracion_contacto SET whatsapp = $1, actualizado_en = NOW() WHERE id = 1',
-    [whatsapp || '']
-  );
-  res.json({ ok: true });
-}));
 
 app.get('/admin/contacto-info', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT * FROM configuracion_contacto WHERE id = 1');
