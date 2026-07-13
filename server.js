@@ -1044,11 +1044,16 @@ async function initSchema() {
     CREATE TABLE IF NOT EXISTS whatsapp_mensajes_pendientes (
       id SERIAL PRIMARY KEY,
       telefono TEXT NOT NULL,
-      texto TEXT NOT NULL,
+      texto TEXT,
+      url_documento TEXT,
+      nombre_documento TEXT,
       enviado BOOLEAN DEFAULT FALSE,
       creado_en TIMESTAMP DEFAULT NOW()
     );
   `);
+  await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ADD COLUMN IF NOT EXISTS url_documento TEXT`);
+  await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ADD COLUMN IF NOT EXISTS nombre_documento TEXT`);
+  await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ALTER COLUMN texto DROP NOT NULL`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS reservas_mensajes (
       id SERIAL PRIMARY KEY,
@@ -5571,13 +5576,11 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
     });
     if (r.telefono_cliente) {
       try {
-        await pool.query('DELETE FROM url_cortas WHERE tipo = $1 AND reserva_id = $2', ['factura', req.params.id]);
-        const codigoFactura = await generarCodigoCorto('factura', req.params.id, null);
-        const urlFactura = `${BASE_URL}/v/${codigoFactura}`;
-        const textoWa = `Hola, ${r.nombre_cliente} 👋\n\nTe enviamos la factura ${resultado.numeroFactura} correspondiente a tu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}).\n\nDescárgala aquí:\n${urlFactura}`;
+        const firma = firmarFactura(req.params.id);
+        const urlDoc = `${BASE_URL}/factura-descarga/${req.params.id}/${firma}`;
         await pool.query(
-          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
-          [r.telefono_cliente, textoWa]
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+          [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`, urlDoc, `factura-${r.numero_reserva}.pdf`]
         );
       } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
     }
@@ -8065,7 +8068,7 @@ function requierePuenteWhatsapp(req, res, next) {
 
 app.get('/api/whatsapp/mensajes-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, telefono, texto FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
+    'SELECT id, telefono, texto, url_documento, nombre_documento FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
   );
   res.json(result.rows);
 }));
