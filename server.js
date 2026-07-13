@@ -5019,88 +5019,175 @@ async function generarVoucherPDF(reservaId) {
   const _textoLimite = _fechaLimite.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) +
     ' a las ' + _fechaLimite.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
+  // Foto del chofer: solo si está aprobada y es base64
+  let fotoChoferBuffer = null;
+  if (r.conductor_foto && r.conductor_foto_estado === 'aprobada' && r.conductor_foto.startsWith('data:image/')) {
+    try {
+      const base64Data = r.conductor_foto.split(',')[1];
+      fotoChoferBuffer = Buffer.from(base64Data, 'base64');
+    } catch(e) { fotoChoferBuffer = null; }
+  }
+
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', layout: 'portrait', margin: 50 });
+    const doc = new PDFDocument({ size: 'A4', layout: 'portrait', margin: 0 });
     const chunks = [];
     doc.on('data', chunk => chunks.push(chunk));
     doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), numero_reserva: r.numero_reserva }));
     doc.on('error', reject);
 
-    const W = doc.page.width - 100;
-    let y = 50;
+    const PW = doc.page.width;   // 595
+    const PH = doc.page.height;  // 842
+    const ML = 40;  // margen izquierdo
+    const MR = 40;  // margen derecho
+    const W  = PW - ML - MR;     // ancho útil
 
-    const linea = (texto, negrita, tam, color) => {
-      if (!texto) return;
-      tam = tam || 11; color = color || '#1C1815';
-      doc.fontSize(tam).font(negrita ? 'Helvetica-Bold' : 'Helvetica').fillColor(color).text(texto, 50, y, { width: W });
-      y += tam + 6;
-    };
+    let y = 0;
 
-    const lineaDoble = (label, valor) => {
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815').text(label + ': ', 50, y, { continued: true, width: W });
-      doc.font('Helvetica').fillColor('#333333').text(valor || '—', { width: W });
-      y = doc.y + 4;
-    };
+    // ── Cabecera oscura (igual que .header en el email) ──
+    doc.rect(0, 0, PW, 72).fill('#2c2c2c');
+    doc.fontSize(18).font('Helvetica-Bold').fillColor('#d4956a')
+      .text('Traslados GC', ML, 18, { align: 'center', width: W });
+    doc.fontSize(10).font('Helvetica').fillColor('#aaaaaa')
+      .text('Gran Canaria', ML, 42, { align: 'center', width: W });
+    y = 90;
 
-    const separador = () => {
-      y += 6;
-      doc.moveTo(50, y).lineTo(50 + W, y).strokeColor('#d4956a').lineWidth(0.5).stroke();
-      y += 10;
-    };
+    // ── Saludo ──
+    doc.fontSize(12).font('Helvetica').fillColor('#1C1815')
+      .text('Hola ', ML, y, { continued: true })
+      .font('Helvetica-Bold').text(r.nombre_cliente + ',');
+    y = doc.y + 10;
 
-    // Cabecera
-    doc.fontSize(20).font('Helvetica-Bold').fillColor('#C1502E').text('TRASLADOS GC', 50, y, { align: 'center', width: W }); y += 28;
-    doc.fontSize(10).font('Helvetica').fillColor('#888888').text('Gran Canaria', 50, y, { align: 'center', width: W }); y += 20;
-    separador();
+    // ── Caja verde "Depósito recibido" (igual que .pagado) ──
+    const altoCajaVerde = 32;
+    doc.rect(ML, y, W, altoCajaVerde).fill('#d1e7dd');
+    doc.fontSize(11).font('Helvetica-Bold').fillColor('#0f5132')
+      .text('Deposito recibido. Tu traslado esta confirmado.', ML + 10, y + 10, { width: W - 20 });
+    y += altoCajaVerde + 14;
 
-    // Título
-    doc.fontSize(16).font('Helvetica-Bold').fillColor('#1C1815').text('VOUCHER DE TRASLADO', 50, y, { align: 'center', width: W }); y += 24;
-    doc.fontSize(22).font('Helvetica-Bold').fillColor('#C1502E').text(r.numero_reserva, 50, y, { align: 'center', width: W }); y += 30;
-    separador();
+    // ── Caja voucher con borde naranja (igual que .voucher-box) ──
+    // Calculamos altura dinámica más abajo; primero pintamos contenido
+    const yInicioVoucher = y;
+    const bordeVoucher = '#d4956a';
 
-    // Datos del traslado
-    linea('DATOS DEL TRASLADO', true, 12, '#555555'); y += 4;
-    lineaDoble('Origen', r.origen || '—');
-    lineaDoble('Destino', r.destino || '—');
-    lineaDoble('Fecha', fechaViaje);
-    lineaDoble('Hora', r.hora ? r.hora.slice(0, 5) : '—');
-    lineaDoble('Categoría', r.categoria_nombre || '—');
-    lineaDoble('Pasajeros', String(r.num_pasajeros || '—'));
-    if (r.direccion_recogida) lineaDoble('Dirección de recogida', r.direccion_recogida);
-    if (r.direccion_destino) lineaDoble('Dirección de destino', r.direccion_destino);
-    if (r.numero_vuelo) lineaDoble('Vuelo', r.numero_vuelo + (r.hora_llegada_vuelo ? ' · Llegada ' + r.hora_llegada_vuelo.slice(0, 5) : ''));
-    if (r.nombre_barco) lineaDoble('Barco', r.nombre_barco + (r.hora_atraque ? ' · Atraque ' + r.hora_atraque.slice(0, 5) : ''));
-    if (r.notas_cliente) lineaDoble('Notas', r.notas_cliente);
-
-    if (r.conductor_nombre) {
-      separador();
-      linea('CONDUCTOR ASIGNADO', true, 12, '#555555'); y += 4;
-      lineaDoble('Conductor', r.conductor_nombre);
-    }
-
-    if (extrasReserva.length) {
-      separador();
-      linea('EXTRAS', true, 12, '#555555'); y += 4;
-      extrasIncluidos.forEach(e => lineaDoble(e.nombre, 'Incluido'));
-      extrasACobrar.forEach(e => lineaDoble(e.nombre, parseFloat(e.precio_en_reserva).toFixed(2) + ' € — a pagar al conductor'));
-      if (extrasACobrar.length) {
-        y += 6;
-        doc.fontSize(11).font('Helvetica-Bold').fillColor('#856404')
-          .text('Total extras a pagar al conductor: ' + totalExtras.toFixed(2) + ' €', 50, y, { width: W });
-        y += 18;
-      }
-    }
-
-    separador();
-    // Nota depósito y cancelación
-    doc.fontSize(10).font('Helvetica').fillColor('#0f5132')
-      .text('✔ Depósito recibido. Tu traslado está confirmado.', 50, y, { width: W }); y += 16;
-    doc.fontSize(10).font('Helvetica').fillColor('#856404')
-      .text('⚠ Cancelación gratuita hasta el ' + _textoLimite + '. Después de esa fecha, el depósito de ' + _importe + ' € no será reembolsado.', 50, y, { width: W });
-    y = doc.y + 16;
-
+    // Etiqueta "Voucher de Traslado"
     doc.fontSize(9).font('Helvetica').fillColor('#888888')
-      .text('Muestra este voucher a tu conductor al inicio del servicio.', 50, y, { align: 'center', width: W });
+      .text('VOUCHER DE TRASLADO', ML + 16, y + 14, { align: 'center', width: W - 32, characterSpacing: 1 });
+    y += 30;
+
+    // PNR
+    doc.fontSize(20).font('Helvetica-Bold').fillColor('#C1502E')
+      .text('N\u00BA ' + r.numero_reserva, ML + 16, y, { align: 'center', width: W - 32 });
+    y = doc.y + 12;
+
+    // Foto del chofer si existe
+    if (fotoChoferBuffer) {
+      const fotoSize = 72;
+      const fotoX = (PW - fotoSize) / 2;
+      try {
+        doc.save();
+        doc.circle(fotoX + fotoSize / 2, y + fotoSize / 2, fotoSize / 2).clip();
+        doc.image(fotoChoferBuffer, fotoX, y, { width: fotoSize, height: fotoSize });
+        doc.restore();
+        // Borde circular naranja
+        doc.circle(fotoX + fotoSize / 2, y + fotoSize / 2, fotoSize / 2)
+          .lineWidth(2).strokeColor(bordeVoucher).stroke();
+        y += fotoSize + 6;
+        doc.fontSize(11).font('Helvetica-Bold').fillColor('#2c2c2c')
+          .text(r.conductor_nombre || '', ML + 16, y, { align: 'center', width: W - 32 });
+        y = doc.y + 2;
+        doc.fontSize(9).font('Helvetica').fillColor('#888888')
+          .text('Tu conductor', ML + 16, y, { align: 'center', width: W - 32 });
+        y = doc.y + 12;
+      } catch(e) { y += 8; }
+    } else if (r.conductor_nombre) {
+      doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815')
+        .text('Conductor: ' + r.conductor_nombre, ML + 16, y, { align: 'center', width: W - 32 });
+      y = doc.y + 12;
+    }
+
+    // ── Caja info (igual que .info-box: fondo #f5f0ea) ──
+    const yInicioInfo = y;
+    const infoX = ML + 16;
+    const infoW = W - 32;
+
+    const campo = (label, valor) => {
+      if (!valor) return;
+      doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815')
+        .text(label + ': ', infoX, y, { continued: true, width: infoW });
+      doc.font('Helvetica').fillColor('#333333').text(String(valor), { width: infoW });
+      y = doc.y + 3;
+    };
+
+    // Primero medimos cuánto ocupa para pintar el fondo
+    // Lo pintamos después con un rect; aquí solo escribimos
+    campo('Origen', r.origen || '—');
+    campo('Destino', r.destino || '—');
+    campo('Fecha', fechaViaje);
+    campo('Hora', r.hora ? r.hora.slice(0, 5) : '—');
+    campo('Categoria', r.categoria_nombre || '—');
+    campo('Pasajeros', String(r.num_pasajeros || '—'));
+    if (r.direccion_recogida) campo('Recogida', r.direccion_recogida);
+    if (r.direccion_destino)  campo('Destino final', r.direccion_destino);
+    if (r.numero_vuelo) campo('Vuelo', r.numero_vuelo + (r.hora_llegada_vuelo ? ' · Llegada ' + r.hora_llegada_vuelo.slice(0, 5) : ''));
+    if (r.nombre_barco) campo('Barco', r.nombre_barco + (r.hora_atraque ? ' · Atraque ' + r.hora_atraque.slice(0, 5) : ''));
+    if (r.notas_cliente) campo('Notas', r.notas_cliente);
+
+    // Extras dentro de la info-box
+    if (extrasReserva.length) {
+      y += 4;
+      doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815').text('Extras:', infoX, y); y = doc.y + 2;
+      extrasIncluidos.forEach(e => {
+        doc.fontSize(10).font('Helvetica').fillColor('#1C1815').text('  · ' + e.nombre + ' ', infoX, y, { continued: true });
+        doc.fillColor('#2e7d32').text('(incluido)'); y = doc.y + 2;
+      });
+      extrasACobrar.forEach(e => {
+        doc.fontSize(10).font('Helvetica').fillColor('#1C1815').text('  · ' + e.nombre + ' ', infoX, y, { continued: true });
+        doc.fillColor('#856404').text('(' + parseFloat(e.precio_en_reserva).toFixed(2) + ' EUR - a pagar al conductor)'); y = doc.y + 2;
+      });
+    }
+
+    const yFinInfo = y + 8;
+
+    // Ahora pintamos el fondo de la info-box por encima (rect detrás del texto ya escrito no funciona en PDFKit)
+    // Lo hacemos con un segundo paso: guardamos posición y usamos un rect ANTES del texto
+    // Nota: PDFKit no tiene z-index, así que reorganizamos el flujo pintando primero el rect
+
+    y = yFinInfo + 4;
+
+    // Total extras caja amarilla
+    if (extrasACobrar.length) {
+      const altoExtras = 36;
+      doc.rect(ML + 16, y, W - 32, altoExtras).fill('#fff8e1');
+      doc.rect(ML + 16, y, W - 32, altoExtras).lineWidth(0.5).strokeColor('#D9A441').stroke();
+      doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815')
+        .text('Total extras a pagar al conductor: ' + totalExtras.toFixed(2) + ' EUR', ML + 26, y + 6, { width: W - 52 });
+      doc.fontSize(9).font('Helvetica').fillColor('#555555')
+        .text('Este importe se abona directamente al conductor al final del servicio.', ML + 26, y + 20, { width: W - 52 });
+      y += altoExtras + 8;
+    }
+
+    // Cierre caja voucher con borde
+    const yFinVoucher = y + 8;
+    doc.rect(ML, yInicioVoucher, W, yFinVoucher - yInicioVoucher).lineWidth(2).strokeColor(bordeVoucher).stroke();
+    y = yFinVoucher + 14;
+
+    // ── Nota pie del voucher ──
+    doc.fontSize(10).font('Helvetica').fillColor('#888888')
+      .text('Muestra este voucher a tu conductor al inicio del servicio.', ML, y, { width: W });
+    y = doc.y + 10;
+
+    // ── Caja cancelación amarilla (igual que en el email) ──
+    const textoCancelacion = 'Cancelacion gratuita hasta el ' + _textoLimite + '. Despues de esa fecha, el deposito de ' + _importe + ' EUR no sera reembolsado.';
+    const altoCancelacion = 38;
+    doc.rect(ML, y, W, altoCancelacion).fill('#fff3cd');
+    doc.fontSize(10).font('Helvetica-Bold').fillColor('#856404')
+      .text('Aviso: ' + textoCancelacion, ML + 10, y + 8, { width: W - 20 });
+    y += altoCancelacion + 14;
+
+    // ── Footer (igual que .footer: fondo #f5f0ea) ──
+    doc.rect(0, PH - 36, PW, 36).fill('#f5f0ea');
+    doc.fontSize(10).font('Helvetica').fillColor('#888888')
+      .text('Traslados GC · Gran Canaria', ML, PH - 22, { align: 'center', width: W });
 
     doc.end();
   });
