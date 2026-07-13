@@ -5007,7 +5007,8 @@ async function generarCartelPDF(reservaId) {
     doc.on('end', () => resolve({
       buffer: Buffer.concat(chunks),
       conductor_email: r.conductor_email,
-      conductor_nombre: r.conductor_nombre
+      conductor_nombre: r.conductor_nombre,
+      numero_reserva: r.numero_reserva
     }));
     doc.on('error', reject);
 
@@ -5614,8 +5615,9 @@ app.get('/cartel-descarga/:id/:firma', asyncHandler(async (req, res) => {
   }
   const cartel = await generarCartelPDF(req.params.id);
   if (!cartel) return res.status(404).send('Cartel no disponible.');
+  const nombreArchivo = 'cartel-' + (cartel.numero_reserva || req.params.id) + '.pdf';
   res.set('Content-Type', 'application/pdf');
-  res.set('Content-Disposition', 'attachment; filename="cartel-' + req.params.id + '.pdf"');
+  res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
   res.send(cartel.buffer);
 }));
 
@@ -5630,8 +5632,9 @@ app.get('/factura-descarga/:id/:firma', asyncHandler(async (req, res) => {
   }
   const resultado = await generarFacturaPDF(req.params.id);
   if (!resultado) return res.status(404).send('Factura no disponible.');
+  const nombreArchivo = 'factura-' + (resultado.numero_reserva || req.params.id) + '.pdf';
   res.set('Content-Type', 'application/pdf');
-  res.set('Content-Disposition', 'attachment; filename="factura-' + req.params.id + '.pdf"');
+  res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
   res.send(resultado.buffer);
 }));
 
@@ -7708,7 +7711,7 @@ async function generarFacturaPDF(reservaId) {
     const doc = new PDFDocument({ size: 'A4', layout: 'portrait', margin: 50 });
     const chunks = [];
     doc.on('data', chunk => chunks.push(chunk));
-    doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), numeroFactura }));
+    doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), numeroFactura, numero_reserva: r.numero_reserva }));
     doc.on('error', reject);
 
     const W = doc.page.width - 100;
