@@ -5604,6 +5604,7 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
     const choferQ = await pool.query('SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]);
     if (choferQ.rows.length && choferQ.rows[0].telefono) {
       try {
+        await pool.query('DELETE FROM url_cortas WHERE tipo = $1 AND reserva_id = $2', ['cartel', req.params.id]);
         const codigoCartel = await generarCodigoCorto('cartel', req.params.id, null);
         const urlCartel = `${BASE_URL}/v/${codigoCartel}`;
         const textoWa = `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe reenviamos el cartel de recogida para la reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}).\n\nDescárgalo aquí:\n${urlCartel}`;
@@ -5643,6 +5644,7 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
     });
     if (r.telefono_cliente) {
       try {
+        await pool.query('DELETE FROM url_cortas WHERE tipo = $1 AND reserva_id = $2', ['factura', req.params.id]);
         const codigoFactura = await generarCodigoCorto('factura', req.params.id, null);
         const urlFactura = `${BASE_URL}/v/${codigoFactura}`;
         const textoWa = `Hola, ${r.nombre_cliente} 👋\n\nTe enviamos la factura ${resultado.numeroFactura} correspondiente a tu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}).\n\nDescárgala aquí:\n${urlFactura}`;
