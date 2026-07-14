@@ -1350,7 +1350,7 @@ async function initSchema() {
       cuerpo_whatsapp: null },
     { clave: 'marca_base', nombre: 'Plantilla base de marca', categoria: 'interno',
       asunto_email: 'marca_base',
-      cuerpo_email: '{"nombre":"Traslados GC","subtitulo":"Gran Canaria","colorCabecera":"#2c2c2c","colorNombre":"#d4956a","pie":"Traslados GC \xc2\xb7 Gran Canaria"}',
+      cuerpo_email: '{"nombre":"Traslados GC","subtitulo":"Gran Canaria","colorCabecera":"#2c2c2c","colorNombre":"#d4956a","pie":"Traslados GC \u00b7 Gran Canaria"}',
       cuerpo_whatsapp: null }
   ];
 
