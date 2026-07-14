@@ -1186,7 +1186,7 @@ table.tabla-precios input {
             </div>
             <div style="margin-bottom:20px;">
               <label class="etiqueta">Texto del pie de página</label>
-              <input type="text" id="marca-pie" class="campo" placeholder="Traslados GC &#183; Gran Canaria">
+              <input type="text" id="marca-pie" class="campo" placeholder="Traslados GC · Gran Canaria">
             </div>
             <div style="display:flex;gap:10px;align-items:center;">
               <button class="boton-primario" onclick="guardarPlantillaMarca()">&#128190; Guardar cambios de marca</button>
@@ -1212,7 +1212,7 @@ table.tabla-precios input {
                   <strong>Destino:</strong> Aeropuerto Sur
                 </div>
               </div>
-              <div id="preview-pie" style="background:#f5f0ea;padding:12px;text-align:center;font-size:12px;color:#888;">Traslados GC &#183; Gran Canaria</div>
+              <div id="preview-pie" style="background:#f5f0ea;padding:12px;text-align:center;font-size:12px;color:#888;">Traslados GC · Gran Canaria</div>
             </div>
           </div>
         </div>
@@ -1393,7 +1393,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo', 'valoraciones'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo', 'valoraciones', 'comunicaciones'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
@@ -6116,7 +6116,7 @@ var _marcaOriginal = {
   subtitulo: 'Gran Canaria',
   colorCabecera: '#2c2c2c',
   colorNombre: '#d4956a',
-  pie: 'Traslados GC \u00b7 Gran Canaria'
+  pie: 'Traslados GC · Gran Canaria'
 };
 
 function iniciarEditorMarca() {
@@ -6169,7 +6169,7 @@ function cargarValoresMarca(cfg) {
   document.getElementById('marca-color-cabecera-hex').value = cfg.colorCabecera || '#2c2c2c';
   document.getElementById('marca-color-nombre').value = cfg.colorNombre || '#d4956a';
   document.getElementById('marca-color-nombre-hex').value = cfg.colorNombre || '#d4956a';
-  document.getElementById('marca-pie').value = cfg.pie || 'Traslados GC \u00b7 Gran Canaria';
+  document.getElementById('marca-pie').value = cfg.pie || 'Traslados GC · Gran Canaria';
   actualizarPreviewMarca();
 }
 
@@ -6178,7 +6178,7 @@ function actualizarPreviewMarca() {
   var subtitulo = document.getElementById('marca-subtitulo').value || 'Gran Canaria';
   var colorCabecera = document.getElementById('marca-color-cabecera-hex').value || '#2c2c2c';
   var colorNombre = document.getElementById('marca-color-nombre-hex').value || '#d4956a';
-  var pie = document.getElementById('marca-pie').value || 'Traslados GC \u00b7 Gran Canaria';
+  var pie = document.getElementById('marca-pie').value || 'Traslados GC · Gran Canaria';
 
   var cab = document.getElementById('preview-cabecera');
   var pNombre = document.getElementById('preview-nombre');
