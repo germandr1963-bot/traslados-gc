@@ -1154,6 +1154,69 @@ table.tabla-precios input {
           </div>
         </div>
       </div>
+    <!-- Plantilla base de marca -->
+      <div style="margin-top:40px;border-top:2px solid var(--borde);padding-top:28px;">
+        <h2 style="font-size:1rem;margin-bottom:4px;">&#127775; Plantilla base de marca</h2>
+        <p class="subtitulo" style="margin-top:0;">Estos son los elementos que aparecen en <strong>todos</strong> los emails. Cámbialos aquí y se actualizan en todos a la vez.</p>
+
+        <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:20px;">
+          <!-- Editor -->
+          <div style="flex:1;min-width:280px;">
+            <div style="margin-bottom:12px;">
+              <label class="etiqueta">Nombre en cabecera</label>
+              <input type="text" id="marca-nombre" class="campo" placeholder="Traslados GC">
+            </div>
+            <div style="margin-bottom:12px;">
+              <label class="etiqueta">Subtexto bajo el nombre</label>
+              <input type="text" id="marca-subtitulo" class="campo" placeholder="Gran Canaria">
+            </div>
+            <div style="margin-bottom:12px;">
+              <label class="etiqueta">Color de cabecera</label>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input type="color" id="marca-color-cabecera" value="#2c2c2c" style="width:48px;height:36px;border:1px solid var(--borde);border-radius:6px;cursor:pointer;padding:2px;">
+                <input type="text" id="marca-color-cabecera-hex" class="campo" style="width:100px;" value="#2c2c2c" placeholder="#2c2c2c">
+              </div>
+            </div>
+            <div style="margin-bottom:12px;">
+              <label class="etiqueta">Color del nombre (dorado)</label>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input type="color" id="marca-color-nombre" value="#d4956a" style="width:48px;height:36px;border:1px solid var(--borde);border-radius:6px;cursor:pointer;padding:2px;">
+                <input type="text" id="marca-color-nombre-hex" class="campo" style="width:100px;" value="#d4956a" placeholder="#d4956a">
+              </div>
+            </div>
+            <div style="margin-bottom:20px;">
+              <label class="etiqueta">Texto del pie de página</label>
+              <input type="text" id="marca-pie" class="campo" placeholder="Traslados GC · Gran Canaria">
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button class="boton-primario" onclick="guardarPlantillaMarca()">&#128190; Guardar cambios de marca</button>
+              <span id="marca-msg-ok" style="font-size:13px;color:green;display:none;">&#10003; Guardado</span>
+              <span id="marca-msg-err" style="font-size:13px;color:red;display:none;">Error al guardar</span>
+            </div>
+            <p style="font-size:12px;color:var(--texto-muted);margin-top:10px;">&#128161; Para aplicar los cambios después de guardar, necesitas hacer un nuevo deploy en Render (o puedes esperar al próximo deploy programado).</p>
+          </div>
+
+          <!-- Vista previa -->
+          <div style="flex:1;min-width:280px;">
+            <label class="etiqueta">Vista previa del email</label>
+            <div style="border:1px solid var(--borde);border-radius:8px;overflow:hidden;max-width:420px;">
+              <div id="preview-cabecera" style="background:#2c2c2c;padding:20px;text-align:center;">
+                <div id="preview-nombre" style="color:#d4956a;font-size:18px;font-weight:700;margin:0;">Traslados GC</div>
+                <div id="preview-subtitulo" style="color:#aaa;font-size:12px;margin-top:4px;">Gran Canaria</div>
+              </div>
+              <div style="padding:20px 18px;font-family:Arial,sans-serif;font-size:14px;color:#1C1815;line-height:1.6;background:#fff;">
+                <p style="margin:0 0 10px;">Hola <strong>Nombre del cliente</strong>,</p>
+                <p style="margin:0 0 10px;">Aquí iría el contenido del email según cada situación.</p>
+                <div style="background:#f5f0ea;border-radius:6px;padding:10px 14px;margin:12px 0;font-size:13px;">
+                  <strong>Origen:</strong> Las Palmas de GC<br>
+                  <strong>Destino:</strong> Aeropuerto Sur
+                </div>
+              </div>
+              <div id="preview-pie" style="background:#f5f0ea;padding:12px;text-align:center;font-size:12px;color:#888;">Traslados GC · Gran Canaria</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="seccion-extras" class="oculto">
@@ -1350,7 +1413,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'clientes') cargarClientes();
     if (boton.dataset.seccion === 'equipo') cargarEquipo();
     if (boton.dataset.seccion === 'valoraciones') cargarValoraciones();
-    if (boton.dataset.seccion === 'comunicaciones') cargarPlantillasCom();
+    if (boton.dataset.seccion === 'comunicaciones') { cargarPlantillasCom(); iniciarEditorMarca(); }
   });
 });
 
@@ -6044,6 +6107,126 @@ function eliminarExtra(id) {
     });
 }
 
+
+// ============================================================
+// PLANTILLA BASE DE MARCA
+// ============================================================
+var _marcaOriginal = {
+  nombre: 'Traslados GC',
+  subtitulo: 'Gran Canaria',
+  colorCabecera: '#2c2c2c',
+  colorNombre: '#d4956a',
+  pie: 'Traslados GC · Gran Canaria'
+};
+
+function iniciarEditorMarca() {
+  // Cargar valores actuales (desde plantilla_comunicacion especial o defaults)
+  fetch('/admin/plantillas-comunicacion/marca_base')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.plantilla && data.plantilla.cuerpo_email) {
+        try {
+          var cfg = JSON.parse(data.plantilla.cuerpo_email);
+          cargarValoresMarca(cfg);
+        } catch(e) { cargarValoresMarca(_marcaOriginal); }
+      } else {
+        cargarValoresMarca(_marcaOriginal);
+      }
+    })
+    .catch(function() { cargarValoresMarca(_marcaOriginal); });
+
+  // Eventos de sincronización color picker <-> hex input
+  document.getElementById('marca-color-cabecera').addEventListener('input', function() {
+    document.getElementById('marca-color-cabecera-hex').value = this.value;
+    actualizarPreviewMarca();
+  });
+  document.getElementById('marca-color-cabecera-hex').addEventListener('input', function() {
+    if (/^#[0-9a-fA-F]{6}$/.test(this.value)) {
+      document.getElementById('marca-color-cabecera').value = this.value;
+      actualizarPreviewMarca();
+    }
+  });
+  document.getElementById('marca-color-nombre').addEventListener('input', function() {
+    document.getElementById('marca-color-nombre-hex').value = this.value;
+    actualizarPreviewMarca();
+  });
+  document.getElementById('marca-color-nombre-hex').addEventListener('input', function() {
+    if (/^#[0-9a-fA-F]{6}$/.test(this.value)) {
+      document.getElementById('marca-color-nombre').value = this.value;
+      actualizarPreviewMarca();
+    }
+  });
+  ['marca-nombre','marca-subtitulo','marca-pie'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', actualizarPreviewMarca);
+  });
+}
+
+function cargarValoresMarca(cfg) {
+  document.getElementById('marca-nombre').value = cfg.nombre || 'Traslados GC';
+  document.getElementById('marca-subtitulo').value = cfg.subtitulo || 'Gran Canaria';
+  document.getElementById('marca-color-cabecera').value = cfg.colorCabecera || '#2c2c2c';
+  document.getElementById('marca-color-cabecera-hex').value = cfg.colorCabecera || '#2c2c2c';
+  document.getElementById('marca-color-nombre').value = cfg.colorNombre || '#d4956a';
+  document.getElementById('marca-color-nombre-hex').value = cfg.colorNombre || '#d4956a';
+  document.getElementById('marca-pie').value = cfg.pie || 'Traslados GC · Gran Canaria';
+  actualizarPreviewMarca();
+}
+
+function actualizarPreviewMarca() {
+  var nombre = document.getElementById('marca-nombre').value || 'Traslados GC';
+  var subtitulo = document.getElementById('marca-subtitulo').value || 'Gran Canaria';
+  var colorCabecera = document.getElementById('marca-color-cabecera-hex').value || '#2c2c2c';
+  var colorNombre = document.getElementById('marca-color-nombre-hex').value || '#d4956a';
+  var pie = document.getElementById('marca-pie').value || 'Traslados GC · Gran Canaria';
+
+  var cab = document.getElementById('preview-cabecera');
+  var pNombre = document.getElementById('preview-nombre');
+  var pSub = document.getElementById('preview-subtitulo');
+  var pPie = document.getElementById('preview-pie');
+
+  if (cab) cab.style.background = colorCabecera;
+  if (pNombre) { pNombre.textContent = nombre; pNombre.style.color = colorNombre; }
+  if (pSub) pSub.textContent = subtitulo;
+  if (pPie) pPie.textContent = pie;
+}
+
+function guardarPlantillaMarca() {
+  var cfg = {
+    nombre: document.getElementById('marca-nombre').value,
+    subtitulo: document.getElementById('marca-subtitulo').value,
+    colorCabecera: document.getElementById('marca-color-cabecera-hex').value,
+    colorNombre: document.getElementById('marca-color-nombre-hex').value,
+    pie: document.getElementById('marca-pie').value
+  };
+
+  var msgOk = document.getElementById('marca-msg-ok');
+  var msgErr = document.getElementById('marca-msg-err');
+  msgOk.style.display = 'none';
+  msgErr.style.display = 'none';
+
+  fetch('/admin/plantillas-comunicacion/marca_base', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nombre: 'Plantilla base de marca',
+      asunto_email: 'marca_base',
+      cuerpo_email: JSON.stringify(cfg),
+      cuerpo_whatsapp: null
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.ok) {
+      msgOk.style.display = 'inline';
+      setTimeout(function() { msgOk.style.display = 'none'; }, 3000);
+    } else {
+      msgErr.style.display = 'inline';
+    }
+  })
+  .catch(function() { msgErr.style.display = 'inline'; });
+}
+// ============================================================
 
 // ============================================================
 // COMUNICACIONES - Plantillas de email y WhatsApp
