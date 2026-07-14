@@ -6109,7 +6109,7 @@ function renderPlantillasCom() {
       html += '<td><strong>' + p.nombre + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + p.clave + '</span></td>';
       html += '<td style="text-align:center;">' + (tieneEmail ? '<span style="color:green;">&#10003;</span>' : '<span style="color:#ccc;">\u2014</span>') + '</td>';
       html += '<td style="text-align:center;">' + (tieneWa ? '<span style="color:green;">&#10003;</span>' : '<span style="color:#ccc;">\u2014</span>') + '</td>';
-      html += '<td style="text-align:right;"><button class="boton-primario" style="font-size:0.8rem;padding:6px 12px;" onclick="abrirModalPlantilla(' + JSON.stringify(p.clave) + ')">&#9998; Editar</button></td>';
+      html += '<td style="text-align:right;"><button class="boton-primario" style="font-size:0.8rem;padding:6px 12px;" onclick="abrirModalPlantilla(\'' + p.clave + '\')">&#9998; Editar</button></td>';
       html += '</tr>';
     });
     html += '</tbody></table></div>';
