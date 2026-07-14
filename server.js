@@ -1347,6 +1347,10 @@ async function initSchema() {
     { clave: 'interno_recuperar_password_admin', nombre: '[Admin] Recuperar contrase\u00f1a de administrador', categoria: 'interno',
       asunto_email: 'Recupera tu contrase\u00f1a \u2014 Traslados GC',
       cuerpo_email: 'Hola \ud83d\udc4b\n\nHemos recibido una solicitud para restablecer la contrase\u00f1a de la cuenta de administrador.\n\nHaz clic en el enlace para crear una nueva contrase\u00f1a. El enlace caduca en 1 hora.\n\nSi no solicitaste este cambio, puedes ignorar este mensaje.',
+      cuerpo_whatsapp: null },
+    { clave: 'marca_base', nombre: 'Plantilla base de marca', categoria: 'interno',
+      asunto_email: 'marca_base',
+      cuerpo_email: '{"nombre":"Traslados GC","subtitulo":"Gran Canaria","colorCabecera":"#2c2c2c","colorNombre":"#d4956a","pie":"Traslados GC \xc2\xb7 Gran Canaria"}',
       cuerpo_whatsapp: null }
   ];
 
