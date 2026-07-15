@@ -5612,12 +5612,15 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
     const resultado = await generarFacturaPDF(req.params.id);
     if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
     const pdfBuffer = resultado.buffer;
+    const _pf = await obtenerPlantilla('cliente_factura', {
+      nombre_cliente: r.nombre_cliente,
+      numero_reserva: r.numero_reserva,
+      numero_factura: resultado.numeroFactura
+    });
     await enviarEmailConAdjunto({
       to: r.email_cliente,
-      subject: '📄 Factura ' + resultado.numeroFactura + ' — Reserva ' + r.numero_reserva,
-      html: `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-             <p>Adjuntamos la factura <strong>${resultado.numeroFactura}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p>
-             <p>Gracias por viajar con Traslados GC.</p>`,
+      subject: (_pf && _pf.asunto) || ('📄 Factura ' + resultado.numeroFactura + ' — Reserva ' + r.numero_reserva),
+      html: plantillaEmail((_pf && _pf.email) || `<p>Hola <strong>${r.nombre_cliente}</strong>,</p><p>Adjuntamos la factura <strong>${resultado.numeroFactura}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p><p>Gracias por viajar con Traslados GC.</p>`),
       adjunto: { filename: 'factura-' + r.numero_reserva + '.pdf', content: pdfBuffer }
     });
     if (r.telefono_cliente) {
@@ -5625,9 +5628,10 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
         const firma = firmarFactura(req.params.id);
         const nombreDoc = `factura-${resultado.numeroFactura}.pdf`;
         const urlDoc = `${BASE_URL}/factura-descarga/${req.params.id}/${firma}/${nombreDoc}`;
+        const textoWa = (_pf && _pf.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`, urlDoc, nombreDoc]
+          [r.telefono_cliente, textoWa, urlDoc, nombreDoc]
         );
       } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
     }
@@ -5680,6 +5684,32 @@ app.get('/voucher-descarga/:id/:firma/:nombre?', asyncHandler(async (req, res) =
   res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
   res.send(resultado.buffer);
 }));
+
+async function obtenerPlantilla(clave, vars) {
+  try {
+    const r = await pool.query(
+      'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion WHERE clave = $1',
+      [clave]
+    );
+    if (!r.rows.length) return null;
+    const p = r.rows[0];
+    const sustituir = (txt) => {
+      if (!txt) return txt;
+      return txt.replace(/\{([^}]+)\}/g, (_, k) => {
+        const v = vars[k];
+        return (v !== undefined && v !== null) ? String(v) : '{' + k + '}';
+      });
+    };
+    return {
+      asunto: sustituir(p.asunto_email),
+      email: sustituir(p.cuerpo_email),
+      whatsapp: sustituir(p.cuerpo_whatsapp)
+    };
+  } catch(e) {
+    console.warn('obtenerPlantilla error (' + clave + '):', e.message);
+    return null;
+  }
+}
 
 function firmarFactura(reservaId) {
   return crypto.createHmac('sha256', process.env.SESSION_SECRET || 'cambia-este-secreto')
