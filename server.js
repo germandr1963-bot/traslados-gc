@@ -5289,9 +5289,11 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
             const firma = firmarVoucher(reservaId);
             const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
             const urlDoc = `${BASE_URL}/voucher-descarga/${reservaId}/${firma}/${nombreDoc}`;
+            const _pvWa1 = await obtenerPlantilla('cliente_voucher', { nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva });
+            const _textoVoucher1 = (_pvWa1 && _pvWa1.whatsapp) ? _pvWa1.whatsapp : `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.`;
             await pool.query(
               'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-              [r.telefono_cliente, await (async () => { const _p = await obtenerPlantilla('cliente_voucher', { nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva }); return (_p && _p.whatsapp) ? _p.whatsapp : `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.`; })(), urlDoc, nombreDoc]
+              [r.telefono_cliente, _textoVoucher1, urlDoc, nombreDoc]
             );
           } catch(e) { console.warn('Error encolando WhatsApp voucher:', e.message); }
         }
@@ -5557,9 +5559,11 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
         const firma = firmarVoucher(req.params.id);
         const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
         const urlDoc = `${BASE_URL}/voucher-descarga/${req.params.id}/${firma}/${nombreDoc}`;
+        const _pvWa2 = await obtenerPlantilla('cliente_voucher', { nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva });
+        const _textoVoucher2 = (_pvWa2 && _pvWa2.whatsapp) ? _pvWa2.whatsapp : `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [r.telefono_cliente, await (async () => { const _p = await obtenerPlantilla('cliente_voucher', { nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva }); return (_p && _p.whatsapp) ? _p.whatsapp : `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.`; })(), urlDoc, nombreDoc]
+          [r.telefono_cliente, _textoVoucher2, urlDoc, nombreDoc]
         );
       } catch(e) { console.warn('Error encolando WhatsApp voucher:', e.message); }
     }
@@ -5592,9 +5596,11 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
         const firma = firmarCartel(req.params.id);
         const nombreDoc = `cartel-${r.numero_reserva}.pdf`;
         const urlDoc = `${BASE_URL}/cartel-descarga/${req.params.id}/${firma}/${nombreDoc}`;
+        const _pcWa = await obtenerPlantilla('chofer_cartel', { nombre_chofer: cartel.conductor_nombre || '', numero_reserva: r.numero_reserva, origen: r.origen || '—', destino: r.destino || '—', fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—', hora: r.hora ? r.hora.slice(0,5) : '—' });
+        const _textoCartel = (_pcWa && _pcWa.whatsapp) ? _pcWa.whatsapp : `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe adjuntamos el cartel de recogida para la reserva ${r.numero_reserva}.`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [choferQ.rows[0].telefono, await (async () => { const _p = await obtenerPlantilla('chofer_cartel', { nombre_chofer: cartel.conductor_nombre || '', numero_reserva: r.numero_reserva, origen: r.origen || '—', destino: r.destino || '—', fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—', hora: r.hora ? r.hora.slice(0,5) : '—' }); return (_p && _p.whatsapp) ? _p.whatsapp : `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe adjuntamos el cartel de recogida para la reserva ${r.numero_reserva}.`; })(), urlDoc, nombreDoc]
+          [choferQ.rows[0].telefono, _textoCartel, urlDoc, nombreDoc]
         );
       } catch(e) { console.warn('Error encolando WhatsApp cartel:', e.message); }
     }
@@ -5630,9 +5636,11 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
         const firma = firmarFactura(req.params.id);
         const nombreDoc = `factura-${resultado.numeroFactura}.pdf`;
         const urlDoc = `${BASE_URL}/factura-descarga/${req.params.id}/${firma}/${nombreDoc}`;
+        const _pfWa = await obtenerPlantilla('cliente_factura', { nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva, numero_factura: resultado.numeroFactura });
+        const textoWaFactura = (_pfWa && _pfWa.whatsapp) ? _pfWa.whatsapp : `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [r.telefono_cliente, await (async () => { const _p = await obtenerPlantilla('cliente_factura', { nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva, numero_factura: resultado.numeroFactura }); return (_p && _p.whatsapp) ? _p.whatsapp : `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.`; })(), urlDoc, nombreDoc]
+          [r.telefono_cliente, textoWaFactura, urlDoc, nombreDoc]
         );
       } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
     }
