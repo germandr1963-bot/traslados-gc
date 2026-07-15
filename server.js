@@ -5624,11 +5624,10 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
     const resultado = await generarFacturaPDF(req.params.id);
     if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
     const pdfBuffer = resultado.buffer;
-    const _pfFactura = await obtenerPlantilla('cliente_factura', { nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva, numero_factura: resultado.numeroFactura });
     await enviarEmailConAdjunto({
       to: r.email_cliente,
-      subject: (_pfFactura && _pfFactura.asunto) || ('📄 Factura ' + resultado.numeroFactura + ' — Reserva ' + r.numero_reserva),
-      html: plantillaEmail((_pfFactura && _pfFactura.email) || `<p>Hola <strong>${r.nombre_cliente}</strong>,</p><p>Adjuntamos la factura <strong>${resultado.numeroFactura}</strong> de tu reserva <strong>${r.numero_reserva}</strong>.</p>`),
+      subject: '📄 Factura ' + resultado.numeroFactura + ' — Reserva ' + r.numero_reserva,
+      html: plantillaEmail(`<p>Hola <strong>${r.nombre_cliente}</strong>,</p><p>Adjuntamos la factura <strong>${resultado.numeroFactura}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p><p>Gracias por viajar con Traslados GC.</p>`),
       adjunto: { filename: 'factura-' + r.numero_reserva + '.pdf', content: pdfBuffer }
     });
     if (r.telefono_cliente) {
@@ -5636,11 +5635,9 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
         const firma = firmarFactura(req.params.id);
         const nombreDoc = `factura-${resultado.numeroFactura}.pdf`;
         const urlDoc = `${BASE_URL}/factura-descarga/${req.params.id}/${firma}/${nombreDoc}`;
-        const _pfWa = await obtenerPlantilla('cliente_factura', { nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva, numero_factura: resultado.numeroFactura });
-        const textoWaFactura = (_pfWa && _pfWa.whatsapp) ? _pfWa.whatsapp : `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [r.telefono_cliente, textoWaFactura, urlDoc, nombreDoc]
+          [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`, urlDoc, nombreDoc]
         );
       } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
     }
