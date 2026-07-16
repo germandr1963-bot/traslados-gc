@@ -8022,6 +8022,13 @@ function requierePuenteWhatsapp(req, res, next) {
   next();
 }
 
+// Endpoint para que puente.js pueda leer plantillas de comunicacion
+app.get('/api/whatsapp/plantilla/:clave', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const resultado = await obtenerPlantilla(req.params.clave, req.query);
+  if (!resultado) return res.json({ ok: false });
+  res.json({ ok: true, whatsapp: resultado.whatsapp });
+}));
+
 app.get('/api/whatsapp/mensajes-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, telefono, texto, url_documento, nombre_documento, documento_base64 FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
