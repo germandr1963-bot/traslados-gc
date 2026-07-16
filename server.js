@@ -5808,9 +5808,10 @@ async function obtenerPlantilla(clave, vars) {
         return (v !== undefined && v !== null) ? String(v) : '{' + k + '}';
       });
     };
+    const emailTexto = sustituir(p.cuerpo_email);
     return {
       asunto: sustituir(p.asunto_email),
-      email: sustituir(p.cuerpo_email),
+      email: emailTexto ? emailTexto.replace(/\n/g, '<br>') : emailTexto,
       whatsapp: sustituir(p.cuerpo_whatsapp)
     };
   } catch(e) {
