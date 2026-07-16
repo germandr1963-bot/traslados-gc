@@ -7762,6 +7762,55 @@ app.post('/admin/facturacion', requireAdmin, asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ─── Admin: listar facturas emitidas ─────────────────────────────────────────
+app.get('/admin/facturas', requireAdmin, asyncHandler(async (req, res) => {
+  const pnr = req.query.pnr ? req.query.pnr.trim() : null;
+  let query = `
+    SELECT f.id, f.numero_factura, f.importe_total, f.generada_en,
+           f.reserva_id, r.numero_reserva, r.nombre_cliente, r.email_cliente
+    FROM facturas f
+    JOIN reservas r ON r.id = f.reserva_id
+  `;
+  const params = [];
+  if (pnr) {
+    params.push('%' + pnr + '%');
+    query += ' WHERE r.numero_reserva ILIKE $1';
+  }
+  query += ' ORDER BY f.generada_en DESC';
+  const result = await pool.query(query, params);
+  res.json({ facturas: result.rows });
+}));
+
+// ─── Admin: enviar factura por id de factura ──────────────────────────────────
+app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, res) => {
+  const facturaQ = await pool.query('SELECT * FROM facturas WHERE id = $1', [req.params.id]);
+  if (!facturaQ.rows.length) return res.status(404).json({ error: 'Factura no encontrada.' });
+  const factura = facturaQ.rows[0];
+  const emailDestino = req.body.email || null;
+
+  const reservaQ = await pool.query('SELECT * FROM reservas WHERE id = $1', [factura.reserva_id]);
+  if (!reservaQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = reservaQ.rows[0];
+  const emailFinal = emailDestino || r.email_cliente;
+  if (!emailFinal) return res.status(400).json({ error: 'No hay email de destino.' });
+
+  const resultado = await generarFacturaPDF(factura.reserva_id);
+  if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
+
+  const _pf = await obtenerPlantilla('cliente_factura', {
+    nombre_cliente: r.nombre_cliente,
+    numero_reserva: r.numero_reserva,
+    numero_factura: factura.numero_factura
+  });
+  await enviarEmailConAdjunto({
+    to: emailFinal,
+    subject: (_pf && _pf.asunto) || ('📄 Factura ' + factura.numero_factura + ' — Reserva ' + r.numero_reserva),
+    html: plantillaEmail((_pf && _pf.email) || `<p>Hola <strong>${r.nombre_cliente}</strong>,</p><p>Adjuntamos la factura <strong>${factura.numero_factura}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p><p>Gracias por viajar con Traslados GC.</p>`),
+    adjunto: { filename: 'factura-' + r.numero_reserva + '.pdf', content: resultado.buffer }
+  });
+  res.json({ ok: true });
+}));
+
 // ─── Admin: descargar factura de una reserva ──────────────────────────────────
 app.get('/admin/reservas/:id/factura', requireAdmin, asyncHandler(async (req, res) => {
   const reservaQ = await pool.query('SELECT numero_reserva FROM reservas WHERE id = $1', [req.params.id]);
