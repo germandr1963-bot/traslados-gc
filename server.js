@@ -5447,6 +5447,8 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
   const importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
   const horas = condiciones ? condiciones.horas_cancelacion : 12;
   const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+  const _fechaLimiteCancelEmail = calcularFechaCancelacion(new Date(r.fecha), r.hora, horas);
+  const _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
 
   // Crear sesión de pago en Stripe si está configurado
   let urlPago = null;
