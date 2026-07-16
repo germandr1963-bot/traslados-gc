@@ -7770,11 +7770,12 @@ app.get('/admin/facturas', requireAdmin, asyncHandler(async (req, res) => {
            f.reserva_id, r.numero_reserva, r.nombre_cliente, r.email_cliente
     FROM facturas f
     JOIN reservas r ON r.id = f.reserva_id
+    WHERE r.estado != 'cancelada'
   `;
   const params = [];
   if (pnr) {
     params.push('%' + pnr + '%');
-    query += ' WHERE r.numero_reserva ILIKE $1';
+    query += ' AND r.numero_reserva ILIKE $1';
   }
   query += ' ORDER BY f.generada_en DESC';
   const result = await pool.query(query, params);
