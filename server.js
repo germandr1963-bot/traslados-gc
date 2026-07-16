@@ -1073,6 +1073,7 @@ async function initSchema() {
   await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ADD COLUMN IF NOT EXISTS url_documento TEXT`);
   await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ADD COLUMN IF NOT EXISTS nombre_documento TEXT`);
   await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ALTER COLUMN texto DROP NOT NULL`);
+  await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ADD COLUMN IF NOT EXISTS documento_base64 TEXT`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS reservas_mensajes (
       id SERIAL PRIMARY KEY,
@@ -5265,13 +5266,14 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         // WhatsApp voucher al cliente
         if (r.telefono_cliente) {
           try {
-            const firma = firmarVoucher(reservaId);
-            const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
-            const urlDoc = `${BASE_URL}/voucher-descarga/${reservaId}/${firma}/${nombreDoc}`;
-            await pool.query(
-              'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-              [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`, urlDoc, nombreDoc]
-            );
+            const voucherPdf = await generarVoucherPDF(reservaId);
+            if (voucherPdf && voucherPdf.buffer) {
+              const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
+              await pool.query(
+                'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, nombre_documento, documento_base64) VALUES ($1, $2, $3, $4)',
+                [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`, nombreDoc, voucherPdf.buffer.toString('base64')]
+              );
+            }
           } catch(e) { console.warn('Error encolando WhatsApp voucher:', e.message); }
         }
         // Enviar cartel PDF al chofer
@@ -5548,13 +5550,14 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
     // WhatsApp voucher al cliente
     if (r.telefono_cliente) {
       try {
-        const firma = firmarVoucher(req.params.id);
-        const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
-        const urlDoc = `${BASE_URL}/voucher-descarga/${req.params.id}/${firma}/${nombreDoc}`;
-        await pool.query(
-          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`, urlDoc, nombreDoc]
-        );
+        const voucherPdf = await generarVoucherPDF(req.params.id);
+        if (voucherPdf && voucherPdf.buffer) {
+          const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
+          await pool.query(
+            'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, nombre_documento, documento_base64) VALUES ($1, $2, $3, $4)',
+            [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`, nombreDoc, voucherPdf.buffer.toString('base64')]
+          );
+        }
       } catch(e) { console.warn('Error encolando WhatsApp voucher:', e.message); }
     }
     res.json({ ok: true });
@@ -5583,12 +5586,10 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
     const choferQ = await pool.query('SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]);
     if (choferQ.rows.length && choferQ.rows[0].telefono) {
       try {
-        const firma = firmarCartel(req.params.id);
         const nombreDoc = `cartel-${r.numero_reserva}.pdf`;
-        const urlDoc = `${BASE_URL}/cartel-descarga/${req.params.id}/${firma}/${nombreDoc}`;
         await pool.query(
-          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [choferQ.rows[0].telefono, `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe adjuntamos el cartel de recogida para la reserva ${r.numero_reserva}.\n\nTraslados GC`, urlDoc, nombreDoc]
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, nombre_documento, documento_base64) VALUES ($1, $2, $3, $4)',
+          [choferQ.rows[0].telefono, `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe adjuntamos el cartel de recogida para la reserva ${r.numero_reserva}.\n\nTraslados GC`, nombreDoc, cartel.buffer.toString('base64')]
         );
       } catch(e) { console.warn('Error encolando WhatsApp cartel:', e.message); }
     }
@@ -5625,13 +5626,11 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
     });
     if (r.telefono_cliente) {
       try {
-        const firma = firmarFactura(req.params.id);
         const nombreDoc = `factura-${resultado.numeroFactura}.pdf`;
-        const urlDoc = `${BASE_URL}/factura-descarga/${req.params.id}/${firma}/${nombreDoc}`;
         const textoWa = (_pf && _pf.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`;
         await pool.query(
-          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [r.telefono_cliente, textoWa, urlDoc, nombreDoc]
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, nombre_documento, documento_base64) VALUES ($1, $2, $3, $4)',
+          [r.telefono_cliente, textoWa, nombreDoc, pdfBuffer.toString('base64')]
         );
       } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
     }
@@ -7788,7 +7787,7 @@ function requierePuenteWhatsapp(req, res, next) {
 
 app.get('/api/whatsapp/mensajes-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, telefono, texto, url_documento, nombre_documento FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
+    'SELECT id, telefono, texto, url_documento, nombre_documento, documento_base64 FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
   );
   res.json(result.rows);
 }));
