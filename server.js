@@ -1708,7 +1708,17 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
   // Email de pre-reserva al cliente
   try {
     const fechaTexto = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+    const horaTexto = hora ? hora.slice(0, 5) : '—';
+    const _par = await obtenerPlantilla('cliente_acuse_recibo', {
+      nombre_cliente: nombre_cliente.trim(),
+      numero_reserva: numeroReserva,
+      origen: origen || '—',
+      destino: destino || '—',
+      fecha: fechaTexto,
+      hora: horaTexto
+    });
     const htmlEmail = plantillaEmail(
+      (_par && _par.email) ||
       `<p>Hola <strong>${nombre_cliente.trim()}</strong>,</p>
        <p>Hemos recibido tu solicitud de traslado. Estamos trabajando en ella y en breve recibirás confirmación.</p>
        <p>Tu número de reserva es:</p>
@@ -1725,7 +1735,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
 
     await enviarEmail({
       to: email_cliente.trim(),
-      subject: 'Solicitud de traslado recibida — ' + numeroReserva,
+      subject: (_par && _par.asunto) || ('Solicitud de traslado recibida — ' + numeroReserva),
       html: htmlEmail
     });
   } catch(emailErr) {
