@@ -1073,6 +1073,7 @@ async function initSchema() {
   await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ADD COLUMN IF NOT EXISTS url_documento TEXT`);
   await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ADD COLUMN IF NOT EXISTS nombre_documento TEXT`);
   await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ALTER COLUMN texto DROP NOT NULL`);
+  await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ADD COLUMN IF NOT EXISTS documento_base64 TEXT`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS reservas_mensajes (
       id SERIAL PRIMARY KEY,
@@ -1206,6 +1207,163 @@ async function initSchema() {
   `);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS token_valoracion TEXT UNIQUE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS completada_en TIMESTAMPTZ`);
+
+  // \u2500\u2500\u2500 Tabla de plantillas de comunicaci\u00f3n \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS plantillas_comunicacion (
+      id SERIAL PRIMARY KEY,
+      clave TEXT UNIQUE NOT NULL,
+      nombre TEXT NOT NULL,
+      categoria TEXT NOT NULL CHECK (categoria IN ('cliente','chofer','interno')),
+      asunto_email TEXT,
+      cuerpo_email TEXT,
+      cuerpo_whatsapp TEXT,
+      activa BOOLEAN DEFAULT TRUE,
+      actualizado_en TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  // Insertar plantillas base (ON CONFLICT DO NOTHING para no sobreescribir ediciones del admin)
+  const plantillasBase = [
+    { clave: 'cliente_acuse_recibo', nombre: 'Solicitud recibida (acuse al cliente)', categoria: 'cliente',
+      asunto_email: 'Solicitud de traslado recibida \u2014 {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nHemos recibido tu solicitud de traslado <strong>{numero_reserva}</strong>.\n\n\ud83d\udccd <strong>Origen:</strong> {origen}\n\ud83c\udfc1 <strong>Destino:</strong> {destino}\n\ud83d\udcc5 <strong>Fecha:</strong> {fecha} \u00b7 {hora}\n\nEl plazo m\u00e1ximo para confirmarte un chofer es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nHemos recibido tu solicitud de traslado {numero_reserva}.\n\n\ud83d\udccd Origen: {origen}\n\ud83c\udfc1 Destino: {destino}\n\ud83d\udcc5 Fecha: {fecha} \u00b7 {hora}\n\nEl plazo m\u00e1ximo para confirmarte un chofer es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.\n\nTraslados GC' },
+    { clave: 'cliente_confirmacion', nombre: 'Traslado confirmado (al cliente)', categoria: 'cliente',
+      asunto_email: 'Traslado confirmado \u2014 {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\n\u2705 Tu traslado <strong>{numero_reserva}</strong> ha sido confirmado.\n\n\ud83d\udccd <strong>Origen:</strong> {origen}\n\ud83c\udfc1 <strong>Destino:</strong> {destino}\n\ud83d\udcc5 <strong>Fecha:</strong> {fecha} \u00b7 {hora}\n\ud83d\ude97 <strong>Veh\u00edculo:</strong> {categoria}\n\ud83d\udcb0 <strong>Precio estimado:</strong> {precio} \u20ac\n\nEn breve recibir\u00e1s el voucher con todos los detalles del servicio.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\n\u2705 Tu traslado {numero_reserva} ha sido confirmado.\n\n\ud83d\udccd Origen: {origen}\n\ud83c\udfc1 Destino: {destino}\n\ud83d\udcc5 Fecha: {fecha} \u00b7 {hora}\n\ud83d\ude97 Veh\u00edculo: {categoria}\n\ud83d\udcb0 Precio estimado: {precio} \u20ac\n\nEn breve recibir\u00e1s el voucher.\n\nTraslados GC' },
+    { clave: 'cliente_enlace_pago', nombre: 'Enlace de pago (dep\u00f3sito)', categoria: 'cliente',
+      asunto_email: 'Enlace de pago \u2014 Reserva {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nTe reenviamos el enlace de pago para confirmar tu reserva <strong>{numero_reserva}</strong>.\n\n\ud83d\udcb3 El dep\u00f3sito de garant\u00eda es de <strong>{importe} \u20ac</strong>.\n\nSi tienes alg\u00fan problema con el pago, contacta con nosotros por WhatsApp.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nTe enviamos el enlace de pago para tu reserva {numero_reserva}.\n\n\ud83d\udcb3 Dep\u00f3sito de garant\u00eda: {importe} \u20ac\n\n{url_pago}\n\nSi tienes cualquier duda, cont\u00e1ctanos. Un saludo \ud83d\ude4f\nTraslados GC' },
+    { clave: 'cliente_voucher', nombre: 'Voucher de traslado', categoria: 'cliente',
+      asunto_email: '\u2714 Voucher de traslado \u2014 {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nAdjuntamos el voucher de tu traslado <strong>{numero_reserva}</strong>. Ll\u00e9valo contigo el d\u00eda del servicio.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nTe adjuntamos el voucher de tu traslado {numero_reserva}. Ll\u00e9valo contigo el d\u00eda del servicio. \ud83d\udcc4\n\nTraslados GC' },
+    { clave: 'cliente_cancelacion', nombre: 'Cancelaci\u00f3n de reserva (al cliente)', categoria: 'cliente',
+      asunto_email: 'Tu reserva {numero_reserva} ha sido cancelada',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nTu reserva <strong>{numero_reserva}</strong> ha sido cancelada correctamente.\n\n\ud83d\udccd <strong>Origen:</strong> {origen}\n\ud83c\udfc1 <strong>Destino:</strong> {destino}\n\nSi tienes alguna duda, puedes contactarnos por WhatsApp.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nTu reserva {numero_reserva} ({origen} \u2192 {destino}) del {fecha} ha sido cancelada correctamente.\n\n\u2705 La cancelaci\u00f3n se ha realizado dentro del plazo establecido. El dep\u00f3sito de garant\u00eda te ser\u00e1 devuelto en breve.\n\nUn saludo \ud83d\ude4f\nTraslados GC' },
+    { clave: 'cliente_modificacion_aprobada', nombre: 'Modificaci\u00f3n aprobada (al cliente)', categoria: 'cliente',
+      asunto_email: '\u2705 Tu modificaci\u00f3n ha sido aprobada \u2014 {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nHemos revisado y aprobado los cambios en tu reserva <strong>{numero_reserva}</strong>.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\n\u2705 Los cambios solicitados en tu reserva {numero_reserva} han sido aprobados.\n\nUn saludo \ud83d\ude4f\nTraslados GC' },
+    { clave: 'cliente_mensaje_admin', nombre: 'Mensaje del equipo al cliente', categoria: 'cliente',
+      asunto_email: '\ud83d\udcac Tienes un mensaje sobre tu reserva {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nEl equipo de Traslados GC te ha enviado un mensaje sobre tu reserva <strong>{numero_reserva}</strong>:\n\n{mensaje}\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nTienes un mensaje sobre tu reserva {numero_reserva}:\n\n{mensaje}\n\nUn saludo \ud83d\ude4f\nTraslados GC' },
+    { clave: 'cliente_valoracion', nombre: 'Solicitud de valoraci\u00f3n (servicio terminado)', categoria: 'cliente',
+      asunto_email: '\u00bfC\u00f3mo fue tu traslado {numero_reserva}?',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nTu traslado <strong>{numero_reserva}</strong> ({origen} \u2192 {destino}) ha finalizado.\n\n\u2b50 \u00bfNos cuentas c\u00f3mo fue? Tu opini\u00f3n nos ayuda a mejorar el servicio. Solo te llevar\u00e1 un momento.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nTu traslado {numero_reserva} ({origen} \u2192 {destino}) ha finalizado.\n\n\u2b50 \u00bfNos cuentas c\u00f3mo fue? Tu opini\u00f3n nos ayuda a mejorar:\n{url_valoracion}\n\nTraslados GC' },
+    { clave: 'cliente_deposito_liberado', nombre: 'Dep\u00f3sito liberado (servicio completado)', categoria: 'cliente',
+      asunto_email: '\u2705 Tu dep\u00f3sito ha sido liberado \u2014 {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nEl dep\u00f3sito de garant\u00eda de tu reserva <strong>{numero_reserva}</strong> ({origen} \u2192 {destino}) ha sido liberado.\n\nEl importe quedar\u00e1 disponible en tu tarjeta en un plazo de 5 a 10 d\u00edas h\u00e1biles seg\u00fan tu entidad bancaria.\n\nGracias por viajar con Traslados GC \ud83d\ude4f\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nEl dep\u00f3sito de garant\u00eda de tu reserva {numero_reserva} ({origen} \u2192 {destino}) ha sido liberado. El importe quedar\u00e1 disponible en tu tarjeta en un plazo de 5 a 10 d\u00edas h\u00e1biles.\n\nGracias por viajar con nosotros \ud83d\ude4f\nTraslados GC' },
+    { clave: 'cliente_deposito_noshow', nombre: 'Dep\u00f3sito retenido por no-show', categoria: 'cliente',
+      asunto_email: '\ud83d\udd12 Dep\u00f3sito retenido por no-show \u2014 {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nLamentamos informarte de que tu traslado <strong>{numero_reserva}</strong> ({origen} \u2192 {destino}) del {fecha} no pudo realizarse al no haberse presentado en el punto de recogida.\n\n\ud83d\udd12 De acuerdo con nuestra pol\u00edtica de reservas, el dep\u00f3sito de garant\u00eda de <strong>{importe} \u20ac</strong> ha sido retenido por no-show.\n\nSi crees que ha habido un error, no dudes en contactarnos.\n\nUn saludo cordial,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nTu traslado {numero_reserva} ({origen} \u2192 {destino}) no pudo realizarse al no presentarse en el punto de recogida. El dep\u00f3sito de garant\u00eda ha sido retenido seg\u00fan nuestra pol\u00edtica de reservas.\n\nSi crees que ha habido un error, cont\u00e1ctanos. Un saludo \ud83d\ude4f\nTraslados GC' },
+    { clave: 'cliente_en_gestion', nombre: 'Seguimos gestionando (15 min sin chofer)', categoria: 'cliente',
+      asunto_email: 'Seguimos gestionando tu traslado \u2014 {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nSeguimos gestionando tu solicitud de traslado. A\u00fan no hemos podido confirmar chofer, pero continuamos buscando disponibilidad. Te avisaremos en cuanto tengamos una respuesta.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nSeguimos gestionando tu solicitud de traslado {numero_reserva}. A\u00fan no hemos podido confirmar chofer, pero continuamos buscando disponibilidad. Te avisaremos en cuanto tengamos una respuesta.\n\nTraslados GC' },
+    { clave: 'cliente_reserva_anulada', nombre: 'Reserva anulada (sin chofer disponible)', categoria: 'cliente',
+      asunto_email: 'Tu reserva {numero_reserva} ha sido anulada',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nLamentamos informarte que no hemos podido confirmar un chofer disponible para tu traslado en la fecha solicitada, por lo que hemos anulado la reserva.\n\nPuedes enviarnos una nueva solicitud m\u00e1s adelante; con gusto intentaremos ayudarte si tenemos disponibilidad.\n\nDisculpa las molestias.\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nLamentamos informarte que no hemos podido confirmar un chofer para tu traslado {numero_reserva}. Hemos anulado la reserva.\n\nPuedes enviarnos una nueva solicitud m\u00e1s adelante. Disculpa las molestias \ud83d\ude4f\nTraslados GC' },
+    { clave: 'cliente_acceso_reserva', nombre: 'Acceso a reserva (contrase\u00f1a provisional)', categoria: 'cliente',
+      asunto_email: 'Acceso a tu reserva {numero_reserva} \u2014 Traslados GC',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nTe hemos creado acceso al portal de cliente para que puedas consultar y gestionar tu reserva <strong>{numero_reserva}</strong>.\n\n\ud83d\udd11 <strong>Email:</strong> {email_cliente}\n\ud83d\udd11 <strong>Contrase\u00f1a temporal:</strong> {password_temporal}\n\nTe pediremos que la cambies en tu primer acceso.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nTe hemos creado acceso al portal de cliente para gestionar tu reserva {numero_reserva}.\n\nEntra en {url_portal} con tu email y contrase\u00f1a temporal: {password_temporal}\n\nTraslados GC' },
+    { clave: 'cliente_recuperar_password', nombre: 'Recuperar contrase\u00f1a (portal cliente)', categoria: 'cliente',
+      asunto_email: 'Recupera tu contrase\u00f1a \u2014 Traslados GC',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nHemos recibido una solicitud para restablecer tu contrase\u00f1a.\n\nHaz clic en el enlace para crear una nueva contrase\u00f1a. El enlace caduca en 1 hora.\n\nSi no solicitaste este cambio, puedes ignorar este mensaje.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: null },
+    { clave: 'cliente_precio_respuesta', nombre: 'Precio \u201ca consultar\u201d \u2192 respuesta con precio', categoria: 'cliente',
+      asunto_email: 'Precio de traslado: {origen} \u2192 {destino}',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nYa tenemos el precio para tu traslado de <strong>{origen}</strong> a <strong>{destino}</strong>.\n\n\ud83d\udcb0 <strong>Precio estimado: {precio} \u20ac</strong>\n\nSi deseas proceder con la reserva, haz clic en el bot\u00f3n de abajo.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nYa tenemos el precio para tu traslado de {origen} a {destino}.\n\n\ud83d\udcb0 Precio estimado: {precio} \u20ac\n\nSi deseas proceder, resp\u00f3ndenos o visita nuestra web. Un saludo \ud83d\ude4f\nTraslados GC' },
+    { clave: 'cliente_precio_negativa', nombre: 'Precio \u201ca consultar\u201d \u2192 no disponible', categoria: 'cliente',
+      asunto_email: 'Tu consulta de traslado \u2014 Traslados GC',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nLamentamos informarte que en este momento no podemos ofrecerte servicio para el traslado solicitado de <strong>{origen}</strong> a <strong>{destino}</strong>.\n\nPuedes volver a consultarnos en otra fecha. Estaremos encantados de ayudarte.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nLamentamos no poder ofrecerte servicio para tu traslado de {origen} a {destino} en este momento.\n\nPuedes volver a consultarnos en otra fecha. Un saludo \ud83d\ude4f\nTraslados GC' },
+    { clave: 'cliente_factura', nombre: 'Factura (al cliente)', categoria: 'cliente',
+      asunto_email: '\ud83d\udcc4 Factura {numero_factura} \u2014 Reserva {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\nAdjuntamos la factura <strong>{numero_factura}</strong> correspondiente a tu reserva <strong>{numero_reserva}</strong>.\n\nGracias por viajar con Traslados GC \ud83d\ude4f\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\nTe adjuntamos la factura {numero_factura} de tu reserva {numero_reserva}. \ud83d\udcc4\n\nGracias por viajar con Traslados GC \ud83d\ude4f' },
+    { clave: 'cliente_comunicacion_masiva', nombre: 'Comunicaci\u00f3n masiva (a clientes)', categoria: 'cliente',
+      asunto_email: '{asunto_libre}',
+      cuerpo_email: 'Hola, <strong>{nombre_cliente}</strong> \ud83d\udc4b\n\n{mensaje_libre}\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_cliente} \ud83d\udc4b\n\n{mensaje_libre}\n\nTraslados GC' },
+    { clave: 'chofer_cartel', nombre: 'Cartel de recogida (al chofer)', categoria: 'chofer',
+      asunto_email: 'Cartel de recogida \u2014 {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_chofer}</strong> \ud83d\udc4b\n\nAdjuntamos el cartel de recogida para tu pr\u00f3ximo servicio.\n\n\ud83d\udccb <strong>Reserva:</strong> {numero_reserva}\n\ud83d\udccd <strong>Origen:</strong> {origen}\n\ud83c\udfc1 <strong>Destino:</strong> {destino}\n\ud83d\udcc5 <strong>Fecha:</strong> {fecha} \u00b7 {hora}\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_chofer} \ud83d\udc4b\n\nTe adjuntamos el cartel de recogida para la reserva {numero_reserva}. \ud83d\udccb\n\n\ud83d\udccd Origen: {origen}\n\ud83c\udfc1 Destino: {destino}\n\ud83d\udcc5 Fecha: {fecha} \u00b7 {hora}\n\nTraslados GC' },
+    { clave: 'chofer_cancelacion', nombre: 'Cancelaci\u00f3n asignada (al chofer)', categoria: 'chofer',
+      asunto_email: '\u274c Cancelaci\u00f3n de reserva \u2014 {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_chofer}</strong> \ud83d\udc4b\n\nLa reserva <strong>{numero_reserva}</strong> ({origen} \u2192 {destino}) del {fecha} a las {hora} ha sido cancelada por el cliente.\n\nQueda liberada de tu agenda.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: '\u274c Cancelaci\u00f3n de reserva\nReserva: {numero_reserva}\nRuta: {origen} \u2192 {destino}\nFecha: {fecha} \u00b7 {hora}\n\nEsta reserva ha sido cancelada por el cliente. Queda liberada de tu agenda.' },
+    { clave: 'chofer_gracias_servicio', nombre: 'Gracias por el servicio (al chofer)', categoria: 'chofer',
+      asunto_email: '\ud83d\ude4f Gracias por el servicio \u2014 {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_chofer}</strong> \ud83d\udc4b\n\n\u2705 Servicio completado. Gracias por realizar el traslado con profesionalidad y puntualidad. Tu trabajo es la base de nuestro servicio.\n\n\ud83d\udccb <strong>Reserva:</strong> {numero_reserva}\n\ud83d\udccd <strong>Ruta:</strong> {origen} \u2192 {destino}\n\ud83d\udcc5 <strong>Fecha:</strong> {fecha}\n\nSeguimos contando contigo para los pr\u00f3ximos servicios. \u00a1Hasta pronto!\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_chofer} \ud83d\udc4b\n\n\u2705 Servicio completado. Gracias por el traslado {numero_reserva} ({origen} \u2192 {destino}) del {fecha}. Tu profesionalidad es la base de nuestro servicio.\n\n\u00a1Hasta pronto! \ud83d\ude4f\nTraslados GC' },
+    { clave: 'chofer_mensaje_admin', nombre: 'Mensaje del equipo al chofer', categoria: 'chofer',
+      asunto_email: '\ud83d\udcac Mensaje sobre la reserva {numero_reserva}',
+      cuerpo_email: 'Hola, <strong>{nombre_chofer}</strong> \ud83d\udc4b\n\nEl equipo de Traslados GC te ha enviado un mensaje sobre la reserva <strong>{numero_reserva}</strong>:\n\n{mensaje}\n\nAccede a tu portal para ver los detalles.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_chofer} \ud83d\udc4b\n\nTienes un mensaje sobre la reserva {numero_reserva}:\n\n{mensaje}\n\nAccede a tu portal para ver los detalles. Un saludo \ud83d\ude4f\nTraslados GC' },
+    { clave: 'chofer_bienvenida', nombre: 'Bienvenida al chofer (cuenta aprobada)', categoria: 'chofer',
+      asunto_email: '\u00a1Bienvenido a Traslados GC!',
+      cuerpo_email: 'Hola, <strong>{nombre_chofer}</strong> \ud83d\udc4b\n\nEs un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada \u2014 a partir de ahora formas parte del equipo de Traslados GC.\n\nYa puedes acceder a tu portal de chofer.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_chofer} \ud83d\udc4b\n\n\u2705 Tu solicitud ha sido aprobada. \u00a1Bienvenido al equipo de Traslados GC!\n\nYa puedes acceder a tu portal de chofer.\n\nUn saludo \ud83d\ude4f\nTraslados GC' },
+    { clave: 'chofer_comunicacion_masiva', nombre: 'Comunicaci\u00f3n masiva (a choferes)', categoria: 'chofer',
+      asunto_email: '{asunto_libre}',
+      cuerpo_email: 'Hola, <strong>{nombre_chofer}</strong> \ud83d\udc4b\n\n{mensaje_libre}\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: 'Hola, {nombre_chofer} \ud83d\udc4b\n\n{mensaje_libre}\n\nTraslados GC' },
+    { clave: 'interno_cliente_modifico', nombre: '[Admin] Cliente modific\u00f3 datos de reserva', categoria: 'interno',
+      asunto_email: '\u270f\ufe0f Cliente modific\u00f3 datos \u2014 {numero_reserva}',
+      cuerpo_email: 'El cliente de la reserva <strong>{numero_reserva}</strong> ha modificado los datos de su traslado.\n\nAccede al panel de administraci\u00f3n para ver los cambios.',
+      cuerpo_whatsapp: null },
+    { clave: 'interno_cliente_cancelo', nombre: '[Admin] Cliente cancel\u00f3 una reserva', categoria: 'interno',
+      asunto_email: '\u274c Cancelaci\u00f3n de reserva \u2014 {numero_reserva}',
+      cuerpo_email: 'El cliente <strong>{nombre_cliente}</strong> ha cancelado la reserva <strong>{numero_reserva}</strong>.\n\nRuta: {origen} \u2192 {destino}\nFecha: {fecha}',
+      cuerpo_whatsapp: null },
+    { clave: 'interno_cliente_mensaje', nombre: '[Admin] Nuevo mensaje de cliente', categoria: 'interno',
+      asunto_email: '\ud83d\udcac Nuevo mensaje de cliente \u2014 {numero_reserva}',
+      cuerpo_email: '<strong>{nombre_cliente}</strong> (reserva <strong>{numero_reserva}</strong>) ha enviado un mensaje:\n\n{mensaje}\n\nAccede al panel de administraci\u00f3n para responder o ver el historial.',
+      cuerpo_whatsapp: null },
+    { clave: 'interno_modificacion_solicitada', nombre: '[Admin] Cliente solicit\u00f3 modificaci\u00f3n', categoria: 'interno',
+      asunto_email: '\u270f\ufe0f Modificaci\u00f3n solicitada \u2014 {numero_reserva}',
+      cuerpo_email: 'El cliente <strong>{nombre_cliente}</strong> ha solicitado modificaciones en la reserva <strong>{numero_reserva}</strong>.\n\nAccede al panel de administraci\u00f3n para revisar y aprobar.',
+      cuerpo_whatsapp: null },
+    { clave: 'interno_sin_choferes', nombre: '[Admin] Sin respuesta de choferes (15 min)', categoria: 'interno',
+      asunto_email: 'Reserva {numero_reserva} sin respuesta de choferes (15 min)',
+      cuerpo_email: 'La reserva <strong>{numero_reserva}</strong> lleva 15 minutos avisada a los choferes disponibles sin que nadie haya aceptado.\n\nPuede que quieras buscar chofer manualmente desde el panel de administraci\u00f3n.',
+      cuerpo_whatsapp: null },
+    { clave: 'interno_registro_chofer', nombre: '[Admin] Nuevo chofer registrado', categoria: 'interno',
+      asunto_email: 'Solicitud recibida \u2014 Traslados GC',
+      cuerpo_email: 'Hola, <strong>{nombre_chofer}</strong> \ud83d\udc4b\n\nHemos recibido tu solicitud para unirte a nuestra flota. Revisaremos tu informaci\u00f3n y te notificaremos en breve.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_whatsapp: null },
+    { clave: 'interno_recuperar_password_admin', nombre: '[Admin] Recuperar contrase\u00f1a de administrador', categoria: 'interno',
+      asunto_email: 'Recupera tu contrase\u00f1a \u2014 Traslados GC',
+      cuerpo_email: 'Hola \ud83d\udc4b\n\nHemos recibido una solicitud para restablecer la contrase\u00f1a de la cuenta de administrador.\n\nHaz clic en el enlace para crear una nueva contrase\u00f1a. El enlace caduca en 1 hora.\n\nSi no solicitaste este cambio, puedes ignorar este mensaje.',
+      cuerpo_whatsapp: null },
+    { clave: 'marca_base', nombre: 'Plantilla base de marca', categoria: 'interno',
+      asunto_email: 'marca_base',
+      cuerpo_email: '{"nombre":"Traslados GC","subtitulo":"Gran Canaria","colorCabecera":"#2c2c2c","colorNombre":"#d4956a","pie":"Traslados GC \u00b7 Gran Canaria"}',
+      cuerpo_whatsapp: null }
+  ];
+
+  for (const p of plantillasBase) {
+    await pool.query(
+      `INSERT INTO plantillas_comunicacion (clave, nombre, categoria, asunto_email, cuerpo_email, cuerpo_whatsapp)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (clave) DO NOTHING`,
+      [p.clave, p.nombre, p.categoria, p.asunto_email, p.cuerpo_email, p.cuerpo_whatsapp]
+    );
+  }
+  console.log('Plantillas de comunicaci\u00f3n cargadas.');
 
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
@@ -3182,20 +3340,11 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
     await enviarEmail({
       to: email.trim(),
       subject: 'Solicitud recibida — Traslados GC',
-      html: `<!DOCTYPE html><html><head><meta charset="utf-8">
-      <meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body>
-      <div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif;">
-        <div style="background:#2c2c2c;padding:24px;text-align:center;">
-          <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
-          <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
-        </div>
-        <div style="padding:28px 24px;">
-          <p>Hola <strong>${nombre.trim()}</strong>,</p>
-          <p>Hemos recibido tu solicitud para unirte a nuestra flota de choferes. Revisaremos tu información y te contactaremos en breve.</p>
-          <p style="font-size:13px;color:#888;">Si tienes alguna pregunta, no dudes en contactarnos.</p>
-        </div>
-        <div style="background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;">Traslados GC · Gran Canaria</div>
-      </div></body></html>`
+      html: plantillaEmail(
+        `<p>Hola <strong>${nombre.trim()}</strong>,</p>
+         <p>Hemos recibido tu solicitud para unirte a nuestra flota de choferes. Revisaremos tu información y te contactaremos en breve.</p>
+         <p style="font-size:13px;color:#888;">Si tienes alguna pregunta, no dudes en contactarnos.</p>`
+      )
     });
   } catch(err) {
     console.warn('Error enviando email confirmación registro chofer:', err.message);
@@ -3256,33 +3405,13 @@ app.post('/chofer/recuperar-password', asyncHandler(async (req, res) => {
   await enviarEmail({
     to: chofer.email,
     subject: 'Recupera tu contraseña — Traslados GC',
-    html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f4f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
-  <div style="max-width:600px;margin:0 auto;padding:40px 16px">
-    <div style="background:#1C1815;padding:28px 32px;border-radius:12px 12px 0 0;text-align:center">
-      <h1 style="color:#D9A441;margin:0;font-size:22px;letter-spacing:1px">Traslados GC</h1>
-    </div>
-    <div style="background:#ffffff;padding:36px 32px;border-radius:0 0 12px 12px;border:1px solid #e1dcd0;border-top:none">
-      <h2 style="color:#2A211B;font-size:20px;margin:0 0 16px">Hola, ${chofer.nombre}</h2>
-      <p style="color:#2A211B;font-size:16px;line-height:1.7;margin:0 0 16px">
-        Has solicitado recuperar el acceso a tu portal de chofer. Pulsa el botón para elegir una contraseña nueva:
-      </p>
-      <div style="text-align:center;margin:28px 0">
-        <a href="${enlace}"
-           style="background:#C1502E;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block">
-          Crear nueva contraseña
-        </a>
-      </div>
-      <p style="color:#5b5347;font-size:13px;line-height:1.6;margin:0 0 0">
-        Este enlace caduca en 1 hora y solo se puede usar una vez. Tu contraseña actual sigue funcionando hasta que la cambies desde aquí.
-      </p>
-      <p style="color:#5b5347;font-size:12px;line-height:1.6;margin:24px 0 0;border-top:1px solid #e1dcd0;padding-top:20px">
-        Si no has solicitado esto, ignora este mensaje — no se cambiará nada.
-      </p>
-    </div>
-    <p style="text-align:center;color:#b5a99a;font-size:12px;margin-top:20px">Traslados GC · Gran Canaria</p>
-  </div>
-</body></html>`
+    html: plantillaEmail(
+      `<p>Hola <strong>${chofer.nombre}</strong>,</p>
+       <p>Has solicitado recuperar el acceso a tu portal de chofer. Pulsa el botón para elegir una contraseña nueva:</p>
+       <p style="text-align:center;"><a href="${enlace}" class="boton">Crear nueva contraseña</a></p>
+       <p style="font-size:13px;color:#5b5347;">Este enlace caduca en 1 hora y solo se puede usar una vez. Tu contraseña actual sigue funcionando hasta que la cambies desde aquí.</p>
+       <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado esto, ignora este mensaje — no se cambiará nada.</p>`
+    )
   });
 
   res.json({ ok: true });
@@ -3565,36 +3694,17 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
 
   // Email al cliente
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <style>
-    body{margin:0;padding:0;background:#F6F4EF;}
-    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
-    .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #D9A441;}
-    .body{padding:28px;}
-    .ruta-box{background:#ECE6D8;border-radius:8px;padding:14px 18px;margin:16px 0;}
-    .boton{display:inline-block;background:#C1502E;color:#fff;padding:13px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;margin-top:10px;}
-    .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}
-    @media(max-width:480px){.body{padding:16px;}}
-  </style></head><body>
-  <div class="wrapper">
-    <div class="header">
-      <h1 style="color:#D9A441;margin:0;font-size:20px;letter-spacing:1px;">TRASLADOS GC</h1>
-      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
-    </div>
-    <div class="body">
-      <p>Hola, <strong>${r.nombre_cliente}</strong>,</p>
-      <p>Tu traslado ha concluido. Nos gustaría saber cómo fue tu experiencia.</p>
-      <div class="ruta-box">
-        <strong>${r.origen} → ${r.destino}</strong><br>
-        <span style="font-size:13px;color:#888;">Reserva ${r.numero_reserva} · ${fechaTexto}</span>
-      </div>
-      <p>Tu opinión nos ayuda a seguir mejorando el servicio. Solo te llevará un momento.</p>
-      <a href="${enlace}" class="boton">Valorar mi traslado</a>
-      <p style="margin-top:24px;color:#888;font-size:13px;">Si no fuiste tú quien realizó este traslado, puedes ignorar este mensaje.</p>
-    </div>
-    <div class="footer">Traslados GC · Gran Canaria</div>
-  </div></body></html>`;
+  const html = plantillaEmail(
+    `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+     <p>Tu traslado ha finalizado. Nos gustaría saber cómo fue tu experiencia.</p>
+     <div class="info-box">
+       <strong>${r.origen} → ${r.destino}</strong><br>
+       <span style="font-size:13px;color:#888;">Reserva ${r.numero_reserva} · ${fechaTexto}</span>
+     </div>
+     <p>Tu opinión nos ayuda a seguir mejorando el servicio. Solo te llevará un momento.</p>
+     <p style="text-align:center;margin:24px 0;"><a href="${enlace}" class="boton">⭐ Valorar mi traslado</a></p>
+     <p style="color:#888;font-size:13px;">Si no fuiste tú quien realizó este traslado, puedes ignorar este mensaje.</p>`
+  );
 
   try {
     await enviarEmail({
@@ -3644,38 +3754,19 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
     await enviarEmail({
       to: r.email_cliente,
       subject: '🔒 Depósito retenido por no-show — ' + r.numero_reserva,
-      html: `<!DOCTYPE html><html><head><meta charset="utf-8">
-      <style>
-        body{margin:0;padding:0;background:#f5f0ea;font-family:'Helvetica Neue',Arial,sans-serif;}
-        .wrapper{max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
-        .header{background:#1C1815;padding:28px 32px;text-align:center;border-bottom:4px solid #C1502E;}
-        .header h1{color:#D9A441;margin:0;font-size:22px;letter-spacing:1px;font-weight:700;}
-        .body{padding:32px;}
-        .caja-aviso{background:#fdecea;border:1px solid #f5b8b8;border-radius:10px;padding:20px 24px;margin:20px 0;}
-        .caja-aviso .titulo{font-size:16px;font-weight:700;color:#c62828;margin-bottom:8px;}
-        .caja-aviso .texto{font-size:14px;color:#7a1e1e;line-height:1.6;}
-        .datos{background:#f9f7f4;border-radius:8px;padding:16px 20px;margin:20px 0;font-size:14px;color:#3a3330;line-height:1.9;}
-        .datos strong{color:#1C1815;}
-        .despedida{font-size:14px;color:#5b5347;line-height:1.7;margin-top:20px;}
-        .footer{background:#ECE6D8;padding:18px 32px;text-align:center;font-size:12px;color:#888;line-height:1.6;}
-      </style></head><body>
-      <div class="wrapper">
-        <div class="header"><h1>Traslados · GC</h1></div>
-        <div class="body">
-          <p style="font-size:17px;color:#1C1815;">Hola, <strong>${r.nombre_cliente}</strong> 👋</p>
-          <div class="caja-aviso">
-            <div class="titulo">🔒 Depósito retenido por no-show</div>
-            <div class="texto">Lamentamos informarte de que tu traslado <strong>${r.numero_reserva}</strong> (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTexto} no pudo realizarse al no haberse presentado en el punto de recogida.<br><br>De acuerdo con nuestra política de reservas, el depósito de garantía de ${importe} € ha sido retenido por no-show.</div>
-          </div>
-          <div class="datos">
-            <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
-            <strong>Fecha del servicio:</strong> ${fechaTexto}<br>
-            <strong>Reserva:</strong> <span style="font-family:monospace;">${r.numero_reserva}</span>
-          </div>
-          <p class="despedida">Si crees que ha habido un error, no dudes en contactarnos.<br><br>Un saludo cordial,<br><strong>El equipo de Traslados GC</strong></p>
-        </div>
-        <div class="footer">Traslados GC · Gran Canaria<br>Este email es una notificación automática de nuestra política de reservas.</div>
-      </div></body></html>`
+      html: plantillaEmail(
+        `<p>Hola <strong>${r.nombre_cliente}</strong> 👋</p>
+         <div class="caja-roja">
+           <p style="margin:0 0 8px 0;font-weight:700;font-size:15px;">🔒 Depósito retenido por no-show</p>
+           <p style="margin:0;font-size:14px;line-height:1.6;">Lamentamos informarte de que tu traslado <strong>${r.numero_reserva}</strong> (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTexto} no pudo realizarse al no haberse presentado en el punto de recogida.<br><br>De acuerdo con nuestra política de reservas, el depósito de garantía de ${importe} € ha sido retenido por no-show.</p>
+         </div>
+         <div class="info-box">
+           <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
+           <strong>Fecha del servicio:</strong> ${fechaTexto}<br>
+           <strong>Reserva:</strong> <span class="pnr">${r.numero_reserva}</span>
+         </div>
+         <p>Si crees que ha habido un error, no dudes en contactarnos.<br><br>Un saludo cordial,<br><strong>El equipo de Traslados GC</strong></p>`
+      )
     });
   } catch(e) { console.warn('Error enviando email no-show:', e.message); }
 
@@ -4025,72 +4116,23 @@ app.post('/admin/cotizaciones/:id/enviar', requireAdmin, asyncHandler(async (req
     </tr>`;
   }).join('');
 
-  const html = `
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-      body { margin:0; padding:0; background:#f5f5f5; }
-      .wrapper { max-width:600px; margin:0 auto; background:#fff; }
-      .header { background:#2c2c2c; padding:24px; text-align:center; }
-      .body { padding:24px; }
-      .tabla-datos { width:100%; border-collapse:collapse; margin:16px 0; }
-      .tabla-datos td { padding:8px 12px; font-size:14px; }
-      .tabla-precios { width:100%; border-collapse:collapse; }
-      .tabla-precios th { background:#2c2c2c; color:#fff; padding:8px 12px; text-align:left; font-size:13px; }
-      .tabla-precios td { padding:8px 12px; border-bottom:1px solid #eee; font-size:14px; }
-      .boton-cta { display:block; background:#d4956a; color:#fff; padding:14px 28px; border-radius:6px; text-decoration:none; font-weight:600; text-align:center; margin:24px auto; max-width:280px; }
-      .footer { background:#f5f0ea; padding:16px; text-align:center; font-size:12px; color:#888; }
-      .nota { font-size:12px; color:#999; margin-top:16px; line-height:1.6; }
-      @media (max-width:480px) {
-        .body { padding:16px; }
-        .tabla-datos td, .tabla-precios th, .tabla-precios td { padding:6px 8px; font-size:13px; }
-        .boton-cta { padding:12px 16px; font-size:14px; }
-      }
-    </style>
-  </head>
-  <body>
-  <div class="wrapper">
-    <div class="header">
-      <h1 style="color:#d4956a;margin:0;font-size:22px;">Traslados GC</h1>
-      <p style="color:#aaa;margin:4px 0 0 0;font-size:13px;">Gran Canaria</p>
-    </div>
-    <div class="body">
-      <p style="margin:0 0 8px 0;">Hola,</p>
-      <p style="margin:0 0 16px 0;">Gracias por contactarnos. Aquí tienes los precios disponibles para tu traslado:</p>
-      <table class="tabla-datos">
-        <tr style="background:#f5f0ea;">
-          <td style="font-weight:600;width:40%;">Origen</td>
-          <td>${c.origen}</td>
-        </tr>
-        <tr>
-          <td style="font-weight:600;">Destino</td>
-          <td>${c.destino}</td>
-        </tr>
-        <tr style="background:#f5f0ea;">
-          <td style="font-weight:600;">Fecha aproximada</td>
-          <td>${fechaViaje}</td>
-        </tr>
-        ${c.num_pasajeros ? `<tr><td style="font-weight:600;">Pasajeros</td><td>${c.num_pasajeros}</td></tr>` : ''}
-      </table>
-      <h3 style="color:#2c2c2c;margin:20px 0 8px 0;font-size:15px;">Opciones disponibles</h3>
-      <table class="tabla-precios">
-        <tr>
-          <th>Categoría</th>
-          <th>Capacidad</th>
-          <th>Precio estimado</th>
-        </tr>
-        ${filasPrecios}
-      </table>
-      <p class="nota">El precio es una estimación basada en los km de distancia. El precio final es lo que marca el taxímetro del conductor. El cobro lo realiza el conductor directamente.</p>
-      <a href="https://traslados-gc.onrender.com" class="boton-cta">Ver todas las rutas disponibles</a>
-    </div>
-    <div class="footer">Traslados GC · Gran Canaria</div>
-  </div>
-  </body>
-  </html>`;
+  const html = plantillaEmail(
+    `<p>Hola <strong>${c.nombre_cliente || ''}</strong>,</p>
+     <p>Gracias por contactarnos. Aquí tienes los precios disponibles para tu traslado:</p>
+     <div class="info-box">
+       <strong>Origen:</strong> ${c.origen}<br>
+       <strong>Destino:</strong> ${c.destino}<br>
+       <strong>Fecha aproximada:</strong> ${fechaViaje}
+       ${c.num_pasajeros ? '<br><strong>Pasajeros:</strong> ' + c.num_pasajeros : ''}
+     </div>
+     <p><strong>Opciones disponibles:</strong></p>
+     <table style="width:100%;border-collapse:collapse;margin:12px 0;">
+       <thead><tr style="background:#2c2c2c;"><th style="color:#fff;padding:8px 12px;text-align:left;font-size:13px;">Categoría</th><th style="color:#fff;padding:8px 12px;text-align:left;font-size:13px;">Capacidad</th><th style="color:#fff;padding:8px 12px;text-align:left;font-size:13px;">Precio estimado</th></tr></thead>
+       <tbody>${filasPrecios}</tbody>
+     </table>
+     <p style="font-size:12px;color:#999;margin-top:16px;line-height:1.6;">El precio indicado es una estimación. El cobro lo realiza el conductor directamente al finalizar el servicio.</p>
+     <p style="text-align:center;margin:24px 0;"><a href="https://traslados-gc.onrender.com" class="boton">Ver todas las rutas</a></p>`
+  );
 
   try {
     await enviarEmail({
@@ -4150,35 +4192,17 @@ app.post('/admin/cotizaciones/:id/respuesta-negativa', requireAdmin, asyncHandle
 
   const fechaViaje = c.fecha_aproximada ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES') : null;
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <style>
-    body{margin:0;padding:0;background:#f5f5f5;}
-    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
-    .header{background:#2c2c2c;padding:24px;text-align:center;}
-    .body{padding:24px;}
-    .ruta-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;}
-    .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
-    @media(max-width:480px){.body{padding:14px;}}
-  </style></head><body>
-  <div class="wrapper">
-    <div class="header">
-      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
-      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
-    </div>
-    <div class="body">
-      <p>${textoNegativo.saludo}</p>
-      <p>${textoNegativo.parrafo1}</p>
-      <p>${textoNegativo.parrafo2}</p>
-      <div class="ruta-box">
-        <strong>${c.origen} → ${c.destino}</strong>
-        ${fechaViaje ? '<br><span style="font-size:13px;color:#888;">' + fechaViaje + '</span>' : ''}
-      </div>
-      <p>${textoNegativo.parrafo3}</p>
-      <p>${textoNegativo.despedida}</p>
-    </div>
-    <div class="footer">Traslados GC · Gran Canaria</div>
-  </div></body></html>`;
+  const html = plantillaEmail(
+    `<p>${textoNegativo.saludo}</p>
+     <p>${textoNegativo.parrafo1}</p>
+     <p>${textoNegativo.parrafo2}</p>
+     <div class="info-box">
+       <strong>${c.origen} → ${c.destino}</strong>
+       ${fechaViaje ? '<br><span style="font-size:13px;color:#888;">' + fechaViaje + '</span>' : ''}
+     </div>
+     <p>${textoNegativo.parrafo3}</p>
+     <p>${textoNegativo.despedida}</p>`
+  );
 
   try {
     await enviarEmail({ to: c.email_cliente, subject: textoNegativo.asunto, html });
@@ -4282,47 +4306,24 @@ app.post('/admin/cotizaciones/:id/respuesta-positiva', requireAdmin, asyncHandle
     '</tr>';
   }).join('');
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <style>
-    body{margin:0;padding:0;background:#f5f5f5;}
-    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
-    .header{background:#2c2c2c;padding:24px;text-align:center;}
-    .body{padding:24px;}
-    .ruta-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;}
-    .tabla-precios{width:100%;border-collapse:collapse;}
-    .tabla-precios th{background:#2c2c2c;color:#fff;padding:8px 12px;text-align:left;font-size:13px;}
-    .boton-cta{display:block;background:#d4956a;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:600;text-align:center;margin:24px auto;max-width:280px;}
-    .nota{font-size:12px;color:#999;margin-top:16px;line-height:1.6;}
-    .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
-    @media(max-width:480px){.body{padding:14px;}.tabla-precios th,.tabla-precios td{padding:6px 8px;font-size:13px;}}
-  </style></head><body>
-  <div class="wrapper">
-    <div class="header">
-      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
-      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
-    </div>
-    <div class="body">
-      <p>${textos.saludo}</p>
-      <p>${textos.parrafo1}</p>
-      <div class="ruta-box">
-        <strong>${seo.origen} → ${seo.destino}</strong>
-        ${fechaViaje ? '<br><span style="font-size:13px;color:#888;">' + fechaViaje + '</span>' : ''}
-        ${c.num_pasajeros ? '<br><span style="font-size:13px;color:#888;">' + c.num_pasajeros + ' pax</span>' : ''}
-      </div>
-      ${preciosResult.rows.length ? `
-      <p>${textos.parrafo2}</p>
-      <table class="tabla-precios">
-        <tr><th>${textos.col_categoria}</th><th>${textos.col_capacidad}</th><th>${textos.col_precio}</th></tr>
-        ${filasPrecios}
-      </table>` : ''}
-      <p>${textos.parrafo3}</p>
-      <a href="${urlRuta}" class="boton-cta">${textos.boton}</a>
-      <p class="nota">${textos.nota}</p>
-      <p>${textos.despedida}</p>
-    </div>
-    <div class="footer">Traslados GC · Gran Canaria</div>
-  </div></body></html>`;
+  const html = plantillaEmail(
+    `<p>${textos.saludo}</p>
+     <p>${textos.parrafo1}</p>
+     <div class="info-box">
+       <strong>${seo.origen} → ${seo.destino}</strong>
+       ${fechaViaje ? '<br><span style="font-size:13px;color:#888;">' + fechaViaje + '</span>' : ''}
+       ${c.num_pasajeros ? '<br><span style="font-size:13px;color:#888;">' + c.num_pasajeros + ' pax</span>' : ''}
+     </div>
+     ${preciosResult.rows.length ? `<p>${textos.parrafo2}</p>
+     <table style="width:100%;border-collapse:collapse;margin:12px 0;">
+       <thead><tr style="background:#2c2c2c;"><th style="color:#fff;padding:8px 12px;text-align:left;font-size:13px;">${textos.col_categoria}</th><th style="color:#fff;padding:8px 12px;text-align:left;font-size:13px;">${textos.col_capacidad}</th><th style="color:#fff;padding:8px 12px;text-align:left;font-size:13px;">${textos.col_precio}</th></tr></thead>
+       <tbody>${filasPrecios}</tbody>
+     </table>` : ''}
+     <p>${textos.parrafo3}</p>
+     <p style="text-align:center;"><a href="${urlRuta}" class="boton">${textos.boton}</a></p>
+     <p style="font-size:12px;color:#999;margin-top:16px;line-height:1.6;">${textos.nota}</p>
+     <p>${textos.despedida}</p>`
+  );
 
   try {
     await enviarEmail({ to: c.email_cliente, subject: textos.asunto, html });
@@ -4753,50 +4754,30 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
            </div>`
         : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
 
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-      <meta name="viewport" content="width=device-width,initial-scale=1.0">
-      <style>
-        body{margin:0;padding:0;background:#f5f5f5;}
-        .wrapper{max-width:600px;margin:0 auto;background:#fff;}
-        .header{background:#2c2c2c;padding:24px;text-align:center;}
-        .body{padding:28px 24px;}
-        .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
-        .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;font-size:14px;line-height:1.8;}
-        .deposito-box{background:#d1e7dd;border-radius:8px;padding:16px 18px;margin:16px 0;}
-        .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
-        @media(max-width:480px){.body{padding:16px;}}
-      </style></head><body>
-      <div class="wrapper">
-        <div class="header">
-          <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
-          <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
-        </div>
-        <div class="body">
-          <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-          <p>¡Tu traslado está confirmado! Hemos asignado un conductor para tu servicio.</p>
-          <p style="text-align:center;margin:20px 0;">Reserva <span class="pnr">${r.numero_reserva}</span></p>
-          <div class="info-box">
-            <strong>Detalles del traslado:</strong><br>
-            Origen: ${r.origen || '—'}<br>
-            Destino: ${r.destino || '—'}<br>
-            Fecha: ${fechaViaje}<br>
-            Hora: ${r.hora ? r.hora.slice(0,5) : '—'}<br>
-            Categoría: ${r.categoria_nombre || '—'}<br>
-            ${r.conductor_nombre ? 'Conductor: ' + r.conductor_nombre : ''}
-          </div>
-          <div class="deposito-box">
-            <p style="margin:0 0 8px 0;font-weight:600;color:#0f5132;">💳 Depósito de garantía — ${importe} €</p>
-            <p style="margin:0 0 8px 0;font-size:13px;color:#0f5132;">Para garantizar tu plaza, realiza el pago del depósito de <strong>${importe} €</strong>. El voucher de tu traslado te llegará automáticamente al confirmar el pago.</p>
-            <p style="margin:0 0 8px 0;font-size:13px;color:#c0392b;"><strong>⚠️ Importante:</strong> Si no recibimos el pago ${horas} horas antes de tu traslado, la reserva será cancelada.</p>
-            <p style="margin:0 0 6px 0;font-size:12px;color:#555;">El depósito te será devuelto íntegramente una vez completado el servicio.</p>
-            <p style="margin:0;font-size:12px;color:#c0392b;"><strong>Cancelación gratuita hasta el ${_textoLimiteCancelEmail}.</strong> Después de esa fecha, el depósito de ${importe} € no será reembolsable.</p>
-          </div>
-          ${botonPago}
-          <p style="font-size:13px;color:#888;">Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.</p>
-          <p style="font-size:12px;color:#aaa;margin-top:12px;">💡 Puedes consultar el estado de tu reserva en cualquier momento desde <a href="${process.env.BASE_URL || 'https://traslados-gc.onrender.com'}/mi-reserva" style="color:#C1502E;">Mi Reserva</a>.</p>
-        </div>
-        <div class="footer">Traslados GC · Gran Canaria</div>
-      </div></body></html>`;
+      const html = plantillaEmail(
+        `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+         <p>¡Tu traslado está confirmado! Hemos asignado un conductor para tu servicio.</p>
+         <p style="text-align:center;margin:20px 0;">Reserva <span class="pnr">${r.numero_reserva}</span></p>
+         <div class="info-box">
+           <strong>Detalles del traslado:</strong><br>
+           Origen: ${r.origen || '—'}<br>
+           Destino: ${r.destino || '—'}<br>
+           Fecha: ${fechaViaje}<br>
+           Hora: ${r.hora ? r.hora.slice(0,5) : '—'}<br>
+           Categoría: ${r.categoria_nombre || '—'}<br>
+           ${r.conductor_nombre ? 'Conductor: ' + r.conductor_nombre : ''}
+         </div>
+         <div class="caja-verde">
+           <p style="margin:0 0 8px 0;font-weight:600;">💳 Depósito de garantía — ${importe} €</p>
+           <p style="margin:0 0 8px 0;font-size:13px;">Para garantizar tu plaza, realiza el pago del depósito de <strong>${importe} €</strong>. El voucher de tu traslado te llegará automáticamente al confirmar el pago.</p>
+           <p style="margin:0 0 8px 0;font-size:13px;"><strong>⚠️ Importante:</strong> Si no recibimos el pago ${horas} horas antes de tu traslado, la reserva será cancelada.</p>
+           <p style="margin:0 0 6px 0;font-size:12px;">El depósito te será devuelto íntegramente una vez completado el servicio.</p>
+           <p style="margin:0;font-size:12px;"><strong>Cancelación gratuita hasta el ${_textoLimiteCancelEmail}.</strong> Después de esa fecha, el depósito de ${importe} € no será reembolsable.</p>
+         </div>
+         ${botonPago}
+         <p style="font-size:13px;color:#888;">Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.</p>
+         <p style="font-size:12px;color:#aaa;margin-top:12px;">💡 Puedes consultar el estado de tu reserva en cualquier momento desde <a href="${process.env.BASE_URL || 'https://traslados-gc.onrender.com'}/mi-reserva" style="color:#C1502E;">Mi Reserva</a>.</p>`
+      );
 
       await enviarEmail({
         to: r.email_cliente,
@@ -5093,7 +5074,7 @@ async function generarVoucherPDF(reservaId) {
       doc.rect(ML, y, W, altoTotal).fill('#fff8e1');
       doc.rect(ML, y, W, altoTotal).lineWidth(0.5).strokeColor('#D9A441').stroke();
       doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815')
-        .text('Total de extras a pagar al conductor: ' + totalExtras.toFixed(2) + ' \u20ac', ML + 10, y + 8, { width: W - 20 });
+        .text('\ud83d\udcb0 Total de extras a pagar al conductor: ' + totalExtras.toFixed(2) + ' \u20ac', ML + 10, y + 8, { width: W - 20 });
       doc.fontSize(9).font('Helvetica').fillColor('#555555')
         .text('Este importe se abona directamente al conductor al final del servicio, aparte del precio del traslado.', ML + 10, y + 24, { width: W - 20 });
       y += altoTotal + 8;
@@ -5113,7 +5094,7 @@ async function generarVoucherPDF(reservaId) {
     const altoCancelacion = 44;
     doc.rect(ML, y, W, altoCancelacion).fill('#fff3cd');
     doc.fontSize(10).font('Helvetica-Bold').fillColor('#856404')
-      .text('Cancelaci\u00f3n gratuita hasta el ' + _textoLimite + '.', ML + 10, y + 8, { width: W - 20 });
+      .text('\u26a0\ufe0f Cancelaci\u00f3n gratuita hasta el ' + _textoLimite + '.', ML + 10, y + 8, { width: W - 20 });
     doc.fontSize(10).font('Helvetica').fillColor('#856404')
       .text('Despu\u00e9s de esa fecha, el dep\u00f3sito de ' + _importe + ' \u20ac no ser\u00e1 reembolsado.', ML + 10, y + 24, { width: W - 20 });
     y += altoCancelacion + 14;
@@ -5285,13 +5266,14 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         // WhatsApp voucher al cliente
         if (r.telefono_cliente) {
           try {
-            const firma = firmarVoucher(reservaId);
-            const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
-            const urlDoc = `${BASE_URL}/voucher-descarga/${reservaId}/${firma}/${nombreDoc}`;
-            await pool.query(
-              'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-              [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`, urlDoc, nombreDoc]
-            );
+            const voucherPdf = await generarVoucherPDF(reservaId);
+            if (voucherPdf && voucherPdf.buffer) {
+              const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
+              await pool.query(
+                'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, nombre_documento, documento_base64) VALUES ($1, $2, $3, $4)',
+                [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`, nombreDoc, voucherPdf.buffer.toString('base64')]
+              );
+            }
           } catch(e) { console.warn('Error encolando WhatsApp voucher:', e.message); }
         }
         // Enviar cartel PDF al chofer
@@ -5322,20 +5304,12 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         await enviarEmail({
           to: r.email_cliente,
           subject: 'Problema con el pago — ' + r.numero_reserva,
-          html: `<!DOCTYPE html><html><head><meta charset="utf-8">
-          <meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body>
-          <div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif;">
-            <div style="background:#2c2c2c;padding:24px;text-align:center;">
-              <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
-            </div>
-            <div style="padding:24px;">
-              <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-              <p>No hemos podido procesar el pago del depósito para tu reserva <strong>${r.numero_reserva}</strong>.</p>
-              <p>Por favor contacta con nosotros por WhatsApp para resolver el pago y confirmar tu traslado.</p>
-              <p style="color:#888;font-size:13px;">Si crees que es un error, puedes intentarlo de nuevo respondiendo a este email.</p>
-            </div>
-            <div style="background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;">Traslados GC · Gran Canaria</div>
-          </div></body></html>`
+          html: plantillaEmail(
+            `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+             <p>No hemos podido procesar el pago del depósito para tu reserva <strong>${r.numero_reserva}</strong>.</p>
+             <div class="caja-amarilla">⚠️ Por favor contacta con nosotros por WhatsApp para resolver el pago y confirmar tu traslado.</div>
+             <p style="color:#888;font-size:13px;">Si crees que es un error, puedes intentarlo de nuevo.</p>`
+          )
         });
       } catch(emailErr) {
         console.warn('Error enviando aviso de pago fallido:', emailErr.message);
@@ -5451,48 +5425,28 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
        </div>`
     : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <style>
-    body{margin:0;padding:0;background:#f5f5f5;}
-    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
-    .header{background:#2c2c2c;padding:24px;text-align:center;}
-    .body{padding:28px 24px;}
-    .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
-    .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;margin:16px 0;font-size:14px;line-height:1.8;}
-    .deposito-box{background:#d1e7dd;border-radius:8px;padding:16px 18px;margin:16px 0;}
-    .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
-    @media(max-width:480px){.body{padding:16px;}}
-  </style></head><body>
-  <div class="wrapper">
-    <div class="header">
-      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
-      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
-    </div>
-    <div class="body">
-      <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-      <p>¡Tu traslado está confirmado! Hemos asignado un conductor para tu servicio.</p>
-      <p style="text-align:center;margin:20px 0;">Reserva <span class="pnr">${r.numero_reserva}</span></p>
-      <div class="info-box">
-        <strong>Detalles del traslado:</strong><br>
-        Origen: ${r.origen || '—'}<br>
-        Destino: ${r.destino || '—'}<br>
-        Fecha: ${fechaViaje}<br>
-        Hora: ${r.hora ? r.hora.slice(0,5) : '—'}<br>
-        Categoría: ${r.categoria_nombre || '—'}<br>
-        ${r.conductor_nombre ? 'Conductor: ' + r.conductor_nombre : ''}
-      </div>
-      <div class="deposito-box">
-        <p style="margin:0 0 8px 0;font-weight:600;color:#0f5132;">💳 Depósito de garantía — ${importe} €</p>
-        <p style="margin:0 0 8px 0;font-size:13px;color:#0f5132;">Para garantizar tu plaza, realiza el pago del depósito de <strong>${importe} €</strong>. El voucher de tu traslado te llegará automáticamente al confirmar el pago.</p>
-        <p style="margin:0 0 8px 0;font-size:13px;color:#c0392b;"><strong>⚠️ Importante:</strong> Si no recibimos el pago ${horas} horas antes de tu traslado, la reserva será cancelada.</p>
-        <p style="margin:0;font-size:12px;color:#555;">El depósito te será devuelto íntegramente una vez completado el servicio. No es reembolsable en caso de no presentarse o cancelar con menos de ${horas} horas de antelación.</p>
-      </div>
-      ${botonPago}
-      <p style="font-size:13px;color:#888;">Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.</p>
-    </div>
-    <div class="footer">Traslados GC · Gran Canaria</div>
-  </div></body></html>`;
+  const html = plantillaEmail(
+    `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+     <p>¡Tu traslado está confirmado! Hemos asignado un conductor para tu servicio.</p>
+     <p style="text-align:center;margin:20px 0;">Reserva <span class="pnr">${r.numero_reserva}</span></p>
+     <div class="info-box">
+       <strong>Detalles del traslado:</strong><br>
+       Origen: ${r.origen || '—'}<br>
+       Destino: ${r.destino || '—'}<br>
+       Fecha: ${fechaViaje}<br>
+       Hora: ${r.hora ? r.hora.slice(0,5) : '—'}<br>
+       Categoría: ${r.categoria_nombre || '—'}<br>
+       ${r.conductor_nombre ? 'Conductor: ' + r.conductor_nombre : ''}
+     </div>
+     <div class="caja-verde">
+       <p style="margin:0 0 8px 0;font-weight:600;">💳 Depósito de garantía — ${importe} €</p>
+       <p style="margin:0 0 8px 0;font-size:13px;">Para garantizar tu plaza, realiza el pago del depósito de <strong>${importe} €</strong>. El voucher de tu traslado te llegará automáticamente al confirmar el pago.</p>
+       <p style="margin:0 0 8px 0;font-size:13px;"><strong>⚠️ Importante:</strong> Si no recibimos el pago ${horas} horas antes de tu traslado, la reserva será cancelada.</p>
+       <p style="margin:0;font-size:12px;">El depósito te será devuelto íntegramente una vez completado el servicio. No es reembolsable en caso de no presentarse o cancelar con menos de ${horas} horas de antelación.</p>
+     </div>
+     ${botonPago}
+     <p style="font-size:13px;color:#888;">Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.</p>`
+  );
 
   try {
     await enviarEmail({
@@ -5562,23 +5516,14 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
   await pool.query('UPDATE reservas SET stripe_session_id = $1 WHERE id = $2', [session.id, r.id]);
 
   // Enviar email con nuevo enlace
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body>
-  <div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif;background:#fff;">
-    <div style="background:#2c2c2c;padding:24px;text-align:center;">
-      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
-      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
-    </div>
-    <div style="padding:28px 24px;">
-      <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-      <p>Te reenviamos el enlace de pago para confirmar tu reserva <strong>${r.numero_reserva}</strong>.</p>
-      <div style="text-align:center;margin:24px 0;">
-        <a href="${session.url}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 Pagar depósito de ${importe} €</a>
-      </div>
-      <p style="font-size:13px;color:#888;">Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.</p>
-    </div>
-    <div style="background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;">Traslados GC · Gran Canaria</div>
-  </div></body></html>`;
+  const html = plantillaEmail(
+    `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+     <p>Te reenviamos el enlace de pago para confirmar tu reserva <strong>${r.numero_reserva}</strong>.</p>
+     <p style="text-align:center;margin:24px 0;">
+       <a href="${session.url}" class="boton">💳 Pagar depósito de ${importe} €</a>
+     </p>
+     <p style="font-size:13px;color:#888;">Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.</p>`
+  );
 
   try {
     await enviarEmail({
@@ -5605,13 +5550,14 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
     // WhatsApp voucher al cliente
     if (r.telefono_cliente) {
       try {
-        const firma = firmarVoucher(req.params.id);
-        const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
-        const urlDoc = `${BASE_URL}/voucher-descarga/${req.params.id}/${firma}/${nombreDoc}`;
-        await pool.query(
-          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`, urlDoc, nombreDoc]
-        );
+        const voucherPdf = await generarVoucherPDF(req.params.id);
+        if (voucherPdf && voucherPdf.buffer) {
+          const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
+          await pool.query(
+            'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, nombre_documento, documento_base64) VALUES ($1, $2, $3, $4)',
+            [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`, nombreDoc, voucherPdf.buffer.toString('base64')]
+          );
+        }
       } catch(e) { console.warn('Error encolando WhatsApp voucher:', e.message); }
     }
     res.json({ ok: true });
@@ -5640,12 +5586,10 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
     const choferQ = await pool.query('SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]);
     if (choferQ.rows.length && choferQ.rows[0].telefono) {
       try {
-        const firma = firmarCartel(req.params.id);
         const nombreDoc = `cartel-${r.numero_reserva}.pdf`;
-        const urlDoc = `${BASE_URL}/cartel-descarga/${req.params.id}/${firma}/${nombreDoc}`;
         await pool.query(
-          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [choferQ.rows[0].telefono, `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe adjuntamos el cartel de recogida para la reserva ${r.numero_reserva}.\n\nTraslados GC`, urlDoc, nombreDoc]
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, nombre_documento, documento_base64) VALUES ($1, $2, $3, $4)',
+          [choferQ.rows[0].telefono, `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe adjuntamos el cartel de recogida para la reserva ${r.numero_reserva}.\n\nTraslados GC`, nombreDoc, cartel.buffer.toString('base64')]
         );
       } catch(e) { console.warn('Error encolando WhatsApp cartel:', e.message); }
     }
@@ -5669,22 +5613,24 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
     const resultado = await generarFacturaPDF(req.params.id);
     if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
     const pdfBuffer = resultado.buffer;
+    const _pf = await obtenerPlantilla('cliente_factura', {
+      nombre_cliente: r.nombre_cliente,
+      numero_reserva: r.numero_reserva,
+      numero_factura: resultado.numeroFactura
+    });
     await enviarEmailConAdjunto({
       to: r.email_cliente,
-      subject: '📄 Factura ' + resultado.numeroFactura + ' — Reserva ' + r.numero_reserva,
-      html: `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-             <p>Adjuntamos la factura <strong>${resultado.numeroFactura}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p>
-             <p>Gracias por viajar con Traslados GC.</p>`,
+      subject: (_pf && _pf.asunto) || ('📄 Factura ' + resultado.numeroFactura + ' — Reserva ' + r.numero_reserva),
+      html: plantillaEmail((_pf && _pf.email) || `<p>Hola <strong>${r.nombre_cliente}</strong>,</p><p>Adjuntamos la factura <strong>${resultado.numeroFactura}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p><p>Gracias por viajar con Traslados GC.</p>`),
       adjunto: { filename: 'factura-' + r.numero_reserva + '.pdf', content: pdfBuffer }
     });
     if (r.telefono_cliente) {
       try {
-        const firma = firmarFactura(req.params.id);
         const nombreDoc = `factura-${resultado.numeroFactura}.pdf`;
-        const urlDoc = `${BASE_URL}/factura-descarga/${req.params.id}/${firma}/${nombreDoc}`;
+        const textoWa = (_pf && _pf.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`;
         await pool.query(
-          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [r.telefono_cliente, `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`, urlDoc, nombreDoc]
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, nombre_documento, documento_base64) VALUES ($1, $2, $3, $4)',
+          [r.telefono_cliente, textoWa, nombreDoc, pdfBuffer.toString('base64')]
         );
       } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
     }
@@ -5737,6 +5683,32 @@ app.get('/voucher-descarga/:id/:firma/:nombre?', asyncHandler(async (req, res) =
   res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
   res.send(resultado.buffer);
 }));
+
+async function obtenerPlantilla(clave, vars) {
+  try {
+    const r = await pool.query(
+      'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion WHERE clave = $1',
+      [clave]
+    );
+    if (!r.rows.length) return null;
+    const p = r.rows[0];
+    const sustituir = (txt) => {
+      if (!txt) return txt;
+      return txt.replace(/\{([^}]+)\}/g, (_, k) => {
+        const v = vars[k];
+        return (v !== undefined && v !== null) ? String(v) : '{' + k + '}';
+      });
+    };
+    return {
+      asunto: sustituir(p.asunto_email),
+      email: sustituir(p.cuerpo_email),
+      whatsapp: sustituir(p.cuerpo_whatsapp)
+    };
+  } catch(e) {
+    console.warn('obtenerPlantilla error (' + clave + '):', e.message);
+    return null;
+  }
+}
 
 function firmarFactura(reservaId) {
   return crypto.createHmac('sha256', process.env.SESSION_SECRET || 'cambia-este-secreto')
@@ -6243,16 +6215,7 @@ app.post('/admin/comunicado/clientes', requireAdmin, asyncHandler(async (req, re
         await enviarEmail({
           to: cliente.email_cliente,
           subject: asunto,
-          html: `<!DOCTYPE html><html><head><meta charset="utf-8">
-          <style>body{margin:0;padding:0;background:#f5f5f5;}.wrapper{max-width:600px;margin:0 auto;background:#fff;}
-          .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #C1502E;}
-          .body{padding:28px 24px;font-family:sans-serif;font-size:15px;color:#1C1815;white-space:pre-wrap;}
-          .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}</style>
-          </head><body><div class="wrapper">
-          <div class="header"><h1 style="color:#D9A441;margin:0;font-size:20px;">Traslados GC</h1></div>
-          <div class="body"><p>Hola ${cliente.nombre || ''},</p><p>${mensaje}</p></div>
-          <div class="footer">Traslados GC · Gran Canaria</div>
-          </div></body></html>`
+          html: plantillaEmail(`<p>Hola <strong>${cliente.nombre || ''}</strong>,</p><p style="white-space:pre-wrap;">${mensaje}</p>`)
         });
       } catch(e) { errores.push(cliente.email_cliente); }
     }
@@ -6295,16 +6258,7 @@ app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res)
         await enviarEmail({
           to: chofer.email,
           subject: asunto,
-          html: `<!DOCTYPE html><html><head><meta charset="utf-8">
-          <style>body{margin:0;padding:0;background:#f5f5f5;}.wrapper{max-width:600px;margin:0 auto;background:#fff;}
-          .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #C1502E;}
-          .body{padding:28px 24px;font-family:sans-serif;font-size:15px;color:#1C1815;white-space:pre-wrap;}
-          .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}</style>
-          </head><body><div class="wrapper">
-          <div class="header"><h1 style="color:#D9A441;margin:0;font-size:20px;">Traslados GC</h1></div>
-          <div class="body"><p>Hola ${chofer.nombre || ''},</p><p>${mensaje}</p></div>
-          <div class="footer">Traslados GC · Gran Canaria</div>
-          </div></body></html>`
+          html: plantillaEmail(`<p>Hola <strong>${chofer.nombre || ''}</strong>,</p><p style="white-space:pre-wrap;">${mensaje}</p>`)
         });
       } catch(e) { errores.push(chofer.email); }
     }
@@ -6417,33 +6371,17 @@ app.post('/api/cliente/solicitar-acceso', asyncHandler(async (req, res) => {
   await enviarEmail({
     to: reserva.email_cliente,
     subject: 'Acceso a tu reserva ' + pnr.toUpperCase() + ' — Traslados GC',
-    html: `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <style>
-      body{margin:0;padding:0;background:#f5f5f5;}
-      .wrapper{max-width:600px;margin:0 auto;background:#fff;}
-      .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #C1502E;}
-      .body{padding:28px 24px;}
-      .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
-      .pwd-box{background:#ECE6D8;border-radius:8px;padding:16px 20px;margin:20px 0;text-align:center;}
-      .pwd{font-family:monospace;font-size:24px;font-weight:700;color:#1C1815;letter-spacing:4px;}
-      .boton{display:inline-block;background:#C1502E;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0;}
-      .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}
-    </style></head><body>
-    <div class="wrapper">
-      <div class="header"><h1 style="color:#D9A441;margin:0;font-size:20px;">Traslados GC</h1></div>
-      <div class="body">
-        <p>Hola <strong>${reserva.nombre_cliente}</strong>,</p>
-        <p>Aquí tienes tu contraseña provisional para acceder al seguimiento de tu reserva <span class="pnr">${pnr.toUpperCase()}</span>.</p>
-        <div class="pwd-box">
-          <div style="font-size:12px;color:#5b5347;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Contraseña provisional</div>
-          <div class="pwd">${pwd}</div>
-        </div>
-        <p style="font-size:13px;color:#5b5347;">Al entrar por primera vez se te pedirá que la cambies por una propia.</p>
-        <div style="text-align:center;"><a href="${BASE_URL}/mi-reserva" class="boton">Ver mi reserva</a></div>
-        <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado este acceso, ignora este mensaje.</p>
-      </div>
-      <div class="footer">Traslados GC · Gran Canaria</div>
-    </div></body></html>`
+    html: plantillaEmail(
+      `<p>Hola <strong>${reserva.nombre_cliente}</strong>,</p>
+       <p>Aquí tienes tu contraseña provisional para acceder al seguimiento de tu reserva <span class="pnr">${pnr.toUpperCase()}</span>.</p>
+       <div class="info-box" style="text-align:center;">
+         <div style="font-size:12px;color:#5b5347;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Contraseña provisional</div>
+         <div style="font-family:monospace;font-size:24px;font-weight:700;color:#C1502E;letter-spacing:4px;">${pwd}</div>
+       </div>
+       <p style="font-size:13px;color:#5b5347;">Al entrar por primera vez se te pedirá que la cambies por una propia.</p>
+       <p style="text-align:center;"><a href="${BASE_URL}/mi-reserva" class="boton">Ver mi reserva</a></p>
+       <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado este acceso, ignora este mensaje.</p>`
+    )
   });
 
   res.json({ ok: true });
@@ -6555,26 +6493,13 @@ app.post('/api/cliente/recuperar-password', asyncHandler(async (req, res) => {
   await enviarEmail({
     to: reserva.email_cliente,
     subject: 'Recupera tu contraseña — Traslados GC',
-    html: `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <style>
-      body{margin:0;padding:0;background:#f5f5f5;}
-      .wrapper{max-width:600px;margin:0 auto;background:#fff;}
-      .header{background:#1C1815;padding:24px;text-align:center;border-bottom:3px solid #C1502E;}
-      .body{padding:28px 24px;}
-      .boton{display:inline-block;background:#C1502E;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0;}
-      .footer{background:#ECE6D8;padding:16px;text-align:center;font-size:12px;color:#888;}
-    </style></head><body>
-    <div class="wrapper">
-      <div class="header"><h1 style="color:#D9A441;margin:0;font-size:20px;">Traslados GC</h1></div>
-      <div class="body">
-        <p>Hola <strong>${reserva.nombre_cliente}</strong>,</p>
-        <p>Has solicitado recuperar el acceso a tu cuenta. Pulsa el botón para elegir una contraseña nueva:</p>
-        <div style="text-align:center;"><a href="${enlace}" class="boton">Crear nueva contraseña</a></div>
-        <p style="font-size:13px;color:#5b5347;">Este enlace caduca en 1 hora y solo se puede usar una vez. Tu contraseña actual sigue funcionando hasta que la cambies desde aquí.</p>
-        <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado esto, simplemente ignora este mensaje — no se cambiará nada.</p>
-      </div>
-      <div class="footer">Traslados GC · Gran Canaria</div>
-    </div></body></html>`
+    html: plantillaEmail(
+      `<p>Hola <strong>${reserva.nombre_cliente}</strong>,</p>
+       <p>Has solicitado recuperar el acceso a tu cuenta. Pulsa el botón para elegir una contraseña nueva:</p>
+       <p style="text-align:center;"><a href="${enlace}" class="boton">Crear nueva contraseña</a></p>
+       <p style="font-size:13px;color:#5b5347;">Este enlace caduca en 1 hora y solo se puede usar una vez. Tu contraseña actual sigue funcionando hasta que la cambies desde aquí.</p>
+       <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado esto, simplemente ignora este mensaje — no se cambiará nada.</p>`
+    )
   });
 
   res.json({ ok: true });
@@ -6834,8 +6759,7 @@ app.post('/api/cliente/modificar', asyncHandler(async (req, res) => {
         await enviarEmail({
           to: em,
           subject: '✏️ Cliente modificó datos — ' + pnr,
-          html: `<p>El cliente de la reserva <strong>${pnr}</strong> ha modificado los datos de su traslado.</p>
-                 <p>Accede al panel de administración para ver los cambios.</p>`
+          html: plantillaEmail(`<p>El cliente de la reserva <strong>${pnr}</strong> ha modificado los datos de su traslado.</p><p>Accede al panel de administración para ver los cambios.</p>`)
         });
       }
     }
@@ -6867,9 +6791,7 @@ app.post('/api/cliente/mensaje', asyncHandler(async (req, res) => {
         await enviarEmail({
           to: em,
           subject: '💬 Nuevo mensaje de cliente — ' + pnr,
-          html: `<p><strong>${nombre}</strong> (reserva <strong>${pnr}</strong>) ha enviado un mensaje:</p>
-                 <blockquote style="border-left:3px solid #C1502E;padding-left:12px;color:#333;margin:16px 0;">${mensaje.trim()}</blockquote>
-                 <p>Accede al panel de administración para responder o ver el historial.</p>`
+          html: plantillaEmail(`<p><strong>${nombre}</strong> (reserva <strong>${pnr}</strong>) ha enviado un mensaje:</p><blockquote>${mensaje.trim()}</blockquote><p>Accede al panel de administración para responder o ver el historial.</p>`)
         });
       }
     }
@@ -7046,10 +6968,7 @@ app.post('/api/cliente/modificar-completo', asyncHandler(async (req, res) => {
       await enviarEmail({
         to: em,
         subject: '✏️ Modificación solicitada — ' + r.numero_reserva,
-        html: `<p>El cliente <strong>${r.nombre_cliente}</strong> ha solicitado modificaciones en la reserva <strong>${r.numero_reserva}</strong>.</p>
-               <p><strong>Cambios:</strong></p>
-               <ul>${cambios.map(c => '<li>' + c + '</li>').join('')}</ul>
-               <p>Accede al panel de administración para revisar y aprobar.</p>`
+        html: plantillaEmail(`<p>El cliente <strong>${r.nombre_cliente}</strong> ha solicitado modificaciones en la reserva <strong>${r.numero_reserva}</strong>.</p><p><strong>Cambios solicitados:</strong></p><ul>${cambios.map(c => '<li>' + c + '</li>').join('')}</ul><p>Accede al panel de administración para revisar y aprobar.</p>`)
       });
     }
   } catch(e) { console.warn('Error notificando modificación al equipo:', e.message); }
@@ -7121,9 +7040,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
       await enviarEmail({
         to: em,
         subject: '❌ Cancelación de reserva — ' + r.numero_reserva,
-        html: `<p>El cliente <strong>${r.nombre_cliente}</strong> ha cancelado la reserva <strong>${r.numero_reserva}</strong>.</p>
-               <p>Ruta: ${r.origen || '—'} → ${r.destino || '—'}</p>
-               <p>Fecha: ${r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—'}</p>`
+        html: plantillaEmail(`<p>El cliente <strong>${r.nombre_cliente}</strong> ha cancelado la reserva <strong>${r.numero_reserva}</strong>.</p><p>Ruta: ${r.origen || '—'} → ${r.destino || '—'}</p><p>Fecha: ${r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES') : '—'}</p>`)
       });
     }
   } catch(e) { console.warn('Error notificando cancelación:', e.message); }
@@ -7138,11 +7055,16 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
     await enviarEmail({
       to: r.email_cliente,
       subject: 'Tu reserva ' + r.numero_reserva + ' ha sido cancelada',
-      html: `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-             <p>Tu reserva <strong>${r.numero_reserva}</strong> ha sido cancelada correctamente.</p>
-             <p><strong>Origen:</strong> ${r.origen || '—'}<br><strong>Destino:</strong> ${r.destino || '—'}</p>
-             ${avisoDeposito}
-             <p>Si tienes alguna duda, puedes contactarnos por WhatsApp.</p>`
+      html: plantillaEmail(
+        `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+         <p>Tu reserva <strong>${r.numero_reserva}</strong> ha sido cancelada correctamente.</p>
+         <div class="info-box">
+           <strong>Origen:</strong> ${r.origen || '—'}<br>
+           <strong>Destino:</strong> ${r.destino || '—'}
+         </div>
+         ${avisoDeposito}
+         <p>Si tienes alguna duda, puedes contactarnos por WhatsApp.</p>`
+      )
     });
   } catch(e) { console.warn('Error enviando email cancelación al cliente:', e.message); }
 
@@ -7212,11 +7134,13 @@ app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(
     await enviarEmail({
       to: ra.email_cliente,
       subject: '✅ Tu modificación ha sido aprobada — ' + ra.numero_reserva,
-      html: `<p>Hola <strong>${ra.nombre_cliente}</strong>,</p>
-             <p>Hemos revisado y aprobado los cambios en tu reserva <strong>${ra.numero_reserva}</strong>.</p>
-             <div style="background:#f5f0ea;border-radius:8px;padding:14px 18px;font-size:14px;line-height:2;margin:12px 0;">${lineas.join('<br>')}</div>
-             <p>Accede a tu portal para ver todos los detalles:<br>
-             <a href="${BASE_URL}/mi-reserva" style="color:#C1502E;">${BASE_URL}/mi-reserva</a></p>`
+      html: plantillaEmail(
+        `<p>Hola <strong>${ra.nombre_cliente}</strong>,</p>
+         <p>Hemos revisado y aprobado los cambios en tu reserva <strong>${ra.numero_reserva}</strong>.</p>
+         <div class="info-box">${lineas.join('<br>')}</div>
+         <p>Accede a tu portal para ver todos los detalles:<br>
+         <a href="${BASE_URL}/mi-reserva" style="color:#C1502E;">${BASE_URL}/mi-reserva</a></p>`
+      )
     });
   } catch(e) { console.warn('Error enviando email aprobación:', e.message); }
 
@@ -7247,11 +7171,13 @@ app.post('/admin/reservas/:id/mensaje-chofer', requireAdmin, asyncHandler(async 
       await enviarEmail({
         to: r.conductor_email,
         subject: '💬 Mensaje sobre la reserva ' + r.numero_reserva,
-        html: `<p>Hola <strong>${r.conductor_nombre || 'Chofer'}</strong>,</p>
-               <p>El equipo de Traslados GC te ha enviado un mensaje sobre la reserva <strong>${r.numero_reserva}</strong>:</p>
-               <blockquote style="border-left:3px solid #C1502E;padding-left:12px;color:#333;margin:16px 0;">${mensaje.trim().replace(/\n/g,'<br>')}</blockquote>
-               <p>Accede a tu portal para ver los detalles:<br>
-               <a href="${BASE_URL}/chofer/portal" style="color:#C1502E;">${BASE_URL}/chofer/portal</a></p>`
+        html: plantillaEmail(
+          `<p>Hola <strong>${r.conductor_nombre || 'Chofer'}</strong>,</p>
+           <p>El equipo de Traslados GC te ha enviado un mensaje sobre la reserva <strong>${r.numero_reserva}</strong>:</p>
+           <blockquote>${mensaje.trim().replace(/\n/g,'<br>')}</blockquote>
+           <p>Accede a tu portal para ver los detalles:<br>
+           <a href="${BASE_URL}/chofer/portal" style="color:#C1502E;">${BASE_URL}/chofer/portal</a></p>`
+        )
       });
     } catch(e) { console.warn('Error enviando email al chofer:', e.message); }
   }
@@ -7413,12 +7339,14 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
       await enviarEmail({
         to: ra.email_cliente,
         subject: '✏️ Tu reserva ' + ra.numero_reserva + ' ha sido actualizada',
-        html: `<p>Hola <strong>${ra.nombre_cliente}</strong>,</p>
-               <p>Tu reserva <strong>${ra.numero_reserva}</strong> ha sido actualizada por nuestro equipo.</p>
-               <p><strong>Resumen actualizado de tu reserva:</strong></p>
-               <div style="background:#f5f0ea;border-radius:8px;padding:14px 18px;font-size:14px;line-height:2;margin:12px 0;">${lineas.join('<br>')}</div>
-               <p>Si tienes alguna pregunta, accede a tu portal:<br>
-               <a href="${BASE_URL}/mi-reserva" style="color:#C1502E;">${BASE_URL}/mi-reserva</a></p>`
+        html: plantillaEmail(
+          `<p>Hola <strong>${ra.nombre_cliente}</strong>,</p>
+           <p>Tu reserva <strong>${ra.numero_reserva}</strong> ha sido actualizada por nuestro equipo.</p>
+           <p><strong>Resumen actualizado:</strong></p>
+           <div class="info-box">${lineas.join('<br>')}</div>
+           <p>Si tienes alguna pregunta, accede a tu portal:<br>
+           <a href="${BASE_URL}/mi-reserva" style="color:#C1502E;">${BASE_URL}/mi-reserva</a></p>`
+        )
       });
     } catch(e) { console.warn('Error enviando email de modificación al cliente:', e.message); }
   }
@@ -7448,11 +7376,13 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
       await enviarEmail({
         to: r.email_cliente,
         subject: '💬 Tienes un mensaje sobre tu reserva ' + r.numero_reserva,
-        html: `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-               <p>El equipo de Traslados GC te ha enviado un mensaje sobre tu reserva <strong>${r.numero_reserva}</strong>:</p>
-               <blockquote style="border-left:3px solid #C1502E;padding-left:12px;color:#333;margin:16px 0;">${mensaje.trim().replace(/\n/g,'<br>')}</blockquote>
-               <p>Accede a tu portal para ver el hilo completo y responder:<br>
-               <a href="${BASE_URL}/mi-reserva" style="color:#C1502E;">${BASE_URL}/mi-reserva</a></p>`
+        html: plantillaEmail(
+          `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
+           <p>El equipo de Traslados GC te ha enviado un mensaje sobre tu reserva <strong>${r.numero_reserva}</strong>:</p>
+           <blockquote>${mensaje.trim().replace(/\n/g,'<br>')}</blockquote>
+           <p>Accede a tu portal para ver el hilo completo y responder:<br>
+           <a href="${BASE_URL}/mi-reserva" style="color:#C1502E;">${BASE_URL}/mi-reserva</a></p>`
+        )
       });
     }
   } catch(e) { console.warn('Error enviando email al cliente:', e.message); }
@@ -7501,42 +7431,19 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
     await fnEmail({
       to: r.email_cliente,
       subject: '✅ Servicio completado — ' + r.numero_reserva,
-      html: `<!DOCTYPE html><html><head><meta charset="utf-8">
-      <style>
-        body{margin:0;padding:0;background:#f5f0ea;font-family:'Helvetica Neue',Arial,sans-serif;}
-        .wrapper{max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
-        .header{background:#1C1815;padding:28px 32px;text-align:center;border-bottom:4px solid #C1502E;}
-        .header h1{color:#D9A441;margin:0;font-size:22px;letter-spacing:1px;font-weight:700;}
-        .body{padding:32px;}
-        .saludo{font-size:17px;color:#1C1815;margin-bottom:20px;}
-        .caja-ok{background:#f0faf5;border:1px solid #a8dfc2;border-radius:10px;padding:20px 24px;margin:20px 0;}
-        .caja-ok .titulo{font-size:16px;font-weight:700;color:#1a6640;margin-bottom:8px;}
-        .caja-ok .texto{font-size:14px;color:#2d5a42;line-height:1.6;}
-        .pnr{font-family:monospace;font-size:20px;font-weight:700;color:#C1502E;letter-spacing:3px;display:inline-block;background:#fdf4f2;padding:4px 14px;border-radius:6px;}
-        .datos{background:#f9f7f4;border-radius:8px;padding:16px 20px;margin:20px 0;font-size:14px;color:#3a3330;line-height:1.9;}
-        .datos strong{color:#1C1815;}
-        .factura-aviso{background:#fff8f0;border:1px solid #f5d9b0;border-radius:8px;padding:14px 18px;margin:20px 0;font-size:13px;color:#7a4f1a;}
-        .despedida{font-size:14px;color:#5b5347;line-height:1.7;margin-top:20px;}
-        .footer{background:#ECE6D8;padding:18px 32px;text-align:center;font-size:12px;color:#888;line-height:1.6;}
-      </style></head><body>
-      <div class="wrapper">
-        <div class="header"><h1>Traslados · GC</h1></div>
-        <div class="body">
-          <p class="saludo">Hola, <strong>${r.nombre_cliente}</strong> 👋</p>
-          <div class="caja-ok">
-            <div class="titulo">✅ Servicio completado con éxito</div>
-            <div class="texto">El depósito de garantía correspondiente a tu reserva <span class="pnr">${r.numero_reserva}</span> ha sido liberado correctamente. El importe quedará disponible en tu tarjeta en un plazo de 5 a 10 días hábiles según tu entidad bancaria.</div>
-          </div>
-          <div class="datos">
-            <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
-            <strong>Fecha del servicio:</strong> ${fechaViaje}<br>
-            <strong>Reserva:</strong> <span style="font-family:monospace;">${r.numero_reserva}</span>
-          </div>
-          ${facturaBuffer ? `<div class="factura-aviso">📄 Adjuntamos la <strong>factura ${numeroFactura}</strong> de tu servicio para tus registros. Puedes descargarla también desde tu portal de cliente.</div>` : ''}
-          <p class="despedida">Ha sido un placer acompañarte en este viaje. Si en algún momento necesitas otro traslado en Gran Canaria, estaremos encantados de ayudarte.<br><br>Un saludo cordial,<br><strong>El equipo de Traslados GC</strong></p>
-        </div>
-        <div class="footer">Traslados GC · Gran Canaria<br>Este email es una confirmación automática del servicio realizado.</div>
-      </div></body></html>`,
+      html: plantillaEmail(
+        `<p>Hola <strong>${r.nombre_cliente}</strong> 👋</p>
+         <div class="caja-verde">
+           ✅ <strong>Servicio completado con éxito.</strong> El depósito de garantía correspondiente a tu reserva <span class="pnr">${r.numero_reserva}</span> ha sido liberado correctamente. El importe quedará disponible en tu tarjeta en un plazo de 5 a 10 días hábiles según tu entidad bancaria.
+         </div>
+         <div class="info-box">
+           <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
+           <strong>Fecha del servicio:</strong> ${fechaViaje}<br>
+           <strong>Reserva:</strong> <span class="pnr">${r.numero_reserva}</span>
+         </div>
+         ${facturaBuffer ? `<div class="caja-amarilla">📄 Adjuntamos la <strong>factura ${numeroFactura}</strong> de tu servicio para tus registros.</div>` : ''}
+         <p>Ha sido un placer acompañarte en este viaje. Si en algún momento necesitas otro traslado en Gran Canaria, estaremos encantados de ayudarte.<br><br>Un saludo cordial,<br><strong>El equipo de Traslados GC</strong></p>`
+      ),
       ...(adjunto ? { adjunto } : {})
     });
   } catch(e) { console.warn('Error enviando email liberación depósito:', e.message); }
@@ -7553,33 +7460,18 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
       await enviarEmail({
         to: chofer.email,
         subject: '🙏 Gracias por el servicio — ' + r.numero_reserva,
-        html: `<!DOCTYPE html><html><head><meta charset="utf-8">
-        <style>
-          body{margin:0;padding:0;background:#f5f0ea;font-family:'Helvetica Neue',Arial,sans-serif;}
-          .wrapper{max-width:560px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
-          .header{background:#1C1815;padding:24px 28px;text-align:center;border-bottom:4px solid #C1502E;}
-          .header h1{color:#D9A441;margin:0;font-size:20px;font-weight:700;}
-          .body{padding:28px;}
-          .caja{background:#f0faf5;border:1px solid #a8dfc2;border-radius:10px;padding:18px 22px;margin:16px 0;font-size:14px;color:#1a6640;line-height:1.7;}
-          .datos{background:#f9f7f4;border-radius:8px;padding:14px 18px;font-size:14px;color:#3a3330;line-height:1.9;margin:16px 0;}
-          .footer{background:#ECE6D8;padding:16px 28px;text-align:center;font-size:12px;color:#888;}
-        </style></head><body>
-        <div class="wrapper">
-          <div class="header"><h1>Traslados · GC</h1></div>
-          <div class="body">
-            <p style="font-size:16px;color:#1C1815;">Hola, <strong>${chofer.nombre}</strong> 👋</p>
-            <div class="caja">
-              ✅ <strong>Servicio completado.</strong> Gracias por realizar el traslado con profesionalidad y puntualidad. Tu trabajo es la base de nuestro servicio.
-            </div>
-            <div class="datos">
-              <strong>Reserva:</strong> <span style="font-family:monospace;">${r.numero_reserva}</span><br>
-              <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
-              <strong>Fecha:</strong> ${fechaViaje}
-            </div>
-            <p style="font-size:14px;color:#5b5347;line-height:1.7;">Seguimos contando contigo para los próximos servicios. ¡Hasta pronto!<br><br>El equipo de <strong>Traslados GC</strong></p>
-          </div>
-          <div class="footer">Traslados GC · Gran Canaria</div>
-        </div></body></html>`
+        html: plantillaEmail(
+          `<p>Hola <strong>${chofer.nombre}</strong> 👋</p>
+           <div class="caja-verde">
+             ✅ <strong>Servicio completado.</strong> Gracias por realizar el traslado con profesionalidad y puntualidad. Tu trabajo es la base de nuestro servicio.
+           </div>
+           <div class="info-box">
+             <strong>Reserva:</strong> <span class="pnr" style="font-size:15px;">${r.numero_reserva}</span><br>
+             <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
+             <strong>Fecha:</strong> ${fechaViaje}
+           </div>
+           <p>Seguimos contando contigo para los próximos servicios. ¡Hasta pronto!<br><br>Un saludo,<br><strong>El equipo de Traslados GC</strong></p>`
+        )
       });
     }
   } catch(e) { console.warn('Error enviando email gracias al chofer:', e.message); }
@@ -7614,38 +7506,19 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
     await enviarEmail({
       to: r.email_cliente,
       subject: '🔒 Depósito retenido por no-show — ' + r.numero_reserva,
-      html: `<!DOCTYPE html><html><head><meta charset="utf-8">
-      <style>
-        body{margin:0;padding:0;background:#f5f0ea;font-family:'Helvetica Neue',Arial,sans-serif;}
-        .wrapper{max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);}
-        .header{background:#1C1815;padding:28px 32px;text-align:center;border-bottom:4px solid #C1502E;}
-        .header h1{color:#D9A441;margin:0;font-size:22px;letter-spacing:1px;font-weight:700;}
-        .body{padding:32px;}
-        .caja-aviso{background:#fdecea;border:1px solid #f5b8b8;border-radius:10px;padding:20px 24px;margin:20px 0;}
-        .caja-aviso .titulo{font-size:16px;font-weight:700;color:#c62828;margin-bottom:8px;}
-        .caja-aviso .texto{font-size:14px;color:#7a1e1e;line-height:1.6;}
-        .datos{background:#f9f7f4;border-radius:8px;padding:16px 20px;margin:20px 0;font-size:14px;color:#3a3330;line-height:1.9;}
-        .datos strong{color:#1C1815;}
-        .despedida{font-size:14px;color:#5b5347;line-height:1.7;margin-top:20px;}
-        .footer{background:#ECE6D8;padding:18px 32px;text-align:center;font-size:12px;color:#888;line-height:1.6;}
-      </style></head><body>
-      <div class="wrapper">
-        <div class="header"><h1>Traslados · GC</h1></div>
-        <div class="body">
-          <p style="font-size:17px;color:#1C1815;">Hola, <strong>${r.nombre_cliente}</strong> 👋</p>
-          <div class="caja-aviso">
-            <div class="titulo">🔒 Depósito retenido por no-show</div>
-            <div class="texto">Lamentamos informarte de que tu traslado <strong>${r.numero_reserva}</strong> (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaViaje} no pudo realizarse al no haberse presentado en el punto de recogida.<br><br>De acuerdo con nuestra política de reservas, el depósito de garantía de ${importe} € ha sido retenido por no-show.</div>
-          </div>
-          <div class="datos">
-            <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
-            <strong>Fecha del servicio:</strong> ${fechaViaje}<br>
-            <strong>Reserva:</strong> <span style="font-family:monospace;">${r.numero_reserva}</span>
-          </div>
-          <p class="despedida">Si crees que ha habido un error, no dudes en contactarnos.<br><br>Un saludo cordial,<br><strong>El equipo de Traslados GC</strong></p>
-        </div>
-        <div class="footer">Traslados GC · Gran Canaria<br>Este email es una notificación automática de nuestra política de reservas.</div>
-      </div></body></html>`
+      html: plantillaEmail(
+        `<p>Hola <strong>${r.nombre_cliente}</strong> 👋</p>
+         <div class="caja-roja">
+           <p style="margin:0 0 8px 0;font-weight:700;font-size:15px;">🔒 Depósito retenido por no-show</p>
+           <p style="margin:0;font-size:14px;line-height:1.6;">Lamentamos informarte de que tu traslado <strong>${r.numero_reserva}</strong> (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaViaje} no pudo realizarse al no haberse presentado en el punto de recogida.<br><br>De acuerdo con nuestra política de reservas, el depósito de garantía de ${importe} € ha sido retenido por no-show.</p>
+         </div>
+         <div class="info-box">
+           <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
+           <strong>Fecha del servicio:</strong> ${fechaViaje}<br>
+           <strong>Reserva:</strong> <span class="pnr">${r.numero_reserva}</span>
+         </div>
+         <p>Si crees que ha habido un error, no dudes en contactarnos.<br><br>Un saludo cordial,<br><strong>El equipo de Traslados GC</strong></p>`
+      )
     });
   } catch(e) { console.warn('Error enviando email no-show:', e.message); }
 
@@ -7914,7 +7787,7 @@ function requierePuenteWhatsapp(req, res, next) {
 
 app.get('/api/whatsapp/mensajes-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, telefono, texto, url_documento, nombre_documento FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
+    'SELECT id, telefono, texto, url_documento, nombre_documento, documento_base64 FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
   );
   res.json(result.rows);
 }));
@@ -8072,6 +7945,40 @@ app.post('/api/whatsapp/asignar/:id', requierePuenteWhatsapp, asyncHandler(async
     [req.params.id]
   );
   res.json({ ok: true });
+}));
+
+// ─── Plantillas de comunicación ───────────────────────────────────────────────
+
+// GET: listar todas las plantillas
+app.get('/admin/plantillas-comunicacion', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, clave, nombre, categoria, asunto_email, cuerpo_email, cuerpo_whatsapp, activa, actualizado_en FROM plantillas_comunicacion ORDER BY categoria, nombre'
+  );
+  res.json({ plantillas: result.rows });
+}));
+
+// GET: obtener una plantilla por clave
+app.get('/admin/plantillas-comunicacion/:clave', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT * FROM plantillas_comunicacion WHERE clave = $1',
+    [req.params.clave]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'Plantilla no encontrada.' });
+  res.json({ plantilla: result.rows[0] });
+}));
+
+// PUT: guardar cambios en una plantilla
+app.put('/admin/plantillas-comunicacion/:clave', requireAdmin, asyncHandler(async (req, res) => {
+  const { asunto_email, cuerpo_email, cuerpo_whatsapp, nombre } = req.body;
+  const result = await pool.query(
+    `UPDATE plantillas_comunicacion
+     SET asunto_email = $1, cuerpo_email = $2, cuerpo_whatsapp = $3, nombre = $4, actualizado_en = NOW()
+     WHERE clave = $5
+     RETURNING *`,
+    [asunto_email, cuerpo_email, cuerpo_whatsapp || null, nombre, req.params.clave]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'Plantilla no encontrada.' });
+  res.json({ ok: true, plantilla: result.rows[0] });
 }));
 
 // ─── Arranque ─────────────────────────────────────────────────────────────────
