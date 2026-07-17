@@ -1256,7 +1256,7 @@ async function initSchema() {
 
 <p style="font-size:13px;color:#888;">El plazo máximo para confirmarte un chofer es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.</p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\nHemos recibido tu solicitud de traslado.\n\n*Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nGuarda este número — lo necesitarás para consultar tu reserva. El plazo máximo para confirmarte un conductor es de 15 minutos. Te avisaremos en cuanto tengamos respuesta.\n\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n📨 Hemos recibido tu solicitud de traslado. Estamos trabajando en ella y en breve recibirás confirmación.\n\n🔖 *Tu número de reserva es:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\n💾 Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.\n\n⏱️ El plazo máximo para confirmarte un conductor es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.\n\nTraslados GC' },
     { clave: 'cliente_confirmacion', nombre: 'Traslado confirmado (al cliente)', categoria: 'cliente',
       asunto_email: 'Traslado confirmado \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -1289,7 +1289,7 @@ async function initSchema() {
 
 <p style="font-size:13px;color:#888;">Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.</p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n✅ *Tu traslado está confirmado.*\n\n*Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Vehículo:* {categoria}\n\n💳 *Depósito de garantía: {importe_deposito} €*\nPara garantizar tu plaza realiza el pago a través del enlace que encontrarás en el email que acabas de recibir. El voucher te llegará automáticamente al confirmar el pago.\n\n{url_pago}\n\nNos pondremos en contacto contigo por WhatsApp para coordinar los detalles del servicio.\n\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n✅ *¡Tu traslado está confirmado! Hemos asignado un conductor para tu servicio.*\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n\n💳 *Depósito de garantía — {importe_deposito} €*\nPara garantizar tu plaza, realiza el pago del depósito de {importe_deposito} €. El voucher de tu traslado te llegará automáticamente al confirmar el pago.\n\n⚠️ *Importante:* Si no recibimos el pago {horas_cancelacion} horas antes de tu traslado, la reserva será cancelada.\n\n✔️ El depósito te será devuelto íntegramente una vez completado el servicio.\n\n🗓️ *Cancelación gratuita hasta el {fecha_limite_cancelacion}.* Después de esa fecha, el depósito de {importe_deposito} € no será reembolsable.\n\n👉 {url_pago}\n\n📲 Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.\n\nTraslados GC' },
     { clave: 'cliente_enlace_pago', nombre: 'Enlace de pago (dep\u00f3sito)', categoria: 'cliente',
       asunto_email: 'Enlace de pago \u2014 Reserva {numero_reserva}',
       cuerpo_email: `
@@ -1301,7 +1301,7 @@ async function initSchema() {
 
 <p style="font-size:13px;color:#888;">Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.</p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\nTe reenviamos el enlace de pago para tu reserva *{numero_reserva}*.\n\n💳 *Depósito de garantía: {importe} €*\n\n{url_pago}\n\nSi tienes cualquier problema con el pago, contáctanos. Un saludo 🙏\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n💳 Te reenviamos el enlace de pago para confirmar tu reserva *{numero_reserva}*.\n\n👉 {url_pago}\n\n❓ Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.\n\nTraslados GC' },
     { clave: 'cliente_voucher', nombre: 'Voucher de traslado', categoria: 'cliente',
       asunto_email: '\u2714 Voucher de traslado \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -1313,7 +1313,7 @@ async function initSchema() {
 Un saludo,<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\nTe adjuntamos el voucher de tu traslado *{numero_reserva}*. 📄\n\nLlévalo contigo el día del servicio — puede ser en papel o en el móvil.\n\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n📄 Adjuntamos el voucher de tu traslado *{numero_reserva}*. Llévalo contigo el día del servicio.\n\n❓ Si tienes cualquier duda, no dudes en contactarnos por WhatsApp.\n\nUn saludo,\nTraslados GC' },
     { clave: 'cliente_cancelacion', nombre: 'Cancelaci\u00f3n de reserva (al cliente)', categoria: 'cliente',
       asunto_email: 'Tu reserva {numero_reserva} ha sido cancelada',
       cuerpo_email: `
@@ -1330,7 +1330,7 @@ Un saludo,<br>
 
 <p>Si tienes alguna duda, puedes contactarnos por WhatsApp.</p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\nTu reserva *{numero_reserva}* ha sido cancelada correctamente.\n\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha}\n\n{aviso_deposito}\n\nSi tienes alguna duda, contáctanos. Un saludo 🙏\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n❌ Tu reserva *{numero_reserva}* ha sido cancelada correctamente.\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n\n{aviso_deposito}\n\n❓ Si tienes alguna duda, puedes contactarnos por WhatsApp.\n\nTraslados GC' },
     { clave: 'cliente_modificacion_aprobada', nombre: 'Modificaci\u00f3n aprobada (al cliente)', categoria: 'cliente',
       asunto_email: '\u2705 Tu modificaci\u00f3n ha sido aprobada \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -1340,7 +1340,7 @@ Un saludo,<br>
 
 <p>Accede a tu portal para ver todos los detalles actualizados.</p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n✅ Los cambios solicitados en tu reserva *{numero_reserva}* han sido revisados y aprobados.\n\nAccede a tu portal para ver todos los detalles actualizados.\n\nUn saludo 🙏\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n✅ Hemos revisado y aprobado los cambios en tu reserva *{numero_reserva}*.\n\n🔍 Accede a tu portal para ver todos los detalles actualizados.\n\nTraslados GC' },
     { clave: 'cliente_mensaje_admin', nombre: 'Mensaje del equipo al cliente', categoria: 'cliente',
       asunto_email: '\ud83d\udcac Tienes un mensaje sobre tu reserva {numero_reserva}',
       cuerpo_email: `
@@ -1352,7 +1352,7 @@ Un saludo,<br>
 
 <p>Accede a tu portal para ver el hilo completo y responder.</p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\nTienes un mensaje del equipo de Traslados GC sobre tu reserva *{numero_reserva}*:\n\n{mensaje}\n\nUn saludo 🙏\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n💬 El equipo de Traslados GC te ha enviado un mensaje sobre tu reserva *{numero_reserva}*:\n\n_{mensaje}_\n\n🔍 Accede a tu portal para ver el hilo completo y responder.\n\nTraslados GC' },
     { clave: 'cliente_valoracion', nombre: 'Solicitud de valoraci\u00f3n (servicio terminado)', categoria: 'cliente',
       asunto_email: '\u00bfC\u00f3mo fue tu traslado {numero_reserva}?',
       cuerpo_email: `
@@ -1371,7 +1371,7 @@ Un saludo,<br>
 
 <p style="color:#888;font-size:13px;">Si no fuiste tú quien realizó este traslado, puedes ignorar este mensaje.</p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\nTu traslado *{numero_reserva}* ha finalizado.\n\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha}\n\n⭐ ¿Nos cuentas cómo fue? Tu opinión nos ayuda a mejorar el servicio. Solo te llevará un momento:\n{url_valoracion}\n\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n🏁 Tu traslado ha finalizado. Nos gustaría saber cómo fue tu experiencia.\n\n🗺️ *{origen} → {destino}*\n🔖 Reserva {numero_reserva} · 📅 {fecha}\n\n⭐ Tu opinión nos ayuda a seguir mejorando el servicio. Solo te llevará un momento:\n👉 {url_valoracion}\n\n_Si no fuiste tú quien realizó este traslado, puedes ignorar este mensaje._\n\nTraslados GC' },
     { clave: 'cliente_deposito_liberado', nombre: 'Dep\u00f3sito liberado (servicio completado)', categoria: 'cliente',
       asunto_email: '\u2705 Tu dep\u00f3sito ha sido liberado \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -1390,7 +1390,7 @@ Un saludo,<br>
 Un saludo cordial,<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n✅ *Servicio completado con éxito.*\n\nEl depósito de garantía de tu reserva *{numero_reserva}* ({origen} → {destino}) ha sido liberado. El importe quedará disponible en tu tarjeta en un plazo de 5 a 10 días hábiles según tu entidad bancaria.\n\nHa sido un placer acompañarte. ¡Hasta pronto! 🙏\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n✅ *Servicio completado con éxito.* El depósito de garantía correspondiente a tu reserva *{numero_reserva}* ha sido liberado correctamente. El importe quedará disponible en tu tarjeta en un plazo de 5 a 10 días hábiles según tu entidad bancaria.\n\n📍 *Ruta:* {origen} → {destino}\n🔖 *Reserva:* {numero_reserva}\n\n🙏 Ha sido un placer acompañarte en este viaje. Si en algún momento necesitas otro traslado en Gran Canaria, estaremos encantados de ayudarte.\n\nUn saludo cordial,\nTraslados GC' },
     { clave: 'cliente_deposito_noshow', nombre: 'Dep\u00f3sito retenido por no-show', categoria: 'cliente',
       asunto_email: '\ud83d\udd12 Dep\u00f3sito retenido por no-show \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -1412,7 +1412,7 @@ Un saludo cordial,<br>
 Un saludo cordial,<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n🔒 *Depósito retenido por no-show.*\n\nLamentamos informarte que tu traslado *{numero_reserva}* ({origen} → {destino}) del {fecha} no pudo realizarse al no haberse presentado en el punto de recogida. De acuerdo con nuestra política de reservas, el depósito de {importe} € ha sido retenido.\n\nSi crees que ha habido un error, no dudes en contactarnos.\n\nUn saludo 🙏\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n🔒 *Depósito retenido por no-show*\n\nLamentamos informarte de que tu traslado *{numero_reserva}* no pudo realizarse al no haberse presentado en el punto de recogida.\n\nDe acuerdo con nuestra política de reservas, el depósito de garantía de {importe} € ha sido retenido por no-show.\n\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha del servicio:* {fecha}\n🔖 *Reserva:* {numero_reserva}\n\n❓ Si crees que ha habido un error, no dudes en contactarnos.\n\nUn saludo cordial,\nTraslados GC' },
     { clave: 'cliente_en_gestion', nombre: 'Seguimos gestionando (15 min sin chofer)', categoria: 'cliente',
       asunto_email: 'Seguimos gestionando tu traslado \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -1427,7 +1427,7 @@ Un saludo cordial,<br>
 <p style="font-size:13px;color:#888;">Un saludo,<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\nSeguimos trabajando en tu solicitud de traslado *{numero_reserva}*. Aún no hemos podido confirmar conductor, pero continuamos buscando disponibilidad.\n\nTe avisaremos en cuanto tengamos respuesta.\n\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n🔄 Seguimos trabajando en tu solicitud de traslado *{numero_reserva}*. Aún no hemos podido confirmar conductor, pero continuamos buscando disponibilidad.\n\n⏱️ Te avisaremos en cuanto tengamos una respuesta. El plazo habitual de gestión es de 15 minutos.\n\nUn saludo,\nTraslados GC' },
     { clave: 'cliente_reserva_anulada', nombre: 'Reserva anulada (sin chofer disponible)', categoria: 'cliente',
       asunto_email: 'Tu reserva {numero_reserva} ha sido anulada',
       cuerpo_email: `
@@ -1442,7 +1442,7 @@ Un saludo cordial,<br>
 <p>Disculpa las molestias.<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\nLamentamos informarte que no hemos podido confirmar un conductor disponible para tu traslado *{numero_reserva}* en la fecha solicitada, por lo que hemos anulado la reserva.\n\nPuedes enviarnos una nueva solicitud más adelante. Disculpa las molestias 🙏\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n😔 Lamentamos informarte que no hemos podido confirmar un conductor disponible para tu traslado en la fecha solicitada, por lo que hemos anulado la reserva *{numero_reserva}*.\n\n🔄 Puedes enviarnos una nueva solicitud más adelante; con gusto intentaremos ayudarte si tenemos disponibilidad.\n\nDisculpa las molestias.\nTraslados GC' },
     { clave: 'cliente_acceso_reserva', nombre: 'Acceso a reserva (contrase\u00f1a provisional)', categoria: 'cliente',
       asunto_email: 'Acceso a tu reserva {numero_reserva} \u2014 Traslados GC',
       cuerpo_email: `
@@ -1459,7 +1459,7 @@ Un saludo cordial,<br>
 
 <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado este acceso, ignora este mensaje.</p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\nTe hemos creado acceso al portal de cliente para gestionar tu reserva *{numero_reserva}*.\n\n🔑 *Contraseña provisional:* {password_temporal}\n\nEntra con tu email en: {url_portal}\n\nSe te pedirá que la cambies en tu primer acceso.\n\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n🔐 Aquí tienes tu contraseña provisional para acceder al seguimiento de tu reserva *{numero_reserva}*.\n\n🔑 *Contraseña provisional:* {password_temporal}\n\n⚠️ Al entrar por primera vez se te pedirá que la cambies por una propia.\n\n_Si no has solicitado este acceso, ignora este mensaje._\n\nTraslados GC' },
     { clave: 'cliente_recuperar_password', nombre: 'Recuperar contrase\u00f1a (portal cliente)', categoria: 'cliente',
       asunto_email: 'Recupera tu contrase\u00f1a \u2014 Traslados GC',
       cuerpo_email: `
@@ -1492,7 +1492,7 @@ Un saludo cordial,<br>
 Un saludo,<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\nYa tenemos el precio para tu traslado.\n\n📍 *Ruta:* {origen} → {destino}\n💰 *Precio estimado: {precio} €*\n\nSi deseas proceder con la reserva, respóndenos aquí o visita nuestra web. Un saludo 🙏\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n✅ Ya tenemos el precio para tu traslado.\n\n📍 *Ruta:* {origen} → {destino}\n💰 *Precio estimado: {precio} €*\n\n👉 Si deseas proceder con la reserva, visita nuestra web o respóndenos por WhatsApp y lo gestionamos enseguida.\n\nUn saludo,\nTraslados GC' },
     { clave: 'cliente_precio_negativa', nombre: 'Precio \u201ca consultar\u201d \u2192 no disponible', categoria: 'cliente',
       asunto_email: 'Tu consulta de traslado \u2014 Traslados GC',
       cuerpo_email: `
@@ -1507,7 +1507,7 @@ Un saludo,<br>
 <p style="font-size:13px;color:#888;">Disculpa las molestias.<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\nHemos revisado tu consulta para el traslado de *{origen}* a *{destino}* y lamentamos informarte que en este momento no podemos ofrecerte servicio para esa ruta o fecha.\n\nPuedes volver a consultarnos en otra fecha. Un saludo 🙏\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n😔 Hemos revisado tu consulta para el traslado de *{origen}* a *{destino}* y lamentamos informarte que en este momento no podemos ofrecerte servicio para esa ruta o fecha.\n\n🔄 Puedes volver a consultarnos en otra fecha. Estaremos encantados de ayudarte si tenemos disponibilidad.\n\nDisculpa las molestias.\nTraslados GC' },
     { clave: 'cliente_factura', nombre: 'Factura (al cliente)', categoria: 'cliente',
       asunto_email: '\ud83d\udcc4 Factura {numero_factura} \u2014 Reserva {numero_reserva}',
       cuerpo_email: `
@@ -1518,7 +1518,7 @@ Un saludo,<br>
 <p>Gracias por viajar con Traslados GC.<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\nTe adjuntamos la factura *{numero_factura}* correspondiente a tu reserva *{numero_reserva}*. 📄\n\nGracias por viajar con Traslados GC 🙏' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n📄 Adjuntamos la factura *{numero_factura}* correspondiente a tu reserva *{numero_reserva}*.\n\n🙏 Gracias por viajar con Traslados GC.\nTraslados GC' },
     { clave: 'cliente_comunicacion_masiva', nombre: 'Comunicaci\u00f3n masiva (a clientes)', categoria: 'cliente',
       asunto_email: '{asunto_libre}',
       cuerpo_email: `
@@ -1529,7 +1529,7 @@ Un saludo,<br>
 <p>Un saludo,<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n{mensaje_libre}\n\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_cliente}*\n\n{mensaje_libre}\n\nUn saludo,\nTraslados GC' },
     { clave: 'chofer_cartel', nombre: 'Cartel de recogida (al chofer)', categoria: 'chofer',
       asunto_email: 'Cartel de recogida \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -1547,7 +1547,7 @@ Un saludo,<br>
 <p style="font-size:13px;color:#888;">Un saludo,<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\nTe adjuntamos el cartel de recogida para tu próximo servicio. Imprímelo y úsalo para identificar a tu cliente. 📋\n\n*Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_chofer}*\n\n📋 Adjuntamos el cartel de recogida para tu próximo servicio. Imprímelo y úsalo para identificar a tu cliente.\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nUn saludo,\nTraslados GC' },
     { clave: 'chofer_cancelacion', nombre: 'Cancelaci\u00f3n asignada (al chofer)', categoria: 'chofer',
       asunto_email: '\u274c Cancelaci\u00f3n de reserva \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -1563,7 +1563,7 @@ Un saludo,<br>
 Un saludo,<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n❌ *Cancelación de reserva.*\n\n*Reserva:* {numero_reserva}\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nEsta reserva ha sido cancelada por el cliente. Queda liberada de tu agenda.\n\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_chofer}*\n\n❌ *Reserva cancelada:* {numero_reserva}\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nLa reserva ha sido cancelada por el cliente. Queda liberada de tu agenda.\n\nUn saludo,\nTraslados GC' },
     { clave: 'chofer_gracias_servicio', nombre: 'Gracias por el servicio (al chofer)', categoria: 'chofer',
       asunto_email: '\ud83d\ude4f Gracias por el servicio \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -1583,7 +1583,7 @@ Un saludo,<br>
 Un saludo,<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n✅ *Servicio completado.*\n\n*Reserva:* {numero_reserva}\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha}\n\nGracias por realizar el traslado con profesionalidad y puntualidad. Tu trabajo es la base de nuestro servicio. Seguimos contando contigo. ¡Hasta pronto! 🙏\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_chofer}*\n\n✅ *Servicio completado.* Gracias por realizar el traslado con profesionalidad y puntualidad. Tu trabajo es la base de nuestro servicio.\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha}\n\n🙏 Seguimos contando contigo para los próximos servicios. ¡Hasta pronto!\n\nUn saludo,\nTraslados GC' },
     { clave: 'chofer_mensaje_admin', nombre: 'Mensaje del equipo al chofer', categoria: 'chofer',
       asunto_email: '\ud83d\udcac Mensaje sobre la reserva {numero_reserva}',
       cuerpo_email: `
@@ -1597,7 +1597,7 @@ Un saludo,<br>
 Un saludo,<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\nTienes un mensaje del equipo de Traslados GC sobre la reserva *{numero_reserva}*:\n\n{mensaje}\n\nAccede a tu portal para ver los detalles. Un saludo 🙏\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_chofer}*\n\n💬 El equipo de Traslados GC te ha enviado un mensaje sobre la reserva *{numero_reserva}*:\n\n_{mensaje}_\n\n🔍 Accede a tu portal para ver los detalles.\n\nUn saludo,\nTraslados GC' },
     { clave: 'chofer_bienvenida', nombre: 'Bienvenida al chofer (cuenta aprobada)', categoria: 'chofer',
       asunto_email: '\u00a1Bienvenido a Traslados GC!',
       cuerpo_email: `
@@ -1613,7 +1613,7 @@ Un saludo,<br>
 
 <p style="font-size:13px;color:#5b5347;">Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n✅ Tu solicitud ha sido aprobada. ¡Bienvenido al equipo de Traslados GC!\n\nYa puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas y podrás gestionar tu perfil.\n\nCualquier duda, estamos aquí. Un saludo 🙏\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_chofer}*\n\n🎉 Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de Traslados GC.\n\n📱 Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.\n\n❓ Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!\n\nTraslados GC' },
     { clave: 'chofer_comunicacion_masiva', nombre: 'Comunicaci\u00f3n masiva (a choferes)', categoria: 'chofer',
       asunto_email: '{asunto_libre}',
       cuerpo_email: `
@@ -1624,7 +1624,7 @@ Un saludo,<br>
 <p>Un saludo,<br>
 <strong>El equipo de Traslados GC</strong></p>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n{mensaje_libre}\n\nTraslados GC' },
+      cuerpo_whatsapp: '👋 Hola, *{nombre_chofer}*\n\n{mensaje_libre}\n\nUn saludo,\nTraslados GC' },
     { clave: 'interno_cliente_modifico', nombre: '[Admin] Cliente modific\u00f3 datos de reserva', categoria: 'interno',
       asunto_email: '\u270f\ufe0f Cliente modific\u00f3 datos \u2014 {numero_reserva}',
       cuerpo_email: 'El cliente de la reserva <strong>{numero_reserva}</strong> ha modificado los datos de su traslado.\n\nAccede al panel de administraci\u00f3n para ver los cambios.',
