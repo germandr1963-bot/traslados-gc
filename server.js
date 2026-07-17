@@ -7955,6 +7955,24 @@ async function generarFacturaPDF(reservaId) {
 }
 
 // ─── Admin: conceptos extra de factura ───────────────────────────────────────
+async function recalcularTotalFactura(facturaId) {
+  const f = await pool.query('SELECT reserva_id FROM facturas WHERE id = $1', [facturaId]);
+  if (!f.rows.length) return;
+  const reservaId = f.rows[0].reserva_id;
+  const r = await pool.query('SELECT precio_estimado FROM reservas WHERE id = $1', [reservaId]);
+  const base = parseFloat(r.rows[0]?.precio_estimado || 0);
+  const extrasR = await pool.query(
+    'SELECT COALESCE(SUM(precio_en_reserva),0) AS total FROM reservas_extras WHERE reserva_id = $1', [reservaId]
+  );
+  const totalExtras = parseFloat(extrasR.rows[0].total);
+  const conceptosR = await pool.query(
+    'SELECT COALESCE(SUM(importe),0) AS total FROM factura_conceptos_extra WHERE factura_id = $1', [facturaId]
+  );
+  const totalConceptos = parseFloat(conceptosR.rows[0].total);
+  const total = base + totalExtras + totalConceptos;
+  await pool.query('UPDATE facturas SET importe_total = $1 WHERE id = $2', [total, facturaId]);
+}
+
 app.post('/admin/facturas/:id/conceptos-extra', requireAdmin, asyncHandler(async (req, res) => {
   const { descripcion, importe } = req.body;
   if (!descripcion || !descripcion.trim()) return res.status(400).json({ error: 'La descripción es obligatoria.' });
@@ -7964,11 +7982,14 @@ app.post('/admin/facturas/:id/conceptos-extra', requireAdmin, asyncHandler(async
     'INSERT INTO factura_conceptos_extra (factura_id, descripcion, importe) VALUES ($1, $2, $3)',
     [req.params.id, descripcion.trim(), imp]
   );
+  await recalcularTotalFactura(req.params.id);
   res.json({ ok: true });
 }));
 
 app.delete('/admin/facturas/conceptos-extra/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const ceQ = await pool.query('SELECT factura_id FROM factura_conceptos_extra WHERE id = $1', [req.params.id]);
   await pool.query('DELETE FROM factura_conceptos_extra WHERE id = $1', [req.params.id]);
+  if (ceQ.rows.length) await recalcularTotalFactura(ceQ.rows[0].factura_id);
   res.json({ ok: true });
 }));
 
