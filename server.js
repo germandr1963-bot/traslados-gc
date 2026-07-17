@@ -5151,12 +5151,17 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
 
   // WhatsApp de confirmación al cliente
   try {
-    if (r.telefono_cliente) {
+    if (r && r.telefono_cliente) {
       const _pc1wa = await obtenerPlantilla('cliente_confirmacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
         origen: r.origen || '—',
-        destino: r.destino || '—'
+        destino: r.destino || '—',
+        fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—',
+        hora: r.hora ? r.hora.slice(0,5) : '—',
+        categoria: r.categoria_nombre || '—',
+        importe_deposito: typeof importe !== 'undefined' ? importe : '',
+        url_pago: typeof urlPago !== 'undefined' && urlPago ? urlPago : ''
       });
       const textoWa = (_pc1wa && _pc1wa.whatsapp) ||
         ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Hemos asignado un conductor para tu servicio. Revisa tu email para todos los detalles y el enlace de pago del depósito.');
