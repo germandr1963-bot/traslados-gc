@@ -4267,7 +4267,7 @@ function descargarFacturaAdmin(reservaId, pnr) {
     .then(function(blob) {
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      a.href = url; a.download = 'factura-' + pnr + '.docx'; a.click();
+      a.href = url; a.download = 'factura-' + pnr + '.pdf'; a.click();
       URL.revokeObjectURL(url);
     })
     .catch(function() { alert('Error al generar la factura.'); });
@@ -4282,7 +4282,7 @@ function descargarFactura() {
     .then(function(blob) {
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      a.href = url; a.download = 'factura-' + reservaDetalleId + '.docx'; a.click();
+      a.href = url; a.download = 'factura-' + reservaDetalleId + '.pdf'; a.click();
       URL.revokeObjectURL(url);
       btn.textContent = '📄 Descargar factura'; btn.disabled = false;
     })
