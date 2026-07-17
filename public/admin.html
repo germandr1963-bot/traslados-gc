@@ -906,6 +906,25 @@ table.tabla-precios input {
         </div>
       </div>
 
+      <!-- Modal: conceptos extra de factura -->
+      <div id="modal-conceptos-extra" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:12px;padding:28px;max-width:520px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);max-height:80vh;overflow-y:auto;">
+          <h3 style="margin:0 0 4px;font-size:1rem;">+ Conceptos extra</h3>
+          <p id="modal-conceptos-titulo" style="font-size:12px;color:#888;margin:0 0 16px;"></p>
+          <div id="modal-conceptos-lista" style="margin-bottom:16px;"></div>
+          <div style="border-top:1px solid #eee;padding-top:14px;">
+            <p style="font-size:13px;font-weight:600;margin:0 0 8px;">Añadir concepto:</p>
+            <input type="text" id="concepto-descripcion" class="campo" placeholder="Descripción del concepto" style="margin-bottom:8px;">
+            <input type="number" id="concepto-importe" class="campo" placeholder="Importe (€)" step="0.01" min="0" style="margin-bottom:12px;">
+            <div style="display:flex;gap:8px;">
+              <button class="boton-primario" style="font-size:0.82rem;" onclick="guardarConceptoExtra()">+ Añadir</button>
+              <button class="boton-costa" style="font-size:0.82rem;" onclick="cerrarConceptosExtra()">Cerrar</button>
+            </div>
+            <div id="aviso-concepto" style="display:none;margin-top:10px;font-size:0.82rem;"></div>
+          </div>
+        </div>
+      </div>
+
       <div id="modal-enviar-factura" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
         <div style="background:#fff;border-radius:12px;padding:28px;max-width:440px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
           <h3 style="margin:0 0 16px;font-size:1rem;">📧 Enviar factura al cliente</h3>
@@ -4222,6 +4241,7 @@ function cargarFacturas() {
             '<td style="display:flex;gap:6px;flex-wrap:wrap;">' +
               '<button class="boton-costa" style="font-size:0.78rem;padding:4px 10px;" onclick="descargarFacturaAdmin(' + f.reserva_id + ', \'' + f.numero_reserva + '\')">📄 Descargar</button>' +
               '<button class="boton-primario" style="font-size:0.78rem;padding:4px 10px;" onclick="abrirModalFactura(' + f.id + ', \'' + f.email_cliente + '\')">📧 Enviar</button>' +
+              '<button class="boton-secundario" style="font-size:0.78rem;padding:4px 10px;background:#6c757d;" onclick="abrirConceptosExtra(' + f.id + ', \'' + f.numero_factura + '\')">+ Conceptos</button>' +
             '</td>' +
           '</tr>';
         }).join('') +
@@ -4271,6 +4291,87 @@ function descargarFacturaAdmin(reservaId, pnr) {
       URL.revokeObjectURL(url);
     })
     .catch(function() { alert('Error al generar la factura.'); });
+}
+
+var _conceptosFacturaId = null;
+
+function abrirConceptosExtra(facturaId, numeroFactura) {
+  _conceptosFacturaId = facturaId;
+  document.getElementById('modal-conceptos-titulo').textContent = 'Factura ' + numeroFactura;
+  document.getElementById('concepto-descripcion').value = '';
+  document.getElementById('concepto-importe').value = '';
+  document.getElementById('aviso-concepto').style.display = 'none';
+  document.getElementById('modal-conceptos-extra').style.display = 'flex';
+  cargarConceptosExtra();
+}
+
+function cerrarConceptosExtra() {
+  document.getElementById('modal-conceptos-extra').style.display = 'none';
+  _conceptosFacturaId = null;
+  cargarFacturas();
+}
+
+function cargarConceptosExtra() {
+  if (!_conceptosFacturaId) return;
+  var lista = document.getElementById('modal-conceptos-lista');
+  lista.innerHTML = '<p style="font-size:13px;color:#888;">Cargando...</p>';
+  fetch('/admin/facturas/' + _conceptosFacturaId + '/conceptos-extra')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.conceptos || !d.conceptos.length) {
+        lista.innerHTML = '<p style="font-size:13px;color:#888;">No hay conceptos extra añadidos.</p>';
+        return;
+      }
+      lista.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+        '<thead><tr><th style="text-align:left;padding:6px 4px;border-bottom:1px solid #eee;">Descripción</th>' +
+        '<th style="text-align:right;padding:6px 4px;border-bottom:1px solid #eee;">Importe</th>' +
+        '<th style="padding:6px 4px;border-bottom:1px solid #eee;"></th></tr></thead><tbody>' +
+        d.conceptos.map(function(c) {
+          return '<tr>' +
+            '<td style="padding:6px 4px;">' + c.descripcion + '</td>' +
+            '<td style="text-align:right;padding:6px 4px;font-family:monospace;">' + parseFloat(c.importe).toFixed(2) + ' €</td>' +
+            '<td style="padding:6px 4px;text-align:center;">' +
+              '<button onclick="eliminarConceptoExtra(' + c.id + ')" style="background:none;border:none;color:var(--rojo);cursor:pointer;font-size:16px;" title="Eliminar">×</button>' +
+            '</td></tr>';
+        }).join('') +
+        '</tbody></table>';
+    });
+}
+
+function guardarConceptoExtra() {
+  if (!_conceptosFacturaId) return;
+  var desc = document.getElementById('concepto-descripcion').value.trim();
+  var imp = document.getElementById('concepto-importe').value.trim();
+  var av = document.getElementById('aviso-concepto');
+  if (!desc) { av.style.display='block'; av.style.color='var(--rojo)'; av.textContent='Escribe una descripción.'; return; }
+  if (!imp || isNaN(parseFloat(imp)) || parseFloat(imp) <= 0) { av.style.display='block'; av.style.color='var(--rojo)'; av.textContent='Escribe un importe válido.'; return; }
+  av.style.display='block'; av.style.color='#888'; av.textContent='Guardando...';
+  fetch('/admin/facturas/' + _conceptosFacturaId + '/conceptos-extra', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ descripcion: desc, importe: parseFloat(imp) })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok) {
+      document.getElementById('concepto-descripcion').value = '';
+      document.getElementById('concepto-importe').value = '';
+      av.style.color='green'; av.textContent='✅ Concepto añadido.';
+      setTimeout(function() { av.style.display='none'; }, 2000);
+      cargarConceptosExtra();
+    } else {
+      av.style.color='var(--rojo)'; av.textContent = d.error || 'Error al guardar.';
+    }
+  });
+}
+
+function eliminarConceptoExtra(conceptoId) {
+  if (!confirm('¿Eliminar este concepto?')) return;
+  fetch('/admin/facturas/conceptos-extra/' + conceptoId, { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) cargarConceptosExtra();
+    });
 }
 
 function descargarFactura() {
