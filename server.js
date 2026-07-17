@@ -1124,6 +1124,13 @@ async function initSchema() {
       importe_total NUMERIC(10,2),
       generada_en TIMESTAMP DEFAULT NOW()
     );
+    CREATE TABLE IF NOT EXISTS factura_conceptos_extra (
+      id SERIAL PRIMARY KEY,
+      factura_id INT NOT NULL REFERENCES facturas(id) ON DELETE CASCADE,
+      descripcion TEXT NOT NULL,
+      importe NUMERIC(10,2) NOT NULL,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
   `);
 
   // Configuración de contacto público
@@ -7819,11 +7826,22 @@ async function generarFacturaPDF(reservaId) {
   const cfg = cfgQ.rows[0] || {};
 
   const facturaExistente = await pool.query(
-    'SELECT numero_factura FROM facturas WHERE reserva_id = $1 ORDER BY generada_en ASC LIMIT 1', [reservaId]
+    'SELECT id, numero_factura FROM facturas WHERE reserva_id = $1 ORDER BY generada_en ASC LIMIT 1', [reservaId]
   );
 
+  // Conceptos extra añadidos manualmente desde el admin
+  let conceptosExtra = [];
+  if (facturaExistente.rows.length) {
+    const ceQ = await pool.query(
+      'SELECT id, descripcion, importe FROM factura_conceptos_extra WHERE factura_id = $1 ORDER BY creado_en ASC',
+      [facturaExistente.rows[0].id]
+    );
+    conceptosExtra = ceQ.rows;
+  }
+
   const totalExtras = extras.reduce((s, e) => s + parseFloat(e.precio_en_reserva), 0);
-  const totalFactura = (parseFloat(r.precio_estimado) || 0) + totalExtras;
+  const totalConceptosExtra = conceptosExtra.reduce((s, c) => s + parseFloat(c.importe), 0);
+  const totalFactura = (parseFloat(r.precio_estimado) || 0) + totalExtras + totalConceptosExtra;
 
   let numeroFactura;
   if (facturaExistente.rows.length) {
@@ -7919,6 +7937,10 @@ async function generarFacturaPDF(reservaId) {
       doc.fontSize(11).font('Helvetica').fillColor('#1C1815').text('Extra: ' + e.nombre, 50, y, { continued: true, width: W });
       doc.font('Helvetica-Bold').text('    ' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €'); y += 16;
     });
+    conceptosExtra.forEach(function(c) {
+      doc.fontSize(11).font('Helvetica').fillColor('#1C1815').text(c.descripcion, 50, y, { continued: true, width: W });
+      doc.font('Helvetica-Bold').text('    ' + parseFloat(c.importe).toFixed(2) + ' €'); y += 16;
+    });
     separador();
 
     // Total
@@ -7931,6 +7953,32 @@ async function generarFacturaPDF(reservaId) {
     doc.end();
   });
 }
+
+// ─── Admin: conceptos extra de factura ───────────────────────────────────────
+app.post('/admin/facturas/:id/conceptos-extra', requireAdmin, asyncHandler(async (req, res) => {
+  const { descripcion, importe } = req.body;
+  if (!descripcion || !descripcion.trim()) return res.status(400).json({ error: 'La descripción es obligatoria.' });
+  const imp = parseFloat(importe);
+  if (isNaN(imp) || imp <= 0) return res.status(400).json({ error: 'El importe no es válido.' });
+  await pool.query(
+    'INSERT INTO factura_conceptos_extra (factura_id, descripcion, importe) VALUES ($1, $2, $3)',
+    [req.params.id, descripcion.trim(), imp]
+  );
+  res.json({ ok: true });
+}));
+
+app.delete('/admin/facturas/conceptos-extra/:id', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM factura_conceptos_extra WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.get('/admin/facturas/:id/conceptos-extra', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, descripcion, importe FROM factura_conceptos_extra WHERE factura_id = $1 ORDER BY creado_en ASC',
+    [req.params.id]
+  );
+  res.json({ conceptos: result.rows });
+}));
 
 // ─── Admin: configuración de facturación ─────────────────────────────────────
 app.get('/admin/facturacion', requireAdmin, asyncHandler(async (req, res) => {
