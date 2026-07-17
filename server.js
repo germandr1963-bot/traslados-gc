@@ -8146,6 +8146,7 @@ app.get('/api/whatsapp/reservas-15min-sin-respuesta', requierePuenteWhatsapp, as
      WHERE r.estado_aviso_whatsapp = 'enviado'
        AND r.whatsapp_aviso_enviado_en IS NOT NULL
        AND r.whatsapp_aviso_enviado_en <= NOW() - INTERVAL '15 minutes'
+       AND r.estado NOT IN ('cancelada', 'completada', 'confirmada')
      ORDER BY r.id ASC`
   );
   res.json(result.rows);
