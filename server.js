@@ -4850,6 +4850,26 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
   } catch(emailErr) {
     console.warn('Error enviando email confirmación automática:', emailErr.message);
   }
+
+  // WhatsApp de confirmación al cliente
+  try {
+    if (r.telefono_cliente) {
+      const _pc1wa = await obtenerPlantilla('cliente_confirmacion', {
+        nombre_cliente: r.nombre_cliente,
+        numero_reserva: r.numero_reserva,
+        origen: r.origen || '—',
+        destino: r.destino || '—'
+      });
+      const textoWa = (_pc1wa && _pc1wa.whatsapp) ||
+        ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Hemos asignado un conductor para tu servicio. Revisa tu email para todos los detalles y el enlace de pago del depósito.');
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [r.telefono_cliente, textoWa]
+      );
+    }
+  } catch(waErr) {
+    console.warn('Error encolando WhatsApp confirmación al cliente:', waErr.message);
+  }
 }
 
 // Asignar chofer manualmente a una reserva
