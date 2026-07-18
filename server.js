@@ -92,6 +92,7 @@ function plantillaEmail(contenidoHtml) {
     .wrapper{max-width:600px;margin:0 auto;background:#fff;}
     .header{background:#2c2c2c;padding:24px;text-align:center;}
     .body{padding:28px 24px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#1C1815;line-height:1.6;}
+    .body p{margin:0 0 8px 0;}
     .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
     .pnr{font-family:monospace;font-size:20px;font-weight:700;color:#C1502E;letter-spacing:3px;}
     .info-box{background:#f5f0ea;border-radius:8px;padding:14px 18px;font-size:14px;line-height:1.8;margin:16px 0;}
