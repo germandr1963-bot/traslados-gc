@@ -5901,10 +5901,39 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
       'UPDATE reservas SET email_confirmacion_enviado = TRUE WHERE id = $1',
       [req.params.id]
     );
-    res.json({ ok: true, url_pago: urlPago });
   } catch(err) {
-    res.status(500).json({ error: 'Error enviando email: ' + err.message });
+    console.warn('Error enviando email confirmación manual:', err.message);
+    return res.status(500).json({ error: 'Error enviando email: ' + err.message });
   }
+
+  // WhatsApp de confirmación al cliente
+  try {
+    if (r.telefono_cliente) {
+      const _pc2wa = await obtenerPlantilla('cliente_confirmacion', {
+        nombre_cliente: r.nombre_cliente,
+        numero_reserva: r.numero_reserva,
+        origen: r.origen || '—',
+        destino: r.destino || '—',
+        fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—',
+        hora: r.hora ? r.hora.slice(0,5) : '—',
+        categoria: r.categoria_nombre || '—',
+        importe_deposito: importe,
+        horas_cancelacion: horas,
+        fecha_limite_cancelacion: _textoLimiteCancelEmail,
+        url_pago: urlPago || ''
+      });
+      const textoWa = (_pc2wa && _pc2wa.whatsapp) ||
+        ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Revisa tu email para ver los detalles y el enlace de pago del depósito.');
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [r.telefono_cliente, textoWa]
+      );
+    }
+  } catch(waErr) {
+    console.warn('Error encolando WhatsApp confirmación manual:', waErr.message);
+  }
+
+  res.json({ ok: true, url_pago: urlPago });
 }));
 
 app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (req, res) => {
@@ -5981,10 +6010,32 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
       subject: (_pep && _pep.asunto) || ('Enlace de pago — Reserva ' + r.numero_reserva),
       html
     });
-    res.json({ ok: true });
   } catch(err) {
-    res.status(500).json({ error: 'Error enviando email: ' + err.message });
+    console.warn('Error enviando email enlace pago:', err.message);
+    return res.status(500).json({ error: 'Error enviando email: ' + err.message });
   }
+
+  // WhatsApp con enlace de pago
+  try {
+    if (r.telefono_cliente) {
+      const _pepwa = await obtenerPlantilla('cliente_enlace_pago', {
+        nombre_cliente: r.nombre_cliente,
+        numero_reserva: r.numero_reserva,
+        importe: importe,
+        url_pago: session.url
+      });
+      const textoWa = (_pepwa && _pepwa.whatsapp) ||
+        ('Te reenviamos el enlace de pago para tu reserva ' + r.numero_reserva + ': ' + session.url);
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [r.telefono_cliente, textoWa]
+      );
+    }
+  } catch(waErr) {
+    console.warn('Error encolando WhatsApp enlace pago:', waErr.message);
+  }
+
+  res.json({ ok: true });
 }));
 
 app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (req, res) => {
