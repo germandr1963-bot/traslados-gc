@@ -1534,131 +1534,157 @@ Un saludo cordial, 🙏
     { clave: 'chofer_cartel', nombre: 'Cartel de recogida (al chofer)', categoria: 'chofer',
       asunto_email: 'Cartel de recogida \u2014 {numero_reserva}',
       cuerpo_email: `
-<p>Hola, <strong>{nombre_chofer}</strong> 👋</p>
+Hola, <strong>{nombre_chofer}</strong> 👋
 
-<p>📋 Adjuntamos el cartel de recogida para tu próximo servicio. Imprímelo y úsalo para identificar a tu cliente.</p>
-
+📋 Adjuntamos el cartel de recogida para tu próximo servicio. Imprímelo y úsalo para identificar a tu cliente.
 <div class="info-box">
   🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span><br>
   📍 <strong>Origen:</strong> {origen}<br>
   🏁 <strong>Destino:</strong> {destino}<br>
   📅 <strong>Fecha:</strong> {fecha} · {hora}
 </div>
-
-<p>Un saludo cordial, 🙏<br>
-<strong>El equipo de Traslados GC</strong></p>
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n📋 Adjuntamos el cartel de recogida para tu próximo servicio. Imprímelo y úsalo para identificar a tu cliente.\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_cancelacion', nombre: 'Cancelaci\u00f3n asignada (al chofer)', categoria: 'chofer',
       asunto_email: '\u274c Cancelaci\u00f3n de reserva \u2014 {numero_reserva}',
       cuerpo_email: `
-<p>Hola, <strong>{nombre_chofer}</strong> 👋</p>
-
+Hola, <strong>{nombre_chofer}</strong> 👋
 <div class="info-box">
   ❌ <strong>Reserva cancelada:</strong> <span class="pnr">{numero_reserva}</span><br>
   📍 <strong>Ruta:</strong> {origen} → {destino}<br>
   📅 <strong>Fecha:</strong> {fecha} · {hora}
 </div>
+La reserva ha sido cancelada por el cliente. Queda liberada de tu agenda.
 
-<p>La reserva ha sido cancelada por el cliente. Queda liberada de tu agenda.</p>
-
-<p>Un saludo cordial, 🙏<br>
-<strong>El equipo de Traslados GC</strong></p>
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n❌ *Reserva cancelada:* {numero_reserva}\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nLa reserva ha sido cancelada por el cliente. Queda liberada de tu agenda.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_gracias_servicio', nombre: 'Gracias por el servicio (al chofer)', categoria: 'chofer',
       asunto_email: '\ud83d\ude4f Gracias por el servicio \u2014 {numero_reserva}',
       cuerpo_email: `
-<p>Hola, <strong>{nombre_chofer}</strong> 👋</p>
-
+Hola, <strong>{nombre_chofer}</strong> 👋
 <div class="caja-verde">
   ✅ <strong>Servicio completado.</strong> Gracias por realizar el traslado con profesionalidad y puntualidad. Tu trabajo es la base de nuestro servicio.
 </div>
-
 <div class="info-box">
   🔖 <strong>Reserva:</strong> <span class="pnr" style="font-size:15px;">{numero_reserva}</span><br>
   📍 <strong>Ruta:</strong> {origen} → {destino}<br>
   📅 <strong>Fecha:</strong> {fecha}
 </div>
+🙏 Seguimos contando contigo para los próximos servicios. ¡Hasta pronto!
 
-<p>🙏 Seguimos contando contigo para los próximos servicios. ¡Hasta pronto!</p>
-
-<p>Un saludo cordial, 🙏<br>
-<strong>El equipo de Traslados GC</strong></p>
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n✅ *Servicio completado.* Gracias por realizar el traslado con profesionalidad y puntualidad. Tu trabajo es la base de nuestro servicio.\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha}\n\n🙏 Seguimos contando contigo para los próximos servicios. ¡Hasta pronto!\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_mensaje_admin', nombre: 'Mensaje del equipo al chofer', categoria: 'chofer',
       asunto_email: '\ud83d\udcac Mensaje sobre la reserva {numero_reserva}',
       cuerpo_email: `
-<p>Hola, <strong>{nombre_chofer}</strong> 👋</p>
+Hola, <strong>{nombre_chofer}</strong> 👋
 
-<p>💬 El equipo de Traslados GC te ha enviado un mensaje sobre la reserva <strong>{numero_reserva}</strong>:</p>
-
+💬 El equipo de Traslados GC te ha enviado un mensaje sobre la reserva <strong>{nombre_reserva}</strong>:
 <blockquote>{mensaje}</blockquote>
+🔍 Accede a tu portal para ver los detalles.
 
-<p>🔍 Accede a tu portal para ver los detalles.</p>
-
-<p>Un saludo cordial, 🙏<br>
-<strong>El equipo de Traslados GC</strong></p>
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n💬 El equipo de Traslados GC te ha enviado un mensaje sobre la reserva *{numero_reserva}*:\n\n_{mensaje}_\n\n🔍 Accede a tu portal para ver los detalles.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_bienvenida', nombre: 'Bienvenida al chofer (cuenta aprobada)', categoria: 'chofer',
       asunto_email: '\u00a1Bienvenido a Traslados GC!',
       cuerpo_email: `
-<p>Hola, <strong>{nombre_chofer}</strong> 👋</p>
+Hola, <strong>{nombre_chofer}</strong> 👋
 
-<p>🎉 Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de Traslados GC.</p>
+🎉 Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de Traslados GC.
 
-<p>📱 Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.</p>
-
+📱 Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.
 <p style="text-align:center;margin:24px 0;">
   <a href="https://traslados-gc.onrender.com/chofer/acceso" class="boton">Acceder a mi portal</a>
 </p>
+<span style="font-size:13px;color:#5b5347;">❓ Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</span>
 
-<p style="font-size:13px;color:#5b5347;">❓ Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</p>
-
-<p>Un saludo cordial, 🙏<br>
-<strong>El equipo de Traslados GC</strong></p>
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n🎉 Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de Traslados GC.\n\n📱 Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.\n\n❓ Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_comunicacion_masiva', nombre: 'Comunicaci\u00f3n masiva (a choferes)', categoria: 'chofer',
       asunto_email: '{asunto_libre}',
       cuerpo_email: `
-<p>Hola, <strong>{nombre_chofer}</strong> 👋</p>
+Hola, <strong>{nombre_chofer}</strong> 👋
 
-<p>{mensaje_libre}</p>
+{mensaje_libre}
 
-<p>Un saludo cordial, 🙏<br>
-<strong>El equipo de Traslados GC</strong></p>
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n{mensaje_libre}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'interno_cliente_modifico', nombre: '[Admin] Cliente modific\u00f3 datos de reserva', categoria: 'interno',
       asunto_email: '\u270f\ufe0f Cliente modific\u00f3 datos \u2014 {numero_reserva}',
-      cuerpo_email: 'El cliente de la reserva <strong>{numero_reserva}</strong> ha modificado los datos de su traslado.\n\nAccede al panel de administraci\u00f3n para ver los cambios.',
+      cuerpo_email: `
+✏️ El cliente de la reserva <strong>{numero_reserva}</strong> ha modificado los datos de su traslado.
+
+🔍 Accede al panel de administración para revisar los cambios y aprobarlos si procede.
+`,
       cuerpo_whatsapp: null },
     { clave: 'interno_cliente_cancelo', nombre: '[Admin] Cliente cancel\u00f3 una reserva', categoria: 'interno',
       asunto_email: '\u274c Cancelaci\u00f3n de reserva \u2014 {numero_reserva}',
-      cuerpo_email: 'El cliente <strong>{nombre_cliente}</strong> ha cancelado la reserva <strong>{numero_reserva}</strong>.\n\nRuta: {origen} \u2192 {destino}\nFecha: {fecha}',
+      cuerpo_email: `
+❌ El cliente <strong>{nombre_cliente}</strong> ha cancelado la reserva <strong>{numero_reserva}</strong>.
+<div class="info-box">
+  📍 <strong>Ruta:</strong> {origen} → {destino}<br>
+  📅 <strong>Fecha:</strong> {fecha}
+</div>
+Revisa el estado del depósito desde el panel de administración.
+`,
       cuerpo_whatsapp: null },
     { clave: 'interno_cliente_mensaje', nombre: '[Admin] Nuevo mensaje de cliente', categoria: 'interno',
       asunto_email: '\ud83d\udcac Nuevo mensaje de cliente \u2014 {numero_reserva}',
-      cuerpo_email: '<strong>{nombre_cliente}</strong> (reserva <strong>{numero_reserva}</strong>) ha enviado un mensaje:\n\n{mensaje}\n\nAccede al panel de administraci\u00f3n para responder o ver el historial.',
+      cuerpo_email: `
+💬 <strong>{nombre_cliente}</strong> (reserva <strong>{numero_reserva}</strong>) ha enviado un mensaje:
+<blockquote>{mensaje}</blockquote>
+🔍 Accede al panel de administración para responder o ver el historial completo.
+`,
       cuerpo_whatsapp: null },
     { clave: 'interno_modificacion_solicitada', nombre: '[Admin] Cliente solicit\u00f3 modificaci\u00f3n', categoria: 'interno',
       asunto_email: '\u270f\ufe0f Modificaci\u00f3n solicitada \u2014 {numero_reserva}',
-      cuerpo_email: 'El cliente <strong>{nombre_cliente}</strong> ha solicitado modificaciones en la reserva <strong>{numero_reserva}</strong>.\n\nAccede al panel de administraci\u00f3n para revisar y aprobar.',
+      cuerpo_email: `
+✏️ El cliente <strong>{nombre_cliente}</strong> ha solicitado modificaciones en la reserva <strong>{numero_reserva}</strong>.
+
+🔍 Accede al panel de administración para revisar y aprobar los cambios.
+`,
       cuerpo_whatsapp: null },
     { clave: 'interno_sin_choferes', nombre: '[Admin] Sin respuesta de choferes (15 min)', categoria: 'interno',
       asunto_email: 'Reserva {numero_reserva} sin respuesta de choferes (15 min)',
-      cuerpo_email: 'La reserva <strong>{numero_reserva}</strong> lleva 15 minutos avisada a los choferes disponibles sin que nadie haya aceptado.\n\nPuede que quieras buscar chofer manualmente desde el panel de administraci\u00f3n.',
+      cuerpo_email: `
+⏱️ <strong>Atención:</strong> La reserva <strong>{numero_reserva}</strong> lleva 15 minutos avisada a los conductores disponibles sin que nadie haya aceptado.
+
+🔍 Accede al panel de administración para asignar conductor manualmente o tomar las medidas oportunas.
+`,
       cuerpo_whatsapp: null },
     { clave: 'interno_registro_chofer', nombre: '[Admin] Nuevo chofer registrado', categoria: 'interno',
       asunto_email: 'Solicitud recibida \u2014 Traslados GC',
-      cuerpo_email: 'Hola, <strong>{nombre_chofer}</strong> \ud83d\udc4b\n\nHemos recibido tu solicitud para unirte a nuestra flota. Revisaremos tu informaci\u00f3n y te notificaremos en breve.\n\nUn saludo,\n<strong>El equipo de Traslados GC</strong>',
+      cuerpo_email: `
+🚗 El conductor <strong>{nombre_chofer}</strong> ha completado su solicitud para unirse a la flota.
+
+🔍 Accede al panel de administración para revisar su perfil y aprobar o rechazar la solicitud.
+`,
       cuerpo_whatsapp: null },
     { clave: 'interno_recuperar_password_admin', nombre: '[Admin] Recuperar contrase\u00f1a de administrador', categoria: 'interno',
       asunto_email: 'Recupera tu contrase\u00f1a \u2014 Traslados GC',
-      cuerpo_email: 'Hola \ud83d\udc4b\n\nHemos recibido una solicitud para restablecer la contrase\u00f1a de la cuenta de administrador.\n\nHaz clic en el enlace para crear una nueva contrase\u00f1a. El enlace caduca en 1 hora.\n\nSi no solicitaste este cambio, puedes ignorar este mensaje.',
+      cuerpo_email: `
+🔑 Se ha solicitado restablecer la contraseña de la cuenta de administrador.
+
+Pulsa el botón para crear una nueva contraseña:
+<p style="text-align:center;">
+  <a href="{enlace_recuperacion}" class="boton">Crear nueva contraseña</a>
+</p>
+<span style="font-size:13px;color:#5b5347;">⏱️ Este enlace caduca en 1 hora y solo se puede usar una vez.</span>
+
+<span style="font-size:12px;color:#aaa;"><em>Si no has solicitado esto, ignora este mensaje — no se cambiará nada.</em></span>
+`,
       cuerpo_whatsapp: null },
     { clave: 'marca_base', nombre: 'Plantilla base de marca', categoria: 'interno',
       asunto_email: 'marca_base',
