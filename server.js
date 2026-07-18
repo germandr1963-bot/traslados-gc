@@ -5928,11 +5928,10 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
     return res.status(500).json({ error: 'Error enviando email: ' + err.message });
   }
 
-  // WhatsApp de confirmación al cliente — URL corta con preview
+  // WhatsApp de confirmación al cliente
   try {
-    if (r.telefono_cliente && urlPago) {
-      const codigoConf = await generarCodigoCorto('pago', r.id, null, urlPago);
-      const urlCortaConf = `${BASE_URL}/v/${codigoConf}`;
+    if (r.telefono_cliente) {
+      const urlCortaConf = urlPago ? `${BASE_URL}/v/${await generarCodigoCorto('pago', r.id, null, urlPago)}` : '';
       const _pc2wa = await obtenerPlantilla('cliente_confirmacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -5948,15 +5947,10 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
         url_corta: urlCortaConf
       });
       const textoWa = (_pc2wa && _pc2wa.whatsapp) ||
-        `Hola, *${r.nombre_cliente}* 👋\n\n✅ *¡Tu traslado está confirmado!*\n\n🔖 *Reserva:* ${r.numero_reserva}\n📍 *Origen:* ${r.origen || '—'}\n🏁 *Destino:* ${r.destino || '—'}\n\n💳 Para garantizar tu plaza, realiza el pago del depósito.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*\n${urlCortaConf}`;
+        ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Revisa tu email para ver los detalles y el enlace de pago del depósito.');
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
         [r.telefono_cliente, textoWa]
-      );
-    } else if (r.telefono_cliente && !urlPago) {
-      await pool.query(
-        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
-        [r.telefono_cliente, `Hola, *${r.nombre_cliente}* 👋\n\n✅ *¡Tu traslado está confirmado!* 🔖 Reserva: *${r.numero_reserva}*\n\nRevisa tu email para ver todos los detalles.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`]
       );
     }
   } catch(waErr) {
