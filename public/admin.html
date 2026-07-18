@@ -4095,7 +4095,8 @@ function guardarContacto() {
   });
 }
 
-var WA_IMAGENES_ETIQUETAS = { valoracion: 'Valoración' };
+var WA_IMAGENES_ETIQUETAS = { valoracion: 'Valoración', pago: 'Enlace de pago' };
+var WA_IMAGENES_MEDIDAS = { pago: 'Medidas recomendadas: 1200 × 400 px (rectángulo horizontal). Fondo oscuro con texto claro.' };
 
 function cargarImagenesWhatsapp() {
   var contenedor = document.getElementById('wa-imagenes-lista');
@@ -4106,7 +4107,7 @@ function cargarImagenesWhatsapp() {
     .then(function(d) {
       var guardadas = {};
       (d.imagenes || []).forEach(function(im) { guardadas[im.tipo] = im; });
-      var tipos = ['valoracion'];
+      var tipos = ['valoracion', 'pago'];
       contenedor.innerHTML = tipos.map(function(tipo) {
         var tiene = !!guardadas[tipo];
         var cuando = tiene ? new Date(guardadas[tipo].actualizado_en).toLocaleDateString('es-ES') : null;
@@ -4115,6 +4116,7 @@ function cargarImagenesWhatsapp() {
             '<div>' +
               '<strong style="font-size:14px;">' + (WA_IMAGENES_ETIQUETAS[tipo] || tipo) + '</strong>' +
               (tiene ? '<span style="font-size:12px;color:var(--texto-muted);margin-left:10px;">Actualizada ' + cuando + '</span>' : '<span style="font-size:12px;color:#e07b5a;margin-left:10px;">Sin imagen</span>') +
+              (WA_IMAGENES_MEDIDAS[tipo] ? '<div style="font-size:11px;color:var(--texto-muted);margin-top:4px;">' + WA_IMAGENES_MEDIDAS[tipo] + '</div>' : '') +
             '</div>' +
             (tiene ? '<a href="/og-imagen/' + tipo + '" target="_blank" style="font-size:12px;color:var(--dorado);">Ver imagen actual ↗</a>' : '') +
           '</div>' +
