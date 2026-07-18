@@ -8174,7 +8174,7 @@ app.get('/admin/whatsapp-imagenes', requireAdmin, asyncHandler(async (req, res) 
 // Sube o actualiza la imagen de un tipo concreto (valoracion, factura, cartel)
 app.post('/admin/whatsapp-imagenes/:tipo', requireAdmin, asyncHandler(async (req, res) => {
   const tipo = req.params.tipo;
-  const tiposPermitidos = ['valoracion'];
+  const tiposPermitidos = ['valoracion', 'pago'];
   if (!tiposPermitidos.includes(tipo)) return res.status(400).json({ error: 'Tipo no válido.' });
   const { imagen } = req.body;
   if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
