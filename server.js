@@ -5462,7 +5462,7 @@ async function generarVoucherPDF(reservaId) {
       doc.rect(ML, y, W, altoTotal).fill('#fff8e1');
       doc.rect(ML, y, W, altoTotal).lineWidth(0.5).strokeColor('#D9A441').stroke();
       doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815')
-        .text('\ud83d\udcb0 Total de extras a pagar al conductor: ' + totalExtras.toFixed(2) + ' \u20ac', ML + 10, y + 8, { width: W - 20 });
+        .text('\u2022 Total de extras a pagar al conductor: ' + totalExtras.toFixed(2) + ' \u20ac', ML + 10, y + 8, { width: W - 20 });
       doc.fontSize(9).font('Helvetica').fillColor('#555555')
         .text('Este importe se abona directamente al conductor al final del servicio, aparte del precio del traslado.', ML + 10, y + 24, { width: W - 20 });
       y += altoTotal + 8;
@@ -5482,7 +5482,7 @@ async function generarVoucherPDF(reservaId) {
     const altoCancelacion = 44;
     doc.rect(ML, y, W, altoCancelacion).fill('#fff3cd');
     doc.fontSize(10).font('Helvetica-Bold').fillColor('#856404')
-      .text('\u26a0\ufe0f Cancelaci\u00f3n gratuita hasta el ' + _textoLimite + '.', ML + 10, y + 8, { width: W - 20 });
+      .text('\u2022 Cancelaci\u00f3n gratuita hasta el ' + _textoLimite + '.', ML + 10, y + 8, { width: W - 20 });
     doc.fontSize(10).font('Helvetica').fillColor('#856404')
       .text('Despu\u00e9s de esa fecha, el dep\u00f3sito de ' + _importe + ' \u20ac no ser\u00e1 reembolsado.', ML + 10, y + 24, { width: W - 20 });
     y += altoCancelacion + 14;
