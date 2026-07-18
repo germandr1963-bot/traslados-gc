@@ -1697,8 +1697,7 @@ Pulsa el botón para crear una nueva contraseña:
     await pool.query(
       `INSERT INTO plantillas_comunicacion (clave, nombre, categoria, asunto_email, cuerpo_email, cuerpo_whatsapp)
        VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (clave) DO UPDATE SET cuerpo_email = EXCLUDED.cuerpo_email, cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp`,
-      // NOTA: Este DO UPDATE sobreescribe los textos en BD con los del código.
+       ON CONFLICT (clave) DO NOTHING`,
       [p.clave, p.nombre, p.categoria, p.asunto_email, p.cuerpo_email, p.cuerpo_whatsapp]
     );
   }
