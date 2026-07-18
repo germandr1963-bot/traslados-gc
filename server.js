@@ -4013,11 +4013,10 @@ app.get('/v/:codigo', asyncHandler(async (req, res) => {
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="400">
 <meta property="og:url" content="${BASE_URL}/v/${req.params.codigo}">
-<meta http-equiv="refresh" content="2;url=${urlDestino}">
-<title>Redirigiendo al pago...</title>
+<title>Pagar depósito — Traslados GC</title>
 </head>
 <body style="margin:0;background:#2c2c2c;display:flex;align-items:center;justify-content:center;height:100vh;">
-<script>setTimeout(function(){ window.location.replace(${JSON.stringify(urlDestino)}); }, 2000);</script>
+<script>window.location.replace(${JSON.stringify(urlDestino)});</script>
 </body>
 </html>`);
   }
