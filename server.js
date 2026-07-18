@@ -195,18 +195,18 @@ function firmarVoucher(reservaId) {
     .update('voucher-' + String(reservaId)).digest('hex').slice(0, 20);
 }
 
-async function generarCodigoCorto(tipo, reservaId, tokenValoracion) {
+async function generarCodigoCorto(tipo, reservaId, tokenValoracion, urlDestino) {
   let codigo = crypto.randomBytes(3).toString('hex');
   try {
     await pool.query(
-      'INSERT INTO url_cortas (codigo, tipo, reserva_id, token_valoracion) VALUES ($1, $2, $3, $4)',
-      [codigo, tipo, reservaId || null, tokenValoracion || null]
+      'INSERT INTO url_cortas (codigo, tipo, reserva_id, token_valoracion, url_destino) VALUES ($1, $2, $3, $4, $5)',
+      [codigo, tipo, reservaId || null, tokenValoracion || null, urlDestino || null]
     );
   } catch(e) {
     codigo = crypto.randomBytes(4).toString('hex');
     await pool.query(
-      'INSERT INTO url_cortas (codigo, tipo, reserva_id, token_valoracion) VALUES ($1, $2, $3, $4)',
-      [codigo, tipo, reservaId || null, tokenValoracion || null]
+      'INSERT INTO url_cortas (codigo, tipo, reserva_id, token_valoracion, url_destino) VALUES ($1, $2, $3, $4, $5)',
+      [codigo, tipo, reservaId || null, tokenValoracion || null, urlDestino || null]
     );
   }
   return codigo;
@@ -1190,6 +1190,7 @@ async function initSchema() {
   await pool.query(`ALTER TABLE url_cortas ADD COLUMN IF NOT EXISTS tipo TEXT DEFAULT 'valoracion'`);
   await pool.query(`ALTER TABLE url_cortas ADD COLUMN IF NOT EXISTS reserva_id INTEGER`);
   await pool.query(`ALTER TABLE url_cortas ALTER COLUMN token_valoracion DROP NOT NULL`);
+  await pool.query(`ALTER TABLE url_cortas ADD COLUMN IF NOT EXISTS url_destino TEXT`);
 
   // ─── Imágenes de WhatsApp ──────────────────────────────────────────────────
   await pool.query(`
@@ -3981,7 +3982,7 @@ app.get('/chofer/mensajes/:reservaId', requireChofer, asyncHandler(async (req, r
 // ─── Redirección URL corta ────────────────────────────────────────────────────
 app.get('/v/:codigo', asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT token_valoracion, tipo, reserva_id FROM url_cortas WHERE codigo = $1',
+    'SELECT token_valoracion, tipo, reserva_id, url_destino FROM url_cortas WHERE codigo = $1',
     [req.params.codigo]
   );
   if (!result.rows.length) return res.status(404).send('Enlace no válido.');
@@ -3996,6 +3997,29 @@ app.get('/v/:codigo', asyncHandler(async (req, res) => {
     const firma = firmarFactura(row.reserva_id);
     const urlDescarga = encodeURIComponent(`${BASE_URL}/factura-descarga/${row.reserva_id}/${firma}`);
     return res.redirect(`${BASE_URL}/ver-factura.html?url=${urlDescarga}`);
+  }
+  if (tipo === 'pago') {
+    if (!row.url_destino) return res.status(404).send('Enlace de pago no disponible.');
+    const ogImagen = `${BASE_URL}/og-imagen/pago`;
+    const urlDestino = row.url_destino;
+    return res.send(`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta property="og:type" content="website">
+<meta property="og:title" content="💳 Pagar depósito — Traslados GC">
+<meta property="og:description" content="Toca para completar el pago de tu reserva de forma segura.">
+<meta property="og:image" content="${ogImagen}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="400">
+<meta property="og:url" content="${BASE_URL}/v/${req.params.codigo}">
+<meta http-equiv="refresh" content="0;url=${urlDestino}">
+<title>Redirigiendo al pago...</title>
+</head>
+<body>
+<script>window.location.replace(${JSON.stringify(urlDestino)});</script>
+</body>
+</html>`);
   }
   res.redirect(`${BASE_URL}/valorar?token=${row.token_valoracion}`);
 }));
