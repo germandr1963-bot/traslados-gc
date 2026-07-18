@@ -5930,9 +5930,11 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
     return res.status(500).json({ error: 'Error enviando email: ' + err.message });
   }
 
-  // WhatsApp de confirmación al cliente
+  // WhatsApp de confirmación al cliente — URL corta con preview
   try {
-    if (r.telefono_cliente) {
+    if (r.telefono_cliente && urlPago) {
+      const codigoConf = await generarCodigoCorto('pago', r.id, null, urlPago);
+      const urlCortaConf = `${BASE_URL}/v/${codigoConf}`;
       const _pc2wa = await obtenerPlantilla('cliente_confirmacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -5944,13 +5946,19 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
         importe_deposito: importe,
         horas_cancelacion: horas,
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
-        url_pago: urlPago || ''
+        url_pago: urlCortaConf,
+        url_corta: urlCortaConf
       });
       const textoWa = (_pc2wa && _pc2wa.whatsapp) ||
-        ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Revisa tu email para ver los detalles y el enlace de pago del depósito.');
+        `Hola, *${r.nombre_cliente}* 👋\n\n✅ *¡Tu traslado está confirmado!*\n\n🔖 *Reserva:* ${r.numero_reserva}\n📍 *Origen:* ${r.origen || '—'}\n🏁 *Destino:* ${r.destino || '—'}\n\n💳 Para garantizar tu plaza, realiza el pago del depósito.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*\n${urlCortaConf}`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
         [r.telefono_cliente, textoWa]
+      );
+    } else if (r.telefono_cliente && !urlPago) {
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [r.telefono_cliente, `Hola, *${r.nombre_cliente}* 👋\n\n✅ *¡Tu traslado está confirmado!* 🔖 Reserva: *${r.numero_reserva}*\n\nRevisa tu email para ver todos los detalles.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`]
       );
     }
   } catch(waErr) {
@@ -6039,17 +6047,20 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
     return res.status(500).json({ error: 'Error enviando email: ' + err.message });
   }
 
-  // WhatsApp con enlace de pago
+  // WhatsApp con enlace de pago — URL corta con preview
   try {
     if (r.telefono_cliente) {
+      const codigoPago = await generarCodigoCorto('pago', r.id, null, session.url);
+      const urlCorta = `${BASE_URL}/v/${codigoPago}`;
       const _pepwa = await obtenerPlantilla('cliente_enlace_pago', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
         importe: importe,
-        url_pago: session.url
+        url_pago: urlCorta,
+        url_corta: urlCorta
       });
       const textoWa = (_pepwa && _pepwa.whatsapp) ||
-        ('Te reenviamos el enlace de pago para tu reserva ' + r.numero_reserva + ': ' + session.url);
+        `Hola, *${r.nombre_cliente}* 👋\n\n💳 Te reenviamos el enlace de pago para confirmar tu reserva *${r.numero_reserva}*.\n\n❓ Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*\n${urlCorta}`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
         [r.telefono_cliente, textoWa]
