@@ -4101,9 +4101,9 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
     }
   } catch(e) { console.warn('Error enviando email valoración:', e.message); }
 
-  // WhatsApp al cliente: texto + factura adjunta
+  // WhatsApp al cliente: mensaje de agradecimiento + valoración
   if (r.telefono_cliente) {
-    const textoWa = (_pval && _pval.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen} → ${r.destino}) ha finalizado.\n\n📄 Adjuntamos tu factura.\n\n⭐ ¿Nos cuentas cómo fue?\n👉 ${enlaceCorto}`;
+    const textoWa = (_pval && _pval.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen} → ${r.destino}) ha finalizado.\n\n⭐ ¿Nos cuentas cómo fue?\n👉 ${enlaceCorto}`;
     try {
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
@@ -4111,15 +4111,21 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
       );
     } catch(e) { console.warn('Error encolando WhatsApp valoración:', e.message); }
 
-    // Enviar factura PDF por WhatsApp si está disponible
+    // Enviar factura PDF por WhatsApp como documento separado
     if (facturaPDF) {
       try {
         const firmaCierre = firmarFactura(r.id);
         const urlFacturaCorta = await generarCodigoCorto('factura', r.id, null, `${BASE_URL}/factura-descarga/${r.id}/${firmaCierre}/factura-${r.numero_reserva}.pdf`);
+        const _pfacwa = await obtenerPlantilla('cliente_factura', {
+          nombre_cliente: r.nombre_cliente,
+          numero_reserva: r.numero_reserva,
+          numero_factura: facturaPDF.numero_factura || r.numero_reserva
+        });
+        const textoFacturaWa = (_pfacwa && _pfacwa.whatsapp) || `📄 Adjuntamos la factura de tu traslado *${r.numero_reserva}*.`;
         await pool.query(
           `INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento)
            VALUES ($1, $2, $3, $4)`,
-          [r.telefono_cliente, '', `${BASE_URL}/v/${urlFacturaCorta}`, `factura-${r.numero_reserva}.pdf`]
+          [r.telefono_cliente, textoFacturaWa, `${BASE_URL}/v/${urlFacturaCorta}`, `factura-${r.numero_reserva}.pdf`]
         );
       } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
     }
