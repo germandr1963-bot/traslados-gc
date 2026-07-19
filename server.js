@@ -3999,25 +3999,7 @@ app.get('/v/:codigo', asyncHandler(async (req, res) => {
   }
   if (tipo === 'pago') {
     if (!row.url_destino) return res.status(404).send('Enlace de pago no disponible.');
-    const ogImagen = `${BASE_URL}/og-imagen/pago`;
-    const urlDestino = row.url_destino;
-    return res.send(`<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta property="og:type" content="website">
-<meta property="og:title" content="💳 Pagar depósito — Traslados GC">
-<meta property="og:description" content="Toca para completar el pago de tu reserva de forma segura.">
-<meta property="og:image" content="${ogImagen}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="400">
-<meta property="og:url" content="${BASE_URL}/v/${req.params.codigo}">
-<title>Pagar depósito — Traslados GC</title>
-</head>
-<body style="margin:0;background:#2c2c2c;display:flex;align-items:center;justify-content:center;height:100vh;">
-<script>window.location.replace(${JSON.stringify(urlDestino)});</script>
-</body>
-</html>`);
+    return res.redirect(row.url_destino);
   }
   res.redirect(`${BASE_URL}/valorar?token=${row.token_valoracion}`);
 }));
@@ -6057,11 +6039,13 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
 
   // Enviar email con nuevo enlace
   const botonPagoReenvio = `<p style="text-align:center;margin:24px 0;"><a href="${session.url}" class="boton">💳 Pagar depósito de ${importe} €</a></p>`;
+  const codigoPagoEmail = await generarCodigoCorto('pago', r.id, null, session.url);
+  const urlCortaEmail = `${BASE_URL}/v/${codigoPagoEmail}`;
   const _pep = await obtenerPlantilla('cliente_enlace_pago', {
     nombre_cliente: r.nombre_cliente,
     numero_reserva: r.numero_reserva,
     importe: importe,
-    url_pago: session.url,
+    url_pago: urlCortaEmail,
     boton_pago: botonPagoReenvio
   });
   const html = plantillaEmail(
@@ -6096,7 +6080,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
         url_corta: urlCorta
       });
       const textoWa = (_pepwa && _pepwa.whatsapp) ||
-        `Hola, *${r.nombre_cliente}* 👋\n\n💳 Te reenviamos el enlace de pago para confirmar tu reserva *${r.numero_reserva}*.\n\n❓ Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*\n${urlCorta}`;
+        `Hola, *${r.nombre_cliente}* 👋\n\n💳 Te reenviamos el enlace de pago para confirmar tu reserva *${r.numero_reserva}*.\n\n👉 ${urlCorta}\n\n❓ Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
         [r.telefono_cliente, textoWa]
