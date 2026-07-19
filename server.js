@@ -5134,6 +5134,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
      WHERE r.id = $2`,
     [conductor_id, reservaIdParam]
   );
+  let urlPago = null;
   try {
 
     if (reserva.rows.length) {
@@ -5158,7 +5159,6 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
       const _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
 
       // Crear sesión de pago en Stripe si está configurado
-      let urlPago = null;
       if (stripe) {
         try {
           const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
