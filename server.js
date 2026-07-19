@@ -4089,23 +4089,56 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
      <p style="color:#888;font-size:13px;">Si no fuiste tú quien realizó este traslado, puedes ignorar este mensaje.</p>`
   );
 
+  // Generar factura PDF
+  let facturaPDF = null;
   try {
-    await enviarEmail({
-      to: r.email_cliente,
-      subject: (_pval && _pval.asunto) || (`¿Cómo fue tu traslado ${r.numero_reserva}?`),
-      html
-    });
+    facturaPDF = await generarFacturaPDF(r.id);
+  } catch(e) { console.warn('Error generando factura PDF en cierre:', e.message); }
+
+  // Email al cliente con factura adjunta
+  try {
+    if (facturaPDF) {
+      await enviarEmailConAdjunto({
+        to: r.email_cliente,
+        subject: (_pval && _pval.asunto) || (`¿Cómo fue tu traslado ${r.numero_reserva}?`),
+        html,
+        adjunto: {
+          filename: `factura-${r.numero_reserva}.pdf`,
+          content: facturaPDF.buffer,
+          contentType: 'application/pdf'
+        }
+      });
+    } else {
+      await enviarEmail({
+        to: r.email_cliente,
+        subject: (_pval && _pval.asunto) || (`¿Cómo fue tu traslado ${r.numero_reserva}?`),
+        html
+      });
+    }
   } catch(e) { console.warn('Error enviando email valoración:', e.message); }
 
-  // WhatsApp al cliente
+  // WhatsApp al cliente: texto + factura adjunta
   if (r.telefono_cliente) {
-    const textoWa = (_pval && _pval.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen} → ${r.destino}) ha finalizado.\n\n¿Nos cuentas cómo fue? Tu opinión nos ayuda a mejorar:\n${enlaceCorto}`;
+    const textoWa = (_pval && _pval.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen} → ${r.destino}) ha finalizado.\n\n📄 Adjuntamos tu factura.\n\n⭐ ¿Nos cuentas cómo fue?\n👉 ${enlaceCorto}`;
     try {
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
         [r.telefono_cliente, textoWa]
       );
     } catch(e) { console.warn('Error encolando WhatsApp valoración:', e.message); }
+
+    // Enviar factura PDF por WhatsApp si está disponible
+    if (facturaPDF) {
+      try {
+        const firmaCierre = firmarFactura(r.id);
+        const urlFacturaCorta = await generarCodigoCorto('factura', r.id, null, `${BASE_URL}/factura-descarga/${r.id}/${firmaCierre}/factura-${r.numero_reserva}.pdf`);
+        await pool.query(
+          `INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento)
+           VALUES ($1, $2, $3, $4)`,
+          [r.telefono_cliente, '', `${BASE_URL}/v/${urlFacturaCorta}`, `factura-${r.numero_reserva}.pdf`]
+        );
+      } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
+    }
   }
 
   res.json({ ok: true });
