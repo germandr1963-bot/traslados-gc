@@ -4064,13 +4064,17 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
 
   // Email al cliente
+  const botonValoracion = `<div style="text-align:center;margin:24px 0;">
+    <a href="${enlaceCorto}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">⭐ Valorar mi traslado</a>
+  </div>`;
   const _pval = await obtenerPlantilla('cliente_valoracion', {
     nombre_cliente: r.nombre_cliente,
     numero_reserva: r.numero_reserva,
     origen: r.origen || '—',
     destino: r.destino || '—',
     fecha: fechaTexto,
-    url_valoracion: enlaceCorto
+    url_valoracion: enlaceCorto,
+    boton_valoracion: botonValoracion
   });
   const html = plantillaEmail(
     (_pval && _pval.email) ||
@@ -5206,7 +5210,14 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
 
   // WhatsApp de confirmación al cliente
   try {
-    if (r && r.telefono_cliente) {
+    if (reserva.rows.length && reserva.rows[0].telefono_cliente) {
+      const r = reserva.rows[0];
+      let urlPagoCorta = '';
+      if (typeof urlPago !== 'undefined' && urlPago) {
+        const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+        const codigoPago = await generarCodigoCorto('pago', r.id, null, urlPago);
+        urlPagoCorta = BASE_URL + '/v/' + codigoPago;
+      }
       const _pc1wa = await obtenerPlantilla('cliente_confirmacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -5216,7 +5227,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         hora: r.hora ? r.hora.slice(0,5) : '—',
         categoria: r.categoria_nombre || '—',
         importe_deposito: typeof importe !== 'undefined' ? importe : '',
-        url_pago: typeof urlPago !== 'undefined' && urlPago ? urlPago : ''
+        url_pago: urlPagoCorta
       });
       const textoWa = (_pc1wa && _pc1wa.whatsapp) ||
         ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Hemos asignado un conductor para tu servicio. Revisa tu email para todos los detalles y el enlace de pago del depósito.');
