@@ -5099,15 +5099,15 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
   }
 
   // Enviar email de confirmación automáticamente
+  const reserva = await pool.query(
+    `SELECT r.*, cv.nombre AS categoria_nombre, c.nombre AS conductor_nombre
+     FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     LEFT JOIN conductores c ON c.id = $1
+     WHERE r.id = $2`,
+    [conductor_id, reservaIdParam]
+  );
   try {
-    const reserva = await pool.query(
-      `SELECT r.*, cv.nombre AS categoria_nombre, c.nombre AS conductor_nombre
-       FROM reservas r
-       LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
-       LEFT JOIN conductores c ON c.id = $1
-       WHERE r.id = $2`,
-      [conductor_id, reservaIdParam]
-    );
 
     if (reserva.rows.length) {
       const r = reserva.rows[0];
