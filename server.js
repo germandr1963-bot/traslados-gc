@@ -1245,9 +1245,9 @@ Hola, <strong>{nombre_cliente}</strong> 👋
   <span class="pnr">{numero_reserva}</span>
 </p>
 <div class="info-box">
-  <strong>Detalles de tu solicitud:</strong><br>
-  📍 Origen: {origen}<br>
-  🏁 Destino: {destino}<br>
+  <strong>Detalles de tu solicitud:</strong>
+  📍 Origen: {origen}
+  🏁 Destino: {destino}
   📅 Fecha: {fecha} · {hora}
 </div>
 <span style="font-size:13px;color:#888;">💾 Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.</span>
@@ -1268,12 +1268,12 @@ Hola, <strong>{nombre_cliente}</strong> 👋
   Reserva <span class="pnr">{numero_reserva}</span>
 </p>
 <div class="info-box">
-  <strong>Detalles del traslado:</strong><br>
-  📍 Origen: {origen}<br>
-  🏁 Destino: {destino}<br>
-  📅 Fecha: {fecha} · {hora}<br>
-  🚗 Categoría: {categoria}<br>
-  {conductor}
+  <strong>Detalles del traslado:</strong>
+  📍 Origen: {origen}
+  🏁 Destino: {destino}
+  📅 Fecha: {fecha} · {hora}
+  🚗 Categoría: {categoria}
+  🧭 Conductor: {conductor}
 </div>
 <div class="caja-verde">
   <span style="font-weight:600;">💳 Depósito de garantía — {importe_deposito} €</span><br>
@@ -1322,8 +1322,8 @@ Hola, <strong>{nombre_cliente}</strong> 👋
 
 ❌ Tu reserva <strong>{numero_reserva}</strong> ha sido cancelada correctamente.
 <div class="info-box">
-  📍 <strong>Origen:</strong> {origen}<br>
-  🏁 <strong>Destino:</strong> {destino}<br>
+  📍 <strong>Origen:</strong> {origen}
+  🏁 <strong>Destino:</strong> {destino}
   📅 <strong>Fecha:</strong> {fecha}
 </div>
 {aviso_deposito}
@@ -1385,7 +1385,7 @@ Hola, <strong>{nombre_cliente}</strong> 👋
   ✅ <strong>Servicio completado con éxito.</strong> El depósito de garantía correspondiente a tu reserva <span class="pnr">{numero_reserva}</span> ha sido liberado correctamente. El importe quedará disponible en tu tarjeta en un plazo de 5 a 10 días hábiles según tu entidad bancaria.
 </div>
 <div class="info-box">
-  📍 <strong>Ruta:</strong> {origen} → {destino}<br>
+  📍 <strong>Ruta:</strong> {origen} → {destino}
   🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span>
 </div>
 🙏 Ha sido un placer acompañarte en este viaje. Si en algún momento necesitas otro traslado en Gran Canaria, estaremos encantados de ayudarte.
@@ -1404,8 +1404,8 @@ Hola, <strong>{nombre_cliente}</strong> 👋
   De acuerdo con nuestra política de reservas, el depósito de garantía de {importe} € ha sido retenido por no-show.</span>
 </div>
 <div class="info-box">
-  📍 <strong>Ruta:</strong> {origen} → {destino}<br>
-  📅 <strong>Fecha del servicio:</strong> {fecha}<br>
+  📍 <strong>Ruta:</strong> {origen} → {destino}
+  📅 <strong>Fecha del servicio:</strong> {fecha}
   🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span>
 </div>
 ❓ Si crees que ha habido un error, no dudes en contactarnos.
@@ -1539,9 +1539,9 @@ Hola, <strong>{nombre_chofer}</strong> 👋
 
 📋 Adjuntamos el cartel de recogida para tu próximo servicio. Imprímelo y úsalo para identificar a tu cliente.
 <div class="info-box">
-  🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span><br>
-  📍 <strong>Origen:</strong> {origen}<br>
-  🏁 <strong>Destino:</strong> {destino}<br>
+  🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span>
+  📍 <strong>Origen:</strong> {origen}
+  🏁 <strong>Destino:</strong> {destino}
   📅 <strong>Fecha:</strong> {fecha} · {hora}
 </div>
 Un saludo cordial, 🙏
@@ -1553,8 +1553,8 @@ Un saludo cordial, 🙏
       cuerpo_email: `
 Hola, <strong>{nombre_chofer}</strong> 👋
 <div class="info-box">
-  ❌ <strong>Reserva cancelada:</strong> <span class="pnr">{numero_reserva}</span><br>
-  📍 <strong>Ruta:</strong> {origen} → {destino}<br>
+  ❌ <strong>Reserva cancelada:</strong> <span class="pnr">{numero_reserva}</span>
+  📍 <strong>Ruta:</strong> {origen} → {destino}
   📅 <strong>Fecha:</strong> {fecha} · {hora}
 </div>
 La reserva ha sido cancelada por el cliente. Queda liberada de tu agenda.
@@ -1571,8 +1571,8 @@ Hola, <strong>{nombre_chofer}</strong> 👋
   ✅ <strong>Servicio completado.</strong> Gracias por realizar el traslado con profesionalidad y puntualidad. Tu trabajo es la base de nuestro servicio.
 </div>
 <div class="info-box">
-  🔖 <strong>Reserva:</strong> <span class="pnr" style="font-size:15px;">{numero_reserva}</span><br>
-  📍 <strong>Ruta:</strong> {origen} → {destino}<br>
+  🔖 <strong>Reserva:</strong> <span class="pnr" style="font-size:15px;">{numero_reserva}</span>
+  📍 <strong>Ruta:</strong> {origen} → {destino}
   📅 <strong>Fecha:</strong> {fecha}
 </div>
 🙏 Seguimos contando contigo para los próximos servicios. ¡Hasta pronto!
@@ -1635,7 +1635,7 @@ Un saludo cordial, 🙏
       cuerpo_email: `
 ❌ El cliente <strong>{nombre_cliente}</strong> ha cancelado la reserva <strong>{numero_reserva}</strong>.
 <div class="info-box">
-  📍 <strong>Ruta:</strong> {origen} → {destino}<br>
+  📍 <strong>Ruta:</strong> {origen} → {destino}
   📅 <strong>Fecha:</strong> {fecha}
 </div>
 Revisa el estado del depósito desde el panel de administración.
