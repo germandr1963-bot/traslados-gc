@@ -514,7 +514,7 @@
         .then(function(blob) {
           var url = URL.createObjectURL(blob);
           var a = document.createElement('a'); a.href = url;
-          a.download = 'cartel-' + pnr + '.docx'; a.click();
+          a.download = 'cartel-' + pnr + '.pdf'; a.click();
           URL.revokeObjectURL(url);
           btn.textContent = '📄 Descargar cartel'; btn.disabled = false;
         })
