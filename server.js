@@ -1264,7 +1264,7 @@ Un saludo cordial, 🙏
 Hola, <strong>{nombre_cliente}</strong> 👋
 
 ✅ <strong>¡Tu traslado está confirmado!</strong> Hemos asignado un conductor para tu servicio.
-<p style="text-align:center;margin:20px 0;">
+<p style="text-align:center;margin:10px 0;">
   Reserva <span class="pnr">{numero_reserva}</span>
 </p>
 <div class="info-box">
@@ -4009,8 +4009,10 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   // Verificar que la reserva pertenece a este chofer y está confirmada
   const check = await pool.query(
     `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
-            r.origen, r.destino, r.fecha
+            r.origen, r.destino, r.fecha,
+            c.nombre AS nombre_chofer, c.telefono AS telefono_chofer
      FROM reservas r
+     LEFT JOIN conductores c ON c.id = $2
      WHERE r.id = $1 AND r.conductor_id = $2 AND r.estado = 'confirmada'`,
     [req.params.id, req.session.choferId]
   );
@@ -4046,7 +4048,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
 
   // Email al cliente
-  const botonValoracion = `<div style="text-align:center;margin:24px 0;">
+  const botonValoracion = `<div style="text-align:center;margin:12px 0;">
     <a href="${enlaceCorto}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">⭐ Valorar mi traslado</a>
   </div>`;
   const _pval = await obtenerPlantilla('cliente_valoracion', {
@@ -4121,6 +4123,25 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
         );
       } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
     }
+  }
+
+  // WhatsApp al chofer — agradecimiento
+  if (r.telefono_chofer) {
+    const _pchoferwa = await obtenerPlantilla('chofer_gracias_servicio', {
+      nombre_chofer: r.nombre_chofer || 'Conductor',
+      numero_reserva: r.numero_reserva,
+      origen: r.origen || '—',
+      destino: r.destino || '—',
+      fecha: fechaTexto
+    });
+    const textoChoferWa = (_pchoferwa && _pchoferwa.whatsapp) ||
+      `Hola, *${r.nombre_chofer || 'Conductor'}* 👋\n\n✅ *Servicio completado.* Gracias por realizar el traslado con profesionalidad y puntualidad. Tu trabajo es la base de nuestro servicio.\n\n🔖 *Reserva:* ${r.numero_reserva}\n📍 *Ruta:* ${r.origen || '—'} → ${r.destino || '—'}\n📅 *Fecha:* ${fechaTexto}\n\n🙏 Seguimos contando contigo para los próximos servicios. ¡Hasta pronto!\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
+    try {
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [r.telefono_chofer, textoChoferWa]
+      );
+    } catch(e) { console.warn('Error encolando WhatsApp gracias chofer:', e.message); }
   }
 
   res.json({ ok: true });
@@ -5164,7 +5185,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
       }
 
       const botonPago = urlPago
-        ? `<div style="text-align:center;margin:24px 0;">
+        ? `<div style="text-align:center;margin:12px 0;">
             <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 Pagar depósito de ${importe} €</a>
            </div>`
         : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
@@ -6038,7 +6059,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
   await pool.query('UPDATE reservas SET stripe_session_id = $1 WHERE id = $2', [session.id, r.id]);
 
   // Enviar email con nuevo enlace
-  const botonPagoReenvio = `<p style="text-align:center;margin:24px 0;"><a href="${session.url}" class="boton">💳 Pagar depósito de ${importe} €</a></p>`;
+  const botonPagoReenvio = `<p style="text-align:center;margin:12px 0;"><a href="${session.url}" class="boton">💳 Pagar depósito de ${importe} €</a></p>`;
   const codigoPagoEmail = await generarCodigoCorto('pago', r.id, null, session.url);
   const urlCortaEmail = `${BASE_URL}/v/${codigoPagoEmail}`;
   const _pep = await obtenerPlantilla('cliente_enlace_pago', {
