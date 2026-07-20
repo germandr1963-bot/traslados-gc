@@ -5135,6 +5135,9 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
     [conductor_id, reservaIdParam]
   );
   let urlPago = null;
+  let importe = '10.00';
+  let horas = 12;
+  let _textoLimiteCancelEmail = '';
   try {
 
     if (reserva.rows.length) {
@@ -5152,11 +5155,11 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         condiciones = general.rows[0];
       }
 
-      const importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
-      const horas = condiciones ? condiciones.horas_cancelacion : 12;
+      importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
+      horas = condiciones ? condiciones.horas_cancelacion : 12;
       const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
       const _fechaLimiteCancelEmail = calcularFechaCancelacion(new Date(r.fecha), r.hora, horas);
-      const _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+      _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
 
       // Crear sesión de pago en Stripe si está configurado
       if (stripe) {
@@ -5268,7 +5271,9 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—',
         hora: r.hora ? r.hora.slice(0,5) : '—',
         categoria: r.categoria_nombre || '—',
-        importe_deposito: typeof importe !== 'undefined' ? importe : '',
+        importe_deposito: importe,
+        horas_cancelacion: horas,
+        fecha_limite_cancelacion: _textoLimiteCancelEmail,
         url_pago: urlPagoCorta
       });
       const textoWa = (_pc1wa && _pc1wa.whatsapp) ||
