@@ -4079,27 +4079,36 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
     facturaPDF = await generarFacturaPDF(r.id);
   } catch(e) { console.warn('Error generando factura PDF en cierre:', e.message); }
 
-  // Email al cliente con factura adjunta
+  // Email valoración al cliente
   try {
-    if (facturaPDF) {
+    await enviarEmail({
+      to: r.email_cliente,
+      subject: (_pval && _pval.asunto) || (`¿Cómo fue tu traslado ${r.numero_reserva}?`),
+      html
+    });
+  } catch(e) { console.warn('Error enviando email valoración:', e.message); }
+
+  // Email factura al cliente
+  if (facturaPDF) {
+    try {
+      const numFacEmail = facturaPDF.numeroFactura || r.numero_reserva;
+      const _pfacemail = await obtenerPlantilla('cliente_factura', {
+        nombre_cliente: r.nombre_cliente,
+        numero_reserva: r.numero_reserva,
+        numero_factura: numFacEmail
+      });
       await enviarEmailConAdjunto({
         to: r.email_cliente,
-        subject: (_pval && _pval.asunto) || (`¿Cómo fue tu traslado ${r.numero_reserva}?`),
-        html,
+        subject: (_pfacemail && _pfacemail.asunto) || (`📄 Factura ${numFacEmail} — Reserva ${r.numero_reserva}`),
+        html: plantillaEmail((_pfacemail && _pfacemail.email) || `<p>Hola <strong>${r.nombre_cliente}</strong>,</p><p>Adjuntamos la factura <strong>${numFacEmail}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p><p>Gracias por viajar con Traslados GC.</p>`),
         adjunto: {
-          filename: `factura-${r.numero_reserva}.pdf`,
+          filename: `factura-${numFacEmail}.pdf`,
           content: facturaPDF.buffer,
           contentType: 'application/pdf'
         }
       });
-    } else {
-      await enviarEmail({
-        to: r.email_cliente,
-        subject: (_pval && _pval.asunto) || (`¿Cómo fue tu traslado ${r.numero_reserva}?`),
-        html
-      });
-    }
-  } catch(e) { console.warn('Error enviando email valoración:', e.message); }
+    } catch(e) { console.warn('Error enviando email factura:', e.message); }
+  }
 
   // WhatsApp al cliente: mensaje de agradecimiento + valoración
   if (r.telefono_cliente) {
