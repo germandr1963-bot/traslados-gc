@@ -4115,17 +4115,18 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
     if (facturaPDF) {
       try {
         const firmaCierre = firmarFactura(r.id);
-        const urlFacturaCorta = await generarCodigoCorto('factura', r.id, null, `${BASE_URL}/factura-descarga/${r.id}/${firmaCierre}/factura-${r.numero_reserva}.pdf`);
+        const numFac = facturaPDF.numeroFactura || r.numero_reserva;
+        const urlFacturaCorta = await generarCodigoCorto('factura', r.id, null, `${BASE_URL}/factura-descarga/${r.id}/${firmaCierre}/factura-${numFac}.pdf`);
         const _pfacwa = await obtenerPlantilla('cliente_factura', {
           nombre_cliente: r.nombre_cliente,
           numero_reserva: r.numero_reserva,
-          numero_factura: facturaPDF.numero_factura || r.numero_reserva
+          numero_factura: numFac
         });
         const textoFacturaWa = (_pfacwa && _pfacwa.whatsapp) || `📄 Adjuntamos la factura de tu traslado *${r.numero_reserva}*.`;
         await pool.query(
           `INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento)
            VALUES ($1, $2, $3, $4)`,
-          [r.telefono_cliente, textoFacturaWa, `${BASE_URL}/v/${urlFacturaCorta}`, `factura-${r.numero_reserva}.pdf`]
+          [r.telefono_cliente, textoFacturaWa, `${BASE_URL}/v/${urlFacturaCorta}`, `factura-${numFac}.pdf`]
         );
       } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
     }
