@@ -5792,6 +5792,24 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
             html: plantillaEmail((_pccA && _pccA.email) || ('<p>Hola ' + (cartelPdf.conductor_nombre || '') + ',</p><p>Adjuntamos el cartel de recogida para tu próximo servicio. Imprímelo y úsalo para identificar a tu cliente.</p><p>Reserva: <strong>' + r.numero_reserva + '</strong></p>')),
             adjunto: { filename: 'cartel-' + r.numero_reserva + '.pdf', content: cartelPdf.buffer }
           });
+          // WhatsApp cartel al chofer
+          try {
+            const telefonoChoferQ = await pool.query(
+              'SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]
+            );
+            if (telefonoChoferQ.rows.length && telefonoChoferQ.rows[0].telefono) {
+              const firmaCartelWa = firmarCartel(reservaId);
+              const nombreDocCartel = `cartel-${r.numero_reserva}.pdf`;
+              const urlCartelCorta = await generarCodigoCorto('cartel', reservaId, null,
+                `${BASE_URL}/cartel-descarga/${reservaId}/${firmaCartelWa}/${nombreDocCartel}`);
+              const textoCartelWa = (_pccA && _pccA.whatsapp) ||
+                `Hola, *${cartelPdf.conductor_nombre || ''}* 👋\n\n📋 Adjuntamos el cartel de recogida para tu próximo servicio.\n\n🔖 *Reserva:* ${r.numero_reserva}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
+              await pool.query(
+                'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+                [telefonoChoferQ.rows[0].telefono, textoCartelWa, `${BASE_URL}/v/${urlCartelCorta}`, nombreDocCartel]
+              );
+            }
+          } catch(waCartelErr) { console.warn('Error encolando WhatsApp cartel chofer:', waCartelErr.message); }
         }
       } catch(emailErr) {
         console.warn('Error enviando voucher/cartel automático:', emailErr.message);
