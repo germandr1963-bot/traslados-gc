@@ -4125,7 +4125,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
       try {
         const firmaCierre = firmarFactura(r.id);
         const numFac = facturaPDF.numeroFactura || r.numero_reserva;
-        const urlFacturaCorta = await generarCodigoCorto('factura', r.id, null, `${BASE_URL}/factura-descarga/${r.id}/${firmaCierre}/factura-${numFac}.pdf`);
+        const urlFacturaDoc = `${BASE_URL}/factura-descarga/${r.id}/${firmaCierre}/factura-${numFac}.pdf`;
         const _pfacwa = await obtenerPlantilla('cliente_factura', {
           nombre_cliente: r.nombre_cliente,
           numero_reserva: r.numero_reserva,
@@ -4135,7 +4135,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
         await pool.query(
           `INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento)
            VALUES ($1, $2, $3, $4)`,
-          [r.telefono_cliente, textoFacturaWa, `${BASE_URL}/v/${urlFacturaCorta}`, `factura-${numFac}.pdf`]
+          [r.telefono_cliente, textoFacturaWa, urlFacturaDoc, `factura-${numFac}.pdf`]
         );
       } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
     }
@@ -5809,13 +5809,12 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
             if (telefonoChoferQ.rows.length && telefonoChoferQ.rows[0].telefono) {
               const firmaCartelWa = firmarCartel(reservaId);
               const nombreDocCartel = `cartel-${r.numero_reserva}.pdf`;
-              const urlCartelCorta = await generarCodigoCorto('cartel', reservaId, null,
-                `${BASE_URL}/cartel-descarga/${reservaId}/${firmaCartelWa}/${nombreDocCartel}`);
+              const urlCartelDoc = `${BASE_URL}/cartel-descarga/${reservaId}/${firmaCartelWa}/${nombreDocCartel}`;
               const textoCartelWa = (_pccA && _pccA.whatsapp) ||
                 `Hola, *${cartelPdf.conductor_nombre || ''}* 👋\n\n📋 Adjuntamos el cartel de recogida para tu próximo servicio.\n\n🔖 *Reserva:* ${r.numero_reserva}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
               await pool.query(
                 'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-                [telefonoChoferQ.rows[0].telefono, textoCartelWa, `${BASE_URL}/v/${urlCartelCorta}`, nombreDocCartel]
+                [telefonoChoferQ.rows[0].telefono, textoCartelWa, urlCartelDoc, nombreDocCartel]
               );
             }
           } catch(waCartelErr) { console.warn('Error encolando WhatsApp cartel chofer:', waCartelErr.message); }
