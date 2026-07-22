@@ -165,6 +165,7 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="equipo">Equipo</button>
       <button class="item-menu" data-seccion="valoraciones">Valoraciones</button>
        <button class="item-menu" data-seccion="comunicaciones">Comunicaciones</button>
+      <button class="item-menu" data-seccion="contabilidad">&#128210; Contabilidad</button>
     </div>
     <button id="boton-salir" style="margin-top:16px;opacity:0.5;width:100%;">Cerrar sesión</button>
   </div>
@@ -1362,10 +1363,189 @@ table.tabla-precios input {
       </div>
     </div>
 
+    <!-- CONTABILIDAD -->
+    <div id="seccion-contabilidad" class="oculto">
+      <h1>&#128210; Contabilidad</h1>
+      <p class="subtitulo">Registro de ingresos, gastos y exportaci&#243;n de informes para gestor&#237;a.</p>
+
+      <style>
+        .tab-contab { padding:8px 18px;border:none;background:none;border-bottom:3px solid transparent;cursor:pointer;font-size:0.85rem;font-weight:500;color:var(--texto-muted);font-family:inherit;margin-bottom:-2px; }
+        .tab-contab.activo { border-bottom:3px solid var(--acento);color:var(--texto);font-weight:700; }
+        .tarjeta-kpi { background:var(--gris-fondo);border:1px solid var(--gris-borde);border-radius:10px;padding:14px 18px;min-width:160px; }
+        .tarjeta-kpi .kpi-label { font-size:11px;color:var(--texto-muted);margin:0 0 4px; }
+        .tarjeta-kpi .kpi-valor { font-size:1.3rem;font-weight:700;margin:0; }
+        .kpi-verde { color:#2e7d32; }
+        .kpi-rojo  { color:var(--rojo-error); }
+        .kpi-azul  { color:#1565c0; }
+      </style>
+
+      <div style="display:flex;gap:0;flex-wrap:wrap;margin-bottom:24px;border-bottom:2px solid var(--gris-borde);">
+        <button class="tab-contab activo" data-tab="comisiones" onclick="switchTabContab('comisiones')">&#128176; Comisiones</button>
+        <button class="tab-contab" data-tab="depositos" onclick="switchTabContab('depositos')">&#128274; Dep&#243;sitos retenidos</button>
+        <button class="tab-contab" data-tab="gastos" onclick="switchTabContab('gastos')">&#9999; Gastos</button>
+        <button class="tab-contab" data-tab="gestoria" onclick="switchTabContab('gestoria')">&#128202; Resumen / Gestor&#237;a</button>
+        <button class="tab-contab" data-tab="fiscal" onclick="switchTabContab('fiscal')">&#9881; Configuraci&#243;n fiscal</button>
+      </div>
+
+      <!-- TAB COMISIONES -->
+      <div id="contab-tab-comisiones">
+        <div class="tarjeta" style="margin-bottom:20px;">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
+            <div><label class="etiqueta">Desde</label><input type="date" id="com-desde" class="campo" style="width:150px;"></div>
+            <div><label class="etiqueta">Hasta</label><input type="date" id="com-hasta" class="campo" style="width:150px;"></div>
+            <div>
+              <label class="etiqueta">Estado</label>
+              <select id="com-estado" class="campo" style="width:160px;">
+                <option value="">Todos</option>
+                <option value="cobrada">Cobrada</option>
+                <option value="pendiente">Pendiente</option>
+              </select>
+            </div>
+            <button class="boton-primario" style="height:38px;font-size:0.85rem;" onclick="cargarComisiones()">Filtrar</button>
+            <button class="boton-costa" style="height:38px;font-size:0.85rem;" onclick="abrirModalNuevaComision()">+ Registrar comisi&#243;n</button>
+          </div>
+          <div id="resumen-comisiones" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;"></div>
+          <div id="lista-comisiones"><p style="color:var(--texto-muted);font-size:13px;">Usa el filtro para cargar comisiones.</p></div>
+        </div>
+      </div>
+
+      <!-- TAB DEPOSITOS -->
+      <div id="contab-tab-depositos" class="oculto">
+        <div class="tarjeta" style="margin-bottom:20px;">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
+            <div><label class="etiqueta">Desde</label><input type="date" id="dep-desde" class="campo" style="width:150px;"></div>
+            <div><label class="etiqueta">Hasta</label><input type="date" id="dep-hasta" class="campo" style="width:150px;"></div>
+            <div>
+              <label class="etiqueta">Tipo</label>
+              <select id="dep-tipo" class="campo" style="width:230px;">
+                <option value="">Todos</option>
+                <option value="no_show">No-show (50% tuyo)</option>
+                <option value="cancelacion">Cancelaci&#243;n fuera de plazo (100%)</option>
+              </select>
+            </div>
+            <button class="boton-primario" style="height:38px;font-size:0.85rem;" onclick="cargarDepositos()">Filtrar</button>
+          </div>
+          <div id="resumen-depositos" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;"></div>
+          <div id="lista-depositos"><p style="color:var(--texto-muted);font-size:13px;">Usa el filtro para cargar dep&#243;sitos retenidos.</p></div>
+        </div>
+      </div>
+
+      <!-- TAB GASTOS -->
+      <div id="contab-tab-gastos" class="oculto">
+        <div class="tarjeta" style="margin-bottom:20px;">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
+            <div><label class="etiqueta">Desde</label><input type="date" id="gas-desde" class="campo" style="width:150px;"></div>
+            <div><label class="etiqueta">Hasta</label><input type="date" id="gas-hasta" class="campo" style="width:150px;"></div>
+            <div>
+              <label class="etiqueta">Categor&#237;a</label>
+              <select id="gas-categoria" class="campo" style="width:220px;">
+                <option value="">Todas</option>
+                <option value="hosting">Hosting / Dominio</option>
+                <option value="pasarela">Pasarela de pago (Stripe)</option>
+                <option value="comunicaciones">Comunicaciones (email/WA)</option>
+                <option value="gestoria">Gestor&#237;a</option>
+                <option value="publicidad">Publicidad</option>
+                <option value="noshow_conductor">Pago no-show a conductor</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <button class="boton-primario" style="height:38px;font-size:0.85rem;" onclick="cargarGastos()">Filtrar</button>
+            <button class="boton-costa" style="height:38px;font-size:0.85rem;" onclick="abrirModalNuevoGasto()">+ Registrar gasto</button>
+          </div>
+          <div id="resumen-gastos" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;"></div>
+          <div id="lista-gastos"><p style="color:var(--texto-muted);font-size:13px;">Usa el filtro para cargar gastos.</p></div>
+        </div>
+      </div>
+
+      <!-- TAB GESTORIA -->
+      <div id="contab-tab-gestoria" class="oculto">
+        <div class="tarjeta" style="margin-bottom:20px;">
+          <h2 style="font-size:1rem;margin:0 0 1rem 0;">&#128202; Resumen por per&#237;odo</h2>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px;">
+            <div><label class="etiqueta">A&#241;o</label><select id="gest-anyo" class="campo" style="width:110px;"></select></div>
+            <div>
+              <label class="etiqueta">Trimestre</label>
+              <select id="gest-trimestre" class="campo" style="width:210px;">
+                <option value="1">T1 - Enero a Marzo</option>
+                <option value="2">T2 - Abril a Junio</option>
+                <option value="3">T3 - Julio a Septiembre</option>
+                <option value="4">T4 - Octubre a Diciembre</option>
+              </select>
+            </div>
+            <button class="boton-primario" style="height:38px;font-size:0.85rem;" onclick="cargarResumenGestoria()">Calcular</button>
+          </div>
+          <div id="resumen-gestoria-resultado" style="display:none;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:20px;" id="tarjetas-resumen-gestoria"></div>
+            <div class="tarjeta" style="background:var(--gris-fondo);margin-bottom:16px;">
+              <h3 style="font-size:0.9rem;margin:0 0 10px 0;">IGIC - Liquidaci&#243;n trimestral estimada</h3>
+              <div id="igic-liquidacion" style="font-size:0.85rem;line-height:1.8;"></div>
+              <p style="font-size:11px;color:var(--texto-muted);margin:8px 0 0;">Los importes son orientativos. Tu gestor&#237;a har&#225; el c&#225;lculo oficial.</p>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="boton-primario" style="font-size:0.85rem;" onclick="exportarComisionesCSV()">Comisiones CSV</button>
+              <button class="boton-secundario" style="font-size:0.85rem;margin-top:0;" onclick="exportarDepositosCSV()">Dep&#243;sitos CSV</button>
+              <button class="boton-secundario" style="font-size:0.85rem;margin-top:0;" onclick="exportarGastosCSV()">Gastos CSV</button>
+            </div>
+            <p style="font-size:11px;color:var(--texto-muted);margin-top:10px;">Los archivos CSV son compatibles con Excel y con el software habitual de gestor&#237;a.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB FISCAL -->
+      <div id="contab-tab-fiscal" class="oculto">
+        <div class="tarjeta" style="max-width:620px;">
+          <h2 style="font-size:1rem;margin:0 0 1rem 0;">Par&#225;metros fiscales</h2>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+            <div style="grid-column:1/-1;">
+              <label class="etiqueta">Modo de facturaci&#243;n de comisiones</label>
+              <select id="fiscal-modo-facturacion" class="campo">
+                <option value="yo_emito">Yo emito la factura al conductor</option>
+                <option value="conductor_emite">El conductor me factura a m&#237;</option>
+              </select>
+              <p style="font-size:11px;color:var(--texto-muted);margin:4px 0 0;">Confirmar con gestor&#237;a.</p>
+            </div>
+            <div>
+              <label class="etiqueta">Tipo IGIC general (%)</label>
+              <input type="number" id="fiscal-igic-general" class="campo" value="7" step="0.1" min="0" max="100">
+            </div>
+            <div>
+              <label class="etiqueta">Tipo IGIC especial (%) - si aplica</label>
+              <input type="number" id="fiscal-igic-especial" class="campo" placeholder="Dejar vac&#237;o si no aplica" step="0.1" min="0" max="100">
+            </div>
+            <div style="grid-column:1/-1;">
+              <label class="etiqueta">Tratamiento fiscal del dep&#243;sito no-show</label>
+              <select id="fiscal-noshow-igic" class="campo">
+                <option value="sujeto">Sujeto a IGIC (tipo general)</option>
+                <option value="exento">Exento - indemnizaci&#243;n</option>
+              </select>
+              <p style="font-size:11px;color:var(--texto-muted);margin:4px 0 0;">Confirmar con gestor&#237;a.</p>
+            </div>
+            <div>
+              <label class="etiqueta">Serie de facturaci&#243;n</label>
+              <input type="text" id="fiscal-serie" class="campo" placeholder="Ej: TGC" style="max-width:120px;">
+            </div>
+            <div>
+              <label class="etiqueta">Num. siguiente factura</label>
+              <input type="number" id="fiscal-num-siguiente" class="campo" value="1" min="1" style="max-width:140px;">
+            </div>
+            <div style="grid-column:1/-1;">
+              <label class="etiqueta">Email de la gestor&#237;a</label>
+              <input type="email" id="fiscal-email-gestoria" class="campo" placeholder="gestoria@ejemplo.es">
+            </div>
+          </div>
+          <button class="boton-primario" onclick="guardarConfigFiscal()">Guardar configuraci&#243;n</button>
+          <div id="aviso-fiscal" style="display:none;margin-top:0.75rem;font-size:0.85rem;"></div>
+        </div>
+      </div>
+
+    </div>
+    <!-- FIN CONTABILIDAD -->
+
   </div>
 </div>
 
 <script>
+
 function mostrarAdmin() {
   document.getElementById('pantalla-login').classList.add('oculto');
   document.getElementById('pantalla-admin').classList.remove('oculto');
@@ -6504,6 +6684,306 @@ function guardarPlantilla() {
   });
 }
 // ============================================================
+
+// ============================================================
+// CONTABILIDAD
+// ============================================================
+
+function switchTabContab(tab) {
+  document.querySelectorAll('.tab-contab').forEach(function(b) { b.classList.remove('activo'); });
+  var btn = document.querySelector('.tab-contab[data-tab="' + tab + '"]');
+  if (btn) btn.classList.add('activo');
+  ['comisiones','depositos','gastos','gestoria','fiscal'].forEach(function(t) {
+    var el = document.getElementById('contab-tab-' + t);
+    if (el) el.classList.toggle('oculto', t !== tab);
+  });
+  if (tab === 'fiscal') cargarConfigFiscal();
+}
+
+function euros(v) { return parseFloat(v || 0).toFixed(2).replace('.', ',') + ' \u20ac'; }
+function fechaCorta(iso) { if (!iso) return '-'; return iso.substring(0,10).split('-').reverse().join('/'); }
+function kpiBox(label, valor, clase) {
+  return '<div class="tarjeta-kpi"><p class="kpi-label">' + label + '</p><p class="kpi-valor ' + (clase||'') + '">' + valor + '</p></div>';
+}
+
+// -- COMISIONES --
+function cargarComisiones() {
+  var desde  = document.getElementById('com-desde').value;
+  var hasta  = document.getElementById('com-hasta').value;
+  var estado = document.getElementById('com-estado').value;
+  var params = new URLSearchParams();
+  if (desde)  params.append('desde', desde);
+  if (hasta)  params.append('hasta', hasta);
+  if (estado) params.append('estado', estado);
+  document.getElementById('lista-comisiones').innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+  fetch('/admin/contabilidad/comisiones?' + params.toString())
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var rows = d.comisiones || [];
+      var totalBruto = rows.reduce(function(a,r) { return a + parseFloat(r.importe_comision||0); }, 0);
+      var cobradas   = rows.filter(function(r) { return r.estado === 'cobrada'; });
+      var pendientes = rows.filter(function(r) { return r.estado !== 'cobrada'; });
+      document.getElementById('resumen-comisiones').innerHTML =
+        kpiBox('Total comisiones', rows.length + ' viajes', '') +
+        kpiBox('Importe bruto', euros(totalBruto), 'kpi-azul') +
+        kpiBox('Cobradas', cobradas.length, 'kpi-verde') +
+        kpiBox('Pendientes', pendientes.length, pendientes.length > 0 ? 'kpi-rojo' : '');
+      if (rows.length === 0) {
+        document.getElementById('lista-comisiones').innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Sin resultados.</p>';
+        return;
+      }
+      var html = '<table class="tabla-admin"><thead><tr><th>Fecha cobro</th><th>PNR</th><th>Conductor</th><th>Importe</th><th>Forma cobro</th><th>Estado</th><th>Acci\u00f3n</th></tr></thead><tbody>';
+      rows.forEach(function(r) {
+        var bg = r.estado === 'cobrada' ? 'background:#e8f5e9;color:#2e7d32;' : 'background:#fff3e0;color:#e65100;';
+        html += '<tr><td>' + fechaCorta(r.fecha_cobro) + '</td><td><strong>' + (r.pnr||'-') + '</strong></td><td>' + (r.nombre_conductor||'-') + '</td><td><strong>' + euros(r.importe_comision) + '</strong></td><td>' + (r.forma_cobro||'-') + '</td><td><span style="font-size:11px;padding:2px 8px;border-radius:10px;' + bg + '">' + (r.estado||'pendiente') + '</span></td><td>' + (r.estado !== 'cobrada' ? '<button class="boton-primario" style="font-size:0.75rem;padding:4px 10px;" onclick="marcarComisionCobrada(' + r.id + ')">\u2714 Cobrada</button>' : '') + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('lista-comisiones').innerHTML = html;
+    })
+    .catch(function() { document.getElementById('lista-comisiones').innerHTML = '<p style="color:var(--rojo-error);font-size:13px;">Error al cargar.</p>'; });
+}
+
+function marcarComisionCobrada(id) {
+  fetch('/admin/contabilidad/comisiones/' + id + '/cobrada', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (d.ok) cargarComisiones(); });
+}
+
+function abrirModalNuevaComision() {
+  fetch('/admin/conductores')
+    .then(function(r) { return r.json(); })
+    .then(function(conductores) {
+      var opts = (conductores || []).map(function(c) { return '<option value="' + c.id + '">' + c.nombre + '</option>'; }).join('');
+      var modal = document.createElement('div');
+      modal.id = 'modal-nueva-comision';
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+      modal.innerHTML = '<div class="tarjeta" style="width:100%;max-width:440px;"><h3 style="margin:0 0 16px;">+ Registrar comisi\u00f3n</h3><label class="etiqueta">Conductor</label><select id="nc-conductor" class="campo" style="margin-bottom:10px;">' + opts + '</select><label class="etiqueta">PNR</label><input type="text" id="nc-pnr" class="campo" placeholder="GC-XXXXXX" style="margin-bottom:10px;"><label class="etiqueta">Importe (\u20ac)</label><input type="number" id="nc-importe" class="campo" step="0.01" min="0" placeholder="0.00" style="margin-bottom:10px;"><label class="etiqueta">Forma de cobro</label><select id="nc-forma" class="campo" style="margin-bottom:10px;"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option></select><label class="etiqueta">Fecha de cobro</label><input type="date" id="nc-fecha" class="campo" style="margin-bottom:16px;"><div style="display:flex;gap:8px;"><button class="boton-primario" onclick="guardarNuevaComision()">Guardar</button><button class="boton-secundario" style="margin-top:0;" onclick="document.getElementById(\'modal-nueva-comision\').remove()">Cancelar</button></div><div id="nc-aviso" style="display:none;margin-top:10px;font-size:0.85rem;"></div></div>';
+      document.body.appendChild(modal);
+      document.getElementById('nc-fecha').value = new Date().toISOString().substring(0,10);
+    });
+}
+
+function guardarNuevaComision() {
+  var payload = {
+    conductor_id: document.getElementById('nc-conductor').value,
+    pnr: document.getElementById('nc-pnr').value.trim(),
+    importe_comision: parseFloat(document.getElementById('nc-importe').value),
+    forma_cobro: document.getElementById('nc-forma').value,
+    fecha_cobro: document.getElementById('nc-fecha').value
+  };
+  fetch('/admin/contabilidad/comisiones', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) { document.getElementById('modal-nueva-comision').remove(); cargarComisiones(); }
+      else { var a = document.getElementById('nc-aviso'); a.style.display='block'; a.textContent = d.error||'Error.'; }
+    });
+}
+
+// -- DEPOSITOS --
+function cargarDepositos() {
+  var desde = document.getElementById('dep-desde').value;
+  var hasta = document.getElementById('dep-hasta').value;
+  var tipo  = document.getElementById('dep-tipo').value;
+  var params = new URLSearchParams();
+  if (desde) params.append('desde', desde);
+  if (hasta) params.append('hasta', hasta);
+  if (tipo)  params.append('tipo', tipo);
+  document.getElementById('lista-depositos').innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+  fetch('/admin/contabilidad/depositos?' + params.toString())
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var rows = d.depositos || [];
+      var totalTuyo = rows.reduce(function(a,r) { return a + parseFloat(r.importe_empresa||0); }, 0);
+      var totalCond = rows.reduce(function(a,r) { return a + parseFloat(r.importe_conductor||0); }, 0);
+      document.getElementById('resumen-depositos').innerHTML =
+        kpiBox('Total casos', rows.length, '') +
+        kpiBox('Tu parte total', euros(totalTuyo), 'kpi-verde') +
+        kpiBox('Parte conductores', euros(totalCond), 'kpi-azul');
+      if (rows.length === 0) {
+        document.getElementById('lista-depositos').innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Sin resultados.</p>';
+        return;
+      }
+      var html = '<table class="tabla-admin"><thead><tr><th>Fecha</th><th>PNR</th><th>Motivo</th><th>Total Stripe</th><th>Tu parte</th><th>Parte conductor</th><th>Pago conductor</th></tr></thead><tbody>';
+      rows.forEach(function(r) {
+        var motivo = r.tipo === 'no_show'
+          ? '<span style="background:#fff3e0;color:#e65100;font-size:11px;padding:2px 8px;border-radius:10px;">No-show</span>'
+          : '<span style="background:#fce4ec;color:#c62828;font-size:11px;padding:2px 8px;border-radius:10px;">Cancelaci\u00f3n</span>';
+        var pagoCond = r.tipo === 'no_show'
+          ? '<span style="font-size:11px;color:' + (r.conductor_pagado ? '#2e7d32':'#e65100') + ';">' + (r.conductor_pagado ? '\u2714 Pagado':'\u23f3 Pendiente') + '</span>'
+          : '<span style="font-size:11px;color:var(--texto-muted);">N/A</span>';
+        html += '<tr><td>' + fechaCorta(r.fecha) + '</td><td><strong>' + (r.pnr||'-') + '</strong></td><td>' + motivo + '</td><td>' + euros(r.importe_total) + '</td><td><strong>' + euros(r.importe_empresa) + '</strong></td><td>' + euros(r.importe_conductor) + '</td><td>' + pagoCond + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('lista-depositos').innerHTML = html;
+    })
+    .catch(function() { document.getElementById('lista-depositos').innerHTML = '<p style="color:var(--rojo-error);font-size:13px;">Error al cargar.</p>'; });
+}
+
+// -- GASTOS --
+function cargarGastos() {
+  var desde = document.getElementById('gas-desde').value;
+  var hasta = document.getElementById('gas-hasta').value;
+  var cat   = document.getElementById('gas-categoria').value;
+  var params = new URLSearchParams();
+  if (desde) params.append('desde', desde);
+  if (hasta) params.append('hasta', hasta);
+  if (cat)   params.append('categoria', cat);
+  document.getElementById('lista-gastos').innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+  fetch('/admin/contabilidad/gastos?' + params.toString())
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var rows = d.gastos || [];
+      var total = rows.reduce(function(a,r) { return a + parseFloat(r.importe||0); }, 0);
+      document.getElementById('resumen-gastos').innerHTML =
+        kpiBox('Total gastos', rows.length + ' registros', '') +
+        kpiBox('Importe total', euros(total), 'kpi-rojo');
+      if (rows.length === 0) {
+        document.getElementById('lista-gastos').innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Sin resultados.</p>';
+        return;
+      }
+      var html = '<table class="tabla-admin"><thead><tr><th>Fecha</th><th>Proveedor</th><th>Concepto</th><th>Categor\u00eda</th><th>Importe</th><th>IGIC soportado</th><th></th></tr></thead><tbody>';
+      rows.forEach(function(r) {
+        html += '<tr><td>' + fechaCorta(r.fecha) + '</td><td>' + (r.proveedor||'-') + '</td><td>' + (r.concepto||'-') + '</td><td style="font-size:11px;color:var(--texto-muted);">' + (r.categoria||'-') + '</td><td><strong>' + euros(r.importe) + '</strong></td><td>' + euros(r.igic_soportado) + '</td><td><button class="boton-secundario" style="font-size:0.75rem;padding:4px 10px;margin-top:0;" onclick="eliminarGasto(' + r.id + ')">Eliminar</button></td></tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('lista-gastos').innerHTML = html;
+    })
+    .catch(function() { document.getElementById('lista-gastos').innerHTML = '<p style="color:var(--rojo-error);font-size:13px;">Error al cargar.</p>'; });
+}
+
+function abrirModalNuevoGasto() {
+  var modal = document.createElement('div');
+  modal.id = 'modal-nuevo-gasto';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = '<div class="tarjeta" style="width:100%;max-width:480px;max-height:90vh;overflow-y:auto;"><h3 style="margin:0 0 16px;">+ Registrar gasto</h3><label class="etiqueta">Fecha</label><input type="date" id="ng-fecha" class="campo" style="margin-bottom:10px;"><label class="etiqueta">Proveedor</label><input type="text" id="ng-proveedor" class="campo" placeholder="Render, Stripe..." style="margin-bottom:10px;"><label class="etiqueta">Concepto</label><input type="text" id="ng-concepto" class="campo" placeholder="Descripci\u00f3n del gasto" style="margin-bottom:10px;"><label class="etiqueta">Categor\u00eda</label><select id="ng-categoria" class="campo" style="margin-bottom:10px;"><option value="hosting">Hosting / Dominio</option><option value="pasarela">Pasarela de pago (Stripe)</option><option value="comunicaciones">Comunicaciones (email/WA)</option><option value="gestoria">Gestor\u00eda</option><option value="publicidad">Publicidad</option><option value="noshow_conductor">Pago no-show a conductor</option><option value="otro">Otro</option></select><label class="etiqueta">Importe total (\u20ac)</label><input type="number" id="ng-importe" class="campo" step="0.01" min="0" placeholder="0.00" style="margin-bottom:10px;"><label class="etiqueta">IGIC soportado (\u20ac)</label><input type="number" id="ng-igic" class="campo" step="0.01" min="0" placeholder="0.00" style="margin-bottom:16px;"><div style="display:flex;gap:8px;"><button class="boton-primario" onclick="guardarNuevoGasto()">Guardar</button><button class="boton-secundario" style="margin-top:0;" onclick="document.getElementById(\'modal-nuevo-gasto\').remove()">Cancelar</button></div><div id="ng-aviso" style="display:none;margin-top:10px;font-size:0.85rem;"></div></div>';
+  document.body.appendChild(modal);
+  document.getElementById('ng-fecha').value = new Date().toISOString().substring(0,10);
+}
+
+function guardarNuevoGasto() {
+  var payload = {
+    fecha: document.getElementById('ng-fecha').value,
+    proveedor: document.getElementById('ng-proveedor').value.trim(),
+    concepto: document.getElementById('ng-concepto').value.trim(),
+    categoria: document.getElementById('ng-categoria').value,
+    importe: parseFloat(document.getElementById('ng-importe').value || 0),
+    igic_soportado: parseFloat(document.getElementById('ng-igic').value || 0)
+  };
+  fetch('/admin/contabilidad/gastos', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) { document.getElementById('modal-nuevo-gasto').remove(); cargarGastos(); }
+      else { var a = document.getElementById('ng-aviso'); a.style.display='block'; a.textContent = d.error||'Error.'; }
+    });
+}
+
+function eliminarGasto(id) {
+  if (!confirm('Eliminar este gasto?')) return;
+  fetch('/admin/contabilidad/gastos/' + id, { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (d.ok) cargarGastos(); });
+}
+
+// -- RESUMEN GESTORIA --
+function inicializarAnios() {
+  var sel = document.getElementById('gest-anyo');
+  if (!sel || sel.options.length > 0) return;
+  var hoy = new Date().getFullYear();
+  for (var y = hoy; y >= hoy - 3; y--) {
+    var opt = document.createElement('option');
+    opt.value = y; opt.textContent = y; sel.appendChild(opt);
+  }
+  var t = Math.ceil((new Date().getMonth() + 1) / 3);
+  var trim = document.getElementById('gest-trimestre');
+  if (trim) trim.value = t;
+}
+
+function cargarResumenGestoria() {
+  var anyo = document.getElementById('gest-anyo').value;
+  var trim  = document.getElementById('gest-trimestre').value;
+  fetch('/admin/contabilidad/resumen?anyo=' + anyo + '&trimestre=' + trim)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('resumen-gestoria-resultado').style.display = 'block';
+      document.getElementById('tarjetas-resumen-gestoria').innerHTML =
+        kpiBox('Comisiones cobradas', euros(d.total_comisiones), 'kpi-verde') +
+        kpiBox('Dep\u00f3sitos (tu parte)', euros(d.total_depositos_empresa), 'kpi-verde') +
+        kpiBox('Total ingresos', euros(d.total_ingresos), 'kpi-azul') +
+        kpiBox('Total gastos', euros(d.total_gastos), 'kpi-rojo') +
+        kpiBox('Resultado neto', euros(d.resultado_neto), d.resultado_neto >= 0 ? 'kpi-verde' : 'kpi-rojo');
+      document.getElementById('igic-liquidacion').innerHTML =
+        '<p>IGIC repercutido (ingresos x ' + (d.tipo_igic||7) + '%)&nbsp;&nbsp;<strong>' + euros(d.igic_repercutido) + '</strong></p>' +
+        '<p>IGIC soportado (gastos deducibles)&nbsp;&nbsp;<strong>- ' + euros(d.igic_soportado) + '</strong></p>' +
+        '<hr style="border:none;border-top:1px solid var(--gris-borde);margin:6px 0;">' +
+        '<p><strong>Cuota a liquidar (orientativo)&nbsp;&nbsp;' + euros(d.igic_a_liquidar) + '</strong></p>';
+    });
+}
+
+function exportarComisionesCSV() {
+  var anyo = document.getElementById('gest-anyo').value;
+  var trim  = document.getElementById('gest-trimestre').value;
+  window.location.href = '/admin/contabilidad/exportar/comisiones?anyo=' + anyo + '&trimestre=' + trim;
+}
+function exportarDepositosCSV() {
+  var anyo = document.getElementById('gest-anyo').value;
+  var trim  = document.getElementById('gest-trimestre').value;
+  window.location.href = '/admin/contabilidad/exportar/depositos?anyo=' + anyo + '&trimestre=' + trim;
+}
+function exportarGastosCSV() {
+  var anyo = document.getElementById('gest-anyo').value;
+  var trim  = document.getElementById('gest-trimestre').value;
+  window.location.href = '/admin/contabilidad/exportar/gastos?anyo=' + anyo + '&trimestre=' + trim;
+}
+
+// -- CONFIG FISCAL --
+function cargarConfigFiscal() {
+  fetch('/admin/contabilidad/config-fiscal')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.modo_facturacion)     document.getElementById('fiscal-modo-facturacion').value = d.modo_facturacion;
+      if (d.igic_general != null) document.getElementById('fiscal-igic-general').value = d.igic_general;
+      if (d.igic_especial)        document.getElementById('fiscal-igic-especial').value = d.igic_especial;
+      if (d.noshow_igic)          document.getElementById('fiscal-noshow-igic').value = d.noshow_igic;
+      if (d.serie_facturacion)    document.getElementById('fiscal-serie').value = d.serie_facturacion;
+      if (d.num_siguiente)        document.getElementById('fiscal-num-siguiente').value = d.num_siguiente;
+      if (d.email_gestoria)       document.getElementById('fiscal-email-gestoria').value = d.email_gestoria;
+    })
+    .catch(function() {});
+}
+
+function guardarConfigFiscal() {
+  var aviso = document.getElementById('aviso-fiscal');
+  var payload = {
+    modo_facturacion:  document.getElementById('fiscal-modo-facturacion').value,
+    igic_general:      parseFloat(document.getElementById('fiscal-igic-general').value || 7),
+    igic_especial:     document.getElementById('fiscal-igic-especial').value || null,
+    noshow_igic:       document.getElementById('fiscal-noshow-igic').value,
+    serie_facturacion: document.getElementById('fiscal-serie').value.trim(),
+    num_siguiente:     parseInt(document.getElementById('fiscal-num-siguiente').value || 1),
+    email_gestoria:    document.getElementById('fiscal-email-gestoria').value.trim()
+  };
+  fetch('/admin/contabilidad/config-fiscal', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      aviso.style.display = 'block';
+      aviso.style.color = d.ok ? 'var(--verde-ok)' : 'var(--rojo-error)';
+      aviso.textContent = d.ok ? 'Guardado correctamente.' : (d.error || 'Error al guardar.');
+      setTimeout(function() { aviso.style.display = 'none'; }, 3000);
+    });
+}
+
+// Inicializar selector de anios al arrancar
+(function() {
+  function tryInit() {
+    var sel = document.getElementById('gest-anyo');
+    if (sel) { inicializarAnios(); }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', tryInit);
+  } else {
+    tryInit();
+  }
+})();
 
 comprobarSesion();
 </script>
