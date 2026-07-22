@@ -1563,6 +1563,42 @@ Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n❌ *Reserva cancelada:* {numero_reserva}\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nLa reserva ha sido cancelada por el cliente. Queda liberada de tu agenda.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+    { clave: 'cliente_cancelacion_no_pago', nombre: 'Cancelación por falta de pago del depósito (al cliente)', categoria: 'cliente',
+      asunto_email: '❌ Tu reserva {numero_reserva} ha sido cancelada por falta de pago',
+      cuerpo_email: `
+Hola, <strong>{nombre_cliente}</strong> 👋
+
+Lamentamos informarte de que tu reserva <strong>{numero_reserva}</strong> ha sido cancelada automáticamente al no haberse completado el pago del depósito de garantía en el plazo establecido.
+<div class="caja-roja">
+  ❌ <strong>Reserva cancelada por falta de pago del depósito</strong><br>
+  <span style="font-size:14px;line-height:1.6;">El depósito de garantía debe abonarse antes del viaje para garantizar tu plaza. Al no recibirse el pago en el plazo indicado, la reserva ha quedado sin efecto.</span>
+</div>
+<div class="info-box">
+  📍 <strong>Ruta:</strong> {origen} → {destino}
+  📅 <strong>Fecha del servicio:</strong> {fecha}
+  🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span>
+</div>
+Si deseas realizar este traslado, puedes enviarnos una nueva solicitud en cualquier momento. Si crees que ha habido un error, no dudes en contactarnos por WhatsApp.
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
+`,
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n❌ *Tu reserva {numero_reserva} ha sido cancelada automáticamente.*\n\nLamentamos informarte de que no hemos recibido el pago del depósito de garantía en el plazo establecido, por lo que la reserva ha quedado sin efecto.\n\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha del servicio:* {fecha}\n🔖 *Reserva:* {numero_reserva}\n\nSi deseas realizar este traslado, puedes enviarnos una nueva solicitud. Si crees que ha habido un error, contáctanos.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+    { clave: 'chofer_cancelacion_no_pago', nombre: 'Cancelación por falta de pago (al chofer)', categoria: 'chofer',
+      asunto_email: '❌ Reserva cancelada por falta de pago — {numero_reserva}',
+      cuerpo_email: `
+Hola, <strong>{nombre_chofer}</strong> 👋
+<div class="info-box">
+  ❌ <strong>Reserva cancelada:</strong> <span class="pnr">{numero_reserva}</span>
+  📍 <strong>Ruta:</strong> {origen} → {destino}
+  📅 <strong>Fecha:</strong> {fecha}
+</div>
+La reserva ha sido cancelada automáticamente por falta de pago del depósito de garantía por parte del cliente. Queda liberada de tu agenda.
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
+`,
+      cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n❌ *Reserva cancelada por falta de pago:* {numero_reserva}\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha}\n\nLa reserva ha sido cancelada automáticamente porque el cliente no completó el pago del depósito de garantía. Queda liberada de tu agenda.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_gracias_servicio', nombre: 'Gracias por el servicio (al chofer)', categoria: 'chofer',
       asunto_email: '\ud83d\ude4f Gracias por el servicio \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -4037,14 +4073,39 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
     );
   }
 
-  // Actualizar estado y guardar token
-  // Si el depósito fue pagado, marcarlo como devolución pendiente (se procesará manualmente en Stripe)
+  // Obtener datos del depósito antes de actualizar
+  const reservaDeposito = await pool.query(
+    'SELECT deposito_pagado, deposito_retenido_noshow, stripe_payment_intent_id, deposito_importe FROM reservas WHERE id = $1',
+    [req.params.id]
+  );
+  const datosDeposito = reservaDeposito.rows[0] || {};
+  const debeDevolver = datosDeposito.deposito_pagado && !datosDeposito.deposito_retenido_noshow;
+
+  // Actualizar estado y guardar token — empieza como devolución pendiente si hay depósito
   await pool.query(
     `UPDATE reservas SET estado = 'completada', completada_en = NOW(), token_valoracion = $1,
      deposito_devolucion_pendiente = CASE WHEN deposito_pagado = TRUE AND deposito_retenido_noshow = FALSE THEN TRUE ELSE deposito_devolucion_pendiente END
      WHERE id = $2`,
     [token, r.id]
   );
+
+  // Intentar devolución automática en Stripe si hay payment_intent guardado
+  if (debeDevolver && datosDeposito.stripe_payment_intent_id) {
+    try {
+      await stripe.refunds.create({
+        payment_intent: datosDeposito.stripe_payment_intent_id
+      });
+      // Stripe confirmó la devolución — marcar como liberado directamente
+      await pool.query(
+        'UPDATE reservas SET deposito_liberado = TRUE, deposito_devolucion_pendiente = FALSE WHERE id = $1',
+        [req.params.id]
+      );
+      console.log(`[STRIPE] Devolución automática completada para reserva ${r.numero_reserva}`);
+    } catch(stripeErr) {
+      // Stripe falló (demo, tarjeta de prueba, etc.) — queda en devolución pendiente para gestión manual
+      console.warn(`[STRIPE] No se pudo devolver automáticamente para ${r.numero_reserva}:`, stripeErr.message);
+    }
+  }
 
   const enlace = `${BASE_URL}/valorar?token=${token}`;
   const enlaceCorto = `${BASE_URL}/v/${codigo}`;
@@ -5742,10 +5803,11 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
     const reservaId = session.metadata && session.metadata.reserva_id;
     if (!reservaId) return res.json({ received: true });
 
-    // Marcar depósito como pagado
+    // Marcar depósito como pagado y guardar el payment_intent_id para futuras devoluciones
+    const paymentIntentId = session.payment_intent || null;
     await pool.query(
-      'UPDATE reservas SET deposito_pagado = TRUE WHERE id = $1',
-      [reservaId]
+      'UPDATE reservas SET deposito_pagado = TRUE, stripe_payment_intent_id = $1 WHERE id = $2',
+      [paymentIntentId, reservaId]
     );
 
     // Obtener datos de la reserva para el voucher
@@ -7652,6 +7714,9 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
   const devolucionPendiente = r.deposito_pagado && !fueraDePlazo;
   if (devolucionPendiente) {
     await pool.query('UPDATE reservas SET deposito_devolucion_pendiente = TRUE WHERE id = $1', [r.id]);
+  } else if (r.deposito_pagado && fueraDePlazo) {
+    // Cancelación fuera de plazo con depósito pagado → se retiene
+    await pool.query('UPDATE reservas SET deposito_retenido_noshow = TRUE WHERE id = $1', [r.id]);
   }
 
   if (r.conductor_id) {
@@ -7699,7 +7764,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
     const fechaTextoCancel = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
     const avisoDeposito = r.deposito_pagado
       ? (fueraDePlazo
-          ? '<p style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:10px 14px;font-size:13px;color:#856404;">⚠️ La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía podría ser retenido según nuestra política de cancelación.</p>'
+          ? '<p style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:10px 14px;font-size:13px;color:#856404;">⚠️ La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía ha sido retenido según nuestra política de cancelación.</p>'
           : '<p style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:10px 14px;font-size:13px;color:#2e7d32;">✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.</p>')
       : '<p style="color:#2e7d32;font-size:13px;">✅ La cancelación se ha realizado dentro del plazo establecido.</p>';
     const _pcancelE = await obtenerPlantilla('cliente_cancelacion', {
@@ -7737,10 +7802,10 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
         origen: r.origen || '—',
         destino: r.destino || '—',
         fecha: fechaTextoWa,
-        aviso_deposito: fueraDePlazo ? '⚠️ La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía podría ser retenido.' : '✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve.'
+        aviso_deposito: fueraDePlazo ? '⚠️ La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido.' : '✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve.'
       });
       const textoWa = (_pcancelWa && _pcancelWa.whatsapp) || (fueraDePlazo
-        ? `Hola, ${r.nombre_cliente} 👋\n\nTu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTextoWa} ha sido cancelada.\n\n⚠️ La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía podría ser retenido según nuestra política de cancelación.\n\nSi tienes alguna duda, contáctanos. Un saludo 🙏`
+        ? `Hola, ${r.nombre_cliente} 👋\n\nTu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTextoWa} ha sido cancelada.\n\n⚠️ La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido según nuestra política de cancelación.\n\nSi tienes alguna duda, contáctanos. Un saludo 🙏`
         : `Hola, ${r.nombre_cliente} 👋\n\nTu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTextoWa} ha sido cancelada correctamente.\n\n✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.\n\nUn saludo 🙏`);
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
@@ -8088,7 +8153,23 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
   if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
   const r = reserva.rows[0];
 
-  await pool.query('UPDATE reservas SET deposito_liberado = TRUE WHERE id = $1', [req.params.id]);
+  // Intentar devolución en Stripe si hay payment_intent guardado (puede ya estar hecho automáticamente)
+  if (r.stripe_payment_intent_id && !r.deposito_liberado) {
+    try {
+      await stripe.refunds.create({
+        payment_intent: r.stripe_payment_intent_id
+      });
+      console.log(`[STRIPE] Devolución manual confirmada para reserva ${r.numero_reserva}`);
+    } catch(stripeErr) {
+      // Si ya fue devuelto automáticamente Stripe devuelve error — lo ignoramos y seguimos
+      console.warn(`[STRIPE] Aviso al liberar manualmente ${r.numero_reserva}:`, stripeErr.message);
+    }
+  }
+
+  await pool.query(
+    'UPDATE reservas SET deposito_liberado = TRUE, deposito_devolucion_pendiente = FALSE WHERE id = $1',
+    [req.params.id]
+  );
 
   // Generar factura PDF
   let facturaBuffer = null;
@@ -8821,6 +8902,132 @@ app.put('/admin/plantillas-comunicacion/:clave', requireAdmin, asyncHandler(asyn
   if (!result.rows.length) return res.status(404).json({ error: 'Plantilla no encontrada.' });
   res.json({ ok: true, plantilla: result.rows[0] });
 }));
+
+// ─── Tarea automática: cancelar reservas confirmadas sin pago de depósito ────
+// Corre cada hora. Busca reservas confirmadas cuyo plazo de pago ya venció
+// y el depósito no fue pagado. Las cancela y notifica al cliente y al chofer.
+async function cancelarReservasSinPago() {
+  try {
+    const ahora = new Date();
+    // Reservas confirmadas, sin depósito pagado, con fecha de viaje conocida
+    const pendientes = await pool.query(
+      `SELECT r.*, cv.nombre AS categoria_nombre,
+              c.nombre AS conductor_nombre, c.email AS conductor_email, c.telefono AS conductor_telefono
+       FROM reservas r
+       LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+       LEFT JOIN conductores c ON c.id = r.conductor_id
+       WHERE r.estado = 'confirmada'
+         AND r.deposito_pagado = FALSE
+         AND r.fecha IS NOT NULL
+         AND r.archivada = FALSE`
+    );
+
+    for (const r of pendientes.rows) {
+      try {
+        const cfgNoshow = await obtenerConfigNoshow(r.fecha);
+        const fechaLimite = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
+        if (ahora < fechaLimite) continue; // aún dentro del plazo
+
+        const fechaTexto = new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+
+        // Cancelar la reserva
+        await pool.query(
+          `UPDATE reservas SET estado = 'cancelada', estado_aviso_whatsapp = 'cancelada_sin_pago' WHERE id = $1`,
+          [r.id]
+        );
+
+        console.log(`[AUTO] Reserva ${r.numero_reserva} cancelada por falta de pago del depósito.`);
+
+        // Email + WhatsApp al cliente
+        try {
+          const _pcliente = await obtenerPlantilla('cliente_cancelacion_no_pago', {
+            nombre_cliente: r.nombre_cliente,
+            numero_reserva: r.numero_reserva,
+            origen: r.origen || '—',
+            destino: r.destino || '—',
+            fecha: fechaTexto
+          });
+          await enviarEmail({
+            to: r.email_cliente,
+            subject: (_pcliente && _pcliente.asunto) || ('❌ Tu reserva ' + r.numero_reserva + ' ha sido cancelada por falta de pago'),
+            html: plantillaEmail((_pcliente && _pcliente.email) ||
+              `<p>Hola <strong>${r.nombre_cliente}</strong> 👋</p>
+               <div class="caja-roja">
+                 ❌ <strong>Reserva cancelada por falta de pago del depósito</strong><br>
+                 <span style="font-size:14px;line-height:1.6;">Tu reserva <strong>${r.numero_reserva}</strong> ha sido cancelada automáticamente al no haberse completado el pago del depósito de garantía en el plazo establecido.</span>
+               </div>
+               <div class="info-box">
+                 📍 <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
+                 📅 <strong>Fecha del servicio:</strong> ${fechaTexto}<br>
+                 🔖 <strong>Reserva:</strong> <span class="pnr">${r.numero_reserva}</span>
+               </div>
+               <p>Si deseas realizar este traslado, puedes enviarnos una nueva solicitud. Si crees que ha habido un error, contáctanos por WhatsApp.</p>
+               <p>Un saludo cordial,<br><strong>El equipo de Traslados GC</strong></p>`)
+          });
+        } catch(e) { console.warn(`[AUTO] Error email cliente ${r.numero_reserva}:`, e.message); }
+
+        if (r.telefono_cliente) {
+          try {
+            const _pclientewa = await obtenerPlantilla('cliente_cancelacion_no_pago', {
+              nombre_cliente: r.nombre_cliente,
+              numero_reserva: r.numero_reserva,
+              origen: r.origen || '—',
+              destino: r.destino || '—',
+              fecha: fechaTexto
+            });
+            const textoWaCliente = (_pclientewa && _pclientewa.whatsapp) ||
+              `Hola, ${r.nombre_cliente} 👋\n\n❌ Tu reserva ${r.numero_reserva} ha sido cancelada automáticamente.\n\nNo hemos recibido el pago del depósito de garantía en el plazo establecido.\n\n📍 Ruta: ${r.origen || '—'} → ${r.destino || '—'}\n📅 Fecha: ${fechaTexto}\n\nSi deseas realizar este traslado, puedes enviarnos una nueva solicitud. Un saludo 🙏`;
+            await pool.query(
+              'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+              [r.telefono_cliente, textoWaCliente]
+            );
+          } catch(e) { console.warn(`[AUTO] Error WhatsApp cliente ${r.numero_reserva}:`, e.message); }
+        }
+
+        // Email + WhatsApp al chofer (si tiene uno asignado)
+        if (r.conductor_id) {
+          try {
+            const _pchofer = await obtenerPlantilla('chofer_cancelacion_no_pago', {
+              nombre_chofer: r.conductor_nombre || '',
+              numero_reserva: r.numero_reserva,
+              origen: r.origen || '—',
+              destino: r.destino || '—',
+              fecha: fechaTexto
+            });
+            if (r.conductor_email) {
+              await enviarEmail({
+                to: r.conductor_email,
+                subject: (_pchofer && _pchofer.asunto) || ('❌ Reserva cancelada por falta de pago — ' + r.numero_reserva),
+                html: plantillaEmail((_pchofer && _pchofer.email) ||
+                  `<p>Hola <strong>${r.conductor_nombre || ''}</strong> 👋</p>
+                   <div class="info-box">
+                     ❌ <strong>Reserva cancelada:</strong> <span class="pnr">${r.numero_reserva}</span><br>
+                     📍 <strong>Ruta:</strong> ${r.origen || '—'} → ${r.destino || '—'}<br>
+                     📅 <strong>Fecha:</strong> ${fechaTexto}
+                   </div>
+                   <p>La reserva ha sido cancelada automáticamente por falta de pago del depósito por parte del cliente. Queda liberada de tu agenda.</p>
+                   <p>Un saludo cordial,<br><strong>El equipo de Traslados GC</strong></p>`)
+              });
+            }
+            if (r.conductor_telefono) {
+              const textoWaChofer = (_pchofer && _pchofer.whatsapp) ||
+                `Hola, *${r.conductor_nombre || ''}* 👋\n\n❌ *Reserva cancelada por falta de pago:* ${r.numero_reserva}\n📍 *Ruta:* ${r.origen || '—'} → ${r.destino || '—'}\n📅 *Fecha:* ${fechaTexto}\n\nLa reserva ha sido cancelada automáticamente porque el cliente no completó el pago del depósito. Queda liberada de tu agenda.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
+              await pool.query(
+                'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+                [r.conductor_telefono, textoWaChofer]
+              );
+            }
+          } catch(e) { console.warn(`[AUTO] Error notificando chofer ${r.numero_reserva}:`, e.message); }
+        }
+
+      } catch(e) { console.warn(`[AUTO] Error procesando reserva ${r.id}:`, e.message); }
+    }
+  } catch(e) { console.warn('[AUTO] Error en tarea cancelarReservasSinPago:', e.message); }
+}
+
+// Ejecutar al arrancar y luego cada hora
+cancelarReservasSinPago();
+setInterval(cancelarReservasSinPago, 60 * 60 * 1000);
 
 // ─── Arranque ─────────────────────────────────────────────────────────────────
 initSchema()
