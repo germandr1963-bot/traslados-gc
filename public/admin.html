@@ -5281,14 +5281,19 @@ function abrirDetalleReserva(id, sinScroll) {
         btnLiberar.style.display = 'none';
         if (btnNoshow) btnNoshow.style.display = 'none';
       } else if (r.deposito_devolucion_pendiente) {
-        depEl.innerHTML = '<span style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:6px 12px;font-size:13px;color:#856404;display:inline-block;">⚠️ Devolución pendiente. El cliente canceló en plazo — procesa la devolución en Stripe y marca como devuelto.</span>';
-        btnLiberar.innerHTML = '✅ Marcar depósito como devuelto';
+        depEl.innerHTML = '<span style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:6px 12px;font-size:13px;color:#856404;display:inline-block;">⚠️ Devolución pendiente. Procesa la devolución en Stripe y confirma aquí cuando esté hecha.</span>';
+        btnLiberar.innerHTML = '✅ Confirmar devolución a cliente';
+        btnLiberar.style.display = 'inline-block';
+        if (btnNoshow) btnNoshow.style.display = 'none';
+      } else if (r.deposito_pagado && r.estado === 'completada') {
+        // Viaje completado pero flag de devolución no activado aún (no debería ocurrir, pero por seguridad)
+        depEl.innerHTML = '<span style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:6px 12px;font-size:13px;color:#856404;display:inline-block;">⚠️ Devolución pendiente. Procesa la devolución en Stripe y pulsa el botón para confirmar.</span>';
+        btnLiberar.innerHTML = '✅ Confirmar devolución a cliente';
         btnLiberar.style.display = 'inline-block';
         if (btnNoshow) btnNoshow.style.display = 'none';
       } else if (r.deposito_pagado) {
-        depEl.innerHTML = '<span style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:6px 12px;font-size:13px;color:#2d7a4f;display:inline-block;font-weight:600;">💳 Depósito retenido — ' + (r.deposito_importe || '—') + ' €. Pulsa el botón cuando el servicio esté completado.</span>';
-        btnLiberar.innerHTML = '✅ Marcar depósito como devuelto';
-        btnLiberar.style.display = 'inline-block';
+        depEl.innerHTML = '<span style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:6px 12px;font-size:13px;color:#2d7a4f;display:inline-block;font-weight:600;">💳 Depósito retenido — ' + (r.deposito_importe || '—') + ' €. El servicio está en curso.</span>';
+        btnLiberar.style.display = 'none';
         if (btnNoshow) btnNoshow.style.display = 'inline-block';
       } else {
         depEl.innerHTML = '<span style="color:var(--texto-muted);">⏳ Pendiente de pago. No hay nada que gestionar aún.</span>';
