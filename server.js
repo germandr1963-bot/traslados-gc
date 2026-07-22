@@ -9027,6 +9027,262 @@ async function cancelarReservasSinPago() {
 
 // Ejecutar al arrancar y luego cada hora
 cancelarReservasSinPago();
+
+// ─── CONTABILIDAD ─────────────────────────────────────────────────────────────
+
+// Tablas necesarias (se crean si no existen)
+async function initContabilidad() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS contab_comisiones (
+      id SERIAL PRIMARY KEY,
+      conductor_id INTEGER REFERENCES conductores(id) ON DELETE SET NULL,
+      pnr TEXT,
+      importe_comision NUMERIC(10,2) NOT NULL DEFAULT 0,
+      forma_cobro TEXT DEFAULT 'transferencia',
+      fecha_cobro DATE,
+      estado TEXT DEFAULT 'pendiente',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS contab_gastos (
+      id SERIAL PRIMARY KEY,
+      fecha DATE NOT NULL,
+      proveedor TEXT,
+      concepto TEXT,
+      categoria TEXT,
+      importe NUMERIC(10,2) NOT NULL DEFAULT 0,
+      igic_soportado NUMERIC(10,2) DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS contab_depositos_retenidos (
+      id SERIAL PRIMARY KEY,
+      reserva_id INTEGER REFERENCES reservas(id) ON DELETE SET NULL,
+      pnr TEXT,
+      tipo TEXT NOT NULL,
+      fecha DATE,
+      importe_total NUMERIC(10,2) DEFAULT 0,
+      importe_empresa NUMERIC(10,2) DEFAULT 0,
+      importe_conductor NUMERIC(10,2) DEFAULT 0,
+      conductor_pagado BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS contab_config_fiscal (
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      modo_facturacion TEXT DEFAULT 'yo_emito',
+      igic_general NUMERIC(5,2) DEFAULT 7,
+      igic_especial NUMERIC(5,2),
+      noshow_igic TEXT DEFAULT 'sujeto',
+      serie_facturacion TEXT DEFAULT 'TGC',
+      num_siguiente INTEGER DEFAULT 1,
+      email_gestoria TEXT
+    );
+    INSERT INTO contab_config_fiscal (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+  `);
+}
+initContabilidad().catch(function(e) { console.error('initContabilidad:', e.message); });
+
+// GET comisiones
+app.get('/admin/contabilidad/comisiones', requireAdmin, asyncHandler(async function(req, res) {
+  var { desde, hasta, estado } = req.query;
+  var conditions = ['1=1'];
+  var vals = [];
+  if (desde)  { vals.push(desde);  conditions.push('c.fecha_cobro >= $' + vals.length); }
+  if (hasta)  { vals.push(hasta);  conditions.push('c.fecha_cobro <= $' + vals.length); }
+  if (estado) { vals.push(estado); conditions.push('c.estado = $' + vals.length); }
+  var rows = await pool.query(
+    'SELECT c.*, co.nombre AS nombre_conductor FROM contab_comisiones c LEFT JOIN conductores co ON co.id = c.conductor_id WHERE ' + conditions.join(' AND ') + ' ORDER BY c.fecha_cobro DESC NULLS LAST, c.id DESC',
+    vals
+  );
+  res.json({ comisiones: rows.rows });
+}));
+
+// POST comisión nueva
+app.post('/admin/contabilidad/comisiones', requireAdmin, asyncHandler(async function(req, res) {
+  var { conductor_id, pnr, importe_comision, forma_cobro, fecha_cobro } = req.body;
+  if (!importe_comision || isNaN(parseFloat(importe_comision))) return res.json({ ok: false, error: 'Importe no válido.' });
+  await pool.query(
+    'INSERT INTO contab_comisiones (conductor_id, pnr, importe_comision, forma_cobro, fecha_cobro, estado) VALUES ($1,$2,$3,$4,$5,$6)',
+    [conductor_id || null, pnr || null, parseFloat(importe_comision), forma_cobro || 'transferencia', fecha_cobro || null, 'cobrada']
+  );
+  res.json({ ok: true });
+}));
+
+// POST marcar comisión como cobrada
+app.post('/admin/contabilidad/comisiones/:id/cobrada', requireAdmin, asyncHandler(async function(req, res) {
+  await pool.query('UPDATE contab_comisiones SET estado=$1 WHERE id=$2', ['cobrada', req.params.id]);
+  res.json({ ok: true });
+}));
+
+// GET depósitos retenidos
+app.get('/admin/contabilidad/depositos', requireAdmin, asyncHandler(async function(req, res) {
+  var { desde, hasta, tipo } = req.query;
+  var conditions = ['1=1'];
+  var vals = [];
+  if (desde) { vals.push(desde); conditions.push('fecha >= $' + vals.length); }
+  if (hasta) { vals.push(hasta); conditions.push('fecha <= $' + vals.length); }
+  if (tipo)  { vals.push(tipo);  conditions.push('tipo = $' + vals.length); }
+  var rows = await pool.query(
+    'SELECT * FROM contab_depositos_retenidos WHERE ' + conditions.join(' AND ') + ' ORDER BY fecha DESC NULLS LAST, id DESC',
+    vals
+  );
+  res.json({ depositos: rows.rows });
+}));
+
+// GET gastos
+app.get('/admin/contabilidad/gastos', requireAdmin, asyncHandler(async function(req, res) {
+  var { desde, hasta, categoria } = req.query;
+  var conditions = ['1=1'];
+  var vals = [];
+  if (desde)     { vals.push(desde);     conditions.push('fecha >= $' + vals.length); }
+  if (hasta)     { vals.push(hasta);     conditions.push('fecha <= $' + vals.length); }
+  if (categoria) { vals.push(categoria); conditions.push('categoria = $' + vals.length); }
+  var rows = await pool.query(
+    'SELECT * FROM contab_gastos WHERE ' + conditions.join(' AND ') + ' ORDER BY fecha DESC NULLS LAST, id DESC',
+    vals
+  );
+  res.json({ gastos: rows.rows });
+}));
+
+// POST gasto nuevo
+app.post('/admin/contabilidad/gastos', requireAdmin, asyncHandler(async function(req, res) {
+  var { fecha, proveedor, concepto, categoria, importe, igic_soportado } = req.body;
+  if (!fecha || !importe || isNaN(parseFloat(importe))) return res.json({ ok: false, error: 'Fecha e importe son obligatorios.' });
+  await pool.query(
+    'INSERT INTO contab_gastos (fecha, proveedor, concepto, categoria, importe, igic_soportado) VALUES ($1,$2,$3,$4,$5,$6)',
+    [fecha, proveedor || null, concepto || null, categoria || 'otro', parseFloat(importe), parseFloat(igic_soportado || 0)]
+  );
+  res.json({ ok: true });
+}));
+
+// DELETE gasto
+app.delete('/admin/contabilidad/gastos/:id', requireAdmin, asyncHandler(async function(req, res) {
+  await pool.query('DELETE FROM contab_gastos WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// GET resumen trimestral
+app.get('/admin/contabilidad/resumen', requireAdmin, asyncHandler(async function(req, res) {
+  var anyo = parseInt(req.query.anyo) || new Date().getFullYear();
+  var trim  = parseInt(req.query.trimestre) || 1;
+  var mesInicio = (trim - 1) * 3 + 1;
+  var mesFin    = mesInicio + 2;
+  var desde = anyo + '-' + String(mesInicio).padStart(2,'0') + '-01';
+  var hasta = anyo + '-' + String(mesFin).padStart(2,'0') + '-' + (mesFin === 3 ? '31' : mesFin === 6 ? '30' : mesFin === 9 ? '30' : '31');
+
+  var cfgRow = await pool.query('SELECT * FROM contab_config_fiscal WHERE id=1');
+  var cfg = cfgRow.rows[0] || {};
+  var tipo_igic = parseFloat(cfg.igic_general || 7);
+
+  var rCom = await pool.query(
+    "SELECT COALESCE(SUM(importe_comision),0) AS total FROM contab_comisiones WHERE estado='cobrada' AND fecha_cobro BETWEEN $1 AND $2",
+    [desde, hasta]
+  );
+  var rDep = await pool.query(
+    'SELECT COALESCE(SUM(importe_empresa),0) AS total FROM contab_depositos_retenidos WHERE fecha BETWEEN $1 AND $2',
+    [desde, hasta]
+  );
+  var rGas = await pool.query(
+    'SELECT COALESCE(SUM(importe),0) AS total_gasto, COALESCE(SUM(igic_soportado),0) AS total_igic FROM contab_gastos WHERE fecha BETWEEN $1 AND $2',
+    [desde, hasta]
+  );
+
+  var total_comisiones      = parseFloat(rCom.rows[0].total);
+  var total_depositos_empresa = parseFloat(rDep.rows[0].total);
+  var total_ingresos        = total_comisiones + total_depositos_empresa;
+  var total_gastos          = parseFloat(rGas.rows[0].total_gasto);
+  var igic_soportado        = parseFloat(rGas.rows[0].total_igic);
+  var resultado_neto        = total_ingresos - total_gastos;
+  var igic_repercutido      = parseFloat((total_ingresos * tipo_igic / 100).toFixed(2));
+  var igic_a_liquidar       = parseFloat((igic_repercutido - igic_soportado).toFixed(2));
+
+  res.json({
+    anyo, trimestre: trim, desde, hasta,
+    total_comisiones, total_depositos_empresa, total_ingresos,
+    total_gastos, resultado_neto,
+    tipo_igic, igic_repercutido, igic_soportado, igic_a_liquidar
+  });
+}));
+
+// GET config fiscal
+app.get('/admin/contabilidad/config-fiscal', requireAdmin, asyncHandler(async function(req, res) {
+  var row = await pool.query('SELECT * FROM contab_config_fiscal WHERE id=1');
+  res.json(row.rows[0] || {});
+}));
+
+// POST config fiscal
+app.post('/admin/contabilidad/config-fiscal', requireAdmin, asyncHandler(async function(req, res) {
+  var { modo_facturacion, igic_general, igic_especial, noshow_igic, serie_facturacion, num_siguiente, email_gestoria } = req.body;
+  await pool.query(
+    'UPDATE contab_config_fiscal SET modo_facturacion=$1, igic_general=$2, igic_especial=$3, noshow_igic=$4, serie_facturacion=$5, num_siguiente=$6, email_gestoria=$7 WHERE id=1',
+    [modo_facturacion || 'yo_emito', parseFloat(igic_general || 7), igic_especial ? parseFloat(igic_especial) : null, noshow_igic || 'sujeto', serie_facturacion || 'TGC', parseInt(num_siguiente || 1), email_gestoria || null]
+  );
+  res.json({ ok: true });
+}));
+
+// EXPORTAR CSV comisiones
+app.get('/admin/contabilidad/exportar/comisiones', requireAdmin, asyncHandler(async function(req, res) {
+  var anyo = parseInt(req.query.anyo) || new Date().getFullYear();
+  var trim  = parseInt(req.query.trimestre) || 1;
+  var mesInicio = (trim - 1) * 3 + 1;
+  var mesFin    = mesInicio + 2;
+  var desde = anyo + '-' + String(mesInicio).padStart(2,'0') + '-01';
+  var hasta = anyo + '-' + String(mesFin).padStart(2,'0') + '-' + (mesFin === 3 ? '31' : mesFin === 6 ? '30' : mesFin === 9 ? '30' : '31');
+  var rows = await pool.query(
+    'SELECT c.fecha_cobro, c.pnr, co.nombre AS conductor, c.importe_comision, c.forma_cobro, c.estado FROM contab_comisiones c LEFT JOIN conductores co ON co.id = c.conductor_id WHERE c.fecha_cobro BETWEEN $1 AND $2 ORDER BY c.fecha_cobro',
+    [desde, hasta]
+  );
+  var csv = 'Fecha cobro;PNR;Conductor;Importe;Forma cobro;Estado\n';
+  rows.rows.forEach(function(r) {
+    csv += [r.fecha_cobro ? r.fecha_cobro.toISOString().substring(0,10) : '', r.pnr||'', r.conductor||'', (r.importe_comision||0).toString().replace('.',','), r.forma_cobro||'', r.estado||''].join(';') + '\n';
+  });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="comisiones-T' + trim + '-' + anyo + '.csv"');
+  res.send('\uFEFF' + csv);
+}));
+
+// EXPORTAR CSV depositos
+app.get('/admin/contabilidad/exportar/depositos', requireAdmin, asyncHandler(async function(req, res) {
+  var anyo = parseInt(req.query.anyo) || new Date().getFullYear();
+  var trim  = parseInt(req.query.trimestre) || 1;
+  var mesInicio = (trim - 1) * 3 + 1;
+  var mesFin    = mesInicio + 2;
+  var desde = anyo + '-' + String(mesInicio).padStart(2,'0') + '-01';
+  var hasta = anyo + '-' + String(mesFin).padStart(2,'0') + '-' + (mesFin === 3 ? '31' : mesFin === 6 ? '30' : mesFin === 9 ? '30' : '31');
+  var rows = await pool.query(
+    'SELECT fecha, pnr, tipo, importe_total, importe_empresa, importe_conductor, conductor_pagado FROM contab_depositos_retenidos WHERE fecha BETWEEN $1 AND $2 ORDER BY fecha',
+    [desde, hasta]
+  );
+  var csv = 'Fecha;PNR;Tipo;Total Stripe;Parte empresa;Parte conductor;Conductor pagado\n';
+  rows.rows.forEach(function(r) {
+    csv += [r.fecha ? r.fecha.toISOString().substring(0,10) : '', r.pnr||'', r.tipo||'', (r.importe_total||0).toString().replace('.',','), (r.importe_empresa||0).toString().replace('.',','), (r.importe_conductor||0).toString().replace('.',','), r.conductor_pagado ? 'Si':'No'].join(';') + '\n';
+  });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="depositos-T' + trim + '-' + anyo + '.csv"');
+  res.send('\uFEFF' + csv);
+}));
+
+// EXPORTAR CSV gastos
+app.get('/admin/contabilidad/exportar/gastos', requireAdmin, asyncHandler(async function(req, res) {
+  var anyo = parseInt(req.query.anyo) || new Date().getFullYear();
+  var trim  = parseInt(req.query.trimestre) || 1;
+  var mesInicio = (trim - 1) * 3 + 1;
+  var mesFin    = mesInicio + 2;
+  var desde = anyo + '-' + String(mesInicio).padStart(2,'0') + '-01';
+  var hasta = anyo + '-' + String(mesFin).padStart(2,'0') + '-' + (mesFin === 3 ? '31' : mesFin === 6 ? '30' : mesFin === 9 ? '30' : '31');
+  var rows = await pool.query(
+    'SELECT fecha, proveedor, concepto, categoria, importe, igic_soportado FROM contab_gastos WHERE fecha BETWEEN $1 AND $2 ORDER BY fecha',
+    [desde, hasta]
+  );
+  var csv = 'Fecha;Proveedor;Concepto;Categoria;Importe;IGIC soportado\n';
+  rows.rows.forEach(function(r) {
+    csv += [r.fecha ? r.fecha.toISOString().substring(0,10) : '', r.proveedor||'', r.concepto||'', r.categoria||'', (r.importe||0).toString().replace('.',','), (r.igic_soportado||0).toString().replace('.',',')].join(';') + '\n';
+  });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="gastos-T' + trim + '-' + anyo + '.csv"');
+  res.send('\uFEFF' + csv);
+}));
+
+// ─── Fin CONTABILIDAD ──────────────────────────────────────────────────────────
+
 setInterval(cancelarReservasSinPago, 60 * 60 * 1000);
 
 // ─── Arranque ─────────────────────────────────────────────────────────────────
