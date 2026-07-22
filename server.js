@@ -4038,8 +4038,11 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   }
 
   // Actualizar estado y guardar token
+  // Si el depósito fue pagado, marcarlo como devolución pendiente (se procesará manualmente en Stripe)
   await pool.query(
-    `UPDATE reservas SET estado = 'completada', completada_en = NOW(), token_valoracion = $1 WHERE id = $2`,
+    `UPDATE reservas SET estado = 'completada', completada_en = NOW(), token_valoracion = $1,
+     deposito_devolucion_pendiente = CASE WHEN deposito_pagado = TRUE AND deposito_retenido_noshow = FALSE THEN TRUE ELSE deposito_devolucion_pendiente END
+     WHERE id = $2`,
     [token, r.id]
   );
 
