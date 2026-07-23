@@ -9123,27 +9123,32 @@ initContabilidad().catch(function(e) { console.error('initContabilidad:', e.mess
 // GET comisiones — basado en facturas existentes
 app.get('/admin/contabilidad/comisiones', requireAdmin, asyncHandler(async function(req, res) {
   var { desde, hasta, estado } = req.query;
-  var conditions = ['1=1'];
+  var conditions = ["r.estado != 'cancelada'"];
   var vals = [];
   if (desde)  { vals.push(desde);  conditions.push('f.generada_en::date >= $' + vals.length); }
   if (hasta)  { vals.push(hasta);  conditions.push('f.generada_en::date <= $' + vals.length); }
   if (estado === 'cobrada')   { conditions.push('f.comision_cobrada = TRUE'); }
   if (estado === 'pendiente') { conditions.push('f.comision_cobrada = FALSE'); }
+  var cfgRow = await pool.query('SELECT comision_por_defecto FROM contab_config_fiscal WHERE id=1');
+  var comisionDefecto = parseFloat((cfgRow.rows[0] && cfgRow.rows[0].comision_por_defecto) || 0);
   var rows = await pool.query(
-    `SELECT f.id, f.numero_factura AS pnr, f.importe_total AS importe_comision,
-            f.generada_en::date AS fecha_cobro, f.comision_cobrada,
-            f.fecha_cobro_comision, f.forma_cobro_comision AS forma_cobro,
-            r.numero_reserva, r.nombre_cliente,
+    `SELECT f.id, f.numero_factura, f.importe_total AS importe_factura,
+            COALESCE(f.comision_importe, $` + (vals.length + 1) + `) AS comision_importe,
+            f.generada_en::date AS fecha_factura,
+            f.comision_cobrada, f.fecha_cobro_comision,
+            f.forma_cobro_comision AS forma_cobro,
+            r.numero_reserva, r.nombre_cliente, r.origen, r.destino, r.fecha AS fecha_viaje,
+            r.conductor_id,
             CASE WHEN f.comision_cobrada THEN 'cobrada' ELSE 'pendiente' END AS estado,
-            co.nombre AS nombre_conductor
+            co.nombre AS nombre_conductor, co.email AS email_conductor, co.telefono AS telefono_conductor
      FROM facturas f
      JOIN reservas r ON r.id = f.reserva_id
      LEFT JOIN conductores co ON co.id = r.conductor_id
-     WHERE r.estado != 'cancelada' AND ` + conditions.join(' AND ') + `
+     WHERE ` + conditions.join(' AND ') + `
      ORDER BY f.generada_en DESC`,
-    vals
+    [...vals, comisionDefecto]
   );
-  res.json({ comisiones: rows.rows });
+  res.json({ comisiones: rows.rows, comision_defecto: comisionDefecto });
 }));
 
 // POST comisión nueva — ya no se usa (las comisiones vienen de facturas)
