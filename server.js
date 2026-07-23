@@ -9116,6 +9116,11 @@ async function initContabilidad() {
     ALTER TABLE facturas ADD COLUMN IF NOT EXISTS comision_cobrada BOOLEAN DEFAULT FALSE;
     ALTER TABLE facturas ADD COLUMN IF NOT EXISTS fecha_cobro_comision DATE;
     ALTER TABLE facturas ADD COLUMN IF NOT EXISTS forma_cobro_comision TEXT DEFAULT 'transferencia';
+    ALTER TABLE facturas ADD COLUMN IF NOT EXISTS comision_importe NUMERIC(10,2);
+  `);
+  // Columnas en contab_config_fiscal
+  await pool.query(`
+    ALTER TABLE contab_config_fiscal ADD COLUMN IF NOT EXISTS comision_por_defecto NUMERIC(10,2) DEFAULT 0;
   `);
 }
 initContabilidad().catch(function(e) { console.error('initContabilidad:', e.message); });
