@@ -9121,6 +9121,45 @@ async function initContabilidad() {
   // Columnas en contab_config_fiscal
   await pool.query(`
     ALTER TABLE contab_config_fiscal ADD COLUMN IF NOT EXISTS comision_por_defecto NUMERIC(10,2) DEFAULT 0;
+    ALTER TABLE contab_config_fiscal ADD COLUMN IF NOT EXISTS emails_gestoria TEXT;
+  `);
+  // Tabla de facturas de comision emitidas a conductores
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS contab_facturas_comision (
+      id SERIAL PRIMARY KEY,
+      numero_factura TEXT NOT NULL,
+      fecha DATE NOT NULL DEFAULT CURRENT_DATE,
+      factura_id INTEGER REFERENCES facturas(id) ON DELETE SET NULL,
+      conductor_id INTEGER REFERENCES conductores(id) ON DELETE SET NULL,
+      nombre_conductor TEXT,
+      email_conductor TEXT,
+      telefono_conductor TEXT,
+      reserva_pnr TEXT,
+      origen TEXT,
+      destino TEXT,
+      fecha_viaje DATE,
+      importe NUMERIC(10,2) NOT NULL DEFAULT 0,
+      pdf BYTEA,
+      enviada_email BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  // Migración histórica: insertar depósitos retenidos que ya existen en reservas
+  await pool.query(`
+    INSERT INTO contab_depositos_retenidos (reserva_id, pnr, tipo, fecha, importe_total, importe_empresa, importe_conductor, conductor_pagado)
+    SELECT r.id, r.numero_reserva,
+      CASE WHEN r.estado = 'no_show' THEN 'no_show' ELSE 'cancelacion' END,
+      COALESCE(r.fecha, CURRENT_DATE),
+      COALESCE(r.deposito_importe, 0),
+      CASE WHEN r.estado = 'no_show' THEN ROUND(COALESCE(r.deposito_importe,0)/2,2) ELSE COALESCE(r.deposito_importe,0) END,
+      CASE WHEN r.estado = 'no_show' THEN ROUND(COALESCE(r.deposito_importe,0)/2,2) ELSE 0 END,
+      CASE WHEN r.estado = 'no_show' THEN FALSE ELSE TRUE END
+    FROM reservas r
+    WHERE r.deposito_retenido_noshow = TRUE
+      AND r.deposito_pagado = TRUE
+      AND NOT EXISTS (
+        SELECT 1 FROM contab_depositos_retenidos d WHERE d.reserva_id = r.id
+      );
   `);
 }
 initContabilidad().catch(function(e) { console.error('initContabilidad:', e.message); });
@@ -9163,12 +9202,156 @@ app.post('/admin/contabilidad/comisiones', requireAdmin, asyncHandler(async func
 
 // POST marcar comisión como cobrada — actualiza la factura
 app.post('/admin/contabilidad/comisiones/:id/cobrada', requireAdmin, asyncHandler(async function(req, res) {
-  var { forma_cobro } = req.body;
+  var { forma_cobro, comision_importe } = req.body;
   await pool.query(
-    'UPDATE facturas SET comision_cobrada=TRUE, fecha_cobro_comision=CURRENT_DATE, forma_cobro_comision=$1 WHERE id=$2',
-    [forma_cobro || 'transferencia', req.params.id]
+    'UPDATE facturas SET comision_cobrada=TRUE, fecha_cobro_comision=CURRENT_DATE, forma_cobro_comision=$1, comision_importe=$2 WHERE id=$3',
+    [forma_cobro || 'transferencia', parseFloat(comision_importe) || null, req.params.id]
   );
   res.json({ ok: true });
+}));
+
+// POST actualizar importe de comision
+app.post('/admin/contabilidad/comisiones/:id/importe', requireAdmin, asyncHandler(async function(req, res) {
+  var { comision_importe } = req.body;
+  await pool.query('UPDATE facturas SET comision_importe=$1 WHERE id=$2', [parseFloat(comision_importe) || null, req.params.id]);
+  res.json({ ok: true });
+}));
+
+// POST generar y enviar factura de comision al conductor
+app.post('/admin/contabilidad/comisiones/:id/factura-conductor', requireAdmin, asyncHandler(async function(req, res) {
+  var fQ = await pool.query(
+    `SELECT f.*, r.numero_reserva, r.origen, r.destino, r.fecha AS fecha_viaje,
+            co.id AS conductor_id, co.nombre AS nombre_conductor,
+            co.email AS email_conductor, co.telefono AS telefono_conductor
+     FROM facturas f
+     JOIN reservas r ON r.id = f.reserva_id
+     LEFT JOIN conductores co ON co.id = r.conductor_id
+     WHERE f.id = $1`, [req.params.id]
+  );
+  if (!fQ.rows.length) return res.status(404).json({ error: 'Factura no encontrada.' });
+  var f = fQ.rows[0];
+  // Comprobar si ya existe factura de comision para esta factura
+  var existeQ = await pool.query('SELECT id, numero_factura, pdf FROM contab_facturas_comision WHERE factura_id=$1 LIMIT 1', [f.id]);
+  if (existeQ.rows.length && existeQ.rows[0].pdf) {
+    // Ya existe — reenviar la misma
+    var fc = existeQ.rows[0];
+    if (f.email_conductor) {
+      try {
+        await enviarEmailConAdjunto({
+          to: f.email_conductor,
+          subject: 'Factura comision ' + fc.numero_factura + ' — Reserva ' + f.numero_reserva,
+          html: plantillaEmail('<p>Estimado/a <strong>' + (f.nombre_conductor||'conductor') + '</strong>,</p><p>Adjuntamos de nuevo la factura de comision <strong>' + fc.numero_factura + '</strong> por la intermediacion del traslado <strong>' + (f.numero_reserva||'—') + '</strong>.</p><p>Gracias por su colaboracion.<br><strong>El equipo de Traslados GC</strong></p>'),
+          adjunto: { filename: 'factura-comision-' + fc.numero_factura + '.pdf', content: fc.pdf }
+        });
+      } catch(e) { console.warn('Email reenvio factura conductor:', e.message); }
+    }
+    return res.json({ ok: true, numero_factura: fc.numero_factura, importe: f.comision_importe, reenviada: true });
+  }
+  var cfgQ = await pool.query('SELECT * FROM configuracion_facturacion WHERE id=1');
+  var cfg = cfgQ.rows[0] || {};
+  var cfgFQ = await pool.query('SELECT * FROM contab_config_fiscal WHERE id=1');
+  var cfgF = cfgFQ.rows[0] || {};
+  var comision = parseFloat(f.comision_importe || cfgF.comision_por_defecto || 0);
+  if (comision <= 0) return res.json({ ok: false, error: 'La comision es 0. Configura el importe en Configuracion fiscal.' });
+  var numSig = parseInt(cfgF.num_siguiente || 1);
+  var serie = (cfgF.serie_facturacion || 'TGC') + '-COM';
+  var numFactura = serie + '-' + new Date().getFullYear() + '-' + String(numSig).padStart(4,'0');
+  await pool.query('UPDATE contab_config_fiscal SET num_siguiente = num_siguiente + 1 WHERE id=1');
+  var fechaViaje = f.fecha_viaje ? new Date(f.fecha_viaje).toLocaleDateString('es-ES', {day:'numeric',month:'long',year:'numeric'}) : '—';
+  var fechaHoy = new Date().toLocaleDateString('es-ES', {day:'numeric',month:'long',year:'numeric'});
+  var PDFDocument = require('pdfkit');
+  var pdfBuffer = await new Promise(function(resolve, reject) {
+    var doc = new PDFDocument({ size: 'A4', margin: 50 });
+    var chunks = []; doc.on('data', function(c){chunks.push(c);}); doc.on('end', function(){resolve(Buffer.concat(chunks));}); doc.on('error', reject);
+    var W = doc.page.width - 100; var y = 50;
+    var lin = function(t,b,s,c){if(!t)return;s=s||11;c=c||'#1C1815';doc.fontSize(s).font(b?'Helvetica-Bold':'Helvetica').fillColor(c).text(t,50,y,{width:W});y+=s+5;};
+    var ld = function(l,v){doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815').text(l+': ',50,y,{continued:true,width:W});doc.font('Helvetica').fillColor('#333333').text(v||'—',{width:W});y=doc.y+4;};
+    var sep = function(){y+=6;doc.moveTo(50,y).lineTo(50+W,y).strokeColor('#AAAAAA').lineWidth(0.5).stroke();y+=10;};
+    doc.fontSize(18).font('Helvetica-Bold').fillColor('#1C1815').text(cfg.razon_social||'Traslados GC',50,y,{width:W});y+=24;
+    if(cfg.nif) lin('NIF: '+cfg.nif,false,10,'#555555');
+    if(cfg.direccion) lin(cfg.direccion,false,10,'#555555');
+    if(cfg.codigo_postal||cfg.ciudad) lin([cfg.codigo_postal,cfg.ciudad].filter(Boolean).join(' '),false,10,'#555555');
+    if(cfg.email) lin(cfg.email,false,10,'#555555');
+    if(cfg.telefono) lin(cfg.telefono,false,10,'#555555');
+    sep();
+    doc.fontSize(20).font('Helvetica-Bold').fillColor('#C1502E').text('FACTURA DE COMISION',50,y,{align:'center',width:W});y+=30;
+    sep();
+    ld('N Factura',numFactura); ld('Fecha',fechaHoy); sep();
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#555555').text('DESTINATARIO',50,y,{width:W});y+=18;
+    ld('Nombre',f.nombre_conductor||'—'); sep();
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#555555').text('CONCEPTO',50,y,{width:W});y+=18;
+    ld('Descripcion','Comision por intermediacion de traslado');
+    ld('Referencia reserva',f.numero_reserva||'—');
+    ld('Ruta',(f.origen||'—')+' a '+(f.destino||'—'));
+    ld('Fecha del servicio',fechaViaje);
+    sep();
+    doc.fontSize(14).font('Helvetica-Bold').fillColor('#1C1815').text('IMPORTE: ',50,y,{continued:true,width:W});
+    doc.fillColor('#C1502E').text(comision.toFixed(2)+' EUR');y+=25;
+    sep();
+    lin('Gracias por trabajar con nosotros.',false,10,'#555555');
+    doc.end();
+  });
+  // Guardar en BD
+  await pool.query(
+    `INSERT INTO contab_facturas_comision (numero_factura, factura_id, conductor_id, nombre_conductor, email_conductor, telefono_conductor, reserva_pnr, origen, destino, fecha_viaje, importe, pdf, enviada_email)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,FALSE)`,
+    [numFactura, f.id, f.conductor_id||null, f.nombre_conductor||null, f.email_conductor||null, f.telefono_conductor||null, f.numero_reserva||null, f.origen||null, f.destino||null, f.fecha_viaje||null, comision, pdfBuffer]
+  );
+  // Email al conductor
+  if (f.email_conductor) {
+    try {
+      await enviarEmailConAdjunto({
+        to: f.email_conductor,
+        subject: 'Factura comision ' + numFactura + ' — Reserva ' + f.numero_reserva,
+        html: plantillaEmail('<p>Estimado/a <strong>'+(f.nombre_conductor||'conductor')+'</strong>,</p><p>Adjuntamos la factura de comision <strong>'+numFactura+'</strong> por la intermediacion del traslado <strong>'+(f.numero_reserva||'—')+'</strong>.</p><p>Ruta: '+(f.origen||'—')+' a '+(f.destino||'—')+'<br>Fecha: '+fechaViaje+'</p><p>Importe: <strong>'+comision.toFixed(2)+' EUR</strong></p><p>Gracias por su colaboracion.<br><strong>El equipo de Traslados GC</strong></p>'),
+        adjunto: { filename: 'factura-comision-'+numFactura+'.pdf', content: pdfBuffer }
+      });
+      await pool.query('UPDATE contab_facturas_comision SET enviada_email=TRUE WHERE numero_factura=$1', [numFactura]);
+    } catch(e) { console.warn('Email factura conductor:', e.message); }
+  }
+  // WhatsApp al conductor
+  if (f.telefono_conductor) {
+    try {
+      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1,$2)',
+        [f.telefono_conductor, 'Hola '+(f.nombre_conductor||'')+', te hemos enviado por email la factura de comision '+numFactura+' por el traslado '+(f.numero_reserva||'—')+' ('+(f.origen||'—')+' a '+(f.destino||'—')+') por importe de '+comision.toFixed(2)+' EUR. Gracias por tu colaboracion. El equipo de Traslados GC']);
+    } catch(e) { console.warn('WA factura conductor:', e.message); }
+  }
+  res.json({ ok: true, numero_factura: numFactura, importe: comision });
+}));
+
+// GET listado facturas de comision
+app.get('/admin/contabilidad/facturas-comision', requireAdmin, asyncHandler(async function(req, res) {
+  var rows = await pool.query(
+    'SELECT id, numero_factura, fecha, nombre_conductor, reserva_pnr, origen, destino, importe, enviada_email, created_at FROM contab_facturas_comision ORDER BY created_at DESC'
+  );
+  res.json({ facturas: rows.rows });
+}));
+
+// POST enviar facturas de comision seleccionadas a gestoria
+app.post('/admin/contabilidad/facturas-comision/enviar-gestoria', requireAdmin, asyncHandler(async function(req, res) {
+  var { ids } = req.body;
+  if (!ids || !ids.length) return res.json({ ok: false, error: 'No hay facturas seleccionadas.' });
+  var cfgFQ = await pool.query('SELECT emails_gestoria FROM contab_config_fiscal WHERE id=1');
+  var cfgF = cfgFQ.rows[0] || {};
+  var emailsGestoria = (cfgF.emails_gestoria || '').split(',').map(function(e){return e.trim();}).filter(Boolean);
+  if (!emailsGestoria.length) return res.json({ ok: false, error: 'No hay emails de gestoria configurados. Añadelos en Configuracion fiscal.' });
+  var rows = await pool.query('SELECT * FROM contab_facturas_comision WHERE id = ANY($1)', [ids]);
+  if (!rows.rows.length) return res.json({ ok: false, error: 'No se encontraron las facturas.' });
+  var adjuntos = rows.rows.map(function(fc) {
+    return { filename: 'factura-comision-' + fc.numero_factura + '.pdf', content: fc.pdf };
+  });
+  for (var em of emailsGestoria) {
+    try {
+      await enviarEmailConAdjunto({
+        to: em,
+        subject: 'Facturas de comision — Traslados GC (' + rows.rows.length + ' facturas)',
+        html: plantillaEmail('<p>Adjuntamos las facturas de comision seleccionadas:</p><ul>' + rows.rows.map(function(fc){return '<li>'+fc.numero_factura+' — '+fc.nombre_conductor+' — '+parseFloat(fc.importe).toFixed(2)+' EUR</li>';}).join('') + '</ul>'),
+        adjunto: adjuntos[0],
+        adjuntos: adjuntos
+      });
+    } catch(e) { console.warn('Email gestoria:', e.message); }
+  }
+  res.json({ ok: true, enviadas: rows.rows.length, destinatarios: emailsGestoria.length });
 }));
 
 // GET depósitos retenidos
@@ -9272,10 +9455,10 @@ app.get('/admin/contabilidad/config-fiscal', requireAdmin, asyncHandler(async fu
 
 // POST config fiscal
 app.post('/admin/contabilidad/config-fiscal', requireAdmin, asyncHandler(async function(req, res) {
-  var { comision_por_defecto, modo_facturacion, igic_general, igic_especial, noshow_igic, serie_facturacion, num_siguiente, email_gestoria } = req.body;
+  var { comision_por_defecto, modo_facturacion, igic_general, igic_especial, noshow_igic, serie_facturacion, num_siguiente, emails_gestoria } = req.body;
   await pool.query(
-    'UPDATE contab_config_fiscal SET comision_por_defecto=$1, modo_facturacion=$2, igic_general=$3, igic_especial=$4, noshow_igic=$5, serie_facturacion=$6, num_siguiente=$7, email_gestoria=$8 WHERE id=1',
-    [parseFloat(comision_por_defecto || 0), modo_facturacion || 'yo_emito', parseFloat(igic_general || 7), igic_especial ? parseFloat(igic_especial) : null, noshow_igic || 'sujeto', serie_facturacion || 'TGC', parseInt(num_siguiente || 1), email_gestoria || null]
+    'UPDATE contab_config_fiscal SET comision_por_defecto=$1, modo_facturacion=$2, igic_general=$3, igic_especial=$4, noshow_igic=$5, serie_facturacion=$6, num_siguiente=$7, emails_gestoria=$8 WHERE id=1',
+    [parseFloat(comision_por_defecto || 0), modo_facturacion || 'yo_emito', parseFloat(igic_general || 7), igic_especial ? parseFloat(igic_especial) : null, noshow_igic || 'sujeto', serie_facturacion || 'TGC', parseInt(num_siguiente || 1), emails_gestoria || null]
   );
   res.json({ ok: true });
 }));
