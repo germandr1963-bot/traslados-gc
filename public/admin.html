@@ -1504,6 +1504,11 @@ table.tabla-precios input {
               </select>
               <p style="font-size:11px;color:var(--texto-muted);margin:4px 0 0;">Confirmar con gestor&#237;a.</p>
             </div>
+            <div style="grid-column:1/-1;">
+              <label class="etiqueta">Comisi&#243;n por defecto por viaje (&#8364;)</label>
+              <input type="number" id="fiscal-comision-defecto" class="campo" step="0.01" min="0" placeholder="Ej: 5.00" style="max-width:160px;">
+              <p style="font-size:11px;color:var(--texto-muted);margin:4px 0 0;">Importe que cobras al conductor por cada viaje. Se precarga en todas las comisiones autom&#225;ticamente.</p>
+            </div>
             <div>
               <label class="etiqueta">Tipo IGIC general (%)</label>
               <input type="number" id="fiscal-igic-general" class="campo" value="7" step="0.1" min="0" max="100">
@@ -6984,6 +6989,7 @@ function cargarConfigFiscal() {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (d.modo_facturacion)     document.getElementById('fiscal-modo-facturacion').value = d.modo_facturacion;
+      if (d.comision_por_defecto != null) document.getElementById('fiscal-comision-defecto').value = d.comision_por_defecto;
       if (d.igic_general != null) document.getElementById('fiscal-igic-general').value = d.igic_general;
       if (d.igic_especial)        document.getElementById('fiscal-igic-especial').value = d.igic_especial;
       if (d.noshow_igic)          document.getElementById('fiscal-noshow-igic').value = d.noshow_igic;
@@ -6997,6 +7003,7 @@ function cargarConfigFiscal() {
 function guardarConfigFiscal() {
   var aviso = document.getElementById('aviso-fiscal');
   var payload = {
+    comision_por_defecto: parseFloat(document.getElementById('fiscal-comision-defecto').value || 0),
     modo_facturacion:  document.getElementById('fiscal-modo-facturacion').value,
     igic_general:      parseFloat(document.getElementById('fiscal-igic-general').value || 7),
     igic_especial:     document.getElementById('fiscal-igic-especial').value || null,
