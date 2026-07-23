@@ -1417,11 +1417,11 @@ table.tabla-precios input {
             <div><label class="etiqueta">Desde</label><input type="date" id="dep-desde" class="campo" style="width:150px;"></div>
             <div><label class="etiqueta">Hasta</label><input type="date" id="dep-hasta" class="campo" style="width:150px;"></div>
             <div>
-              <label class="etiqueta">Tipo</label>
+              <label class="etiqueta">Dep&#243;sito</label>
               <select id="dep-tipo" class="campo" style="width:230px;">
                 <option value="">Todos</option>
-                <option value="no_show">No-show (50% tuyo)</option>
-                <option value="cancelacion">Cancelaci&#243;n fuera de plazo (100%)</option>
+                <option value="retenido">&#128179; Retenido</option>
+                <option value="devolucion_pendiente">&#9888; Devoluci&#243;n pendiente</option>
               </select>
             </div>
             <button class="boton-primario" style="height:38px;font-size:0.85rem;" onclick="cargarDepositos()">Filtrar</button>
@@ -6863,25 +6863,28 @@ function cargarDepositos() {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       var rows = d.depositos || [];
-      var totalTuyo = rows.reduce(function(a,r) { return a + parseFloat(r.importe_empresa||0); }, 0);
-      var totalCond = rows.reduce(function(a,r) { return a + parseFloat(r.importe_conductor||0); }, 0);
+      var total = rows.reduce(function(a,r) { return a + parseFloat(r.importe_total||0); }, 0);
       document.getElementById('resumen-depositos').innerHTML =
         kpiBox('Total casos', rows.length, '') +
-        kpiBox('Tu parte total', euros(totalTuyo), 'kpi-verde') +
-        kpiBox('Parte conductores', euros(totalCond), 'kpi-azul');
+        kpiBox('Total retenido', euros(total), 'kpi-verde');
       if (rows.length === 0) {
         document.getElementById('lista-depositos').innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Sin resultados.</p>';
         return;
       }
-      var html = '<table class="tabla-admin"><thead><tr><th>Fecha</th><th>PNR</th><th>Motivo</th><th>Total Stripe</th><th>Tu parte</th><th>Parte conductor</th><th>Pago conductor</th></tr></thead><tbody>';
+      var estadoBadges = {
+        'completada':'&#128203; Completada','no_show':'&#128683; No-show',
+        'cancelada':'&#10060; Cancelada','confirmada':'&#9989; Confirmada','pendiente':'&#9203; Pendiente'
+      };
+      var depositoBadges = {
+        'retenido':'<span style="background:#fff3e0;color:#e65100;font-size:11px;padding:2px 8px;border-radius:10px;">&#128179; Retenido</span>',
+        'no_show':'<span style="background:#fce4ec;color:#c62828;font-size:11px;padding:2px 8px;border-radius:10px;">&#128274; No-show</span>',
+        'devolucion_pendiente':'<span style="background:#fff8e1;color:#f57c00;font-size:11px;padding:2px 8px;border-radius:10px;">&#9888; Devoluci&#243;n pendiente</span>'
+      };
+      var html = '<table class="tabla-admin"><thead><tr><th>Fecha</th><th>PNR</th><th>Estado reserva</th><th>Dep&#243;sito</th><th>Total Stripe</th></tr></thead><tbody>';
       rows.forEach(function(r) {
-        var motivo = r.tipo === 'no_show'
-          ? '<span style="background:#fff3e0;color:#e65100;font-size:11px;padding:2px 8px;border-radius:10px;">No-show</span>'
-          : '<span style="background:#fce4ec;color:#c62828;font-size:11px;padding:2px 8px;border-radius:10px;">Cancelaci\u00f3n</span>';
-        var pagoCond = r.tipo === 'no_show'
-          ? '<span style="font-size:11px;color:' + (r.conductor_pagado ? '#2e7d32':'#e65100') + ';">' + (r.conductor_pagado ? '\u2714 Pagado':'\u23f3 Pendiente') + '</span>'
-          : '<span style="font-size:11px;color:var(--texto-muted);">N/A</span>';
-        html += '<tr><td>' + fechaCorta(r.fecha) + '</td><td><strong>' + (r.pnr||'-') + '</strong></td><td>' + motivo + '</td><td>' + euros(r.importe_total) + '</td><td><strong>' + euros(r.importe_empresa) + '</strong></td><td>' + euros(r.importe_conductor) + '</td><td>' + pagoCond + '</td></tr>';
+        var est = estadoBadges[r.estado_reserva] || r.estado_reserva || '-';
+        var dep = depositoBadges[r.estado_deposito] || r.estado_deposito || '-';
+        html += '<tr><td>' + fechaCorta(r.fecha) + '</td><td><strong>' + (r.pnr||'-') + '</strong></td><td>' + est + '</td><td>' + dep + '</td><td><strong>' + euros(r.importe_total) + '</strong></td></tr>';
       });
       html += '</tbody></table>';
       document.getElementById('lista-depositos').innerHTML = html;
