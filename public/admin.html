@@ -1384,6 +1384,7 @@ table.tabla-precios input {
         <button class="tab-contab" data-tab="depositos" onclick="switchTabContab('depositos')">&#128274; Dep&#243;sitos retenidos</button>
         <button class="tab-contab" data-tab="gastos" onclick="switchTabContab('gastos')">&#9999; Gastos</button>
         <button class="tab-contab" data-tab="gestoria" onclick="switchTabContab('gestoria')">&#128202; Resumen / Gestor&#237;a</button>
+        <button class="tab-contab" data-tab="facturas-cond" onclick="switchTabContab('facturas-cond')">&#128203; Facturas a conductores</button>
         <button class="tab-contab" data-tab="fiscal" onclick="switchTabContab('fiscal')">&#9881; Configuraci&#243;n fiscal</button>
       </div>
 
@@ -1492,6 +1493,21 @@ table.tabla-precios input {
       </div>
 
       <!-- TAB FISCAL -->
+      <!-- TAB FACTURAS CONDUCTORES -->
+      <div id="contab-tab-facturas-cond" class="oculto">
+        <div class="tarjeta" style="margin-bottom:20px;">
+          <h2 style="font-size:1rem;margin:0 0 4px 0;">Facturas de comisi&#243;n emitidas a conductores</h2>
+          <p style="font-size:13px;color:var(--texto-muted);margin:0 0 16px;">Selecciona las que quieras enviar a la gestor&#237;a.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+            <button class="boton-costa" style="font-size:0.85rem;" onclick="cargarFacturasConductor()">Actualizar</button>
+            <button class="boton-primario" style="font-size:0.85rem;" onclick="enviarSeleccionadasGestoria()">Enviar seleccionadas a gestor&#237;a</button>
+            <button class="boton-secundario" style="font-size:0.85rem;margin-top:0;" onclick="seleccionarTodasFacturas()">Seleccionar todas</button>
+          </div>
+          <div id="aviso-facturas-cond" style="display:none;margin-bottom:12px;font-size:0.85rem;"></div>
+          <div id="lista-facturas-conductor"><p style="color:var(--texto-muted);font-size:13px;">Cargando...</p></div>
+        </div>
+      </div>
+
       <div id="contab-tab-fiscal" class="oculto">
         <div class="tarjeta" style="max-width:620px;">
           <h2 style="font-size:1rem;margin:0 0 1rem 0;">Par&#225;metros fiscales</h2>
@@ -1534,8 +1550,13 @@ table.tabla-precios input {
               <input type="number" id="fiscal-num-siguiente" class="campo" value="1" min="1" style="max-width:140px;">
             </div>
             <div style="grid-column:1/-1;">
-              <label class="etiqueta">Email de la gestor&#237;a</label>
-              <input type="email" id="fiscal-email-gestoria" class="campo" placeholder="gestoria@ejemplo.es">
+              <label class="etiqueta">Emails de la gestor&#237;a</label>
+              <div id="lista-emails-gestoria" style="margin-bottom:8px;display:flex;flex-direction:column;gap:6px;"></div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input type="email" id="nuevo-email-gestoria" class="campo" placeholder="gestoria@ejemplo.es" style="flex:1;">
+                <button class="boton-primario" style="height:36px;font-size:0.82rem;" onclick="agregarEmailGestoria()">+ A&#241;adir</button>
+              </div>
+              <p style="font-size:11px;color:var(--texto-muted);margin:4px 0 0;">Puedes a&#241;adir varios emails separados.</p>
             </div>
           </div>
           <button class="boton-primario" onclick="guardarConfigFiscal()">Guardar configuraci&#243;n</button>
@@ -6698,11 +6719,12 @@ function switchTabContab(tab) {
   document.querySelectorAll('.tab-contab').forEach(function(b) { b.classList.remove('activo'); });
   var btn = document.querySelector('.tab-contab[data-tab="' + tab + '"]');
   if (btn) btn.classList.add('activo');
-  ['comisiones','depositos','gastos','gestoria','fiscal'].forEach(function(t) {
+  ['comisiones','depositos','gastos','gestoria','facturas-cond','fiscal'].forEach(function(t) {
     var el = document.getElementById('contab-tab-' + t);
     if (el) el.classList.toggle('oculto', t !== tab);
   });
   if (tab === 'fiscal') cargarConfigFiscal();
+  if (tab === 'facturas-cond') cargarFacturasConductor();
 }
 
 function euros(v) { return parseFloat(v || 0).toFixed(2).replace('.', ',') + ' \u20ac'; }
@@ -6995,7 +7017,7 @@ function cargarConfigFiscal() {
       if (d.noshow_igic)          document.getElementById('fiscal-noshow-igic').value = d.noshow_igic;
       if (d.serie_facturacion)    document.getElementById('fiscal-serie').value = d.serie_facturacion;
       if (d.num_siguiente)        document.getElementById('fiscal-num-siguiente').value = d.num_siguiente;
-      if (d.email_gestoria)       document.getElementById('fiscal-email-gestoria').value = d.email_gestoria;
+      if (d.emails_gestoria) cargarEmailsGestoria(d.emails_gestoria);
     })
     .catch(function() {});
 }
@@ -7010,7 +7032,7 @@ function guardarConfigFiscal() {
     noshow_igic:       document.getElementById('fiscal-noshow-igic').value,
     serie_facturacion: document.getElementById('fiscal-serie').value.trim(),
     num_siguiente:     parseInt(document.getElementById('fiscal-num-siguiente').value || 1),
-    email_gestoria:    document.getElementById('fiscal-email-gestoria').value.trim()
+    emails_gestoria:   Array.from(document.querySelectorAll('#lista-emails-gestoria span')).map(function(s){return s.textContent.trim();}).join(',')
   };
   fetch('/admin/contabilidad/config-fiscal', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
     .then(function(r) { return r.json(); })
@@ -7034,6 +7056,121 @@ function guardarConfigFiscal() {
     tryInit();
   }
 })();
+
+
+// FACTURAS A CONDUCTORES
+function cargarFacturasConductor() {
+  fetch('/admin/contabilidad/facturas-comision')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var rows = d.facturas || [];
+      if (rows.length === 0) {
+        document.getElementById('lista-facturas-conductor').innerHTML =
+          '<p style="color:var(--texto-muted);font-size:13px;">No hay facturas de comision emitidas todavia.</p>';
+        return;
+      }
+      var html = '<table class="tabla-admin"><thead><tr>' +
+        '<th><input type="checkbox" id="chk-todas-fc" onchange="toggleTodasFacturas(this.checked)"></th>' +
+        '<th>N Factura</th><th>Fecha</th><th>Conductor</th><th>Reserva</th><th>Ruta</th><th>Importe</th><th>Estado</th>' +
+        '</tr></thead><tbody>';
+      rows.forEach(function(r) {
+        var estado = r.enviada_email
+          ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#e8f5e9;color:#2e7d32;">Enviada</span>'
+          : '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#fff3e0;color:#e65100;">Pendiente</span>';
+        html += '<tr>' +
+          '<td><input type="checkbox" class="chk-fc" value="' + r.id + '"></td>' +
+          '<td style="font-size:12px;"><strong>' + (r.numero_factura || '-') + '</strong></td>' +
+          '<td>' + fechaCorta(r.fecha) + '</td>' +
+          '<td>' + (r.nombre_conductor || '-') + '</td>' +
+          '<td>' + (r.reserva_pnr || '-') + '</td>' +
+          '<td style="font-size:12px;color:var(--texto-muted);">' + (r.origen || '-') + ' a ' + (r.destino || '-') + '</td>' +
+          '<td><strong>' + euros(r.importe) + '</strong></td>' +
+          '<td>' + estado + '</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('lista-facturas-conductor').innerHTML = html;
+    })
+    .catch(function() {
+      document.getElementById('lista-facturas-conductor').innerHTML =
+        '<p style="color:var(--rojo-error);font-size:13px;">Error al cargar.</p>';
+    });
+}
+
+function seleccionarTodasFacturas() {
+  var chk = document.getElementById('chk-todas-fc');
+  if (chk) { chk.checked = true; toggleTodasFacturas(true); }
+}
+
+function toggleTodasFacturas(val) {
+  document.querySelectorAll('.chk-fc').forEach(function(c) { c.checked = val; });
+}
+
+function enviarSeleccionadasGestoria() {
+  var ids = Array.from(document.querySelectorAll('.chk-fc:checked')).map(function(c) { return parseInt(c.value); });
+  if (!ids.length) { alert('Selecciona al menos una factura.'); return; }
+  var aviso = document.getElementById('aviso-facturas-cond');
+  aviso.style.display = 'block';
+  aviso.style.color = 'var(--texto-muted)';
+  aviso.textContent = 'Enviando...';
+  fetch('/admin/contabilidad/facturas-comision/enviar-gestoria', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids: ids })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    aviso.style.color = d.ok ? 'var(--verde-ok)' : 'var(--rojo-error)';
+    aviso.textContent = d.ok
+      ? d.enviadas + ' factura(s) enviada(s) a ' + d.destinatarios + ' destinatario(s).'
+      : (d.error || 'Error al enviar.');
+    if (d.ok) cargarFacturasConductor();
+  });
+}
+
+// EMAILS GESTORIA
+function cargarEmailsGestoria(emailsStr) {
+  var lista = document.getElementById('lista-emails-gestoria');
+  if (!lista) return;
+  var emails = (emailsStr || '').split(',').map(function(e) { return e.trim(); }).filter(Boolean);
+  lista.innerHTML = emails.map(function(em) {
+    return '<div style="display:flex;align-items:center;gap:8px;">' +
+      '<span style="flex:1;font-size:13px;padding:6px 10px;background:var(--gris-fondo);border-radius:6px;">' + em + '</span>' +
+      '<button style="background:none;border:none;color:var(--rojo-error);cursor:pointer;font-size:13px;" ' +
+        'onclick="eliminarEmailGestoria(\'' + em.replace(/'/g, "\\'") + '\')">x</button>' +
+      '</div>';
+  }).join('');
+}
+
+function agregarEmailGestoria() {
+  var inp = document.getElementById('nuevo-email-gestoria');
+  var em = (inp.value || '').trim();
+  if (!em || !em.includes('@')) { alert('Email no valido.'); return; }
+  var actual = Array.from(document.querySelectorAll('#lista-emails-gestoria span'))
+    .map(function(s) { return s.textContent.trim(); });
+  if (actual.includes(em)) { alert('Ya esta en la lista.'); return; }
+  actual.push(em);
+  _guardarEmailsGestoria(actual);
+  inp.value = '';
+}
+
+function eliminarEmailGestoria(em) {
+  var actual = Array.from(document.querySelectorAll('#lista-emails-gestoria span'))
+    .map(function(s) { return s.textContent.trim(); })
+    .filter(function(e) { return e !== em; });
+  _guardarEmailsGestoria(actual);
+}
+
+function _guardarEmailsGestoria(arr) {
+  var emailsStr = arr.join(',');
+  fetch('/admin/contabilidad/config-fiscal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ emails_gestoria: emailsStr })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) { if (d.ok) cargarEmailsGestoria(emailsStr); });
+}
 
 comprobarSesion();
 </script>
