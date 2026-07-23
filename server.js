@@ -9222,7 +9222,10 @@ app.get('/admin/contabilidad/resumen', requireAdmin, asyncHandler(async function
   var tipo_igic = parseFloat(cfg.igic_general || 7);
 
   var rCom = await pool.query(
-    "SELECT COALESCE(SUM(f.importe_total),0) AS total FROM facturas f JOIN reservas r ON r.id=f.reserva_id WHERE f.comision_cobrada=TRUE AND r.estado!='cancelada' AND f.fecha_cobro_comision BETWEEN $1 AND $2",
+    `SELECT COALESCE(SUM(COALESCE(f.comision_importe, cfg.comision_por_defecto, 0)),0) AS total
+     FROM facturas f JOIN reservas r ON r.id=f.reserva_id
+     CROSS JOIN (SELECT COALESCE(comision_por_defecto,0) AS comision_por_defecto FROM contab_config_fiscal WHERE id=1) cfg
+     WHERE f.comision_cobrada=TRUE AND r.estado!='cancelada' AND f.fecha_cobro_comision BETWEEN $1 AND $2`,
     [desde, hasta]
   );
   var rDep = await pool.query(
@@ -9276,20 +9279,20 @@ app.get('/admin/contabilidad/exportar/comisiones', requireAdmin, asyncHandler(as
   var desde = anyo + '-' + String(mesInicio).padStart(2,'0') + '-01';
   var hasta = anyo + '-' + String(mesFin).padStart(2,'0') + '-' + (mesFin === 3 ? '31' : mesFin === 6 ? '30' : mesFin === 9 ? '30' : '31');
   var rows = await pool.query(
-    `SELECT f.fecha_cobro_comision AS fecha_cobro, f.numero_factura AS numero_factura,
-            r.numero_reserva, co.nombre AS conductor, f.importe_total AS importe,
-            f.forma_cobro_comision AS forma_cobro,
-            CASE WHEN f.comision_cobrada THEN 'cobrada' ELSE 'pendiente' END AS estado
-     FROM facturas f
-     JOIN reservas r ON r.id=f.reserva_id
+    `SELECT f.fecha_cobro_comision AS fecha_cobro, f.numero_factura,
+            r.numero_reserva, co.nombre AS conductor,
+            COALESCE(f.comision_importe, cfg.comision_por_defecto, 0) AS comision,
+            f.importe_total AS importe_factura, f.forma_cobro_comision AS forma_cobro
+     FROM facturas f JOIN reservas r ON r.id=f.reserva_id
      LEFT JOIN conductores co ON co.id=r.conductor_id
-     WHERE r.estado!='cancelada' AND f.fecha_cobro_comision BETWEEN $1 AND $2
+     CROSS JOIN (SELECT COALESCE(comision_por_defecto,0) AS comision_por_defecto FROM contab_config_fiscal WHERE id=1) cfg
+     WHERE r.estado!='cancelada' AND f.comision_cobrada=TRUE AND f.fecha_cobro_comision BETWEEN $1 AND $2
      ORDER BY f.fecha_cobro_comision`,
     [desde, hasta]
   );
-  var csv = 'Fecha cobro;Factura;Reserva;Conductor;Importe;Forma cobro;Estado\n';
+  var csv = 'Fecha cobro;N Factura;N Reserva;Conductor;Mi comision;Total factura cliente;Forma cobro\n';
   rows.rows.forEach(function(r) {
-    csv += [r.fecha_cobro ? r.fecha_cobro.toISOString().substring(0,10) : '', r.numero_factura||'', r.numero_reserva||'', r.conductor||'', (r.importe||0).toString().replace('.',','), r.forma_cobro||'', r.estado||''].join(';') + '\n';
+    csv += [r.fecha_cobro ? r.fecha_cobro.toISOString().substring(0,10) : '', r.numero_factura||'', r.numero_reserva||'', r.conductor||'', (r.comision||0).toString().replace('.',','), (r.importe_factura||0).toString().replace('.',','), r.forma_cobro||''].join(';') + '\n';
   });
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="comisiones-T' + trim + '-' + anyo + '.csv"');
