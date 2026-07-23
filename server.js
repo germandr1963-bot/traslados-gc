@@ -4245,19 +4245,6 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
     [r.id]
   );
 
-  // Registrar en contabilidad — no-show: 50% empresa / 50% conductor
-  try {
-    const _cfgNs0 = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
-    const _imp = parseFloat((_cfgNs0.rows[0] && _cfgNs0.rows[0].importe_deposito) || 10);
-    const _mitad = parseFloat((_imp / 2).toFixed(2));
-    await pool.query(
-      `INSERT INTO contab_depositos_retenidos (reserva_id, pnr, tipo, fecha, importe_total, importe_empresa, importe_conductor, conductor_pagado)
-       VALUES ($1,$2,$3,CURRENT_DATE,$4,$5,$6,FALSE)
-       ON CONFLICT DO NOTHING`,
-      [r.id, r.numero_reserva, 'no_show', _imp, _mitad, _mitad]
-    );
-  } catch(e) { console.warn('contab deposito no-show (chofer):', e.message); }
-
   const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
   const _cfgNs1 = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
   const importe = ((_cfgNs1.rows[0] && _cfgNs1.rows[0].importe_deposito) || 10).toString();
@@ -7731,17 +7718,6 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
   } else if (r.deposito_pagado && fueraDePlazo) {
     // Cancelación fuera de plazo con depósito pagado → se retiene
     await pool.query('UPDATE reservas SET deposito_retenido_noshow = TRUE WHERE id = $1', [r.id]);
-    // Registrar en contabilidad — cancelación fuera de plazo: 100% empresa
-    try {
-      const _cfgNs3b = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
-      const _imp3 = parseFloat((_cfgNs3b.rows[0] && _cfgNs3b.rows[0].importe_deposito) || 10);
-      await pool.query(
-        `INSERT INTO contab_depositos_retenidos (reserva_id, pnr, tipo, fecha, importe_total, importe_empresa, importe_conductor, conductor_pagado)
-         VALUES ($1,$2,$3,CURRENT_DATE,$4,$5,$6,TRUE)
-         ON CONFLICT DO NOTHING`,
-        [r.id, r.numero_reserva, 'cancelacion', _imp3, _imp3, 0]
-      );
-    } catch(e) { console.warn('contab deposito cancelacion:', e.message); }
   }
 
   if (r.conductor_id) {
@@ -8307,19 +8283,6 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
   const r = reserva.rows[0];
 
   await pool.query('UPDATE reservas SET deposito_retenido_noshow = TRUE WHERE id = $1', [req.params.id]);
-
-  // Registrar en contabilidad — no-show admin: 50% empresa / 50% conductor
-  try {
-    const _cfgNs2c = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
-    const _imp2 = parseFloat((_cfgNs2c.rows[0] && _cfgNs2c.rows[0].importe_deposito) || 10);
-    const _mitad2 = parseFloat((_imp2 / 2).toFixed(2));
-    await pool.query(
-      `INSERT INTO contab_depositos_retenidos (reserva_id, pnr, tipo, fecha, importe_total, importe_empresa, importe_conductor, conductor_pagado)
-       VALUES ($1,$2,$3,CURRENT_DATE,$4,$5,$6,FALSE)
-       ON CONFLICT DO NOTHING`,
-      [r.id, r.numero_reserva, 'no_show', _imp2, _mitad2, _mitad2]
-    );
-  } catch(e) { console.warn('contab deposito no-show (admin):', e.message); }
 
   const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
   const _cfgNs2b = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
@@ -9092,18 +9055,6 @@ async function initContabilidad() {
       igic_soportado NUMERIC(10,2) DEFAULT 0,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
-    CREATE TABLE IF NOT EXISTS contab_depositos_retenidos (
-      id SERIAL PRIMARY KEY,
-      reserva_id INTEGER REFERENCES reservas(id) ON DELETE SET NULL,
-      pnr TEXT,
-      tipo TEXT NOT NULL,
-      fecha DATE,
-      importe_total NUMERIC(10,2) DEFAULT 0,
-      importe_empresa NUMERIC(10,2) DEFAULT 0,
-      importe_conductor NUMERIC(10,2) DEFAULT 0,
-      conductor_pagado BOOLEAN DEFAULT FALSE,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    );
     CREATE TABLE IF NOT EXISTS contab_config_fiscal (
       id INTEGER PRIMARY KEY DEFAULT 1,
       modo_facturacion TEXT DEFAULT 'yo_emito',
@@ -9148,31 +9099,6 @@ async function initContabilidad() {
       enviada_email BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
-  `);
-  // Migracion historica: insertar depositos retenidos que ya existen en reservas
-  await pool.query(`
-    INSERT INTO contab_depositos_retenidos (reserva_id, pnr, tipo, fecha, importe_total, importe_empresa, importe_conductor, conductor_pagado)
-    SELECT r.id, r.numero_reserva,
-      CASE
-        WHEN r.deposito_retenido_noshow = TRUE THEN 'no_show'
-        WHEN r.deposito_liberado = TRUE THEN 'devuelto'
-        WHEN r.deposito_devolucion_pendiente = TRUE THEN 'devolucion_pendiente'
-        WHEN r.deposito_pagado = TRUE THEN 'retenido'
-        ELSE 'pendiente'
-      END,
-      COALESCE(r.fecha, CURRENT_DATE),
-      COALESCE(cn.importe_deposito, 10),
-      COALESCE(cn.importe_deposito, 10),
-      0,
-      FALSE
-    FROM reservas r
-    LEFT JOIN configuracion_noshow cn ON cn.es_general = TRUE
-    WHERE r.deposito_pagado = TRUE
-      AND (r.deposito_liberado IS NOT TRUE)
-      AND (r.deposito_devolucion_pendiente IS NOT TRUE)
-      AND NOT EXISTS (
-        SELECT 1 FROM contab_depositos_retenidos d WHERE d.reserva_id = r.id
-      );
   `);
 }
 initContabilidad().catch(function(e) { console.error('initContabilidad:', e.message); });
@@ -9369,14 +9295,26 @@ app.post('/admin/contabilidad/facturas-comision/enviar-gestoria', requireAdmin, 
 
 // GET depósitos retenidos
 app.get('/admin/contabilidad/depositos', requireAdmin, asyncHandler(async function(req, res) {
-  var { desde, hasta, tipo } = req.query;
-  var conditions = ['1=1'];
+  var { desde, hasta, deposito } = req.query;
+  var conditions = ["r.deposito_pagado = TRUE AND r.deposito_liberado IS NOT TRUE"];
   var vals = [];
-  if (desde) { vals.push(desde); conditions.push('fecha >= $' + vals.length); }
-  if (hasta) { vals.push(hasta); conditions.push('fecha <= $' + vals.length); }
-  if (tipo)  { vals.push(tipo);  conditions.push('tipo = $' + vals.length); }
+  if (desde)   { vals.push(desde);   conditions.push('r.fecha::date >= $' + vals.length); }
+  if (hasta)   { vals.push(hasta);   conditions.push('r.fecha::date <= $' + vals.length); }
+  if (deposito === 'no_show')              { conditions.push('r.deposito_retenido_noshow = TRUE'); }
+  if (deposito === 'devolucion_pendiente') { conditions.push('r.deposito_devolucion_pendiente = TRUE'); }
+  if (deposito === 'retenido')             { conditions.push('r.deposito_retenido_noshow IS NOT TRUE AND r.deposito_devolucion_pendiente IS NOT TRUE'); }
   var rows = await pool.query(
-    'SELECT * FROM contab_depositos_retenidos WHERE ' + conditions.join(' AND ') + ' ORDER BY fecha DESC NULLS LAST, id DESC',
+    `SELECT r.numero_reserva AS pnr, r.fecha, r.estado AS estado_reserva,
+            CASE
+              WHEN r.deposito_retenido_noshow = TRUE THEN 'no_show'
+              WHEN r.deposito_devolucion_pendiente = TRUE THEN 'devolucion_pendiente'
+              ELSE 'retenido'
+            END AS estado_deposito,
+            COALESCE(cn.importe_deposito, 10) AS importe_total
+     FROM reservas r
+     LEFT JOIN configuracion_noshow cn ON cn.es_general = TRUE
+     WHERE ` + conditions.join(' AND ') + `
+     ORDER BY r.fecha DESC NULLS LAST`,
     vals
   );
   res.json({ depositos: rows.rows });
@@ -9435,7 +9373,12 @@ app.get('/admin/contabilidad/resumen', requireAdmin, asyncHandler(async function
     [desde, hasta]
   );
   var rDep = await pool.query(
-    'SELECT COALESCE(SUM(importe_empresa),0) AS total FROM contab_depositos_retenidos WHERE fecha BETWEEN $1 AND $2',
+    `SELECT COALESCE(SUM(cn.importe_deposito), 0) AS total
+     FROM reservas r
+     LEFT JOIN configuracion_noshow cn ON cn.es_general = TRUE
+     WHERE r.deposito_pagado = TRUE
+       AND (r.deposito_liberado IS NOT TRUE)
+       AND r.fecha::date BETWEEN $1 AND $2`,
     [desde, hasta]
   );
   var rGas = await pool.query(
@@ -9514,12 +9457,23 @@ app.get('/admin/contabilidad/exportar/depositos', requireAdmin, asyncHandler(asy
   var desde = anyo + '-' + String(mesInicio).padStart(2,'0') + '-01';
   var hasta = anyo + '-' + String(mesFin).padStart(2,'0') + '-' + (mesFin === 3 ? '31' : mesFin === 6 ? '30' : mesFin === 9 ? '30' : '31');
   var rows = await pool.query(
-    'SELECT fecha, pnr, tipo, importe_total, importe_empresa, importe_conductor, conductor_pagado FROM contab_depositos_retenidos WHERE fecha BETWEEN $1 AND $2 ORDER BY fecha',
+    `SELECT r.fecha, r.numero_reserva AS pnr, r.estado AS estado_reserva,
+            CASE
+              WHEN r.deposito_retenido_noshow = TRUE THEN 'No-show'
+              WHEN r.deposito_devolucion_pendiente = TRUE THEN 'Devolucion pendiente'
+              ELSE 'Retenido'
+            END AS estado_deposito,
+            COALESCE(cn.importe_deposito, 10) AS importe_total
+     FROM reservas r
+     LEFT JOIN configuracion_noshow cn ON cn.es_general = TRUE
+     WHERE r.deposito_pagado = TRUE AND (r.deposito_liberado IS NOT TRUE)
+       AND r.fecha::date BETWEEN $1 AND $2
+     ORDER BY r.fecha`,
     [desde, hasta]
   );
-  var csv = 'Fecha;PNR;Tipo;Total Stripe;Parte empresa;Parte conductor;Conductor pagado\n';
+  var csv = 'Fecha;PNR;Estado reserva;Deposito;Total Stripe\n';
   rows.rows.forEach(function(r) {
-    csv += [r.fecha ? r.fecha.toISOString().substring(0,10) : '', r.pnr||'', r.tipo||'', (r.importe_total||0).toString().replace('.',','), (r.importe_empresa||0).toString().replace('.',','), (r.importe_conductor||0).toString().replace('.',','), r.conductor_pagado ? 'Si':'No'].join(';') + '\n';
+    csv += [r.fecha ? r.fecha.toISOString().substring(0,10) : '', r.pnr||'', r.estado_reserva||'', r.estado_deposito||'', (r.importe_total||0).toString().replace('.',',')].join(';') + '\n';
   });
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="depositos-T' + trim + '-' + anyo + '.csv"');
