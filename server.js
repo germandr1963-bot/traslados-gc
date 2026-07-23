@@ -4245,6 +4245,18 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
     [r.id]
   );
 
+  // Registrar en contabilidad — no-show: 50% empresa / 50% conductor
+  try {
+    const _imp = parseFloat(r.deposito_importe || 10);
+    const _mitad = parseFloat((_imp / 2).toFixed(2));
+    await pool.query(
+      `INSERT INTO contab_depositos_retenidos (reserva_id, pnr, tipo, fecha, importe_total, importe_empresa, importe_conductor, conductor_pagado)
+       VALUES ($1,$2,$3,CURRENT_DATE,$4,$5,$6,FALSE)
+       ON CONFLICT DO NOTHING`,
+      [r.id, r.numero_reserva, 'no_show', _imp, _mitad, _mitad]
+    );
+  } catch(e) { console.warn('contab deposito no-show (chofer):', e.message); }
+
   const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
   const importe = r.deposito_importe || '10';
 
@@ -7717,6 +7729,16 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
   } else if (r.deposito_pagado && fueraDePlazo) {
     // Cancelación fuera de plazo con depósito pagado → se retiene
     await pool.query('UPDATE reservas SET deposito_retenido_noshow = TRUE WHERE id = $1', [r.id]);
+    // Registrar en contabilidad — cancelación fuera de plazo: 100% empresa
+    try {
+      const _imp3 = parseFloat(r.deposito_importe || 10);
+      await pool.query(
+        `INSERT INTO contab_depositos_retenidos (reserva_id, pnr, tipo, fecha, importe_total, importe_empresa, importe_conductor, conductor_pagado)
+         VALUES ($1,$2,$3,CURRENT_DATE,$4,$5,$6,TRUE)
+         ON CONFLICT DO NOTHING`,
+        [r.id, r.numero_reserva, 'cancelacion', _imp3, _imp3, 0]
+      );
+    } catch(e) { console.warn('contab deposito cancelacion:', e.message); }
   }
 
   if (r.conductor_id) {
@@ -8282,6 +8304,18 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
   const r = reserva.rows[0];
 
   await pool.query('UPDATE reservas SET deposito_retenido_noshow = TRUE WHERE id = $1', [req.params.id]);
+
+  // Registrar en contabilidad — no-show admin: 50% empresa / 50% conductor
+  try {
+    const _imp2 = parseFloat(r.deposito_importe || 10);
+    const _mitad2 = parseFloat((_imp2 / 2).toFixed(2));
+    await pool.query(
+      `INSERT INTO contab_depositos_retenidos (reserva_id, pnr, tipo, fecha, importe_total, importe_empresa, importe_conductor, conductor_pagado)
+       VALUES ($1,$2,$3,CURRENT_DATE,$4,$5,$6,FALSE)
+       ON CONFLICT DO NOTHING`,
+      [r.id, r.numero_reserva, 'no_show', _imp2, _mitad2, _mitad2]
+    );
+  } catch(e) { console.warn('contab deposito no-show (admin):', e.message); }
 
   const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
   const importe = r.deposito_importe || '10';
@@ -9077,38 +9111,53 @@ async function initContabilidad() {
     );
     INSERT INTO contab_config_fiscal (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
   `);
+  // Columnas de comisión sobre la tabla facturas existente
+  await pool.query(`
+    ALTER TABLE facturas ADD COLUMN IF NOT EXISTS comision_cobrada BOOLEAN DEFAULT FALSE;
+    ALTER TABLE facturas ADD COLUMN IF NOT EXISTS fecha_cobro_comision DATE;
+    ALTER TABLE facturas ADD COLUMN IF NOT EXISTS forma_cobro_comision TEXT DEFAULT 'transferencia';
+  `);
 }
 initContabilidad().catch(function(e) { console.error('initContabilidad:', e.message); });
 
-// GET comisiones
+// GET comisiones — basado en facturas existentes
 app.get('/admin/contabilidad/comisiones', requireAdmin, asyncHandler(async function(req, res) {
   var { desde, hasta, estado } = req.query;
   var conditions = ['1=1'];
   var vals = [];
-  if (desde)  { vals.push(desde);  conditions.push('c.fecha_cobro >= $' + vals.length); }
-  if (hasta)  { vals.push(hasta);  conditions.push('c.fecha_cobro <= $' + vals.length); }
-  if (estado) { vals.push(estado); conditions.push('c.estado = $' + vals.length); }
+  if (desde)  { vals.push(desde);  conditions.push('f.generada_en::date >= $' + vals.length); }
+  if (hasta)  { vals.push(hasta);  conditions.push('f.generada_en::date <= $' + vals.length); }
+  if (estado === 'cobrada')   { conditions.push('f.comision_cobrada = TRUE'); }
+  if (estado === 'pendiente') { conditions.push('f.comision_cobrada = FALSE'); }
   var rows = await pool.query(
-    'SELECT c.*, co.nombre AS nombre_conductor FROM contab_comisiones c LEFT JOIN conductores co ON co.id = c.conductor_id WHERE ' + conditions.join(' AND ') + ' ORDER BY c.fecha_cobro DESC NULLS LAST, c.id DESC',
+    `SELECT f.id, f.numero_factura AS pnr, f.importe_total AS importe_comision,
+            f.generada_en::date AS fecha_cobro, f.comision_cobrada,
+            f.fecha_cobro_comision, f.forma_cobro_comision AS forma_cobro,
+            r.numero_reserva, r.nombre_cliente,
+            CASE WHEN f.comision_cobrada THEN 'cobrada' ELSE 'pendiente' END AS estado,
+            co.nombre AS nombre_conductor
+     FROM facturas f
+     JOIN reservas r ON r.id = f.reserva_id
+     LEFT JOIN conductores co ON co.id = r.conductor_id
+     WHERE r.estado != 'cancelada' AND ` + conditions.join(' AND ') + `
+     ORDER BY f.generada_en DESC`,
     vals
   );
   res.json({ comisiones: rows.rows });
 }));
 
-// POST comisión nueva
+// POST comisión nueva — ya no se usa (las comisiones vienen de facturas)
 app.post('/admin/contabilidad/comisiones', requireAdmin, asyncHandler(async function(req, res) {
-  var { conductor_id, pnr, importe_comision, forma_cobro, fecha_cobro } = req.body;
-  if (!importe_comision || isNaN(parseFloat(importe_comision))) return res.json({ ok: false, error: 'Importe no válido.' });
-  await pool.query(
-    'INSERT INTO contab_comisiones (conductor_id, pnr, importe_comision, forma_cobro, fecha_cobro, estado) VALUES ($1,$2,$3,$4,$5,$6)',
-    [conductor_id || null, pnr || null, parseFloat(importe_comision), forma_cobro || 'transferencia', fecha_cobro || null, 'cobrada']
-  );
-  res.json({ ok: true });
+  res.json({ ok: false, error: 'Las comisiones se gestionan desde las facturas emitidas.' });
 }));
 
-// POST marcar comisión como cobrada
+// POST marcar comisión como cobrada — actualiza la factura
 app.post('/admin/contabilidad/comisiones/:id/cobrada', requireAdmin, asyncHandler(async function(req, res) {
-  await pool.query('UPDATE contab_comisiones SET estado=$1 WHERE id=$2', ['cobrada', req.params.id]);
+  var { forma_cobro } = req.body;
+  await pool.query(
+    'UPDATE facturas SET comision_cobrada=TRUE, fecha_cobro_comision=CURRENT_DATE, forma_cobro_comision=$1 WHERE id=$2',
+    [forma_cobro || 'transferencia', req.params.id]
+  );
   res.json({ ok: true });
 }));
 
@@ -9173,7 +9222,7 @@ app.get('/admin/contabilidad/resumen', requireAdmin, asyncHandler(async function
   var tipo_igic = parseFloat(cfg.igic_general || 7);
 
   var rCom = await pool.query(
-    "SELECT COALESCE(SUM(importe_comision),0) AS total FROM contab_comisiones WHERE estado='cobrada' AND fecha_cobro BETWEEN $1 AND $2",
+    "SELECT COALESCE(SUM(f.importe_total),0) AS total FROM facturas f JOIN reservas r ON r.id=f.reserva_id WHERE f.comision_cobrada=TRUE AND r.estado!='cancelada' AND f.fecha_cobro_comision BETWEEN $1 AND $2",
     [desde, hasta]
   );
   var rDep = await pool.query(
@@ -9227,12 +9276,20 @@ app.get('/admin/contabilidad/exportar/comisiones', requireAdmin, asyncHandler(as
   var desde = anyo + '-' + String(mesInicio).padStart(2,'0') + '-01';
   var hasta = anyo + '-' + String(mesFin).padStart(2,'0') + '-' + (mesFin === 3 ? '31' : mesFin === 6 ? '30' : mesFin === 9 ? '30' : '31');
   var rows = await pool.query(
-    'SELECT c.fecha_cobro, c.pnr, co.nombre AS conductor, c.importe_comision, c.forma_cobro, c.estado FROM contab_comisiones c LEFT JOIN conductores co ON co.id = c.conductor_id WHERE c.fecha_cobro BETWEEN $1 AND $2 ORDER BY c.fecha_cobro',
+    `SELECT f.fecha_cobro_comision AS fecha_cobro, f.numero_factura AS numero_factura,
+            r.numero_reserva, co.nombre AS conductor, f.importe_total AS importe,
+            f.forma_cobro_comision AS forma_cobro,
+            CASE WHEN f.comision_cobrada THEN 'cobrada' ELSE 'pendiente' END AS estado
+     FROM facturas f
+     JOIN reservas r ON r.id=f.reserva_id
+     LEFT JOIN conductores co ON co.id=r.conductor_id
+     WHERE r.estado!='cancelada' AND f.fecha_cobro_comision BETWEEN $1 AND $2
+     ORDER BY f.fecha_cobro_comision`,
     [desde, hasta]
   );
-  var csv = 'Fecha cobro;PNR;Conductor;Importe;Forma cobro;Estado\n';
+  var csv = 'Fecha cobro;Factura;Reserva;Conductor;Importe;Forma cobro;Estado\n';
   rows.rows.forEach(function(r) {
-    csv += [r.fecha_cobro ? r.fecha_cobro.toISOString().substring(0,10) : '', r.pnr||'', r.conductor||'', (r.importe_comision||0).toString().replace('.',','), r.forma_cobro||'', r.estado||''].join(';') + '\n';
+    csv += [r.fecha_cobro ? r.fecha_cobro.toISOString().substring(0,10) : '', r.numero_factura||'', r.numero_reserva||'', r.conductor||'', (r.importe||0).toString().replace('.',','), r.forma_cobro||'', r.estado||''].join(';') + '\n';
   });
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="comisiones-T' + trim + '-' + anyo + '.csv"');
