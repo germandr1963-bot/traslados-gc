@@ -9262,10 +9262,10 @@ app.get('/admin/contabilidad/config-fiscal', requireAdmin, asyncHandler(async fu
 
 // POST config fiscal
 app.post('/admin/contabilidad/config-fiscal', requireAdmin, asyncHandler(async function(req, res) {
-  var { modo_facturacion, igic_general, igic_especial, noshow_igic, serie_facturacion, num_siguiente, email_gestoria } = req.body;
+  var { comision_por_defecto, modo_facturacion, igic_general, igic_especial, noshow_igic, serie_facturacion, num_siguiente, email_gestoria } = req.body;
   await pool.query(
-    'UPDATE contab_config_fiscal SET modo_facturacion=$1, igic_general=$2, igic_especial=$3, noshow_igic=$4, serie_facturacion=$5, num_siguiente=$6, email_gestoria=$7 WHERE id=1',
-    [modo_facturacion || 'yo_emito', parseFloat(igic_general || 7), igic_especial ? parseFloat(igic_especial) : null, noshow_igic || 'sujeto', serie_facturacion || 'TGC', parseInt(num_siguiente || 1), email_gestoria || null]
+    'UPDATE contab_config_fiscal SET comision_por_defecto=$1, modo_facturacion=$2, igic_general=$3, igic_especial=$4, noshow_igic=$5, serie_facturacion=$6, num_siguiente=$7, email_gestoria=$8 WHERE id=1',
+    [parseFloat(comision_por_defecto || 0), modo_facturacion || 'yo_emito', parseFloat(igic_general || 7), igic_especial ? parseFloat(igic_especial) : null, noshow_igic || 'sujeto', serie_facturacion || 'TGC', parseInt(num_siguiente || 1), email_gestoria || null]
   );
   res.json({ ok: true });
 }));
