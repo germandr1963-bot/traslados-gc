@@ -6720,22 +6720,46 @@ function cargarComisiones() {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       var rows = d.comisiones || [];
-      var totalBruto = rows.reduce(function(a,r) { return a + parseFloat(r.importe_comision||0); }, 0);
+      var comisionDef = d.comision_defecto || 0;
+      var totalMio = rows.filter(function(r){return r.estado==='cobrada';}).reduce(function(a,r){return a+parseFloat(r.comision_importe||comisionDef||0);},0);
       var cobradas   = rows.filter(function(r) { return r.estado === 'cobrada'; });
       var pendientes = rows.filter(function(r) { return r.estado !== 'cobrada'; });
       document.getElementById('resumen-comisiones').innerHTML =
-        kpiBox('Total comisiones', rows.length + ' viajes', '') +
-        kpiBox('Importe bruto', euros(totalBruto), 'kpi-azul') +
+        kpiBox('Facturas emitidas', rows.length, '') +
+        kpiBox('Mis comisiones cobradas', euros(totalMio), 'kpi-verde') +
         kpiBox('Cobradas', cobradas.length, 'kpi-verde') +
         kpiBox('Pendientes', pendientes.length, pendientes.length > 0 ? 'kpi-rojo' : '');
       if (rows.length === 0) {
-        document.getElementById('lista-comisiones').innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Sin resultados.</p>';
+        document.getElementById('lista-comisiones').innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Sin resultados para ese per&#237;odo.</p>';
         return;
       }
-      var html = '<table class="tabla-admin"><thead><tr><th>Fecha cobro</th><th>PNR</th><th>Conductor</th><th>Importe</th><th>Forma cobro</th><th>Estado</th><th>Acci\u00f3n</th></tr></thead><tbody>';
+      var html = '<table class="tabla-admin"><thead><tr>' +
+        '<th>Fecha factura</th><th>N&#186; Factura</th><th>Reserva</th><th>Conductor</th>' +
+        '<th>Total factura cliente</th><th>Mi comisi&#243;n (&#8364;)</th><th>Estado</th><th>Acciones</th>' +
+        '</tr></thead><tbody>';
       rows.forEach(function(r) {
         var bg = r.estado === 'cobrada' ? 'background:#e8f5e9;color:#2e7d32;' : 'background:#fff3e0;color:#e65100;';
-        html += '<tr><td>' + fechaCorta(r.fecha_cobro) + '</td><td><strong>' + (r.pnr||'-') + '</strong></td><td>' + (r.nombre_conductor||'-') + '</td><td><strong>' + euros(r.importe_comision) + '</strong></td><td>' + (r.forma_cobro||'-') + '</td><td><span style="font-size:11px;padding:2px 8px;border-radius:10px;' + bg + '">' + (r.estado||'pendiente') + '</span></td><td>' + (r.estado !== 'cobrada' ? '<button class="boton-primario" style="font-size:0.75rem;padding:4px 10px;" onclick="marcarComisionCobrada(' + r.id + ')">\u2714 Cobrada</button>' : '') + '</td></tr>';
+        var comision = parseFloat(r.comision_importe || comisionDef || 0);
+        var inputCom = '<input type="number" value="' + comision.toFixed(2) + '" step="0.01" min="0" ' +
+          'style="width:75px;height:28px;border-radius:4px;border:1px solid var(--gris-borde);text-align:center;font-size:12px;" ' +
+          'id="com-imp-' + r.id + '" onchange="actualizarComisionImporte(' + r.id + ')">';
+        var acciones = '';
+        if (r.estado !== 'cobrada') {
+          acciones += '<button class="boton-primario" style="font-size:0.75rem;padding:4px 8px;display:block;margin-bottom:4px;" ' +
+            'onclick="abrirModalCobrarComision(' + r.id + ')">&#10004; Cobrada</button>';
+        }
+        acciones += '<button class="boton-costa" style="font-size:0.75rem;padding:4px 8px;display:block;" ' +
+          'onclick="generarFacturaConductor(' + r.id + ', \'' + (r.numero_reserva||'').replace(/'/g,'') + '\')">Factura al conductor</button>';
+        html += '<tr>' +
+          '<td>' + fechaCorta(r.fecha_factura) + '</td>' +
+          '<td style="font-size:12px;">' + (r.numero_factura||'-') + '</td>' +
+          '<td><strong>' + (r.numero_reserva||'-') + '</strong></td>' +
+          '<td>' + (r.nombre_conductor||'-') + '</td>' +
+          '<td style="color:var(--texto-muted);">' + euros(r.importe_factura) + '</td>' +
+          '<td>' + inputCom + '</td>' +
+          '<td><span style="font-size:11px;padding:2px 8px;border-radius:10px;' + bg + '">' + (r.estado||'pendiente') + '</span></td>' +
+          '<td>' + acciones + '</td>' +
+          '</tr>';
       });
       html += '</tbody></table>';
       document.getElementById('lista-comisiones').innerHTML = html;
@@ -6743,42 +6767,61 @@ function cargarComisiones() {
     .catch(function() { document.getElementById('lista-comisiones').innerHTML = '<p style="color:var(--rojo-error);font-size:13px;">Error al cargar.</p>'; });
 }
 
-function marcarComisionCobrada(id) {
-  fetch('/admin/contabilidad/comisiones/' + id + '/cobrada', { method: 'POST' })
-    .then(function(r) { return r.json(); })
-    .then(function(d) { if (d.ok) cargarComisiones(); });
+function actualizarComisionImporte(id) {
+  var el = document.getElementById('com-imp-' + id);
+  if (!el) return;
+  fetch('/admin/contabilidad/comisiones/' + id + '/importe', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ comision_importe: parseFloat(el.value) })
+  }).then(function(r){return r.json();}).then(function(d){ if(!d.ok) alert('Error al guardar importe.'); });
 }
 
-function abrirModalNuevaComision() {
-  fetch('/admin/conductores')
-    .then(function(r) { return r.json(); })
-    .then(function(conductores) {
-      var opts = (conductores || []).map(function(c) { return '<option value="' + c.id + '">' + c.nombre + '</option>'; }).join('');
-      var modal = document.createElement('div');
-      modal.id = 'modal-nueva-comision';
-      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
-      modal.innerHTML = '<div class="tarjeta" style="width:100%;max-width:440px;"><h3 style="margin:0 0 16px;">+ Registrar comisi\u00f3n</h3><label class="etiqueta">Conductor</label><select id="nc-conductor" class="campo" style="margin-bottom:10px;">' + opts + '</select><label class="etiqueta">PNR</label><input type="text" id="nc-pnr" class="campo" placeholder="GC-XXXXXX" style="margin-bottom:10px;"><label class="etiqueta">Importe (\u20ac)</label><input type="number" id="nc-importe" class="campo" step="0.01" min="0" placeholder="0.00" style="margin-bottom:10px;"><label class="etiqueta">Forma de cobro</label><select id="nc-forma" class="campo" style="margin-bottom:10px;"><option value="transferencia">Transferencia</option><option value="efectivo">Efectivo</option></select><label class="etiqueta">Fecha de cobro</label><input type="date" id="nc-fecha" class="campo" style="margin-bottom:16px;"><div style="display:flex;gap:8px;"><button class="boton-primario" onclick="guardarNuevaComision()">Guardar</button><button class="boton-secundario" style="margin-top:0;" onclick="document.getElementById(\'modal-nueva-comision\').remove()">Cancelar</button></div><div id="nc-aviso" style="display:none;margin-top:10px;font-size:0.85rem;"></div></div>';
-      document.body.appendChild(modal);
-      document.getElementById('nc-fecha').value = new Date().toISOString().substring(0,10);
+function abrirModalCobrarComision(id) {
+  var modal = document.createElement('div');
+  modal.id = 'modal-cobrar-com';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = '<div class="tarjeta" style="width:100%;max-width:360px;">' +
+    '<h3 style="margin:0 0 16px;">Marcar como cobrada</h3>' +
+    '<label class="etiqueta">Forma de cobro</label>' +
+    '<select id="mc-forma" class="campo" style="margin-bottom:16px;">' +
+      '<option value="transferencia">Transferencia</option>' +
+      '<option value="efectivo">Efectivo</option>' +
+    '</select>' +
+    '<div style="display:flex;gap:8px;">' +
+      '<button class="boton-primario" onclick="confirmarCobrarComision(' + id + ')">Confirmar</button>' +
+      '<button class="boton-secundario" style="margin-top:0;" onclick="document.getElementById(\'modal-cobrar-com\').remove()">Cancelar</button>' +
+    '</div></div>';
+  document.body.appendChild(modal);
+}
+
+function confirmarCobrarComision(id) {
+  var forma = document.getElementById('mc-forma').value;
+  var el = document.getElementById('com-imp-' + id);
+  var comision = el ? parseFloat(el.value) : 0;
+  fetch('/admin/contabilidad/comisiones/' + id + '/cobrada', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ forma_cobro: forma, comision_importe: comision })
+  }).then(function(r){return r.json();}).then(function(d){
+    var m = document.getElementById('modal-cobrar-com');
+    if (m) m.remove();
+    if (d.ok) cargarComisiones();
+    else alert(d.error || 'Error.');
+  });
+}
+
+function generarFacturaConductor(id, reserva) {
+  if (!confirm('Generar y enviar factura de comisi&#243;n al conductor para la reserva ' + reserva + '?')) return;
+  fetch('/admin/contabilidad/comisiones/' + id + '/factura-conductor', { method: 'POST' })
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok) {
+        alert('Factura ' + d.numero_factura + ' generada y enviada. Importe: ' + parseFloat(d.importe).toFixed(2) + ' EUR');
+        cargarComisiones();
+      } else {
+        alert(d.error || 'Error al generar la factura.');
+      }
     });
 }
-
-function guardarNuevaComision() {
-  var payload = {
-    conductor_id: document.getElementById('nc-conductor').value,
-    pnr: document.getElementById('nc-pnr').value.trim(),
-    importe_comision: parseFloat(document.getElementById('nc-importe').value),
-    forma_cobro: document.getElementById('nc-forma').value,
-    fecha_cobro: document.getElementById('nc-fecha').value
-  };
-  fetch('/admin/contabilidad/comisiones', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d.ok) { document.getElementById('modal-nueva-comision').remove(); cargarComisiones(); }
-      else { var a = document.getElementById('nc-aviso'); a.style.display='block'; a.textContent = d.error||'Error.'; }
-    });
-}
-
 // -- DEPOSITOS --
 function cargarDepositos() {
   var desde = document.getElementById('dep-desde').value;
