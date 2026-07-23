@@ -4075,7 +4075,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
 
   // Obtener datos del depósito antes de actualizar
   const reservaDeposito = await pool.query(
-    'SELECT deposito_pagado, deposito_retenido_noshow, stripe_payment_intent_id, deposito_importe FROM reservas WHERE id = $1',
+    'SELECT deposito_pagado, deposito_retenido_noshow, stripe_payment_intent_id FROM reservas WHERE id = $1',
     [req.params.id]
   );
   const datosDeposito = reservaDeposito.rows[0] || {};
@@ -4231,7 +4231,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
 app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req, res) => {
   const check = await pool.query(
     `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
-            r.origen, r.destino, r.fecha, r.deposito_pagado, r.deposito_importe
+            r.origen, r.destino, r.fecha, r.deposito_pagado
      FROM reservas r
      WHERE r.id = $1 AND r.conductor_id = $2 AND r.estado = 'confirmada'`,
     [req.params.id, req.session.choferId]
@@ -4247,7 +4247,8 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
 
   // Registrar en contabilidad — no-show: 50% empresa / 50% conductor
   try {
-    const _imp = parseFloat(r.deposito_importe || 10);
+    const _cfgNs0 = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
+    const _imp = parseFloat((_cfgNs0.rows[0] && _cfgNs0.rows[0].importe_deposito) || 10);
     const _mitad = parseFloat((_imp / 2).toFixed(2));
     await pool.query(
       `INSERT INTO contab_depositos_retenidos (reserva_id, pnr, tipo, fecha, importe_total, importe_empresa, importe_conductor, conductor_pagado)
@@ -4258,7 +4259,8 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
   } catch(e) { console.warn('contab deposito no-show (chofer):', e.message); }
 
   const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
-  const importe = r.deposito_importe || '10';
+  const _cfgNs1 = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
+  const importe = ((_cfgNs1.rows[0] && _cfgNs1.rows[0].importe_deposito) || 10).toString();
 
   // Email al cliente
   try {
@@ -7731,7 +7733,8 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
     await pool.query('UPDATE reservas SET deposito_retenido_noshow = TRUE WHERE id = $1', [r.id]);
     // Registrar en contabilidad — cancelación fuera de plazo: 100% empresa
     try {
-      const _imp3 = parseFloat(r.deposito_importe || 10);
+      const _cfgNs3b = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
+      const _imp3 = parseFloat((_cfgNs3b.rows[0] && _cfgNs3b.rows[0].importe_deposito) || 10);
       await pool.query(
         `INSERT INTO contab_depositos_retenidos (reserva_id, pnr, tipo, fecha, importe_total, importe_empresa, importe_conductor, conductor_pagado)
          VALUES ($1,$2,$3,CURRENT_DATE,$4,$5,$6,TRUE)
@@ -8307,7 +8310,8 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
 
   // Registrar en contabilidad — no-show admin: 50% empresa / 50% conductor
   try {
-    const _imp2 = parseFloat(r.deposito_importe || 10);
+    const _cfgNs2c = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
+    const _imp2 = parseFloat((_cfgNs2c.rows[0] && _cfgNs2c.rows[0].importe_deposito) || 10);
     const _mitad2 = parseFloat((_imp2 / 2).toFixed(2));
     await pool.query(
       `INSERT INTO contab_depositos_retenidos (reserva_id, pnr, tipo, fecha, importe_total, importe_empresa, importe_conductor, conductor_pagado)
@@ -8318,7 +8322,8 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
   } catch(e) { console.warn('contab deposito no-show (admin):', e.message); }
 
   const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
-  const importe = r.deposito_importe || '10';
+  const _cfgNs2b = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
+  const importe = ((_cfgNs2b.rows[0] && _cfgNs2b.rows[0].importe_deposito) || 10).toString();
 
   // Email al cliente
   try {
@@ -9150,11 +9155,12 @@ async function initContabilidad() {
     SELECT r.id, r.numero_reserva,
       CASE WHEN r.estado = 'no_show' THEN 'no_show' ELSE 'cancelacion' END,
       COALESCE(r.fecha, CURRENT_DATE),
-      COALESCE(r.deposito_importe, 0),
-      CASE WHEN r.estado = 'no_show' THEN ROUND(COALESCE(r.deposito_importe,0)/2,2) ELSE COALESCE(r.deposito_importe,0) END,
-      CASE WHEN r.estado = 'no_show' THEN ROUND(COALESCE(r.deposito_importe,0)/2,2) ELSE 0 END,
+      COALESCE(cn.importe_deposito, 10),
+      CASE WHEN r.estado = 'no_show' THEN ROUND(COALESCE(cn.importe_deposito,10)/2,2) ELSE COALESCE(cn.importe_deposito,10) END,
+      CASE WHEN r.estado = 'no_show' THEN ROUND(COALESCE(cn.importe_deposito,10)/2,2) ELSE 0 END,
       CASE WHEN r.estado = 'no_show' THEN FALSE ELSE TRUE END
     FROM reservas r
+    LEFT JOIN configuracion_noshow cn ON cn.es_general = TRUE
     WHERE r.deposito_pagado = TRUE
       AND (r.deposito_liberado IS NOT TRUE)
       AND (r.deposito_devolucion_pendiente IS NOT TRUE)
