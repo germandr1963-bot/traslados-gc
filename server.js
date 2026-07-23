@@ -9155,8 +9155,9 @@ async function initContabilidad() {
       CASE WHEN r.estado = 'no_show' THEN ROUND(COALESCE(r.deposito_importe,0)/2,2) ELSE 0 END,
       CASE WHEN r.estado = 'no_show' THEN FALSE ELSE TRUE END
     FROM reservas r
-    WHERE r.deposito_retenido_noshow = TRUE
-      AND r.deposito_pagado = TRUE
+    WHERE r.deposito_pagado = TRUE
+      AND (r.deposito_liberado IS NOT TRUE)
+      AND (r.deposito_devolucion_pendiente IS NOT TRUE)
       AND NOT EXISTS (
         SELECT 1 FROM contab_depositos_retenidos d WHERE d.reserva_id = r.id
       );
