@@ -9149,16 +9149,22 @@ async function initContabilidad() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
-  // Migración histórica: insertar depósitos retenidos que ya existen en reservas
+  // Migracion historica: insertar depositos retenidos que ya existen en reservas
   await pool.query(`
     INSERT INTO contab_depositos_retenidos (reserva_id, pnr, tipo, fecha, importe_total, importe_empresa, importe_conductor, conductor_pagado)
     SELECT r.id, r.numero_reserva,
-      CASE WHEN r.estado = 'no_show' THEN 'no_show' ELSE 'cancelacion' END,
+      CASE
+        WHEN r.deposito_retenido_noshow = TRUE THEN 'no_show'
+        WHEN r.deposito_liberado = TRUE THEN 'devuelto'
+        WHEN r.deposito_devolucion_pendiente = TRUE THEN 'devolucion_pendiente'
+        WHEN r.deposito_pagado = TRUE THEN 'retenido'
+        ELSE 'pendiente'
+      END,
       COALESCE(r.fecha, CURRENT_DATE),
       COALESCE(cn.importe_deposito, 10),
-      CASE WHEN r.estado = 'no_show' THEN ROUND(COALESCE(cn.importe_deposito,10)/2,2) ELSE COALESCE(cn.importe_deposito,10) END,
-      CASE WHEN r.estado = 'no_show' THEN ROUND(COALESCE(cn.importe_deposito,10)/2,2) ELSE 0 END,
-      CASE WHEN r.estado = 'no_show' THEN FALSE ELSE TRUE END
+      COALESCE(cn.importe_deposito, 10),
+      0,
+      FALSE
     FROM reservas r
     LEFT JOIN configuracion_noshow cn ON cn.es_general = TRUE
     WHERE r.deposito_pagado = TRUE
