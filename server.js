@@ -3151,8 +3151,15 @@ app.get('/admin/seo/destinos/:id/idioma/:lang', requireAdmin, asyncHandler(async
 
 // Devuelve todos los idiomas de un destino de golpe con medición de píxeles
 app.get('/admin/seo/destinos/:id/completo', requireAdmin, asyncHandler(async (req, res) => {
+  // Crear fichas si no existen (IDIOMAS_PERMITIDOS ya está cargado en este punto)
+  const destInfo = await pool.query('SELECT nombre FROM destinos WHERE id = $1', [req.params.id]);
+  if (destInfo.rows.length > 0) {
+    await crearFichasSEODestinoSiFaltan(req.params.id, destInfo.rows[0].nombre);
+  }
   const result = await pool.query(
-    `SELECT dss.*, d.nombre FROM destinos_seo_settings dss
+    `SELECT dss.*, d.nombre, d.zona, d.isla, d.orden, d.visible_rutas,
+            d.sitemap_prioridad, d.sitemap_frecuencia
+     FROM destinos_seo_settings dss
      JOIN destinos d ON d.id = dss.destino_id WHERE dss.destino_id = $1`,
     [req.params.id]
   );
