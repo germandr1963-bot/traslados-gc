@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rutas — Traslados GC</title>
-  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <title>Rutas y Destinos — Traslados GC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/estilos.css">
   <style>
     body { background: var(--gris-fondo); color: var(--texto-oscuro); min-height: 100vh; }
@@ -35,12 +35,127 @@
       header.app .marca { font-size: 19px; letter-spacing: 1px; }
       header.app a.nav { font-size: 12px; }
     }
-    .contenido { max-width: 700px; margin: 0 auto; padding: 40px 24px 80px; text-align: center; }
-    h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: clamp(32px, 6vw, 52px); margin-bottom: 12px; color: var(--texto-oscuro); }
-    .subtitulo { color: var(--texto-muted); font-size: 19px; font-style: italic; letter-spacing: 0.3px; margin-bottom: 48px; line-height: 1.6; }
-    .aviso { color: var(--texto-muted); font-size: 14px; }
-    @media (max-width: 600px) { .contenido { padding: 24px 16px 60px; } }
+
+    .contenido { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+    h1 {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: clamp(32px, 6vw, 52px);
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    h1 span { color: var(--terracota); }
+    .subtitulo {
+      color: var(--texto-muted);
+      font-size: 16px;
+      font-style: italic;
+      text-align: center;
+      margin-bottom: 48px;
+      line-height: 1.6;
+    }
+
+    .isla-bloque { margin-bottom: 48px; }
+    .isla-titulo {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 24px;
+      color: var(--texto-oscuro);
+      border-bottom: 2px solid var(--terracota);
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .isla-titulo .isla-label {
+      font-family: 'Public Sans', sans-serif;
+      font-size: 11px;
+      color: var(--texto-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-weight: 400;
+    }
+
+    .grid-destinos {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+    }
+
+    .tarjeta-destino {
+      background: #fff;
+      border: 1px solid var(--gris-borde);
+      border-radius: 12px;
+      overflow: hidden;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+      transition: border-color 0.15s;
+    }
+    .tarjeta-destino:hover { border-color: var(--terracota); }
+
+    .td-foto {
+      height: 110px;
+      background: var(--charcoal);
+      position: relative;
+    }
+    .td-foto img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .td-zona {
+      position: absolute;
+      bottom: 8px;
+      left: 10px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: rgba(255,255,255,0.5);
+      font-family: 'Public Sans', sans-serif;
+    }
+
+    .td-body { padding: 12px 14px 14px; }
+    .td-nombre {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 18px;
+      color: var(--texto-oscuro);
+      margin-bottom: 4px;
+      line-height: 1.1;
+    }
+    .td-rutas { font-size: 12px; color: var(--texto-muted); }
+
+    .bloque-proximamente {
+      margin-top: 24px;
+      padding: 28px 24px;
+      background: #fff;
+      border: 1px solid var(--gris-borde);
+      border-radius: 12px;
+      text-align: center;
+    }
+    .prox-titulo {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 22px;
+      color: var(--texto-muted);
+      margin-bottom: 8px;
+    }
+    .prox-sub {
+      font-size: 13px;
+      color: var(--texto-muted);
+      font-style: italic;
+    }
+
+    .cargando { text-align: center; color: var(--texto-muted); font-size: 14px; padding: 60px 0; }
+
+    @media (max-width: 600px) {
+      .contenido { padding: 24px 16px 60px; }
+      .grid-destinos { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    }
+
     footer { text-align: center; padding: 30px; color: var(--texto-muted); font-size: 13px; }
+    footer a { color: var(--texto-muted); text-decoration: none; margin: 0 12px; font-size: 13px; }
+    footer a:hover { color: var(--texto-oscuro); }
+    .footer-links { margin-bottom: 12px; }
   </style>
 </head>
 <body>
@@ -49,21 +164,72 @@
     <a href="/" class="marca">TRASLADOS · GC</a>
     <a href="/contacto" class="nav derecha">Contacto</a>
   </header>
+
   <div class="contenido">
-    <h1>Rutas</h1>
-    <p class="subtitulo">Descubre todos nuestros trayectos por la isla</p>
-    <p class="aviso">Estamos preparando esta sección. Muy pronto podrás ver aquí todas nuestras rutas.</p>
+    <h1>Rutas <span>&amp;</span> Destinos</h1>
+    <p class="subtitulo" id="subtitulo-rutas">Traslados intermunicipales en Gran Canaria</p>
+
+    <div id="contenido-destinos">
+      <div class="cargando">⏳ Cargando destinos...</div>
+    </div>
+
+    <div class="bloque-proximamente">
+      <div class="prox-titulo">Próximamente · Otras islas</div>
+      <p class="prox-sub">Estamos ampliando el servicio al resto del archipiélago. Muy pronto, más islas.</p>
+    </div>
   </div>
+
   <footer>
-    <div style="margin-bottom:12px;">
-      <a href="/rutas" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;">Rutas</a>
-      <a href="/flota" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;">Flota</a>
-      <a href="/contacto" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;">Contacto</a>
-      <a href="/chofer/acceso/alta" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;">Alta choferes</a>
-      <a href="/chofer/acceso" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;">Acceso a choferes</a>
-      <a href="/mi-reserva" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;">Acceso clientes</a>
+    <div class="footer-links">
+      <a href="/rutas">Rutas</a>
+      <a href="/flota">Flota</a>
+      <a href="/contacto">Contacto</a>
+      <a href="/chofer/acceso/alta">Alta choferes</a>
+      <a href="/chofer/acceso">Acceso a choferes</a>
+      <a href="/mi-reserva">Acceso clientes</a>
     </div>
     Traslados · GC — Gran Canaria
   </footer>
+
+  <script>
+    fetch('/api/destinos-publicos')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        var islas = d.islas || {};
+        var nombres = Object.keys(islas);
+        if (nombres.length === 0) {
+          document.getElementById('contenido-destinos').innerHTML =
+            '<p style="text-align:center;color:var(--texto-muted);font-size:14px;padding:40px 0;">Próximamente los destinos disponibles.</p>';
+          return;
+        }
+        var html = '';
+        nombres.forEach(function(isla) {
+          var destinos = islas[isla];
+          html += '<div class="isla-bloque">';
+          html += '<div class="isla-titulo">' + isla + ' <span class="isla-label">Isla</span></div>';
+          html += '<div class="grid-destinos">';
+          destinos.forEach(function(dest) {
+            var slug = dest.slug || dest.nombre.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            var url = '/rutas/gran-canaria/' + slug;
+            var rutasTexto = dest.rutas === 1 ? '1 ruta disponible' : (dest.rutas > 1 ? dest.rutas + ' rutas disponibles' : 'Próximamente');
+            html += '<a href="' + url + '" class="tarjeta-destino">';
+            html += '<div class="td-foto">';
+            if (dest.zona) html += '<span class="td-zona">' + dest.zona + '</span>';
+            html += '</div>';
+            html += '<div class="td-body">';
+            html += '<div class="td-nombre">' + dest.nombre + '</div>';
+            html += '<div class="td-rutas">' + rutasTexto + '</div>';
+            html += '</div>';
+            html += '</a>';
+          });
+          html += '</div></div>';
+        });
+        document.getElementById('contenido-destinos').innerHTML = html;
+      })
+      .catch(function() {
+        document.getElementById('contenido-destinos').innerHTML =
+          '<p style="text-align:center;color:var(--texto-muted);font-size:14px;padding:40px 0;">No se pudieron cargar los destinos.</p>';
+      });
+  </script>
 </body>
 </html>
