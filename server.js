@@ -9100,6 +9100,24 @@ async function initContabilidad() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS contab_notas_retencion (
+      id SERIAL PRIMARY KEY,
+      numero_nota TEXT NOT NULL,
+      fecha DATE NOT NULL DEFAULT CURRENT_DATE,
+      reserva_id INTEGER REFERENCES reservas(id) ON DELETE SET NULL,
+      reserva_pnr TEXT,
+      nombre_cliente TEXT,
+      origen TEXT,
+      destino TEXT,
+      fecha_viaje DATE,
+      motivo TEXT,
+      importe NUMERIC(10,2) NOT NULL DEFAULT 0,
+      pdf BYTEA,
+      enviada_gestoria BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
 }
 initContabilidad().catch(function(e) { console.error('initContabilidad:', e.message); });
 
@@ -9317,6 +9335,125 @@ app.get('/admin/contabilidad/depositos', requireAdmin, asyncHandler(async functi
     vals
   );
   res.json({ depositos: rows.rows });
+}));
+
+// POST generar nota de retención para una reserva
+app.post('/admin/contabilidad/depositos/:id/nota-retencion', requireAdmin, asyncHandler(async function(req, res) {
+  var rQ = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.origen, r.destino, r.fecha AS fecha_viaje, r.estado,
+            r.deposito_retenido_noshow, COALESCE(cn.importe_deposito, 10) AS importe
+     FROM reservas r
+     LEFT JOIN configuracion_noshow cn ON cn.es_general = TRUE
+     WHERE r.numero_reserva = $1 AND r.deposito_retenido_noshow = TRUE`, [req.params.id]
+  );
+  if (!rQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada o sin retención.' });
+  var r = rQ.rows[0];
+
+  // Si ya existe nota para esta reserva, reenviar la misma
+  var existeQ = await pool.query('SELECT * FROM contab_notas_retencion WHERE reserva_pnr = $1 LIMIT 1', [r.numero_reserva]);
+  if (existeQ.rows.length && existeQ.rows[0].pdf) {
+    return res.json({ ok: true, numero_nota: existeQ.rows[0].numero_nota, importe: existeQ.rows[0].importe, ya_existia: true });
+  }
+
+  var cfgQ = await pool.query('SELECT * FROM configuracion_facturacion WHERE id=1');
+  var cfg = cfgQ.rows[0] || {};
+  var cfgFQ = await pool.query('SELECT * FROM contab_config_fiscal WHERE id=1');
+  var cfgF = cfgFQ.rows[0] || {};
+
+  var numSig = parseInt(cfgF.num_siguiente || 1);
+  var serie = (cfgF.serie_facturacion || 'TGC') + '-RET';
+  var numeroNota = serie + '-' + new Date().getFullYear() + '-' + String(numSig).padStart(4, '0');
+  await pool.query('UPDATE contab_config_fiscal SET num_siguiente = num_siguiente + 1 WHERE id=1');
+
+  var motivo = r.estado === 'no_show'
+    ? 'No presentacion del cliente (no-show). El deposito de garantia queda retenido segun las condiciones del servicio.'
+    : 'Cancelacion fuera del plazo establecido. El deposito de garantia queda retenido segun la politica de cancelacion.';
+
+  var fechaViaje = r.fecha_viaje ? new Date(r.fecha_viaje).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '-';
+  var fechaHoy = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  var importe = parseFloat(r.importe);
+
+  var PDFDocument = require('pdfkit');
+  var pdfBuffer = await new Promise(function(resolve, reject) {
+    var doc = new PDFDocument({ size: 'A4', margin: 50 });
+    var chunks = []; doc.on('data', function(c) { chunks.push(c); }); doc.on('end', function() { resolve(Buffer.concat(chunks)); }); doc.on('error', reject);
+    var W = doc.page.width - 100; var y = 50;
+    var lin = function(t, b, s, c) { if (!t) return; s = s || 11; c = c || '#1C1815'; doc.fontSize(s).font(b ? 'Helvetica-Bold' : 'Helvetica').fillColor(c).text(t, 50, y, { width: W }); y += s + 5; };
+    var ld  = function(l, v) { doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815').text(l + ': ', 50, y, { continued: true, width: W }); doc.font('Helvetica').fillColor('#333333').text(v || '-', { width: W }); y = doc.y + 4; };
+    var sep = function() { y += 6; doc.moveTo(50, y).lineTo(50 + W, y).strokeColor('#AAAAAA').lineWidth(0.5).stroke(); y += 10; };
+
+    doc.fontSize(18).font('Helvetica-Bold').fillColor('#1C1815').text(cfg.razon_social || 'Traslados GC', 50, y, { width: W }); y += 24;
+    if (cfg.nif) lin('NIF: ' + cfg.nif, false, 10, '#555555');
+    if (cfg.direccion) lin(cfg.direccion, false, 10, '#555555');
+    if (cfg.codigo_postal || cfg.ciudad) lin([cfg.codigo_postal, cfg.ciudad].filter(Boolean).join(' '), false, 10, '#555555');
+    if (cfg.email) lin(cfg.email, false, 10, '#555555');
+    sep();
+
+    doc.fontSize(20).font('Helvetica-Bold').fillColor('#C1502E').text('NOTA DE RETENCION DE DEPOSITO', 50, y, { align: 'center', width: W }); y += 30;
+    sep();
+    ld('N Documento', numeroNota); ld('Fecha', fechaHoy);
+    sep();
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#555555').text('RESERVA', 50, y, { width: W }); y += 18;
+    ld('PNR', r.numero_reserva);
+    ld('Cliente', r.nombre_cliente || '-');
+    ld('Ruta', (r.origen || '-') + ' - ' + (r.destino || '-'));
+    ld('Fecha del servicio', fechaViaje);
+    sep();
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#555555').text('MOTIVO', 50, y, { width: W }); y += 18;
+    doc.fontSize(11).font('Helvetica').fillColor('#333333').text(motivo, 50, y, { width: W }); y = doc.y + 14;
+    sep();
+    doc.fontSize(14).font('Helvetica-Bold').fillColor('#1C1815').text('IMPORTE RETENIDO: ', 50, y, { continued: true, width: W });
+    doc.fillColor('#C1502E').text(importe.toFixed(2) + ' EUR'); y += 25;
+    sep();
+    lin('Documento interno para uso contable y fiscal.', false, 10, '#555555');
+    doc.end();
+  });
+
+  await pool.query(
+    `INSERT INTO contab_notas_retencion (numero_nota, reserva_id, reserva_pnr, nombre_cliente, origen, destino, fecha_viaje, motivo, importe, pdf, enviada_gestoria)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,FALSE)`,
+    [numeroNota, r.id, r.numero_reserva, r.nombre_cliente || null, r.origen || null, r.destino || null, r.fecha_viaje || null, motivo, importe, pdfBuffer]
+  );
+
+  res.json({ ok: true, numero_nota: numeroNota, importe: importe });
+}));
+
+// GET listado notas de retención
+app.get('/admin/contabilidad/notas-retencion', requireAdmin, asyncHandler(async function(req, res) {
+  var rows = await pool.query(
+    'SELECT id, numero_nota, fecha, reserva_pnr, nombre_cliente, origen, destino, importe, enviada_gestoria, created_at FROM contab_notas_retencion ORDER BY created_at DESC'
+  );
+  res.json({ notas: rows.rows });
+}));
+
+// POST enviar notas de retención seleccionadas a gestoría
+app.post('/admin/contabilidad/notas-retencion/enviar-gestoria', requireAdmin, asyncHandler(async function(req, res) {
+  var { ids } = req.body;
+  if (!ids || !ids.length) return res.json({ ok: false, error: 'No hay notas seleccionadas.' });
+  var cfgFQ = await pool.query('SELECT emails_gestoria FROM contab_config_fiscal WHERE id=1');
+  var cfgF = cfgFQ.rows[0] || {};
+  var emailsGestoria = (cfgF.emails_gestoria || '').split(',').map(function(e) { return e.trim(); }).filter(Boolean);
+  if (!emailsGestoria.length) return res.json({ ok: false, error: 'No hay emails de gestoria configurados.' });
+  var rows = await pool.query('SELECT * FROM contab_notas_retencion WHERE id = ANY($1)', [ids]);
+  if (!rows.rows.length) return res.json({ ok: false, error: 'No se encontraron las notas.' });
+  var adjuntos = rows.rows.map(function(n) {
+    return { filename: 'nota-retencion-' + n.numero_nota + '.pdf', content: n.pdf };
+  });
+  for (var em of emailsGestoria) {
+    try {
+      await enviarEmailConAdjunto({
+        to: em,
+        subject: 'Notas de retencion de deposito — Traslados GC (' + rows.rows.length + ' documentos)',
+        html: plantillaEmail('<p>Adjuntamos las notas de retencion de deposito seleccionadas:</p><ul>' +
+          rows.rows.map(function(n) { return '<li>' + n.numero_nota + ' — ' + (n.reserva_pnr || '-') + ' — ' + (n.nombre_cliente || '-') + ' — ' + parseFloat(n.importe).toFixed(2) + ' EUR</li>'; }).join('') +
+          '</ul>'),
+        adjunto: adjuntos[0],
+        adjuntos: adjuntos
+      });
+    } catch(e) { console.warn('Email gestoria notas retencion:', e.message); }
+  }
+  await pool.query('UPDATE contab_notas_retencion SET enviada_gestoria = TRUE WHERE id = ANY($1)', [ids]);
+  res.json({ ok: true, enviadas: rows.rows.length, destinatarios: emailsGestoria.length });
 }));
 
 // GET gastos
