@@ -7475,11 +7475,28 @@ function abrirEditorDestino(destinoId) {
         // Fotos carrusel
         '<div style="background:var(--gris-fondo);padding:12px 14px;border-radius:8px;margin-bottom:18px;">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-        '<label class="etiqueta" style="font-size:11px;">Fotos del destino (carrusel)</label>' +
+        '<label class="etiqueta" style="font-size:11px;">Fotos del destino — la primera es la portada</label>' +
         '<label class="boton-secundario" style="cursor:pointer;padding:5px 12px;font-size:0.78rem;">' +
-        '+ Añadir foto <input type="file" accept="image/*" style="display:none;" onchange="subirFotoDestino(' + destinoId + ', this)"></label>' +
+        '+ A&#241;adir foto <input type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style="display:none;" onchange="previsualizarFotoDestino(' + destinoId + ', this)"></label>' +
         '</div>' +
-        '<div id="fotos-destino-' + destinoId + '" style="display:flex;gap:8px;flex-wrap:wrap;min-height:60px;">' +
+        '<div id="panel-nueva-foto-' + destinoId + '" style="display:none;background:#fff;border:1px solid var(--gris-borde);border-radius:8px;padding:12px;margin-bottom:10px;">' +
+        '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">' +
+        '<img id="preview-foto-' + destinoId + '" style="width:120px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--gris-borde);">' +
+        '<div style="flex:1;min-width:200px;">' +
+        '<label class="etiqueta" style="font-size:11px;">Nombre de archivo (.webp)</label>' +
+        '<input class="campo" id="nueva-foto-nombre-' + destinoId + '" type="text" placeholder="ej: maspalomas-dunas-gran-canaria.webp" style="margin-bottom:8px;font-family:monospace;font-size:12px;">' +
+        '<label class="etiqueta" style="font-size:11px;">Alt text</label>' +
+        '<input class="campo" id="nueva-foto-alt-' + destinoId + '" type="text" placeholder="Descripci&#243;n de la imagen para Google">' +
+        '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+        '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" onclick="sugerirFotoIA(' + destinoId + ')">&#10024; Sugerir con IA</button>' +
+        '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" onclick="confirmarSubidaFoto(' + destinoId + ')">&#128190; Guardar foto</button>' +
+        '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 12px;" onclick="cancelarNuevaFoto(' + destinoId + ')">Cancelar</button>' +
+        '<span id="msg-foto-' + destinoId + '" style="font-size:12px;align-self:center;"></span>' +
+        '</div>' +
+        '</div>' +
+        '<div id="fotos-destino-' + destinoId + '" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;min-height:40px;">' +
         '<span style="font-size:12px;color:var(--texto-muted);">Cargando fotos...</span>' +
         '</div>' +
         '</div>' +
@@ -7503,32 +7520,93 @@ function cargarFotosDestino(destinoId) {
       var cont = document.getElementById('fotos-destino-' + destinoId);
       if (!cont) return;
       if (!d.fotos || d.fotos.length === 0) {
-        cont.innerHTML = '<span style="font-size:12px;color:var(--texto-muted);">Sin fotos todavía.</span>';
+        cont.innerHTML = '<span style="font-size:12px;color:var(--texto-muted);">Sin fotos todav&#237;a.</span>';
         return;
       }
-      cont.innerHTML = d.fotos.map(function(f) {
-        return '<div style="position:relative;width:100px;height:65px;border-radius:6px;overflow:hidden;border:1px solid var(--gris-borde);">' +
+      cont.innerHTML = d.fotos.map(function(f, i) {
+        return '<div style="border:1px solid var(--gris-borde);border-radius:8px;overflow:hidden;">' +
+          '<div style="position:relative;height:80px;background:var(--charcoal);">' +
           '<img src="/destino-foto/' + f.id + '" style="width:100%;height:100%;object-fit:cover;">' +
+          (i === 0 ? '<span style="position:absolute;top:4px;left:4px;background:var(--terracota);color:#fff;font-size:9px;padding:2px 6px;border-radius:3px;">PORTADA</span>' : '') +
           '<button onclick="eliminarFotoDestino(' + destinoId + ',' + f.id + ')" ' +
-          'style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer;">✕</button>' +
+          'style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:3px;padding:1px 6px;font-size:11px;cursor:pointer;">&#10005;</button>' +
+          '</div>' +
+          '<div style="padding:6px 8px;">' +
+          '<div style="font-size:10px;color:var(--texto-muted);">Nombre</div>' +
+          '<div style="font-size:10px;font-family:monospace;word-break:break-all;">' + escapar(f.nombre_archivo || '&#8212;') + '</div>' +
+          '<div style="font-size:10px;color:var(--texto-muted);margin-top:3px;">Alt</div>' +
+          '<div style="font-size:10px;">' + escapar(f.alt_texto || '&#8212;') + '</div>' +
+          '</div>' +
           '</div>';
       }).join('');
     });
 }
 
-function subirFotoDestino(destinoId, input) {
+var _fotoDestinoData = {};
+
+function previsualizarFotoDestino(destinoId, input) {
   var file = input.files[0];
   if (!file) return;
-  comprimirImagenOG(file, function(dataUrl) {
-    fetch('/admin/seo/destinos/' + destinoId + '/fotos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imagen: dataUrl, alt_texto: '' })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-      if (d.ok) cargarFotosDestino(destinoId);
-      else alert(d.error || 'Error al subir foto.');
-    });
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    _fotoDestinoData[destinoId] = e.target.result;
+    var preview = document.getElementById('preview-foto-' + destinoId);
+    if (preview) preview.src = e.target.result;
+    var panel = document.getElementById('panel-nueva-foto-' + destinoId);
+    if (panel) panel.style.display = 'block';
+    var nombre = document.getElementById('nueva-foto-nombre-' + destinoId);
+    var alt = document.getElementById('nueva-foto-alt-' + destinoId);
+    if (nombre) nombre.value = '';
+    if (alt) alt.value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function sugerirFotoIA(destinoId) {
+  var imagen = _fotoDestinoData[destinoId];
+  if (!imagen) return;
+  var msg = document.getElementById('msg-foto-' + destinoId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Analizando imagen...'; }
+  fetch('/admin/seo/destinos/' + destinoId + '/fotos/sugerir-ia', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imagen: imagen, lang: 'es' })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      var nombre = document.getElementById('nueva-foto-nombre-' + destinoId);
+      var alt = document.getElementById('nueva-foto-alt-' + destinoId);
+      if (nombre) nombre.value = d.nombre_archivo || '';
+      if (alt) alt.value = d.alt_texto || '';
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = 'Revisa y ajusta si hace falta'; }
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al analizar.'; }
+    }
+  }).catch(function() {
+    if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexion.'; }
   });
+}
+
+function confirmarSubidaFoto(destinoId) {
+  var imagen = _fotoDestinoData[destinoId];
+  if (!imagen) return;
+  var nombre = (document.getElementById('nueva-foto-nombre-' + destinoId) || {}).value || '';
+  var alt = (document.getElementById('nueva-foto-alt-' + destinoId) || {}).value || '';
+  var msg = document.getElementById('msg-foto-' + destinoId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Subiendo...'; }
+  fetch('/admin/seo/destinos/' + destinoId + '/fotos', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imagen: imagen, alt_texto: alt, nombre_archivo: nombre })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) { cancelarNuevaFoto(destinoId); cargarFotosDestino(destinoId); }
+    else { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; } }
+  }).catch(function() {
+    if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexion.'; }
+  });
+}
+
+function cancelarNuevaFoto(destinoId) {
+  delete _fotoDestinoData[destinoId];
+  var panel = document.getElementById('panel-nueva-foto-' + destinoId);
+  if (panel) panel.style.display = 'none';
 }
 
 function eliminarFotoDestino(destinoId, fotoId) {
