@@ -195,6 +195,11 @@ function firmarVoucher(reservaId) {
     .update('voucher-' + String(reservaId)).digest('hex').slice(0, 20);
 }
 
+function firmarFacturaComision(numeroFactura) {
+  return crypto.createHmac('sha256', process.env.SESSION_SECRET || 'cambia-este-secreto')
+    .update('factura-comision-' + String(numeroFactura)).digest('hex').slice(0, 20);
+}
+
 async function generarCodigoCorto(tipo, reservaId, tokenValoracion, urlDestino) {
   let codigo = crypto.randomBytes(3).toString('hex');
   try {
@@ -6405,6 +6410,18 @@ app.get('/voucher-descarga/:id/:firma/:nombre?', asyncHandler(async (req, res) =
   res.send(resultado.buffer);
 }));
 
+app.get('/factura-comision-descarga/:numero/:firma/:nombre?', asyncHandler(async (req, res) => {
+  if (req.params.firma !== firmarFacturaComision(req.params.numero)) {
+    return res.status(403).send('Enlace no válido o caducado.');
+  }
+  var row = await pool.query('SELECT pdf, numero_factura FROM contab_facturas_comision WHERE numero_factura=$1 LIMIT 1', [req.params.numero]);
+  if (!row.rows.length || !row.rows[0].pdf) return res.status(404).send('Factura no disponible.');
+  var nombreArchivo = req.params.nombre || 'factura-comision-' + row.rows[0].numero_factura + '.pdf';
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
+  res.send(row.rows[0].pdf);
+}));
+
 async function obtenerPlantilla(clave, vars) {
   try {
     const r = await pool.query(
@@ -9298,9 +9315,8 @@ app.post('/admin/contabilidad/comisiones/:id/factura-conductor', requireAdmin, a
   if (f.telefono_conductor) {
     try {
       var nombreDocFC = 'factura-comision-' + numFactura + '.pdf';
-      var urlPdfFC = '/admin/contabilidad/factura-comision-pdf/' + numFactura;
-      var codigoFC = await generarCodigoCorto('factura_comision', null, null, urlPdfFC);
-      var urlDocFC = BASE_URL + '/v/' + codigoFC;
+      var firmaFC = firmarFacturaComision(numFactura);
+      var urlDocFC = BASE_URL + '/factura-comision-descarga/' + encodeURIComponent(numFactura) + '/' + firmaFC + '/' + nombreDocFC;
       var textoWaFC = (_pfc && _pfc.whatsapp) || ('Hola ' + (f.nombre_conductor || '') + ', adjuntamos la factura de comision ' + numFactura + ' por el traslado ' + (f.numero_reserva || '—') + '. Gracias por tu colaboracion. El equipo de Traslados GC');
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1,$2,$3,$4)',
@@ -9352,9 +9368,8 @@ app.post('/admin/contabilidad/facturas-comision/:id/reenviar-conductor', require
   if (fc.telefono_conductor) {
     try {
       var nombreDocFC = 'factura-comision-' + fc.numero_factura + '.pdf';
-      var urlPdfFC = '/admin/contabilidad/factura-comision-pdf/' + fc.numero_factura;
-      var codigoFC = await generarCodigoCorto('factura_comision', null, null, urlPdfFC);
-      var urlDocFC = BASE_URL + '/v/' + codigoFC;
+      var firmaFC = firmarFacturaComision(fc.numero_factura);
+      var urlDocFC = BASE_URL + '/factura-comision-descarga/' + encodeURIComponent(fc.numero_factura) + '/' + firmaFC + '/' + nombreDocFC;
       var textoWaFC = (_pfc && _pfc.whatsapp) || ('Hola ' + (fc.nombre_conductor || '') + ', te hemos enviado por email la factura de comision ' + fc.numero_factura + '. Gracias por tu colaboracion. El equipo de Traslados GC');
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1,$2,$3,$4)',
