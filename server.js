@@ -3151,16 +3151,31 @@ app.get('/admin/seo/destinos/:id/idioma/:lang', requireAdmin, asyncHandler(async
 
 // Devuelve todos los idiomas de un destino de golpe con medición de píxeles
 app.get('/admin/seo/destinos/:id/completo', requireAdmin, asyncHandler(async (req, res) => {
-  // Crear fichas si no existen (IDIOMAS_PERMITIDOS ya está cargado en este punto)
-  const destInfo = await pool.query('SELECT nombre FROM destinos WHERE id = $1', [req.params.id]);
-  if (destInfo.rows.length > 0) {
-    await crearFichasSEODestinoSiFaltan(req.params.id, destInfo.rows[0].nombre);
+  const destInfo = await pool.query('SELECT nombre, isla FROM destinos WHERE id = $1', [req.params.id]);
+  if (destInfo.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado' });
+  const nombre = destInfo.rows[0].nombre;
+  const isla = destInfo.rows[0].isla || 'gran-canaria';
+  const slug = slugify(nombre);
+  // Crear fichas usando idiomas_web directamente — independiente de route_seo_settings
+  const idiomasDB = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE ORDER BY orden');
+  for (const row of idiomasDB.rows) {
+    await pool.query(
+      `INSERT INTO destinos_seo_settings (destino_id, lang_code, slug_url, canonical_url)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (destino_id, lang_code) DO NOTHING`,
+      [req.params.id, row.codigo, slug, BASE_URL + '/destino/' + slugify(isla) + '/' + slug]
+    );
   }
   const result = await pool.query(
-    `SELECT dss.*, d.nombre, d.zona, d.isla, d.orden, d.visible_rutas,
+    `SELECT dss.destino_id, dss.lang_code, dss.slug_url, dss.meta_title, dss.meta_description,
+            dss.og_title, dss.og_description, dss.robots_status, dss.canonical_url,
+            dss.texto_descripcion, dss.activo, dss.updated_at,
+            d.nombre, d.zona, d.isla, d.orden, d.visible_rutas,
             d.sitemap_prioridad, d.sitemap_frecuencia
      FROM destinos_seo_settings dss
-     JOIN destinos d ON d.id = dss.destino_id WHERE dss.destino_id = $1`,
+     JOIN destinos d ON d.id = dss.destino_id
+     WHERE dss.destino_id = $1
+     ORDER BY dss.lang_code`,
     [req.params.id]
   );
   const porIdioma = {};
@@ -3177,7 +3192,9 @@ app.post('/admin/seo/destinos/:id/idioma/:lang', requireAdmin, asyncHandler(asyn
   if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) return res.status(400).json({ error: 'Idioma no válido' });
   const { slug_url, meta_title, meta_description, og_title, og_description, robots_status, texto_descripcion } = req.body;
   const slugLimpio = slug_url ? slugify(slug_url) : null;
-  const canonical = BASE_URL + '/rutas/' + slugify(req.body.isla || 'gran-canaria') + '/' + (slugLimpio || '');
+  const islaDestino = await pool.query('SELECT isla FROM destinos WHERE id = $1', [req.params.id]);
+  const islaSlug = slugify((islaDestino.rows[0] && islaDestino.rows[0].isla) || 'gran-canaria');
+  const canonical = BASE_URL + '/destino/' + islaSlug + '/' + (slugLimpio || '');
   await pool.query(
     `UPDATE destinos_seo_settings
      SET slug_url = $1, meta_title = $2, meta_description = $3,
