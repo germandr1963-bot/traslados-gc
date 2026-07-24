@@ -1768,6 +1768,40 @@ Pulsa el botón para crear una nueva contraseña:
   await pool.query(`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS orden INT DEFAULT 99`);
   await pool.query(`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS slug TEXT DEFAULT ''`);
   await pool.query(`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS visible_rutas BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS sitemap_prioridad NUMERIC(2,1) DEFAULT 0.8`);
+  await pool.query(`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS sitemap_frecuencia VARCHAR(20) DEFAULT 'monthly'`);
+
+  // ─── Destinos SEO settings: una fila por destino+idioma ──────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS destinos_seo_settings (
+      id SERIAL PRIMARY KEY,
+      destino_id INT NOT NULL REFERENCES destinos(id) ON DELETE CASCADE,
+      lang_code VARCHAR(5) NOT NULL,
+      slug_url TEXT,
+      meta_title TEXT,
+      meta_description TEXT,
+      og_title TEXT,
+      og_description TEXT,
+      robots_status VARCHAR(50) DEFAULT 'index,follow',
+      canonical_url TEXT,
+      texto_descripcion TEXT,
+      activo BOOLEAN DEFAULT FALSE,
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(destino_id, lang_code)
+    )
+  `);
+
+  // ─── Destinos fotos: carrusel de imágenes por destino ────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS destinos_fotos (
+      id SERIAL PRIMARY KEY,
+      destino_id INT NOT NULL REFERENCES destinos(id) ON DELETE CASCADE,
+      imagen TEXT NOT NULL,
+      alt_texto TEXT DEFAULT '',
+      orden INT DEFAULT 1,
+      creado_en TIMESTAMP DEFAULT NOW()
+    )
+  `);
 
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
@@ -3063,6 +3097,250 @@ app.post('/admin/seo/importar', requireAdmin, upload.single('archivo'), asyncHan
   }
 
   res.json({ ok: true, actualizadas, errores, avisosPixeles });
+}));
+
+// ─── SEO Destinos ─────────────────────────────────────────────────────────────
+// Tabla destinos_seo_settings: una fila por destino+idioma, igual que
+// route_seo_settings pero para páginas de destino (/rutas/gran-canaria/slug).
+
+// Crea fichas SEO para un destino en todos los idiomas activos si no existen
+async function crearFichasSEODestinoSiFaltan(destinoId, nombre) {
+  const slug = slugify(nombre);
+  for (const lang of IDIOMAS_PERMITIDOS) {
+    await pool.query(
+      `INSERT INTO destinos_seo_settings (destino_id, lang_code, slug_url)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (destino_id, lang_code) DO NOTHING`,
+      [destinoId, lang, slug]
+    );
+  }
+}
+
+// Lista todos los destinos con su estado SEO por idioma
+app.get('/admin/seo/destinos', requireAdmin, asyncHandler(async (req, res) => {
+  const destinos = await pool.query('SELECT id, nombre, isla, zona, orden, visible_rutas FROM destinos ORDER BY isla, orden, nombre');
+  for (const d of destinos.rows) {
+    await crearFichasSEODestinoSiFaltan(d.id, d.nombre);
+  }
+  const seoData = await pool.query(
+    `SELECT destino_id, lang_code, slug_url, meta_title, activo
+     FROM destinos_seo_settings ORDER BY destino_id, lang_code`
+  );
+  const seoMap = {};
+  for (const row of seoData.rows) {
+    if (!seoMap[row.destino_id]) seoMap[row.destino_id] = {};
+    seoMap[row.destino_id][row.lang_code] = { slug: row.slug_url, titulo: row.meta_title, activo: row.activo };
+  }
+  res.json({ destinos: destinos.rows, seo: seoMap, idiomas: IDIOMAS_PERMITIDOS });
+}));
+
+// Devuelve los datos SEO completos de un destino en un idioma
+app.get('/admin/seo/destinos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) return res.status(400).json({ error: 'Idioma no válido' });
+  const result = await pool.query(
+    `SELECT dss.*, d.nombre, d.isla, d.zona, d.orden, d.visible_rutas,
+            (SELECT COUNT(*) FROM destinos_fotos df WHERE df.destino_id = d.id) AS num_fotos
+     FROM destinos_seo_settings dss
+     JOIN destinos d ON d.id = dss.destino_id
+     WHERE dss.destino_id = $1 AND dss.lang_code = $2`,
+    [req.params.id, req.params.lang]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'No encontrado' });
+  res.json(result.rows[0]);
+}));
+
+// Devuelve todos los idiomas de un destino de golpe con medición de píxeles
+app.get('/admin/seo/destinos/:id/completo', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT dss.*, d.nombre FROM destinos_seo_settings dss
+     JOIN destinos d ON d.id = dss.destino_id WHERE dss.destino_id = $1`,
+    [req.params.id]
+  );
+  const porIdioma = {};
+  for (const fila of result.rows) {
+    const pxTitulo = medirPxTitulo(fila.meta_title);
+    const pxDesc = medirPxDescripcion(fila.meta_description);
+    porIdioma[fila.lang_code] = { ...fila, px_titulo: pxTitulo, px_descripcion: pxDesc, excede: pxTitulo > 600 || pxDesc > 960 };
+  }
+  res.json({ idiomas: porIdioma });
+}));
+
+// Guarda los campos SEO de un destino en un idioma
+app.post('/admin/seo/destinos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) return res.status(400).json({ error: 'Idioma no válido' });
+  const { slug_url, meta_title, meta_description, og_title, og_description, robots_status, texto_descripcion } = req.body;
+  const slugLimpio = slug_url ? slugify(slug_url) : null;
+  const canonical = BASE_URL + '/rutas/' + slugify(req.body.isla || 'gran-canaria') + '/' + (slugLimpio || '');
+  await pool.query(
+    `UPDATE destinos_seo_settings
+     SET slug_url = $1, meta_title = $2, meta_description = $3,
+         og_title = $4, og_description = $5, robots_status = $6,
+         canonical_url = $7, texto_descripcion = $8, updated_at = NOW()
+     WHERE destino_id = $9 AND lang_code = $10`,
+    [slugLimpio || null, meta_title || null, meta_description || null,
+     og_title || meta_title || null, og_description || meta_description || null,
+     robots_status || 'index,follow', canonical,
+     texto_descripcion || null, req.params.id, req.params.lang]
+  );
+  res.json({ ok: true });
+}));
+
+// Activa o desactiva la página pública de un destino en un idioma
+app.post('/admin/seo/destinos/:id/idioma/:lang/activar', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) return res.status(400).json({ error: 'Idioma no válido' });
+  await pool.query(
+    `UPDATE destinos_seo_settings SET activo = $1 WHERE destino_id = $2 AND lang_code = $3`,
+    [!!req.body.activo, req.params.id, req.params.lang]
+  );
+  res.json({ ok: true });
+}));
+
+// Guarda configuración del destino: zona, orden, isla, visible_rutas, sitemap
+app.post('/admin/seo/destinos/:id/config', requireAdmin, asyncHandler(async (req, res) => {
+  const { zona, orden, isla, visible_rutas, sitemap_prioridad, sitemap_frecuencia } = req.body;
+  await pool.query(
+    `UPDATE destinos SET zona = $1, orden = $2, isla = $3, visible_rutas = $4,
+     sitemap_prioridad = $5, sitemap_frecuencia = $6 WHERE id = $7`,
+    [zona || '', parseInt(orden) || 99, isla || 'Gran Canaria',
+     !!visible_rutas, parseFloat(sitemap_prioridad) || 0.8,
+     sitemap_frecuencia || 'monthly', req.params.id]
+  );
+  res.json({ ok: true });
+}));
+
+// Sube una foto al carrusel del destino
+app.post('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
+  const { imagen, alt_texto } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/') || imagen.length > 3000000) {
+    return res.status(400).json({ error: 'Imagen no válida o demasiado grande (máx. ~650KB).' });
+  }
+  const maxOrden = await pool.query('SELECT COALESCE(MAX(orden), 0) AS m FROM destinos_fotos WHERE destino_id = $1', [req.params.id]);
+  await pool.query(
+    `INSERT INTO destinos_fotos (destino_id, imagen, alt_texto, orden) VALUES ($1, $2, $3, $4)`,
+    [req.params.id, imagen, alt_texto || '', maxOrden.rows[0].m + 1]
+  );
+  res.json({ ok: true });
+}));
+
+// Lista las fotos del carrusel de un destino
+app.get('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, alt_texto, orden FROM destinos_fotos WHERE destino_id = $1 ORDER BY orden`,
+    [req.params.id]
+  );
+  res.json({ fotos: result.rows });
+}));
+
+// Sirve una foto pública por su id (para la web y para WhatsApp/redes)
+app.get('/destino-foto/:fotoId', asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT imagen FROM destinos_fotos WHERE id = $1', [req.params.fotoId]);
+  if (result.rows.length === 0) return res.status(404).send('No encontrado');
+  const imagen = result.rows[0].imagen;
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).send('Formato no válido');
+  res.setHeader('Content-Type', matches[1]);
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(Buffer.from(matches[2], 'base64'));
+}));
+
+// Elimina una foto del carrusel
+app.post('/admin/seo/destinos/:id/fotos/:fotoId/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM destinos_fotos WHERE id = $1 AND destino_id = $2', [req.params.fotoId, req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Reordena las fotos del carrusel
+app.post('/admin/seo/destinos/:id/fotos/reordenar', requireAdmin, asyncHandler(async (req, res) => {
+  const { orden } = req.body; // array de ids en nuevo orden
+  if (!Array.isArray(orden)) return res.status(400).json({ error: 'Datos no válidos' });
+  for (let i = 0; i < orden.length; i++) {
+    await pool.query('UPDATE destinos_fotos SET orden = $1 WHERE id = $2 AND destino_id = $3', [i + 1, orden[i], req.params.id]);
+  }
+  res.json({ ok: true });
+}));
+
+// Genera texto descriptivo del destino con IA — con directivas SEO explícitas
+app.post('/admin/seo/destinos/:id/generar-texto', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { lang } = req.body;
+  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado' });
+  const d = destino.rows[0];
+  const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || 'español';
+  const prompt = `Eres un experto en SEO y redacción de contenido turístico para webs de transporte privado.
+Escribe un texto descriptivo en ${lang === 'es' ? 'español' : nombreIdioma} para la página del destino "${d.nombre}" (${d.isla}, zona: ${d.zona || 'no especificada'}) dentro de una web de traslados intermunicipales privados en ${d.isla}.
+
+Requisitos SEO y de contenido:
+- Entre 180 y 250 palabras exactamente.
+- Incluye de forma natural las palabras clave: "${d.nombre}", "traslado privado", "${d.isla}", y términos relacionados con el lugar.
+- Estructura: 3 párrafos. Primero: qué es el lugar y por qué visitarlo. Segundo: cómo llegar desde los puntos principales de la isla (sin inventar precios ni tiempos exactos). Tercero: llamada a la acción para reservar el traslado.
+- Tono: profesional, cálido, orientado al viajero. Sin exageraciones ni superlativos vacíos.
+- No menciones nombres de competidores ni precios concretos.
+- No uses listas con viñetas — solo párrafos fluidos.
+
+Responde ÚNICAMENTE con el texto, sin título, sin comentarios, sin comillas.`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    return res.status(500).json({ error: 'Error IA: ' + err.slice(0, 200) });
+  }
+  const data = await response.json();
+  const texto = data.content.map(function(b) { return b.text || ''; }).join('').trim();
+  res.json({ ok: true, texto });
+}));
+
+// Traduce con IA el título, descripción y texto de destinos que falten en un idioma
+app.post('/admin/seo/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) return res.status(400).json({ error: 'Idioma no válido' });
+  const pendientes = await pool.query(
+    `SELECT dss.destino_id, d.nombre, d.zona, d.isla,
+            dss.meta_title, dss.meta_description, dss.texto_descripcion
+     FROM destinos_seo_settings dss
+     JOIN destinos d ON d.id = dss.destino_id
+     WHERE dss.lang_code = $1 AND (dss.meta_title IS NULL OR dss.meta_description IS NULL)`,
+    [lang]
+  );
+  if (pendientes.rows.length === 0) return res.json({ ok: true, propuestas: [] });
+  const baseES = await pool.query(
+    `SELECT destino_id, meta_title, meta_description, texto_descripcion
+     FROM destinos_seo_settings WHERE lang_code = 'es'`
+  );
+  const mapaES = {};
+  for (const f of baseES.rows) mapaES[f.destino_id] = f;
+  const items = pendientes.rows
+    .map(function(r) {
+      const base = mapaES[r.destino_id] || {};
+      return { destino_id: r.destino_id, nombre: r.nombre, isla: r.isla,
+        titulo_es: base.meta_title || '', descripcion_es: base.meta_description || '',
+        texto_es: base.texto_descripcion || '' };
+    })
+    .filter(function(i) { return i.titulo_es && i.descripcion_es; });
+  if (items.length === 0) return res.json({ ok: true, propuestas: [] });
+  const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || lang;
+  const prompt = `Traduce los siguientes títulos, descripciones SEO y textos descriptivos de páginas de destino turístico en ${mapaES[pendientes.rows[0]?.destino_id]?.isla || 'Gran Canaria'}, del español al ${nombreIdioma}.\n\nReglas:\n- Título: conciso, 55-60 caracteres máx, pensado para Google.\n- Descripción: 140-160 caracteres, persuasiva, sin inventar datos.\n- Texto: mantén la misma estructura y longitud del original en español, adaptando nombres de lugares a la forma más natural en ${nombreIdioma}.\n- Los slugs nunca se traducen.\n- Tono profesional y cercano.\n\nDatos (JSON):\n${JSON.stringify(items, null, 2)}\n\nResponde EXCLUSIVAMENTE con JSON válido, sin markdown, con esta forma:\n{"1": {"meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}}`;
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 6000, messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error IA' });
+  const data = await response.json();
+  const limpio = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  const traducciones = JSON.parse(limpio);
+  const propuestas = items.map(function(i) {
+    const t = traducciones[i.destino_id] || traducciones[String(i.destino_id)] || {};
+    return { destino_id: i.destino_id, nombre: i.nombre,
+      titulo_sugerido: t.meta_title || '', descripcion_sugerida: t.meta_description || '',
+      texto_sugerido: t.texto_descripcion || '' };
+  });
+  res.json({ ok: true, propuestas });
 }));
 
 // ─── robots.txt y sitemap.xml ────────────────────────────────────────────────
