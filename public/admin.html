@@ -7646,7 +7646,7 @@ function toggleActivarDestino(destinoId, lang, activar) {
 }
 
 function copiarEnlaceDestino(slug, boton) {
-  var url = window.location.origin + '/rutas/gran-canaria/' + slug;
+  var url = window.location.origin + '/destino/gran-canaria/' + slug;
   navigator.clipboard.writeText(url).then(function() {
     var orig = boton.textContent;
     boton.textContent = '✓ ¡Copiado!';
