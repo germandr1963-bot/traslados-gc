@@ -7100,7 +7100,7 @@ function cargarFacturasConductor() {
       }
       var html = '<table class="tabla-admin"><thead><tr>' +
         '<th><input type="checkbox" id="chk-todas-fc" onchange="toggleTodasFacturas(this.checked)"></th>' +
-        '<th>N Factura</th><th>Fecha</th><th>Conductor</th><th>Reserva</th><th>Ruta</th><th>Importe</th><th>Estado</th>' +
+        '<th>N Factura</th><th>Fecha</th><th>Conductor</th><th>Reserva</th><th>Ruta</th><th>Importe</th><th>Estado</th><th></th>' +
         '</tr></thead><tbody>';
       rows.forEach(function(r) {
         var estado = r.enviada_email
@@ -7115,6 +7115,10 @@ function cargarFacturasConductor() {
           '<td style="font-size:12px;color:var(--texto-muted);">' + (r.origen || '-') + ' a ' + (r.destino || '-') + '</td>' +
           '<td><strong>' + euros(r.importe) + '</strong></td>' +
           '<td>' + estado + '</td>' +
+          '<td style="white-space:nowrap;">' +
+          '<a href="/admin/contabilidad/factura-comision-pdf/' + (r.numero_factura||'') + '" target="_blank" class="boton-secundario" style="font-size:0.75rem;padding:4px 10px;margin-top:0;text-decoration:none;">Descargar</a>' +
+          ' <button class="boton-costa" style="font-size:0.75rem;padding:4px 10px;margin-top:0;" onclick="reenviarFacturaConductor(' + r.id + ', this)">Reenviar</button>' +
+          '</td>' +
           '</tr>';
       });
       html += '</tbody></table>';
@@ -7129,6 +7133,29 @@ function cargarFacturasConductor() {
 function seleccionarTodasFacturas() {
   var chk = document.getElementById('chk-todas-fc');
   if (chk) { chk.checked = true; toggleTodasFacturas(true); }
+}
+
+function reenviarFacturaConductor(id, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  fetch('/admin/contabilidad/facturas-comision/' + id + '/reenviar-conductor', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        btn.textContent = 'Enviado';
+        btn.style.color = 'var(--verde-ok)';
+      } else {
+        btn.textContent = 'Error';
+        btn.style.color = 'var(--rojo-error)';
+        btn.disabled = false;
+        alert(d.error || 'Error al reenviar.');
+      }
+    })
+    .catch(function() {
+      btn.textContent = 'Error';
+      btn.style.color = 'var(--rojo-error)';
+      btn.disabled = false;
+    });
 }
 
 function toggleTodasFacturas(val) {
