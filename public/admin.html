@@ -7367,6 +7367,13 @@ comprobarSesion();
 // PÁGINA RUTAS — SEO DESTINOS
 // ═══════════════════════════════════════════════════════════════════════════
 
+function opcionesPrioridadDestino(valorActual) {
+  var niveles = [[1.0, 'Alta (1.0)'], [0.8, 'Media (0.8)'], [0.5, 'Baja (0.5)']];
+  return niveles.map(function(n) {
+    return '<option value="' + n[0] + '"' + (parseFloat(valorActual) === n[0] ? ' selected' : '') + '>' + n[1] + '</option>';
+  }).join('');
+}
+
 var editorDestinoCache = {};
 
 function cargarPaginaRutas() {
@@ -7453,7 +7460,7 @@ function abrirEditorDestino(destinoId) {
         '<div><label class="etiqueta" style="font-size:11px;">Orden en la rejilla</label>' +
         '<input class="campo" id="dest-orden" type="number" value="' + (primerIdioma.orden || 99) + '" style="height:32px;width:80px;"></div>' +
         '<div><label class="etiqueta" style="font-size:11px;">Prioridad sitemap</label>' +
-        '<select id="dest-sitemap-prioridad" class="campo" style="height:32px;">' + opcionesPrioridad() + '</select></div>' +
+        '<select id="dest-sitemap-prioridad" class="campo" style="height:32px;">' + opcionesPrioridadDestino(primerIdioma.sitemap_prioridad || 0.8) + '</select></div>' +
         '<button class="boton-costa" style="padding:7px 14px;font-size:0.82rem;" onclick="guardarConfigDestino(' + destinoId + ')">Guardar config</button>' +
         '</div>' +
         '<div style="margin-top:10px;display:flex;align-items:center;gap:12px;">' +
@@ -7484,10 +7491,6 @@ function abrirEditorDestino(destinoId) {
       // Cargar fotos y primer idioma
       cargarFotosDestino(destinoId);
       cambiarIdiomaEditorDestino(destinoId, 'es', editor.querySelector('.tab-idioma'));
-
-      // Ajustar prioridad al valor guardado
-      var selPrior = document.getElementById('dest-sitemap-prioridad');
-      if (selPrior && primerIdioma.sitemap_prioridad) selPrior.value = String(primerIdioma.sitemap_prioridad);
     });
 }
 
