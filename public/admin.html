@@ -7099,15 +7099,15 @@ function cargarFacturasConductor() {
         return;
       }
       var html = '<table class="tabla-admin"><thead><tr>' +
-        '<th style="width:30px;"><input type="checkbox" id="chk-todas-fc" onchange="toggleTodasFacturas(this.checked)"></th>' +
-        '<th>N Factura</th>' +
-        '<th>Fecha</th>' +
-        '<th>Conductor</th>' +
-        '<th>Reserva</th>' +
-        '<th style="width:220px;">Ruta</th>' +
-        '<th>Importe</th>' +
-        '<th>Estado</th>' +
-        '<th></th>' +
+        '<th style="width:28px;"><input type="checkbox" id="chk-todas-fc" onchange="toggleTodasFacturas(this.checked)"></th>' +
+        '<th style="white-space:nowrap;">N Factura</th>' +
+        '<th style="white-space:nowrap;">Fecha</th>' +
+        '<th style="white-space:nowrap;">Conductor</th>' +
+        '<th style="white-space:nowrap;">Reserva</th>' +
+        '<th>Ruta</th>' +
+        '<th style="white-space:nowrap;">Importe</th>' +
+        '<th style="white-space:nowrap;">Estado</th>' +
+        '<th style="white-space:nowrap;"></th>' +
         '</tr></thead><tbody>';
       rows.forEach(function(r) {
         var estado = r.enviada_email
@@ -7119,7 +7119,7 @@ function cargarFacturasConductor() {
           '<td>' + fechaCorta(r.fecha) + '</td>' +
           '<td>' + (r.nombre_conductor || '-') + '</td>' +
           '<td style="padding-left:12px;">' + (r.reserva_pnr || '-') + '</td>' +
-          '<td style="font-size:12px;color:var(--texto-muted);white-space:normal;overflow-wrap:break-word;word-break:break-word;">' + (r.origen || '-') + ' a ' + (r.destino || '-') + '</td>' +
+          '<td style="font-size:12px;color:var(--texto-muted);white-space:normal;overflow-wrap:break-word;word-break:break-word;min-width:160px;">' + (r.origen || '-') + ' → ' + (r.destino || '-') + '</td>' +
           '<td><strong>' + euros(r.importe) + '</strong></td>' +
           '<td>' + estado + '</td>' +
           '<td style="white-space:nowrap;">' +
