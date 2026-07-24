@@ -7437,8 +7437,10 @@ function abrirEditorDestino(destinoId) {
   fetch('/admin/seo/destinos/' + destinoId + '/completo')
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      var idiomas = Object.keys(d.idiomas);
-      var primerIdioma = d.idiomas[idiomas[0]] || {};
+      // ES siempre primero, luego el resto en el orden que vengan
+      var todosIdiomas = Object.keys(d.idiomas);
+      var idiomas = ['es'].concat(todosIdiomas.filter(function(l) { return l !== 'es'; }));
+      var primerIdioma = d.idiomas['es'] || d.idiomas[idiomas[0]] || {};
       var nombre = primerIdioma.nombre || 'Destino';
       var tabs = idiomas.map(function(lang) {
         var info = d.idiomas[lang] || {};
