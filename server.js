@@ -1663,19 +1663,19 @@ Un saludo cordial, 🙏
       cuerpo_email: `
 Hola, <strong>{nombre_chofer}</strong> 👋
 
-Adjuntamos la factura de comisi\u00f3n <strong>{numero_factura}</strong> por la intermediaci\u00f3n del traslado que realizaste con nosotros.
+Adjuntamos la factura de comisi\u00f3n <strong>{numero_factura}</strong> por la intermediaci\u00f3n del traslado <strong>{numero_reserva}</strong>.
 <div class="info-box">
   🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span>
   📍 <strong>Ruta:</strong> {origen} → {destino}
   📅 <strong>Fecha del servicio:</strong> {fecha}
-  💶 <strong>Importe:</strong> {importe} €
+  💶 <strong>Importe de comisi\u00f3n:</strong> {importe} €
 </div>
-Gracias por tu colaboraci\u00f3n. Seguimos contando contigo para los pr\u00f3ximos servicios.
+Gracias por tu colaboraci\u00f3n.
 
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\\n\\nAdjuntamos la factura de comisi\u00f3n *{numero_factura}* por la intermediaci\u00f3n del traslado que realizaste con nosotros.\\n\\n🔖 *Reserva:* {numero_reserva}\\n📍 *Ruta:* {origen} → {destino}\\n📅 *Fecha:* {fecha}\\n💶 *Importe:* {importe} €\\n\\nGracias por tu colaboraci\u00f3n. Seguimos contando contigo para los pr\u00f3ximos servicios.\\n\\nUn saludo cordial, 🙏\\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola {nombre_chofer}, te hemos enviado por email la factura de comision {numero_factura} por el traslado {numero_reserva} ({origen} a {destino}) por importe de {importe} EUR. Gracias por tu colaboracion. El equipo de Traslados GC' },
     { clave: 'interno_cliente_modifico', nombre: '[Admin] Cliente modific\u00f3 datos de reserva', categoria: 'interno',
       asunto_email: '\u270f\ufe0f Cliente modific\u00f3 datos \u2014 {numero_reserva}',
       cuerpo_email: `
