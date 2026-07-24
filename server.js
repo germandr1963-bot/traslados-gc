@@ -1658,6 +1658,24 @@ Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n{mensaje_libre}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+    { clave: 'chofer_factura_comision', nombre: 'Factura de comisi\u00f3n (al chofer)', categoria: 'chofer',
+      asunto_email: 'Factura de comisi\u00f3n {numero_factura} \u2014 Reserva {numero_reserva}',
+      cuerpo_email: `
+Hola, <strong>{nombre_chofer}</strong> 👋
+
+Adjuntamos la factura de comisi\u00f3n <strong>{numero_factura}</strong> por la intermediaci\u00f3n del traslado que realizaste con nosotros.
+<div class="info-box">
+  🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span>
+  📍 <strong>Ruta:</strong> {origen} → {destino}
+  📅 <strong>Fecha del servicio:</strong> {fecha}
+  💶 <strong>Importe:</strong> {importe} €
+</div>
+Gracias por tu colaboraci\u00f3n. Seguimos contando contigo para los pr\u00f3ximos servicios.
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
+`,
+      cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\\n\\nAdjuntamos la factura de comisi\u00f3n *{numero_factura}* por la intermediaci\u00f3n del traslado que realizaste con nosotros.\\n\\n🔖 *Reserva:* {numero_reserva}\\n📍 *Ruta:* {origen} → {destino}\\n📅 *Fecha:* {fecha}\\n💶 *Importe:* {importe} €\\n\\nGracias por tu colaboraci\u00f3n. Seguimos contando contigo para los pr\u00f3ximos servicios.\\n\\nUn saludo cordial, 🙏\\n*El equipo de Traslados GC*' },
     { clave: 'interno_cliente_modifico', nombre: '[Admin] Cliente modific\u00f3 datos de reserva', categoria: 'interno',
       asunto_email: '\u270f\ufe0f Cliente modific\u00f3 datos \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -9254,26 +9272,52 @@ app.post('/admin/contabilidad/comisiones/:id/factura-conductor', requireAdmin, a
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,FALSE)`,
     [numFactura, f.id, f.conductor_id||null, f.nombre_conductor||null, f.email_conductor||null, f.telefono_conductor||null, f.numero_reserva||null, f.origen||null, f.destino||null, f.fecha_viaje||null, comision, pdfBuffer]
   );
+  // Obtener plantilla
+  var _pfc = await obtenerPlantilla('chofer_factura_comision', {
+    nombre_chofer: f.nombre_conductor || '',
+    numero_factura: numFactura,
+    numero_reserva: f.numero_reserva || '—',
+    origen: f.origen || '—',
+    destino: f.destino || '—',
+    fecha: fechaViaje,
+    importe: comision.toFixed(2)
+  });
   // Email al conductor
   if (f.email_conductor) {
     try {
       await enviarEmailConAdjunto({
         to: f.email_conductor,
-        subject: 'Factura comision ' + numFactura + ' — Reserva ' + f.numero_reserva,
-        html: plantillaEmail('<p>Estimado/a <strong>'+(f.nombre_conductor||'conductor')+'</strong>,</p><p>Adjuntamos la factura de comision <strong>'+numFactura+'</strong> por la intermediacion del traslado <strong>'+(f.numero_reserva||'—')+'</strong>.</p><p>Ruta: '+(f.origen||'—')+' a '+(f.destino||'—')+'<br>Fecha: '+fechaViaje+'</p><p>Importe: <strong>'+comision.toFixed(2)+' EUR</strong></p><p>Gracias por su colaboracion.<br><strong>El equipo de Traslados GC</strong></p>'),
-        adjunto: { filename: 'factura-comision-'+numFactura+'.pdf', content: pdfBuffer }
+        subject: (_pfc && _pfc.asunto) || ('Factura de comision ' + numFactura + ' — Reserva ' + f.numero_reserva),
+        html: plantillaEmail((_pfc && _pfc.email) || ('<p>Adjuntamos la factura de comision <strong>' + numFactura + '</strong>.</p>')),
+        adjunto: { filename: 'factura-comision-' + numFactura + '.pdf', content: pdfBuffer }
       });
       await pool.query('UPDATE contab_facturas_comision SET enviada_email=TRUE WHERE numero_factura=$1', [numFactura]);
     } catch(e) { console.warn('Email factura conductor:', e.message); }
   }
-  // WhatsApp al conductor
+  // WhatsApp al conductor con PDF adjunto
   if (f.telefono_conductor) {
     try {
-      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1,$2)',
-        [f.telefono_conductor, 'Hola '+(f.nombre_conductor||'')+', te hemos enviado por email la factura de comision '+numFactura+' por el traslado '+(f.numero_reserva||'—')+' ('+(f.origen||'—')+' a '+(f.destino||'—')+') por importe de '+comision.toFixed(2)+' EUR. Gracias por tu colaboracion. El equipo de Traslados GC']);
+      var nombreDocFC = 'factura-comision-' + numFactura + '.pdf';
+      var codigoFC = await generarCodigoCorto('factura_comision', null, null, null);
+      await pool.query('UPDATE url_cortas SET url_destino=$1 WHERE codigo=$2', ['/admin/contabilidad/factura-comision-pdf/' + numFactura, codigoFC]);
+      var urlDocFC = BASE_URL + '/v/' + codigoFC;
+      var textoWaFC = (_pfc && _pfc.whatsapp) || ('Hola ' + (f.nombre_conductor || '') + ', adjuntamos la factura de comision ' + numFactura + ' por el traslado ' + (f.numero_reserva || '—') + '. Gracias por tu colaboracion. El equipo de Traslados GC');
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1,$2,$3,$4)',
+        [f.telefono_conductor, textoWaFC, urlDocFC, nombreDocFC]
+      );
     } catch(e) { console.warn('WA factura conductor:', e.message); }
   }
   res.json({ ok: true, numero_factura: numFactura, importe: comision });
+}));
+
+// GET PDF factura comision (para enlace WhatsApp)
+app.get('/admin/contabilidad/factura-comision-pdf/:numero', asyncHandler(async function(req, res) {
+  var row = await pool.query('SELECT pdf, numero_factura FROM contab_facturas_comision WHERE numero_factura=$1 LIMIT 1', [req.params.numero]);
+  if (!row.rows.length || !row.rows[0].pdf) return res.status(404).send('No encontrado');
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'inline; filename="factura-comision-' + row.rows[0].numero_factura + '.pdf"');
+  res.send(row.rows[0].pdf);
 }));
 
 // GET listado facturas de comision
