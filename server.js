@@ -3292,16 +3292,24 @@ app.post('/admin/seo/destinos/:id/generar-texto', requireAdmin, asyncHandler(asy
   if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado' });
   const d = destino.rows[0];
   const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || 'español';
-  const prompt = `Eres un experto en SEO y redacción de contenido turístico para webs de transporte privado.
-Escribe un texto descriptivo en ${lang === 'es' ? 'español' : nombreIdioma} para la página del destino "${d.nombre}" (${d.isla}, zona: ${d.zona || 'no especificada'}) dentro de una web de traslados intermunicipales privados en ${d.isla}.
+  const prompt = `Eres un redactor de viajes con mucho oficio. Escribes para personas reales, no para algoritmos. Tu estilo es cercano, evocador y directo — el tipo de texto que hace que alguien cierre el ordenador y reserve un viaje.
 
-Requisitos SEO y de contenido:
-- Entre 180 y 250 palabras exactamente.
-- Incluye de forma natural las palabras clave: "${d.nombre}", "traslado privado", "${d.isla}", y términos relacionados con el lugar.
-- Estructura: 3 párrafos. Primero: qué es el lugar y por qué visitarlo. Segundo: cómo llegar desde los puntos principales de la isla (sin inventar precios ni tiempos exactos). Tercero: llamada a la acción para reservar el traslado.
-- Tono: profesional, cálido, orientado al viajero. Sin exageraciones ni superlativos vacíos.
-- No menciones nombres de competidores ni precios concretos.
-- No uses listas con viñetas — solo párrafos fluidos.
+Escribe un texto en ${lang === 'es' ? 'español' : nombreIdioma} para la página del destino "${d.nombre}" en ${d.isla}. Este texto aparece en una web de traslados privados intermunicipales — pero no lo menciones de forma forzada. El objetivo es que el lector quiera ir a ese lugar, y que de forma natural entienda que puede llegar cómodamente con un traslado privado.
+
+Estructura en 3 párrafos, entre 200 y 260 palabras en total:
+
+Párrafo 1 — El lugar: Qué hace especial a "${d.nombre}". Qué se puede ver, sentir o vivir allí. Usa detalles concretos y sensoriales del lugar real — paisaje, ambiente, gastronomía, cultura, historia, lo que sea auténtico de ese destino. Nada genérico. Que el lector lo visualice.
+
+Párrafo 2 — Cómo llegar: Contextualiza la distancia desde los principales puntos de ${d.isla} de forma natural, sin inventar tiempos ni precios exactos. Introduce la idea del traslado privado como la forma más cómoda de llegar — especialmente útil con equipaje, en familia, o llegando en avión. Que suene a consejo de alguien que conoce la isla, no a publicidad.
+
+Párrafo 3 — Invitación: Una llamada a la acción cálida y directa. Que reserve su traslado, que no pierda tiempo buscando, que nosotros nos encargamos del trayecto para que él disfrute del destino desde el primer momento.
+
+Reglas de estilo:
+- Cero frases hechas del tipo "joya escondida", "paraíso", "imprescindible" o "no te lo puedes perder".
+- Sin listas. Solo párrafos fluidos.
+- Que no parezca escrito por una IA. Nada de estructura rígida ni frases simétricas.
+- Incluye de forma natural las palabras clave: "${d.nombre}", "traslado privado", "${d.isla}".
+- No menciones precios, competidores ni datos inventados.
 
 Responde ÚNICAMENTE con el texto, sin título, sin comentarios, sin comillas.`;
 
