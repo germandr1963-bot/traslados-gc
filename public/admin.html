@@ -166,6 +166,7 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="valoraciones">Valoraciones</button>
        <button class="item-menu" data-seccion="comunicaciones">Comunicaciones</button>
       <button class="item-menu" data-seccion="contabilidad">&#128210; Contabilidad</button>
+      <button class="item-menu" data-seccion="pagina-rutas">&#127758; Página Rutas</button>
     </div>
     <button id="boton-salir" style="margin-top:16px;opacity:0.5;width:100%;">Cerrar sesión</button>
   </div>
@@ -1575,6 +1576,37 @@ table.tabla-precios input {
     </div>
     <!-- FIN CONTABILIDAD -->
 
+    <div id="seccion-pagina-rutas" class="oculto">
+      <h1>🌍 Página Rutas — SEO Destinos</h1>
+      <p class="subtitulo">Gestiona los destinos que aparecen en la página pública /rutas. Cada destino tiene su propia página con fotos, texto descriptivo y datos SEO por idioma. Los slugs, rutas y demás datos vienen de las secciones Destinos y Rutas y precios — aquí solo se enriquece y activa.</p>
+
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <div style="background:var(--gris-fondo);padding:10px 14px;border-radius:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:13px;">🤖 Traducir título, descripción y texto con IA:</span>
+          <select id="select-idioma-ia-destinos" class="campo" style="height:34px;width:auto;"></select>
+          <button class="boton-costa" onclick="traducirDestinosSEOConIA()">Traducir lo que falte</button>
+        </div>
+      </div>
+
+      <div id="revision-seo-destinos-ia" class="tarjeta oculto" style="margin-bottom:20px;"></div>
+      <div id="mensaje-pagina-rutas" style="margin-bottom:12px;"></div>
+
+      <table class="tabla-admin">
+        <thead>
+          <tr>
+            <th>Destino</th>
+            <th>Isla</th>
+            <th>Zona</th>
+            <th>Visible</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-pagina-rutas-cuerpo"></tbody>
+      </table>
+
+      <div id="editor-pagina-rutas" class="tarjeta oculto" style="margin-top:20px;max-width:760px;"></div>
+    </div>
+
   </div>
 </div>
 
@@ -1626,7 +1658,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo', 'valoraciones', 'comunicaciones', 'contabilidad'].forEach(function (s) {
+    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo', 'valoraciones', 'comunicaciones', 'contabilidad', 'pagina-rutas'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
@@ -1645,6 +1677,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); cargarPreferencias(); cargarSugerenciasPreferencias(); }
     if (boton.dataset.seccion === 'clientes') cargarClientes();
     if (boton.dataset.seccion === 'equipo') cargarEquipo();
+    if (boton.dataset.seccion === 'pagina-rutas') cargarPaginaRutas();
     if (boton.dataset.seccion === 'valoraciones') cargarValoraciones();
     if (boton.dataset.seccion === 'comunicaciones') { cargarPlantillasCom(); iniciarEditorMarca(); }
   });
@@ -7329,6 +7362,366 @@ function _guardarEmailsGestoria(arr) {
 }
 
 comprobarSesion();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PÁGINA RUTAS — SEO DESTINOS
+// ═══════════════════════════════════════════════════════════════════════════
+
+var editorDestinoCache = {};
+
+function cargarPaginaRutas() {
+  var cuerpo = document.getElementById('tabla-pagina-rutas-cuerpo');
+  cuerpo.innerHTML = '<tr><td colspan="5" style="color:var(--texto-muted)">Cargando...</td></tr>';
+
+  // Cargar selector de idiomas para traducción IA
+  fetch('/admin/idiomas').then(function(r) { return r.json(); }).then(function(idiomas) {
+    var select = document.getElementById('select-idioma-ia-destinos');
+    if (select) {
+      select.innerHTML = idiomas.filter(function(i) { return !i.es_base; })
+        .map(function(i) { return '<option value="' + i.codigo + '">' + i.nombre + '</option>'; }).join('');
+    }
+  });
+
+  fetch('/admin/seo/destinos')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      editorDestinoCache = d.seo || {};
+      var destinos = d.destinos || [];
+      var idiomas = d.idiomas || [];
+      if (destinos.length === 0) {
+        cuerpo.innerHTML = '<tr><td colspan="5" style="color:var(--texto-muted)">No hay destinos.</td></tr>';
+        return;
+      }
+      var html = '';
+      destinos.forEach(function(dest) {
+        var seo = editorDestinoCache[dest.id] || {};
+        var badgesIdioma = idiomas.map(function(lang) {
+          var s = seo[lang] || {};
+          var color = s.activo ? '#2e7d32' : (s.titulo ? '#b8860b' : '#aaa');
+          var bg = s.activo ? '#e8f5e9' : (s.titulo ? '#fff8e1' : '#f5f5f5');
+          return '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:' + bg + ';color:' + color + ';margin:1px;">' + lang.toUpperCase() + '</span>';
+        }).join('');
+        var visibleBadge = dest.visible_rutas
+          ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#e8f5e9;color:#2e7d32;">✓ Visible</span>'
+          : '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#f5f5f5;color:#aaa;">Oculto</span>';
+        html += '<tr>' +
+          '<td><strong>' + escapar(dest.nombre) + '</strong><br><div style="margin-top:4px;">' + badgesIdioma + '</div></td>' +
+          '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(dest.isla || 'Gran Canaria') + '</td>' +
+          '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(dest.zona || '—') + '</td>' +
+          '<td>' + visibleBadge + '</td>' +
+          '<td style="white-space:nowrap;">' +
+          '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 10px;" onclick="abrirEditorDestino(' + dest.id + ')">✏️ Editar</button>' +
+          '</td>' +
+          '</tr>';
+      });
+      cuerpo.innerHTML = html;
+    })
+    .catch(function() {
+      cuerpo.innerHTML = '<tr><td colspan="5" style="color:var(--rojo-error)">Error al cargar.</td></tr>';
+    });
+}
+
+function abrirEditorDestino(destinoId) {
+  var editor = document.getElementById('editor-pagina-rutas');
+  editor.classList.remove('oculto');
+  editor.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  fetch('/admin/seo/destinos/' + destinoId + '/completo')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var idiomas = Object.keys(d.idiomas);
+      var primerIdioma = d.idiomas[idiomas[0]] || {};
+      var nombre = primerIdioma.nombre || 'Destino';
+      var tabs = idiomas.map(function(lang) {
+        var info = d.idiomas[lang] || {};
+        var excede = info.excede;
+        return '<button class="tab-idioma' + (lang === 'es' ? ' activo' : '') + (excede ? ' tab-idioma-rojo' : '') + '" ' +
+          'id="tab-dest-idioma-' + lang + '" ' +
+          'onclick="cambiarIdiomaEditorDestino(' + destinoId + ', \'' + lang + '\', this)">' +
+          lang.toUpperCase() + (excede ? ' ⚠️' : '') + '</button>';
+      }).join('');
+
+      editor.innerHTML =
+        '<h2 style="margin-top:0">✏️ SEO Destino: ' + escapar(nombre) + '</h2>' +
+
+        // Configuración general
+        '<div style="background:var(--gris-fondo);padding:12px 14px;border-radius:8px;margin-bottom:18px;">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end;flex-wrap:wrap;">' +
+        '<div><label class="etiqueta" style="font-size:11px;">Zona</label>' +
+        '<input class="campo" id="dest-zona" type="text" placeholder="Sur, Norte, Capital..." value="' + escapar(primerIdioma.zona || '') + '" style="height:32px;"></div>' +
+        '<div><label class="etiqueta" style="font-size:11px;">Orden en la rejilla</label>' +
+        '<input class="campo" id="dest-orden" type="number" value="' + (primerIdioma.orden || 99) + '" style="height:32px;width:80px;"></div>' +
+        '<div><label class="etiqueta" style="font-size:11px;">Prioridad sitemap</label>' +
+        '<select id="dest-sitemap-prioridad" class="campo" style="height:32px;">' + opcionesPrioridad() + '</select></div>' +
+        '<button class="boton-costa" style="padding:7px 14px;font-size:0.82rem;" onclick="guardarConfigDestino(' + destinoId + ')">Guardar config</button>' +
+        '</div>' +
+        '<div style="margin-top:10px;display:flex;align-items:center;gap:12px;">' +
+        '<label style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;">' +
+        '<input type="checkbox" id="dest-visible" ' + (primerIdioma.visible_rutas ? 'checked' : '') + '> Visible en página /rutas</label>' +
+        '<span style="font-size:12px;color:var(--texto-muted);">— Si está desmarcado no aparece en la web aunque tenga páginas activas</span>' +
+        '</div>' +
+        '</div>' +
+
+        // Fotos carrusel
+        '<div style="background:var(--gris-fondo);padding:12px 14px;border-radius:8px;margin-bottom:18px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+        '<label class="etiqueta" style="font-size:11px;">Fotos del destino (carrusel)</label>' +
+        '<label class="boton-secundario" style="cursor:pointer;padding:5px 12px;font-size:0.78rem;">' +
+        '+ Añadir foto <input type="file" accept="image/*" style="display:none;" onchange="subirFotoDestino(' + destinoId + ', this)"></label>' +
+        '</div>' +
+        '<div id="fotos-destino-' + destinoId + '" style="display:flex;gap:8px;flex-wrap:wrap;min-height:60px;">' +
+        '<span style="font-size:12px;color:var(--texto-muted);">Cargando fotos...</span>' +
+        '</div>' +
+        '</div>' +
+
+        // Pestañas idioma
+        '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
+        '<div id="dest-campos-editor"></div>' +
+        '<div id="dest-mensaje-editor" style="margin-top:8px;"></div>' +
+        '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-pagina-rutas\').classList.add(\'oculto\')">Cerrar</button>';
+
+      // Cargar fotos y primer idioma
+      cargarFotosDestino(destinoId);
+      cambiarIdiomaEditorDestino(destinoId, 'es', editor.querySelector('.tab-idioma'));
+
+      // Ajustar prioridad al valor guardado
+      var selPrior = document.getElementById('dest-sitemap-prioridad');
+      if (selPrior && primerIdioma.sitemap_prioridad) selPrior.value = String(primerIdioma.sitemap_prioridad);
+    });
+}
+
+function cargarFotosDestino(destinoId) {
+  fetch('/admin/seo/destinos/' + destinoId + '/fotos')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var cont = document.getElementById('fotos-destino-' + destinoId);
+      if (!cont) return;
+      if (!d.fotos || d.fotos.length === 0) {
+        cont.innerHTML = '<span style="font-size:12px;color:var(--texto-muted);">Sin fotos todavía.</span>';
+        return;
+      }
+      cont.innerHTML = d.fotos.map(function(f) {
+        return '<div style="position:relative;width:100px;height:65px;border-radius:6px;overflow:hidden;border:1px solid var(--gris-borde);">' +
+          '<img src="/destino-foto/' + f.id + '" style="width:100%;height:100%;object-fit:cover;">' +
+          '<button onclick="eliminarFotoDestino(' + destinoId + ',' + f.id + ')" ' +
+          'style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:3px;padding:1px 5px;font-size:10px;cursor:pointer;">✕</button>' +
+          '</div>';
+      }).join('');
+    });
+}
+
+function subirFotoDestino(destinoId, input) {
+  var file = input.files[0];
+  if (!file) return;
+  comprimirImagenOG(file, function(dataUrl) {
+    fetch('/admin/seo/destinos/' + destinoId + '/fotos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imagen: dataUrl, alt_texto: '' })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      if (d.ok) cargarFotosDestino(destinoId);
+      else alert(d.error || 'Error al subir foto.');
+    });
+  });
+}
+
+function eliminarFotoDestino(destinoId, fotoId) {
+  if (!confirm('¿Eliminar esta foto?')) return;
+  fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/eliminar', { method: 'POST' })
+    .then(function() { cargarFotosDestino(destinoId); });
+}
+
+function guardarConfigDestino(destinoId) {
+  var datos = {
+    zona: (document.getElementById('dest-zona') || {}).value || '',
+    orden: (document.getElementById('dest-orden') || {}).value || 99,
+    isla: 'Gran Canaria',
+    visible_rutas: document.getElementById('dest-visible') ? document.getElementById('dest-visible').checked : false,
+    sitemap_prioridad: (document.getElementById('dest-sitemap-prioridad') || {}).value || 0.8,
+    sitemap_frecuencia: 'monthly'
+  };
+  fetch('/admin/seo/destinos/' + destinoId + '/config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos)
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var msg = document.getElementById('dest-mensaje-editor');
+    if (msg) {
+      msg.innerHTML = d.ok ? '<div class="aviso-ok">✅ Configuración guardada</div>' : '<div class="aviso-error">Error: ' + escapar(d.error || '') + '</div>';
+      setTimeout(function() { msg.innerHTML = ''; }, 3000);
+    }
+    if (d.ok) cargarPaginaRutas();
+  });
+}
+
+function cambiarIdiomaEditorDestino(destinoId, lang, botonTab) {
+  document.querySelectorAll('.tab-idioma').forEach(function(b) { b.classList.remove('activo'); });
+  if (botonTab) botonTab.classList.add('activo');
+  fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + lang)
+    .then(function(r) { return r.json(); })
+    .then(function(datos) { renderizarCamposDestinoSEO(destinoId, lang, datos); });
+}
+
+function renderizarCamposDestinoSEO(destinoId, lang, datos) {
+  var activo = datos.activo || false;
+  var slug = escapar(datos.slug_url || '');
+  var titulo = escapar(datos.meta_title || '');
+  var desc = datos.meta_description || '';
+  var texto = datos.texto_descripcion || '';
+  var campos = document.getElementById('dest-campos-editor');
+  if (!campos) return;
+
+  campos.innerHTML =
+    // Estado activo/inactivo
+    '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--gris-fondo);border-radius:8px;margin-bottom:16px;flex-wrap:wrap;">' +
+    '<span style="font-size:14px;">' + (activo ? '🟢 Esta página <strong>está activa</strong> en internet' : '⚪ Esta página <strong>está desactivada</strong>') + '</span>' +
+    '<button class="' + (activo ? 'boton-peligro' : 'boton-costa') + '" style="padding:6px 14px;font-size:0.82rem;" ' +
+    'onclick="toggleActivarDestino(' + destinoId + ', \'' + lang + '\', ' + (!activo) + ')">' + (activo ? 'Desactivar' : 'Activar') + '</button>' +
+    (activo ? '<button class="boton-secundario" style="padding:6px 14px;font-size:0.82rem;" onclick="copiarEnlaceDestino(\'' + slug + '\', this)">🔗 Copiar enlace</button>' : '') +
+    '</div>' +
+
+    // Slug
+    '<label class="etiqueta">URL amigable (slug) — se genera automáticamente, edítalo solo si es necesario</label>' +
+    '<input class="campo" id="dest-slug" type="text" value="' + slug + '" ' +
+    'oninput="validarSlugEnVivo(this)" style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;">' +
+    '<div id="seo-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
+
+    // Meta title
+    '<label class="etiqueta">Título para Google (máx. 600px de ancho real)</label>' +
+    '<input class="campo" id="dest-titulo" type="text" value="' + titulo + '" ' +
+    'oninput="contarPxSEO(this,\'dest-titulo-count\',600,\'20px arial\')" style="margin-bottom:4px;">' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:12px;" id="dest-titulo-count">' + medirPx(datos.meta_title || '', '20px arial') + ' / 600 px</div>' +
+
+    // Meta description
+    '<label class="etiqueta">Descripción para Google (máx. 960px de ancho real)</label>' +
+    '<textarea class="campo" id="dest-desc" rows="3" ' +
+    'oninput="contarPxSEO(this,\'dest-desc-count\',960,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="dest-desc-count">' + medirPx(desc, '13px arial') + ' / 960 px</div>' +
+
+    // Texto descriptivo
+    '<label class="etiqueta">Texto descriptivo del destino (visible en la página pública — SEO friendly)</label>' +
+    '<div style="display:flex;gap:8px;margin-bottom:6px;">' +
+    '<button class="boton-costa" style="padding:5px 12px;font-size:0.78rem;" onclick="generarTextoDestinoIA(' + destinoId + ', \'' + lang + '\')">✨ Generar con IA</button>' +
+    '<span style="font-size:12px;color:var(--texto-muted);align-self:center;">— Genera un texto SEO optimizado de 180-250 palabras</span>' +
+    '</div>' +
+    '<textarea class="campo" id="dest-texto" rows="8" style="margin-bottom:16px;font-size:13px;line-height:1.6;">' + escapar(texto) + '</textarea>' +
+
+    '<button class="boton-primario" onclick="guardarDestinoSEO(' + destinoId + ', \'' + lang + '\')">💾 Guardar</button>' +
+    '<div id="dest-mensaje-editor" style="margin-top:8px;"></div>';
+}
+
+function guardarDestinoSEO(destinoId, lang) {
+  var slugInput = document.getElementById('dest-slug');
+  var slugVal = slugInput ? slugInput.value.trim() : '';
+  var errorSlug = validarSlug(slugVal);
+  var msg = document.getElementById('dest-mensaje-editor');
+  if (errorSlug) {
+    if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ URL no válida: ' + errorSlug + '</div>';
+    return;
+  }
+  var datos = {
+    slug_url: slugVal,
+    meta_title: (document.getElementById('dest-titulo') || {}).value || '',
+    meta_description: (document.getElementById('dest-desc') || {}).value || '',
+    texto_descripcion: (document.getElementById('dest-texto') || {}).value || '',
+    isla: 'Gran Canaria'
+  };
+  fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + lang, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos)
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (msg) {
+      msg.innerHTML = d.ok ? '<div class="aviso-ok">✅ Guardado correctamente</div>' : '<div class="aviso-error">' + escapar(d.error || 'Error') + '</div>';
+      setTimeout(function() { msg.innerHTML = ''; }, 3000);
+    }
+    if (d.ok) cargarPaginaRutas();
+  });
+}
+
+function toggleActivarDestino(destinoId, lang, activar) {
+  fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + lang + '/activar', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activo: activar })
+  }).then(function() {
+    cambiarIdiomaEditorDestino(destinoId, lang, document.getElementById('tab-dest-idioma-' + lang));
+    cargarPaginaRutas();
+  });
+}
+
+function copiarEnlaceDestino(slug, boton) {
+  var url = window.location.origin + '/rutas/gran-canaria/' + slug;
+  navigator.clipboard.writeText(url).then(function() {
+    var orig = boton.textContent;
+    boton.textContent = '✓ ¡Copiado!';
+    setTimeout(function() { boton.textContent = orig; }, 1800);
+  }).catch(function() { prompt('Copia el enlace manualmente:', url); });
+}
+
+function generarTextoDestinoIA(destinoId, lang) {
+  var btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Generando...';
+  fetch('/admin/seo/destinos/' + destinoId + '/generar-texto', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: lang })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    btn.disabled = false;
+    btn.textContent = '✨ Generar con IA';
+    if (d.ok) {
+      var textarea = document.getElementById('dest-texto');
+      if (textarea) textarea.value = d.texto;
+    } else {
+      alert(d.error || 'Error al generar texto.');
+    }
+  }).catch(function() {
+    btn.disabled = false;
+    btn.textContent = '✨ Generar con IA';
+    alert('Error de conexión.');
+  });
+}
+
+function traducirDestinosSEOConIA() {
+  var lang = (document.getElementById('select-idioma-ia-destinos') || {}).value;
+  if (!lang) return;
+  var panel = document.getElementById('revision-seo-destinos-ia');
+  panel.classList.remove('oculto');
+  panel.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Consultando a la IA...</p>';
+  fetch('/admin/seo/destinos/traducir-ia/' + lang, { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok || !d.propuestas || d.propuestas.length === 0) {
+        panel.innerHTML = '<p style="color:#2e7d32;font-size:13px;">✅ Todos los destinos ya tienen título y descripción en ' + lang.toUpperCase() + '.</p>';
+        return;
+      }
+      var html = '<h3 style="margin-top:0;">Propuestas de traducción para ' + lang.toUpperCase() + ' — revisa antes de guardar</h3>';
+      d.propuestas.forEach(function(p) {
+        html += '<div style="border:1px solid var(--gris-borde);border-radius:8px;padding:12px;margin-bottom:12px;">' +
+          '<strong>' + escapar(p.nombre) + '</strong><br>' +
+          '<label class="etiqueta" style="margin-top:8px;">Título</label>' +
+          '<input class="campo" id="trad-dest-titulo-' + p.destino_id + '" value="' + escapar(p.titulo_sugerido) + '" style="margin-bottom:6px;">' +
+          '<label class="etiqueta">Descripción</label>' +
+          '<textarea class="campo" id="trad-dest-desc-' + p.destino_id + '" rows="2">' + escapar(p.descripcion_sugerida) + '</textarea>' +
+          '</div>';
+      });
+      html += '<button class="boton-primario" onclick="guardarTraduccionesDestinos(' + JSON.stringify(d.propuestas.map(function(p){return p.destino_id;})) + ', \'' + lang + '\')">💾 Guardar todas</button>';
+      panel.innerHTML = html;
+    })
+    .catch(function() { panel.innerHTML = '<p style="color:var(--rojo-error);font-size:13px;">Error al conectar con la IA.</p>'; });
+}
+
+function guardarTraduccionesDestinos(ids, lang) {
+  var promesas = ids.map(function(id) {
+    var datos = {
+      meta_title: (document.getElementById('trad-dest-titulo-' + id) || {}).value || '',
+      meta_description: (document.getElementById('trad-dest-desc-' + id) || {}).value || '',
+      isla: 'Gran Canaria', slug_url: ''
+    };
+    return fetch('/admin/seo/destinos/' + id + '/idioma/' + lang, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos)
+    });
+  });
+  Promise.all(promesas).then(function() {
+    var panel = document.getElementById('revision-seo-destinos-ia');
+    if (panel) panel.innerHTML = '<p style="color:#2e7d32;font-size:13px;">✅ Traducciones guardadas.</p>';
+    cargarPaginaRutas();
+  });
+}
 </script>
 
 </body>
