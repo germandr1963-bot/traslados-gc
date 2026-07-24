@@ -9298,8 +9298,8 @@ app.post('/admin/contabilidad/comisiones/:id/factura-conductor', requireAdmin, a
   if (f.telefono_conductor) {
     try {
       var nombreDocFC = 'factura-comision-' + numFactura + '.pdf';
-      var codigoFC = await generarCodigoCorto('factura_comision', null, null, null);
-      await pool.query('UPDATE url_cortas SET url_destino=$1 WHERE codigo=$2', ['/admin/contabilidad/factura-comision-pdf/' + numFactura, codigoFC]);
+      var urlPdfFC = '/admin/contabilidad/factura-comision-pdf/' + numFactura;
+      var codigoFC = await generarCodigoCorto('factura_comision', null, null, urlPdfFC);
       var urlDocFC = BASE_URL + '/v/' + codigoFC;
       var textoWaFC = (_pfc && _pfc.whatsapp) || ('Hola ' + (f.nombre_conductor || '') + ', adjuntamos la factura de comision ' + numFactura + ' por el traslado ' + (f.numero_reserva || '—') + '. Gracias por tu colaboracion. El equipo de Traslados GC');
       await pool.query(
@@ -9352,8 +9352,8 @@ app.post('/admin/contabilidad/facturas-comision/:id/reenviar-conductor', require
   if (fc.telefono_conductor) {
     try {
       var nombreDocFC = 'factura-comision-' + fc.numero_factura + '.pdf';
-      var codigoFC = await generarCodigoCorto('factura_comision', null, null, null);
-      await pool.query('UPDATE url_cortas SET url_destino=$1 WHERE codigo=$2', ['/admin/contabilidad/factura-comision-pdf/' + fc.numero_factura, codigoFC]);
+      var urlPdfFC = '/admin/contabilidad/factura-comision-pdf/' + fc.numero_factura;
+      var codigoFC = await generarCodigoCorto('factura_comision', null, null, urlPdfFC);
       var urlDocFC = BASE_URL + '/v/' + codigoFC;
       var textoWaFC = (_pfc && _pfc.whatsapp) || ('Hola ' + (fc.nombre_conductor || '') + ', te hemos enviado por email la factura de comision ' + fc.numero_factura + '. Gracias por tu colaboracion. El equipo de Traslados GC');
       await pool.query(
