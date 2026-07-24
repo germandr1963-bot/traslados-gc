@@ -9295,14 +9295,11 @@ app.post('/admin/contabilidad/facturas-comision/enviar-gestoria', requireAdmin, 
 
 // GET depósitos retenidos
 app.get('/admin/contabilidad/depositos', requireAdmin, asyncHandler(async function(req, res) {
-  var { desde, hasta, deposito } = req.query;
-  var conditions = ["r.deposito_pagado = TRUE AND r.deposito_liberado IS NOT TRUE"];
+  var { desde, hasta } = req.query;
+  var conditions = ["r.deposito_retenido_noshow = TRUE"];
   var vals = [];
-  if (desde)   { vals.push(desde);   conditions.push('r.fecha::date >= $' + vals.length); }
-  if (hasta)   { vals.push(hasta);   conditions.push('r.fecha::date <= $' + vals.length); }
-  if (deposito === 'no_show')              { conditions.push('r.deposito_retenido_noshow = TRUE'); }
-  if (deposito === 'devolucion_pendiente') { conditions.push('r.deposito_devolucion_pendiente = TRUE'); }
-  if (deposito === 'retenido')             { conditions.push('r.deposito_retenido_noshow IS NOT TRUE AND r.deposito_devolucion_pendiente IS NOT TRUE'); }
+  if (desde) { vals.push(desde); conditions.push('r.fecha::date >= $' + vals.length); }
+  if (hasta) { vals.push(hasta); conditions.push('r.fecha::date <= $' + vals.length); }
   var rows = await pool.query(
     `SELECT r.numero_reserva AS pnr, r.fecha, r.estado AS estado_reserva,
             CASE
@@ -9310,7 +9307,9 @@ app.get('/admin/contabilidad/depositos', requireAdmin, asyncHandler(async functi
               WHEN r.deposito_devolucion_pendiente = TRUE THEN 'devolucion_pendiente'
               ELSE 'retenido'
             END AS estado_deposito,
-            COALESCE(cn.importe_deposito, 10) AS importe_total
+            COALESCE(cn.importe_deposito, 10) AS importe_total,
+            CASE WHEN r.estado = 'cancelada' THEN COALESCE(cn.importe_deposito, 10) ELSE 0 END AS importe_cancelacion_tardia,
+            CASE WHEN r.estado = 'no_show'   THEN COALESCE(cn.importe_deposito, 10) ELSE 0 END AS importe_noshow
      FROM reservas r
      LEFT JOIN configuracion_noshow cn ON cn.es_general = TRUE
      WHERE ` + conditions.join(' AND ') + `
@@ -9376,8 +9375,7 @@ app.get('/admin/contabilidad/resumen', requireAdmin, asyncHandler(async function
     `SELECT COALESCE(SUM(cn.importe_deposito), 0) AS total
      FROM reservas r
      LEFT JOIN configuracion_noshow cn ON cn.es_general = TRUE
-     WHERE r.deposito_pagado = TRUE
-       AND (r.deposito_liberado IS NOT TRUE)
+     WHERE r.deposito_retenido_noshow = TRUE
        AND r.fecha::date BETWEEN $1 AND $2`,
     [desde, hasta]
   );
