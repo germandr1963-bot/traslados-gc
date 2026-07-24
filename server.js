@@ -9320,6 +9320,51 @@ app.get('/admin/contabilidad/factura-comision-pdf/:numero', asyncHandler(async f
   res.send(row.rows[0].pdf);
 }));
 
+// POST reenviar factura de comision al conductor (email + WhatsApp)
+app.post('/admin/contabilidad/facturas-comision/:id/reenviar-conductor', requireAdmin, asyncHandler(async function(req, res) {
+  var fcQ = await pool.query('SELECT * FROM contab_facturas_comision WHERE id=$1 LIMIT 1', [req.params.id]);
+  if (!fcQ.rows.length) return res.status(404).json({ error: 'Factura no encontrada.' });
+  var fc = fcQ.rows[0];
+  if (!fc.pdf) return res.json({ ok: false, error: 'Esta factura no tiene PDF generado.' });
+  var fechaViaje = fc.fecha_viaje ? new Date(fc.fecha_viaje).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+  var _pfc = await obtenerPlantilla('chofer_factura_comision', {
+    nombre_chofer: fc.nombre_conductor || '',
+    numero_factura: fc.numero_factura,
+    numero_reserva: fc.reserva_pnr || '—',
+    origen: fc.origen || '—',
+    destino: fc.destino || '—',
+    fecha: fechaViaje,
+    importe: parseFloat(fc.importe).toFixed(2)
+  });
+  // Email al conductor
+  if (fc.email_conductor) {
+    try {
+      await enviarEmailConAdjunto({
+        to: fc.email_conductor,
+        subject: (_pfc && _pfc.asunto) || ('Factura de comision ' + fc.numero_factura),
+        html: plantillaEmail((_pfc && _pfc.email) || ('<p>Adjuntamos la factura de comision <strong>' + fc.numero_factura + '</strong>.</p>')),
+        adjunto: { filename: 'factura-comision-' + fc.numero_factura + '.pdf', content: fc.pdf }
+      });
+      await pool.query('UPDATE contab_facturas_comision SET enviada_email=TRUE WHERE id=$1', [fc.id]);
+    } catch(e) { console.warn('Email reenvio factura conductor:', e.message); }
+  }
+  // WhatsApp al conductor con PDF
+  if (fc.telefono_conductor) {
+    try {
+      var nombreDocFC = 'factura-comision-' + fc.numero_factura + '.pdf';
+      var codigoFC = await generarCodigoCorto('factura_comision', null, null, null);
+      await pool.query('UPDATE url_cortas SET url_destino=$1 WHERE codigo=$2', ['/admin/contabilidad/factura-comision-pdf/' + fc.numero_factura, codigoFC]);
+      var urlDocFC = BASE_URL + '/v/' + codigoFC;
+      var textoWaFC = (_pfc && _pfc.whatsapp) || ('Hola ' + (fc.nombre_conductor || '') + ', te hemos enviado por email la factura de comision ' + fc.numero_factura + '. Gracias por tu colaboracion. El equipo de Traslados GC');
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1,$2,$3,$4)',
+        [fc.telefono_conductor, textoWaFC, urlDocFC, nombreDocFC]
+      );
+    } catch(e) { console.warn('WA reenvio factura conductor:', e.message); }
+  }
+  res.json({ ok: true });
+}));
+
 // GET listado facturas de comision
 app.get('/admin/contabilidad/facturas-comision', requireAdmin, asyncHandler(async function(req, res) {
   var rows = await pool.query(
