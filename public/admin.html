@@ -1416,14 +1416,6 @@ table.tabla-precios input {
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
             <div><label class="etiqueta">Desde</label><input type="date" id="dep-desde" class="campo" style="width:150px;"></div>
             <div><label class="etiqueta">Hasta</label><input type="date" id="dep-hasta" class="campo" style="width:150px;"></div>
-            <div>
-              <label class="etiqueta">Dep&#243;sito</label>
-              <select id="dep-tipo" class="campo" style="width:230px;">
-                <option value="">Todos</option>
-                <option value="retenido">&#128179; Retenido</option>
-                <option value="devolucion_pendiente">&#9888; Devoluci&#243;n pendiente</option>
-              </select>
-            </div>
             <button class="boton-primario" style="height:38px;font-size:0.85rem;" onclick="cargarDepositos()">Filtrar</button>
           </div>
           <div id="resumen-depositos" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;"></div>
@@ -6853,20 +6845,22 @@ function generarFacturaConductor(id, reserva) {
 function cargarDepositos() {
   var desde = document.getElementById('dep-desde').value;
   var hasta = document.getElementById('dep-hasta').value;
-  var tipo  = document.getElementById('dep-tipo').value;
   var params = new URLSearchParams();
   if (desde) params.append('desde', desde);
   if (hasta) params.append('hasta', hasta);
-  if (tipo)  params.append('tipo', tipo);
   document.getElementById('lista-depositos').innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
   fetch('/admin/contabilidad/depositos?' + params.toString())
     .then(function(r) { return r.json(); })
     .then(function(d) {
       var rows = d.depositos || [];
-      var total = rows.reduce(function(a,r) { return a + parseFloat(r.importe_total||0); }, 0);
+      var totalCancelacion = rows.reduce(function(a,r) { return a + parseFloat(r.importe_cancelacion_tardia||0); }, 0);
+      var totalNoshow      = rows.reduce(function(a,r) { return a + parseFloat(r.importe_noshow||0); }, 0);
+      var totalRetenido    = totalCancelacion + totalNoshow;
       document.getElementById('resumen-depositos').innerHTML =
         kpiBox('Total casos', rows.length, '') +
-        kpiBox('Total retenido', euros(total), 'kpi-verde');
+        kpiBox('Cancelaci\u00f3n tard\u00eda', euros(totalCancelacion), '') +
+        kpiBox('No-show', euros(totalNoshow), '') +
+        kpiBox('Total retenido', euros(totalRetenido), 'kpi-verde');
       if (rows.length === 0) {
         document.getElementById('lista-depositos').innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Sin resultados.</p>';
         return;
@@ -6880,11 +6874,25 @@ function cargarDepositos() {
         'no_show':'<span style="background:#fce4ec;color:#c62828;font-size:11px;padding:2px 8px;border-radius:10px;">&#128274; No-show</span>',
         'devolucion_pendiente':'<span style="background:#fff8e1;color:#f57c00;font-size:11px;padding:2px 8px;border-radius:10px;">&#9888; Devoluci&#243;n pendiente</span>'
       };
-      var html = '<table class="tabla-admin"><thead><tr><th>Fecha</th><th>PNR</th><th>Estado reserva</th><th>Dep&#243;sito</th><th>Total Stripe</th></tr></thead><tbody>';
+      var html = '<table class="tabla-admin"><thead><tr>' +
+        '<th>Fecha</th><th>PNR</th><th>Estado reserva</th><th>Dep\u00f3sito</th>' +
+        '<th>Cancelaci\u00f3n tard\u00eda</th><th>No-show</th><th>Total retenido</th>' +
+        '</tr></thead><tbody>';
       rows.forEach(function(r) {
         var est = estadoBadges[r.estado_reserva] || r.estado_reserva || '-';
         var dep = depositoBadges[r.estado_deposito] || r.estado_deposito || '-';
-        html += '<tr><td>' + fechaCorta(r.fecha) + '</td><td><strong>' + (r.pnr||'-') + '</strong></td><td>' + est + '</td><td>' + dep + '</td><td><strong>' + euros(r.importe_total) + '</strong></td></tr>';
+        var impCancel = parseFloat(r.importe_cancelacion_tardia||0);
+        var impNoshow = parseFloat(r.importe_noshow||0);
+        var impTotal  = impCancel + impNoshow;
+        html += '<tr>' +
+          '<td>' + fechaCorta(r.fecha) + '</td>' +
+          '<td><strong>' + (r.pnr||'-') + '</strong></td>' +
+          '<td>' + est + '</td>' +
+          '<td>' + dep + '</td>' +
+          '<td>' + (impCancel > 0 ? '<strong>' + euros(impCancel) + '</strong>' : '<span style="color:var(--texto-muted);">—</span>') + '</td>' +
+          '<td>' + (impNoshow > 0 ? '<strong>' + euros(impNoshow) + '</strong>' : '<span style="color:var(--texto-muted);">—</span>') + '</td>' +
+          '<td><strong>' + euros(impTotal) + '</strong></td>' +
+          '</tr>';
       });
       html += '</tbody></table>';
       document.getElementById('lista-depositos').innerHTML = html;
