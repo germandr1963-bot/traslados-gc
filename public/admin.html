@@ -1385,6 +1385,7 @@ table.tabla-precios input {
         <button class="tab-contab" data-tab="gastos" onclick="switchTabContab('gastos')">&#9999; Gastos</button>
         <button class="tab-contab" data-tab="gestoria" onclick="switchTabContab('gestoria')">&#128202; Resumen / Gestor&#237;a</button>
         <button class="tab-contab" data-tab="facturas-cond" onclick="switchTabContab('facturas-cond')">&#128203; Facturas a conductores</button>
+        <button class="tab-contab" data-tab="notas-ret" onclick="switchTabContab('notas-ret')">&#128274; Notas de retenci&#243;n</button>
         <button class="tab-contab" data-tab="fiscal" onclick="switchTabContab('fiscal')">&#9881; Configuraci&#243;n fiscal</button>
       </div>
 
@@ -1481,6 +1482,21 @@ table.tabla-precios input {
             </div>
             <p style="font-size:11px;color:var(--texto-muted);margin-top:10px;">Los archivos CSV son compatibles con Excel y con el software habitual de gestor&#237;a.</p>
           </div>
+        </div>
+      </div>
+
+      <!-- TAB NOTAS DE RETENCION -->
+      <div id="contab-tab-notas-ret" class="oculto">
+        <div class="tarjeta" style="margin-bottom:20px;">
+          <h2 style="font-size:1rem;margin:0 0 4px 0;">Notas de retenci&#243;n de dep&#243;sito</h2>
+          <p style="font-size:13px;color:var(--texto-muted);margin:0 0 16px;">Documentos internos que justifican los dep&#243;sitos retenidos. Sel&#233;ccionalos para enviarlos a la gestor&#237;a.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+            <button class="boton-costa" style="font-size:0.85rem;" onclick="cargarNotasRetencion()">Actualizar</button>
+            <button class="boton-primario" style="font-size:0.85rem;" onclick="enviarNotasGestoria()">Enviar seleccionadas a gestor&#237;a</button>
+            <button class="boton-secundario" style="font-size:0.85rem;margin-top:0;" onclick="seleccionarTodasNotas()">Seleccionar todas</button>
+          </div>
+          <div id="aviso-notas-ret" style="display:none;margin-bottom:12px;font-size:0.85rem;"></div>
+          <div id="lista-notas-ret"><p style="color:var(--texto-muted);font-size:13px;">Cargando...</p></div>
         </div>
       </div>
 
@@ -6711,12 +6727,13 @@ function switchTabContab(tab) {
   document.querySelectorAll('.tab-contab').forEach(function(b) { b.classList.remove('activo'); });
   var btn = document.querySelector('.tab-contab[data-tab="' + tab + '"]');
   if (btn) btn.classList.add('activo');
-  ['comisiones','depositos','gastos','gestoria','facturas-cond','fiscal'].forEach(function(t) {
+  ['comisiones','depositos','gastos','gestoria','facturas-cond','notas-ret','fiscal'].forEach(function(t) {
     var el = document.getElementById('contab-tab-' + t);
     if (el) el.classList.toggle('oculto', t !== tab);
   });
   if (tab === 'fiscal') cargarConfigFiscal();
   if (tab === 'facturas-cond') cargarFacturasConductor();
+  if (tab === 'notas-ret') cargarNotasRetencion();
 }
 
 function euros(v) { return parseFloat(v || 0).toFixed(2).replace('.', ',') + ' \u20ac'; }
@@ -6876,7 +6893,7 @@ function cargarDepositos() {
       };
       var html = '<table class="tabla-admin"><thead><tr>' +
         '<th>Fecha</th><th>PNR</th><th>Estado reserva</th><th>Dep\u00f3sito</th>' +
-        '<th>Cancelaci\u00f3n tard\u00eda</th><th>No-show</th><th>Total retenido</th>' +
+        '<th>Cancelaci\u00f3n tard\u00eda</th><th>No-show</th><th>Total retenido</th><th></th>' +
         '</tr></thead><tbody>';
       rows.forEach(function(r) {
         var est = estadoBadges[r.estado_reserva] || r.estado_reserva || '-';
@@ -6892,6 +6909,7 @@ function cargarDepositos() {
           '<td>' + (impCancel > 0 ? '<strong>' + euros(impCancel) + '</strong>' : '<span style="color:var(--texto-muted);">—</span>') + '</td>' +
           '<td>' + (impNoshow > 0 ? '<strong>' + euros(impNoshow) + '</strong>' : '<span style="color:var(--texto-muted);">—</span>') + '</td>' +
           '<td><strong>' + euros(impTotal) + '</strong></td>' +
+          '<td><button class="boton-secundario" style="font-size:0.75rem;padding:4px 10px;margin-top:0;" onclick="generarNotaRetencion(\'' + (r.pnr||'') + '\', this)">Generar nota</button></td>' +
           '</tr>';
       });
       html += '</tbody></table>';
@@ -7136,6 +7154,99 @@ function enviarSeleccionadasGestoria() {
       ? d.enviadas + ' factura(s) enviada(s) a ' + d.destinatarios + ' destinatario(s).'
       : (d.error || 'Error al enviar.');
     if (d.ok) cargarFacturasConductor();
+  });
+}
+
+// NOTAS DE RETENCION
+function cargarNotasRetencion() {
+  fetch('/admin/contabilidad/notas-retencion')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var rows = d.notas || [];
+      if (rows.length === 0) {
+        document.getElementById('lista-notas-ret').innerHTML =
+          '<p style="color:var(--texto-muted);font-size:13px;">No hay notas de retencion generadas todavia. Gener\u00e1las desde la pesta\u00f1a Dep\u00f3sitos retenidos.</p>';
+        return;
+      }
+      var html = '<table class="tabla-admin"><thead><tr>' +
+        '<th><input type="checkbox" id="chk-todas-nr" onchange="toggleTodasNotas(this.checked)"></th>' +
+        '<th>N Documento</th><th>Fecha</th><th>PNR</th><th>Cliente</th><th>Ruta</th><th>Importe</th><th>Estado</th>' +
+        '</tr></thead><tbody>';
+      rows.forEach(function(r) {
+        var estado = r.enviada_gestoria
+          ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#e8f5e9;color:#2e7d32;">Enviada</span>'
+          : '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#fff3e0;color:#e65100;">Pendiente</span>';
+        html += '<tr>' +
+          '<td><input type="checkbox" class="chk-nr" value="' + r.id + '"></td>' +
+          '<td style="font-size:12px;"><strong>' + (r.numero_nota || '-') + '</strong></td>' +
+          '<td>' + fechaCorta(r.fecha) + '</td>' +
+          '<td><strong>' + (r.reserva_pnr || '-') + '</strong></td>' +
+          '<td>' + (r.nombre_cliente || '-') + '</td>' +
+          '<td style="font-size:12px;color:var(--texto-muted);">' + (r.origen || '-') + ' a ' + (r.destino || '-') + '</td>' +
+          '<td><strong>' + euros(r.importe) + '</strong></td>' +
+          '<td>' + estado + '</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('lista-notas-ret').innerHTML = html;
+    })
+    .catch(function() {
+      document.getElementById('lista-notas-ret').innerHTML =
+        '<p style="color:var(--rojo-error);font-size:13px;">Error al cargar.</p>';
+    });
+}
+
+function toggleTodasNotas(val) {
+  document.querySelectorAll('.chk-nr').forEach(function(c) { c.checked = val; });
+}
+
+function seleccionarTodasNotas() {
+  var chk = document.getElementById('chk-todas-nr');
+  if (chk) { chk.checked = true; toggleTodasNotas(true); }
+}
+
+function generarNotaRetencion(pnr, btn) {
+  if (!pnr) return;
+  btn.disabled = true;
+  btn.textContent = 'Generando...';
+  fetch('/admin/contabilidad/depositos/' + pnr + '/nota-retencion', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        btn.textContent = d.ya_existia ? 'Ya generada' : 'Generada';
+        btn.style.color = 'var(--verde-ok)';
+      } else {
+        btn.textContent = 'Error';
+        btn.style.color = 'var(--rojo-error)';
+        btn.disabled = false;
+      }
+    })
+    .catch(function() {
+      btn.textContent = 'Error';
+      btn.style.color = 'var(--rojo-error)';
+      btn.disabled = false;
+    });
+}
+
+function enviarNotasGestoria() {
+  var ids = Array.from(document.querySelectorAll('.chk-nr:checked')).map(function(c) { return parseInt(c.value); });
+  if (!ids.length) { alert('Selecciona al menos una nota.'); return; }
+  var aviso = document.getElementById('aviso-notas-ret');
+  aviso.style.display = 'block';
+  aviso.style.color = 'var(--texto-muted)';
+  aviso.textContent = 'Enviando...';
+  fetch('/admin/contabilidad/notas-retencion/enviar-gestoria', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids: ids })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    aviso.style.color = d.ok ? 'var(--verde-ok)' : 'var(--rojo-error)';
+    aviso.textContent = d.ok
+      ? d.enviadas + ' nota(s) enviada(s) a ' + d.destinatarios + ' destinatario(s).'
+      : (d.error || 'Error al enviar.');
+    if (d.ok) cargarNotasRetencion();
   });
 }
 
