@@ -6,6 +6,7 @@ const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
+const sharp = require('sharp');
 const path = require('path');
 const crypto = require('crypto');
 const ExcelJS = require('exceljs');
@@ -1796,12 +1797,16 @@ Pulsa el botón para crear una nueva contraseña:
     CREATE TABLE IF NOT EXISTS destinos_fotos (
       id SERIAL PRIMARY KEY,
       destino_id INT NOT NULL REFERENCES destinos(id) ON DELETE CASCADE,
-      imagen TEXT NOT NULL,
+      imagen BYTEA NOT NULL,
+      mime_type TEXT DEFAULT 'image/webp',
+      nombre_archivo TEXT DEFAULT '',
       alt_texto TEXT DEFAULT '',
       orden INT DEFAULT 1,
       creado_en TIMESTAMP DEFAULT NOW()
     )
   `);
+  await pool.query(`ALTER TABLE destinos_fotos ADD COLUMN IF NOT EXISTS mime_type TEXT DEFAULT 'image/webp'`);
+  await pool.query(`ALTER TABLE destinos_fotos ADD COLUMN IF NOT EXISTS nombre_archivo TEXT DEFAULT ''`);
 
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
@@ -3232,39 +3237,81 @@ app.post('/admin/seo/destinos/:id/config', requireAdmin, asyncHandler(async (req
   res.json({ ok: true });
 }));
 
-// Sube una foto al carrusel del destino
+// Sube una foto al carrusel — convierte a WebP con Sharp
 app.post('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
-  const { imagen, alt_texto } = req.body;
-  if (!imagen || !imagen.startsWith('data:image/') || imagen.length > 3000000) {
-    return res.status(400).json({ error: 'Imagen no válida o demasiado grande (máx. ~650KB).' });
+  const { imagen, alt_texto, nombre_archivo } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/') || imagen.length > 10000000) {
+    return res.status(400).json({ error: 'Imagen no válida o demasiado grande (máx. ~7MB).' });
   }
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato de imagen no válido.' });
+  const buffer = Buffer.from(matches[2], 'base64');
+  const webpBuffer = await sharp(buffer).webp({ quality: 85 }).toBuffer();
   const maxOrden = await pool.query('SELECT COALESCE(MAX(orden), 0) AS m FROM destinos_fotos WHERE destino_id = $1', [req.params.id]);
   await pool.query(
-    `INSERT INTO destinos_fotos (destino_id, imagen, alt_texto, orden) VALUES ($1, $2, $3, $4)`,
-    [req.params.id, imagen, alt_texto || '', maxOrden.rows[0].m + 1]
+    `INSERT INTO destinos_fotos (destino_id, imagen, mime_type, nombre_archivo, alt_texto, orden)
+     VALUES ($1, $2, 'image/webp', $3, $4, $5)`,
+    [req.params.id, webpBuffer, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1]
   );
   res.json({ ok: true });
+}));
+
+// Sugiere con IA el nombre de archivo SEO y el alt text para una foto
+app.post('/admin/seo/destinos/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { imagen, lang } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
+  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado.' });
+  const d = destino.rows[0];
+  const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || 'español';
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
+  const prompt = `Eres un experto en SEO de imágenes para webs de turismo y transporte.
+Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y devuelve dos cosas:
+
+1. nombre_archivo: Un nombre de archivo SEO optimizado en ${lang === 'es' ? 'español' : nombreIdioma}, en minúsculas, con guiones en lugar de espacios, sin tildes ni caracteres especiales, con extensión .webp. Debe describir lo que se ve en la imagen e incluir el nombre del destino. Ejemplo: "maspalomas-dunas-atardecer-gran-canaria.webp"
+
+2. alt_texto: Un texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}, de 8-12 palabras, que describa lo que se ve en la imagen de forma natural e incluya el destino. Este texto lo leerá Google y las personas con discapacidad visual.
+
+Responde ÚNICAMENTE con JSON válido, sin markdown, con esta forma exacta:
+{"nombre_archivo": "...", "alt_texto": "..."}`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: 200,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+        { type: 'text', text: prompt }
+      ]}]
+    })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
+  const data = await response.json();
+  const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  const resultado = JSON.parse(texto);
+  res.json({ ok: true, nombre_archivo: resultado.nombre_archivo || '', alt_texto: resultado.alt_texto || '' });
 }));
 
 // Lista las fotos del carrusel de un destino
 app.get('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    `SELECT id, alt_texto, orden FROM destinos_fotos WHERE destino_id = $1 ORDER BY orden`,
+    `SELECT id, alt_texto, nombre_archivo, orden FROM destinos_fotos WHERE destino_id = $1 ORDER BY orden`,
     [req.params.id]
   );
   res.json({ fotos: result.rows });
 }));
 
-// Sirve una foto pública por su id (para la web y para WhatsApp/redes)
+// Sirve una foto pública por su id
 app.get('/destino-foto/:fotoId', asyncHandler(async (req, res) => {
-  const result = await pool.query('SELECT imagen FROM destinos_fotos WHERE id = $1', [req.params.fotoId]);
+  const result = await pool.query('SELECT imagen, mime_type FROM destinos_fotos WHERE id = $1', [req.params.fotoId]);
   if (result.rows.length === 0) return res.status(404).send('No encontrado');
-  const imagen = result.rows[0].imagen;
-  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
-  if (!matches) return res.status(400).send('Formato no válido');
-  res.setHeader('Content-Type', matches[1]);
+  res.setHeader('Content-Type', result.rows[0].mime_type || 'image/webp');
   res.setHeader('Cache-Control', 'public, max-age=86400');
-  res.send(Buffer.from(matches[2], 'base64'));
+  res.send(result.rows[0].imagen);
 }));
 
 // Elimina una foto del carrusel
@@ -3275,7 +3322,7 @@ app.post('/admin/seo/destinos/:id/fotos/:fotoId/eliminar', requireAdmin, asyncHa
 
 // Reordena las fotos del carrusel
 app.post('/admin/seo/destinos/:id/fotos/reordenar', requireAdmin, asyncHandler(async (req, res) => {
-  const { orden } = req.body; // array de ids en nuevo orden
+  const { orden } = req.body;
   if (!Array.isArray(orden)) return res.status(400).json({ error: 'Datos no válidos' });
   for (let i = 0; i < orden.length; i++) {
     await pool.query('UPDATE destinos_fotos SET orden = $1 WHERE id = $2 AND destino_id = $3', [i + 1, orden[i], req.params.id]);
@@ -3356,7 +3403,7 @@ app.post('/admin/seo/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(asy
     .filter(function(i) { return i.titulo_es && i.descripcion_es; });
   if (items.length === 0) return res.json({ ok: true, propuestas: [] });
   const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || lang;
-  const prompt = `Traduce los siguientes títulos, descripciones SEO y textos descriptivos de páginas de destino turístico en ${mapaES[pendientes.rows[0]?.destino_id]?.isla || 'Gran Canaria'}, del español al ${nombreIdioma}.\n\nReglas:\n- Título: conciso, 55-60 caracteres máx, pensado para Google.\n- Descripción: 140-160 caracteres, persuasiva, sin inventar datos.\n- Texto: mantén la misma estructura y longitud del original en español, adaptando nombres de lugares a la forma más natural en ${nombreIdioma}.\n- Los slugs nunca se traducen.\n- Tono profesional y cercano.\n\nDatos (JSON):\n${JSON.stringify(items, null, 2)}\n\nResponde EXCLUSIVAMENTE con JSON válido, sin markdown, con esta forma:\n{"1": {"meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}}`;
+  const prompt = `Traduce los siguientes títulos, descripciones SEO y textos descriptivos de páginas de destino turístico en ${mapaES[pendientes.rows[0]?.destino_id]?.isla || 'Gran Canaria'}, del español al ${nombreIdioma}.\n\nReglas:\n- Título: Google lo muestra hasta 600px reales (fuente Arial 20px). Escribe el título para que NO supere esos 600px — en idiomas con palabras largas (alemán, finés, neerlandés, ruso) usa menos palabras. NUNCA superes 600px.\n- Descripción: Google la muestra hasta 960px reales (fuente Arial 13px). Escribe la descripción para que quepa en esos 960px — en idiomas con palabras largas sé más conciso. NUNCA superes 960px.\n- Texto: mantén la misma estructura y longitud del original en español, adaptando nombres de lugares a la forma más natural en ${nombreIdioma}.\n- Los slugs nunca se traducen.\n- Tono profesional y cercano.\n\nDatos (JSON):\n${JSON.stringify(items, null, 2)}\n\nResponde EXCLUSIVAMENTE con JSON válido, sin markdown, con esta forma:\n{"1": {"meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}}`;
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
@@ -3617,8 +3664,8 @@ async function traducirSEOConClaudeIA(items, nombreIdioma) {
   const prompt = 'Traduce los siguientes títulos y descripciones SEO de una web de traslados privados en Gran Canaria, ' +
     'del español al ' + nombreIdioma + '. Cada uno incluye el origen y destino de la ruta y el texto actual en español.\n\n' +
     'Reglas importantes:\n' +
-    '- El título debe ser conciso, pensado para un resultado de búsqueda de Google (no te pases de unos 55-60 caracteres).\n' +
-    '- La descripción debe rondar 140-160 caracteres, persuasiva pero realista, sin inventar datos que no estén en el original.\n' +
+    '- Título: Google lo muestra hasta 600px reales (fuente Arial 20px). Escribe el título para que NO supere esos 600px — en idiomas con palabras largas (alemán, finés, neerlandés, ruso) usa menos palabras. NUNCA superes 600px.\n' +
+    '- Descripción: Google la muestra hasta 960px reales (fuente Arial 13px). Escribe la descripción para que quepa en esos 960px — en idiomas con palabras largas sé más conciso. NUNCA superes 960px.\n' +
     '- Tono profesional pero cercano, igual que el original en español.\n' +
     '- Para los nombres de lugares: usa la forma más natural y reconocible en ' + nombreIdioma + '. ' +
     'Por ejemplo "Aeropuerto de Gran Canaria" puede traducirse como "Gran Canaria Airport" en inglés. ' +
