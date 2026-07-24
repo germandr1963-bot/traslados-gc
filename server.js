@@ -1762,6 +1762,13 @@ Pulsa el botón para crear una nueva contraseña:
   }
   console.log('Plantillas de comunicaci\u00f3n cargadas.');
 
+  // ─── Destinos: columnas para página pública de rutas ─────────────────────
+  await pool.query(`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS isla TEXT DEFAULT 'Gran Canaria'`);
+  await pool.query(`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS zona TEXT DEFAULT ''`);
+  await pool.query(`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS orden INT DEFAULT 99`);
+  await pool.query(`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS slug TEXT DEFAULT ''`);
+  await pool.query(`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS visible_rutas BOOLEAN DEFAULT FALSE`);
+
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
     await pool.query(
@@ -3681,6 +3688,36 @@ app.get('/api/contacto', asyncHandler(async (req, res) => {
 }));
 
 // ─── Registro público de choferes ─────────────────────────────────────────────
+
+// ─── API pública: destinos para página /rutas ────────────────────────────────
+app.get('/api/destinos-publicos', asyncHandler(async (req, res) => {
+  const destinos = await pool.query(`
+    SELECT d.id, d.nombre, d.isla, d.zona, d.orden, d.slug
+    FROM destinos d
+    WHERE d.activo = TRUE AND d.visible_rutas = TRUE
+    ORDER BY d.isla, d.orden, d.nombre
+  `);
+  const rutas = await pool.query(`
+    SELECT origen, destino FROM rutas WHERE activa = TRUE
+  `);
+  const contar = function(nombre) {
+    return rutas.rows.filter(function(r) {
+      return r.origen === nombre || r.destino === nombre;
+    }).length;
+  };
+  const porIsla = {};
+  for (const d of destinos.rows) {
+    if (!porIsla[d.isla]) porIsla[d.isla] = [];
+    porIsla[d.isla].push({
+      id: d.id,
+      nombre: d.nombre,
+      zona: d.zona,
+      slug: d.slug,
+      rutas: contar(d.nombre)
+    });
+  }
+  res.json({ islas: porIsla });
+}));
 
 app.get('/rutas', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'rutas.html'));
