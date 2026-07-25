@@ -3293,7 +3293,7 @@ Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y devuelve dos cosas:
 
 1. nombre_archivo: Un nombre de archivo SEO optimizado en ${lang === 'es' ? 'español' : nombreIdioma}, en minúsculas, con guiones en lugar de espacios, sin tildes ni caracteres especiales, con extensión .webp. Debe describir lo que se ve en la imagen e incluir el nombre del destino. Ejemplo: "maspalomas-dunas-atardecer-gran-canaria.webp"
 
-2. alt_texto: Un texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe con detalle lo que se ve en la imagen — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres. Cuenta los caracteres antes de responder y ajusta hasta estar en ese rango.
+2. alt_texto: Un texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe con detalle lo que se ve en la imagen — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto.
 
 Responde ÚNICAMENTE con JSON válido, sin markdown, con esta forma exacta:
 {"nombre_archivo": "...", "alt_texto": "..."}`;
@@ -3401,7 +3401,7 @@ Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text
 Para cada idioma:
 - Escribe de forma completamente nativa — como lo escribiria un SEO local de ese mercado, NO como una traduccion del espanol
 - Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino
-- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres. Cuenta los caracteres antes de responder y ajusta hasta estar en ese rango
+- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto
 - Maximo 125 caracteres
 
 Responde UNICAMENTE con JSON valido, sin markdown:
@@ -3468,7 +3468,7 @@ Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text
 El alt text debe:
 - Estar escrito en ${esBase ? 'español' : nombreIdioma} de forma completamente nativa — como lo escribiría un SEO local de ese mercado, no como una traducción
 - Describir lo que se ve en la imagen de forma natural e incluir el nombre del destino
-- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres. Cuenta los caracteres antes de responder y ajusta hasta estar en ese rango
+- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto
 - Máximo 125 caracteres
 
 Responde ÚNICAMENTE con JSON válido, sin markdown:
@@ -3519,7 +3519,7 @@ Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text
 Para cada idioma:
 - Escribe de forma completamente nativa — como lo escribiría un SEO local de ese mercado, NO como una traducción del español
 - Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino
-- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres. Cuenta los caracteres antes de responder y ajusta hasta estar en ese rango
+- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto
 - Máximo 125 caracteres
 
 Responde ÚNICAMENTE con JSON válido, sin markdown:
@@ -3829,7 +3829,7 @@ let IDIOMAS_TRADUCIBLES = IDIOMAS_TRADUCIBLES_INICIAL;
 
 const NOMBRE_IDIOMA_ES = {
   en: 'inglés', de: 'alemán', sv: 'sueco', no: 'noruego',
-  nl: 'holandés', it: 'italiano', fr: 'francés', fi: 'finés'
+  nl: 'holandés', it: 'italiano', fr: 'francés', fi: 'finés', ru: 'ruso'
 };
 
 // Llama a la API de Claude (Anthropic) para traducir un lote de textos de
