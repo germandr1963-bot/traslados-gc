@@ -3598,6 +3598,42 @@ Responde ÚNICAMENTE con el texto, sin título, sin comentarios, sin comillas.`;
   res.json({ ok: true, texto });
 }));
 
+// Genera título y descripción SEO de un destino con IA en el idioma activo
+app.post('/admin/seo/destinos/:id/generar-titulo-desc', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { lang } = req.body;
+  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado' });
+  const d = destino.rows[0];
+  const nombreIdioma = await getNombreIdioma(lang);
+  const esBase = lang === 'es';
+  const prompt = `Eres un experto en SEO que trabaja en el mercado de habla ${esBase ? 'español' : nombreIdioma}. Conoces cómo busca la gente en ${esBase ? 'español' : nombreIdioma} cuando quiere viajar a Gran Canaria. No traduces. Creas desde cero en ${esBase ? 'español' : nombreIdioma}, pensando como un SEO nativo de ese mercado.
+
+Escribe el título y descripción SEO para la página del destino "${d.nombre}" en ${d.isla}, en una web de traslados privados intermunicipales.
+
+Reglas:
+- meta_title: Título para Google. Límite estricto: 600px reales (fuente Arial 20px). Usa las expresiones reales con las que alguien de ese mercado buscaría un traslado a ${d.nombre} en Gran Canaria. En idiomas con palabras largas (alemán, neerlandés, finés) usa menos palabras. NUNCA superes 600px.
+- meta_description: Descripción para Google. Límite estricto: 920px reales (fuente Arial 13px). Debe invitar al clic con tono y expresiones naturales de ese mercado. Menciona el traslado privado y ${d.nombre}. En idiomas con palabras largas sé más conciso. NUNCA superes 920px.
+- Escribe como nativo, no como traductor.
+- Sin frases hechas tipo "joya escondida" o "paraíso".
+- No menciones precios ni datos inventados.
+
+Responde ÚNICAMENTE con JSON válido, sin markdown:
+{"meta_title": "...", "meta_description": "..."}`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 400, messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
+  const data = await response.json();
+  const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  const resultado = JSON.parse(texto);
+  res.json({ ok: true, meta_title: resultado.meta_title || '', meta_description: resultado.meta_description || '' });
+}));
+
 // Traduce con IA el título, descripción y texto de destinos que falten en un idioma
 app.post('/admin/seo/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const lang = req.params.lang;
