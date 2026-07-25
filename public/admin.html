@@ -2914,10 +2914,10 @@ function renderizarCamposSEO(rutaId, lang, datos) {
       'oninput="contarPxSEO(this,\'seo-titulo-count\',600,\'20px arial\')" style="margin-bottom:4px;">' +
     '<div style="text-align:right;font-size:11px;margin-bottom:12px;" id="seo-titulo-count">' + medirPx(datos.meta_title || '', '20px arial') + ' / 600 px</div>' +
 
-    '<label class="etiqueta">Descripción para Google (máx. 960px de ancho real)</label>' +
+    '<label class="etiqueta">Descripción para Google (máx. 920px de ancho real)</label>' +
     '<textarea class="campo" id="seo-desc" rows="3" ' +
-      'oninput="contarPxSEO(this,\'seo-desc-count\',960,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
-    '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-desc-count">' + medirPx(desc, '13px arial') + ' / 960 px</div>' +
+      'oninput="contarPxSEO(this,\'seo-desc-count\',920,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-desc-count">' + medirPx(desc, '13px arial') + ' / 920 px</div>' +
 
     '<button class="boton-primario" onclick="guardarSEO(' + rutaId + ', \'' + lang + '\')">💾 Guardar</button> ' +
     '<button class="boton-secundario" onclick="verSchemaRuta(' + rutaId + ', \'' + lang + '\')">👁️ Ver datos estructurados</button>' +
@@ -2973,7 +2973,7 @@ function guardarSEO(rutaId, lang) {
     if (respuesta.ok) {
       var pxTitulo = medirPx(datos.meta_title, '20px arial');
       var pxDesc = medirPx(datos.meta_description, '13px arial');
-      var excede = pxTitulo > 600 || pxDesc > 960;
+      var excede = pxTitulo > 600 || pxDesc > 920;
 
       // Actualiza la pestaña de este idioma en vivo, sin tener que cerrar y reabrir el editor
       var tab = document.getElementById('tab-idioma-' + lang);
@@ -2987,7 +2987,7 @@ function guardarSEO(rutaId, lang) {
 
       var avisos = [];
       if (pxTitulo > 600) avisos.push('el título se pasa de 600px (' + pxTitulo + 'px) y Google podría cortarlo');
-      if (pxDesc > 960) avisos.push('la descripción se pasa de 960px (' + pxDesc + 'px) y Google podría cortarla');
+      if (pxDesc > 920) avisos.push('la descripción se pasa de 920px (' + pxDesc + 'px) y Google podría cortarla');
       if (avisos.length) {
         msg.innerHTML = '<div class="aviso-error">✅ Guardado, pero ' + avisos.join(' y ') + '.</div>';
       } else {
@@ -7675,16 +7675,16 @@ function renderizarCamposDestinoSEO(destinoId, lang, datos) {
     '<div style="text-align:right;font-size:11px;margin-bottom:12px;" id="dest-titulo-count">' + medirPx(datos.meta_title || '', '20px arial') + ' / 600 px</div>' +
 
     // Meta description
-    '<label class="etiqueta">Descripción para Google (máx. 960px de ancho real)</label>' +
+    '<label class="etiqueta">Descripción para Google (máx. 920px de ancho real)</label>' +
     '<textarea class="campo" id="dest-desc" rows="3" ' +
-    'oninput="contarPxSEO(this,\'dest-desc-count\',960,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
-    '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="dest-desc-count">' + medirPx(desc, '13px arial') + ' / 960 px</div>' +
+    'oninput="contarPxSEO(this,\'dest-desc-count\',920,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="dest-desc-count">' + medirPx(desc, '13px arial') + ' / 920 px</div>' +
 
     // Texto descriptivo
     '<label class="etiqueta">Texto descriptivo del destino (visible en la página pública — SEO friendly)</label>' +
     '<div style="display:flex;gap:8px;margin-bottom:6px;">' +
     '<button class="boton-costa" style="padding:5px 12px;font-size:0.78rem;" onclick="generarTextoDestinoIA(' + destinoId + ', \'' + lang + '\')">✨ Generar con IA</button>' +
-    '<span style="font-size:12px;color:var(--texto-muted);align-self:center;">— Genera un texto SEO optimizado de 180-250 palabras</span>' +
+    '<span style="font-size:12px;color:var(--texto-muted);align-self:center;">— Genera un texto SEO optimizado en el idioma nativo de ese mercado</span>' +
     '</div>' +
     '<textarea class="campo" id="dest-texto" rows="8" style="margin-bottom:16px;font-size:13px;line-height:1.6;">' + escapar(texto) + '</textarea>' +
 
