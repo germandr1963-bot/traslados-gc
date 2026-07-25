@@ -3339,23 +3339,25 @@ app.post('/admin/seo/destinos/:id/generar-texto', requireAdmin, asyncHandler(asy
   if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado' });
   const d = destino.rows[0];
   const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || 'español';
-  const prompt = `Eres un redactor de viajes con mucho oficio. Escribes para personas reales, no para algoritmos. Tu estilo es cercano, evocador y directo — el tipo de texto que hace que alguien cierre el ordenador y reserve un viaje.
+  const prompt = `Eres un experto en SEO que trabaja en el mercado de habla ${lang === 'es' ? 'español' : nombreIdioma}. Conoces cómo busca la gente en ${lang === 'es' ? 'español' : nombreIdioma} cuando quiere viajar a Gran Canaria — qué términos usan, qué intención tienen, cómo hablan del transporte privado en ese idioma. No traduces. Creas.
 
-Escribe un texto en ${lang === 'es' ? 'español' : nombreIdioma} para la página del destino "${d.nombre}" en ${d.isla}. Este texto aparece en una web de traslados privados intermunicipales — pero no lo menciones de forma forzada. El objetivo es que el lector quiera ir a ese lugar, y que de forma natural entienda que puede llegar cómodamente con un traslado privado.
+Escribe un texto en ${lang === 'es' ? 'español' : nombreIdioma} para la página del destino "${d.nombre}" en ${d.isla}. Este texto aparece en una web de traslados privados intermunicipales. El objetivo es que el lector quiera ir a ese lugar y que entienda de forma natural que puede llegar cómodamente con un traslado privado.
 
-Estructura en 3 párrafos, entre 200 y 260 palabras en total:
+Antes de escribir, piensa: ¿cómo busca realmente alguien de ese mercado un traslado privado a ${d.nombre} en Gran Canaria? ¿Qué palabras usa? Incorpora esas expresiones de forma natural en el texto — no como lista de keywords, sino como habla un nativo cuando recomienda un viaje.
 
-Párrafo 1 — El lugar: Qué hace especial a "${d.nombre}". Qué se puede ver, sentir o vivir allí. Usa detalles concretos y sensoriales del lugar real — paisaje, ambiente, gastronomía, cultura, historia, lo que sea auténtico de ese destino. Nada genérico. Que el lector lo visualice.
+Estructura en 3 párrafos:
 
-Párrafo 2 — Cómo llegar: Contextualiza la distancia desde los principales puntos de ${d.isla} de forma natural, sin inventar tiempos ni precios exactos. Introduce la idea del traslado privado como la forma más cómoda de llegar — especialmente útil con equipaje, en familia, o llegando en avión. Que suene a consejo de alguien que conoce la isla, no a publicidad.
+Párrafo 1 — El lugar: Qué hace especial a "${d.nombre}". Detalles concretos y sensoriales — paisaje, ambiente, gastronomía, cultura, historia. Nada genérico. Que el lector lo visualice.
 
-Párrafo 3 — Invitación: Una llamada a la acción cálida y directa. Que reserve su traslado, que no pierda tiempo buscando, que nosotros nos encargamos del trayecto para que él disfrute del destino desde el primer momento.
+Párrafo 2 — Cómo llegar: Contextualiza la distancia desde los principales puntos de ${d.isla} de forma natural, sin inventar tiempos ni precios. Introduce el traslado privado como la opción más cómoda — especialmente útil con equipaje, en familia, o llegando en avión.
 
-Reglas de estilo:
-- Cero frases hechas del tipo "joya escondida", "paraíso", "imprescindible" o "no te lo puedes perder".
+Párrafo 3 — Invitación: Llamada a la acción cálida y directa. Que reserve su traslado, que nosotros nos encargamos del trayecto para que disfrute del destino desde el primer momento.
+
+Reglas:
+- Escribe como nativo, no como traductor. El ritmo, la sintaxis y las expresiones deben sonar naturales en ${lang === 'es' ? 'español' : nombreIdioma}.
+- Cero frases hechas del tipo "joya escondida", "paraíso", "imprescindible".
 - Sin listas. Solo párrafos fluidos.
-- Que no parezca escrito por una IA. Nada de estructura rígida ni frases simétricas.
-- Incluye de forma natural las palabras clave: "${d.nombre}", "traslado privado", "${d.isla}".
+- Incorpora de forma natural las expresiones reales con las que alguien de ese mercado buscaría llegar a "${d.nombre}" en Gran Canaria.
 - No menciones precios, competidores ni datos inventados.
 
 Responde ÚNICAMENTE con el texto, sin título, sin comentarios, sin comillas.`;
@@ -3403,7 +3405,7 @@ app.post('/admin/seo/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(asy
     .filter(function(i) { return i.titulo_es && i.descripcion_es; });
   if (items.length === 0) return res.json({ ok: true, propuestas: [] });
   const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || lang;
-  const prompt = `Traduce los siguientes títulos, descripciones SEO y textos descriptivos de páginas de destino turístico en ${mapaES[pendientes.rows[0]?.destino_id]?.isla || 'Gran Canaria'}, del español al ${nombreIdioma}.\n\nReglas:\n- Título: Google lo muestra hasta 600px reales (fuente Arial 20px). Escribe el título para que NO supere esos 600px — en idiomas con palabras largas (alemán, finés, neerlandés, ruso) usa menos palabras. NUNCA superes 600px.\n- Descripción: Google la muestra hasta 960px reales (fuente Arial 13px). Escribe la descripción para que quepa en esos 960px — en idiomas con palabras largas sé más conciso. NUNCA superes 960px.\n- Texto: mantén la misma estructura y longitud del original en español, adaptando nombres de lugares a la forma más natural en ${nombreIdioma}.\n- Los slugs nunca se traducen.\n- Tono profesional y cercano.\n\nDatos (JSON):\n${JSON.stringify(items, null, 2)}\n\nResponde EXCLUSIVAMENTE con JSON válido, sin markdown, con esta forma:\n{"1": {"meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}}`;
+  const prompt = `Eres un experto en SEO que trabaja en el mercado de habla ${nombreIdioma}. Conoces cómo busca la gente en ${nombreIdioma} cuando quiere viajar a Gran Canaria — qué términos usan, qué intención tienen, cómo hablan del transporte privado en ese idioma. No traduces. Creas cada texto desde cero en ${nombreIdioma}, pensando como un SEO nativo de ese mercado. El texto en español es solo una referencia del contenido y la estructura, no una plantilla que traducir.\n\nPara cada destino, escribe en ${nombreIdioma}:\n- meta_title: Título para Google. Límite: 600px reales (fuente Arial 20px). Usa las expresiones reales con las que alguien de ese mercado buscaría ese traslado en Gran Canaria. Para nombres de lugares usa la forma más natural en ${nombreIdioma}. En idiomas con palabras largas (alemán, neerlandés, polaco) usa menos palabras. NUNCA superes 600px.\n- meta_description: Descripción para Google. Límite: 920px reales (fuente Arial 13px). Debe invitar al clic con tono y expresiones naturales de ese mercado. En idiomas con palabras largas sé más conciso. NUNCA superes 920px.\n- texto_descripcion: Texto de 3 párrafos para la página del destino. Escríbelo como nativo — ritmo, sintaxis y expresiones naturales en ${nombreIdioma}. Incorpora de forma natural las búsquedas reales de ese mercado. Sin listas, solo párrafos fluidos. Sin frases hechas.\nLos slugs nunca se tocan.\n\nDatos (JSON) — titulo_es, descripcion_es y texto_es son solo referencia de contenido:\n${JSON.stringify(items, null, 2)}\n\nResponde EXCLUSIVAMENTE con JSON válido, sin markdown, con esta forma exacta:\n{"1": {"meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}}`;
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
@@ -3661,17 +3663,12 @@ async function traducirSEOConClaudeIA(items, nombreIdioma) {
     throw new Error('Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.');
   }
 
-  const prompt = 'Traduce los siguientes títulos y descripciones SEO de una web de traslados privados en Gran Canaria, ' +
-    'del español al ' + nombreIdioma + '. Cada uno incluye el origen y destino de la ruta y el texto actual en español.\n\n' +
-    'Reglas importantes:\n' +
-    '- Título: Google lo muestra hasta 600px reales (fuente Arial 20px). Escribe el título para que NO supere esos 600px — en idiomas con palabras largas (alemán, finés, neerlandés, ruso) usa menos palabras. NUNCA superes 600px.\n' +
-    '- Descripción: Google la muestra hasta 960px reales (fuente Arial 13px). Escribe la descripción para que quepa en esos 960px — en idiomas con palabras largas sé más conciso. NUNCA superes 960px.\n' +
-    '- Tono profesional pero cercano, igual que el original en español.\n' +
-    '- Para los nombres de lugares: usa la forma más natural y reconocible en ' + nombreIdioma + '. ' +
-    'Por ejemplo "Aeropuerto de Gran Canaria" puede traducirse como "Gran Canaria Airport" en inglés. ' +
-    'Si el nombre no tiene una forma establecida en ese idioma, consérvalo en español.\n' +
-    '- Los slugs de URL nunca se traducen, solo los textos visibles.\n\n' +
-    'Textos a traducir (JSON):\n' + JSON.stringify(items, null, 2) + '\n\n' +
+  const prompt = 'Eres un experto en SEO que trabaja en el mercado de habla ' + nombreIdioma + '. Conoces cómo busca la gente en ' + nombreIdioma + ' cuando quiere contratar un traslado privado en Gran Canaria — qué términos usan, qué intención tienen, cómo se expresan. No traduces. Creas cada texto desde cero en ' + nombreIdioma + ', pensando como un SEO nativo de ese mercado. El texto en español es solo una referencia de contenido, no una plantilla.\n\n' +
+    'Para cada ruta, escribe en ' + nombreIdioma + ':\n' +
+    '- meta_title: Título para Google. Límite: 600px reales (fuente Arial 20px). Usa las expresiones reales con las que alguien de ese mercado buscaría ese traslado. Para nombres de lugares usa la forma más natural en ' + nombreIdioma + ' (ej: "Gran Canaria Airport" en inglés). En idiomas con palabras largas (alemán, neerlandés, polaco) usa menos palabras. NUNCA superes 600px.\n' +
+    '- meta_description: Descripción para Google. Límite: 920px reales (fuente Arial 13px). Debe invitar al clic con tono y expresiones naturales de ese mercado. En idiomas con palabras largas sé más conciso. NUNCA superes 920px.\n' +
+    'Los slugs de URL nunca se tocan.\n\n' +
+    'Datos (JSON) — titulo_es y descripcion_es son solo referencia de contenido:\n' + JSON.stringify(items, null, 2) + '\n\n' +
     'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, sin bloques de markdown, ' +
     'usando el route_id de cada ruta como clave, con esta forma exacta: ' +
     '{\"3\": {\"meta_title\": \"...\", \"meta_description\": \"...\"}, \"18\": {\"meta_title\": \"...\", \"meta_description\": \"...\"}}';
