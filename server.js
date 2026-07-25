@@ -3631,7 +3631,38 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
   const data = await response.json();
   const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
   const resultado = JSON.parse(texto);
-  res.json({ ok: true, meta_title: resultado.meta_title || '', meta_description: resultado.meta_description || '' });
+  let metaTitle = resultado.meta_title || '';
+  let metaDesc = resultado.meta_description || '';
+
+  // Verificar px reales — si se pasa, pedir a la IA que acorte
+  const pxTitulo = medirPxTitulo(metaTitle);
+  const pxDesc = medirPxDescripcion(metaDesc);
+  const tituloSePasa = pxTitulo > 600;
+  const descSePasa = pxDesc > 920;
+
+  if (tituloSePasa || descSePasa) {
+    const instrucciones = [];
+    if (tituloSePasa) instrucciones.push(`- meta_title actual (${pxTitulo}px, máx 600px): "${metaTitle}" → acórtalo para que no supere 600px reales (Arial 20px). Mantén el significado y las keywords principales.`);
+    if (descSePasa) instrucciones.push(`- meta_description actual (${pxDesc}px, máx 920px): "${metaDesc}" → acórtala para que no supere 920px reales (Arial 13px). Mantén el tono, la invitación al clic y las keywords.`);
+
+    const listaInstrucciones = instrucciones.join('\n');
+    const promptCorto = 'Eres un experto en SEO. Los siguientes textos se pasan de los límites de píxeles reales de Google. Acórtalos manteniendo el significado, el tono nativo en ' + nombreIdioma + ' y las keywords principales. No traduzcas ni cambies el idioma.\n\n' + listaInstrucciones + '\n\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"meta_title": "...", "meta_description": "..."}';
+
+    const r2 = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 300, messages: [{ role: 'user', content: promptCorto }] })
+    });
+    if (r2.ok) {
+      const d2 = await r2.json();
+      const t2 = d2.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+      const r2json = JSON.parse(t2);
+      if (tituloSePasa && r2json.meta_title) metaTitle = r2json.meta_title;
+      if (descSePasa && r2json.meta_description) metaDesc = r2json.meta_description;
+    }
+  }
+
+  res.json({ ok: true, meta_title: metaTitle, meta_description: metaDesc });
 }));
 
 // Traduce con IA el título, descripción y texto de destinos que falten en un idioma
