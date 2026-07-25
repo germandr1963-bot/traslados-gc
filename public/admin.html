@@ -6653,7 +6653,7 @@ function renderPlantillasCom() {
     html += '</tbody></table></div>';
   });
 
-  if (!html) html = '<p style="color:var(--texto-muted);">No hay plantillas en esta categor�a.</p>';
+  if (!html) html = '<p style="color:var(--texto-muted);">No hay plantillas en esta categor�a.</p>';
   document.getElementById('lista-plantillas-com').innerHTML = html;
 }
 
@@ -7485,12 +7485,14 @@ function abrirEditorDestino(destinoId) {
         '<div style="flex:1;min-width:200px;">' +
         '<label class="etiqueta" style="font-size:11px;">Nombre de archivo (.webp)</label>' +
         '<input class="campo" id="nueva-foto-nombre-' + destinoId + '" type="text" placeholder="ej: maspalomas-dunas-gran-canaria.webp" style="margin-bottom:8px;font-family:monospace;font-size:12px;">' +
-        '<label class="etiqueta" style="font-size:11px;">Alt text</label>' +
-        '<input class="campo" id="nueva-foto-alt-' + destinoId + '" type="text" placeholder="Descripci&#243;n de la imagen para Google">' +
+        '<label class="etiqueta" style="font-size:11px;">Alt text (español) — máx. 125 caracteres</label>' +
+        '<input class="campo" id="nueva-foto-alt-' + destinoId + '" type="text" placeholder="Descripción de la imagen para Google" oninput="contarAltFoto(this,\'cnt-alt-' + destinoId + '\')">' +
+        '<div id="cnt-alt-' + destinoId + '" style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:4px;">0 / 125</div>' +
         '</div>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
-        '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" onclick="sugerirFotoIA(' + destinoId + ')">&#10024; Sugerir con IA</button>' +
+        '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" onclick="sugerirFotoIA(' + destinoId + ')">&#10024; Sugerir en ES con IA</button>' +
+        '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;background:var(--verde-ok);" onclick="generarTodosAltFotoNueva(' + destinoId + ')">&#10024; Generar todos los idiomas con IA</button>' +
         '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" onclick="confirmarSubidaFoto(' + destinoId + ')">&#128190; Guardar foto</button>' +
         '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 12px;" onclick="cancelarNuevaFoto(' + destinoId + ')">Cancelar</button>' +
         '<span id="msg-foto-' + destinoId + '" style="font-size:12px;align-self:center;"></span>' +
@@ -7533,9 +7535,8 @@ function cargarFotosDestino(destinoId) {
           '</div>' +
           '<div style="padding:6px 8px;">' +
           '<div style="font-size:10px;color:var(--texto-muted);">Nombre</div>' +
-          '<div style="font-size:10px;font-family:monospace;word-break:break-all;">' + escapar(f.nombre_archivo || '&#8212;') + '</div>' +
-          '<div style="font-size:10px;color:var(--texto-muted);margin-top:3px;">Alt</div>' +
-          '<div style="font-size:10px;">' + escapar(f.alt_texto || '&#8212;') + '</div>' +
+          '<div style="font-size:10px;font-family:monospace;word-break:break-all;margin-bottom:6px;">' + escapar(f.nombre_archivo || '&#8212;') + '</div>' +
+          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;" onclick="abrirAltTextosFoto(' + destinoId + ',' + f.id + ')">&#9998; Alt texts por idioma</button>' +
           '</div>' +
           '</div>';
       }).join('');
@@ -7543,6 +7544,155 @@ function cargarFotosDestino(destinoId) {
 }
 
 var _fotoDestinoData = {};
+var _fotoAltPanelData = {};
+
+function contarAltFoto(input, idCont) {
+  var n = input.value.length;
+  var el = document.getElementById(idCont);
+  if (!el) return;
+  el.textContent = n + ' / 125';
+  el.style.color = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+}
+
+function generarTodosAltFotoNueva(destinoId) {
+  var imagen = _fotoDestinoData[destinoId];
+  if (!imagen) return;
+  var msg = document.getElementById('msg-foto-' + destinoId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Generando alt texts en todos los idiomas...'; }
+  fetch('/admin/seo/destinos/' + destinoId + '/fotos/nueva/alt/generar-todos', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imagen: imagen })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      var altEs = d.alts && d.alts['es'];
+      var altInput = document.getElementById('nueva-foto-alt-' + destinoId);
+      if (altInput && altEs) { altInput.value = altEs; contarAltFoto(altInput, 'cnt-alt-' + destinoId); }
+      _fotoAltPanelData[destinoId] = d.alts || {};
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Alt texts generados en ' + Object.keys(d.alts || {}).length + ' idiomas. Revisa y guarda la foto.'; }
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al generar.'; }
+    }
+  }).catch(function() {
+    if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexión.'; }
+  });
+}
+
+function abrirAltTextosFoto(destinoId, fotoId) {
+  var cont = document.getElementById('fotos-destino-' + destinoId);
+  var panelId = 'panel-alt-foto-' + fotoId;
+  var existing = document.getElementById(panelId);
+  if (existing) { existing.remove(); return; }
+  var panel = document.createElement('div');
+  panel.id = panelId;
+  panel.style.cssText = 'background:var(--gris-fondo);border:1px solid var(--gris-borde);border-radius:8px;padding:14px;margin-top:10px;';
+  panel.innerHTML = '<p style="font-size:12px;color:var(--texto-muted);">Cargando alt texts...</p>';
+  cont.parentNode.insertBefore(panel, cont.nextSibling);
+  fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/alt')
+    .then(function(r) { return r.json(); })
+    .then(function(d) { renderizarAltTextosFoto(destinoId, fotoId, d, panel); });
+}
+
+function renderizarAltTextosFoto(destinoId, fotoId, d, panel) {
+  var idiomas = d.idiomas || [];
+  var alts = d.alts || {};
+  var tabs = idiomas.map(function(i, idx) {
+    var tieneTexto = !!(alts[i.codigo] && alts[i.codigo].trim());
+    return '<button class="tab-idioma' + (idx === 0 ? ' activo' : '') + (tieneTexto ? '' : ' tab-idioma-rojo') + '" ' +
+      'id="tab-alt-foto-' + fotoId + '-' + i.codigo + '" ' +
+      'onclick="cambiarTabAltFoto(' + fotoId + ', '' + i.codigo + '', this)">' +
+      i.codigo.toUpperCase() + (tieneTexto ? '' : ' ⚠️') + '</button>';
+  }).join('');
+  panel.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+    '<strong style="font-size:12px;">Alt texts por idioma — foto #' + fotoId + '</strong>' +
+    '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" onclick="this.closest('[id^=panel-alt-foto]').remove()">✕ Cerrar</button>' +
+    '</div>' +
+    '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
+    '<div id="alt-foto-campos-' + fotoId + '"></div>' +
+    '<div id="alt-foto-msg-' + fotoId + '" style="margin-top:8px;font-size:12px;"></div>';
+  panel._altData = d;
+  panel._destinoId = destinoId;
+  if (idiomas.length > 0) cambiarTabAltFoto(fotoId, idiomas[0].codigo, panel.querySelector('.tab-idioma'), d);
+}
+
+function cambiarTabAltFoto(fotoId, lang, boton, dataOverride) {
+  document.querySelectorAll('#panel-alt-foto-' + fotoId + ' .tab-idioma').forEach(function(b) { b.classList.remove('activo'); });
+  if (boton) boton.classList.add('activo');
+  var panel = document.getElementById('panel-alt-foto-' + fotoId);
+  if (!panel) return;
+  var destinoId = panel._destinoId;
+  var d = dataOverride || panel._altData || {};
+  var alts = d.alts || {};
+  var altActual = alts[lang] || '';
+  var n = altActual.length;
+  var colorCont = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+  var campos = document.getElementById('alt-foto-campos-' + fotoId);
+  if (!campos) return;
+  campos.innerHTML =
+    '<label class="etiqueta" style="font-size:11px;">Alt text en ' + lang.toUpperCase() + ' — máx. 125 caracteres</label>' +
+    '<input class="campo" id="alt-foto-input-' + fotoId + '" type="text" value="' + escapar(altActual) + '" ' +
+    'oninput="(function(el){var n=el.value.length;var cnt=document.getElementById('cnt-alt-foto-' + fotoId + '');if(cnt){cnt.textContent=n+' / 125';cnt.style.color=n>125?'var(--rojo-error)':'var(--texto-muted)';};})(this)" ' +
+    'style="margin-bottom:4px;">' +
+    '<div id="cnt-alt-foto-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:' + colorCont + ';">' + n + ' / 125</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+    '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" onclick="sugerirAltFotoIA(' + destinoId + ',' + fotoId + ','' + lang + '')">&#10024; Sugerir con IA</button>' +
+    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" onclick="guardarAltFoto(' + destinoId + ',' + fotoId + ','' + lang + '')">&#128190; Guardar</button>' +
+    '</div>';
+}
+
+function sugerirAltFotoIA(destinoId, fotoId, lang) {
+  var msg = document.getElementById('alt-foto-msg-' + fotoId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Generando con IA...'; }
+  fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/imagen-base64')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error.'; } return null; }
+      return fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/alt/' + lang + '/sugerir-ia', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imagen: d.imagen })
+      });
+    })
+    .then(function(r) { return r && r.json(); })
+    .then(function(d) {
+      if (!d) return;
+      if (d.ok) {
+        var input = document.getElementById('alt-foto-input-' + fotoId);
+        if (input) {
+          input.value = d.alt_texto || '';
+          var n = input.value.length;
+          var cnt = document.getElementById('cnt-alt-foto-' + fotoId);
+          if (cnt) { cnt.textContent = n + ' / 125'; cnt.style.color = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)'; }
+        }
+        var panel = document.getElementById('panel-alt-foto-' + fotoId);
+        if (panel && panel._altData) panel._altData.alts[lang] = d.alt_texto || '';
+        if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Revisa y guarda'; }
+      } else {
+        if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al generar.'; }
+      }
+    }).catch(function() {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexión.'; }
+    });
+}
+
+function guardarAltFoto(destinoId, fotoId, lang) {
+  var input = document.getElementById('alt-foto-input-' + fotoId);
+  var altTexto = input ? input.value.trim() : '';
+  var msg = document.getElementById('alt-foto-msg-' + fotoId);
+  fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/alt/' + lang, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alt_texto: altTexto })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      var panel = document.getElementById('panel-alt-foto-' + fotoId);
+      if (panel && panel._altData) panel._altData.alts[lang] = altTexto;
+      var tab = document.getElementById('tab-alt-foto-' + fotoId + '-' + lang);
+      if (tab && altTexto) { tab.textContent = lang.toUpperCase(); tab.classList.remove('tab-idioma-rojo'); }
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado'; setTimeout(function() { if (msg) msg.textContent = ''; }, 2000); }
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
+    }
+  });
+}
 
 function previsualizarFotoDestino(destinoId, input) {
   var file = input.files[0];
