@@ -3285,7 +3285,7 @@ app.post('/admin/seo/destinos/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(
   const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
   if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado.' });
   const d = destino.rows[0];
-  const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || 'español';
+  const nombreIdioma = await getNombreIdioma(lang);
   const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
   const prompt = `Eres un experto en SEO de imágenes para webs de turismo y transporte.
@@ -3392,7 +3392,7 @@ app.post('/admin/seo/destinos/:id/fotos/nueva/alt/generar-todos', requireAdmin, 
   const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return res.status(400).json({ error: 'Formato no valido.' });
   const listaIdiomas = idiomas.rows.map(function(i) {
-    return i.codigo + ' (' + (NOMBRE_IDIOMA_ES[i.codigo] || i.nombre) + ')';
+    return i.codigo + ' (' + i.nombre + ')';
   }).join(', ');
   const codigos = idiomas.rows.map(function(i) { return '"' + i.codigo + '": "..."'; }).join(', ');
   const prompt = `Eres un experto en SEO de imagenes para webs de turismo y transporte. Trabajas para multiples mercados europeos.
@@ -3459,7 +3459,7 @@ app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt/:lang/sugerir-ia', requireAd
   if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado.' });
   const d = destino.rows[0];
   const esBase = lang === 'es';
-  const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || 'español';
+  const nombreIdioma = await getNombreIdioma(lang);
   const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
   const prompt = `Eres un experto en SEO de imágenes para webs de turismo y transporte. Trabajas en el mercado de habla ${esBase ? 'español' : nombreIdioma}.
@@ -3831,6 +3831,18 @@ const NOMBRE_IDIOMA_ES = {
   en: 'inglés', de: 'alemán', sv: 'sueco', no: 'noruego',
   nl: 'holandés', it: 'italiano', fr: 'francés', fi: 'finés', ru: 'ruso'
 };
+
+// Lee el nombre de un idioma desde la base de datos — así funciona con cualquier idioma nuevo
+async function getNombreIdioma(lang) {
+  if (lang === 'es') return 'español';
+  // Primero intentar desde la BD
+  try {
+    const r = await pool.query('SELECT nombre FROM idiomas_web WHERE codigo = $1', [lang]);
+    if (r.rows.length > 0) return r.rows[0].nombre;
+  } catch(e) {}
+  // Fallback al diccionario
+  return NOMBRE_IDIOMA_ES[lang] || lang;
+}
 
 // Llama a la API de Claude (Anthropic) para traducir un lote de textos de
 // golpe, usando el contexto de cada uno para que la traducción encaje con
