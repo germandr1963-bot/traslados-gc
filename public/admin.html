@@ -7486,7 +7486,7 @@ function abrirEditorDestino(destinoId) {
         '<label class="etiqueta" style="font-size:11px;">Nombre de archivo (.webp)</label>' +
         '<input class="campo" id="nueva-foto-nombre-' + destinoId + '" type="text" placeholder="ej: maspalomas-dunas-gran-canaria.webp" style="margin-bottom:8px;font-family:monospace;font-size:12px;">' +
         '<label class="etiqueta" style="font-size:11px;">Alt text (español) — máx. 125 caracteres</label>' +
-        '<input class="campo" id="nueva-foto-alt-' + destinoId + '" type="text" placeholder="Descripción de la imagen para Google" oninput="contarAltFoto(this,\'cnt-alt-' + destinoId + '\')">' +
+        '<input class="campo" id="nueva-foto-alt-' + destinoId + '" type="text" placeholder="Descripción de la imagen para Google" data-cntid="cnt-alt-' + destinoId + '" oninput="contarAltFoto(this,this.dataset.cntid)">' +
         '<div id="cnt-alt-' + destinoId + '" style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:4px;">0 / 125</div>' +
         '</div>' +
         '</div>' +
