@@ -7495,8 +7495,8 @@ function abrirEditorDestino(destinoId) {
         '<input class="campo" id="nueva-foto-nombre-' + destinoId + '" type="text" placeholder="ej: maspalomas-dunas-gran-canaria.webp" style="margin-bottom:8px;font-family:monospace;font-size:12px;">' +
         '<label class="etiqueta" style="font-size:11px;">Alt text (español) — máx. 125 caracteres</label>' +
         '<input class="campo" id="nueva-foto-alt-' + destinoId + '" type="text" placeholder="Descripción de la imagen para Google" ' +
-        'oninput="contarChars(this,\'cnt-alt-' + destinoId + '\',125)">' +
-        '<div id="cnt-alt-' + destinoId + '" style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:4px;">0 / 125</div>' +
+        'oninput="contarChars(this,\'nueva-foto-alt-cnt\',125)">' +
+        '<div id="nueva-foto-alt-cnt" style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:4px;">0 / 125</div>' +
         '</div>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
@@ -7764,7 +7764,10 @@ function sugerirFotoIA(destinoId) {
       var nombre = document.getElementById('nueva-foto-nombre-' + destinoId);
       var alt = document.getElementById('nueva-foto-alt-' + destinoId);
       if (nombre) nombre.value = d.nombre_archivo || '';
-      if (alt) alt.value = d.alt_texto || '';
+      if (alt) {
+        alt.value = d.alt_texto || '';
+        contarChars(alt, 'nueva-foto-alt-cnt', 125);
+      }
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = 'Revisa y ajusta si hace falta'; }
     } else {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al analizar.'; }
