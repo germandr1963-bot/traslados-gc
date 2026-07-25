@@ -1808,6 +1808,18 @@ Pulsa el botón para crear una nueva contraseña:
   await pool.query(`ALTER TABLE destinos_fotos ADD COLUMN IF NOT EXISTS mime_type TEXT DEFAULT 'image/webp'`);
   await pool.query(`ALTER TABLE destinos_fotos ADD COLUMN IF NOT EXISTS nombre_archivo TEXT DEFAULT ''`);
 
+  // ─── Alt text de fotos por idioma ────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS destinos_fotos_alt (
+      id SERIAL PRIMARY KEY,
+      foto_id INT NOT NULL REFERENCES destinos_fotos(id) ON DELETE CASCADE,
+      lang_code VARCHAR(2) NOT NULL,
+      alt_texto TEXT DEFAULT '',
+      creado_en TIMESTAMP DEFAULT NOW(),
+      UNIQUE(foto_id, lang_code)
+    )
+  `);
+
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
     await pool.query(
@@ -3247,12 +3259,20 @@ app.post('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req,
   if (!matches) return res.status(400).json({ error: 'Formato de imagen no válido.' });
   const buffer = Buffer.from(matches[2], 'base64');
   const webpBuffer = await sharp(buffer).webp({ quality: 85 }).toBuffer();
+  const webpHex = '\\x' + webpBuffer.toString('hex');
   const maxOrden = await pool.query('SELECT COALESCE(MAX(orden), 0) AS m FROM destinos_fotos WHERE destino_id = $1', [req.params.id]);
-  await pool.query(
+  const inserted = await pool.query(
     `INSERT INTO destinos_fotos (destino_id, imagen, mime_type, nombre_archivo, alt_texto, orden)
-     VALUES ($1, $2, 'image/webp', $3, $4, $5)`,
-    [req.params.id, webpBuffer, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1]
+     VALUES ($1, $2::bytea, 'image/webp', $3, $4, $5) RETURNING id`,
+    [req.params.id, webpHex, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1]
   );
+  if (alt_texto && inserted.rows[0]) {
+    await pool.query(
+      `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, 'es', $2)
+       ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $2`,
+      [inserted.rows[0].id, alt_texto]
+    );
+  }
   res.json({ ok: true });
 }));
 
@@ -3328,6 +3348,189 @@ app.post('/admin/seo/destinos/:id/fotos/reordenar', requireAdmin, asyncHandler(a
     await pool.query('UPDATE destinos_fotos SET orden = $1 WHERE id = $2 AND destino_id = $3', [i + 1, orden[i], req.params.id]);
   }
   res.json({ ok: true });
+}));
+
+// Devuelve la imagen de una foto ya guardada como base64 (para pasarla a la IA)
+app.get('/admin/seo/destinos/:id/fotos/:fotoId/imagen-base64', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT imagen, mime_type FROM destinos_fotos WHERE id = $1 AND destino_id = $2', [req.params.fotoId, req.params.id]);
+  if (result.rows.length === 0) return res.status(404).json({ ok: false, error: 'Foto no encontrada.' });
+  const row = result.rows[0];
+  const base64 = Buffer.from(row.imagen).toString('base64');
+  const dataUrl = 'data:' + (row.mime_type || 'image/webp') + ';base64,' + base64;
+  res.json({ ok: true, imagen: dataUrl });
+}));
+
+// Genera alt texts en todos los idiomas para una foto nueva (antes de guardarla)
+app.post('/admin/seo/destinos/:id/fotos/nueva/alt/generar-todos', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { imagen } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no valida.' });
+  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado.' });
+  const d = destino.rows[0];
+  const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato no valido.' });
+  const listaIdiomas = idiomas.rows.map(function(i) {
+    return i.codigo + ' (' + (NOMBRE_IDIOMA_ES[i.codigo] || i.nombre) + ')';
+  }).join(', ');
+  const codigos = idiomas.rows.map(function(i) { return '"' + i.codigo + '": "..."'; }).join(', ');
+  const prompt = `Eres un experto en SEO de imagenes para webs de turismo y transporte. Trabajas para multiples mercados europeos.
+Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text para cada uno de estos idiomas: ${listaIdiomas}.
+
+Para cada idioma:
+- Escribe de forma completamente nativa — como lo escribiria un SEO local de ese mercado, NO como una traduccion del espanol
+- Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino
+- Entre 8 y 12 palabras
+- Maximo 125 caracteres
+
+Responde UNICAMENTE con JSON valido, sin markdown:
+{${codigos}}`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: 600,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+        { type: 'text', text: prompt }
+      ]}]
+    })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
+  const data = await response.json();
+  const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  const resultado = JSON.parse(texto);
+  res.json({ ok: true, alts: resultado });
+}));
+
+// Obtiene los alt texts de una foto en todos los idiomas activos
+app.get('/admin/seo/destinos/:id/fotos/:fotoId/alt', requireAdmin, asyncHandler(async (req, res) => {
+  const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
+  const alts = await pool.query(
+    'SELECT lang_code, alt_texto FROM destinos_fotos_alt WHERE foto_id = $1',
+    [req.params.fotoId]
+  );
+  const mapa = {};
+  for (const a of alts.rows) mapa[a.lang_code] = a.alt_texto;
+  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa });
+}));
+
+// Guarda el alt text de una foto en un idioma concreto
+app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const { alt_texto } = req.body;
+  await pool.query(
+    `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
+     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
+    [req.params.fotoId, req.params.lang, alt_texto || '']
+  );
+  res.json({ ok: true });
+}));
+
+// Sugiere con IA el alt text de una foto en el idioma activo
+app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt/:lang/sugerir-ia', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { imagen } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
+  const lang = req.params.lang;
+  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado.' });
+  const d = destino.rows[0];
+  const esBase = lang === 'es';
+  const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || 'español';
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
+  const prompt = `Eres un experto en SEO de imágenes para webs de turismo y transporte. Trabajas en el mercado de habla ${esBase ? 'español' : nombreIdioma}.
+Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text.
+
+El alt text debe:
+- Estar escrito en ${esBase ? 'español' : nombreIdioma} de forma completamente nativa — como lo escribiría un SEO local de ese mercado, no como una traducción
+- Describir lo que se ve en la imagen de forma natural e incluir el nombre del destino
+- Entre 8 y 12 palabras
+- Máximo 125 caracteres
+
+Responde ÚNICAMENTE con JSON válido, sin markdown:
+{"alt_texto": "..."}`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: 100,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+        { type: 'text', text: prompt }
+      ]}]
+    })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
+  const data = await response.json();
+  const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  const resultado = JSON.parse(texto);
+  await pool.query(
+    `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
+     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
+    [req.params.fotoId, lang, resultado.alt_texto || '']
+  );
+  res.json({ ok: true, alt_texto: resultado.alt_texto || '' });
+}));
+
+// Genera con IA los alt texts de una foto en todos los idiomas de una vez
+app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt/generar-todos', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { imagen } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
+  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado.' });
+  const d = destino.rows[0];
+  const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
+  const listaIdiomas = idiomas.rows.map(function(i) {
+    return i.codigo + ' (' + (NOMBRE_IDIOMA_ES[i.codigo] || i.nombre) + ')';
+  }).join(', ');
+  const codigos = idiomas.rows.map(function(i) { return '"' + i.codigo + '": "..."'; }).join(', ');
+  const prompt = `Eres un experto en SEO de imágenes para webs de turismo y transporte. Trabajas para múltiples mercados europeos.
+Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text para cada uno de estos idiomas: ${listaIdiomas}.
+
+Para cada idioma:
+- Escribe de forma completamente nativa — como lo escribiría un SEO local de ese mercado, NO como una traducción del español
+- Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino
+- Entre 8 y 12 palabras
+- Máximo 125 caracteres
+
+Responde ÚNICAMENTE con JSON válido, sin markdown:
+{${codigos}}`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: 600,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+        { type: 'text', text: prompt }
+      ]}]
+    })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
+  const data = await response.json();
+  const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  const resultado = JSON.parse(texto);
+  for (const [langCode, altTexto] of Object.entries(resultado)) {
+    if (altTexto) {
+      await pool.query(
+        `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
+         ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
+        [req.params.fotoId, langCode, altTexto]
+      );
+    }
+  }
+  res.json({ ok: true, alts: resultado });
 }));
 
 // Genera texto descriptivo del destino con IA — con directivas SEO explícitas
