@@ -3382,7 +3382,7 @@ Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text
 Para cada idioma:
 - Escribe de forma completamente nativa — como lo escribiria un SEO local de ese mercado, NO como una traduccion del espanol
 - Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino
-- Entre 8 y 12 palabras
+- Entre 10 y 16 palabras, aprovechando hasta los 125 caracteres
 - Maximo 125 caracteres
 
 Responde UNICAMENTE con JSON valido, sin markdown:
@@ -3449,7 +3449,7 @@ Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text
 El alt text debe:
 - Estar escrito en ${esBase ? 'español' : nombreIdioma} de forma completamente nativa — como lo escribiría un SEO local de ese mercado, no como una traducción
 - Describir lo que se ve en la imagen de forma natural e incluir el nombre del destino
-- Entre 8 y 12 palabras
+- Entre 10 y 16 palabras, aprovechando hasta los 125 caracteres
 - Máximo 125 caracteres
 
 Responde ÚNICAMENTE con JSON válido, sin markdown:
@@ -3500,7 +3500,7 @@ Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text
 Para cada idioma:
 - Escribe de forma completamente nativa — como lo escribiría un SEO local de ese mercado, NO como una traducción del español
 - Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino
-- Entre 8 y 12 palabras
+- Entre 10 y 16 palabras, aprovechando hasta los 125 caracteres
 - Máximo 125 caracteres
 
 Responde ÚNICAMENTE con JSON válido, sin markdown:
