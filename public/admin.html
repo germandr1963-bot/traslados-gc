@@ -7605,7 +7605,7 @@ function renderizarAltTextosFoto(destinoId, fotoId, d, panel) {
   panel.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
     '<strong style="font-size:12px;">Alt texts por idioma — foto #' + fotoId + '</strong>' +
-    '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" onclick="this.closest('[id^=panel-alt-foto]').remove()">✕ Cerrar</button>' +
+    '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" onclick="document.getElementById(\'panel-alt-foto-' + fotoId + '\').remove()">&#10005; Cerrar</button>' +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="alt-foto-campos-' + fotoId + '"></div>' +
