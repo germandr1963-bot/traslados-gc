@@ -3329,9 +3329,15 @@ app.get('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req, 
 app.get('/destino-foto/:fotoId', asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT imagen, mime_type FROM destinos_fotos WHERE id = $1', [req.params.fotoId]);
   if (result.rows.length === 0) return res.status(404).send('No encontrado');
-  const imgBuffer = Buffer.isBuffer(result.rows[0].imagen)
-    ? result.rows[0].imagen
-    : Buffer.from(result.rows[0].imagen);
+  let imgBuffer;
+  const raw = result.rows[0].imagen;
+  if (Buffer.isBuffer(raw)) {
+    imgBuffer = raw;
+  } else if (typeof raw === 'string' && raw.startsWith('\\x')) {
+    imgBuffer = Buffer.from(raw.slice(2), 'hex');
+  } else {
+    imgBuffer = Buffer.from(raw);
+  }
   res.setHeader('Content-Type', result.rows[0].mime_type || 'image/webp');
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.send(imgBuffer);
@@ -3358,7 +3364,16 @@ app.get('/admin/seo/destinos/:id/fotos/:fotoId/imagen-base64', requireAdmin, asy
   const result = await pool.query('SELECT imagen, mime_type FROM destinos_fotos WHERE id = $1 AND destino_id = $2', [req.params.fotoId, req.params.id]);
   if (result.rows.length === 0) return res.status(404).json({ ok: false, error: 'Foto no encontrada.' });
   const row = result.rows[0];
-  const imgBuffer = Buffer.isBuffer(row.imagen) ? row.imagen : Buffer.from(row.imagen);
+  // PostgreSQL devuelve bytea como Buffer directamente con el driver pg
+  // Si viene como string hex (\x...) hay que convertirlo
+  let imgBuffer;
+  if (Buffer.isBuffer(row.imagen)) {
+    imgBuffer = row.imagen;
+  } else if (typeof row.imagen === 'string' && row.imagen.startsWith('\\x')) {
+    imgBuffer = Buffer.from(row.imagen.slice(2), 'hex');
+  } else {
+    imgBuffer = Buffer.from(row.imagen);
+  }
   const base64 = imgBuffer.toString('base64');
   const dataUrl = 'data:' + (row.mime_type || 'image/webp') + ';base64,' + base64;
   res.json({ ok: true, imagen: dataUrl });
