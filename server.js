@@ -3293,7 +3293,7 @@ Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y devuelve dos cosas:
 
 1. nombre_archivo: Un nombre de archivo SEO optimizado en ${lang === 'es' ? 'español' : nombreIdioma}, en minúsculas, con guiones en lugar de espacios, sin tildes ni caracteres especiales, con extensión .webp. Debe describir lo que se ve en la imagen e incluir el nombre del destino. Ejemplo: "maspalomas-dunas-atardecer-gran-canaria.webp"
 
-2. alt_texto: Un texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}, de 8-12 palabras, que describa lo que se ve en la imagen de forma natural e incluya el destino. Este texto lo leerá Google y las personas con discapacidad visual.
+2. alt_texto: Un texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe con detalle lo que se ve en la imagen — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Mínimo 100 caracteres, máximo 125 caracteres. Es obligatorio que supere los 100 caracteres.
 
 Responde ÚNICAMENTE con JSON válido, sin markdown, con esta forma exacta:
 {"nombre_archivo": "...", "alt_texto": "..."}`;
@@ -3382,7 +3382,7 @@ Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text
 Para cada idioma:
 - Escribe de forma completamente nativa — como lo escribiria un SEO local de ese mercado, NO como una traduccion del espanol
 - Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino
-- Entre 10 y 16 palabras, aprovechando hasta los 125 caracteres
+- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Mínimo 100 caracteres, máximo 125 caracteres. Es obligatorio que supere los 100 caracteres
 - Maximo 125 caracteres
 
 Responde UNICAMENTE con JSON valido, sin markdown:
@@ -3449,7 +3449,7 @@ Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text
 El alt text debe:
 - Estar escrito en ${esBase ? 'español' : nombreIdioma} de forma completamente nativa — como lo escribiría un SEO local de ese mercado, no como una traducción
 - Describir lo que se ve en la imagen de forma natural e incluir el nombre del destino
-- Entre 10 y 16 palabras, aprovechando hasta los 125 caracteres
+- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Mínimo 100 caracteres, máximo 125 caracteres. Es obligatorio que supere los 100 caracteres
 - Máximo 125 caracteres
 
 Responde ÚNICAMENTE con JSON válido, sin markdown:
@@ -3500,7 +3500,7 @@ Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text
 Para cada idioma:
 - Escribe de forma completamente nativa — como lo escribiría un SEO local de ese mercado, NO como una traducción del español
 - Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino
-- Entre 10 y 16 palabras, aprovechando hasta los 125 caracteres
+- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Mínimo 100 caracteres, máximo 125 caracteres. Es obligatorio que supere los 100 caracteres
 - Máximo 125 caracteres
 
 Responde ÚNICAMENTE con JSON válido, sin markdown:
