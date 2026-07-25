@@ -7554,6 +7554,14 @@ function contarAltFoto(input, idCont) {
   el.style.color = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)';
 }
 
+function actualizarContadorAltFoto(input, fotoId) {
+  var n = input.value.length;
+  var el = document.getElementById('cnt-alt-foto-' + fotoId);
+  if (!el) return;
+  el.textContent = n + ' / 125';
+  el.style.color = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+}
+
 function generarTodosAltFotoNueva(destinoId) {
   var imagen = _fotoDestinoData[destinoId];
   if (!imagen) return;
@@ -7599,13 +7607,14 @@ function renderizarAltTextosFoto(destinoId, fotoId, d, panel) {
     var tieneTexto = !!(alts[i.codigo] && alts[i.codigo].trim());
     return '<button class="tab-idioma' + (idx === 0 ? ' activo' : '') + (tieneTexto ? '' : ' tab-idioma-rojo') + '" ' +
       'id="tab-alt-foto-' + fotoId + '-' + i.codigo + '" ' +
-      'onclick="cambiarTabAltFoto(' + fotoId + ', '' + i.codigo + '', this)">' +
+      'data-fotoid="' + fotoId + '" data-lang="' + i.codigo + '" ' +
+      'onclick="cambiarTabAltFotoBtn(this)">' +
       i.codigo.toUpperCase() + (tieneTexto ? '' : ' ⚠️') + '</button>';
   }).join('');
   panel.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
     '<strong style="font-size:12px;">Alt texts por idioma — foto #' + fotoId + '</strong>' +
-    '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" onclick="document.getElementById(\'panel-alt-foto-' + fotoId + '\').remove()">&#10005; Cerrar</button>' +
+    '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" data-panelid="panel-alt-foto-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">&#10005; Cerrar</button>' +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="alt-foto-campos-' + fotoId + '"></div>' +
@@ -7613,6 +7622,26 @@ function renderizarAltTextosFoto(destinoId, fotoId, d, panel) {
   panel._altData = d;
   panel._destinoId = destinoId;
   if (idiomas.length > 0) cambiarTabAltFoto(fotoId, idiomas[0].codigo, panel.querySelector('.tab-idioma'), d);
+}
+
+function cambiarTabAltFotoBtn(boton) {
+  var fotoId = parseInt(boton.dataset.fotoid);
+  var lang = boton.dataset.lang;
+  cambiarTabAltFoto(fotoId, lang, boton);
+}
+
+function sugerirAltFotoIABtn(boton) {
+  var destinoId = parseInt(boton.dataset.destinoid);
+  var fotoId = parseInt(boton.dataset.fotoid);
+  var lang = boton.dataset.lang;
+  sugerirAltFotoIA(destinoId, fotoId, lang);
+}
+
+function guardarAltFotoBtn(boton) {
+  var destinoId = parseInt(boton.dataset.destinoid);
+  var fotoId = parseInt(boton.dataset.fotoid);
+  var lang = boton.dataset.lang;
+  guardarAltFoto(destinoId, fotoId, lang);
 }
 
 function cambiarTabAltFoto(fotoId, lang, boton, dataOverride) {
@@ -7628,15 +7657,16 @@ function cambiarTabAltFoto(fotoId, lang, boton, dataOverride) {
   var colorCont = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)';
   var campos = document.getElementById('alt-foto-campos-' + fotoId);
   if (!campos) return;
+  var cntId = 'cnt-alt-foto-' + fotoId;
   campos.innerHTML =
     '<label class="etiqueta" style="font-size:11px;">Alt text en ' + lang.toUpperCase() + ' — máx. 125 caracteres</label>' +
     '<input class="campo" id="alt-foto-input-' + fotoId + '" type="text" value="' + escapar(altActual) + '" ' +
-    'oninput="(function(el){var n=el.value.length;var cnt=document.getElementById('cnt-alt-foto-' + fotoId + '');if(cnt){cnt.textContent=n+' / 125';cnt.style.color=n>125?'var(--rojo-error)':'var(--texto-muted)';};})(this)" ' +
+    'oninput="actualizarContadorAltFoto(this,' + fotoId + ')" ' +
     'style="margin-bottom:4px;">' +
     '<div id="cnt-alt-foto-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:' + colorCont + ';">' + n + ' / 125</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-    '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" onclick="sugerirAltFotoIA(' + destinoId + ',' + fotoId + ','' + lang + '')">&#10024; Sugerir con IA</button>' +
-    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" onclick="guardarAltFoto(' + destinoId + ',' + fotoId + ','' + lang + '')">&#128190; Guardar</button>' +
+    '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="sugerirAltFotoIABtn(this)">&#10024; Sugerir con IA</button>' +
+    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoBtn(this)">&#128190; Guardar</button>' +
     '</div>';
 }
 
