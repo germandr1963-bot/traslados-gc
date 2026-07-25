@@ -7860,6 +7860,12 @@ function renderizarCamposDestinoSEO(destinoId, lang, datos) {
     'oninput="validarSlugEnVivo(this)" style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;">' +
     '<div id="seo-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
 
+    // Meta title + descripción con botón IA
+    '<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">' +
+    '<button class="boton-costa" style="padding:5px 12px;font-size:0.78rem;" data-destinoid="' + destinoId + '" data-lang="' + lang + '" onclick="generarTituloDescIA(this)">&#10024; Generar título y descripción con IA</button>' +
+    '<span style="font-size:12px;color:var(--texto-muted);">— Crea textos SEO nativos para este idioma</span>' +
+    '</div>' +
+
     // Meta title
     '<label class="etiqueta">Título para Google (máx. 600px de ancho real)</label>' +
     '<input class="campo" id="dest-titulo" type="text" value="' + titulo + '" ' +
@@ -7882,6 +7888,41 @@ function renderizarCamposDestinoSEO(destinoId, lang, datos) {
 
     '<button class="boton-primario" onclick="guardarDestinoSEO(' + destinoId + ', \'' + lang + '\')">💾 Guardar</button>' +
     '<div id="dest-mensaje-editor" style="margin-top:8px;"></div>';
+}
+
+function generarTituloDescIA(boton) {
+  var destinoId = parseInt(boton.dataset.destinoid);
+  var lang = boton.dataset.lang;
+  var orig = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = 'Generando...';
+  fetch('/admin/seo/destinos/' + destinoId + '/generar-titulo-desc', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang: lang })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    boton.disabled = false;
+    boton.textContent = orig;
+    if (d.ok) {
+      var titulo = document.getElementById('dest-titulo');
+      var desc = document.getElementById('dest-desc');
+      if (titulo) {
+        titulo.value = d.meta_title || '';
+        contarPxSEO(titulo, 'dest-titulo-count', 600, '20px arial');
+      }
+      if (desc) {
+        desc.value = d.meta_description || '';
+        contarPxSEO(desc, 'dest-desc-count', 920, '13px arial');
+      }
+      var msg = document.getElementById('dest-mensaje-editor');
+      if (msg) { msg.innerHTML = '<div class="aviso-ok">✅ Título y descripción generados — revisa y guarda</div>'; setTimeout(function() { msg.innerHTML = ''; }, 4000); }
+    } else {
+      alert(d.error || 'Error al generar.');
+    }
+  }).catch(function() {
+    boton.disabled = false;
+    boton.textContent = orig;
+    alert('Error de conexión.');
+  });
 }
 
 function guardarDestinoSEO(destinoId, lang) {
