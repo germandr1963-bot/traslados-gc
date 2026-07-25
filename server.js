@@ -3669,12 +3669,16 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
 app.post('/admin/seo/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const lang = req.params.lang;
   if (!IDIOMAS_TRADUCIBLES.includes(lang)) return res.status(400).json({ error: 'Idioma no válido' });
+  // Buscar destinos que NO tienen título o descripción en este idioma
+  // Incluye tanto filas vacías como destinos sin fila en este idioma
   const pendientes = await pool.query(
-    `SELECT dss.destino_id, d.nombre, d.zona, d.isla,
+    `SELECT d.id AS destino_id, d.nombre, d.zona, d.isla,
             dss.meta_title, dss.meta_description, dss.texto_descripcion
-     FROM destinos_seo_settings dss
-     JOIN destinos d ON d.id = dss.destino_id
-     WHERE dss.lang_code = $1 AND (dss.meta_title IS NULL OR dss.meta_description IS NULL)`,
+     FROM destinos d
+     LEFT JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = $1
+     WHERE dss.destino_id IS NULL
+        OR dss.meta_title IS NULL OR dss.meta_title = ''
+        OR dss.meta_description IS NULL OR dss.meta_description = ''`,
     [lang]
   );
   if (pendientes.rows.length === 0) return res.json({ ok: true, propuestas: [] });
