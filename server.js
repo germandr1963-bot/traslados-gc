@@ -3668,51 +3668,64 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
 // Traduce con IA el título, descripción y texto de destinos que falten en un idioma
 app.post('/admin/seo/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const lang = req.params.lang;
-  if (!IDIOMAS_TRADUCIBLES.includes(lang)) return res.status(400).json({ error: 'Idioma no válido' });
-  // Buscar destinos que NO tienen título o descripción en este idioma
-  // Incluye tanto filas vacías como destinos sin fila en este idioma
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) return res.status(400).json({ error: 'Idioma no válido' });
+
+  // Destinos que les falta título, descripción O texto descriptivo en este idioma
   const pendientes = await pool.query(
-    `SELECT d.id AS destino_id, d.nombre, d.zona, d.isla,
-            dss.meta_title, dss.meta_description, dss.texto_descripcion
+    `SELECT d.id AS destino_id, d.nombre, d.zona, d.isla
      FROM destinos d
      LEFT JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = $1
      WHERE dss.destino_id IS NULL
         OR dss.meta_title IS NULL OR dss.meta_title = ''
-        OR dss.meta_description IS NULL OR dss.meta_description = ''`,
+        OR dss.meta_description IS NULL OR dss.meta_description = ''
+        OR dss.texto_descripcion IS NULL OR dss.texto_descripcion = ''`,
     [lang]
   );
   if (pendientes.rows.length === 0) return res.json({ ok: true, propuestas: [] });
-  const baseES = await pool.query(
-    `SELECT destino_id, meta_title, meta_description, texto_descripcion
-     FROM destinos_seo_settings WHERE lang_code = 'es'`
-  );
-  const mapaES = {};
-  for (const f of baseES.rows) mapaES[f.destino_id] = f;
-  const items = pendientes.rows
-    .map(function(r) {
-      const base = mapaES[r.destino_id] || {};
-      return { destino_id: r.destino_id, nombre: r.nombre, isla: r.isla,
-        titulo_es: base.meta_title || '', descripcion_es: base.meta_description || '',
-        texto_es: base.texto_descripcion || '' };
-    })
-    .filter(function(i) { return i.titulo_es && i.descripcion_es; });
-  if (items.length === 0) return res.json({ ok: true, propuestas: [] });
-  const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || lang;
-  const prompt = `Eres un experto en SEO que trabaja en el mercado de habla ${nombreIdioma}. Conoces cómo busca la gente en ${nombreIdioma} cuando quiere viajar a Gran Canaria — qué términos usan, qué intención tienen, cómo hablan del transporte privado en ese idioma. No traduces. Creas cada texto desde cero en ${nombreIdioma}, pensando como un SEO nativo de ese mercado. El texto en español es solo una referencia del contenido y la estructura, no una plantilla que traducir.\n\nPara cada destino, escribe en ${nombreIdioma}:\n- meta_title: Título para Google. Límite: 600px reales (fuente Arial 20px). Usa las expresiones reales con las que alguien de ese mercado buscaría ese traslado en Gran Canaria. Para nombres de lugares usa la forma más natural en ${nombreIdioma}. En idiomas con palabras largas (alemán, neerlandés, polaco) usa menos palabras. NUNCA superes 600px.\n- meta_description: Descripción para Google. Límite: 920px reales (fuente Arial 13px). Debe invitar al clic con tono y expresiones naturales de ese mercado. En idiomas con palabras largas sé más conciso. NUNCA superes 920px.\n- texto_descripcion: Texto de 3 párrafos para la página del destino. Escríbelo como nativo — ritmo, sintaxis y expresiones naturales en ${nombreIdioma}. Incorpora de forma natural las búsquedas reales de ese mercado. Sin listas, solo párrafos fluidos. Sin frases hechas.\nLos slugs nunca se tocan.\n\nDatos (JSON) — titulo_es, descripcion_es y texto_es son solo referencia de contenido:\n${JSON.stringify(items, null, 2)}\n\nResponde EXCLUSIVAMENTE con JSON válido, sin markdown, con esta forma exacta:\n{"1": {"meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}}`;
+
+  const items = pendientes.rows.map(function(r) {
+    return { destino_id: r.destino_id, nombre: r.nombre, isla: r.isla || 'Gran Canaria', zona: r.zona || '' };
+  });
+
+  const nombreIdioma = await getNombreIdioma(lang);
+
+  const prompt = `Eres un experto en SEO de destinos turísticos. Tu tarea es escribir contenido SEO en ${nombreIdioma} para una web de traslados privados intermunicipales en Gran Canaria (Islas Canarias, España).
+
+Escribe como lo haría un profesional SEO nativo de ${nombreIdioma} — con el ritmo, las expresiones y las palabras clave que usa de verdad alguien de ese mercado cuando busca un traslado privado en Gran Canaria. No traduces. Creas desde cero.
+
+Para cada destino genera:
+- meta_title: Título para Google. Máximo 600px reales (Arial 20px). Usa términos de búsqueda reales de ese mercado. En idiomas con palabras largas (alemán, neerlandés, finés) usa menos palabras. NUNCA superes 600px.
+- meta_description: Descripción para Google. Máximo 920px reales (Arial 13px). Invita al clic con tono natural de ese mercado. NUNCA superes 920px.
+- texto_descripcion: Exactamente 3 párrafos para la página pública del destino. Contenido:
+  Párrafo 1 — Describe el destino: qué se puede ver, qué hacer, gastronomía, ambiente, qué lo hace especial. Concreto y sensorial, nada genérico.
+  Párrafo 2 — Cómo llegar: menciona que se puede llegar desde cualquier punto de Gran Canaria con nuestro servicio de traslado privado. Cómodo, sin esperas, ideal con equipaje o en familia. Sin inventar tiempos ni precios.
+  Párrafo 3 — Invitación a reservar: cálida y directa. El precio depende del tipo de vehículo elegido, siempre asequible. Que reserves y nosotros nos encargamos del trayecto.
+  Sin listas. Solo párrafos fluidos. Sin frases hechas tipo "joya escondida" o "paraíso".
+
+Destinos (JSON con id, nombre, isla, zona):
+${JSON.stringify(items, null, 2)}
+
+Responde EXCLUSIVAMENTE con JSON válido, sin markdown, con esta estructura exacta donde la clave es el destino_id:
+{"1": {"meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}, "2": {...}}`;
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 6000, messages: [{ role: 'user', content: prompt }] })
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] })
   });
-  if (!response.ok) return res.status(500).json({ error: 'Error IA' });
+  if (!response.ok) return res.status(500).json({ error: 'Error al conectar con la IA.' });
   const data = await response.json();
   const limpio = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-  const traducciones = JSON.parse(limpio);
+  let traducciones = {};
+  try { traducciones = JSON.parse(limpio); } catch(e) { return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' }); }
   const propuestas = items.map(function(i) {
     const t = traducciones[i.destino_id] || traducciones[String(i.destino_id)] || {};
-    return { destino_id: i.destino_id, nombre: i.nombre,
-      titulo_sugerido: t.meta_title || '', descripcion_sugerida: t.meta_description || '',
-      texto_sugerido: t.texto_descripcion || '' };
+    return {
+      destino_id: i.destino_id, nombre: i.nombre,
+      titulo_sugerido: t.meta_title || '',
+      descripcion_sugerida: t.meta_description || '',
+      texto_sugerido: t.texto_descripcion || ''
+    };
   });
   res.json({ ok: true, propuestas });
 }));
