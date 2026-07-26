@@ -1582,9 +1582,9 @@ table.tabla-precios input {
 
       <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
         <div style="background:var(--gris-fondo);padding:10px 14px;border-radius:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <span style="font-size:13px;">🤖 Traducir título, descripción y texto con IA:</span>
+          <span style="font-size:13px;">🤖 Generar con IA para el idioma seleccionado:</span>
           <select id="select-idioma-ia-destinos" class="campo" style="height:34px;width:auto;"></select>
-          <button class="boton-costa" onclick="traducirDestinosSEOConIA()">Traducir lo que falte</button>
+          <button class="boton-costa" onclick="traducirDestinosSEOConIA()">🤖 Generar lo que falte</button>
         </div>
       </div>
 
@@ -7392,7 +7392,7 @@ function cargarPaginaRutas() {
   fetch('/admin/idiomas').then(function(r) { return r.json(); }).then(function(idiomas) {
     var select = document.getElementById('select-idioma-ia-destinos');
     if (select) {
-      select.innerHTML = idiomas.filter(function(i) { return !i.es_base; })
+      select.innerHTML = idiomas
         .map(function(i) { return '<option value="' + i.codigo + '">' + i.nombre + '</option>'; }).join('');
     }
   });
@@ -7998,47 +7998,58 @@ function traducirDestinosSEOConIA() {
   if (!lang) return;
   var panel = document.getElementById('revision-seo-destinos-ia');
   panel.classList.remove('oculto');
-  panel.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Consultando a la IA...</p>';
+  panel.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">⏳ Generando con IA... puede tardar unos segundos.</p>';
   fetch('/admin/seo/destinos/traducir-ia/' + lang, { method: 'POST' })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      if (!d.ok || !d.propuestas || d.propuestas.length === 0) {
-        panel.innerHTML = '<p style="color:#2e7d32;font-size:13px;">✅ Todos los destinos ya tienen título y descripción en ' + lang.toUpperCase() + '.</p>';
+      if (!d.ok) {
+        panel.innerHTML = '<p style="color:var(--rojo-error);font-size:13px;">❌ ' + escapar(d.error || 'Error al generar.') + '</p>';
         return;
       }
-      var html = '<h3 style="margin-top:0;">Propuestas de traducción para ' + lang.toUpperCase() + ' — revisa antes de guardar</h3>';
+      if (!d.propuestas || d.propuestas.length === 0) {
+        panel.innerHTML = '<p style="color:#2e7d32;font-size:13px;">✅ Todos los destinos ya tienen título, descripción y texto en ' + lang.toUpperCase() + '.</p>';
+        return;
+      }
+      var html = '<h3 style="margin-top:0;">Contenido generado para ' + lang.toUpperCase() + ' — revisa y guarda</h3>';
       d.propuestas.forEach(function(p) {
-        var tid = 'trad-dest-titulo-' + p.destino_id;
-        var did = 'trad-dest-desc-' + p.destino_id;
+        var tid  = 'trad-dest-titulo-' + p.destino_id;
+        var did  = 'trad-dest-desc-'   + p.destino_id;
+        var txid = 'trad-dest-texto-'  + p.destino_id;
         var tcnt = 'trad-dest-titulo-cnt-' + p.destino_id;
-        var dcnt = 'trad-dest-desc-cnt-' + p.destino_id;
+        var dcnt = 'trad-dest-desc-cnt-'   + p.destino_id;
         var pxT = medirPx(p.titulo_sugerido || '', '20px arial');
         var pxD = medirPx(p.descripcion_sugerida || '', '13px arial');
         var colorT = pxT > 600 ? 'var(--rojo-error)' : 'var(--texto-muted)';
         var colorD = pxD > 920 ? 'var(--rojo-error)' : 'var(--texto-muted)';
-        html += '<div style="border:1px solid var(--gris-borde);border-radius:8px;padding:12px;margin-bottom:12px;">' +
-          '<strong>' + escapar(p.nombre) + '</strong><br>' +
-          '<label class="etiqueta" style="margin-top:8px;">Título para Google (máx. 600px)</label>' +
+        html +=
+          '<div style="border:1px solid var(--gris-borde);border-radius:8px;padding:14px;margin-bottom:14px;">' +
+          '<strong style="font-size:14px;">📍 ' + escapar(p.nombre) + '</strong>' +
+          '<div style="margin-top:10px;">' +
+          '<label class="etiqueta">Título para Google (máx. 600px)</label>' +
           '<input class="campo" id="' + tid + '" value="' + escapar(p.titulo_sugerido) + '" ' +
           'oninput="contarPxSEO(this,\'' + tcnt + '\',600,\'20px arial\')" style="margin-bottom:4px;">' +
-          '<div id="' + tcnt + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:' + colorT + ';">' + pxT + ' / 600 px</div>' +
+          '<div id="' + tcnt + '" style="text-align:right;font-size:11px;margin-bottom:12px;color:' + colorT + ';">' + pxT + ' / 600 px</div>' +
           '<label class="etiqueta">Descripción para Google (máx. 920px)</label>' +
-          '<textarea class="campo" id="' + did + '" rows="2" ' +
-          'oninput="contarPxSEO(this,\'' + dcnt + '\',920,\'13px arial\')">'+escapar(p.descripcion_sugerida)+'</textarea>' +
-          '<div id="' + dcnt + '" style="text-align:right;font-size:11px;margin-bottom:6px;color:' + colorD + ';">' + pxD + ' / 920 px</div>' +
-          '</div>';
+          '<textarea class="campo" id="' + did + '" rows="3" ' +
+          'oninput="contarPxSEO(this,\'' + dcnt + '\',920,\'13px arial\')" style="margin-bottom:4px;">' + escapar(p.descripcion_sugerida) + '</textarea>' +
+          '<div id="' + dcnt + '" style="text-align:right;font-size:11px;margin-bottom:12px;color:' + colorD + ';">' + pxD + ' / 920 px</div>' +
+          '<label class="etiqueta">Texto descriptivo del destino</label>' +
+          '<textarea class="campo" id="' + txid + '" rows="6" style="margin-bottom:4px;font-size:13px;line-height:1.6;">' + escapar(p.texto_sugerido) + '</textarea>' +
+          '</div></div>';
       });
-      html += '<button class="boton-primario" onclick="guardarTraduccionesDestinos(' + JSON.stringify(d.propuestas.map(function(p){return p.destino_id;})) + ', \'' + lang + '\')">💾 Guardar todas</button>';
+      var idsJson = JSON.stringify(d.propuestas.map(function(p) { return p.destino_id; }));
+      html += '<button class="boton-primario" style="margin-top:4px;" data-ids=\'' + idsJson + '\' data-lang="' + lang + '" onclick="guardarTraduccionesDestinos(JSON.parse(this.dataset.ids), this.dataset.lang)">💾 Guardar todo</button>';
       panel.innerHTML = html;
     })
-    .catch(function() { panel.innerHTML = '<p style="color:var(--rojo-error);font-size:13px;">Error al conectar con la IA.</p>'; });
+    .catch(function() { panel.innerHTML = '<p style="color:var(--rojo-error);font-size:13px;">❌ Error de conexión.</p>'; });
 }
 
 function guardarTraduccionesDestinos(ids, lang) {
   var promesas = ids.map(function(id) {
     var datos = {
-      meta_title: (document.getElementById('trad-dest-titulo-' + id) || {}).value || '',
-      meta_description: (document.getElementById('trad-dest-desc-' + id) || {}).value || '',
+      meta_title:        (document.getElementById('trad-dest-titulo-' + id) || {}).value || '',
+      meta_description:  (document.getElementById('trad-dest-desc-'   + id) || {}).value || '',
+      texto_descripcion: (document.getElementById('trad-dest-texto-'  + id) || {}).value || '',
       isla: 'Gran Canaria', slug_url: ''
     };
     return fetch('/admin/seo/destinos/' + id + '/idioma/' + lang, {
@@ -8047,8 +8058,11 @@ function guardarTraduccionesDestinos(ids, lang) {
   });
   Promise.all(promesas).then(function() {
     var panel = document.getElementById('revision-seo-destinos-ia');
-    if (panel) panel.innerHTML = '<p style="color:#2e7d32;font-size:13px;">✅ Traducciones guardadas.</p>';
+    if (panel) panel.innerHTML = '<p style="color:#2e7d32;font-size:13px;">✅ Todo guardado correctamente.</p>';
     cargarPaginaRutas();
+  }).catch(function() {
+    var panel = document.getElementById('revision-seo-destinos-ia');
+    if (panel) panel.innerHTML = '<p style="color:var(--rojo-error);font-size:13px;">❌ Error al guardar. Inténtalo de nuevo.</p>';
   });
 }
 </script>
