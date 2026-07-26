@@ -7861,10 +7861,10 @@ function renderizarCamposDestinoSEO(destinoId, lang, datos) {
     'oninput="validarSlugEnVivo(this)" style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;">' +
     '<div id="seo-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
 
-    // Meta title + descripción con botón IA
-    '<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">' +
-    '<button class="boton-costa" style="padding:5px 12px;font-size:0.78rem;" data-destinoid="' + destinoId + '" data-lang="' + lang + '" onclick="generarTituloDescIA(this)">&#10024; Generar título y descripción con IA</button>' +
-    '<span style="font-size:12px;color:var(--texto-muted);">— Crea textos SEO nativos para este idioma</span>' +
+    // Botón único IA
+    '<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;">' +
+    '<button class="boton-costa" style="padding:7px 16px;font-size:0.85rem;" data-destinoid="' + destinoId + '" data-lang="' + lang + '" onclick="generarTodoIA(this)">🤖 Generar todo con IA</button>' +
+    '<span style="font-size:12px;color:var(--texto-muted);">— Genera slug, título, descripción y texto en ' + lang.toUpperCase() + '</span>' +
     '</div>' +
 
     // Meta title
@@ -7880,49 +7880,44 @@ function renderizarCamposDestinoSEO(destinoId, lang, datos) {
     '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="dest-desc-count">' + medirPx(desc, '13px arial') + ' / 920 px</div>' +
 
     // Texto descriptivo
-    '<label class="etiqueta">Texto descriptivo del destino (visible en la página pública — SEO friendly)</label>' +
-    '<div style="display:flex;gap:8px;margin-bottom:6px;">' +
-    '<button class="boton-costa" style="padding:5px 12px;font-size:0.78rem;" onclick="generarTextoDestinoIA(' + destinoId + ', \'' + lang + '\')">✨ Generar con IA</button>' +
-    '<span style="font-size:12px;color:var(--texto-muted);align-self:center;">— Genera un texto SEO optimizado en el idioma nativo de ese mercado</span>' +
-    '</div>' +
+    '<label class="etiqueta">Texto descriptivo del destino (visible en la página pública)</label>' +
     '<textarea class="campo" id="dest-texto" rows="8" style="margin-bottom:16px;font-size:13px;line-height:1.6;">' + escapar(texto) + '</textarea>' +
 
     '<button class="boton-primario" onclick="guardarDestinoSEO(' + destinoId + ', \'' + lang + '\')">💾 Guardar</button>' +
     '<div id="dest-mensaje-editor" style="margin-top:8px;"></div>';
 }
 
-function generarTituloDescIA(boton) {
+function generarTodoIA(boton) {
   var destinoId = parseInt(boton.dataset.destinoid);
   var lang = boton.dataset.lang;
   var orig = boton.textContent;
   boton.disabled = true;
-  boton.textContent = 'Generando...';
-  fetch('/admin/seo/destinos/' + destinoId + '/generar-titulo-desc', {
+  boton.textContent = '⏳ Generando...';
+  var msg = document.getElementById('dest-mensaje-editor');
+  if (msg) msg.innerHTML = '';
+  fetch('/admin/seo/destinos/' + destinoId + '/generar-todo', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ lang: lang })
   }).then(function(r) { return r.json(); }).then(function(d) {
     boton.disabled = false;
     boton.textContent = orig;
     if (d.ok) {
+      var slug  = document.getElementById('dest-slug');
       var titulo = document.getElementById('dest-titulo');
-      var desc = document.getElementById('dest-desc');
-      if (titulo) {
-        titulo.value = d.meta_title || '';
-        contarPxSEO(titulo, 'dest-titulo-count', 600, '20px arial');
-      }
-      if (desc) {
-        desc.value = d.meta_description || '';
-        contarPxSEO(desc, 'dest-desc-count', 920, '13px arial');
-      }
-      var msg = document.getElementById('dest-mensaje-editor');
-      if (msg) { msg.innerHTML = '<div class="aviso-ok">✅ Título y descripción generados — revisa y guarda</div>'; setTimeout(function() { msg.innerHTML = ''; }, 4000); }
+      var desc   = document.getElementById('dest-desc');
+      var texto  = document.getElementById('dest-texto');
+      if (slug)  { slug.value  = d.slug || '';              validarSlugEnVivo(slug); }
+      if (titulo){ titulo.value = d.meta_title || '';       contarPxSEO(titulo, 'dest-titulo-count', 600, '20px arial'); }
+      if (desc)  { desc.value   = d.meta_description || ''; contarPxSEO(desc,   'dest-desc-count',   920, '13px arial'); }
+      if (texto) { texto.value  = d.texto_descripcion || ''; }
+      if (msg) { msg.innerHTML = '<div class="aviso-ok">✅ Todo generado — revisa y guarda</div>'; setTimeout(function() { msg.innerHTML = ''; }, 4000); }
     } else {
-      alert(d.error || 'Error al generar.');
+      if (msg) msg.innerHTML = '<div class="aviso-error">❌ ' + escapar(d.error || 'Error al generar.') + '</div>';
     }
   }).catch(function() {
     boton.disabled = false;
     boton.textContent = orig;
-    alert('Error de conexión.');
+    if (msg) msg.innerHTML = '<div class="aviso-error">❌ Error de conexión.</div>';
   });
 }
 
@@ -7971,27 +7966,6 @@ function copiarEnlaceDestino(slug, boton) {
   }).catch(function() { prompt('Copia el enlace manualmente:', url); });
 }
 
-function generarTextoDestinoIA(destinoId, lang) {
-  var btn = event.target;
-  btn.disabled = true;
-  btn.textContent = 'Generando...';
-  fetch('/admin/seo/destinos/' + destinoId + '/generar-texto', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: lang })
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    btn.disabled = false;
-    btn.textContent = '✨ Generar con IA';
-    if (d.ok) {
-      var textarea = document.getElementById('dest-texto');
-      if (textarea) textarea.value = d.texto;
-    } else {
-      alert(d.error || 'Error al generar texto.');
-    }
-  }).catch(function() {
-    btn.disabled = false;
-    btn.textContent = '✨ Generar con IA';
-    alert('Error de conexión.');
-  });
-}
 
 function traducirDestinosSEOConIA() {
   var lang = (document.getElementById('select-idioma-ia-destinos') || {}).value;
