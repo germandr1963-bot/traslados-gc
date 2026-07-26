@@ -3665,6 +3665,101 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
   res.json({ ok: true, meta_title: metaTitle, meta_description: metaDesc });
 }));
 
+// Genera de una sola vez: slug + título + descripción + texto descriptivo para un destino en un idioma
+app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { lang } = req.body;
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) return res.status(400).json({ error: 'Idioma no válido.' });
+  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado.' });
+  const d = destino.rows[0];
+  const nombreIdioma = await getNombreIdioma(lang);
+
+  // Regla de slug según alfabeto del idioma
+  const ALFABETO_LATINO = ['es','en','de','fr','it','nl','sv','no','fi','pt','pl','cs','ro','hu','sk','hr','sl','da'];
+  const ALFABETO_CIRILI = ['ru','bg','uk','sr','mk'];
+  let reglasSlug = '';
+  if (ALFABETO_LATINO.includes(lang)) {
+    reglasSlug = `El slug debe estar en ${nombreIdioma}, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). Ejemplo para "Aeropuerto de Gran Canaria" en inglés: "gran-canaria-airport".`;
+  } else if (ALFABETO_CIRILI.includes(lang)) {
+    reglasSlug = `El slug debe ser una transliteración al latín del nombre en ${nombreIdioma}, usando solo a-z y guiones. Ejemplo para "Aeropuerto" en ruso: "aeroport-gran-kanaria".`;
+  } else {
+    reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones. El nombre del destino en inglés. Ejemplo: "gran-canaria-airport".`;
+  }
+
+  const prompt = `Eres un experto en SEO de destinos turísticos. Escribe contenido SEO en ${nombreIdioma} para la página del destino "${d.nombre}" (${d.isla}, Islas Canarias) en una web de traslados privados intermunicipales.
+
+Escribe exactamente como lo haría un profesional SEO nativo de ${nombreIdioma}. No traduces. Creas desde cero con el ritmo, las expresiones y las palabras clave reales de ese mercado.
+
+Genera estos 4 campos:
+
+1. slug: URL amigable para este destino. ${reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
+
+2. meta_title: Título para Google. Máximo 600px reales (Arial 20px). Usa los términos con los que alguien de ese mercado buscaría un traslado privado a ${d.nombre} en Gran Canaria. En idiomas con palabras largas (alemán, neerlandés, finés) usa menos palabras. NUNCA superes 600px.
+
+3. meta_description: Descripción para Google. Máximo 920px reales (Arial 13px). Invita al clic con tono natural de ese mercado. NUNCA superes 920px.
+
+4. texto_descripcion: Exactamente 3 párrafos para la página pública:
+   - Párrafo 1: Describe ${d.nombre} — qué se puede ver, qué hacer, gastronomía, ambiente, qué lo hace especial. Concreto y sensorial, nada genérico.
+   - Párrafo 2: Cómo llegar desde cualquier punto de Gran Canaria con traslado privado. Cómodo, sin esperas, ideal con equipaje o en familia. Sin inventar tiempos ni precios.
+   - Párrafo 3: Invitación cálida a reservar. El precio depende del tipo de vehículo elegido, siempre asequible. Nosotros nos encargamos del trayecto.
+   Sin listas. Solo párrafos fluidos. Sin frases hechas tipo "joya escondida" o "paraíso".
+
+Responde ÚNICAMENTE con JSON válido, sin markdown:
+{"slug": "...", "meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error al conectar con la IA.' });
+  const data = await response.json();
+  const limpio = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  let resultado = {};
+  try { resultado = JSON.parse(limpio); } catch(e) {
+    console.error('[generar-todo] JSON inválido:', limpio.slice(0, 300));
+    return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' });
+  }
+
+  // Limpiar el slug por si la IA mete caracteres no válidos
+  const slugGenerado = String(resultado.slug || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  // Verificar px del título — si se pasa, segunda llamada para acortar
+  let metaTitle = resultado.meta_title || '';
+  let metaDesc  = resultado.meta_description || '';
+  const pxT = medirPxTitulo(metaTitle);
+  const pxD = medirPxDescripcion(metaDesc);
+  if (pxT > 600 || pxD > 920) {
+    const instrucciones = [];
+    if (pxT > 600) instrucciones.push(`- meta_title (${pxT}px, máx 600px): "${metaTitle}" → acórtalo sin superar 600px (Arial 20px).`);
+    if (pxD > 920) instrucciones.push(`- meta_description (${pxD}px, máx 920px): "${metaDesc}" → acórtalo sin superar 920px (Arial 13px).`);
+    const r2 = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 300,
+        messages: [{ role: 'user', content: `Acorta estos textos SEO en ${nombreIdioma} para que no superen los límites de píxeles de Google. Mantén el tono nativo y las keywords.\n\n${instrucciones.join('\n')}\n\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"meta_title": "...", "meta_description": "..."}` }] })
+    });
+    if (r2.ok) {
+      const d2 = await r2.json();
+      const t2 = d2.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+      try {
+        const r2j = JSON.parse(t2);
+        if (pxT > 600 && r2j.meta_title) metaTitle = r2j.meta_title;
+        if (pxD > 920 && r2j.meta_description) metaDesc = r2j.meta_description;
+      } catch(e) {}
+    }
+  }
+
+  res.json({ ok: true, slug: slugGenerado, meta_title: metaTitle, meta_description: metaDesc, texto_descripcion: resultado.texto_descripcion || '' });
+}));
+
 // Traduce con IA el título, descripción y texto de destinos que falten en un idioma
 app.post('/admin/seo/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const lang = req.params.lang;
@@ -3711,13 +3806,18 @@ Responde EXCLUSIVAMENTE con JSON válido, sin markdown, con esta estructura exac
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] })
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 16000, messages: [{ role: 'user', content: prompt }] })
   });
   if (!response.ok) return res.status(500).json({ error: 'Error al conectar con la IA.' });
   const data = await response.json();
   const limpio = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
   let traducciones = {};
-  try { traducciones = JSON.parse(limpio); } catch(e) { return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' }); }
+  try {
+    traducciones = JSON.parse(limpio);
+  } catch(e) {
+    console.error('[generar-destinos-ia] JSON inválido recibido:', limpio.slice(0, 500));
+    return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' });
+  }
   const propuestas = items.map(function(i) {
     const t = traducciones[i.destino_id] || traducciones[String(i.destino_id)] || {};
     return {
