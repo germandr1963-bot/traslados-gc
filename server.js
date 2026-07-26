@@ -3731,30 +3731,49 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
 
-  // Verificar px del título — si se pasa, segunda llamada para acortar
+  // Verificar px — si se pasa, hasta 2 intentos de acortar con datos exactos
   let metaTitle = resultado.meta_title || '';
   let metaDesc  = resultado.meta_description || '';
-  const pxT = medirPxTitulo(metaTitle);
-  const pxD = medirPxDescripcion(metaDesc);
-  if (pxT > 600 || pxD > 920) {
+
+  async function acortarSiNecesario(title, desc, intento) {
+    const pxT = medirPxTitulo(title);
+    const pxD = medirPxDescripcion(desc);
+    if (pxT <= 600 && pxD <= 920) return { title, desc, ok: true };
     const instrucciones = [];
-    if (pxT > 600) instrucciones.push(`- meta_title (${pxT}px, máx 600px): "${metaTitle}" → acórtalo sin superar 600px (Arial 20px).`);
-    if (pxD > 920) instrucciones.push(`- meta_description (${pxD}px, máx 920px): "${metaDesc}" → acórtalo sin superar 920px (Arial 13px).`);
-    const r2 = await fetch('https://api.anthropic.com/v1/messages', {
+    if (pxT > 600) {
+      const excesoPx = pxT - 600;
+      const excesoPct = Math.ceil((excesoPx / pxT) * 100);
+      instrucciones.push(`- meta_title: mide ${pxT}px, límite 600px. Te pasas ${excesoPx}px (un ${excesoPct}% más de lo permitido). Reduce el texto aproximadamente un ${excesoPct}% menos de caracteres. Texto actual: "${title}"`);
+    }
+    if (pxD > 920) {
+      const excesoPx = pxD - 920;
+      const excesoPct = Math.ceil((excesoPx / pxD) * 100);
+      instrucciones.push(`- meta_description: mide ${pxD}px, límite 920px. Te pasas ${excesoPx}px (un ${excesoPct}% más de lo permitido). Reduce el texto aproximadamente un ${excesoPct}% menos de caracteres. Texto actual: "${desc}"`);
+    }
+    const promptAcortar = `Eres un experto SEO en ${nombreIdioma}. Los siguientes textos superan los límites de píxeles reales de Google (medidos en Arial). Acórtalos exactamente lo necesario — ni más ni menos. Mantén el tono nativo, las keywords principales y la invitación al clic. No cambies el idioma.\n\n${instrucciones.join('\n\n')}\n\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"meta_title": "...", "meta_description": "..."}`;
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 300,
-        messages: [{ role: 'user', content: `Acorta estos textos SEO en ${nombreIdioma} para que no superen los límites de píxeles de Google. Mantén el tono nativo y las keywords.\n\n${instrucciones.join('\n')}\n\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"meta_title": "...", "meta_description": "..."}` }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 400, messages: [{ role: 'user', content: promptAcortar }] })
     });
-    if (r2.ok) {
-      const d2 = await r2.json();
-      const t2 = d2.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-      try {
-        const r2j = JSON.parse(t2);
-        if (pxT > 600 && r2j.meta_title) metaTitle = r2j.meta_title;
-        if (pxD > 920 && r2j.meta_description) metaDesc = r2j.meta_description;
-      } catch(e) {}
-    }
+    if (!r.ok) return { title, desc, ok: false };
+    const rData = await r.json();
+    const rTexto = rData.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+    try {
+      const rJson = JSON.parse(rTexto);
+      const newTitle = (medirPxTitulo(title) > 600 && rJson.meta_title) ? rJson.meta_title : title;
+      const newDesc  = (medirPxDescripcion(desc) > 920 && rJson.meta_description) ? rJson.meta_description : desc;
+      return { title: newTitle, desc: newDesc, ok: true };
+    } catch(e) { return { title, desc, ok: false }; }
+  }
+
+  // Intento 1
+  const r1 = await acortarSiNecesario(metaTitle, metaDesc, 1);
+  metaTitle = r1.title; metaDesc = r1.desc;
+  // Intento 2 si todavía se pasa
+  if (medirPxTitulo(metaTitle) > 600 || medirPxDescripcion(metaDesc) > 920) {
+    const r2 = await acortarSiNecesario(metaTitle, metaDesc, 2);
+    metaTitle = r2.title; metaDesc = r2.desc;
   }
 
   res.json({ ok: true, slug: slugGenerado, meta_title: metaTitle, meta_description: metaDesc, texto_descripcion: resultado.texto_descripcion || '' });
