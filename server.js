@@ -3688,10 +3688,10 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
     reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones. El nombre del destino en inglés. Ejemplo: "gran-canaria-airport".`;
   }
 
-  const MAX_CHARS_TITULO = {es:63,en:66,de:63,fr:65,it:66,nl:64,sv:71,no:70,fi:67,ru:56};
-  const MAX_CHARS_DESC   = {es:154,en:161,de:155,fr:157,it:165,nl:151,sv:164,no:168,fi:159,ru:134};
-  const maxCharsTitulo = MAX_CHARS_TITULO[lang] || 63;
-  const maxCharsDesc   = MAX_CHARS_DESC[lang]   || 150;
+  const MAX_CHARS_TITULO = {es:60,en:62,de:55,fr:60,it:60,nl:57,sv:57,no:57,fi:54,ru:50};
+  const MAX_CHARS_DESC   = {es:155,en:160,de:140,fr:155,it:158,nl:148,sv:150,no:152,fi:138,ru:128};
+  const maxCharsTitulo = MAX_CHARS_TITULO[lang] || 57;
+  const maxCharsDesc   = MAX_CHARS_DESC[lang]   || 148;
 
 
   const prompt = `Eres un experto en SEO de destinos turísticos. Escribe contenido SEO en ${nombreIdioma} para la página del destino "${d.nombre}" (${d.isla}, Islas Canarias) en una web de traslados privados intermunicipales.
@@ -3702,9 +3702,22 @@ Genera estos 4 campos:
 
 1. slug: URL amigable para este destino. ${reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
 
-2. meta_title: Título para Google. LÍMITE ESTRICTO: ${maxCharsTitulo} CARACTERES MÁXIMO. Cuenta los caracteres antes de responder. Usa los términos con los que alguien de ese mercado buscaría un traslado privado a ${d.nombre} en Gran Canaria.\n\
+2. meta_title: Título para Google. Usa los términos con los que alguien de ese mercado buscaría un traslado privado a ${d.nombre} en Gran Canaria.\n\
 
-3. meta_description: Descripción para Google. LÍMITE ESTRICTO: ${maxCharsDesc} CARACTERES MÁXIMO. Cuenta los caracteres antes de responder. Invita al clic con tono natural de ese mercado.\n\
+3. meta_description: Descripción para Google. Invita al clic con tono natural de ese mercado.\n\
+
+Genera los metadatos SEO respetando estrictamente los siguientes límites MÁXIMOS de caracteres según el idioma asignado (cuentan espacios y puntuación):\n\
+ES: Título max 60 chars | Descripción max 155 chars\n\
+EN: Título max 62 chars | Descripción max 160 chars\n\
+DE: Título max 55 chars | Descripción max 140 chars\n\
+FR: Título max 60 chars | Descripción max 155 chars\n\
+IT: Título max 60 chars | Descripción max 158 chars\n\
+NL: Título max 57 chars | Descripción max 148 chars\n\
+SV: Título max 57 chars | Descripción max 150 chars\n\
+NO: Título max 57 chars | Descripción max 152 chars\n\
+FI: Título max 54 chars | Descripción max 138 chars\n\
+RU: Título max 50 chars | Descripción max 128 chars\n\
+Regla obligatoria: Nunca superes el límite máximo indicado. Es preferible quedarse 3 o 4 caracteres por debajo para asegurar el ajuste exacto en píxeles.\n\
 
 4. texto_descripcion: Exactamente 3 párrafos para la página pública:
    - Párrafo 1: Describe ${d.nombre} — qué se puede ver, qué hacer, gastronomía, ambiente, qué lo hace especial. Concreto y sensorial, nada genérico.
