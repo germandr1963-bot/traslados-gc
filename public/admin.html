@@ -7852,7 +7852,7 @@ function renderizarCamposDestinoSEO(destinoId, lang, datos) {
     '<span style="font-size:14px;">' + (activo ? '🟢 Esta página <strong>está activa</strong> en internet' : '⚪ Esta página <strong>está desactivada</strong>') + '</span>' +
     '<button class="' + (activo ? 'boton-peligro' : 'boton-costa') + '" style="padding:6px 14px;font-size:0.82rem;" ' +
     'onclick="toggleActivarDestino(' + destinoId + ', \'' + lang + '\', ' + (!activo) + ')">' + (activo ? 'Desactivar' : 'Activar') + '</button>' +
-    (activo ? '<button class="boton-secundario" style="padding:6px 14px;font-size:0.82rem;" onclick="copiarEnlaceDestino(\'' + slug + '\', this)">🔗 Copiar enlace</button>' : '') +
+    (activo ? '<button class="boton-secundario" style="padding:6px 14px;font-size:0.82rem;" onclick="copiarEnlaceDestino(document.getElementById(\'dest-slug\').value, this)">🔗 Copiar enlace</button>' : '') +
     '</div>' +
 
     // Slug
