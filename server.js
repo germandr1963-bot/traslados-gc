@@ -3688,6 +3688,12 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
     reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones. El nombre del destino en inglés. Ejemplo: "gran-canaria-airport".`;
   }
 
+  const MAX_CHARS_TITULO = {es:63,en:66,de:63,fr:65,it:66,nl:64,sv:71,no:70,fi:67,ru:56};
+  const MAX_CHARS_DESC   = {es:154,en:161,de:155,fr:157,it:165,nl:151,sv:164,no:168,fi:159,ru:134};
+  const maxCharsTitulo = MAX_CHARS_TITULO[lang] || 63;
+  const maxCharsDesc   = MAX_CHARS_DESC[lang]   || 150;
+
+
   const prompt = `Eres un experto en SEO de destinos turísticos. Escribe contenido SEO en ${nombreIdioma} para la página del destino "${d.nombre}" (${d.isla}, Islas Canarias) en una web de traslados privados intermunicipales.
 
 Escribe exactamente como lo haría un profesional SEO nativo de ${nombreIdioma}. No traduces. Creas desde cero con el ritmo, las expresiones y las palabras clave reales de ese mercado.
@@ -3696,9 +3702,9 @@ Genera estos 4 campos:
 
 1. slug: URL amigable para este destino. ${reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
 
-2. meta_title: Título para Google. Máximo 600px reales (Arial 20px). Usa los términos con los que alguien de ese mercado buscaría un traslado privado a ${d.nombre} en Gran Canaria. En idiomas con palabras largas (alemán, neerlandés, finés) usa menos palabras. NUNCA superes 600px.
+2. meta_title: Título para Google. LÍMITE ESTRICTO: ${maxCharsTitulo} CARACTERES MÁXIMO. Cuenta los caracteres antes de responder. Usa los términos con los que alguien de ese mercado buscaría un traslado privado a ${d.nombre} en Gran Canaria.\n\
 
-3. meta_description: Descripción para Google. Máximo 920px reales (Arial 13px). Invita al clic con tono natural de ese mercado. NUNCA superes 920px.
+3. meta_description: Descripción para Google. LÍMITE ESTRICTO: ${maxCharsDesc} CARACTERES MÁXIMO. Cuenta los caracteres antes de responder. Invita al clic con tono natural de ese mercado.\n\
 
 4. texto_descripcion: Exactamente 3 párrafos para la página pública:
    - Párrafo 1: Describe ${d.nombre} — qué se puede ver, qué hacer, gastronomía, ambiente, qué lo hace especial. Concreto y sensorial, nada genérico.
@@ -3743,14 +3749,18 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
     if (pxT > 600) {
       const excesoPx = pxT - 600;
       const excesoPct = Math.ceil((excesoPx / pxT) * 100);
-      instrucciones.push(`- meta_title: mide ${pxT}px, límite 600px. Te pasas ${excesoPx}px (un ${excesoPct}% más de lo permitido). Reduce el texto aproximadamente un ${excesoPct}% menos de caracteres. Texto actual: "${title}"`);
+      const charsActualT = title.length;
+      const charsMaxT = Math.floor(charsActualT * 600 / pxT) - 2;
+      instrucciones.push(`TÍTULO: tiene ${charsActualT} caracteres. MÁXIMO ${charsMaxT} caracteres. Elimina ${charsActualT - charsMaxT} caracteres. Texto: "${title}"`);
     }
     if (pxD > 920) {
       const excesoPx = pxD - 920;
       const excesoPct = Math.ceil((excesoPx / pxD) * 100);
-      instrucciones.push(`- meta_description: mide ${pxD}px, límite 920px. Te pasas ${excesoPx}px (un ${excesoPct}% más de lo permitido). Reduce el texto aproximadamente un ${excesoPct}% menos de caracteres. Texto actual: "${desc}"`);
+      const charsActualD = desc.length;
+      const charsMaxD = Math.floor(charsActualD * 920 / pxD) - 2;
+      instrucciones.push(`DESCRIPCIÓN: tiene ${charsActualD} caracteres. MÁXIMO ${charsMaxD} caracteres. Elimina ${charsActualD - charsMaxD} caracteres. Texto: "${desc}"`);
     }
-    const promptAcortar = `Eres un experto SEO en ${nombreIdioma}. Los siguientes textos superan los límites de píxeles reales de Google (medidos en Arial). Acórtalos exactamente lo necesario — ni más ni menos. Mantén el tono nativo, las keywords principales y la invitación al clic. No cambies el idioma.\n\n${instrucciones.join('\n\n')}\n\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"meta_title": "...", "meta_description": "..."}`;
+    const promptAcortar = `Acorta estos textos SEO en ${nombreIdioma}. El límite es en NÚMERO DE CARACTERES — cuenta los caracteres del resultado y no superes el máximo. Mantén tono nativo y palabras clave.\n\n${instrucciones.join('\n\n')}\n\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"meta_title": "...", "meta_description": "..."}`;
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
