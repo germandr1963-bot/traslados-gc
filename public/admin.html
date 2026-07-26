@@ -1580,16 +1580,7 @@ table.tabla-precios input {
       <h1>🌍 Página Rutas — SEO Destinos</h1>
       <p class="subtitulo">Gestiona los destinos que aparecen en la página pública /rutas. Cada destino tiene su propia página con fotos, texto descriptivo y datos SEO por idioma. Los slugs, rutas y demás datos vienen de las secciones Destinos y Rutas y precios — aquí solo se enriquece y activa.</p>
 
-      <div id="panel-estado-destinos" style="background:var(--gris-fondo);padding:12px 16px;border-radius:8px;margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:600;margin-bottom:8px;">📊 Estado del contenido por destino</div>
-        <div id="estado-destinos-cuerpo" style="font-size:12px;color:var(--texto-muted);">Cargando...</div>
-        <div style="margin-top:10px;font-size:11px;color:var(--texto-muted);display:flex;gap:14px;flex-wrap:wrap;">
-          <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#e8f5e9;border:1px solid #81c784;margin-right:4px;"></span>Completo (título + desc + texto)</span>
-          <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#fff8e1;border:1px solid #f9a825;margin-right:4px;"></span>Parcial (falta algo)</span>
-          <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f5f5f5;border:1px solid #ccc;margin-right:4px;"></span>Vacío</span>
-          <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#fdecea;border:1px solid #e74c3c;margin-right:4px;"></span>Excede límite px</span>
-        </div>
-      </div>
+
       <div id="mensaje-pagina-rutas" style="margin-bottom:12px;"></div>
 
       <table class="tabla-admin">
@@ -7389,37 +7380,7 @@ function cargarPaginaRutas() {
   var cuerpo = document.getElementById('tabla-pagina-rutas-cuerpo');
   cuerpo.innerHTML = '<tr><td colspan="5" style="color:var(--texto-muted)">Cargando...</td></tr>';
 
-  // Cargar panel de estado superior
-  fetch('/admin/seo/destinos').then(function(r) { return r.json(); }).then(function(d) {
-    var cuerpo = document.getElementById('estado-destinos-cuerpo');
-    if (!cuerpo) return;
-    var destinos = d.destinos || [];
-    var seo = d.seo || {};
-    var idiomas = d.idiomas || [];
-    if (destinos.length === 0) { cuerpo.textContent = 'No hay destinos.'; return; }
-    var html = '<div style="display:flex;flex-direction:column;gap:6px;">';
-    destinos.forEach(function(dest) {
-      var seoD = seo[dest.id] || {};
-      var badges = idiomas.map(function(lang) {
-        var s = seoD[lang] || {};
-        var tieneTitulo = !!(s.titulo && s.titulo.trim());
-        var tieneDesc   = !!(s.titulo && s.titulo.trim()); // usa titulo como proxy (lo que devuelve seoMap)
-        var completo = tieneTitulo;
-        var bg    = completo ? '#e8f5e9' : '#f5f5f5';
-        var color = completo ? '#2e7d32' : '#aaa';
-        var border = completo ? '#81c784' : '#ccc';
-        return '<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';margin:1px;">' + lang.toUpperCase() + '</span>';
-      }).join('');
-      html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
-        '<span style="font-size:12px;min-width:160px;font-weight:500;">' + escapar(dest.nombre) + '</span>' +
-        badges + '</div>';
-    });
-    html += '</div>';
-    cuerpo.innerHTML = html;
-  }).catch(function() {
-    var cuerpo = document.getElementById('estado-destinos-cuerpo');
-    if (cuerpo) cuerpo.textContent = 'Error al cargar el estado.';
-  });
+
 
   fetch('/admin/seo/destinos')
     .then(function(r) { return r.json(); })
@@ -7439,13 +7400,15 @@ function cargarPaginaRutas() {
           var tieneTitulo = !!(s.titulo && s.titulo.trim());
           var color = s.activo ? '#2e7d32' : (tieneTitulo ? '#b8860b' : '#aaa');
           var bg = s.activo ? '#e8f5e9' : (tieneTitulo ? '#fff8e1' : '#f5f5f5');
-          return '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:' + bg + ';color:' + color + ';margin:1px;">' + lang.toUpperCase() + '</span>';
+          var border = s.activo ? '#81c784' : (tieneTitulo ? '#f9a825' : '#ccc');
+          var icono = s.activo ? ' ✓' : '';
+          return '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';margin:2px;display:inline-block;">' + lang.toUpperCase() + icono + '</span>';
         }).join('');
         var visibleBadge = dest.visible_rutas
           ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#e8f5e9;color:#2e7d32;">✓ Visible</span>'
           : '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#f5f5f5;color:#aaa;">Oculto</span>';
         html += '<tr>' +
-          '<td><strong>' + escapar(dest.nombre) + '</strong><br><div style="margin-top:4px;">' + badgesIdioma + '</div></td>' +
+          '<td style="max-width:220px;"><strong>' + escapar(dest.nombre) + '</strong><br><div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:2px;">' + badgesIdioma + '</div></td>' +
           '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(dest.isla || 'Gran Canaria') + '</td>' +
           '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(dest.zona || '—') + '</td>' +
           '<td>' + visibleBadge + '</td>' +
