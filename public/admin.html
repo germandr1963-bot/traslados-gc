@@ -7527,6 +7527,34 @@ function abrirEditorDestino(destinoId) {
     });
 }
 
+function marcarCabeceraFoto(destinoId, fotoId) {
+  fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/principal', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) { cargarFotosDestino(destinoId); }
+    else { alert(d.error || 'Error al marcar cabecera.'); }
+  });
+}
+
+function guardarOrdenFoto(destinoId, fotoId) {
+  var input = document.getElementById('orden-foto-' + fotoId);
+  var msg = document.getElementById('msg-orden-' + fotoId);
+  if (!input) return;
+  var orden = parseInt(input.value);
+  if (isNaN(orden) || orden < 1) { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Número no válido'; } return; }
+  fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/orden', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orden: orden })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓'; setTimeout(function() { if (msg) msg.textContent = ''; }, 2000); }
+      cargarFotosDestino(destinoId);
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error'; }
+    }
+  });
+}
+
 function cargarFotosDestino(destinoId) {
   fetch('/admin/seo/destinos/' + destinoId + '/fotos')
     .then(function(r) { return r.json(); })
@@ -7537,18 +7565,30 @@ function cargarFotosDestino(destinoId) {
         cont.innerHTML = '<span style="font-size:12px;color:var(--texto-muted);">Sin fotos todav&#237;a.</span>';
         return;
       }
-      cont.innerHTML = d.fotos.map(function(f, i) {
-        return '<div style="border:1px solid var(--gris-borde);border-radius:8px;overflow:hidden;">' +
+      cont.innerHTML = d.fotos.map(function(f) {
+        var esPrincipal = !!f.es_principal;
+        var bordeColor = esPrincipal ? '2px solid var(--terracota)' : '1px solid var(--gris-borde)';
+        return '<div id="foto-card-' + f.id + '" style="border:' + bordeColor + ';border-radius:8px;overflow:hidden;">' +
           '<div style="position:relative;height:80px;background:var(--charcoal);">' +
           '<img src="/destino-foto/' + f.id + '" style="width:100%;height:100%;object-fit:cover;">' +
-          (i === 0 ? '<span style="position:absolute;top:4px;left:4px;background:var(--terracota);color:#fff;font-size:9px;padding:2px 6px;border-radius:3px;">PORTADA</span>' : '') +
+          (esPrincipal ? '<span style="position:absolute;top:4px;left:4px;background:var(--terracota);color:#fff;font-size:9px;padding:2px 6px;border-radius:3px;">&#11088; CABECERA</span>' : '') +
           '<button onclick="eliminarFotoDestino(' + destinoId + ',' + f.id + ')" ' +
           'style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:3px;padding:1px 6px;font-size:11px;cursor:pointer;">&#10005;</button>' +
           '</div>' +
           '<div style="padding:6px 8px;">' +
-          '<div style="font-size:10px;color:var(--texto-muted);">Nombre</div>' +
+          '<div style="font-size:10px;color:var(--texto-muted);margin-bottom:2px;">Nombre</div>' +
           '<div style="font-size:10px;font-family:monospace;word-break:break-all;margin-bottom:6px;">' + escapar(f.nombre_archivo || '&#8212;') + '</div>' +
-          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;" onclick="abrirAltTextosFoto(' + destinoId + ',' + f.id + ')">&#9998; Alt texts por idioma</button>' +
+          '<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;">' +
+          '<span style="font-size:10px;color:var(--texto-muted);">Orden:</span>' +
+          '<input type="number" min="1" max="99" value="' + f.orden + '" id="orden-foto-' + f.id + '" ' +
+          'style="width:44px;font-size:11px;padding:2px 4px;border:1px solid var(--gris-borde);border-radius:4px;">' +
+          '<button onclick="guardarOrdenFoto(' + destinoId + ',' + f.id + ')" ' +
+          'style="font-size:10px;padding:2px 6px;border:1px solid var(--gris-borde);border-radius:4px;cursor:pointer;background:var(--gris-fondo);">OK</button>' +
+          '<span id="msg-orden-' + f.id + '" style="font-size:10px;"></span>' +
+          '</div>' +
+          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;margin-bottom:4px;" onclick="abrirAltTextosFoto(' + destinoId + ',' + f.id + ')">&#9998; Alt texts por idioma</button>' +
+          '<button style="width:100%;font-size:10px;padding:3px 6px;border:1px solid ' + (esPrincipal ? 'var(--terracota)' : 'var(--gris-borde)') + ';border-radius:6px;cursor:pointer;background:' + (esPrincipal ? '#fff5f2' : 'var(--gris-fondo)') + ';color:' + (esPrincipal ? 'var(--terracota)' : 'var(--texto-muted)') + ';" ' +
+          'onclick="marcarCabeceraFoto(' + destinoId + ',' + f.id + ')">' + (esPrincipal ? '&#11088; Cabecera actual' : 'Marcar como cabecera') + '</button>' +
           '</div>' +
           '</div>';
       }).join('');
