@@ -3207,11 +3207,12 @@ app.get('/admin/seo/destinos/:id/completo', requireAdmin, asyncHandler(async (re
 // Guarda los campos SEO de un destino en un idioma
 app.post('/admin/seo/destinos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
   if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) return res.status(400).json({ error: 'Idioma no válido' });
-  const { slug_url, meta_title, meta_description, og_title, og_description, robots_status, texto_descripcion } = req.body;
+  const { slug_url, canonical_url, meta_title, meta_description, og_title, og_description, robots_status, texto_descripcion } = req.body;
   const slugLimpio = slug_url ? slugify(slug_url) : null;
+  // Usar canonical_url del cliente si viene (revisado y confirmado por el usuario), si no construir automático
   const islaDestino = await pool.query('SELECT isla FROM destinos WHERE id = $1', [req.params.id]);
   const islaSlug = slugify((islaDestino.rows[0] && islaDestino.rows[0].isla) || 'gran-canaria');
-  const canonical = BASE_URL + '/destino/' + islaSlug + '/' + (slugLimpio || '');
+  const canonical = (canonical_url && canonical_url.trim()) ? canonical_url.trim() : ('/destino/' + islaSlug + '/' + (slugLimpio || ''));
   await pool.query(
     `UPDATE destinos_seo_settings
      SET slug_url = $1, meta_title = $2, meta_description = $3,
@@ -3734,6 +3735,16 @@ ESTRUCTURA DE LOS ENTREGABLES:
 1. SLUG:
 URL amigable para este destino. ${reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
 
+2. URL_PUBLICA:
+La URL completa de esta página en ${nombreIdioma}. Formato exacto: /[codigo_idioma]/[palabra_destino]/[nombre_isla]/[slug]
+- [codigo_idioma]: el código de 2 letras del idioma (ej: es, en, de, ru...)
+- [palabra_destino]: la palabra "destino" traducida a ${nombreIdioma} en caracteres latinos a-z y guiones. Sin tildes, sin caracteres especiales, sin cirílico (transliterar si es necesario). Ejemplos: destino, destination, reiseziel, destinazione, bestemming, destinasjon, kohde, napravlenie...
+- [nombre_isla]: el nombre de la isla "${d.isla}" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones. Ejemplo en ruso: gran-kanaria.
+- [slug]: exactamente el mismo valor que el campo slug generado arriba.
+Ejemplo para ruso: /ru/napravlenie/gran-kanaria/aeroport-gran-kanaria
+Ejemplo para inglés: /en/destination/gran-canaria/gran-canaria-airport
+Solo caracteres a-z, números y guiones. Sin tildes, sin caracteres especiales.
+
 2. META_TITLE (campo: meta_title):
 - Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
 - Formato habitual: [Traslado / Taxi Privado al Destino] | [Propuesta de Valor] | [CTA o Garantía]
@@ -3764,7 +3775,7 @@ AUTOCONTROL DE CARACTERES:
 Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) del meta_title y de la meta_description. Si superan por 1 solo carácter el límite máximo del idioma ${nombreIdioma}, reescríbelos y acórtalos hasta cumplirlo estrictamente.
 
 Responde ÚNICAMENTE con JSON válido, sin markdown:
-{"slug": "...", "meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}`;
+{"slug": "...", "url_publica": "...", "meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}`;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -3837,7 +3848,16 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
     metaTitle = r2.title; metaDesc = r2.desc;
   }
 
-  res.json({ ok: true, slug: slugGenerado, meta_title: metaTitle, meta_description: metaDesc, texto_descripcion: resultado.texto_descripcion || '' });
+  // Limpiar url_publica — solo a-z, 0-9, guiones y barras
+  const urlPublicaGenerada = String(resultado.url_publica || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\-\/]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/\/+-+/g, '/')
+    .replace(/-+\/+/g, '/');
+
+  res.json({ ok: true, slug: slugGenerado, url_publica: urlPublicaGenerada, meta_title: metaTitle, meta_description: metaDesc, texto_descripcion: resultado.texto_descripcion || '' });
 }));
 
 // Traduce con IA el título, descripción y texto de destinos que falten en un idioma
