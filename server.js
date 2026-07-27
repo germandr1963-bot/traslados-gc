@@ -1807,6 +1807,7 @@ Pulsa el botón para crear una nueva contraseña:
   `);
   await pool.query(`ALTER TABLE destinos_fotos ADD COLUMN IF NOT EXISTS mime_type TEXT DEFAULT 'image/webp'`);
   await pool.query(`ALTER TABLE destinos_fotos ADD COLUMN IF NOT EXISTS nombre_archivo TEXT DEFAULT ''`);
+  await pool.query(`ALTER TABLE destinos_fotos ADD COLUMN IF NOT EXISTS es_principal BOOLEAN DEFAULT FALSE`);
 
   // ─── Alt text de fotos por idioma ────────────────────────────────────────
   await pool.query(`
@@ -3320,7 +3321,7 @@ Responde ÚNICAMENTE con JSON válido, sin markdown, con esta forma exacta:
 // Lista las fotos del carrusel de un destino
 app.get('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    `SELECT id, alt_texto, nombre_archivo, orden FROM destinos_fotos WHERE destino_id = $1 ORDER BY orden`,
+    `SELECT id, alt_texto, nombre_archivo, orden, es_principal FROM destinos_fotos WHERE destino_id = $1 ORDER BY orden`,
     [req.params.id]
   );
   res.json({ fotos: result.rows });
@@ -3357,6 +3358,28 @@ app.post('/admin/seo/destinos/:id/fotos/reordenar', requireAdmin, asyncHandler(a
   for (let i = 0; i < orden.length; i++) {
     await pool.query('UPDATE destinos_fotos SET orden = $1 WHERE id = $2 AND destino_id = $3', [i + 1, orden[i], req.params.id]);
   }
+  res.json({ ok: true });
+}));
+
+// Marca una foto como cabecera principal (desactiva las demás del mismo destino)
+app.post('/admin/seo/destinos/:id/fotos/:fotoId/principal', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE destinos_fotos SET es_principal = FALSE WHERE destino_id = $1', [req.params.id]);
+  await pool.query('UPDATE destinos_fotos SET es_principal = TRUE WHERE id = $1 AND destino_id = $2', [req.params.fotoId, req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Actualiza el orden de una foto individual
+app.post('/admin/seo/destinos/:id/fotos/:fotoId/orden', requireAdmin, asyncHandler(async (req, res) => {
+  const { orden } = req.body;
+  const ordenNum = parseInt(orden);
+  if (isNaN(ordenNum) || ordenNum < 1) return res.status(400).json({ error: 'Orden no v\u00e1lido' });
+  // Verificar que no haya otra foto con ese orden en el mismo destino
+  const existe = await pool.query(
+    'SELECT id FROM destinos_fotos WHERE destino_id = $1 AND orden = $2 AND id != $3',
+    [req.params.id, ordenNum, req.params.fotoId]
+  );
+  if (existe.rows.length > 0) return res.status(400).json({ error: 'Ya existe una foto con ese n\u00famero de orden. Cambia primero la otra.' });
+  await pool.query('UPDATE destinos_fotos SET orden = $1 WHERE id = $2 AND destino_id = $3', [ordenNum, req.params.fotoId, req.params.id]);
   res.json({ ok: true });
 }));
 
