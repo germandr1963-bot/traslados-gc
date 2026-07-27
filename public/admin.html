@@ -7862,6 +7862,12 @@ function renderizarCamposDestinoSEO(destinoId, lang, datos) {
     'oninput="validarSlugEnVivo(this)" style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;">' +
     '<div id="seo-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
 
+    // URL publica
+    '<label class="etiqueta">URL pública de esta página — generada por la IA, revísala y corrígela si es necesario</label>' +
+    '<input class="campo" id="dest-url-publica" type="text" value="' + escapar(datos.canonical_url || '') + '" ' +
+    'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;color:var(--terracota);">' +
+    '<div style="font-size:11px;color:var(--texto-muted);margin-bottom:16px;">Esta URL se guarda tal como la ves al pulsar Guardar</div>' +
+
     // Botón único IA
     '<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;">' +
     '<button class="boton-costa" style="padding:7px 16px;font-size:0.85rem;" data-destinoid="' + destinoId + '" data-lang="' + lang + '" onclick="generarTodoIA(this)">🤖 Generar todo con IA</button>' +
@@ -7939,6 +7945,8 @@ function generarTodoIA(boton) {
       var desc   = document.getElementById('dest-desc');
       var texto  = document.getElementById('dest-texto');
       if (slug)  { slug.value  = d.slug || '';              validarSlugEnVivo(slug); }
+      var urlPublica = document.getElementById('dest-url-publica');
+      if (urlPublica) { urlPublica.value = d.url_publica || ''; }
       if (titulo){ titulo.value = d.meta_title || '';       contarPxSEO(titulo, 'dest-titulo-count', 600, '20px arial'); }
       if (desc)  { desc.value   = d.meta_description || ''; contarPxSEO(desc,   'dest-desc-count',   920, '13px arial'); }
       if (texto) {
@@ -7970,8 +7978,10 @@ function guardarDestinoSEO(destinoId, lang) {
     if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ URL no válida: ' + errorSlug + '</div>';
     return;
   }
+  var urlPublicaInput = document.getElementById('dest-url-publica');
   var datos = {
     slug_url: slugVal,
+    canonical_url: urlPublicaInput ? urlPublicaInput.value.trim() : '',
     meta_title: (document.getElementById('dest-titulo') || {}).value || '',
     meta_description: (document.getElementById('dest-desc') || {}).value || '',
     texto_descripcion: (document.getElementById('dest-texto') || {}).value || '',
