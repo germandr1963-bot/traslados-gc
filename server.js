@@ -3730,20 +3730,23 @@ El idioma de redacción es: ${nombreIdioma}. Aplica sus límites correspondiente
 - Usa un tono cercano, natural y conversacional (de persona local a viajero).
 - Alterna la longitud de las frases (cortas y directas con explicativas) para dar un ritmo de lectura 100% humano.
 
+### REGLAS OBLIGATORIAS SOBRE PRECIOS Y TARIFAS:
+1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):
+   Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía. El servicio se realiza en taxi con taxímetro.
+2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
+   En su lugar, para transmitir un buen precio o valor, UTILIZA TÉRMINOS COMO:
+   - "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial" y otros que creas necesario para enriquecer el texto.
+
 ESTRUCTURA DE LOS ENTREGABLES:
 
 1. SLUG:
 URL amigable para este destino. ${reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
 
-2. URL_PUBLICA:
-La URL completa de esta página en ${nombreIdioma}. Formato exacto: /[codigo_idioma]/[palabra_destino]/[nombre_isla]/[slug]
-- [codigo_idioma]: el código de 2 letras del idioma (ej: es, en, de, ru...)
-- [palabra_destino]: la palabra "destino" traducida a ${nombreIdioma} en caracteres latinos a-z y guiones. Sin tildes, sin caracteres especiales, sin cirílico (transliterar si es necesario). Ejemplos: destino, destination, reiseziel, destinazione, bestemming, destinasjon, kohde, napravlenie...
-- [nombre_isla]: el nombre de la isla "${d.isla}" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones. Ejemplo en ruso: gran-kanaria.
-- [slug]: exactamente el mismo valor que el campo slug generado arriba.
-Ejemplo para ruso: /ru/napravlenie/gran-kanaria/aeroport-gran-kanaria
-Ejemplo para inglés: /en/destination/gran-canaria/gran-canaria-airport
-Solo caracteres a-z, números y guiones. Sin tildes, sin caracteres especiales.
+2. PALABRA_DESTINO:
+La palabra "destino" (lugar al que se viaja) traducida a ${nombreIdioma}, en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico (transliterar si es necesario). Solo la palabra, sin barras ni otros caracteres. Ejemplos: destino, destination, reiseziel, destinazione, bestemming, destinasjon, kohde, napravlenie...
+
+3. NOMBRE_ISLA:
+El nombre de la isla "${d.isla}" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales. Ejemplo en ruso: gran-kanaria. En la mayoría de idiomas latinos se queda igual: gran-canaria.
 
 2. META_TITLE (campo: meta_title):
 - Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
@@ -3775,7 +3778,7 @@ AUTOCONTROL DE CARACTERES:
 Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) del meta_title y de la meta_description. Si superan por 1 solo carácter el límite máximo del idioma ${nombreIdioma}, reescríbelos y acórtalos hasta cumplirlo estrictamente.
 
 Responde ÚNICAMENTE con JSON válido, sin markdown:
-{"slug": "...", "url_publica": "...", "meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}`;
+{"slug": "...", "palabra_destino": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}`;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -3848,14 +3851,13 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
     metaTitle = r2.title; metaDesc = r2.desc;
   }
 
-  // Limpiar url_publica — solo a-z, 0-9, guiones y barras
-  const urlPublicaGenerada = String(resultado.url_publica || '')
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\-\/]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/\/+-+/g, '/')
-    .replace(/-+\/+/g, '/');
+  // Construir url_publica en el servidor: /lang/palabra_destino/nombre_isla/slug
+  function limpiarSegmento(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  }
+  const palabraDestino = limpiarSegmento(resultado.palabra_destino || 'destino');
+  const nombreIsla     = limpiarSegmento(resultado.nombre_isla || slugify(d.isla || 'gran-canaria'));
+  const urlPublicaGenerada = '/' + lang + '/' + palabraDestino + '/' + nombreIsla + '/' + slugGenerado;
 
   res.json({ ok: true, slug: slugGenerado, url_publica: urlPublicaGenerada, meta_title: metaTitle, meta_description: metaDesc, texto_descripcion: resultado.texto_descripcion || '' });
 }));
