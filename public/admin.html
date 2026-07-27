@@ -121,8 +121,9 @@ table.tabla-precios input {
   font-weight: 700;
 }
 .tab-idioma-rojo.activo {
-  background: var(--rojo-error) !important;
-  color: white !important;
+  outline: 3px solid var(--rojo-error);
+  outline-offset: 2px;
+  font-weight: 700;
 }
 .estado-seo-ok    { color: #2e7d32; font-weight: 600; font-size: 13px; }
 .estado-seo-draft { color: #b8860b; font-size: 13px; }
@@ -7616,11 +7617,16 @@ function renderizarAltTextosFoto(destinoId, fotoId, d, panel) {
   var alts = d.alts || {};
   var tabs = idiomas.map(function(i, idx) {
     var tieneTexto = !!(alts[i.codigo] && alts[i.codigo].trim());
-    return '<button class="tab-idioma' + (idx === 0 ? ' activo' : '') + (tieneTexto ? '' : ' tab-idioma-rojo') + '" ' +
+    var estiloTab = tieneTexto
+      ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
+      : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
+    var icono = tieneTexto ? ' ✓' : ' ⚠️';
+    return '<button class="tab-idioma' + (idx === 0 ? ' activo' : '') + '" ' +
       'id="tab-alt-foto-' + fotoId + '-' + i.codigo + '" ' +
+      'style="' + estiloTab + '" ' +
       'data-fotoid="' + fotoId + '" data-lang="' + i.codigo + '" ' +
       'onclick="cambiarTabAltFotoBtn(this)">' +
-      i.codigo.toUpperCase() + (tieneTexto ? '' : ' ⚠️') + '</button>';
+      i.codigo.toUpperCase() + icono + '</button>';
   }).join('');
   panel.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
@@ -7727,7 +7733,15 @@ function guardarAltFoto(destinoId, fotoId, lang) {
       var panel = document.getElementById('panel-alt-foto-' + fotoId);
       if (panel && panel._altData) panel._altData.alts[lang] = altTexto;
       var tab = document.getElementById('tab-alt-foto-' + fotoId + '-' + lang);
-      if (tab && altTexto) { tab.textContent = lang.toUpperCase(); tab.classList.remove('tab-idioma-rojo'); }
+      if (tab) {
+        if (altTexto) {
+          tab.textContent = lang.toUpperCase() + ' ✓';
+          tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
+        } else {
+          tab.textContent = lang.toUpperCase() + ' ⚠️';
+          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
+        }
+      }
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado'; setTimeout(function() { if (msg) msg.textContent = ''; }, 2000); }
     } else {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
