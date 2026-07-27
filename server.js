@@ -3748,15 +3748,17 @@ Redacta el cuerpo completo de la página con estas secciones, en ${nombreIdioma}
 
 EXTENSIÓN TOTAL OBLIGATORIA: Entre 400 y 550 palabras en total (LÍMITE MÁXIMO ABSOLUTO: 600 palabras). No crees textos excesivamente largos.
 
-ESTRUCTURA Y LÍMITES POR SECCIÓN:
-- H1 / Encabezado Principal: 1 frase potente que conecte el viaje a "${d.nombre}" con la comodidad de llegar en traslado privado.
-- Descubre el Destino: Máximo 1 párrafo (aprox. 60-80 palabras). Presentación vibrante de por qué "${d.nombre}" es un lugar imprescindible para visitar.
-- Qué ver y hacer en ${d.nombre}: Máximo 2 o 3 puntos/párrafos breves (aprox. 120-150 palabras). Experiencias clave, atractivos principales, planes para familias, parejas o grupos.
-- La mejor forma de llegar a ${d.nombre}: Máximo 2 párrafos enfocados en el traslado privado (aprox. 100-120 palabras). Explica por qué el traslado privado puerta a puerta es la opción superior frente a autobuses o largas esperas de taxi.
-- Consejos del Local: 2 o 3 tips muy breves en formato lista/puntos (aprox. 60-80 palabras). Recomendaciones prácticas para disfrutar al máximo de la visita.
-- Cierre y CTA de Reserva: 1 párrafo final directo con llamada a la acción (aprox. 40-50 palabras). Motiva e invita directamente al usuario a reservar su traslado privado hacia "${d.nombre}".
+FORMATO DE SALIDA: El campo texto_descripcion debe ser HTML válido. Usa etiquetas <h2>, <h3>, <p>, <ul>, <li>, <strong>. NUNCA uses <h1> — ese lo pone la página automáticamente. NUNCA uses Markdown (#, ##, **, -). Solo HTML limpio.
 
-Sin frases hechas.
+ESTRUCTURA Y LÍMITES POR SECCIÓN:
+- <h2> Encabezado Principal: 1 frase potente que conecte el viaje a "${d.nombre}" con la comodidad de llegar en traslado privado.
+- <h2> Descubre el Destino + <p>: Máximo 1 párrafo (aprox. 60-80 palabras). Presentación vibrante de por qué "${d.nombre}" es un lugar imprescindible para visitar.
+- <h2> Qué ver y hacer en ${d.nombre} + <p> o <ul><li>: Máximo 2 o 3 bloques breves (aprox. 120-150 palabras). Experiencias clave, atractivos principales, planes para familias, parejas o grupos.
+- <h2> La mejor forma de llegar a ${d.nombre} + <p>: Máximo 2 párrafos enfocados en el traslado privado (aprox. 100-120 palabras). Explica por qué el traslado privado puerta a puerta es la opción superior frente a autobuses o largas esperas de taxi.
+- <h2> Consejos del Local + <ul><li>: 2 o 3 tips muy breves (aprox. 60-80 palabras). Recomendaciones prácticas para disfrutar al máximo de la visita.
+- <h2> Reserva tu traslado + <p>: 1 párrafo final directo con llamada a la acción (aprox. 40-50 palabras). Motiva e invita directamente al usuario a reservar su traslado privado hacia "${d.nombre}".
+
+Sin frases hechas. Sin atributos de estilo inline en las etiquetas HTML.
 
 AUTOCONTROL DE CARACTERES:
 Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) del meta_title y de la meta_description. Si superan por 1 solo carácter el límite máximo del idioma ${nombreIdioma}, reescríbelos y acórtalos hasta cumplirlo estrictamente.
