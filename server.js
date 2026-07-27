@@ -3694,36 +3694,72 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
   const maxCharsDesc   = MAX_CHARS_DESC[lang]   || 148;
 
 
-  const prompt = `Eres un experto en SEO de destinos turísticos. Escribe contenido SEO en ${nombreIdioma} para la página del destino "${d.nombre}" (${d.isla}, Islas Canarias) en una web de traslados privados intermunicipales.
+  const prompt = `Actúa como un Experto en SEO Local y Redactor Creativo Nativo. Tu trabajo consiste en redactar metadatos y contenidos altamente persuasivos, escritos de "humano a humano", para una página de captación del destino "${d.nombre}" (${d.isla}, Islas Canarias) de una empresa de traslados y transportes privados intermunicipales.
 
-Escribe exactamente como lo haría un profesional SEO nativo de ${nombreIdioma}. No traduces. Creas desde cero con el ritmo, las expresiones y las palabras clave reales de ese mercado.
+REGLA DE NATIVIDAD (NO TRADUCIR):
+No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo busca, piensa y reserva un usuario real de ese idioma cuando planifica su viaje a "${d.nombre}".
 
-Genera estos 4 campos:
+CONCEPTO Y OBJETIVO DE LA PÁGINA:
+Esta página es una landing de atracción/captación. Su objetivo es inspirar al cliente a visitar "${d.nombre}" y presentar el servicio de traslado/transporte privado como la opción más cómoda, rápida y directa para llegar hasta allí (desde aeropuertos, hoteles u otros puntos).
 
-1. slug: URL amigable para este destino. ${reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
+REGLAS DE ORO Y ESTILO (HUMAN-LIKE):
 
-2. meta_title: Título para Google. Usa los términos con los que alguien de ese mercado buscaría un traslado privado a ${d.nombre} en Gran Canaria.\n\
+1. ENFOQUE HACIA EL DESTINO:
+Todo el contenido (Título, Descripción y Texto) debe enfocar el viaje y transporte privado HACIA "${d.nombre}".
 
-3. meta_description: Descripción para Google. Invita al clic con tono natural de ese mercado.\n\
+2. LÍMITES ESTRICTOS DE CARACTERES (INFRANQUEABLES):
+Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido para aprovechar el espacio SEO, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter.
 
-Genera los metadatos SEO respetando estrictamente los siguientes límites MÁXIMOS de caracteres según el idioma asignado (cuentan espacios y puntuación):\n\
-ES: Título max 60 chars | Descripción max 155 chars\n\
-EN: Título max 62 chars | Descripción max 160 chars\n\
-DE: Título max 55 chars | Descripción max 140 chars\n\
-FR: Título max 60 chars | Descripción max 155 chars\n\
-IT: Título max 60 chars | Descripción max 158 chars\n\
-NL: Título max 57 chars | Descripción max 148 chars\n\
-SV: Título max 57 chars | Descripción max 150 chars\n\
-NO: Título max 57 chars | Descripción max 152 chars\n\
-FI: Título max 54 chars | Descripción max 138 chars\n\
-RU: Título max 50 chars | Descripción max 128 chars\n\
-Regla obligatoria: Nunca superes el límite máximo indicado. Es preferible quedarse 3 o 4 caracteres por debajo para asegurar el ajuste exacto en píxeles.\n\
+Aplica el límite de caracteres según el idioma en el que estés redactando:
+- Español (ES): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)
+- Inglés (EN): Título (54-60 chars | MÁX 62) | Descripción (150-157 chars | MÁX 160)
+- Alemán (DE): Título (48-53 chars | MÁX 55) | Descripción (130-137 chars | MÁX 140)
+- Francés (FR): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)
+- Italiano (IT): Título (52-58 chars | MÁX 60) | Descripción (148-155 chars | MÁX 158)
+- Neerlandés (NL): Título (50-55 chars | MÁX 57) | Descripción (138-145 chars | MÁX 148)
+- Sueco (SV): Título (50-55 chars | MÁX 57) | Descripción (140-147 chars | MÁX 150)
+- Noruego (NO): Título (50-55 chars | MÁX 57) | Descripción (142-149 chars | MÁX 152)
+- Finlandés (FI): Título (46-52 chars | MÁX 54) | Descripción (128-135 chars | MÁX 138)
+- Ruso (RU): Título (42-48 chars | MÁX 50) | Descripción (118-125 chars | MÁX 128)
 
-4. texto_descripcion: Exactamente 3 párrafos para la página pública:
-   - Párrafo 1: Describe ${d.nombre} — qué se puede ver, qué hacer, gastronomía, ambiente, qué lo hace especial. Concreto y sensorial, nada genérico.
-   - Párrafo 2: Cómo llegar desde cualquier punto de Gran Canaria con traslado privado. Cómodo, sin esperas, ideal con equipaje o en familia. Sin inventar tiempos ni precios.
-   - Párrafo 3: Invitación cálida a reservar. El precio depende del tipo de vehículo elegido, siempre asequible. Nosotros nos encargamos del trayecto.
-   Sin listas. Solo párrafos fluidos. Sin frases hechas tipo "joya escondida" o "paraíso".
+El idioma de redacción es: ${nombreIdioma}. Aplica sus límites correspondientes.
+
+3. ESTILO NATURAL Y PROHIBICIONES:
+- Prohibido usar: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido", "joya escondida", "paraíso".
+- Usa un tono cercano, natural y conversacional (de persona local a viajero).
+- Alterna la longitud de las frases (cortas y directas con explicativas) para dar un ritmo de lectura 100% humano.
+
+ESTRUCTURA DE LOS ENTREGABLES:
+
+1. SLUG:
+URL amigable para este destino. ${reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
+
+2. META_TITLE (campo: meta_title):
+- Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
+- Formato habitual: [Traslado / Taxi Privado al Destino] | [Propuesta de Valor] | [CTA o Garantía]
+- Usa los términos con los que alguien de ese mercado buscaría un traslado privado a "${d.nombre}" en Gran Canaria.
+
+3. META_DESCRIPTION (campo: meta_description):
+- Redactada como una solución persuasiva de transporte para el viajero.
+- Formato habitual: [Solución/Promesa de llegada al Destino] + [Ventajas: tarifa fija, comodidad, sin colas, espacio] + [Llamada a la Acción corta].
+
+4. TEXTO PRINCIPAL DEL DESTINO (campo: texto_descripcion):
+Redacta el cuerpo completo de la página con estas secciones, en ${nombreIdioma}, de forma fluida y atractiva.
+
+EXTENSIÓN TOTAL OBLIGATORIA: Entre 400 y 550 palabras en total (LÍMITE MÁXIMO ABSOLUTO: 600 palabras). No crees textos excesivamente largos.
+
+ESTRUCTURA Y LÍMITES POR SECCIÓN:
+- H1 / Encabezado Principal: 1 frase potente que conecte el viaje a "${d.nombre}" con la comodidad de llegar en traslado privado.
+- Descubre el Destino: Máximo 1 párrafo (aprox. 60-80 palabras). Presentación vibrante de por qué "${d.nombre}" es un lugar imprescindible para visitar.
+- Qué ver y hacer en ${d.nombre}: Máximo 2 o 3 puntos/párrafos breves (aprox. 120-150 palabras). Experiencias clave, atractivos principales, planes para familias, parejas o grupos.
+- La mejor forma de llegar a ${d.nombre}: Máximo 2 párrafos enfocados en el traslado privado (aprox. 100-120 palabras). Explica por qué el traslado privado puerta a puerta es la opción superior frente a autobuses o largas esperas de taxi.
+- Consejos del Local: 2 o 3 tips muy breves en formato lista/puntos (aprox. 60-80 palabras). Recomendaciones prácticas para disfrutar al máximo de la visita.
+- Cierre y CTA de Reserva: 1 párrafo final directo con llamada a la acción (aprox. 40-50 palabras). Motiva e invita directamente al usuario a reservar su traslado privado hacia "${d.nombre}".
+
+Sin frases hechas.
+
+AUTOCONTROL DE CARACTERES:
+Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) del meta_title y de la meta_description. Si superan por 1 solo carácter el límite máximo del idioma ${nombreIdioma}, reescríbelos y acórtalos hasta cumplirlo estrictamente.
 
 Responde ÚNICAMENTE con JSON válido, sin markdown:
 {"slug": "...", "meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}`;
@@ -3731,7 +3767,7 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
   });
   if (!response.ok) return res.status(500).json({ error: 'Error al conectar con la IA.' });
   const data = await response.json();
