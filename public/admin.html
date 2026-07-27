@@ -110,9 +110,9 @@ table.tabla-precios input {
   font-family: 'JetBrains Mono', monospace;
 }
 .tab-idioma.activo {
-  background: var(--charcoal);
-  color: white;
-  border-color: var(--charcoal);
+  outline: 3px solid var(--charcoal);
+  outline-offset: 2px;
+  font-weight: 700;
 }
 .tab-idioma-rojo {
   background: #fdecea !important;
@@ -7456,6 +7456,7 @@ function abrirEditorDestino(destinoId) {
         var icono = excede ? ' ⚠️' : completo ? ' ✓' : parcial ? ' ·' : '';
         return '<button class="tab-idioma' + (lang === 'es' ? ' activo' : '') + '" ' +
           'id="tab-dest-idioma-' + lang + '" style="' + estilo + '" ' +
+          'data-estilo-base="' + estilo + '" ' +
           'onclick="cambiarIdiomaEditorDestino(' + destinoId + ', \'' + lang + '\', this)">' +
           lang.toUpperCase() + icono + '</button>';
       }).join('');
@@ -7879,12 +7880,43 @@ function renderizarCamposDestinoSEO(destinoId, lang, datos) {
     'oninput="contarPxSEO(this,\'dest-desc-count\',920,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
     '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="dest-desc-count">' + medirPx(desc, '13px arial') + ' / 920 px</div>' +
 
-    // Texto descriptivo
+    // Texto descriptivo - doble vista
     '<label class="etiqueta">Texto descriptivo del destino (visible en la página pública)</label>' +
-    '<textarea class="campo" id="dest-texto" rows="8" style="margin-bottom:16px;font-size:13px;line-height:1.6;">' + escapar(texto) + '</textarea>' +
+    '<div style="display:flex;gap:6px;margin-bottom:6px;">' +
+    '<button type="button" id="btn-vista-preview" onclick="toggleVistaTexto(\'preview\')" style="padding:4px 12px;font-size:12px;border:1px solid var(--gris-borde);border-radius:6px;cursor:pointer;background:var(--charcoal);color:white;font-weight:700;">👁️ Vista previa</button>' +
+    '<button type="button" id="btn-vista-html" onclick="toggleVistaTexto(\'html\')" style="padding:4px 12px;font-size:12px;border:1px solid var(--gris-borde);border-radius:6px;cursor:pointer;background:var(--gris-fondo);color:var(--texto-muted);">&#9999;&#65039; Editar HTML</button>' +
+    '</div>' +
+    '<div id="dest-texto-preview" style="border:1px solid var(--gris-borde);border-radius:8px;padding:16px 20px;min-height:180px;margin-bottom:16px;font-size:14px;line-height:1.7;background:#fff;display:block;"></div>' +
+    '<textarea class="campo" id="dest-texto" rows="10" style="margin-bottom:16px;font-size:12px;line-height:1.5;font-family:monospace;display:none;">' + escapar(texto) + '</textarea>' +
 
-    '<button class="boton-primario" onclick="guardarDestinoSEO(' + destinoId + ', \'' + lang + '\')">💾 Guardar</button>' +
+    '<button class="boton-primario" onclick="guardarDestinoSEO(' + destinoId + ', \'' + lang + '\')">&#128190; Guardar</button>' +
     '<div id="dest-mensaje-editor" style="margin-top:8px;"></div>';
+  // Mostrar preview si hay texto
+  if (texto) {
+    var preview = document.getElementById('dest-texto-preview');
+    var textarea = document.getElementById('dest-texto');
+    if (preview && textarea) { preview.innerHTML = texto; }
+  }
+}
+
+function toggleVistaTexto(modo) {
+  var preview = document.getElementById('dest-texto-preview');
+  var textarea = document.getElementById('dest-texto');
+  var btnPreview = document.getElementById('btn-vista-preview');
+  var btnHtml = document.getElementById('btn-vista-html');
+  if (!preview || !textarea) return;
+  if (modo === 'preview') {
+    preview.innerHTML = textarea.value;
+    preview.style.display = 'block';
+    textarea.style.display = 'none';
+    if (btnPreview) { btnPreview.style.background = 'var(--charcoal)'; btnPreview.style.color = 'white'; btnPreview.style.fontWeight = '700'; }
+    if (btnHtml)    { btnHtml.style.background = 'var(--gris-fondo)'; btnHtml.style.color = 'var(--texto-muted)'; btnHtml.style.fontWeight = ''; }
+  } else {
+    preview.style.display = 'none';
+    textarea.style.display = 'block';
+    if (btnPreview) { btnPreview.style.background = 'var(--gris-fondo)'; btnPreview.style.color = 'var(--texto-muted)'; btnPreview.style.fontWeight = ''; }
+    if (btnHtml)    { btnHtml.style.background = 'var(--charcoal)'; btnHtml.style.color = 'white'; btnHtml.style.fontWeight = '700'; }
+  }
 }
 
 function generarTodoIA(boton) {
@@ -7909,7 +7941,15 @@ function generarTodoIA(boton) {
       if (slug)  { slug.value  = d.slug || '';              validarSlugEnVivo(slug); }
       if (titulo){ titulo.value = d.meta_title || '';       contarPxSEO(titulo, 'dest-titulo-count', 600, '20px arial'); }
       if (desc)  { desc.value   = d.meta_description || ''; contarPxSEO(desc,   'dest-desc-count',   920, '13px arial'); }
-      if (texto) { texto.value  = d.texto_descripcion || ''; }
+      if (texto) {
+        texto.value = d.texto_descripcion || '';
+        var preview = document.getElementById('dest-texto-preview');
+        if (preview) { preview.innerHTML = texto.value; preview.style.display = 'block'; texto.style.display = 'none'; }
+        var btnP = document.getElementById('btn-vista-preview');
+        var btnH = document.getElementById('btn-vista-html');
+        if (btnP) { btnP.style.background = 'var(--charcoal)'; btnP.style.color = 'white'; btnP.style.fontWeight = '700'; }
+        if (btnH) { btnH.style.background = 'var(--gris-fondo)'; btnH.style.color = 'var(--texto-muted)'; btnH.style.fontWeight = ''; }
+      }
       if (msg) { msg.innerHTML = '<div class="aviso-ok">✅ Todo generado — revisa y guarda</div>'; setTimeout(function() { msg.innerHTML = ''; }, 4000); }
     } else {
       if (msg) msg.innerHTML = '<div class="aviso-error">❌ ' + escapar(d.error || 'Error al generar.') + '</div>';
