@@ -3365,15 +3365,17 @@ app.post('/admin/seo/destinos/:id/fotos/reordenar', requireAdmin, asyncHandler(a
 app.post('/admin/seo/destinos/:id/fotos/:fotoId/principal', requireAdmin, asyncHandler(async (req, res) => {
   const destinoId = req.params.id;
   const fotoId = req.params.fotoId;
-  // Poner todas como no-principal con orden temporal alto para evitar conflictos
-  await pool.query('UPDATE destinos_fotos SET es_principal = FALSE WHERE destino_id = $1', [destinoId]);
-  // Marcar la nueva cabecera con orden 0
-  await pool.query('UPDATE destinos_fotos SET es_principal = TRUE, orden = 0 WHERE id = $1 AND destino_id = $2', [fotoId, destinoId]);
-  // Reordenar el resto secuencialmente desde 1 por orden actual
+  // Paso 1: guardar el orden actual del resto (excluir la nueva cabecera) antes de tocar nada
   const resto = await pool.query(
-    'SELECT id FROM destinos_fotos WHERE destino_id = $1 AND id != $2 ORDER BY orden ASC, id ASC',
+    'SELECT id FROM destinos_fotos WHERE destino_id = $1 AND id != $2 ORDER BY CASE WHEN orden IS NULL THEN 9999 ELSE orden END ASC, id ASC',
     [destinoId, fotoId]
   );
+  // Paso 2: poner todos a orden 9000+ temporal para evitar conflictos de unicidad
+  await pool.query('UPDATE destinos_fotos SET orden = id + 9000 WHERE destino_id = $1', [destinoId]);
+  // Paso 3: marcar la nueva cabecera con orden 0 y es_principal TRUE
+  await pool.query('UPDATE destinos_fotos SET es_principal = FALSE WHERE destino_id = $1', [destinoId]);
+  await pool.query('UPDATE destinos_fotos SET es_principal = TRUE, orden = 0 WHERE id = $1 AND destino_id = $2', [fotoId, destinoId]);
+  // Paso 4: reasignar orden 1, 2, 3... al resto en su orden original
   for (let i = 0; i < resto.rows.length; i++) {
     await pool.query('UPDATE destinos_fotos SET orden = $1 WHERE id = $2', [i + 1, resto.rows[i].id]);
   }
