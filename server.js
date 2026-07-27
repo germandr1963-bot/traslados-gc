@@ -3361,10 +3361,28 @@ app.post('/admin/seo/destinos/:id/fotos/reordenar', requireAdmin, asyncHandler(a
   res.json({ ok: true });
 }));
 
-// Marca una foto como cabecera principal (desactiva las demás del mismo destino)
+// Marca una foto como cabecera principal (desactiva las demás, quita orden a la cabecera)
 app.post('/admin/seo/destinos/:id/fotos/:fotoId/principal', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query('UPDATE destinos_fotos SET es_principal = FALSE WHERE destino_id = $1', [req.params.id]);
-  await pool.query('UPDATE destinos_fotos SET es_principal = TRUE WHERE id = $1 AND destino_id = $2', [req.params.fotoId, req.params.id]);
+  // La que era cabecera antes pierde ese rol — le asignamos el siguiente orden disponible
+  const anteriorCabecera = await pool.query(
+    'SELECT id FROM destinos_fotos WHERE destino_id = $1 AND es_principal = TRUE AND id != $2',
+    [req.params.id, req.params.fotoId]
+  );
+  if (anteriorCabecera.rows.length > 0) {
+    const maxOrden = await pool.query(
+      'SELECT COALESCE(MAX(orden), 0) AS m FROM destinos_fotos WHERE destino_id = $1 AND es_principal = FALSE',
+      [req.params.id]
+    );
+    await pool.query(
+      'UPDATE destinos_fotos SET es_principal = FALSE, orden = $1 WHERE id = $2',
+      [maxOrden.rows[0].m + 1, anteriorCabecera.rows[0].id]
+    );
+  }
+  // La nueva cabecera: es_principal = TRUE, orden = NULL
+  await pool.query(
+    'UPDATE destinos_fotos SET es_principal = TRUE, orden = NULL WHERE id = $1 AND destino_id = $2',
+    [req.params.fotoId, req.params.id]
+  );
   res.json({ ok: true });
 }));
 
