@@ -3637,11 +3637,18 @@ function abrirPanelIdiomas() {
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   fetch('/admin/idiomas').then(function (r) { return r.json(); }).then(function (idiomas) {
-    var filas = idiomas.map(function (idi) {
+    var filas = idiomas.map(function (idi, idx) {
+      var btnArriba = idx === 0
+        ? '<button disabled style="padding:3px 8px;font-size:0.78rem;opacity:0.3;">↑</button>'
+        : '<button class="boton-secundario" style="padding:3px 8px;font-size:0.78rem;" onclick="moverIdiomaOrden(\'' + idi.codigo + '\',\'arriba\')">↑</button>';
+      var btnAbajo = idx === idiomas.length - 1
+        ? '<button disabled style="padding:3px 8px;font-size:0.78rem;opacity:0.3;">↓</button>'
+        : '<button class="boton-secundario" style="padding:3px 8px;font-size:0.78rem;" onclick="moverIdiomaOrden(\'' + idi.codigo + '\',\'abajo\')">↓</button>';
       return '<tr>' +
         '<td><strong>' + escapar(idi.nombre) + '</strong></td>' +
         '<td style="font-family:\'JetBrains Mono\',monospace;">' + escapar(idi.codigo) + '</td>' +
         '<td style="font-family:\'JetBrains Mono\',monospace;color:var(--texto-muted);">' + escapar(idi.palabra_traslado) + '</td>' +
+        '<td style="white-space:nowrap;">' + btnArriba + ' ' + btnAbajo + '</td>' +
         '<td>' + (idi.es_base
           ? '<span style="color:var(--texto-muted);font-size:12px;">Idioma base</span>'
           : '<button class="' + (idi.activo ? 'boton-peligro' : 'boton-costa') + '" style="padding:5px 10px;font-size:0.78rem;" ' +
@@ -3653,8 +3660,9 @@ function abrirPanelIdiomas() {
 
     panel.innerHTML =
       '<h3 style="margin-top:0">🌐 Idiomas de la web</h3>' +
+      '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">El orden aquí es el orden en que aparecen las píldoras de idioma en la web pública.</p>' +
       '<table class="tabla-admin" style="margin-bottom:20px;">' +
-      '<thead><tr><th>Nombre</th><th>Código</th><th>Palabra en la URL</th><th>Acción</th></tr></thead>' +
+      '<thead><tr><th>Nombre</th><th>Código</th><th>Palabra en la URL</th><th>Orden</th><th>Acción</th></tr></thead>' +
       '<tbody>' + filas + '</tbody></table>' +
 
       '<h3>➕ Añadir idioma nuevo</h3>' +
@@ -3675,6 +3683,14 @@ function toggleIdiomaActivo(codigo, activar) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ activo: activar })
+  }).then(function () { abrirPanelIdiomas(); });
+}
+
+function moverIdiomaOrden(codigo, direccion) {
+  fetch('/admin/idiomas/' + codigo + '/orden', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ direccion: direccion })
   }).then(function () { abrirPanelIdiomas(); });
 }
 

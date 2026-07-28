@@ -228,6 +228,29 @@
   .precio-grande { font-size: 28px; }
 }
 
+.lang-pill {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.45);
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  text-transform: uppercase;
+}
+.lang-pill:hover {
+  border-color: rgba(255,255,255,0.5);
+  color: rgba(255,255,255,0.85);
+}
+.lang-pill.activo {
+  background: #C1502E;
+  border-color: #C1502E;
+  color: #fff;
+}
 .seccion {
   max-width: 900px;
   margin: 50px auto;
@@ -260,6 +283,7 @@ footer {
     <span class="titular" style="font-size:18px;">Traslados · GC</span>
     <nav class="nav-links"><a href="/mi-reserva" style="color:rgba(255,255,255,0.6);text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='#C1502E'" onmouseout="this.style.color='rgba(255,255,255,0.6)'">Acceso clientes</a></nav>
   </div>
+  <div id="selector-idioma" style="display:flex;justify-content:center;flex-wrap:wrap;gap:5px;margin-bottom:18px;"></div>
 
   <div class="hero-overlay">
     <div class="titulo-hero titular">Cruza la isla<br>como se <span class="acento">merece</span></div>
@@ -521,6 +545,20 @@ document.getElementById('ver-precio').addEventListener('click', verPrecio);
 cargarFondo();
 cargarRutas();
 cargarCategorias();
+
+function cargarSelectorIdioma() {
+  var langActual = (window.location.pathname.match(/^\/([a-z]{2})(\/|$)/) || [])[1] || 'es';
+  fetch('/api/idiomas-activos').then(function(r) { return r.json(); }).then(function(idiomas) {
+    var contenedor = document.getElementById('selector-idioma');
+    if (!contenedor) return;
+    contenedor.innerHTML = idiomas.map(function(idi) {
+      var href = idi.codigo === 'es' ? '/' : '/' + idi.codigo + '/';
+      var activo = idi.codigo === langActual ? ' activo' : '';
+      return '<a href="' + href + '" class="lang-pill' + activo + '">' + idi.codigo.toUpperCase() + '</a>';
+    }).join('');
+  });
+}
+cargarSelectorIdioma();
 
 function abrirFormCotizacion() {
   var modal = document.getElementById('modal-cotizacion');
