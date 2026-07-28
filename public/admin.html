@@ -3485,7 +3485,7 @@ var textosCache = null;
 function renderizarCabeceraTextos() {
   var thead = document.getElementById('thead-textos');
   if (!thead) return;
-  thead.innerHTML = '<tr><th>Texto</th><th>Módulo</th>' +
+  thead.innerHTML = '<tr><th>Texto</th>' +
     IDIOMAS_TEXTOS.map(function (l) { return '<th style="text-align:center">' + l.toUpperCase() + '</th>'; }).join('') +
     '<th>Acción</th></tr>';
 }
@@ -3516,18 +3516,64 @@ function renderizarTablaTextos(datos) {
     cuerpo.innerHTML = '<tr><td colspan="11">No hay textos registrados todavía.</td></tr>';
     return;
   }
-  cuerpo.innerHTML = datos.textos.map(function (t) {
-    var celdas = IDIOMAS_TEXTOS.map(function (lang) {
-      var ok = t.estado[lang];
-      return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
-    }).join('');
-    return '<tr>' +
-      '<td><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
-      '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(t.modulo) + '</td>' +
-      celdas +
-      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
+
+  // Agrupar por módulo manteniendo orden de aparición
+  var modulos = [];
+  var porModulo = {};
+  datos.textos.forEach(function(t) {
+    if (!porModulo[t.modulo]) {
+      porModulo[t.modulo] = [];
+      modulos.push(t.modulo);
+    }
+    porModulo[t.modulo].push(t);
+  });
+
+  var cols = 2 + IDIOMAS_TEXTOS.length + 1; // texto + módulo + idiomas + acción (módulo oculto en vista colapsable)
+
+  var html = '';
+  modulos.forEach(function(modulo, idx) {
+    var textos = porModulo[modulo];
+    var totalIdiomas = IDIOMAS_TEXTOS.length;
+    var traducidos = textos.reduce(function(sum, t) {
+      return sum + IDIOMAS_TEXTOS.filter(function(l) { return t.estado[l]; }).length;
+    }, 0);
+    var total = textos.length * totalIdiomas;
+    var pct = total > 0 ? Math.round(traducidos / total * 100) : 0;
+    var colorPct = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
+    var seccionId = 'modulo-sec-' + idx;
+
+    // Fila cabecera colapsable
+    html += '<tr style="background:var(--gris-fondo);cursor:pointer;" onclick="toggleSeccionTextos(\'' + seccionId + '\', this)">' +
+      '<td colspan="' + cols + '" style="padding:10px 14px;font-weight:600;font-size:13px;user-select:none;">' +
+        '<span id="' + seccionId + '-icono">▶</span> ' + escapar(modulo) +
+        ' <span style="font-size:11px;font-weight:400;color:var(--texto-muted);">(' + textos.length + ' textos)</span>' +
+        ' <span style="float:right;font-size:12px;color:' + colorPct + ';">' + pct + '% traducido</span>' +
+      '</td>' +
     '</tr>';
-  }).join('');
+
+    // Filas de textos (ocultas por defecto)
+    textos.forEach(function(t) {
+      var celdas = IDIOMAS_TEXTOS.map(function(lang) {
+        var ok = t.estado[lang];
+        return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+      }).join('');
+      html += '<tr class="' + seccionId + '" style="display:none;">' +
+        '<td><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
+        celdas +
+        '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
+      '</tr>';
+    });
+  });
+
+  cuerpo.innerHTML = html;
+}
+
+function toggleSeccionTextos(seccionId, cabeceraEl) {
+  var filas = document.querySelectorAll('.' + seccionId);
+  var icono = document.getElementById(seccionId + '-icono');
+  var visible = filas.length > 0 && filas[0].style.display !== 'none';
+  filas.forEach(function(f) { f.style.display = visible ? 'none' : ''; });
+  if (icono) icono.textContent = visible ? '▶' : '▼';
 }
 
 function abrirEditorTexto(textoId) {
