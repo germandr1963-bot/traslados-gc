@@ -670,10 +670,10 @@ async function initSchema() {
   for (const tx of TEXTOS_HOME) {
     const fila = await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
-       VALUES ($1, 'Página de inicio', $3, $4)
-       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de inicio', contexto = $3, texto_es = $4
+       VALUES ($1, 'Página de inicio', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de inicio', contexto = $2, texto_es = $3
        RETURNING id`,
-      [tx.clave, tx.clave, tx.contexto, tx.es]
+      [tx.clave, tx.contexto, tx.es]
     );
     const textoId = fila.rows[0].id;
     if (tx.en) {
