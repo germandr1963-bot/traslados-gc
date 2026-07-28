@@ -7947,6 +7947,11 @@ function renderizarCamposDestinoSEO(destinoId, lang, datos) {
     'oninput="contarPxSEO(this,\'dest-desc-count\',920,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
     '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="dest-desc-count">' + medirPx(desc, '13px arial') + ' / 920 px</div>' +
 
+    '<label class="etiqueta">Reseña breve para tarjeta (máx. 200 caracteres)</label>' +
+    '<textarea class="campo" id="dest-resena" rows="3" maxlength="200" ' +
+    'oninput="contarCharsResena()" style="margin-bottom:4px;">' + escapar(datos.resena_breve || '') + '</textarea>' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="dest-resena-count">' + (datos.resena_breve ? datos.resena_breve.length : 0) + ' / 200</div>' +
+
     // Texto descriptivo - doble vista
     '<label class="etiqueta">Texto descriptivo del destino (visible en la página pública)</label>' +
     '<div style="display:flex;gap:6px;margin-bottom:6px;">' +
@@ -8010,6 +8015,8 @@ function generarTodoIA(boton) {
       if (urlPublica) { urlPublica.value = d.url_publica || ''; }
       if (titulo){ titulo.value = d.meta_title || '';       contarPxSEO(titulo, 'dest-titulo-count', 600, '20px arial'); }
       if (desc)  { desc.value   = d.meta_description || ''; contarPxSEO(desc,   'dest-desc-count',   920, '13px arial'); }
+      var resena = document.getElementById('dest-resena');
+      if (resena && d.texto_tarjeta) { resena.value = d.texto_tarjeta; contarCharsResena(); }
       if (texto) {
         texto.value = d.texto_descripcion || '';
         var preview = document.getElementById('dest-texto-preview');
@@ -8030,6 +8037,15 @@ function generarTodoIA(boton) {
   });
 }
 
+function contarCharsResena() {
+  var el = document.getElementById('dest-resena');
+  var cnt = document.getElementById('dest-resena-count');
+  if (!el || !cnt) return;
+  var n = el.value.length;
+  cnt.textContent = n + ' / 200';
+  cnt.style.color = n > 200 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+}
+
 function guardarDestinoSEO(destinoId, lang) {
   var slugInput = document.getElementById('dest-slug');
   var slugVal = slugInput ? slugInput.value.trim() : '';
@@ -8045,6 +8061,7 @@ function guardarDestinoSEO(destinoId, lang) {
     canonical_url: urlPublicaInput ? urlPublicaInput.value.trim() : '',
     meta_title: (document.getElementById('dest-titulo') || {}).value || '',
     meta_description: (document.getElementById('dest-desc') || {}).value || '',
+    resena_breve: (document.getElementById('dest-resena') || {}).value || '',
     texto_descripcion: (document.getElementById('dest-texto') || {}).value || '',
     isla: 'Gran Canaria'
   };

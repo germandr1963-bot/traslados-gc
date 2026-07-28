@@ -124,6 +124,7 @@
       line-height: 1.1;
     }
     .td-rutas { font-size: 12px; color: var(--texto-muted); }
+    .td-resena { font-size: 12px; color: var(--texto-muted); line-height: 1.4; margin-top: 4px; }
 
     .bloque-proximamente {
       margin-top: 24px;
@@ -220,6 +221,9 @@
             html += '</div>';
             html += '<div class="td-body">';
             html += '<div class="td-nombre">' + dest.nombre + '</div>';
+            if (dest.resena_breve) {
+              html += '<div class="td-resena">' + dest.resena_breve + '</div>';
+            }
             html += '</div>';
             html += '</a>';
           });
