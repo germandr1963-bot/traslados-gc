@@ -3910,7 +3910,7 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
   }
   const palabraDestino = limpiarSegmento(resultado.palabra_destino || 'destino');
   const nombreIsla     = limpiarSegmento(resultado.nombre_isla || slugify(d.isla || 'gran-canaria'));
-  const urlPublicaGenerada = '/' + lang + '/' + palabraDestino + '/' + nombreIsla + '/' + slugGenerado;
+  const urlPublicaGenerada = '/' + lang + '/' + nombreIsla + '/' + slugGenerado;
 
   const textaTarjeta = (resultado.texto_tarjeta || '').slice(0, 200);
 
@@ -4715,7 +4715,7 @@ app.get('/api/destino-publico/:isla/:slug', asyncHandler(async (req, res) => {
 }));
 
 // Página pública de destino individual
-app.get('/es/destino/:isla/:slug', (req, res) => {
+app.get('/es/:isla/:slug', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'destino-pagina.html'));
 });
 
