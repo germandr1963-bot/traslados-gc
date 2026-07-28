@@ -141,9 +141,9 @@
 
   <script>
     var partes = window.location.pathname.split('/');
-    // /es/gran-canaria/maspalomas
-    var isla = partes[2] || '';
-    var slug = partes[3] || '';
+    // /es/destino/gran-canaria/maspalomas
+    var isla = partes[3] || '';
+    var slug = partes[4] || '';
 
     fetch('/api/destino-publico/' + isla + '/' + slug)
       .then(function(r) { return r.json(); })
