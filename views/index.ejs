@@ -432,7 +432,8 @@ function cargarFondo() {
 }
 
 function poblarSelect(select, valores) {
-  select.innerHTML = '<option value="">' + (select.id === 'desde' || select.id === 'hasta' ? '— ' : '') + '</option>';
+  var primera = select.options[0] ? select.options[0].textContent : '';
+  select.innerHTML = '<option value="">' + primera + '</option>';
   valores.forEach(function (v) {
     var opt = document.createElement('option');
     opt.value = v;
