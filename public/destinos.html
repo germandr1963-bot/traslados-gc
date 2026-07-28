@@ -193,7 +193,7 @@
   </footer>
 
   <script>
-    fetch('/api/destinos-publicos')
+    fetch('/api/destinos-pagina')
       .then(function(r) { return r.json(); })
       .then(function(d) {
         var islas = d.islas || {};
@@ -213,14 +213,12 @@
             var slug = dest.slug || dest.nombre.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
             var isla = (dest.isla || 'Gran Canaria').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
             var url = '/es/destino/' + isla + '/' + slug;
-            var rutasTexto = dest.rutas === 1 ? '1 ruta disponible' : (dest.rutas > 1 ? dest.rutas + ' rutas disponibles' : 'Próximamente');
             html += '<a href="' + url + '" class="tarjeta-destino">';
             html += '<div class="td-foto">';
             if (dest.zona) html += '<span class="td-zona">' + dest.zona + '</span>';
             html += '</div>';
             html += '<div class="td-body">';
             html += '<div class="td-nombre">' + dest.nombre + '</div>';
-            html += '<div class="td-rutas">' + rutasTexto + '</div>';
             html += '</div>';
             html += '</a>';
           });
