@@ -315,7 +315,7 @@ footer {
         </div>
         <div>
           <label class="etiqueta"><%= t('home_label_categoria') %></label>
-          <select id="categoria" class="campo"><option value="">...</option></select>
+          <select id="categoria" class="campo"><option value=""><%= t('home_label_selecciona') %></option></select>
         </div>
       </div>
       <div style="text-align:center;margin-top:10px;">
@@ -409,6 +409,7 @@ var TXT = {
   botonReservar: '<%- t("home_boton_reservar").replace(/'/g, "\\'") %>',
   verOtrasCats:  '<%- t("home_texto_ver_otras_cats").replace(/'/g, "\\'") %>',
   paxSufijo:     '<%- t("home_pax_sufijo").replace(/'/g, "\\'") %>',
+  maletas:       '<%- t("home_maletas").replace(/'/g, "\\'") %>',
   enviando:      '<%- t("home_modal_enviando").replace(/'/g, "\\'") %>',
   cerrar:        '<%- t("home_modal_cerrar").replace(/'/g, "\\'") %>',
   okMsg:         '<%- t("home_modal_ok").replace(/'/g, "\\'") %>',
@@ -482,7 +483,7 @@ function actualizarCategoriasSegunRuta() {
   categoriasRuta.forEach(function (c) {
     var opt = document.createElement('option');
     opt.value = c.id;
-    opt.textContent = c.nombre + ' (' + c.capacidad_pasajeros + ' pax)';
+    opt.textContent = c.nombre + ' (' + c.capacidad_pasajeros + ' ' + TXT.paxSufijo + ')';
     if (String(c.id) === String(valorActual)) opt.selected = true;
     select.appendChild(opt);
   });
@@ -528,7 +529,7 @@ function verPrecio() {
           (catData.capacidad_maletas
             ? '<div class="tarjeta-resultado-dato">' +
                 '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D9A441" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>' +
-                catData.capacidad_maletas + ' maletas' +
+                catData.capacidad_maletas + ' ' + TXT.maletas +
               '</div>'
             : '')
         : '';
