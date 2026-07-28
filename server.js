@@ -4644,8 +4644,8 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
            dss.slug_url,
            (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
     FROM destinos d
-    JOIN destinos_seo_settings dss ON dss.destino_id = d.id
-    WHERE dss.activo = TRUE AND dss.lang_code = 'es'
+    JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = 'es'
+    WHERE d.visible_rutas = TRUE
     ORDER BY d.isla, d.orden, d.nombre
   `);
   const porIsla = {};
