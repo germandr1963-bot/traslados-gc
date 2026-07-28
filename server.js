@@ -1808,6 +1808,8 @@ Pulsa el botón para crear una nueva contraseña:
   await pool.query(`ALTER TABLE destinos_fotos ADD COLUMN IF NOT EXISTS mime_type TEXT DEFAULT 'image/webp'`);
   await pool.query(`ALTER TABLE destinos_fotos ADD COLUMN IF NOT EXISTS nombre_archivo TEXT DEFAULT ''`);
   await pool.query(`ALTER TABLE destinos_fotos ADD COLUMN IF NOT EXISTS es_principal BOOLEAN DEFAULT FALSE`);
+  // Permitir NULL en orden para fotos sin posición asignada aún
+  await pool.query(`ALTER TABLE destinos_fotos ALTER COLUMN orden DROP NOT NULL`).catch(() => {});
 
   // ─── Alt text de fotos por idioma ────────────────────────────────────────
   await pool.query(`
@@ -3361,32 +3363,23 @@ app.post('/admin/seo/destinos/:id/fotos/reordenar', requireAdmin, asyncHandler(a
   res.json({ ok: true });
 }));
 
-// Marca una foto como cabecera. Usa una transacción para evitar cualquier conflicto.
+// Marca una foto como cabecera (lógica simple: quitar principal a todas, asignar a la elegida)
 app.post('/admin/seo/destinos/:id/fotos/:fotoId/principal', requireAdmin, asyncHandler(async (req, res) => {
   const destinoId = req.params.id;
-  const fotoId = req.params.fotoId;
+  const fotoId = parseInt(req.params.fotoId);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Quitar es_principal a todas y poner orden 1,2,3 secuencial por id
-    const todas = await client.query(
-      'SELECT id FROM destinos_fotos WHERE destino_id = $1 ORDER BY id ASC',
+    // Paso 1: quitar cabecera a todas las fotos del destino y dejar orden NULL
+    await client.query(
+      'UPDATE destinos_fotos SET es_principal = FALSE, orden = NULL WHERE destino_id = $1',
       [destinoId]
     );
-    // Primero poner orden negativo temporal a todas para evitar conflictos
-    for (const f of todas.rows) {
-      await client.query('UPDATE destinos_fotos SET es_principal = FALSE, orden = $1 WHERE id = $2', [-(f.id), f.id]);
-    }
-    // Ahora asignar orden 0 a la cabecera y 1,2,3 al resto en orden de id
-    let contador = 1;
-    for (const f of todas.rows) {
-      if (String(f.id) === String(fotoId)) {
-        await client.query('UPDATE destinos_fotos SET es_principal = TRUE, orden = 0 WHERE id = $1', [f.id]);
-      } else {
-        await client.query('UPDATE destinos_fotos SET orden = $1 WHERE id = $2', [contador, f.id]);
-        contador++;
-      }
-    }
+    // Paso 2: marcar la elegida como cabecera con orden 0
+    await client.query(
+      'UPDATE destinos_fotos SET es_principal = TRUE, orden = 0 WHERE id = $1 AND destino_id = $2',
+      [fotoId, destinoId]
+    );
     await client.query('COMMIT');
     res.json({ ok: true });
   } catch(e) {
@@ -3398,18 +3391,14 @@ app.post('/admin/seo/destinos/:id/fotos/:fotoId/principal', requireAdmin, asyncH
   }
 }));
 
-// Actualiza el orden de una foto individual
+// Actualiza el orden de una foto individual (solo fotos que no son cabecera)
 app.post('/admin/seo/destinos/:id/fotos/:fotoId/orden', requireAdmin, asyncHandler(async (req, res) => {
   const { orden } = req.body;
   const ordenNum = parseInt(orden);
-  if (isNaN(ordenNum) || ordenNum < 1) return res.status(400).json({ error: 'El orden debe ser 1 o mayor.' });
-  const esCabecera = await pool.query('SELECT es_principal FROM destinos_fotos WHERE id = $1', [req.params.fotoId]);
-  if (esCabecera.rows.length > 0 && esCabecera.rows[0].es_principal) return res.status(400).json({ error: 'La foto cabecera no tiene orden editable.' });
-  const existe = await pool.query(
-    'SELECT id FROM destinos_fotos WHERE destino_id = $1 AND orden = $2 AND id != $3',
-    [req.params.id, ordenNum, req.params.fotoId]
-  );
-  if (existe.rows.length > 0) return res.status(400).json({ error: 'Ya hay una foto con ese número. Cambia primero la otra.' });
+  if (isNaN(ordenNum) || ordenNum < 1 || ordenNum > 99) return res.status(400).json({ error: 'El orden debe ser un número entre 1 y 99.' });
+  const foto = await pool.query('SELECT es_principal FROM destinos_fotos WHERE id = $1 AND destino_id = $2', [req.params.fotoId, req.params.id]);
+  if (foto.rows.length === 0) return res.status(404).json({ error: 'Foto no encontrada.' });
+  if (foto.rows[0].es_principal) return res.status(400).json({ error: 'La foto cabecera no tiene orden editable.' });
   await pool.query('UPDATE destinos_fotos SET orden = $1 WHERE id = $2 AND destino_id = $3', [ordenNum, req.params.fotoId, req.params.id]);
   res.json({ ok: true });
 }));
