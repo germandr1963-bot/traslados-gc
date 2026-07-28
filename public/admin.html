@@ -7399,11 +7399,12 @@ function cargarPaginaRutas() {
         var badgesIdioma = idiomas.map(function(lang) {
           var s = seo[lang] || {};
           var tieneTitulo = !!(s.titulo && s.titulo.trim());
-          var color = s.activo ? '#2e7d32' : (tieneTitulo ? '#b8860b' : '#aaa');
-          var bg = s.activo ? '#e8f5e9' : (tieneTitulo ? '#fff8e1' : '#f5f5f5');
-          var border = s.activo ? '#81c784' : (tieneTitulo ? '#f9a825' : '#ccc');
-          var icono = s.activo ? ' ✓' : '';
-          return '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';margin:2px;display:inline-block;">' + lang.toUpperCase() + icono + '</span>';
+          var excede = !!s.excede;
+          var color  = excede ? '#c0392b' : (s.activo ? '#2e7d32' : (tieneTitulo ? '#b8860b' : '#aaa'));
+          var bg     = excede ? '#fdecea' : (s.activo ? '#e8f5e9' : (tieneTitulo ? '#fff8e1' : '#f5f5f5'));
+          var border = excede ? '#e74c3c' : (s.activo ? '#81c784' : (tieneTitulo ? '#f9a825' : '#ccc'));
+          var icono  = excede ? ' ⚠️' : (s.activo ? ' ✓' : '');
+          return '<span title="' + (excede ? 'Título o descripción pasados de píxeles' : '') + '" style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';margin:2px;display:inline-block;font-weight:' + (excede ? '700' : 'normal') + ';">' + lang.toUpperCase() + icono + '</span>';
         }).join('');
         var visibleBadge = dest.visible_rutas
           ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#e8f5e9;color:#2e7d32;">✓ Visible</span>'
