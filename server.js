@@ -4513,48 +4513,6 @@ app.get('/admin/textos/exportar', requireAdmin, asyncHandler(async (req, res) =>
 // Importa el Excel traducido y actualiza las traducciones
 app.post('/admin/textos/importar', requireAdmin, upload.single('archivo'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Falta el archivo Excel' });
-app.get('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
-  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
-    return res.status(400).json({ error: 'Idioma no válido' });
-  }
-  const result = await pool.query(
-    'SELECT texto FROM textos_interfaz_traducciones WHERE texto_id = $1 AND lang_code = $2',
-    [req.params.id, req.params.lang]
-  );
-  res.json({ texto: result.rows.length ? result.rows[0].texto : '' });
-}));
-
-app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
-  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
-    return res.status(400).json({ error: 'Idioma no válido' });
-  }
-  await pool.query(
-    `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
-    [req.params.id, req.params.lang, req.body.texto || '']
-  );
-  await cargarTextosCache();
-  res.json({ ok: true });
-}));
-
-
-app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
-  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
-    return res.status(400).json({ error: 'Idioma no válido' });
-  }
-  await pool.query(
-    `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
-    [req.params.id, req.params.lang, req.body.texto || '']
-  );
-  await cargarTextosCache();
-  res.json({ ok: true });
-}));
-
-// Exporta todos los textos a un Excel listo para traductores —
-// mismo patrón que el Excel de SEO, una fila por texto y por idioma
 
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(req.file.buffer);
@@ -4590,6 +4548,31 @@ app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req
 
   await cargarTextosCache();
   res.json({ ok: true, actualizadas, errores });
+}));
+
+app.get('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  const result = await pool.query(
+    'SELECT texto FROM textos_interfaz_traducciones WHERE texto_id = $1 AND lang_code = $2',
+    [req.params.id, req.params.lang]
+  );
+  res.json({ texto: result.rows.length ? result.rows[0].texto : '' });
+}));
+
+app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  await pool.query(
+    `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
+    [req.params.id, req.params.lang, req.body.texto || '']
+  );
+  await cargarTextosCache();
+  res.json({ ok: true });
 }));
 
 // Traduce con IA (Claude) todos los textos que falten en un idioma — no
