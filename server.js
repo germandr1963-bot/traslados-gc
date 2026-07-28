@@ -618,6 +618,74 @@ async function initSchema() {
     );
   }
 
+  // ─── Textos de la página de inicio (index.ejs) ───────────────────────────
+  const TEXTOS_HOME = [
+    { clave: 'home_page_title',          contexto: 'Título de la pestaña del navegador en la página de inicio', es: 'Traslados GC — Traslados de larga distancia en Gran Canaria', en: 'Traslados GC — Long-distance transfers in Gran Canaria' },
+    { clave: 'home_nav_acceso_clientes', contexto: 'Enlace de acceso clientes en la cabecera de la página de inicio', es: 'Acceso clientes', en: 'Client access' },
+    { clave: 'home_titulo_hero',         contexto: 'Título principal del hero. En español lleva un salto de línea después de "isla"', es: 'Cruza la isla como se merece', en: 'Cross the island the way you deserve' },
+    { clave: 'home_subtitulo_hero',      contexto: 'Frase bajo el título del hero', es: 'Traslados de larga distancia en Gran Canaria. Precio fijo por ruta, chofer confirmado antes de salir.', en: 'Long-distance transfers in Gran Canaria. Fixed price per route, confirmed driver before departure.' },
+    { clave: 'home_label_desde',         contexto: 'Etiqueta del selector de origen en el buscador de rutas', es: 'Desde', en: 'From' },
+    { clave: 'home_label_hasta',         contexto: 'Etiqueta del selector de destino en el buscador de rutas', es: 'Hasta', en: 'To' },
+    { clave: 'home_label_categoria',     contexto: 'Etiqueta del selector de categoría de vehículo', es: 'Categoría', en: 'Category' },
+    { clave: 'home_label_selecciona',    contexto: 'Opción por defecto de los selectores del buscador', es: 'Selecciona', en: 'Select' },
+    { clave: 'home_boton_ver_precio',    contexto: 'Botón principal del buscador de rutas', es: 'Ver precio', en: 'See price' },
+    { clave: 'home_texto_elige_ruta',    contexto: 'Texto de ayuda bajo el buscador cuando no se ha seleccionado ruta', es: 'Elige una ruta y categoría para ver el precio', en: 'Choose a route and category to see the price' },
+    { clave: 'home_link_no_encuentras',  contexto: 'Enlace bajo el buscador para solicitar precio de ruta no listada', es: '¿No encuentras tu ruta? Pídenos precio →', en: "Can't find your route? Ask us for a price →" },
+    { clave: 'home_titulo_como_funciona',contexto: 'Título de la sección de 3 pasos de la página de inicio', es: 'Cómo funciona', en: 'How it works' },
+    { clave: 'home_paso1_titulo',        contexto: 'Título del paso 1 en la home', es: '1. Reserva', en: '1. Booking' },
+    { clave: 'home_paso1_texto',         contexto: 'Descripción del paso 1 en la home', es: 'Eliges tu ruta, la categoría de vehículo y la fecha. Ves el precio fijo antes de confirmar.', en: 'Choose your route, vehicle category and date. See the fixed price before confirming.' },
+    { clave: 'home_paso2_titulo',        contexto: 'Título del paso 2 en la home', es: '2. Confirmación', en: '2. Confirmation' },
+    { clave: 'home_paso2_texto',         contexto: 'Descripción del paso 2 en la home', es: 'Un chofer acepta tu viaje y te lo confirmamos antes de que salgas de casa.', en: 'A driver accepts your trip and we confirm it before you leave home.' },
+    { clave: 'home_paso3_titulo',        contexto: 'Título del paso 3 en la home', es: '3. Viaje', en: '3. Trip' },
+    { clave: 'home_paso3_texto',         contexto: 'Descripción del paso 3 en la home', es: 'Coordinamos los detalles finales por WhatsApp. Tu chofer ya sabe dónde y cuándo recogerte.', en: 'We coordinate the final details by WhatsApp. Your driver already knows where and when to pick you up.' },
+    { clave: 'home_modal_titulo',        contexto: 'Título del modal de solicitud de precio', es: 'Solicitar precio', en: 'Request a price' },
+    { clave: 'home_modal_subtitulo',     contexto: 'Subtítulo del modal de solicitud de precio', es: 'Te respondemos por email con los precios disponibles.', en: 'We will reply by email with the available prices.' },
+    { clave: 'home_modal_label_origen',  contexto: 'Etiqueta del campo origen en el modal de cotización', es: 'Origen', en: 'Origin' },
+    { clave: 'home_modal_label_destino', contexto: 'Etiqueta del campo destino en el modal de cotización', es: 'Destino', en: 'Destination' },
+    { clave: 'home_modal_label_fecha',   contexto: 'Etiqueta del campo fecha en el modal de cotización', es: 'Fecha aproximada', en: 'Approximate date' },
+    { clave: 'home_modal_label_pax',     contexto: 'Etiqueta del campo número de pasajeros en el modal de cotización', es: 'Nº pasajeros', en: 'No. of passengers' },
+    { clave: 'home_modal_label_email',   contexto: 'Etiqueta del campo email en el modal de cotización', es: 'Tu email', en: 'Your email' },
+    { clave: 'home_modal_boton_enviar',  contexto: 'Botón de envío del modal de cotización', es: 'Enviar solicitud', en: 'Send request' },
+    { clave: 'home_modal_boton_cancelar',contexto: 'Botón de cancelar del modal de cotización', es: 'Cancelar', en: 'Cancel' },
+    { clave: 'home_modal_enviando',      contexto: 'Texto del botón de envío mientras se procesa la solicitud', es: 'Enviando...', en: 'Sending...' },
+    { clave: 'home_modal_cerrar',        contexto: 'Texto del botón cancelar tras envío exitoso', es: 'Cerrar', en: 'Close' },
+    { clave: 'home_modal_ok',            contexto: 'Mensaje de confirmación tras enviar la solicitud de precio. {email} se sustituye por el email del usuario', es: '✔ Solicitud enviada — Te responderemos a {email} en breve.', en: '✔ Request sent — We will reply to {email} shortly.' },
+    { clave: 'home_modal_error_campos',  contexto: 'Error de validación cuando faltan campos obligatorios en el modal', es: 'Por favor rellena origen, destino y email.', en: 'Please fill in origin, destination and email.' },
+    { clave: 'home_modal_error_email',   contexto: 'Error de validación cuando el email no es válido', es: 'El email no es válido.', en: 'The email address is not valid.' },
+    { clave: 'home_modal_error_conexion',contexto: 'Error cuando falla la conexión al enviar la solicitud', es: 'Error de conexión. Inténtalo de nuevo.', en: 'Connection error. Please try again.' },
+    { clave: 'home_badge_precio_aprox',  contexto: 'Badge junto al precio en el resultado del buscador', es: 'precio aproximado', en: 'estimated price' },
+    { clave: 'home_nota_taximetro',      contexto: 'Nota bajo el precio en el resultado del buscador', es: 'El precio final lo determina el taxímetro del conductor.', en: 'The final price is determined by the driver\'s meter.' },
+    { clave: 'home_texto_a_consultar',   contexto: 'Texto cuando no hay precio disponible para esa combinación de ruta y categoría', es: 'A consultar', en: 'On request' },
+    { clave: 'home_boton_reservar',      contexto: 'Botón de reserva en el resultado del buscador', es: 'Reservar este traslado →', en: 'Book this transfer →' },
+    { clave: 'home_texto_ver_otras_cats',contexto: 'Nota bajo el resultado del buscador para ver otras categorías', es: 'Para ver el precio de otras categorías, selecciónala y pulsa Ver precio.', en: 'To see prices for other categories, select one and press See price.' },
+    { clave: 'home_pax_sufijo',          contexto: 'Sufijo tras el número de pasajeros en el resultado del buscador', es: 'pasajeros', en: 'passengers' },
+    { clave: 'home_footer_rutas',        contexto: 'Enlace Rutas en el footer', es: 'Rutas', en: 'Routes' },
+    { clave: 'home_footer_destinos',     contexto: 'Enlace Destinos en el footer', es: 'Destinos', en: 'Destinations' },
+    { clave: 'home_footer_flota',        contexto: 'Enlace Flota en el footer', es: 'Flota', en: 'Fleet' },
+    { clave: 'home_footer_contacto',     contexto: 'Enlace Contacto en el footer', es: 'Contacto', en: 'Contact' },
+    { clave: 'home_footer_alta_choferes',contexto: 'Enlace Alta choferes en el footer', es: 'Alta choferes', en: 'Driver sign-up' },
+    { clave: 'home_footer_acceso_choferes', contexto: 'Enlace Acceso a choferes en el footer', es: 'Acceso a choferes', en: 'Driver access' },
+    { clave: 'home_footer_acceso_clientes', contexto: 'Enlace Acceso clientes en el footer', es: 'Acceso clientes', en: 'Client access' },
+  ];
+  for (const tx of TEXTOS_HOME) {
+    const fila = await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Página de inicio', $3, $4)
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de inicio', contexto = $3, texto_es = $4
+       RETURNING id`,
+      [tx.clave, tx.clave, tx.contexto, tx.es]
+    );
+    const textoId = fila.rows[0].id;
+    if (tx.en) {
+      await pool.query(
+        `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
+         VALUES ($1, 'en', $2)
+         ON CONFLICT (texto_id, lang_code) DO NOTHING`,
+        [textoId, tx.en]
+      );
+    }
+  }
+
   // Sincronizar nombres de categorías activas como textos traducibles
   const catsActivas = await pool.query('SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
   for (const cat of catsActivas.rows) {
@@ -4698,6 +4766,24 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
     });
   }
   res.json({ islas: porIsla });
+}));
+
+// ─── Página de inicio — renderizada en servidor con EJS ──────────────────
+async function renderHome(req, res, lang) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  const idiomas = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
+  res.render('index', { lang, t, idiomas: idiomas.rows, BASE_URL });
+}
+
+app.get('/', asyncHandler(async (req, res) => {
+  await renderHome(req, res, 'es');
+}));
+
+app.get('/:lang([a-z]{2})/', asyncHandler(async (req, res) => {
+  await renderHome(req, res, req.params.lang);
 }));
 
 app.get('/rutas', (req, res) => {
