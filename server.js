@@ -4671,6 +4671,35 @@ app.get('/destinos', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'destinos.html'));
 });
 
+// API pública de un destino por isla y slug
+app.get('/api/destino-publico/:isla/:slug', asyncHandler(async (req, res) => {
+  const { isla, slug } = req.params;
+  const result = await pool.query(
+    `SELECT d.id, d.nombre, d.isla, d.zona,
+            dss.texto_descripcion, dss.meta_title, dss.meta_description,
+            (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
+     FROM destinos d
+     JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = 'es'
+     WHERE dss.slug_url = $1
+     LIMIT 1`,
+    [slug]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'No encontrado' });
+  const dest = result.rows[0];
+  const fotos = await pool.query(
+    `SELECT id, alt_texto FROM destinos_fotos
+     WHERE destino_id = $1 AND (es_principal = FALSE OR es_principal IS NULL)
+     ORDER BY orden ASC NULLS LAST LIMIT 3`,
+    [dest.id]
+  );
+  res.json({ ...dest, fotos: fotos.rows });
+}));
+
+// Página pública de destino individual
+app.get('/es/destino/:isla/:slug', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'destino-pagina.html'));
+});
+
 app.get('/flota', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'flota.html'));
 });
