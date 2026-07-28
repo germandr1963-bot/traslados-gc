@@ -3485,7 +3485,7 @@ var textosCache = null;
 function renderizarCabeceraTextos() {
   var thead = document.getElementById('thead-textos');
   if (!thead) return;
-  thead.innerHTML = '<tr><th>Texto</th>' +
+  thead.innerHTML = '<tr><th>Texto</th><th>Módulo</th>' +
     IDIOMAS_TEXTOS.map(function (l) { return '<th style="text-align:center">' + l.toUpperCase() + '</th>'; }).join('') +
     '<th>Acción</th></tr>';
 }
@@ -3528,23 +3528,22 @@ function renderizarTablaTextos(datos) {
     porModulo[t.modulo].push(t);
   });
 
-  var cols = 2 + IDIOMAS_TEXTOS.length + 1; // texto + módulo + idiomas + acción (módulo oculto en vista colapsable)
-
+  var totalCols = 2 + IDIOMAS_TEXTOS.length + 1;
   var html = '';
+
   modulos.forEach(function(modulo, idx) {
     var textos = porModulo[modulo];
-    var totalIdiomas = IDIOMAS_TEXTOS.length;
     var traducidos = textos.reduce(function(sum, t) {
       return sum + IDIOMAS_TEXTOS.filter(function(l) { return t.estado[l]; }).length;
     }, 0);
-    var total = textos.length * totalIdiomas;
+    var total = textos.length * IDIOMAS_TEXTOS.length;
     var pct = total > 0 ? Math.round(traducidos / total * 100) : 0;
     var colorPct = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
     var seccionId = 'modulo-sec-' + idx;
 
     // Fila cabecera colapsable
     html += '<tr style="background:var(--gris-fondo);cursor:pointer;" onclick="toggleSeccionTextos(\'' + seccionId + '\', this)">' +
-      '<td colspan="' + cols + '" style="padding:10px 14px;font-weight:600;font-size:13px;user-select:none;">' +
+      '<td colspan="' + totalCols + '" style="padding:10px 14px;font-weight:600;font-size:13px;user-select:none;">' +
         '<span id="' + seccionId + '-icono">▶</span> ' + escapar(modulo) +
         ' <span style="font-size:11px;font-weight:400;color:var(--texto-muted);">(' + textos.length + ' textos)</span>' +
         ' <span style="float:right;font-size:12px;color:' + colorPct + ';">' + pct + '% traducido</span>' +
@@ -3559,6 +3558,7 @@ function renderizarTablaTextos(datos) {
       }).join('');
       html += '<tr class="' + seccionId + '" style="display:none;">' +
         '<td><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
+        '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(t.modulo) + '</td>' +
         celdas +
         '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
       '</tr>';
