@@ -659,7 +659,7 @@ async function initSchema() {
     { clave: 'home_boton_reservar',      contexto: 'Botón de reserva en el resultado del buscador', es: 'Reservar este traslado →', en: 'Book this transfer →' },
     { clave: 'home_texto_ver_otras_cats',contexto: 'Nota bajo el resultado del buscador para ver otras categorías', es: 'Para ver el precio de otras categorías, selecciónala y pulsa Ver precio.', en: 'To see prices for other categories, select one and press See price.' },
     { clave: 'home_pax_sufijo',          contexto: 'Sufijo tras el número de pasajeros en el resultado del buscador', es: 'pasajeros', en: 'passengers' },
-    { clave: 'home_footer_rutas',        contexto: 'Enlace Rutas en el footer', es: 'Rutas', en: 'Routes' },
+    { clave: 'home_maletas',             contexto: 'Palabra maletas en la tarjeta de resultado del buscador', es: 'maletas', en: 'suitcases' },
     { clave: 'home_footer_destinos',     contexto: 'Enlace Destinos en el footer', es: 'Destinos', en: 'Destinations' },
     { clave: 'home_footer_flota',        contexto: 'Enlace Flota en el footer', es: 'Flota', en: 'Fleet' },
     { clave: 'home_footer_contacto',     contexto: 'Enlace Contacto en el footer', es: 'Contacto', en: 'Contact' },
