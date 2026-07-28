@@ -3143,13 +3143,15 @@ app.get('/admin/seo/destinos', requireAdmin, asyncHandler(async (req, res) => {
     await crearFichasSEODestinoSiFaltan(d.id, d.nombre);
   }
   const seoData = await pool.query(
-    `SELECT destino_id, lang_code, slug_url, meta_title, activo
+    `SELECT destino_id, lang_code, slug_url, meta_title, meta_description, activo
      FROM destinos_seo_settings ORDER BY destino_id, lang_code`
   );
   const seoMap = {};
   for (const row of seoData.rows) {
     if (!seoMap[row.destino_id]) seoMap[row.destino_id] = {};
-    seoMap[row.destino_id][row.lang_code] = { slug: row.slug_url, titulo: row.meta_title, activo: row.activo };
+    const pxT = medirPxTitulo(row.meta_title);
+    const pxD = medirPxDescripcion(row.meta_description);
+    seoMap[row.destino_id][row.lang_code] = { slug: row.slug_url, titulo: row.meta_title, activo: row.activo, excede: pxT > 600 || pxD > 960 };
   }
   res.json({ destinos: destinos.rows, seo: seoMap, idiomas: IDIOMAS_PERMITIDOS });
 }));
