@@ -4642,6 +4642,10 @@ app.get('/rutas', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'rutas.html'));
 });
 
+app.get('/destinos', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'destinos.html'));
+});
+
 app.get('/flota', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'flota.html'));
 });
