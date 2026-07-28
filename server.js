@@ -1810,6 +1810,7 @@ Pulsa el botón para crear una nueva contraseña:
   await pool.query(`ALTER TABLE destinos_fotos ADD COLUMN IF NOT EXISTS es_principal BOOLEAN DEFAULT FALSE`);
   // Permitir NULL en orden para fotos sin posición asignada aún
   await pool.query(`ALTER TABLE destinos_fotos ALTER COLUMN orden DROP NOT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE destinos_seo_settings ADD COLUMN IF NOT EXISTS resena_breve TEXT`);
 
   // ─── Alt text de fotos por idioma ────────────────────────────────────────
   await pool.query(`
@@ -3222,12 +3223,13 @@ app.post('/admin/seo/destinos/:id/idioma/:lang', requireAdmin, asyncHandler(asyn
     `UPDATE destinos_seo_settings
      SET slug_url = $1, meta_title = $2, meta_description = $3,
          og_title = $4, og_description = $5, robots_status = $6,
-         canonical_url = $7, texto_descripcion = $8, updated_at = NOW()
-     WHERE destino_id = $9 AND lang_code = $10`,
+         canonical_url = $7, texto_descripcion = $8, resena_breve = $9, updated_at = NOW()
+     WHERE destino_id = $10 AND lang_code = $11`,
     [slugLimpio || null, meta_title || null, meta_description || null,
      og_title || meta_title || null, og_description || meta_description || null,
      robots_status || 'index,follow', canonical,
-     texto_descripcion || null, req.params.id, req.params.lang]
+     texto_descripcion || null, req.body.resena_breve || null,
+     req.params.id, req.params.lang]
   );
   res.json({ ok: true });
 }));
@@ -3740,23 +3742,29 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
   const maxCharsDesc   = MAX_CHARS_DESC[lang]   || 148;
 
 
-  const prompt = `Actúa como un Experto en SEO Local y Redactor Creativo Nativo. Tu trabajo consiste en redactar metadatos y contenidos altamente persuasivos, escritos de "humano a humano", para una página de captación del destino "${d.nombre}" (${d.isla}, Islas Canarias) de una empresa de traslados y transportes privados intermunicipales.
+  const prompt = `# INSTRUCCIONES GENERALES DE REDACCIÓN SEO LOCAL Y METADATOS MULTIIDIOMA
+
+Actúa como un Experto en SEO Local y Redactor Creativo Nativo. Tu trabajo consiste en redactar metadatos y contenidos altamente persuasivos, escritos de "humano a humano", para una página de captación del destino "${d.nombre}" (${d.isla}, Islas Canarias) de una empresa de traslados y transportes privados intermunicipales.
 
 REGLA DE NATIVIDAD (NO TRADUCIR):
 No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo busca, piensa y reserva un usuario real de ese idioma cuando planifica su viaje a "${d.nombre}".
 
-CONCEPTO Y OBJETIVO DE LA PÁGINA:
+---
+
+## CONCEPTO Y OBJETIVO DE LA PÁGINA
 Esta página es una landing de atracción/captación. Su objetivo es inspirar al cliente a visitar "${d.nombre}" y presentar el servicio de traslado/transporte privado como la opción más cómoda, rápida y directa para llegar hasta allí (desde aeropuertos, hoteles u otros puntos).
 
-REGLAS DE ORO Y ESTILO (HUMAN-LIKE):
+---
+
+## REGLAS DE ORO Y ESTILO (HUMAN-LIKE)
 
 1. ENFOQUE HACIA EL DESTINO:
-Todo el contenido (Título, Descripción y Texto) debe enfocar el viaje y transporte privado HACIA "${d.nombre}".
+Todo el contenido (Título, Descripción, Tarjeta y Texto Principal) debe enfocar el viaje y transporte privado HACIA "${d.nombre}".
 
 2. LÍMITES ESTRICTOS DE CARACTERES (INFRANQUEABLES):
-Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido para aprovechar el espacio SEO, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter.
+Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido para aprovechar el espacio SEO, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO en ${nombreIdioma}. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter.
 
-Aplica el límite de caracteres según el idioma en el que estés redactando:
+Límites de caracteres por idioma:
 - Español (ES): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)
 - Inglés (EN): Título (54-60 chars | MÁX 62) | Descripción (150-157 chars | MÁX 160)
 - Alemán (DE): Título (48-53 chars | MÁX 55) | Descripción (130-137 chars | MÁX 140)
@@ -3768,64 +3776,64 @@ Aplica el límite de caracteres según el idioma en el que estés redactando:
 - Finlandés (FI): Título (46-52 chars | MÁX 54) | Descripción (128-135 chars | MÁX 138)
 - Ruso (RU): Título (42-48 chars | MÁX 50) | Descripción (118-125 chars | MÁX 128)
 
-El idioma de redacción es: ${nombreIdioma}. Aplica sus límites correspondientes.
-
-3. ESTILO NATURAL Y PROHIBICIONES:
-- Prohibido usar: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido", "joya escondida", "paraíso".
+3. ESTILO NATURAL Y PROHIBICIONES DE IA:
+- Prohibido usar palabras y clichés típicos de IA como: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido".
 - Usa un tono cercano, natural y conversacional (de persona local a viajero).
 - Alterna la longitud de las frases (cortas y directas con explicativas) para dar un ritmo de lectura 100% humano.
 
 ### REGLAS OBLIGATORIAS SOBRE PRECIOS Y TARIFAS:
 1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):
-   Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía. El servicio se realiza en taxi con taxímetro.
+   Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
 2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
-   En su lugar, para transmitir un buen precio o valor, UTILIZA TÉRMINOS COMO:
-   - "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial" y otros que creas necesario para enriquecer el texto.
+   "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".
 
-ESTRUCTURA DE LOS ENTREGABLES:
+---
+
+## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
 
 1. SLUG:
 URL amigable para este destino. ${reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
 
 2. PALABRA_DESTINO:
-La palabra "destino" (lugar al que se viaja) traducida a ${nombreIdioma}, en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico (transliterar si es necesario). Solo la palabra, sin barras ni otros caracteres. Ejemplos: destino, destination, reiseziel, destinazione, bestemming, destinasjon, kohde, napravlenie...
+La palabra "destino" (lugar al que se viaja) traducida a ${nombreIdioma}, en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico. Solo la palabra.
 
 3. NOMBRE_ISLA:
-El nombre de la isla "${d.isla}" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales. Ejemplo en ruso: gran-kanaria. En la mayoría de idiomas latinos se queda igual: gran-canaria.
+El nombre de la isla "${d.isla}" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente.
 
-2. META_TITLE (campo: meta_title):
+4. META_TITLE (campo: meta_title):
 - Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
-- Formato habitual: [Traslado / Taxi Privado al Destino] | [Propuesta de Valor] | [CTA o Garantía]
-- Usa los términos con los que alguien de ese mercado buscaría un traslado privado a "${d.nombre}" en Gran Canaria.
+- Formato habitual: [Traslado / Taxi Privado a ${d.nombre}] | [Propuesta de Valor] | [CTA o Garantía]
 
-3. META_DESCRIPTION (campo: meta_description):
+5. META_DESCRIPTION (campo: meta_description):
 - Redactada como una solución persuasiva de transporte para el viajero.
-- Formato habitual: [Solución/Promesa de llegada al Destino] + [Ventajas: tarifa fija, comodidad, sin colas, espacio] + [Llamada a la Acción corta].
+- Formato habitual: [Solución/Promesa de llegada a ${d.nombre}] + [Ventajas: tarifas competitivas, comodidad, sin colas] + [Llamada a la Acción corta].
 
-4. TEXTO PRINCIPAL DEL DESTINO (campo: texto_descripcion):
-Redacta el cuerpo completo de la página con estas secciones, en ${nombreIdioma}, de forma fluida y atractiva.
+6. TEXTO INTRODUCTORIO PARA TARJETA DE DESTINO (campo: texto_tarjeta):
+- EXTENSIÓN: Entre 150 y 200 caracteres (MÁXIMO ABSOLUTO: 200 caracteres, incluidos espacios).
+- OBJETIVO: Pincelada corta y atractiva para la ficha previa del destino con botón hacia la página completa.
+- ESTRUCTURA (2 frases): [Frase 1: Atractivo principal de ${d.nombre}] + [Frase 2: Ventaja del traslado privado + CTA de clic].
 
-EXTENSIÓN TOTAL OBLIGATORIA: Entre 400 y 550 palabras en total (LÍMITE MÁXIMO ABSOLUTO: 600 palabras). No crees textos excesivamente largos.
+7. TEXTO PRINCIPAL DEL DESTINO (campo: texto_descripcion):
+EXTENSIÓN TOTAL OBLIGATORIA: Entre 400 y 550 palabras (LÍMITE MÁXIMO ABSOLUTO: 600 palabras).
+FORMATO: HTML válido. Usa <h2>, <h3>, <p>, <ul>, <li>, <strong>. NUNCA <h1>. NUNCA Markdown.
+ESTRUCTURA:
+- <h2> Encabezado Principal: 1 frase potente.
+- <h2> Descubre ${d.nombre} + <p>: Máximo 1 párrafo (aprox. 60-80 palabras).
+- <h2> Qué ver y hacer en ${d.nombre} + <p> o <ul><li>: Máximo 2-3 bloques breves (aprox. 120-150 palabras).
+- <h2> La mejor forma de llegar a ${d.nombre} + <p>: Máximo 2 párrafos (aprox. 100-120 palabras).
+- <h2> Consejos del Local + <ul><li>: 2-3 tips breves (aprox. 60-80 palabras).
+- <h2> Reserva tu traslado + <p>: 1 párrafo final con CTA (aprox. 40-50 palabras).
 
-FORMATO DE SALIDA: El campo texto_descripcion debe ser HTML válido. Usa etiquetas <h2>, <h3>, <p>, <ul>, <li>, <strong>. NUNCA uses <h1> — ese lo pone la página automáticamente. NUNCA uses Markdown (#, ##, **, -). Solo HTML limpio.
+---
 
-ESTRUCTURA Y LÍMITES POR SECCIÓN:
-- <h2> Encabezado Principal: 1 frase potente que conecte el viaje a "${d.nombre}" con la comodidad de llegar en traslado privado.
-- <h2> Descubre el Destino + <p>: Máximo 1 párrafo (aprox. 60-80 palabras). Presentación vibrante de por qué "${d.nombre}" es un lugar imprescindible para visitar.
-- <h2> Qué ver y hacer en ${d.nombre} + <p> o <ul><li>: Máximo 2 o 3 bloques breves (aprox. 120-150 palabras). Experiencias clave, atractivos principales, planes para familias, parejas o grupos.
-- <h2> La mejor forma de llegar a ${d.nombre} + <p>: Máximo 2 párrafos enfocados en el traslado privado (aprox. 100-120 palabras). Explica por qué el traslado privado puerta a puerta es la opción superior frente a autobuses o largas esperas de taxi.
-- <h2> Consejos del Local + <ul><li>: 2 o 3 tips muy breves (aprox. 60-80 palabras). Recomendaciones prácticas para disfrutar al máximo de la visita.
-- <h2> Reserva tu traslado + <p>: 1 párrafo final directo con llamada a la acción (aprox. 40-50 palabras). Motiva e invita directamente al usuario a reservar su traslado privado hacia "${d.nombre}".
+## AUTOCONTROL DE CARACTERES
+Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) del meta_title, meta_description y texto_tarjeta. Si superan por 1 solo carácter el límite máximo, reescríbelos.
 
-Sin frases hechas. Sin atributos de estilo inline en las etiquetas HTML.
+---
 
-AUTOCONTROL DE CARACTERES:
-Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) del meta_title y de la meta_description. Si superan por 1 solo carácter el límite máximo del idioma ${nombreIdioma}, reescríbelos y acórtalos hasta cumplirlo estrictamente.
-
+## FORMATO DE SALIDA (OBLIGATORIO)
 Responde ÚNICAMENTE con JSON válido, sin markdown:
-{"slug": "...", "palabra_destino": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}`;
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+{"slug": "...", "palabra_destino": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "texto_tarjeta": "...", "texto_descripcion": "..."}`;  const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
@@ -3904,7 +3912,17 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
   const nombreIsla     = limpiarSegmento(resultado.nombre_isla || slugify(d.isla || 'gran-canaria'));
   const urlPublicaGenerada = '/' + lang + '/' + palabraDestino + '/' + nombreIsla + '/' + slugGenerado;
 
-  res.json({ ok: true, slug: slugGenerado, url_publica: urlPublicaGenerada, meta_title: metaTitle, meta_description: metaDesc, texto_descripcion: resultado.texto_descripcion || '' });
+  const textaTarjeta = (resultado.texto_tarjeta || '').slice(0, 200);
+
+  // Guardar resena_breve en BD si es ES
+  if (lang === 'es' && textaTarjeta) {
+    await pool.query(
+      'UPDATE destinos_seo_settings SET resena_breve = $1 WHERE destino_id = $2 AND lang_code = $3',
+      [textaTarjeta, req.params.id, lang]
+    );
+  }
+
+  res.json({ ok: true, slug: slugGenerado, url_publica: urlPublicaGenerada, meta_title: metaTitle, meta_description: metaDesc, texto_descripcion: resultado.texto_descripcion || '', texto_tarjeta: textaTarjeta });
 }));
 
 // Traduce con IA el título, descripción y texto de destinos que falten en un idioma
@@ -4641,7 +4659,7 @@ app.get('/api/destinos-publicos', asyncHandler(async (req, res) => {
 app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
   const result = await pool.query(`
     SELECT DISTINCT d.id, d.nombre, d.isla, d.zona, d.orden,
-           dss.slug_url,
+           dss.slug_url, dss.resena_breve,
            (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
     FROM destinos d
     JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = 'es'
@@ -4657,7 +4675,8 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
       nombre: d.nombre,
       zona: d.zona,
       slug: d.slug_url || slugify(d.nombre),
-      foto_cabecera_id: d.foto_cabecera_id || null
+      foto_cabecera_id: d.foto_cabecera_id || null,
+      resena_breve: d.resena_breve || ''
     });
   }
   res.json({ islas: porIsla });
