@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= t('home_page_title') %></title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/estilos.css">
+<style>
+.hero {
+  min-height: 520px;
+  background-color: var(--charcoal);
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  flex-direction: column;
+  color: var(--texto-claro);
+  padding: 24px 24px 60px;
+}
+.hero::before {
+  content: "";
+}
+.hero-overlay {
+  position: relative;
+  background: rgba(28,24,21,0.55);
+  border-radius: 16px;
+  padding: 36px 32px;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+.nav-superior {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 900px;
+  margin: 0 auto 8px;
+  width: 100%;
+}
+.nav-links {
+  font-size: 13px;
+  opacity: 0.7;
+}
+.lang-bar {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: 900px;
+  margin: 0 auto 20px;
+  width: 100%;
+}
+.lang-pill {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.45);
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.lang-pill:hover {
+  border-color: rgba(255,255,255,0.5);
+  color: rgba(255,255,255,0.85);
+}
+.lang-pill.activo {
+  background: #C1502E;
+  border-color: #C1502E;
+  color: #fff;
+}
+.titulo-hero {
+  font-size: clamp(28px, 5vw, 46px);
+  line-height: 1.1;
+  margin-bottom: 12px;
+}
+.titulo-hero .acento {
+  color: var(--terracota);
+}
+.subtitulo-hero {
+  font-size: 15px;
+  opacity: 0.85;
+  max-width: 420px;
+  margin-bottom: 26px;
+}
+.panel-busqueda {
+  background: var(--piedra);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.fila-busqueda {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.fila-busqueda select.campo,
+.fila-busqueda .campo {
+  height: auto;
+  min-height: 40px;
+  white-space: normal;
+  word-break: break-word;
+  padding: 8px 10px;
+}
+#resultado-precio {
+  font-size: 14px;
+  color: var(--texto-muted);
+  min-height: 26px;
+}
+.resultado-vacio {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  color: var(--texto-oscuro);
+}
+.tarjeta-resultado {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  background: var(--charcoal-2);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.tarjeta-resultado-foto {
+  width: 150px;
+  height: auto;
+  align-self: stretch;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #fff;
+  flex-shrink: 0;
+  padding: 8px;
+}
+.tarjeta-resultado-foto-placeholder {
+  width: 150px;
+  align-self: stretch;
+  border-radius: 8px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  flex-shrink: 0;
+}
+.tarjeta-resultado-info {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+.tarjeta-resultado-nombre {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-size: 20px;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+.tarjeta-resultado-datos {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.tarjeta-resultado-dato {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: rgba(242,237,228,0.85);
+  background: rgba(255,255,255,0.07);
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+.tarjeta-resultado-dato svg {
+  flex-shrink: 0;
+}
+.tarjeta-resultado-precio-bloque {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 140px;
+}
+.precio-grande {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 36px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+.badge-aproximado {
+  background: var(--oro);
+  color: var(--oro-texto);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 20px;
+  letter-spacing: 0.2px;
+}
+.tarjeta-resultado-nota {
+  font-size: 11px;
+  color: rgba(242,237,228,0.45);
+  margin-top: 2px;
+  line-height: 1.5;
+  text-align: right;
+  max-width: 180px;
+}
+.boton-reservar {
+  background: var(--terracota);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 13px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+  margin-left: auto;
+}
+.boton-reservar:hover {
+  background: var(--terracota-oscuro);
+}
+@media (max-width: 600px) {
+  .hero { padding: 20px 16px 24px; }
+  .caja-busqueda { padding: 14px 12px; }
+  .fila-busqueda { grid-template-columns: 1fr; }
+  .tarjeta-resultado {
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+  }
+  .tarjeta-resultado-foto,
+  .tarjeta-resultado-foto-placeholder {
+    width: 100%;
+    height: 160px;
+  }
+  .tarjeta-resultado-precio-bloque {
+    align-items: flex-start;
+    min-width: unset;
+    width: 100%;
+  }
+  .tarjeta-resultado-nota { text-align: left; max-width: 100%; }
+  .boton-reservar {
+    width: 100%;
+    margin-left: 0;
+    text-align: center;
+  }
+  .precio-grande { font-size: 28px; }
+}
+.seccion {
+  max-width: 900px;
+  margin: 50px auto;
+  padding: 0 24px;
+}
+.seccion h2 {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-weight: 500;
+  font-size: 24px;
+  margin-bottom: 16px;
+  color: var(--texto-oscuro);
+}
+.tres-columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+footer {
+  text-align: center;
+  padding: 30px;
+  color: var(--texto-muted);
+  font-size: 13px;
+}
+</style>
+</head>
+<body>
+
+<div class="hero" id="hero">
+  <div class="nav-superior">
+    <span class="titular" style="font-size:18px;">Traslados · GC</span>
+    <nav class="nav-links"><a href="/mi-reserva" style="color:rgba(255,255,255,0.6);text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='#C1502E'" onmouseout="this.style.color='rgba(255,255,255,0.6)'""><%= t('home_nav_acceso_clientes') %></a></nav>
+  </div>
+
+  <div class="lang-bar">
+    <% idiomas.forEach(function(idi) { %>
+      <a href="<%= idi.codigo === 'es' ? '/' : '/' + idi.codigo + '/' %>"
+         class="lang-pill<%= idi.codigo === lang ? ' activo' : ''%>">
+        <%= idi.codigo.toUpperCase() %>
+      </a>
+    <% }); %>
+  </div>
+
+  <div class="hero-overlay">
+    <div class="titulo-hero titular"><%= t('home_titulo_hero') %></div>
+    <p class="subtitulo-hero"><%= t('home_subtitulo_hero') %></p>
+
+    <div class="panel-busqueda">
+      <div class="fila-busqueda">
+        <div>
+          <label class="etiqueta"><%= t('home_label_desde') %></label>
+          <select id="desde" class="campo" onchange="actualizarCategoriasSegunRuta()" size="1"><option value=""><%= t('home_label_selecciona') %></option></select>
+        </div>
+        <div>
+          <label class="etiqueta"><%= t('home_label_hasta') %></label>
+          <select id="hasta" class="campo" onchange="actualizarCategoriasSegunRuta()" size="1"><option value=""><%= t('home_label_selecciona') %></option></select>
+        </div>
+        <div>
+          <label class="etiqueta"><%= t('home_label_categoria') %></label>
+          <select id="categoria" class="campo"><option value="">...</option></select>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:10px;">
+        <button id="ver-precio" class="boton-primario" style="padding:10px 40px;"><%= t('home_boton_ver_precio') %></button>
+      </div>
+      <div id="resultado-precio"><%= t('home_texto_elige_ruta') %></div>
+      <div style="text-align:center;margin-top:16px;">
+        <button onclick="abrirFormCotizacion()" style="background:none;border:none;color:#6b5c44;cursor:pointer;font-size:0.9rem;text-decoration:underline;"><%= t('home_link_no_encuentras') %></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de cotización -->
+<div id="modal-cotizacion" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;">
+  <div style="background:#fff;border-radius:12px;padding:1.5rem;max-width:440px;width:90%;margin:auto;position:relative;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+      <h2 style="font-size:1.1rem;margin:0;color:#2c2c2c;"><%= t('home_modal_titulo') %></h2>
+      <button onclick="cerrarFormCotizacion()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888;padding:0 4px;line-height:1;">✕</button>
+    </div>
+    <p style="font-size:0.85rem;color:#888;margin:0 0 1.25rem 0;"><%= t('home_modal_subtitulo') %></p>
+    <div style="display:flex;flex-direction:column;gap:0.75rem;">
+      <div>
+        <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;"><%= t('home_modal_label_origen') %> *</label>
+        <input type="text" id="cotiz-origen" class="campo" placeholder="Ej: Las Palmas de Gran Canaria">
+      </div>
+      <div>
+        <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;"><%= t('home_modal_label_destino') %> *</label>
+        <input type="text" id="cotiz-destino" class="campo" placeholder="Ej: Puerto de Mogán">
+      </div>
+      <div style="display:flex;gap:0.75rem;">
+        <div style="flex:1;">
+          <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;"><%= t('home_modal_label_fecha') %></label>
+          <input type="date" id="cotiz-fecha" class="campo">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;"><%= t('home_modal_label_pax') %></label>
+          <input type="number" id="cotiz-pax" class="campo" min="1" max="16" placeholder="1">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;"><%= t('home_modal_label_email') %> *</label>
+        <input type="email" id="cotiz-email" class="campo" placeholder="tunombre@email.com">
+      </div>
+      <div id="cotiz-error" style="color:#e07b5a;font-size:0.82rem;display:none;"></div>
+      <div id="cotiz-ok" style="color:#2d7a4f;font-size:0.85rem;display:none;text-align:center;padding:0.75rem;background:#d1e7dd;border-radius:6px;"></div>
+      <button id="btn-enviar-cotizacion" onclick="enviarCotizacion()" class="boton-primario" style="width:100%;margin-top:0.5rem;"><%= t('home_modal_boton_enviar') %></button>
+      <button id="btn-cancelar-cotizacion" onclick="cerrarFormCotizacion()" style="width:100%;background:#f5f0ea;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:0.9rem;padding:0.6rem;"><%= t('home_modal_boton_cancelar') %></button>
+    </div>
+  </div>
+</div>
+
+<div class="seccion">
+  <h2><%= t('home_titulo_como_funciona') %></h2>
+  <div class="tres-columnas">
+    <div class="tarjeta">
+      <strong><%= t('home_paso1_titulo') %></strong>
+      <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);"><%= t('home_paso1_texto') %></p>
+    </div>
+    <div class="tarjeta">
+      <strong><%= t('home_paso2_titulo') %></strong>
+      <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);"><%= t('home_paso2_texto') %></p>
+    </div>
+    <div class="tarjeta">
+      <strong><%= t('home_paso3_titulo') %></strong>
+      <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);"><%= t('home_paso3_texto') %></p>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div style="margin-bottom:12px;">
+    <a href="/rutas" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_rutas') %></a>
+    <a href="/destinos" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_destinos') %></a>
+    <a href="/flota" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_flota') %></a>
+    <a href="/contacto" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_contacto') %></a>
+    <a href="/chofer/acceso/alta" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_alta_choferes') %></a>
+    <a href="/chofer/acceso" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_acceso_choferes') %></a>
+    <a href="/mi-reserva" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_acceso_clientes') %></a>
+  </div>
+  Traslados · GC — Gran Canaria
+</footer>
+
+<script>
+var LANG = '<%= lang %>';
+var TXT = {
+  eligeRuta:     '<%- t("home_texto_elige_ruta").replace(/'/g, "\\'") %>',
+  aConsultar:    '<%- t("home_texto_a_consultar").replace(/'/g, "\\'") %>',
+  badgeAprox:    '<%- t("home_badge_precio_aprox").replace(/'/g, "\\'") %>',
+  notaTaxi:      '<%- t("home_nota_taximetro").replace(/'/g, "\\'") %>',
+  botonReservar: '<%- t("home_boton_reservar").replace(/'/g, "\\'") %>',
+  verOtrasCats:  '<%- t("home_texto_ver_otras_cats").replace(/'/g, "\\'") %>',
+  paxSufijo:     '<%- t("home_pax_sufijo").replace(/'/g, "\\'") %>',
+  enviando:      '<%- t("home_modal_enviando").replace(/'/g, "\\'") %>',
+  cerrar:        '<%- t("home_modal_cerrar").replace(/'/g, "\\'") %>',
+  okMsg:         '<%- t("home_modal_ok").replace(/'/g, "\\'") %>',
+  errCampos:     '<%- t("home_modal_error_campos").replace(/'/g, "\\'") %>',
+  errEmail:      '<%- t("home_modal_error_email").replace(/'/g, "\\'") %>',
+  errConexion:   '<%- t("home_modal_error_conexion").replace(/'/g, "\\'") %>',
+  enviarSolicitud: '<%- t("home_modal_boton_enviar").replace(/'/g, "\\'") %>',
+  cancelar:      '<%- t("home_modal_boton_cancelar").replace(/'/g, "\\'") %>'
+};
+
+var rutasDisponibles = [];
+var categoriasDisponibles = [];
+
+function cargarFondo() {
+  var img = new Image();
+  img.onload = function () {
+    document.getElementById('hero').style.backgroundImage = "url('/fondo-activo')";
+  };
+  img.onerror = function () {};
+  img.src = '/fondo-activo';
+}
+
+function poblarSelect(select, valores) {
+  select.innerHTML = '<option value="">' + (select.id === 'desde' || select.id === 'hasta' ? '— ' : '') + '</option>';
+  valores.forEach(function (v) {
+    var opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v;
+    select.appendChild(opt);
+  });
+}
+
+function cargarRutas() {
+  fetch('/api/rutas').then(function (r) { return r.json(); }).then(function (rutas) {
+    rutasDisponibles = rutas;
+    var origenes = Array.from(new Set(rutas.map(function (r) { return r.origen; })));
+    var destinos = Array.from(new Set(rutas.map(function (r) { return r.destino; })));
+    poblarSelect(document.getElementById('desde'), origenes);
+    poblarSelect(document.getElementById('hasta'), destinos);
+    if (rutas.length === 0) {
+      document.getElementById('resultado-precio').textContent = TXT.eligeRuta;
+    }
+  });
+}
+
+function cargarCategorias() {
+  fetch('/api/categorias').then(function (r) { return r.json(); }).then(function (categorias) {
+    categoriasDisponibles = categorias;
+    actualizarCategoriasSegunRuta();
+  });
+}
+
+function actualizarCategoriasSegunRuta() {
+  var desdeVal = document.getElementById('desde').value;
+  var hastaVal = document.getElementById('hasta').value;
+  var select = document.getElementById('categoria');
+  var valorActual = select.value;
+
+  var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; })
+          || rutasDisponibles.find(function (r) { return r.origen === hastaVal && r.destino === desdeVal; });
+
+  select.innerHTML = '<option value=""></option>';
+
+  if (!ruta || !desdeVal || !hastaVal) return;
+
+  var categoriasRuta = categoriasDisponibles.filter(function (c) {
+    return ruta.categorias_con_precio && ruta.categorias_con_precio.indexOf(c.id) !== -1;
+  });
+
+  categoriasRuta.forEach(function (c) {
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.nombre + ' (' + c.capacidad_pasajeros + ' pax)';
+    if (String(c.id) === String(valorActual)) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  if (valorActual && !categoriasRuta.find(function(c) { return String(c.id) === String(valorActual); })) {
+    document.getElementById('resultado-precio').innerHTML = '';
+  }
+}
+
+function verPrecio() {
+  var desdeVal = document.getElementById('desde').value;
+  var hastaVal = document.getElementById('hasta').value;
+  var categoriaId = document.getElementById('categoria').value;
+  var resultado = document.getElementById('resultado-precio');
+
+  if (!desdeVal || !hastaVal || !categoriaId) {
+    resultado.innerHTML = '<div class="resultado-vacio">' + TXT.eligeRuta + '</div>';
+    return;
+  }
+
+  var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; })
+          || rutasDisponibles.find(function (r) { return r.origen === hastaVal && r.destino === desdeVal; });
+  var categoriaSelect = document.getElementById('categoria');
+  var catData = categoriasDisponibles.find(function (c) { return String(c.id) === String(categoriaId); });
+
+  if (!ruta) {
+    resultado.innerHTML = '<div class="resultado-vacio">' + TXT.aConsultar + '</div>';
+    return;
+  }
+
+  fetch('/api/precio?ruta_id=' + ruta.id + '&categoria_id=' + categoriaId)
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var fotoHtml = catData && catData.foto
+        ? '<img class="tarjeta-resultado-foto" src="' + catData.foto + '" alt="' + (catData.nombre || '') + '">'
+        : '<div class="tarjeta-resultado-foto-placeholder">🚗</div>';
+
+      var paxHtml = catData
+        ? '<div class="tarjeta-resultado-dato">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D9A441" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
+            catData.capacidad_pasajeros + ' ' + TXT.paxSufijo +
+          '</div>' +
+          (catData.capacidad_maletas
+            ? '<div class="tarjeta-resultado-dato">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D9A441" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>' +
+                catData.capacidad_maletas + ' maletas' +
+              '</div>'
+            : '')
+        : '';
+
+      var precioHtml = data.a_consultar
+        ? '<span class="precio precio-grande" style="font-size:22px;">' + TXT.aConsultar + '</span>'
+        : '<span class="precio precio-grande">' + Number(data.precio).toFixed(0) + ' €</span>';
+
+      var botonHtml = '<button class="boton-reservar" onclick="irAReserva()">' + TXT.botonReservar + '</button>';
+
+      resultado.innerHTML =
+        '<div class="tarjeta-resultado">' +
+          fotoHtml +
+          '<div class="tarjeta-resultado-info">' +
+            '<div class="tarjeta-resultado-nombre">' + (catData ? catData.nombre : '') + '</div>' +
+            '<div class="tarjeta-resultado-datos">' + paxHtml + '</div>' +
+          '</div>' +
+          '<div class="tarjeta-resultado-precio-bloque">' +
+            precioHtml +
+            '<span class="badge-aproximado">' + TXT.badgeAprox + '</span>' +
+            '<div class="tarjeta-resultado-nota">' + TXT.notaTaxi + '</div>' +
+          '</div>' +
+          botonHtml +
+        '</div>' +
+        '<p style="text-align:center;font-size:0.82rem;color:#6b5c44;margin:12px 0 0 0;">' + TXT.verOtrasCats + '</p>';
+    });
+}
+
+function irAReserva() {
+  var desde = document.getElementById('desde').value;
+  var hasta = document.getElementById('hasta').value;
+  var categoriaId = document.getElementById('categoria').value;
+  var params = new URLSearchParams({ desde: desde, hasta: hasta, categoria_id: categoriaId });
+  window.location.href = '/reserva?' + params.toString();
+}
+
+document.getElementById('ver-precio').addEventListener('click', verPrecio);
+cargarFondo();
+cargarRutas();
+cargarCategorias();
+
+function abrirFormCotizacion() {
+  var modal = document.getElementById('modal-cotizacion');
+  modal.style.display = 'flex';
+  document.getElementById('cotiz-origen').value = '';
+  document.getElementById('cotiz-destino').value = '';
+  document.getElementById('cotiz-fecha').value = '';
+  document.getElementById('cotiz-pax').value = '';
+  document.getElementById('cotiz-email').value = '';
+  document.getElementById('cotiz-error').style.display = 'none';
+  document.getElementById('cotiz-ok').style.display = 'none';
+  var btnEnviar = document.getElementById('btn-enviar-cotizacion');
+  var btnCancelar = document.getElementById('btn-cancelar-cotizacion');
+  if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = TXT.enviarSolicitud; btnEnviar.style.display = ''; }
+  if (btnCancelar) btnCancelar.textContent = TXT.cancelar;
+}
+
+function cerrarFormCotizacion() {
+  document.getElementById('modal-cotizacion').style.display = 'none';
+  var btnEnviar = document.getElementById('btn-enviar-cotizacion');
+  var btnCancelar = document.getElementById('btn-cancelar-cotizacion');
+  if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = TXT.enviarSolicitud; btnEnviar.style.display = ''; }
+  if (btnCancelar) btnCancelar.textContent = TXT.cancelar;
+  document.getElementById('cotiz-origen').value = '';
+  document.getElementById('cotiz-destino').value = '';
+  document.getElementById('cotiz-fecha').value = '';
+  document.getElementById('cotiz-pax').value = '';
+  document.getElementById('cotiz-email').value = '';
+  document.getElementById('cotiz-error').style.display = 'none';
+  document.getElementById('cotiz-ok').style.display = 'none';
+}
+
+function enviarCotizacion() {
+  var origen  = document.getElementById('cotiz-origen').value.trim();
+  var destino = document.getElementById('cotiz-destino').value.trim();
+  var email   = document.getElementById('cotiz-email').value.trim();
+  var fecha   = document.getElementById('cotiz-fecha').value;
+  var pax     = document.getElementById('cotiz-pax').value;
+  var err     = document.getElementById('cotiz-error');
+  var ok      = document.getElementById('cotiz-ok');
+
+  err.style.display = 'none';
+  ok.style.display = 'none';
+
+  if (!origen || !destino || !email) {
+    err.textContent = TXT.errCampos;
+    err.style.display = 'block';
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    err.textContent = TXT.errEmail;
+    err.style.display = 'block';
+    return;
+  }
+
+  var btnEnviar = document.getElementById('btn-enviar-cotizacion');
+  var btnCancelar = document.getElementById('btn-cancelar-cotizacion');
+  if (btnEnviar) { btnEnviar.disabled = true; btnEnviar.textContent = TXT.enviando; }
+
+  fetch('/api/cotizaciones', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ origen: origen, destino: destino, fecha_aproximada: fecha || null, num_pasajeros: pax ? Number(pax) : null, email_cliente: email, lang: LANG })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) {
+      err.textContent = data.error;
+      err.style.display = 'block';
+      if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = TXT.enviarSolicitud; }
+      return;
+    }
+    if (btnEnviar) btnEnviar.style.display = 'none';
+    if (btnCancelar) btnCancelar.textContent = TXT.cerrar;
+    ok.innerHTML = '<strong>' + TXT.okMsg.replace('{email}', '<strong>' + email + '</strong>') + '</strong>';
+    ok.style.display = 'block';
+  })
+  .catch(function() {
+    err.textContent = TXT.errConexion;
+    err.style.display = 'block';
+    if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = TXT.enviarSolicitud; }
+  });
+}
+
+document.getElementById('modal-cotizacion').addEventListener('click', function(e) {
+  if (e.target === this) cerrarFormCotizacion();
+});
+</script>
+
+</body>
+</html>
