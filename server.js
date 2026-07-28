@@ -4332,6 +4332,24 @@ app.post('/admin/idiomas', requireAdmin, asyncHandler(async (req, res) => {
   res.json({ ok: true, codigo, rutasPreparadas: rutas.rows.length });
 }));
 
+// Mueve un idioma hacia arriba o hacia abajo en el orden de aparición
+app.post('/admin/idiomas/:codigo/orden', requireAdmin, asyncHandler(async (req, res) => {
+  const { codigo } = req.params;
+  const { direccion } = req.body; // 'arriba' o 'abajo'
+  const todos = await pool.query('SELECT codigo, orden FROM idiomas_web ORDER BY orden, codigo');
+  const filas = todos.rows;
+  const idx = filas.findIndex(function(f) { return f.codigo === codigo; });
+  if (idx === -1) return res.status(404).json({ error: 'Idioma no encontrado' });
+  const swapIdx = direccion === 'arriba' ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= filas.length) return res.json({ ok: true });
+  const ordenA = filas[idx].orden;
+  const ordenB = filas[swapIdx].orden;
+  await pool.query('UPDATE idiomas_web SET orden = $1 WHERE codigo = $2', [ordenB, filas[idx].codigo]);
+  await pool.query('UPDATE idiomas_web SET orden = $1 WHERE codigo = $2', [ordenA, filas[swapIdx].codigo]);
+  await cargarIdiomasCache();
+  res.json({ ok: true });
+}));
+
 // Activa/desactiva un idioma sin borrarlo (el idioma base no se puede desactivar)
 app.post('/admin/idiomas/:codigo/activo', requireAdmin, asyncHandler(async (req, res) => {
   const codigo = req.params.codigo;
