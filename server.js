@@ -4638,6 +4638,29 @@ app.get('/api/destinos-publicos', asyncHandler(async (req, res) => {
   res.json({ islas: porIsla });
 }));
 
+app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
+  const result = await pool.query(`
+    SELECT DISTINCT d.id, d.nombre, d.isla, d.zona, d.orden,
+           dss.slug_url
+    FROM destinos d
+    JOIN destinos_seo_settings dss ON dss.destino_id = d.id
+    WHERE dss.activo = TRUE AND dss.lang_code = 'es'
+    ORDER BY d.isla, d.orden, d.nombre
+  `);
+  const porIsla = {};
+  for (const d of result.rows) {
+    const isla = d.isla || 'Gran Canaria';
+    if (!porIsla[isla]) porIsla[isla] = [];
+    porIsla[isla].push({
+      id: d.id,
+      nombre: d.nombre,
+      zona: d.zona,
+      slug: d.slug_url || slugify(d.nombre)
+    });
+  }
+  res.json({ islas: porIsla });
+}));
+
 app.get('/rutas', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'rutas.html'));
 });
