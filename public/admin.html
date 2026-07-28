@@ -7581,8 +7581,8 @@ function cargarFotosDestino(destinoId) {
           '<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;">' +
           '<span style="font-size:10px;color:var(--texto-muted);">Orden:</span>' +
           (esPrincipal
-            ? '<span style="font-size:11px;font-weight:700;color:var(--terracota);padding:2px 6px;">0 (cabecera)</span>'
-            : ('<input type="number" min="1" max="99" value="' + (f.orden || '') + '" id="orden-foto-' + f.id + '" ' +
+            ? '<span style="font-size:11px;font-weight:700;color:var(--terracota);padding:2px 6px;">Cabecera</span>'
+            : ('<input type="number" min="1" max="99" value="' + (f.orden != null ? f.orden : '') + '" placeholder="1-3" id="orden-foto-' + f.id + '" ' +
               'style="width:44px;font-size:11px;padding:2px 4px;border:1px solid var(--gris-borde);border-radius:4px;">' +
               '<button onclick="guardarOrdenFoto(' + destinoId + ',' + f.id + ')" ' +
               'style="font-size:10px;padding:2px 6px;border:1px solid var(--gris-borde);border-radius:4px;cursor:pointer;background:var(--gris-fondo);">OK</button>' +
