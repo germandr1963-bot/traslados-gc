@@ -4641,7 +4641,8 @@ app.get('/api/destinos-publicos', asyncHandler(async (req, res) => {
 app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
   const result = await pool.query(`
     SELECT DISTINCT d.id, d.nombre, d.isla, d.zona, d.orden,
-           dss.slug_url
+           dss.slug_url,
+           (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
     FROM destinos d
     JOIN destinos_seo_settings dss ON dss.destino_id = d.id
     WHERE dss.activo = TRUE AND dss.lang_code = 'es'
@@ -4655,7 +4656,8 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
       id: d.id,
       nombre: d.nombre,
       zona: d.zona,
-      slug: d.slug_url || slugify(d.nombre)
+      slug: d.slug_url || slugify(d.nombre),
+      foto_cabecera_id: d.foto_cabecera_id || null
     });
   }
   res.json({ islas: porIsla });
