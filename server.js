@@ -179,16 +179,19 @@ app.use(session({
 // admin), para que añadir un idioma no requiera tocar código nunca más.
 let IDIOMAS_PERMITIDOS = [];
 let SECCIONES_TRASLADO = {};
+let SECCIONES_RESERVA = {};
 let IDIOMA_BASE = 'es';
 
 async function cargarIdiomasCache() {
   const result = await pool.query(
-    'SELECT codigo, palabra_traslado, es_base FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo'
+    'SELECT codigo, palabra_traslado, palabra_reserva, es_base FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo'
   );
   IDIOMAS_PERMITIDOS = result.rows.map(function (r) { return r.codigo; });
   SECCIONES_TRASLADO = {};
+  SECCIONES_RESERVA = {};
   for (const fila of result.rows) {
     SECCIONES_TRASLADO[fila.codigo] = fila.palabra_traslado;
+    SECCIONES_RESERVA[fila.codigo] = (fila.palabra_reserva && fila.palabra_reserva.trim()) ? fila.palabra_reserva : 'reserva';
     if (fila.es_base) IDIOMA_BASE = fila.codigo;
   }
   IDIOMAS_TRADUCIBLES = IDIOMAS_PERMITIDOS.filter(function (l) { return l !== IDIOMA_BASE; });
@@ -896,6 +899,22 @@ async function initSchema() {
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (codigo) DO NOTHING`,
       [idioma.codigo, idioma.nombre, idioma.palabra, idioma.base, idioma.orden]
+    );
+  }
+
+  // Palabra de la página de reserva en la URL, por idioma. Editable desde el
+  // admin (panel de Idiomas); la siembra solo rellena las que estén vacías,
+  // nunca pisa un valor ya guardado o editado.
+  await pool.query(`ALTER TABLE idiomas_web ADD COLUMN IF NOT EXISTS palabra_reserva TEXT`);
+  const PALABRAS_RESERVA_SEMILLA = {
+    es: 'reserva', en: 'booking', de: 'buchung', sv: 'bokning', no: 'bestilling',
+    nl: 'boeking', it: 'prenotazione', fr: 'reservation', fi: 'varaus', ru: 'bronirovanie'
+  };
+  for (const codigo of Object.keys(PALABRAS_RESERVA_SEMILLA)) {
+    await pool.query(
+      `UPDATE idiomas_web SET palabra_reserva = $2
+       WHERE codigo = $1 AND (palabra_reserva IS NULL OR palabra_reserva = '')`,
+      [codigo, PALABRAS_RESERVA_SEMILLA[codigo]]
     );
   }
 
@@ -4593,6 +4612,35 @@ app.post('/admin/idiomas', requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 // Mueve un idioma hacia arriba o hacia abajo en el orden de aparición
+// Edita las palabras de URL de un idioma existente (traslado y/o reserva)
+// y recarga la caché para que el cambio sea inmediato, sin redesplegar.
+app.post('/admin/idiomas/:codigo/palabras', requireAdmin, asyncHandler(async (req, res) => {
+  const codigo = req.params.codigo;
+  const existe = await pool.query('SELECT codigo FROM idiomas_web WHERE codigo = $1', [codigo]);
+  if (existe.rows.length === 0) return res.status(404).json({ error: 'Idioma no encontrado' });
+
+  const limpiar = function (v) {
+    return String(v || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  };
+  const campos = [];
+  const valores = [];
+  if (req.body.palabra_traslado !== undefined) {
+    const p = limpiar(req.body.palabra_traslado);
+    if (!p) return res.status(400).json({ error: 'La palabra de traslado no puede quedar vacía' });
+    valores.push(p); campos.push('palabra_traslado = $' + (valores.length + 1));
+  }
+  if (req.body.palabra_reserva !== undefined) {
+    const p = limpiar(req.body.palabra_reserva);
+    if (!p) return res.status(400).json({ error: 'La palabra de reserva no puede quedar vacía' });
+    valores.push(p); campos.push('palabra_reserva = $' + (valores.length + 1));
+  }
+  if (campos.length === 0) return res.status(400).json({ error: 'Nada que actualizar' });
+
+  await pool.query('UPDATE idiomas_web SET ' + campos.join(', ') + ' WHERE codigo = $1', [codigo].concat(valores));
+  await cargarIdiomasCache();
+  res.json({ ok: true });
+}));
+
 app.post('/admin/idiomas/:codigo/orden', requireAdmin, asyncHandler(async (req, res) => {
   const { codigo } = req.params;
   const { direccion } = req.body; // 'arriba' o 'abajo'
