@@ -931,7 +931,7 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
   }
 
   // Cargar extras
-  fetch('/api/extras-publicos').then(function(r){ return r.json(); }).then(function(extras){
+  fetch('/api/extras-publicos?lang=' + LANG).then(function(r){ return r.json(); }).then(function(extras){
     extrasData = extras;
     var lista = document.getElementById('lista-extras');
     if (!extras.length) {
@@ -941,7 +941,7 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
     lista.innerHTML = extras.map(function(ex){
       return '<div class="extra-item" id="extra-' + ex.id + '" onclick="toggleExtra(' + ex.id + ')">' +
         '<div class="extra-check" id="check-' + ex.id + '"></div>' +
-        '<span class="extra-nombre">' + ex.nombre + '</span>' +
+        '<span class="extra-nombre">' + (ex.nombre_traducido || ex.nombre) + '</span>' +
         '<span class="extra-precio">' + Number(ex.precio).toFixed(2) + ' €</span>' +
       '</div>';
     }).join('');
@@ -1425,7 +1425,7 @@ function mostrarResumen() {
     '<strong>' + TXT.resHora + '</strong> ' + horaTexto + '<br>' +
     '<strong>' + TXT.resPasajeros + '</strong> ' + document.getElementById('num-pasajeros').value + '<br>' +
     (precioEstimado ? '<strong>' + TXT.resPrecio + '</strong> ' + Number(precioEstimado).toFixed(0) + ' €<br>' : '') +
-    (extrasSeleccionados.length ? '<strong>' + TXT.resExtras + '</strong> ' + extrasSeleccionados.map(function(e){ return e.nombre + ' (' + Number(e.precio).toFixed(2) + ' €)'; }).join(', ') + '<br>' : '') +
+    (extrasSeleccionados.length ? '<strong>' + TXT.resExtras + '</strong> ' + extrasSeleccionados.map(function(e){ return (e.nombre_traducido || e.nombre) + ' (' + Number(e.precio).toFixed(2) + ' €)'; }).join(', ') + '<br>' : '') +
     '<strong>' + TXT.resPasajero + '</strong> ' + pasajero + '<br>' +
     ((origenEsAero || origenEsPuerto) ? '<strong>' + TXT.resPasaporte + '</strong> ' + (esOtraPersona ? document.getElementById('otra-persona-pasaporte').value.trim() : document.getElementById('pasajero-pasaporte').value.trim()) + '<br>' : '') +
     (esOtraPersona ? '<strong>' + TXT.resOtraPersona + '</strong> — ' + TXT.resContactoViaja + ' ' + otraTel + ' · ' + otraEmail + '<br>' : '') +
