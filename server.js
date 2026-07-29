@@ -150,6 +150,15 @@ const upload = multer({
 app.use('/webhook/stripe', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// ─── MODO PRIVADO: web cerrada a buscadores ──────────────────────────────
+// QUITAR ESTE BLOQUE AL LANZAR CON EL DOMINIO DEFINITIVO (traslados-gc.es).
+// Envía en cada respuesta la señal "noindex, nofollow": Google y el resto de
+// buscadores no indexan ninguna página y borran las que ya tuvieran.
+app.use(function (req, res, next) {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  next();
+});
+
 // La portada la sirve la ruta EJS (renderHome), no el index.html estático.
 // index:false evita que la carpeta public responda en la raíz por su cuenta.
 app.get('/index.html', function (req, res) { res.redirect(301, '/'); });
