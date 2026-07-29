@@ -162,6 +162,7 @@ app.use(function (req, res, next) {
 // La portada la sirve la ruta EJS (renderHome), no el index.html estático.
 // index:false evita que la carpeta public responda en la raíz por su cuenta.
 app.get('/index.html', function (req, res) { res.redirect(301, '/'); });
+app.get('/reserva.html', function (req, res) { res.redirect(301, '/reserva'); });
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 app.set('trust proxy', 1);
@@ -2484,9 +2485,9 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
   res.json({ ok: true, reserva_id: reservaId, numero_reserva: numeroReserva });
 }));
 
-app.get('/reserva', (req, res) => {
-  res.sendFile('reserva.html', { root: path.join(__dirname, 'public') });
-});
+app.get('/reserva', asyncHandler(async (req, res) => {
+  await renderReserva(req, res, 'es');
+}));
 
 app.get('/fondo-activo', asyncHandler(async (req, res) => {
   const result = await pool.query(
@@ -4998,7 +4999,8 @@ async function renderHome(req, res, lang) {
   }
   const t = function(clave) { return obtenerTexto(clave, lang); };
   const idiomas = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
-  res.render('index', { lang, t, idiomas: idiomas.rows, BASE_URL });
+  const rutaReserva = lang === 'es' ? '/reserva' : '/' + lang + '/' + (SECCIONES_RESERVA[lang] || 'reserva');
+  res.render('index', { lang, t, idiomas: idiomas.rows, BASE_URL, rutaReserva });
 }
 
 app.get('/', asyncHandler(async (req, res) => {
@@ -5009,6 +5011,47 @@ app.get('/:lang([a-z]{2})/', asyncHandler(async (req, res) => {
   // La versión española oficial es la raíz: /es/ redirige de forma permanente
   if (req.params.lang === 'es') return res.redirect(301, '/');
   await renderHome(req, res, req.params.lang);
+}));
+
+// ─── Página de reserva — renderizada en servidor con EJS ─────────────────
+async function renderReserva(req, res, lang) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+  const t = function (clave) { return obtenerTexto(clave, lang); };
+  const idiomas = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
+  const rutaReserva = lang === 'es' ? '/reserva' : '/' + lang + '/' + (SECCIONES_RESERVA[lang] || 'reserva');
+  const urlHome = lang === 'es' ? '/' : '/' + lang + '/';
+  res.render('reserva', {
+    lang, t, idiomas: idiomas.rows, BASE_URL,
+    palabrasReserva: SECCIONES_RESERVA,
+    rutaReserva, urlHome
+  });
+}
+
+// Direcciones de reserva por idioma (/en/booking, /ru/bronirovanie...).
+// La palabra por idioma vive en idiomas_web.palabra_reserva y es editable
+// desde el admin. Red de seguridad: /xx/reserva redirige siempre a la
+// dirección correcta del idioma, para no perder enlaces antiguos o mal escritos.
+app.get('/:lang([a-z]{2})/:seccion', asyncHandler(async (req, res) => {
+  const { lang, seccion } = req.params;
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+  const palabra = SECCIONES_RESERVA[lang] || 'reserva';
+  const idx = req.originalUrl.indexOf('?');
+  const query = idx !== -1 ? req.originalUrl.slice(idx) : '';
+
+  if (lang === 'es' && (seccion === palabra || seccion === 'reserva')) {
+    return res.redirect(301, '/reserva' + query);
+  }
+  if (seccion === palabra) {
+    return renderReserva(req, res, lang);
+  }
+  if (seccion === 'reserva') {
+    return res.redirect(301, '/' + lang + '/' + palabra + query);
+  }
+  return res.status(404).send('Página no encontrada');
 }));
 
 app.get('/rutas', (req, res) => {
