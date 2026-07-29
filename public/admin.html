@@ -3693,7 +3693,10 @@ function abrirPanelIdiomas() {
       return '<tr>' +
         '<td><strong>' + escapar(idi.nombre) + '</strong></td>' +
         '<td style="font-family:\'JetBrains Mono\',monospace;">' + escapar(idi.codigo) + '</td>' +
-        '<td style="font-family:\'JetBrains Mono\',monospace;color:var(--texto-muted);">' + escapar(idi.palabra_traslado) + '</td>' +
+        '<td style="font-family:\'JetBrains Mono\',monospace;color:var(--texto-muted);">' + escapar(idi.palabra_traslado) +
+          ' <button class="boton-secundario" style="padding:2px 7px;font-size:0.72rem;" onclick="editarPalabraIdioma(\'' + idi.codigo + '\',\'palabra_traslado\',\'' + escapar(idi.palabra_traslado) + '\')">✏️</button></td>' +
+        '<td style="font-family:\'JetBrains Mono\',monospace;color:var(--texto-muted);">' + escapar(idi.palabra_reserva || '') +
+          ' <button class="boton-secundario" style="padding:2px 7px;font-size:0.72rem;" onclick="editarPalabraIdioma(\'' + idi.codigo + '\',\'palabra_reserva\',\'' + escapar(idi.palabra_reserva || '') + '\')">✏️</button></td>' +
         '<td style="white-space:nowrap;">' + btnArriba + ' ' + btnAbajo + '</td>' +
         '<td>' + (idi.es_base
           ? '<span style="color:var(--texto-muted);font-size:12px;">Idioma base</span>'
@@ -3708,7 +3711,7 @@ function abrirPanelIdiomas() {
       '<h3 style="margin-top:0">🌐 Idiomas de la web</h3>' +
       '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">El orden aquí es el orden en que aparecen las píldoras de idioma en la web pública.</p>' +
       '<table class="tabla-admin" style="margin-bottom:20px;">' +
-      '<thead><tr><th>Nombre</th><th>Código</th><th>Palabra en la URL</th><th>Orden</th><th>Acción</th></tr></thead>' +
+      '<thead><tr><th>Nombre</th><th>Código</th><th>Palabra rutas (URL)</th><th>Palabra reserva (URL)</th><th>Orden</th><th>Acción</th></tr></thead>' +
       '<tbody>' + filas + '</tbody></table>' +
 
       '<h3>➕ Añadir idioma nuevo</h3>' +
@@ -3721,6 +3724,22 @@ function abrirPanelIdiomas() {
       '</div>' +
       '<div id="mensaje-nuevo-idioma" style="margin-top:10px;"></div>' +
       '<button class="boton-secundario" style="margin-top:16px;" onclick="document.getElementById(\'panel-gestion-idiomas\').classList.add(\'oculto\')">Cerrar</button>';
+  });
+}
+
+function editarPalabraIdioma(codigo, campo, valorActual) {
+  var etiqueta = campo === 'palabra_reserva' ? 'palabra de la página de reserva' : 'palabra de las páginas de rutas';
+  var nueva = prompt('Nueva ' + etiqueta + ' en la URL para "' + codigo.toUpperCase() + '" (solo letras, números y guiones):', valorActual || '');
+  if (nueva === null) return;
+  var cuerpo = {};
+  cuerpo[campo] = nueva;
+  fetch('/admin/idiomas/' + codigo + '/palabras', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cuerpo)
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (!respuesta.ok) alert(respuesta.error || 'Error al guardar');
+    abrirPanelIdiomas();
   });
 }
 
