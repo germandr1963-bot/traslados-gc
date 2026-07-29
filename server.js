@@ -2019,6 +2019,27 @@ app.get('/api/categorias', asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas, foto FROM categorias_vehiculos WHERE disponible = TRUE ORDER BY orden, nombre'
   );
+
+  // Si se pide un idioma distinto del español, añadimos el nombre traducido
+  // leyendo en vivo las traducciones editables desde Admin → Idiomas → Categorías.
+  const lang = req.query.lang;
+  if (lang && lang !== 'es') {
+    const catsTrad = await pool.query(
+      `SELECT ti.texto_es, COALESCE(tit.texto, ti.texto_es) AS nombre_traducido
+       FROM textos_interfaz ti
+       LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+       WHERE ti.modulo = 'Categorías de vehículo'`,
+      [lang]
+    );
+    const mapaCategorias = {};
+    for (const c of catsTrad.rows) {
+      mapaCategorias[c.texto_es] = c.nombre_traducido;
+    }
+    for (const r of result.rows) {
+      r.nombre_traducido = mapaCategorias[r.nombre] || r.nombre;
+    }
+  }
+
   res.json(result.rows);
 }));
 
