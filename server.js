@@ -851,6 +851,18 @@ async function initSchema() {
     }
   }
 
+  // Sincronizar nombres de extras activos como textos traducibles
+  const extrasActivos = await pool.query('SELECT id, nombre FROM extras WHERE activo = TRUE ORDER BY bloque, orden, id');
+  for (const ex of extrasActivos.rows) {
+    const claveExtra = 'extra_nombre_' + ex.id;
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Extras', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+      [claveExtra, 'Nombre del extra "' + ex.nombre + '" tal como aparece en la página de reserva', ex.nombre]
+    );
+  }
+
   await cargarTextosCache();
 
   // ─── Tarifario de precios ─────────────────────────────────────────────────
@@ -2281,6 +2293,27 @@ app.get('/api/extras-publicos', asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, nombre, precio, bloque, orden, tipo_seleccion FROM extras WHERE activo = TRUE ORDER BY bloque, orden, id'
   );
+
+  // Si se pide un idioma distinto del español, añadimos el nombre traducido
+  // leyendo en vivo las traducciones editables desde Admin → Idiomas → Extras.
+  const lang = req.query.lang;
+  if (lang && lang !== 'es') {
+    const extrasTrad = await pool.query(
+      `SELECT ti.texto_es, COALESCE(tit.texto, ti.texto_es) AS nombre_traducido
+       FROM textos_interfaz ti
+       LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+       WHERE ti.modulo = 'Extras'`,
+      [lang]
+    );
+    const mapaExtras = {};
+    for (const e of extrasTrad.rows) {
+      mapaExtras[e.texto_es] = e.nombre_traducido;
+    }
+    for (const r of result.rows) {
+      r.nombre_traducido = mapaExtras[r.nombre] || r.nombre;
+    }
+  }
+
   res.json(result.rows);
 }));
 
