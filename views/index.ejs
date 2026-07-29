@@ -433,21 +433,28 @@ function cargarFondo() {
 }
 
 function poblarSelect(select, valores) {
+  // valores: lista de objetos { valor, etiqueta }
+  // valor = nombre en español (interno, para buscar ruta y precio)
+  // etiqueta = nombre traducido (lo que ve el visitante)
   var primera = select.options[0] ? select.options[0].textContent : '';
   select.innerHTML = '<option value="">' + primera + '</option>';
   valores.forEach(function (v) {
     var opt = document.createElement('option');
-    opt.value = v;
-    opt.textContent = v;
+    opt.value = v.valor;
+    opt.textContent = v.etiqueta;
     select.appendChild(opt);
   });
 }
 
 function cargarRutas() {
-  fetch('/api/rutas').then(function (r) { return r.json(); }).then(function (rutas) {
+  fetch('/api/rutas?lang=' + LANG).then(function (r) { return r.json(); }).then(function (rutas) {
     rutasDisponibles = rutas;
-    var origenes = Array.from(new Set(rutas.map(function (r) { return r.origen; })));
-    var destinos = Array.from(new Set(rutas.map(function (r) { return r.destino; })));
+    var vistosO = {}, origenes = [];
+    var vistosD = {}, destinos = [];
+    rutas.forEach(function (r) {
+      if (!vistosO[r.origen]) { vistosO[r.origen] = true; origenes.push({ valor: r.origen, etiqueta: r.origen_traducido || r.origen }); }
+      if (!vistosD[r.destino]) { vistosD[r.destino] = true; destinos.push({ valor: r.destino, etiqueta: r.destino_traducido || r.destino }); }
+    });
     poblarSelect(document.getElementById('desde'), origenes);
     poblarSelect(document.getElementById('hasta'), destinos);
     if (rutas.length === 0) {
