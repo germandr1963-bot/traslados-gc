@@ -826,6 +826,10 @@ function generarPNR() {
 var params = new URLSearchParams(window.location.search);
 var paramOrigen = params.get('desde') || '';
 var paramDestino = params.get('hasta') || '';
+// Nombres para MOSTRAR al visitante (traducidos al cargar las rutas).
+// Internamente y hacia el sistema siempre viajan los nombres en español.
+var ORIGEN_MOSTRAR = paramOrigen;
+var DESTINO_MOSTRAR = paramDestino;
 var paramCategoriaId = params.get('categoria_id') || '';
 
 // Detectar tipo de origen y destino
@@ -886,6 +890,8 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
     fetch('/api/rutas?lang=' + LANG).then(function(r){ return r.json(); }).then(function(rutas){
       var ruta = rutas.find(function(r){ return r.origen === paramOrigen && r.destino === paramDestino; });
       if (!ruta) return;
+      if (ruta.origen_traducido) { ORIGEN_MOSTRAR = ruta.origen_traducido; document.getElementById('tbl-origen').textContent = ORIGEN_MOSTRAR; }
+      if (ruta.destino_traducido) { DESTINO_MOSTRAR = ruta.destino_traducido; document.getElementById('tbl-destino').textContent = DESTINO_MOSTRAR; }
       fetch('/api/precio?ruta_id=' + ruta.id + '&categoria_id=' + paramCategoriaId)
         .then(function(r){ return r.json(); })
         .then(function(data){
@@ -903,7 +909,7 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
       var cat = cats.find(function(c){ return String(c.id) === String(paramCategoriaId); });
       if (!cat) return;
       categoriaNombre = cat.nombre_traducido || cat.nombre;
-      document.getElementById('tbl-categoria').textContent = (cat.nombre_traducido || cat.nombre) + ' · ' + cat.capacidad_pasajeros + ' pax';
+      document.getElementById('tbl-categoria').textContent = (cat.nombre_traducido || cat.nombre) + ' · ' + cat.capacidad_pasajeros + ' ' + TXT.paxSufijo;
       var maxPax = parseInt(cat.capacidad_pasajeros) || 8;
       var sel = document.getElementById('num-pasajeros');
       sel.innerHTML = '';
@@ -1051,7 +1057,7 @@ function actualizarCategoriasSegunRuta() {
   categoriasRuta.forEach(function (c) {
     var opt = document.createElement('option');
     opt.value = c.id;
-    opt.textContent = (c.nombre_traducido || c.nombre) + ' (' + c.capacidad_pasajeros + ' pax)';
+    opt.textContent = (c.nombre_traducido || c.nombre) + ' (' + c.capacidad_pasajeros + ' ' + TXT.paxSufijo + ')';
     if (String(c.id) === String(valorActual)) opt.selected = true;
     select.appendChild(opt);
   });
@@ -1412,8 +1418,8 @@ function mostrarResumen() {
 
   var html =
     '<strong>' + TXT.resNumero + '</strong> ' + pnrGenerado + '<br>' +
-    '<strong>' + TXT.resOrigen + '</strong> ' + paramOrigen + (dirOrigen ? ' — ' + dirOrigen : '') + '<br>' +
-    '<strong>' + TXT.resDestino + '</strong> ' + paramDestino + (dirDestino ? ' — ' + dirDestino : '') + '<br>' +
+    '<strong>' + TXT.resOrigen + '</strong> ' + ORIGEN_MOSTRAR + (dirOrigen ? ' — ' + dirOrigen : '') + '<br>' +
+    '<strong>' + TXT.resDestino + '</strong> ' + DESTINO_MOSTRAR + (dirDestino ? ' — ' + dirDestino : '') + '<br>' +
     (categoriaNombre ? '<strong>' + TXT.resCategoria + '</strong> ' + categoriaNombre + '<br>' : '') +
     '<strong>' + TXT.resFecha + '</strong> ' + fechaTexto + '<br>' +
     '<strong>' + TXT.resHora + '</strong> ' + horaTexto + '<br>' +
@@ -1520,8 +1526,8 @@ function rellenarResumenPermiso() {
   var barcoTexto = origenEsPuerto ? document.getElementById('barco-llegada').value.trim() : '';
 
   var html =
-    '<strong>' + TXT.resOrigen + '</strong> ' + paramOrigen + '<br>' +
-    '<strong>' + TXT.resDestino + '</strong> ' + paramDestino + '<br>' +
+    '<strong>' + TXT.resOrigen + '</strong> ' + ORIGEN_MOSTRAR + '<br>' +
+    '<strong>' + TXT.resDestino + '</strong> ' + DESTINO_MOSTRAR + '<br>' +
     '<strong>' + TXT.resFecha + '</strong> ' + fechaTexto + '<br>' +
     (origenEsAero ? '<strong>' + TXT.resVuelo + '</strong> ' + (vueloTexto || '—') + '<br>' : '') +
     (origenEsPuerto ? '<strong>' + TXT.resBarco + '</strong> ' + (barcoTexto || '—') + '<br>' : '') +
