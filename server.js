@@ -2040,6 +2040,27 @@ app.get('/api/rutas', asyncHandler(async (req, res) => {
     GROUP BY r.id, r.origen, r.destino
     ORDER BY r.origen, r.destino
   `);
+
+  // Si se pide un idioma distinto del español, añadimos los nombres traducidos
+  // desde destinos_traducciones (con el nombre español como respaldo).
+  const lang = req.query.lang;
+  if (lang && lang !== 'es') {
+    const destinosTrad = await pool.query(
+      `SELECT d.nombre AS nombre_es, dt.nombre AS nombre_traducido
+       FROM destinos d
+       LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1`,
+      [lang]
+    );
+    const mapaDestinos = {};
+    for (const d of destinosTrad.rows) {
+      mapaDestinos[d.nombre_es] = (d.nombre_traducido && d.nombre_traducido.trim()) ? d.nombre_traducido : d.nombre_es;
+    }
+    for (const r of result.rows) {
+      r.origen_traducido = mapaDestinos[r.origen] || r.origen;
+      r.destino_traducido = mapaDestinos[r.destino] || r.destino;
+    }
+  }
+
   res.json(result.rows);
 }));
 
