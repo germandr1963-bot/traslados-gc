@@ -698,6 +698,132 @@ async function initSchema() {
     }
   }
 
+  // ─── Textos de la página de reserva (traducibles desde Idiomas) ──────────
+  // Los textos que la página de reserva clona de la portada (buscador de rutas,
+  // modal de cotización, tarjeta de precio) NO se duplican aquí: en la versión
+  // multiidioma se reutilizan las claves home_* ya existentes y traducidas.
+  const TEXTOS_RESERVA = [
+    { clave: 'reserva_page_title',          contexto: 'Título de la pestaña del navegador en la página de reserva', es: 'Reservar traslado — Traslados GC', en: 'Book a transfer — Traslados GC' },
+    { clave: 'reserva_boton_volver',        contexto: 'Botón de la cabecera para volver a la portada', es: '← Volver al inicio', en: '← Back to home' },
+    { clave: 'reserva_boton_volver_panel',  contexto: 'Botón de la cabecera para volver al panel cuando el cliente tiene sesión', es: '← Volver a mi panel', en: '← Back to my account' },
+    { clave: 'reserva_boton_reiniciar',     contexto: 'Botón de la cabecera para reiniciar el formulario', es: '↺ Comenzar de nuevo', en: '↺ Start over' },
+    { clave: 'reserva_confirm_reiniciar',   contexto: 'Confirmación al pulsar comenzar de nuevo', es: '¿Seguro que quieres comenzar de nuevo? Se perderán los datos introducidos.', en: 'Are you sure you want to start over? The data you entered will be lost.' },
+    { clave: 'reserva_banner_portal',       contexto: 'Rótulo del banner del portal del cliente cuando hay sesión', es: 'Portal del cliente', en: 'Client portal' },
+    { clave: 'reserva_banner_hola',         contexto: 'Saludo del banner del portal. {nombre} se sustituye por el nombre del cliente', es: 'Hola, {nombre}', en: 'Hello, {nombre}' },
+    { clave: 'reserva_titulo',              contexto: 'Título principal de la página de reserva', es: 'Solicitar traslado', en: 'Request a transfer' },
+    { clave: 'reserva_subtitulo',           contexto: 'Subtítulo bajo el título principal', es: 'Rellena los datos y te confirmamos disponibilidad en menos de 24 horas.', en: 'Fill in your details and we will confirm availability within 24 hours.' },
+    { clave: 'reserva_selecciona_origen',   contexto: 'Opción por defecto del selector de origen en el panel de ruta', es: 'Selecciona origen', en: 'Select origin' },
+    { clave: 'reserva_selecciona_destino',  contexto: 'Opción por defecto del selector de destino en el panel de ruta', es: 'Selecciona destino', en: 'Select destination' },
+    { clave: 'reserva_cargando',            contexto: 'Texto mientras cargan datos (categorías, extras)', es: 'Cargando...', en: 'Loading...' },
+    { clave: 'reserva_sin_rutas',           contexto: 'Aviso cuando no hay rutas cargadas en el sistema', es: 'Aún no hay rutas cargadas', en: 'No routes available yet' },
+    { clave: 'reserva_ruta_a_consultar',    contexto: 'Aviso cuando la ruta elegida no tiene precio y hay que consultar', es: 'Ruta a consultar — contáctanos', en: 'Route on request — contact us' },
+    { clave: 'reserva_etiqueta_origen',     contexto: 'Etiqueta ORIGEN de la tarjeta resumen del traslado (en mayúsculas)', es: 'ORIGEN', en: 'ORIGIN' },
+    { clave: 'reserva_etiqueta_destino',    contexto: 'Etiqueta DESTINO de la tarjeta resumen del traslado (en mayúsculas)', es: 'DESTINO', en: 'DESTINATION' },
+    { clave: 'reserva_paso1_titulo',        contexto: 'Título del paso 1', es: 'Detalles del viaje', en: 'Trip details' },
+    { clave: 'reserva_paso1_resumen',       contexto: 'Subtítulo del paso 1', es: 'Fecha, hora y datos del trayecto', en: 'Date, time and journey details' },
+    { clave: 'reserva_label_fecha',         contexto: 'Etiqueta del campo fecha del traslado', es: 'Fecha del traslado *', en: 'Transfer date *' },
+    { clave: 'reserva_err_fecha',           contexto: 'Error si no se elige fecha', es: 'Selecciona una fecha', en: 'Select a date' },
+    { clave: 'reserva_label_vuelo',         contexto: 'Etiqueta del campo número de vuelo de llegada', es: 'Número de vuelo de llegada', en: 'Arrival flight number' },
+    { clave: 'reserva_ph_vuelo',            contexto: 'Placeholder del campo número de vuelo', es: 'Ej: IB3456', en: 'E.g. IB3456' },
+    { clave: 'reserva_label_hora_vuelo',    contexto: 'Etiqueta del campo hora de llegada del vuelo', es: 'Hora de llegada del vuelo *', en: 'Flight arrival time *' },
+    { clave: 'reserva_err_hora_vuelo',      contexto: 'Error si falta la hora de llegada del vuelo', es: 'Indica la hora de llegada', en: 'Enter the arrival time' },
+    { clave: 'reserva_label_barco',         contexto: 'Etiqueta del campo nombre del barco o crucero', es: 'Nombre del barco / crucero', en: 'Ship / cruise name' },
+    { clave: 'reserva_ph_barco',            contexto: 'Placeholder del campo nombre del barco', es: 'Ej: MSC Bellísima', en: 'E.g. MSC Bellissima' },
+    { clave: 'reserva_label_hora_atraque',  contexto: 'Etiqueta del campo hora de atraque', es: 'Hora de atraque *', en: 'Docking time *' },
+    { clave: 'reserva_err_hora_atraque',    contexto: 'Error si falta la hora de atraque', es: 'Indica la hora de atraque', en: 'Enter the docking time' },
+    { clave: 'reserva_label_hora_recogida', contexto: 'Etiqueta del campo hora de recogida', es: 'Hora de recogida *', en: 'Pick-up time *' },
+    { clave: 'reserva_err_hora_recogida',   contexto: 'Error si falta la hora de recogida', es: 'Indica la hora de recogida', en: 'Enter the pick-up time' },
+    { clave: 'reserva_label_num_pasajeros', contexto: 'Etiqueta del selector de número de pasajeros', es: 'Número de pasajeros', en: 'Number of passengers' },
+    { clave: 'reserva_pax_singular',        contexto: 'Palabra tras el número en el selector de pasajeros, singular (1). En idiomas con declinaciones puede usarse una abreviatura invariable', es: 'pasajero', en: 'passenger' },
+    { clave: 'reserva_pax_plural',          contexto: 'Palabra tras el número en el selector de pasajeros, plural (2 o más). En idiomas con declinaciones puede usarse una abreviatura invariable', es: 'pasajeros', en: 'passengers' },
+    { clave: 'reserva_label_dir_origen',    contexto: 'Etiqueta del campo dirección exacta de recogida', es: 'Dirección exacta de recogida *', en: 'Exact pick-up address *' },
+    { clave: 'reserva_ph_dir_origen',       contexto: 'Placeholder del campo dirección de recogida', es: 'Calle, número, hotel, municipio...', en: 'Street, number, hotel, municipality...' },
+    { clave: 'reserva_err_dir_origen',      contexto: 'Error si falta la dirección de recogida', es: 'Indica la dirección de recogida', en: 'Enter the pick-up address' },
+    { clave: 'reserva_label_dir_destino',   contexto: 'Etiqueta del campo dirección o lugar de destino', es: 'Dirección exacta, hotel o lugar de destino *', en: 'Exact address, hotel or destination *' },
+    { clave: 'reserva_ph_dir_destino',      contexto: 'Placeholder del campo dirección de destino', es: 'Hotel, calle, número, municipio...', en: 'Hotel, street, number, municipality...' },
+    { clave: 'reserva_err_dir_destino',     contexto: 'Error si falta el lugar de destino', es: 'Indica el lugar de destino', en: 'Enter the destination' },
+    { clave: 'reserva_boton_continuar',     contexto: 'Botón para pasar al siguiente paso', es: 'Continuar →', en: 'Continue →' },
+    { clave: 'reserva_paso2_titulo',        contexto: 'Título del paso 2', es: 'Pasajero y contacto', en: 'Passenger and contact' },
+    { clave: 'reserva_paso2_resumen',       contexto: 'Subtítulo del paso 2', es: 'Quién viaja y cómo contactarte', en: 'Who is travelling and how to reach you' },
+    { clave: 'reserva_nota_datos_cuenta',   contexto: 'Nota sobre los campos prellenados cuando el cliente tiene sesión', es: 'Datos de tu cuenta', en: 'Your account details' },
+    { clave: 'reserva_label_nombre',        contexto: 'Etiqueta del campo nombre de contacto', es: 'Nombre de contacto *', en: 'Contact name *' },
+    { clave: 'reserva_ph_nombre',           contexto: 'Placeholder del campo nombre de contacto', es: 'Nombre y apellidos', en: 'First and last name' },
+    { clave: 'reserva_err_obligatorio',     contexto: 'Error genérico de campo obligatorio', es: 'Campo obligatorio', en: 'Required field' },
+    { clave: 'reserva_label_telefono',      contexto: 'Etiqueta del campo teléfono con código de país', es: 'Teléfono (con código de país) *', en: 'Phone (with country code) *' },
+    { clave: 'reserva_err_telefono',        contexto: 'Error de teléfono no válido', es: 'Introduce un número válido (mínimo 7 dígitos)', en: 'Enter a valid number (minimum 7 digits)' },
+    { clave: 'reserva_label_email',         contexto: 'Etiqueta del campo email de contacto', es: 'Email *', en: 'Email *' },
+    { clave: 'reserva_ph_email',            contexto: 'Placeholder del campo email de contacto', es: 'tu@email.com', en: 'you@email.com' },
+    { clave: 'reserva_err_email',           contexto: 'Error de email no válido', es: 'Introduce un email válido', en: 'Enter a valid email address' },
+    { clave: 'reserva_label_pasaporte',     contexto: 'Etiqueta del campo pasaporte o DNI del titular', es: 'Número de pasaporte o DNI *', en: 'Passport or ID number *' },
+    { clave: 'reserva_ph_pasaporte',        contexto: 'Placeholder del campo pasaporte o DNI', es: 'Ej: ABC123456', en: 'E.g. ABC123456' },
+    { clave: 'reserva_check_otra_persona',  contexto: 'Casilla para indicar que la reserva es para otra persona', es: 'Yo no viajo — la reserva es para otra persona', en: 'I am not travelling — this booking is for someone else' },
+    { clave: 'reserva_label_otra_nombre',   contexto: 'Etiqueta del campo nombre de quien viaja', es: 'Nombre de quien viaja *', en: 'Traveller first name *' },
+    { clave: 'reserva_ph_otra_nombre',      contexto: 'Placeholder del campo nombre de quien viaja', es: 'Nombre', en: 'First name' },
+    { clave: 'reserva_label_otra_apellidos',contexto: 'Etiqueta del campo apellidos de quien viaja', es: 'Apellidos de quien viaja *', en: 'Traveller last name *' },
+    { clave: 'reserva_ph_otra_apellidos',   contexto: 'Placeholder del campo apellidos de quien viaja', es: 'Apellidos', en: 'Last name' },
+    { clave: 'reserva_nota_cartel',         contexto: 'Nota bajo el nombre de quien viaja sobre el cartel del conductor', es: 'El cartel del conductor llevará este nombre.', en: 'The driver\u2019s pick-up sign will show this name.' },
+    { clave: 'reserva_label_otra_pasaporte',contexto: 'Etiqueta del campo pasaporte o DNI de quien viaja', es: 'Número de pasaporte o DNI de quien viaja *', en: 'Traveller passport or ID number *' },
+    { clave: 'reserva_label_otra_telefono', contexto: 'Etiqueta del campo teléfono de quien viaja', es: 'Teléfono de quien viaja (con código de país) *', en: 'Traveller phone (with country code) *' },
+    { clave: 'reserva_err_otra_telefono',   contexto: 'Error de teléfono de quien viaja no válido', es: 'Introduce un número válido', en: 'Enter a valid number' },
+    { clave: 'reserva_label_otra_email',    contexto: 'Etiqueta del campo email de quien viaja', es: 'Email de quien viaja *', en: 'Traveller email *' },
+    { clave: 'reserva_ph_otra_email',       contexto: 'Placeholder del campo email de quien viaja', es: 'email@ejemplo.com', en: 'email@example.com' },
+    { clave: 'reserva_label_notas',         contexto: 'Etiqueta del campo de comentarios adicionales', es: 'Comentarios o información adicional (opcional)', en: 'Comments or additional information (optional)' },
+    { clave: 'reserva_ph_notas',            contexto: 'Placeholder del campo de comentarios', es: 'Equipaje especial, necesidades particulares...', en: 'Special luggage, particular needs...' },
+    { clave: 'reserva_paso3_titulo',        contexto: 'Título del paso 3', es: 'Extras', en: 'Extras' },
+    { clave: 'reserva_paso3_resumen',       contexto: 'Subtítulo del paso 3', es: 'Servicios adicionales opcionales', en: 'Optional additional services' },
+    { clave: 'reserva_sin_extras',          contexto: 'Aviso cuando no hay extras disponibles', es: 'No hay extras disponibles.', en: 'No extras available.' },
+    { clave: 'reserva_total_extras',        contexto: 'Etiqueta del total de extras seleccionados', es: 'Total extras', en: 'Extras total' },
+    { clave: 'reserva_total_extras_nota',   contexto: 'Nota corta bajo el total de extras', es: 'Se abonan directamente al conductor', en: 'Paid directly to the driver' },
+    { clave: 'reserva_nota_extras',         contexto: 'Nota larga sobre el pago de los extras', es: 'Los extras se abonan directamente al conductor junto con el precio del taxímetro. No forman parte de ningún cargo online.', en: 'Extras are paid directly to the driver together with the meter fare. They are not part of any online charge.' },
+    { clave: 'reserva_resumen_titulo',      contexto: 'Título del resumen final de la reserva', es: 'Resumen de la reserva', en: 'Booking summary' },
+    { clave: 'reserva_resumen_aviso',       contexto: 'Aviso bajo el resumen final. Mantener las etiquetas <strong> alrededor de Pre-reserva', es: 'Revise que toda la información sea correcta antes de confirmar. Una vez enviada, recibirá su documento de <strong>Pre-reserva</strong> con los datos de su solicitud de traslado. El voucher definitivo con el nombre del conductor asignado se enviará una vez confirmada la disponibilidad y completado el pago de la pre-reserva.', en: 'Please check that all the information is correct before confirming. Once submitted, you will receive your <strong>Pre-booking</strong> document with the details of your transfer request. The final voucher with the assigned driver\u2019s name will be sent once availability is confirmed and the pre-booking payment is completed.' },
+    { clave: 'reserva_boton_revisar',       contexto: 'Botón para revisar y enviar la solicitud', es: 'Revisar y enviar solicitud', en: 'Review and send request' },
+    { clave: 'reserva_boton_confirmar',     contexto: 'Botón de confirmación final del envío', es: 'Confirmar y enviar solicitud', en: 'Confirm and send request' },
+    { clave: 'reserva_err_envio',           contexto: 'Error genérico al enviar la reserva', es: 'Error al enviar. Inténtalo de nuevo.', en: 'Error sending. Please try again.' },
+    { clave: 'reserva_res_numero',          contexto: 'Etiqueta Reserva número en el resumen', es: 'Reserva número:', en: 'Booking number:' },
+    { clave: 'reserva_res_origen',          contexto: 'Etiqueta Origen en el resumen', es: 'Origen:', en: 'Origin:' },
+    { clave: 'reserva_res_destino',         contexto: 'Etiqueta Destino en el resumen', es: 'Destino:', en: 'Destination:' },
+    { clave: 'reserva_res_categoria',       contexto: 'Etiqueta Categoría en el resumen', es: 'Categoría:', en: 'Category:' },
+    { clave: 'reserva_res_fecha',           contexto: 'Etiqueta Fecha en el resumen', es: 'Fecha:', en: 'Date:' },
+    { clave: 'reserva_res_hora',            contexto: 'Etiqueta Hora en el resumen', es: 'Hora:', en: 'Time:' },
+    { clave: 'reserva_res_pasajeros',       contexto: 'Etiqueta Pasajeros en el resumen', es: 'Pasajeros:', en: 'Passengers:' },
+    { clave: 'reserva_res_precio_estimado', contexto: 'Etiqueta Precio estimado en el resumen', es: 'Precio estimado:', en: 'Estimated price:' },
+    { clave: 'reserva_res_extras',          contexto: 'Etiqueta Extras en el resumen', es: 'Extras:', en: 'Extras:' },
+    { clave: 'reserva_res_pasajero',        contexto: 'Etiqueta Pasajero en el resumen', es: 'Pasajero:', en: 'Passenger:' },
+    { clave: 'reserva_res_pasaporte',       contexto: 'Etiqueta Pasaporte/DNI en el resumen', es: 'Pasaporte/DNI:', en: 'Passport/ID:' },
+    { clave: 'reserva_res_otra_persona',    contexto: 'Texto Reserva para otra persona en el resumen', es: 'Reserva para otra persona', en: 'Booking for someone else' },
+    { clave: 'reserva_res_contacto_viaja',  contexto: 'Texto contacto de quien viaja en el resumen (va tras un guion)', es: 'contacto de quien viaja:', en: 'traveller contact:' },
+    { clave: 'reserva_res_contacto',        contexto: 'Etiqueta Contacto en el resumen', es: 'Contacto:', en: 'Contact:' },
+    { clave: 'reserva_res_llegada_vuelo',   contexto: 'Prefijo Llegada vuelo en la línea de hora del resumen', es: 'Llegada vuelo:', en: 'Flight arrival:' },
+    { clave: 'reserva_res_atraque',         contexto: 'Prefijo Atraque en la línea de hora del resumen', es: 'Atraque:', en: 'Docking:' },
+    { clave: 'reserva_res_vuelo',           contexto: 'Etiqueta Vuelo llegada en el resumen del permiso', es: 'Vuelo llegada:', en: 'Arrival flight:' },
+    { clave: 'reserva_res_barco',           contexto: 'Etiqueta Barco en el resumen del permiso', es: 'Barco:', en: 'Ship:' },
+    { clave: 'reserva_ok_titulo',           contexto: 'Título de la pantalla de confirmación tras enviar', es: 'Solicitud recibida', en: 'Request received' },
+    { clave: 'reserva_ok_texto',            contexto: 'Texto de la pantalla de confirmación tras enviar', es: 'Hemos recibido tu solicitud de traslado. Recibirás en breve tu documento de Pre-reserva con todos los detalles. El voucher definitivo con el conductor asignado se enviará una vez confirmada la disponibilidad.', en: 'We have received your transfer request. You will shortly receive your Pre-booking document with all the details. The final voucher with the assigned driver will be sent once availability is confirmed.' },
+    { clave: 'reserva_ok_numero_label',     contexto: 'Rótulo sobre el número de reserva en la confirmación (en mayúsculas)', es: 'TU NÚMERO DE RESERVA', en: 'YOUR BOOKING NUMBER' },
+    { clave: 'reserva_ok_guarda',           contexto: 'Nota bajo el número de reserva en la confirmación', es: 'Guarda este número — lo recibirás también por email', en: 'Keep this number — you will also receive it by email' },
+    { clave: 'reserva_ok_volver',           contexto: 'Botón para volver a la portada tras la confirmación', es: 'Volver al inicio', en: 'Back to home' },
+    { clave: 'reserva_ok_volver_panel',     contexto: 'Botón para volver al panel tras la confirmación cuando hay sesión', es: 'Volver a mi panel', en: 'Back to my account' },
+  ];
+  for (const tx of TEXTOS_RESERVA) {
+    const fila = await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Página de reserva', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de reserva', contexto = $2, texto_es = $3
+       RETURNING id`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+    const textoId = fila.rows[0].id;
+    if (tx.en) {
+      await pool.query(
+        `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
+         VALUES ($1, 'en', $2)
+         ON CONFLICT (texto_id, lang_code) DO NOTHING`,
+        [textoId, tx.en]
+      );
+    }
+  }
+
   // Sincronizar nombres de categorías activas como textos traducibles
   const catsActivas = await pool.query('SELECT id, nombre, capacidad_maletas FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
   for (const cat of catsActivas.rows) {
