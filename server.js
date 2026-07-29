@@ -150,7 +150,10 @@ const upload = multer({
 app.use('/webhook/stripe', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+// La portada la sirve la ruta EJS (renderHome), no el index.html estático.
+// index:false evita que la carpeta public responda en la raíz por su cuenta.
+app.get('/index.html', function (req, res) { res.redirect(301, '/'); });
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 app.set('trust proxy', 1);
 app.use(session({
@@ -4820,6 +4823,8 @@ app.get('/', asyncHandler(async (req, res) => {
 }));
 
 app.get('/:lang([a-z]{2})/', asyncHandler(async (req, res) => {
+  // La versión española oficial es la raíz: /es/ redirige de forma permanente
+  if (req.params.lang === 'es') return res.redirect(301, '/');
   await renderHome(req, res, req.params.lang);
 }));
 
