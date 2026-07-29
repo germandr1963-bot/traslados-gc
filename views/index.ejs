@@ -401,6 +401,7 @@ footer {
 
 <script>
 var LANG = '<%= lang %>';
+var RUTA_RESERVA = '<%= rutaReserva %>';
 var TXT = {
   eligeRuta:     '<%- t("home_texto_elige_ruta").replace(/'/g, "\\'") %>',
   aConsultar:    '<%- t("home_texto_a_consultar").replace(/'/g, "\\'") %>',
@@ -571,7 +572,7 @@ function irAReserva() {
   var hasta = document.getElementById('hasta').value;
   var categoriaId = document.getElementById('categoria').value;
   var params = new URLSearchParams({ desde: desde, hasta: hasta, categoria_id: categoriaId });
-  window.location.href = '/reserva?' + params.toString();
+  window.location.href = RUTA_RESERVA + '?' + params.toString();
 }
 
 document.getElementById('ver-precio').addEventListener('click', verPrecio);

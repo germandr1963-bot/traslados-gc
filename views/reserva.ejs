@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= t('reserva_page_title') %></title>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/estilos.css">
+<style>
+.cabecera {
+  background:var(--charcoal);
+  padding:14px 24px;
+  display:flex; align-items:center; justify-content:space-between;
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  box-shadow:0 2px 8px rgba(0,0,0,0.15);
+}
+.cabecera .marca { font-family:'Big Shoulders Display',sans-serif; font-size:18px; color:#fff; }
+.boton-volver {
+  display:inline-flex; align-items:center; gap:6px;
+  background:rgba(255,255,255,0.1); color:#fff;
+  border:1px solid rgba(255,255,255,0.2); border-radius:6px;
+  padding:7px 14px; font-size:13px; font-weight:500;
+  cursor:pointer; text-decoration:none;
+}
+.boton-volver:hover { background:rgba(255,255,255,0.2); }
+.boton-reiniciar {
+  display:inline-flex; align-items:center; gap:6px;
+  background:transparent; color:rgba(255,255,255,0.55);
+  border:1px solid rgba(255,255,255,0.15); border-radius:6px;
+  padding:7px 14px; font-size:13px; cursor:pointer;
+}
+.boton-reiniciar:hover { color:#fff; border-color:rgba(255,255,255,0.35); }
+.contenedor { max-width:720px; margin:0 auto; padding:80px 20px 60px; }
+
+/* Tarjeta traslado */
+.tarjeta-traslado {
+  background:var(--charcoal-2); border-radius:12px;
+  padding:18px 22px; margin-bottom:28px;
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+}
+.traslado-bloque { flex:1; min-width:140px; }
+.traslado-etiqueta { font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:3px; letter-spacing:0.4px; }
+.traslado-valor { font-family:'Big Shoulders Display',sans-serif; font-size:18px; color:#fff; }
+.traslado-flecha { font-size:22px; color:rgba(255,255,255,0.25); flex-shrink:0; }
+.traslado-precio-box { text-align:right; flex-shrink:0; }
+.traslado-precio { font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:700; color:#fff; }
+.traslado-badge { background:var(--oro); color:var(--oro-texto); font-size:11px; font-weight:700; padding:3px 10px; border-radius:10px; display:none; margin-top:4px; }
+.traslado-cat { font-size:11px; color:rgba(255,255,255,0.35); margin-top:4px; }
+
+/* Pasos */
+.paso { margin-bottom:10px; border:1px solid var(--gris-borde); border-radius:12px; overflow:visible; }
+.paso-cabecera { border-radius:11px; }
+.paso:has(.paso-cuerpo.visible) .paso-cabecera { border-radius:11px 11px 0 0; }
+.paso-cuerpo { border-radius:0 0 11px 11px; }
+.paso-cabecera {
+  display:flex; align-items:center; gap:14px;
+  padding:16px 20px; background:#fff;
+}
+.paso-cabecera.clickable { cursor:pointer; }
+.paso-cabecera.clickable:hover { background:#fafafa; }
+.paso-numero {
+  width:28px; height:28px; border-radius:50%;
+  background:var(--charcoal); color:#fff;
+  font-size:13px; font-weight:600;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.paso-numero.activo { background:var(--terracota); }
+.paso-numero.completado { background:#1E8E5A; }
+.paso-titulo { font-weight:500; font-size:15px; color:var(--texto-oscuro); }
+.paso-resumen { font-size:13px; color:var(--texto-muted); margin-top:2px; }
+.paso-cuerpo { padding:20px; background:var(--gris-fondo); border-top:1px solid var(--gris-borde); display:none; }
+.paso-cuerpo.visible { display:block; }
+
+/* Campos */
+.campo-grupo { margin-bottom:14px; position:relative; }
+.campo-grupo label { font-size:12px; color:var(--texto-muted); display:block; margin-bottom:5px; }
+.campo-grupo input,
+.campo-grupo select,
+.campo-grupo textarea {
+  width:100%; border:1px solid var(--piedra-borde); border-radius:6px;
+  background:#fff; color:var(--texto-oscuro);
+  padding:10px 12px; font-family:inherit; font-size:14px;
+  box-sizing:border-box;
+}
+.campo-grupo textarea { height:76px; resize:vertical; }
+.dos-columnas { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media(max-width:500px){ .dos-columnas { grid-template-columns:1fr; } }
+@media(max-width:600px){
+  .contenedor { padding:70px 12px 40px; }
+  .tarjeta-traslado { flex-direction:column; align-items:flex-start; gap:10px; padding:14px; }
+  .traslado-precio-box { text-align:left; }
+  .traslado-precio { font-size:22px; }
+  .paso-cabecera { padding:12px 14px; gap:10px; }
+  .paso-cuerpo { padding:14px; }
+  .paso-titulo { font-size:14px; }
+  .cabecera-fija { padding:10px 12px; }
+  .boton-volver, .boton-reiniciar { font-size:12px; padding:5px 10px; }
+}
+.aviso-campo { font-size:12px; color:var(--rojo-error); margin-top:4px; display:none; }
+.sugerencias-lista {
+  position:absolute; top:100%; left:0; right:0; z-index:200;
+  background:#fff; border:1px solid var(--gris-borde);
+  border-radius:0 0 8px 8px; max-height:220px; overflow-y:auto;
+  box-shadow:0 4px 12px rgba(0,0,0,0.1); display:none;
+}
+.sugerencia-item {
+  padding:10px 14px; font-size:13px; color:var(--texto-oscuro);
+  cursor:pointer; border-bottom:1px solid var(--gris-borde);
+  line-height:1.4;
+}
+.sugerencia-item:last-child { border-bottom:none; }
+.sugerencia-item:hover { background:var(--gris-fondo); }
+.separador { border:none; border-top:1px solid var(--gris-borde); margin:18px 0 16px; }
+.bloque-oculto { display:none; }
+
+/* Extras */
+.lista-extras { display:flex; flex-direction:column; gap:10px; }
+.extra-item {
+  display:flex; align-items:center; gap:14px;
+  background:#fff; border:1px solid var(--gris-borde);
+  border-radius:8px; padding:12px 16px; cursor:pointer;
+}
+.extra-item:hover { border-color:var(--terracota); }
+.extra-item.seleccionado { border-color:var(--terracota); background:#fdf4f2; }
+.extra-check {
+  width:20px; height:20px; border:2px solid var(--gris-borde);
+  border-radius:4px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:13px;
+}
+.extra-item.seleccionado .extra-check { background:var(--terracota); border-color:var(--terracota); color:#fff; }
+.extra-nombre { flex:1; font-size:14px; }
+.extra-precio { font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:600; }
+.total-extras {
+  margin-top:14px; padding:12px 16px;
+  border-radius:8px; font-size:13px;
+  display:none; justify-content:space-between; align-items:center;
+  color:var(--texto-oscuro);
+}
+.nota-extras { font-size:12px; color:var(--texto-muted); margin-top:10px; line-height:1.5; }
+
+/* Teléfono */
+.telefono-grupo { display:flex; gap:8px; }
+.telefono-prefijo {
+  width:110px; flex-shrink:0;
+  border:1px solid var(--piedra-borde); border-radius:6px;
+  background:#fff; color:var(--texto-oscuro);
+  padding:10px 8px; font-family:inherit; font-size:14px;
+}
+
+/* Botones */
+.boton-siguiente {
+  margin-top:20px; background:var(--terracota); color:#fff;
+  border:none; border-radius:8px; padding:13px 28px;
+  font-size:14px; font-weight:600; cursor:pointer; width:100%;
+}
+.boton-siguiente:hover { background:var(--terracota-oscuro); }
+.boton-siguiente:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* Resumen y confirmación */
+.resumen-box {
+  border:1px solid var(--gris-borde); border-radius:10px;
+  padding:16px 18px; margin-bottom:20px;
+  font-size:13px; line-height:1.9;
+  color:var(--texto-oscuro);
+}
+.resumen-box strong { color:var(--texto-oscuro); }
+.mensaje-ok { text-align:center; padding:50px 20px; }
+.mensaje-ok .icono { font-size:52px; margin-bottom:18px; }
+.mensaje-ok h2 { font-family:'Big Shoulders Display',sans-serif; font-size:28px; margin-bottom:10px; color:var(--texto-oscuro); }
+.mensaje-ok p { font-size:14px; color:var(--texto-muted); max-width:420px; margin:0 auto; line-height:1.7; }
+
+/* Panel de ruta (espejo del buscador de la portada, solo si se llega sin ruta) */
+.panel-busqueda {
+  background: var(--piedra);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 28px;
+  /* Mismo ancho efectivo que el panel de la portada (hero-overlay 900px − 64px de padding) */
+  width: min(836px, calc(100vw - 48px));
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.fila-busqueda {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.fila-busqueda select.campo,
+.fila-busqueda .campo {
+  height: auto;
+  min-height: 40px;
+  white-space: normal;
+  word-break: break-word;
+  padding: 8px 10px;
+}
+#resultado-precio {
+  font-size: 14px;
+  color: var(--texto-muted);
+  min-height: 26px;
+}
+.resultado-vacio {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  color: var(--texto-oscuro);
+}
+.tarjeta-resultado {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  background: var(--charcoal-2);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.tarjeta-resultado-foto {
+  width: 150px;
+  height: auto;
+  align-self: stretch;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #fff;
+  flex-shrink: 0;
+  padding: 8px;
+}
+.tarjeta-resultado-foto-placeholder {
+  width: 150px;
+  align-self: stretch;
+  border-radius: 8px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  flex-shrink: 0;
+}
+.tarjeta-resultado-info {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+.tarjeta-resultado-nombre {
+  font-family: 'Big Shoulders Display', sans-serif;
+  font-size: 20px;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+.tarjeta-resultado-datos {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.tarjeta-resultado-dato {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: rgba(242,237,228,0.85);
+  background: rgba(255,255,255,0.07);
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+.tarjeta-resultado-dato svg {
+  flex-shrink: 0;
+}
+.tarjeta-resultado-precio-bloque {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 140px;
+}
+.precio-grande {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 36px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+.badge-aproximado {
+  background: var(--oro);
+  color: var(--oro-texto);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 20px;
+  letter-spacing: 0.2px;
+}
+.tarjeta-resultado-nota {
+  font-size: 11px;
+  color: rgba(242,237,228,0.45);
+  margin-top: 2px;
+  line-height: 1.5;
+  text-align: right;
+  max-width: 180px;
+}
+.boton-reservar {
+  background: var(--terracota);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 13px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+  margin-left: auto;
+}
+.boton-reservar:hover {
+  background: var(--terracota-oscuro);
+}
+@media (max-width: 600px) {
+  .fila-busqueda { grid-template-columns: 1fr; }
+  .tarjeta-resultado {
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+  }
+  .tarjeta-resultado-foto,
+  .tarjeta-resultado-foto-placeholder {
+    width: 100%;
+    height: 160px;
+  }
+  .tarjeta-resultado-precio-bloque {
+    align-items: flex-start;
+    min-width: unset;
+    width: 100%;
+  }
+  .tarjeta-resultado-nota { text-align: left; max-width: 100%; }
+  .boton-reservar {
+    width: 100%;
+    margin-left: 0;
+    text-align: center;
+  }
+  .precio-grande { font-size: 28px; }
+}
+.lang-bar {
+  display:flex; justify-content:center; flex-wrap:wrap; gap:5px;
+  margin:0 auto 18px; width:100%;
+}
+.lang-pill {
+  font-size:11px; font-weight:500; letter-spacing:0.6px;
+  padding:3px 10px; border-radius:20px;
+  border:1px solid var(--gris-borde); color:var(--texto-muted);
+  background:transparent; cursor:pointer; text-decoration:none; text-transform:uppercase;
+}
+.lang-pill:hover { border-color:var(--texto-muted); color:var(--texto-oscuro); }
+.lang-pill.activo { background:#C1502E; border-color:#C1502E; color:#fff; }
+footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13px; }
+</style>
+</head>
+<body>
+
+<div class="cabecera">
+  <a href="<%= urlHome %>" class="boton-volver"><%= t('reserva_boton_volver') %></a>
+  <span class="marca">Traslados · GC</span>
+  <button class="boton-reiniciar" onclick="reiniciarFormulario()"><%= t('reserva_boton_reiniciar') %></button>
+</div>
+
+<div class="contenedor">
+  <div class="lang-bar">
+    <% idiomas.forEach(function(idi) { %>
+      <a href="<%= idi.codigo === 'es' ? '/reserva' : '/' + idi.codigo + '/' + (palabrasReserva[idi.codigo] || 'reserva') %>"
+         class="lang-pill<%= idi.codigo === lang ? ' activo' : '' %>">
+        <%= idi.codigo.toUpperCase() %>
+      </a>
+    <% }); %>
+  </div>
+  <!-- Banner portal del cliente (solo si hay sesión activa) -->
+  <div id="banner-portal-cliente" style="display:none;background:#f5f0ea;border:1px solid #d4c4b0;border-radius:10px;padding:14px 20px;margin-bottom:22px;">
+    <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C1502E;font-weight:700;margin-bottom:2px;"><%= t('reserva_banner_portal') %></div>
+    <div id="banner-nombre-cliente" style="font-size:18px;font-weight:700;color:#1C1815;"></div>
+  </div>
+  <h1 class="titular" style="font-size:26px;margin-bottom:6px;"><%= t('reserva_titulo') %></h1>
+  <p style="font-size:14px;color:var(--texto-muted);margin-bottom:22px;"><%= t('reserva_subtitulo') %></p>
+
+  <!-- Panel de ruta (solo si se llega sin ruta elegida) -->
+  <div class="panel-busqueda" id="panel-ruta" style="display:none;">
+    <div class="fila-busqueda">
+      <div>
+        <label class="etiqueta"><%= t('home_label_desde') %></label>
+        <select id="desde" class="campo" onchange="actualizarCategoriasSegunRuta()" size="1"><option value=""><%= t('reserva_selecciona_origen') %></option></select>
+      </div>
+      <div>
+        <label class="etiqueta"><%= t('home_label_hasta') %></label>
+        <select id="hasta" class="campo" onchange="actualizarCategoriasSegunRuta()" size="1"><option value=""><%= t('reserva_selecciona_destino') %></option></select>
+      </div>
+      <div>
+        <label class="etiqueta"><%= t('home_label_categoria') %></label>
+        <select id="categoria" class="campo"><option value=""><%= t('reserva_cargando') %></option></select>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:10px;">
+      <button id="ver-precio" class="boton-primario" style="padding:10px 40px;"><%= t('home_boton_ver_precio') %></button>
+    </div>
+    <div id="resultado-precio"><%= t('home_texto_elige_ruta') %></div>
+    <div style="text-align:center;margin-top:16px;">
+      <button onclick="abrirFormCotizacion()" style="background:none;border:none;color:#6b5c44;cursor:pointer;font-size:0.9rem;text-decoration:underline;"><%= t('home_link_no_encuentras') %></button>
+    </div>
+  </div>
+
+  <!-- Modal de cotización (clonado de la portada) -->
+  <div id="modal-cotizacion" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;">
+    <div style="background:#fff;border-radius:12px;padding:1.5rem;max-width:440px;width:90%;margin:auto;position:relative;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+        <h2 style="font-size:1.1rem;margin:0;color:#2c2c2c;"><%= t('home_modal_titulo') %></h2>
+        <button onclick="cerrarFormCotizacion()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888;padding:0 4px;line-height:1;">✕</button>
+      </div>
+      <p style="font-size:0.85rem;color:#888;margin:0 0 1.25rem 0;"><%= t('home_modal_subtitulo') %></p>
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        <div>
+          <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;"><%= t('home_modal_label_origen') %> *</label>
+          <input type="text" id="cotiz-origen" class="campo" placeholder="Ej: Las Palmas de Gran Canaria">
+        </div>
+        <div>
+          <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;"><%= t('home_modal_label_destino') %> *</label>
+          <input type="text" id="cotiz-destino" class="campo" placeholder="Ej: Puerto de Mogán">
+        </div>
+        <div style="display:flex;gap:0.75rem;">
+          <div style="flex:1;">
+            <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;"><%= t('home_modal_label_fecha') %></label>
+            <input type="date" id="cotiz-fecha" class="campo">
+          </div>
+          <div style="flex:1;">
+            <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;"><%= t('home_modal_label_pax') %></label>
+            <input type="number" id="cotiz-pax" class="campo" min="1" max="16" placeholder="1">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.82rem;font-weight:600;color:#555;display:block;margin-bottom:4px;"><%= t('home_modal_label_email') %> *</label>
+          <input type="email" id="cotiz-email" class="campo" placeholder="tunombre@email.com">
+        </div>
+        <div id="cotiz-error" style="color:#e07b5a;font-size:0.82rem;display:none;"></div>
+        <div id="cotiz-ok" style="color:#2d7a4f;font-size:0.85rem;display:none;text-align:center;padding:0.75rem;background:#d1e7dd;border-radius:6px;"></div>
+        <button id="btn-enviar-cotizacion" onclick="enviarCotizacion()" class="boton-primario" style="width:100%;margin-top:0.5rem;"><%= t('home_modal_boton_enviar') %></button>
+        <button id="btn-cancelar-cotizacion" onclick="cerrarFormCotizacion()" style="width:100%;background:#f5f0ea;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:0.9rem;padding:0.6rem;"><%= t('home_modal_boton_cancelar') %></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tarjeta resumen -->
+  <div class="tarjeta-traslado" id="tarjeta-traslado" style="display:none;">
+    <div class="traslado-bloque">
+      <div class="traslado-etiqueta"><%= t('reserva_etiqueta_origen') %></div>
+      <div class="traslado-valor" id="tbl-origen"></div>
+    </div>
+    <div class="traslado-flecha">→</div>
+    <div class="traslado-bloque">
+      <div class="traslado-etiqueta"><%= t('reserva_etiqueta_destino') %></div>
+      <div class="traslado-valor" id="tbl-destino"></div>
+    </div>
+    <div class="traslado-precio-box">
+      <div class="traslado-precio" id="tbl-precio"></div>
+      <div class="traslado-badge" id="tbl-badge"><%= t('home_badge_precio_aprox') %></div>
+      <div class="traslado-cat" id="tbl-categoria"></div>
+    </div>
+  </div>
+
+  <!-- ═══ PASO 1: Detalles del viaje ═══ -->
+  <div class="paso" id="paso-1">
+    <div class="paso-cabecera" id="cab-1">
+      <div class="paso-numero activo" id="num-1">1</div>
+      <div>
+        <div class="paso-titulo"><%= t('reserva_paso1_titulo') %></div>
+        <div class="paso-resumen" id="resumen-1"><%= t('reserva_paso1_resumen') %></div>
+      </div>
+    </div>
+    <div class="paso-cuerpo visible" id="cuerpo-1">
+
+      <!-- Fecha siempre primero -->
+      <div class="campo-grupo">
+        <label><%= t('reserva_label_fecha') %></label>
+        <input type="date" id="fecha">
+        <div class="aviso-campo" id="err-fecha"><%= t('reserva_err_fecha') %></div>
+      </div>
+
+      <!-- Si origen es AEROPUERTO -->
+      <div id="bloque-aero-origen" class="bloque-oculto">
+        <div class="dos-columnas">
+          <div class="campo-grupo">
+            <label><%= t('reserva_label_vuelo') %></label>
+            <input type="text" id="vuelo-llegada" placeholder="<%= t('reserva_ph_vuelo') %>">
+          </div>
+          <div class="campo-grupo">
+            <label><%= t('reserva_label_hora_vuelo') %></label>
+            <input type="time" id="hora-llegada-vuelo">
+            <div class="aviso-campo" id="err-hora-llegada"><%= t('reserva_err_hora_vuelo') %></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Si origen es PUERTO -->
+      <div id="bloque-puerto-origen" class="bloque-oculto">
+        <div class="dos-columnas">
+          <div class="campo-grupo">
+            <label><%= t('reserva_label_barco') %></label>
+            <input type="text" id="barco-llegada" placeholder="<%= t('reserva_ph_barco') %>">
+          </div>
+          <div class="campo-grupo">
+            <label><%= t('reserva_label_hora_atraque') %></label>
+            <input type="time" id="hora-atraque">
+            <div class="aviso-campo" id="err-hora-atraque"><%= t('reserva_err_hora_atraque') %></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Si origen es OTRO: hora de recogida -->
+      <div id="bloque-hora-recogida" class="bloque-oculto">
+        <div class="campo-grupo">
+          <label><%= t('reserva_label_hora_recogida') %></label>
+          <input type="time" id="hora-recogida">
+          <div class="aviso-campo" id="err-hora-recogida"><%= t('reserva_err_hora_recogida') %></div>
+        </div>
+      </div>
+
+      <!-- Cantidad de pasajeros (siempre) -->
+      <div class="campo-grupo">
+        <label><%= t('reserva_label_num_pasajeros') %></label>
+        <select id="num-pasajeros"></select>
+      </div>
+
+      <hr class="separador">
+
+      <!-- Si origen es OTRO: dirección de recogida (PRIMERO) -->
+      <div id="bloque-dir-origen" class="bloque-oculto">
+        <div class="campo-grupo" style="position:relative;">
+          <label><%= t('reserva_label_dir_origen') %></label>
+          <input type="text" id="direccion-origen" placeholder="<%= t('reserva_ph_dir_origen') %>" autocomplete="off" oninput="buscarDireccion('origen')">
+          <div id="sugerencias-origen" class="sugerencias-lista"></div>
+          <div class="aviso-campo" id="err-dir-origen"><%= t('reserva_err_dir_origen') %></div>
+        </div>
+      </div>
+
+      <!-- Destino: dirección solo si NO es aeropuerto ni puerto (DESPUÉS) -->
+      <div id="bloque-dir-destino" class="bloque-oculto">
+        <div class="campo-grupo" style="position:relative;">
+          <label><%= t('reserva_label_dir_destino') %></label>
+          <input type="text" id="direccion-destino" placeholder="<%= t('reserva_ph_dir_destino') %>" autocomplete="off" oninput="buscarDireccion('destino')">
+          <div id="sugerencias-destino" class="sugerencias-lista"></div>
+          <div class="aviso-campo" id="err-dir-destino"><%= t('reserva_err_dir_destino') %></div>
+        </div>
+      </div>
+
+      <button class="boton-siguiente" onclick="siguientePaso(1)"><%= t('reserva_boton_continuar') %></button>
+    </div>
+  </div>
+
+  <!-- ═══ PASO 2: Pasajero y contacto ═══ -->
+  <div class="paso" id="paso-2">
+    <div class="paso-cabecera" id="cab-2">
+      <div class="paso-numero" id="num-2">2</div>
+      <div>
+        <div class="paso-titulo"><%= t('reserva_paso2_titulo') %></div>
+        <div class="paso-resumen" id="resumen-2"><%= t('reserva_paso2_resumen') %></div>
+      </div>
+    </div>
+    <div class="paso-cuerpo" id="cuerpo-2">
+
+      <div id="nota-datos-cuenta" style="display:none;font-size:12px;color:var(--texto-muted);margin-bottom:10px;"><%= t('reserva_nota_datos_cuenta') %></div>
+
+      <div class="campo-grupo">
+        <label><%= t('reserva_label_nombre') %></label>
+        <input type="text" id="contacto-nombre" placeholder="<%= t('reserva_ph_nombre') %>">
+        <div class="aviso-campo" id="err-contacto-nombre"><%= t('reserva_err_obligatorio') %></div>
+      </div>
+
+      <div class="campo-grupo">
+        <label><%= t('reserva_label_telefono') %></label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="telefono-prefijo" style="width:120px;flex-shrink:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 8px;font-family:inherit;font-size:14px;">
+            <option value="+34">🇪🇸 +34</option>
+            <option value="+44">🇬🇧 +44</option>
+            <option value="+49">🇩🇪 +49</option>
+            <option value="+46">🇸🇪 +46</option>
+            <option value="+47">🇳🇴 +47</option>
+            <option value="+31">🇳🇱 +31</option>
+            <option value="+39">🇮🇹 +39</option>
+            <option value="+33">🇫🇷 +33</option>
+            <option value="+358">🇫🇮 +358</option>
+            <option value="+7">🇷🇺 +7</option>
+            <option value="+1">🇺🇸 +1</option>
+            <option value="+351">🇵🇹 +351</option>
+            <option value="+32">🇧🇪 +32</option>
+            <option value="+41">🇨🇭 +41</option>
+            <option value="+43">🇦🇹 +43</option>
+            <option value="+48">🇵🇱 +48</option>
+          </select>
+          <input type="tel" id="telefono-numero" placeholder="600 000 000" style="flex:1;min-width:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 12px;font-family:inherit;font-size:14px;">
+        </div>
+        <div class="aviso-campo" id="err-telefono"><%= t('reserva_err_telefono') %></div>
+      </div>
+
+      <div class="campo-grupo">
+        <label><%= t('reserva_label_email') %></label>
+        <input type="email" id="contacto-email" placeholder="<%= t('reserva_ph_email') %>">
+        <div class="aviso-campo" id="err-email"><%= t('reserva_err_email') %></div>
+      </div>
+
+      <!-- Pasaporte del cliente: solo en recogidas en aeropuerto o puerto, y solo si viaja él -->
+      <div id="bloque-pasaporte" class="bloque-oculto">
+        <div class="campo-grupo">
+          <label><%= t('reserva_label_pasaporte') %></label>
+          <input type="text" id="pasajero-pasaporte" placeholder="<%= t('reserva_ph_pasaporte') %>">
+          <div class="aviso-campo" id="err-pasajero-pasaporte"><%= t('reserva_err_obligatorio') %></div>
+        </div>
+      </div>
+
+      <div class="campo-grupo" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="es-para-otra-persona" onchange="toggleOtraPersona(this.checked)" style="width:18px;height:18px;flex-shrink:0;">
+        <label for="es-para-otra-persona" style="margin:0;cursor:pointer;"><%= t('reserva_check_otra_persona') %></label>
+      </div>
+
+      <div id="bloque-otra-persona" class="bloque-oculto">
+        <div class="dos-columnas">
+          <div class="campo-grupo">
+            <label><%= t('reserva_label_otra_nombre') %></label>
+            <input type="text" id="pasajero-nombre" placeholder="<%= t('reserva_ph_otra_nombre') %>">
+            <div class="aviso-campo" id="err-pasajero-nombre"><%= t('reserva_err_obligatorio') %></div>
+          </div>
+          <div class="campo-grupo">
+            <label><%= t('reserva_label_otra_apellidos') %></label>
+            <input type="text" id="pasajero-apellidos" placeholder="<%= t('reserva_ph_otra_apellidos') %>">
+            <div class="aviso-campo" id="err-pasajero-apellidos"><%= t('reserva_err_obligatorio') %></div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--texto-muted);margin:-6px 0 12px;"><%= t('reserva_nota_cartel') %></div>
+        <div id="bloque-pasaporte-otra" class="bloque-oculto">
+          <div class="campo-grupo">
+            <label><%= t('reserva_label_otra_pasaporte') %></label>
+            <input type="text" id="otra-persona-pasaporte" placeholder="<%= t('reserva_ph_pasaporte') %>">
+            <div class="aviso-campo" id="err-otra-persona-pasaporte"><%= t('reserva_err_obligatorio') %></div>
+          </div>
+        </div>
+        <div class="campo-grupo">
+          <label><%= t('reserva_label_otra_telefono') %></label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="otra-persona-prefijo" style="width:120px;flex-shrink:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 8px;font-family:inherit;font-size:14px;">
+              <option value="+34">🇪🇸 +34</option>
+              <option value="+44">🇬🇧 +44</option>
+              <option value="+49">🇩🇪 +49</option>
+              <option value="+46">🇸🇪 +46</option>
+              <option value="+47">🇳🇴 +47</option>
+              <option value="+31">🇳🇱 +31</option>
+              <option value="+39">🇮🇹 +39</option>
+              <option value="+33">🇫🇷 +33</option>
+              <option value="+358">🇫🇮 +358</option>
+              <option value="+7">🇷🇺 +7</option>
+              <option value="+1">🇺🇸 +1</option>
+              <option value="+351">🇵🇹 +351</option>
+              <option value="+32">🇧🇪 +32</option>
+              <option value="+41">🇨🇭 +41</option>
+              <option value="+43">🇦🇹 +43</option>
+              <option value="+48">🇵🇱 +48</option>
+            </select>
+            <input type="tel" id="otra-persona-telefono" placeholder="600 000 000" style="flex:1;min-width:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 12px;font-family:inherit;font-size:14px;">
+          </div>
+          <div class="aviso-campo" id="err-otra-persona-telefono"><%= t('reserva_err_otra_telefono') %></div>
+        </div>
+        <div class="campo-grupo">
+          <label><%= t('reserva_label_otra_email') %></label>
+          <input type="email" id="otra-persona-email" placeholder="<%= t('reserva_ph_otra_email') %>">
+          <div class="aviso-campo" id="err-otra-persona-email"><%= t('reserva_err_email') %></div>
+        </div>
+      </div>
+
+      <div class="campo-grupo">
+        <label><%= t('reserva_label_notas') %></label>
+        <textarea id="pasajero-notas" placeholder="<%= t('reserva_ph_notas') %>"></textarea>
+      </div>
+
+      <button class="boton-siguiente" onclick="siguientePaso(2)"><%= t('reserva_boton_continuar') %></button>
+    </div>
+  </div>
+
+  <!-- ═══ PASO 3: Extras ═══ -->
+  <div class="paso" id="paso-3">
+    <div class="paso-cabecera" id="cab-3">
+      <div class="paso-numero" id="num-3">3</div>
+      <div>
+        <div class="paso-titulo"><%= t('reserva_paso3_titulo') %></div>
+        <div class="paso-resumen" id="resumen-3"><%= t('reserva_paso3_resumen') %></div>
+      </div>
+    </div>
+    <div class="paso-cuerpo" id="cuerpo-3">
+      <div class="lista-extras" id="lista-extras">
+        <p style="color:var(--texto-muted);font-size:13px;"><%= t('reserva_cargando') %></p>
+      </div>
+      <div class="total-extras" id="total-extras" style="border:1px solid var(--gris-borde);border-radius:8px;">
+        <div>
+          <div style="opacity:0.75;margin-bottom:2px;"><%= t('reserva_total_extras') %></div>
+          <div style="font-size:11px;opacity:0.45;"><%= t('reserva_total_extras_nota') %></div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--texto-oscuro);" id="total-extras-precio">0 €</span>
+      </div>
+      <p class="nota-extras"><%= t('reserva_nota_extras') %></p>
+
+      <div id="resumen-final" style="display:none;">
+        <h3 id="resumen-titulo" style="text-align:center;font-family:'Big Shoulders Display',sans-serif;font-size:20px;font-weight:600;color:var(--texto-oscuro);margin:0 0 14px;"><%= t('reserva_resumen_titulo') %></h3>
+        <div id="resumen-final-contenido" class="resumen-box"></div>
+        <p style="font-size:13px;color:var(--texto-muted);text-align:center;margin:0 0 16px;line-height:1.6;"><%- t('reserva_resumen_aviso') %></p>
+      </div>
+      <button class="boton-siguiente" id="boton-enviar" onclick="mostrarResumen()"><%= t('reserva_boton_revisar') %></button>
+      <div id="err-envio" style="margin-top:10px;font-size:13px;color:var(--rojo-error);display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Confirmación -->
+  <div id="confirmacion" style="display:none;">
+    <div class="tarjeta mensaje-ok">
+      <div class="icono">✅</div>
+      <h2><%= t('reserva_ok_titulo') %></h2>
+      <p><%= t('reserva_ok_texto') %></p>
+      <div style="margin:20px auto;background:var(--gris-fondo);border:1px solid var(--gris-borde);border-radius:10px;padding:16px 24px;max-width:280px;">
+        <div style="font-size:11px;color:var(--texto-muted);letter-spacing:0.6px;margin-bottom:6px;"><%= t('reserva_ok_numero_label') %></div>
+        <div id="numero-reserva-mostrar" style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--texto-oscuro);letter-spacing:2px;"></div>
+        <div style="font-size:11px;color:var(--texto-muted);margin-top:6px;"><%= t('reserva_ok_guarda') %></div>
+      </div>
+      <a href="<%= urlHome %>" id="link-final-inicio" style="display:inline-block;margin-top:10px;background:var(--terracota);color:#fff;padding:12px 32px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;"><%= t('reserva_ok_volver') %></a>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <div style="margin-bottom:12px;">
+    <a href="/rutas" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_rutas') %></a>
+    <a href="/destinos" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_destinos') %></a>
+    <a href="/flota" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_flota') %></a>
+    <a href="/contacto" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_contacto') %></a>
+    <a href="/chofer/acceso/alta" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_alta_choferes') %></a>
+    <a href="/chofer/acceso" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_acceso_choferes') %></a>
+    <a href="/mi-reserva" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_acceso_clientes') %></a>
+  </div>
+  Traslados · GC — Gran Canaria
+</footer>
+
+<script>
+// ── Idioma y textos traducidos (inyectados por el servidor) ─────────────────
+var LANG = '<%= lang %>';
+var LOCALE = { es:'es-ES', en:'en-GB', de:'de-DE', sv:'sv-SE', no:'nb-NO', nl:'nl-NL', it:'it-IT', fr:'fr-FR', fi:'fi-FI', ru:'ru-RU' }[LANG] || LANG;
+var RUTA_RESERVA = '<%= rutaReserva %>';
+var URL_HOME = '<%= urlHome %>';
+var TXT = {
+  selecciona:     '<%- t("home_label_selecciona").replace(/'/g, "\\'") %>',
+  eligeRuta:      '<%- t("home_texto_elige_ruta").replace(/'/g, "\\'") %>',
+  aConsultar:     '<%- t("home_texto_a_consultar").replace(/'/g, "\\'") %>',
+  badgeAprox:     '<%- t("home_badge_precio_aprox").replace(/'/g, "\\'") %>',
+  notaTaxi:       '<%- t("home_nota_taximetro").replace(/'/g, "\\'") %>',
+  botonReservar:  '<%- t("home_boton_reservar").replace(/'/g, "\\'") %>',
+  verOtrasCats:   '<%- t("home_texto_ver_otras_cats").replace(/'/g, "\\'") %>',
+  paxSufijo:      '<%- t("home_pax_sufijo").replace(/'/g, "\\'") %>',
+  enviando:       '<%- t("home_modal_enviando").replace(/'/g, "\\'") %>',
+  cerrar:         '<%- t("home_modal_cerrar").replace(/'/g, "\\'") %>',
+  okMsg:          '<%- t("home_modal_ok").replace(/'/g, "\\'") %>',
+  errCampos:      '<%- t("home_modal_error_campos").replace(/'/g, "\\'") %>',
+  errEmailModal:  '<%- t("home_modal_error_email").replace(/'/g, "\\'") %>',
+  errConexion:    '<%- t("home_modal_error_conexion").replace(/'/g, "\\'") %>',
+  enviarSolicitud:'<%- t("home_modal_boton_enviar").replace(/'/g, "\\'") %>',
+  cancelar:       '<%- t("home_modal_boton_cancelar").replace(/'/g, "\\'") %>',
+  cargando:       '<%- t("reserva_cargando").replace(/'/g, "\\'") %>',
+  sinRutas:       '<%- t("reserva_sin_rutas").replace(/'/g, "\\'") %>',
+  rutaAConsultar: '<%- t("reserva_ruta_a_consultar").replace(/'/g, "\\'") %>',
+  sinExtras:      '<%- t("reserva_sin_extras").replace(/'/g, "\\'") %>',
+  paxSingular:    '<%- t("reserva_pax_singular").replace(/'/g, "\\'") %>',
+  paxPlural:      '<%- t("reserva_pax_plural").replace(/'/g, "\\'") %>',
+  bannerHola:     '<%- t("reserva_banner_hola").replace(/'/g, "\\'") %>',
+  confirmReiniciar:'<%- t("reserva_confirm_reiniciar").replace(/'/g, "\\'") %>',
+  volverPanel:    '<%- t("reserva_boton_volver_panel").replace(/'/g, "\\'") %>',
+  volverPanelFin: '<%- t("reserva_ok_volver_panel").replace(/'/g, "\\'") %>',
+  botonConfirmar: '<%- t("reserva_boton_confirmar").replace(/'/g, "\\'") %>',
+  errEnvio:       '<%- t("reserva_err_envio").replace(/'/g, "\\'") %>',
+  resumenTitulo:  '<%- t("reserva_resumen_titulo").replace(/'/g, "\\'") %>',
+  resNumero:      '<%- t("reserva_res_numero").replace(/'/g, "\\'") %>',
+  resOrigen:      '<%- t("reserva_res_origen").replace(/'/g, "\\'") %>',
+  resDestino:     '<%- t("reserva_res_destino").replace(/'/g, "\\'") %>',
+  resCategoria:   '<%- t("reserva_res_categoria").replace(/'/g, "\\'") %>',
+  resFecha:       '<%- t("reserva_res_fecha").replace(/'/g, "\\'") %>',
+  resHora:        '<%- t("reserva_res_hora").replace(/'/g, "\\'") %>',
+  resPasajeros:   '<%- t("reserva_res_pasajeros").replace(/'/g, "\\'") %>',
+  resPrecio:      '<%- t("reserva_res_precio_estimado").replace(/'/g, "\\'") %>',
+  resExtras:      '<%- t("reserva_res_extras").replace(/'/g, "\\'") %>',
+  resPasajero:    '<%- t("reserva_res_pasajero").replace(/'/g, "\\'") %>',
+  resPasaporte:   '<%- t("reserva_res_pasaporte").replace(/'/g, "\\'") %>',
+  resOtraPersona: '<%- t("reserva_res_otra_persona").replace(/'/g, "\\'") %>',
+  resContactoViaja:'<%- t("reserva_res_contacto_viaja").replace(/'/g, "\\'") %>',
+  resContacto:    '<%- t("reserva_res_contacto").replace(/'/g, "\\'") %>',
+  resLlegadaVuelo:'<%- t("reserva_res_llegada_vuelo").replace(/'/g, "\\'") %>',
+  resAtraque:     '<%- t("reserva_res_atraque").replace(/'/g, "\\'") %>',
+  resVuelo:       '<%- t("reserva_res_vuelo").replace(/'/g, "\\'") %>',
+  resBarco:       '<%- t("reserva_res_barco").replace(/'/g, "\\'") %>'
+};
+// Las píldoras de idioma conservan la ruta y categoría elegidas
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.location.search) {
+    document.querySelectorAll('.lang-pill').forEach(function(a) { a.href += window.location.search; });
+  }
+});
+
+// ── Variables ───────────────────────────────────────────────────────────────
+var extrasData = [];
+var extrasSeleccionados = [];
+var precioEstimado = null;
+var categoriaNombre = '';
+var pasoActual = 1;
+var pnrGenerado = '';
+
+function generarPNR() {
+  var letras = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  var nums = '0123456789';
+  var l = function(){ return letras[Math.floor(Math.random() * letras.length)]; };
+  var n = function(){ return nums[Math.floor(Math.random() * nums.length)]; };
+  return l() + l() + l() + n() + n() + n();
+}
+
+var params = new URLSearchParams(window.location.search);
+var paramOrigen = params.get('desde') || '';
+var paramDestino = params.get('hasta') || '';
+var paramCategoriaId = params.get('categoria_id') || '';
+
+// Detectar tipo de origen y destino
+var oL = paramOrigen.toLowerCase();
+var dL = paramDestino.toLowerCase();
+var origenEsAero    = oL.indexOf('aeropuerto') !== -1;
+var origenEsPuerto  = !origenEsAero && oL.indexOf('puerto') !== -1;
+var destinoEsAero   = dL.indexOf('aeropuerto') !== -1;
+var destinoEsPuerto = !destinoEsAero && dL.indexOf('puerto') !== -1;
+var tocaAeropuerto  = origenEsAero || destinoEsAero;
+var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
+
+// ── Inicialización ──────────────────────────────────────────────────────────
+(function init() {
+  // Sin ruta elegida (p. ej. llegando desde "+ Nueva reserva"):
+  // mostrar el panel de ruta y ocultar el formulario hasta que elija
+  if (!paramOrigen || !paramDestino || !paramCategoriaId) {
+    document.getElementById('panel-ruta').style.display = 'block';
+    document.querySelectorAll('.paso').forEach(function(p){ p.style.display = 'none'; });
+    cargarRutas();
+    cargarCategorias();
+    return;
+  }
+
+  // Tarjeta resumen
+  if (paramOrigen && paramDestino) {
+    document.getElementById('tbl-origen').textContent = paramOrigen;
+    document.getElementById('tbl-destino').textContent = paramDestino;
+    document.getElementById('tarjeta-traslado').style.display = 'flex';
+  }
+
+  // Mostrar campos correctos según origen
+  if (origenEsAero) {
+    mostrar('bloque-aero-origen');
+  } else if (origenEsPuerto) {
+    mostrar('bloque-puerto-origen');
+  } else {
+    mostrar('bloque-hora-recogida');
+    mostrar('bloque-dir-origen');
+  }
+
+  // Mostrar campo dirección destino solo si no es aeropuerto ni puerto
+  if (!destinoEsAero && !destinoEsPuerto) {
+    mostrar('bloque-dir-destino');
+  }
+
+  // Campos del paso 2 según tipo de trayecto
+  if (origenEsAero || origenEsPuerto) {
+    mostrar('bloque-pasaporte');
+    mostrar('bloque-pasaporte-otra');
+  }
+
+  // Fecha mínima hoy
+  document.getElementById('fecha').min = new Date().toISOString().split('T')[0];
+
+  // Cargar precio y categoría
+  if (paramCategoriaId && paramOrigen && paramDestino) {
+    fetch('/api/rutas?lang=' + LANG).then(function(r){ return r.json(); }).then(function(rutas){
+      var ruta = rutas.find(function(r){ return r.origen === paramOrigen && r.destino === paramDestino; });
+      if (!ruta) return;
+      fetch('/api/precio?ruta_id=' + ruta.id + '&categoria_id=' + paramCategoriaId)
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          if (!data.a_consultar) {
+            precioEstimado = data.precio;
+            document.getElementById('tbl-precio').textContent = Number(data.precio).toFixed(0) + ' €';
+            document.getElementById('tbl-badge').style.display = 'inline-block';
+          } else {
+            document.getElementById('tbl-precio').textContent = '';
+            document.getElementById('tbl-badge').style.display = 'none';
+          }
+        });
+    });
+    fetch('/api/categorias?lang=' + LANG).then(function(r){ return r.json(); }).then(function(cats){
+      var cat = cats.find(function(c){ return String(c.id) === String(paramCategoriaId); });
+      if (!cat) return;
+      categoriaNombre = cat.nombre_traducido || cat.nombre;
+      document.getElementById('tbl-categoria').textContent = (cat.nombre_traducido || cat.nombre) + ' · ' + cat.capacidad_pasajeros + ' pax';
+      var maxPax = parseInt(cat.capacidad_pasajeros) || 8;
+      var sel = document.getElementById('num-pasajeros');
+      sel.innerHTML = '';
+      for (var i = 1; i <= maxPax; i++) {
+        var opt = document.createElement('option');
+        opt.value = i; opt.textContent = i + ' ' + (i === 1 ? TXT.paxSingular : TXT.paxPlural);
+        sel.appendChild(opt);
+      }
+    });
+  } else {
+    // Sin categoría: pasajeros por defecto
+    var sel = document.getElementById('num-pasajeros');
+    sel.innerHTML = '';
+    for (var i = 1; i <= 8; i++) {
+      var opt = document.createElement('option');
+      opt.value = i; opt.textContent = i + ' ' + (i === 1 ? TXT.paxSingular : TXT.paxPlural);
+      sel.appendChild(opt);
+    }
+  }
+
+  // Cargar extras
+  fetch('/api/extras-publicos').then(function(r){ return r.json(); }).then(function(extras){
+    extrasData = extras;
+    var lista = document.getElementById('lista-extras');
+    if (!extras.length) {
+      lista.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">' + TXT.sinExtras + '</p>';
+      return;
+    }
+    lista.innerHTML = extras.map(function(ex){
+      return '<div class="extra-item" id="extra-' + ex.id + '" onclick="toggleExtra(' + ex.id + ')">' +
+        '<div class="extra-check" id="check-' + ex.id + '"></div>' +
+        '<span class="extra-nombre">' + ex.nombre + '</span>' +
+        '<span class="extra-precio">' + Number(ex.precio).toFixed(2) + ' €</span>' +
+      '</div>';
+    }).join('');
+  });
+
+  // Si el cliente ya tiene sesión abierta, prellenar sus datos de contacto y mostrar banner
+  fetch('/api/cliente/sesion').then(function(r){ return r.json(); }).then(function(s){
+    if (!s.autenticado) return;
+    fetch('/api/cliente/mis-datos').then(function(r){ return r.json(); }).then(function(d){
+      if (!d.nombre_cliente) return;
+      // Mostrar banner portal del cliente (nombre + primer apellido)
+      var banner = document.getElementById('banner-portal-cliente');
+      var nombreBanner = document.getElementById('banner-nombre-cliente');
+      if (banner && nombreBanner) {
+        var parteNombre = (d.nombre_cliente || '').trim().split(/\s+/);
+        var nombreCorto = parteNombre.length >= 2 ? parteNombre[0] + ' ' + parteNombre[1] : parteNombre[0] || '';
+        nombreBanner.textContent = TXT.bannerHola.replace('{nombre}', nombreCorto);
+        banner.style.display = 'block';
+      }
+      document.getElementById('contacto-nombre').value = d.nombre_cliente;
+      document.getElementById('contacto-email').value = d.email_cliente;
+      var tel = (d.telefono_cliente || '').trim();
+      var partes = tel.split(' ');
+      if (partes.length > 1 && partes[0].indexOf('+') === 0) {
+        var prefijoSel = document.getElementById('telefono-prefijo');
+        var existe = Array.from(prefijoSel.options).some(function(o){ return o.value === partes[0]; });
+        if (existe) prefijoSel.value = partes[0];
+        document.getElementById('telefono-numero').value = partes.slice(1).join(' ');
+      } else {
+        document.getElementById('telefono-numero').value = tel;
+      }
+      // Con sesión: los datos del titular salen por omisión y no son editables
+      document.getElementById('nota-datos-cuenta').style.display = 'block';
+      ['contacto-nombre','telefono-numero','contacto-email'].forEach(function(id){
+        var el = document.getElementById(id);
+        el.readOnly = true;
+        el.style.background = 'var(--gris-fondo)';
+        el.style.color = 'var(--texto-muted)';
+      });
+      var pref = document.getElementById('telefono-prefijo');
+      pref.disabled = true;
+      pref.style.background = 'var(--gris-fondo)';
+      pref.style.color = 'var(--texto-muted)';
+    });
+  });
+})();
+
+function mostrar(id) { document.getElementById(id).style.display = 'block'; }
+
+// ── Panel de ruta (espejo del buscador de la portada) ───────────────────────
+var rutasDisponibles = [];
+var categoriasDisponibles = [];
+
+function poblarSelect(select, valores) {
+  // valores: lista de objetos { valor, etiqueta } — valor interno en español,
+  // etiqueta traducida para el visitante (mismo patrón que la portada)
+  select.innerHTML = '<option value="">' + TXT.selecciona + '</option>';
+  valores.forEach(function (v) {
+    var opt = document.createElement('option');
+    opt.value = v.valor;
+    opt.textContent = v.etiqueta;
+    select.appendChild(opt);
+  });
+}
+
+function cargarRutas() {
+  fetch('/api/rutas?lang=' + LANG).then(function (r) { return r.json(); }).then(function (rutas) {
+    rutasDisponibles = rutas;
+    var vistosO = {}, origenes = [];
+    var vistosD = {}, destinos = [];
+    rutas.forEach(function (r) {
+      if (!vistosO[r.origen]) { vistosO[r.origen] = true; origenes.push({ valor: r.origen, etiqueta: r.origen_traducido || r.origen }); }
+      if (!vistosD[r.destino]) { vistosD[r.destino] = true; destinos.push({ valor: r.destino, etiqueta: r.destino_traducido || r.destino }); }
+    });
+    poblarSelect(document.getElementById('desde'), origenes);
+    poblarSelect(document.getElementById('hasta'), destinos);
+    if (rutas.length === 0) {
+      document.getElementById('resultado-precio').textContent = TXT.sinRutas;
+    }
+  });
+}
+
+function cargarCategorias() {
+  fetch('/api/categorias?lang=' + LANG).then(function (r) { return r.json(); }).then(function (categorias) {
+    categoriasDisponibles = categorias;
+    // No cargamos todas de golpe — se filtran al elegir ruta
+    actualizarCategoriasSegunRuta();
+  });
+}
+
+function actualizarCategoriasSegunRuta() {
+  var desdeVal = document.getElementById('desde').value;
+  var hastaVal = document.getElementById('hasta').value;
+  var select = document.getElementById('categoria');
+  var valorActual = select.value;
+
+  // Buscar la ruta seleccionada (en ambas direcciones)
+  var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; })
+          || rutasDisponibles.find(function (r) { return r.origen === hastaVal && r.destino === desdeVal; });
+
+  select.innerHTML = '<option value="">' + TXT.selecciona + '</option>';
+
+  if (!ruta || !desdeVal || !hastaVal) {
+    // Sin ruta seleccionada — no mostrar categorías
+    return;
+  }
+
+  // Filtrar solo las categorías que tienen precio para esta ruta
+  var categoriasRuta = categoriasDisponibles.filter(function (c) {
+    return ruta.categorias_con_precio && ruta.categorias_con_precio.indexOf(c.id) !== -1;
+  });
+
+  categoriasRuta.forEach(function (c) {
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = (c.nombre_traducido || c.nombre) + ' (' + c.capacidad_pasajeros + ' pax)';
+    if (String(c.id) === String(valorActual)) opt.selected = true;
+    select.appendChild(opt);
+  });
+
+  // Limpiar resultado si la categoría ya no es válida
+  if (valorActual && !categoriasRuta.find(function(c) { return String(c.id) === String(valorActual); })) {
+    document.getElementById('resultado-precio').innerHTML = '';
+  }
+}
+
+function verPrecio() {
+  var desdeVal = document.getElementById('desde').value;
+  var hastaVal = document.getElementById('hasta').value;
+  var categoriaId = document.getElementById('categoria').value;
+  var resultado = document.getElementById('resultado-precio');
+
+  if (!desdeVal || !hastaVal || !categoriaId) {
+    resultado.innerHTML = '<div class="resultado-vacio">' + TXT.eligeRuta + '</div>';
+    return;
+  }
+
+  var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; })
+          || rutasDisponibles.find(function (r) { return r.origen === hastaVal && r.destino === desdeVal; });
+  var categoriaSelect = document.getElementById('categoria');
+  var categoriaTexto = categoriaSelect.options[categoriaSelect.selectedIndex].text;
+
+  // Buscar datos de la categoría (foto, pax, maletas)
+  var catData = categoriasDisponibles.find(function (c) { return String(c.id) === String(categoriaId); });
+
+  if (!ruta) {
+    resultado.innerHTML = '<div class="resultado-vacio">' + TXT.rutaAConsultar + '</div>';
+    return;
+  }
+
+  fetch('/api/precio?ruta_id=' + ruta.id + '&categoria_id=' + categoriaId)
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var fotoHtml = catData && catData.foto
+        ? '<img class="tarjeta-resultado-foto" src="' + catData.foto + '" alt="' + (catData.nombre_traducido || catData.nombre || '') + '">'
+        : '<div class="tarjeta-resultado-foto-placeholder">🚗</div>';
+
+      var paxHtml = catData
+        ? '<div class="tarjeta-resultado-dato">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D9A441" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
+            catData.capacidad_pasajeros + ' ' + TXT.paxSufijo +
+          '</div>' +
+          (catData.capacidad_maletas
+            ? '<div class="tarjeta-resultado-dato">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D9A441" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>' +
+                (catData.capacidad_maletas_traducida || catData.capacidad_maletas) +
+              '</div>'
+            : '')
+        : '';
+
+      var precioHtml = data.a_consultar
+        ? '<span class="precio precio-grande" style="font-size:22px;">' + TXT.aConsultar + '</span>'
+        : '<span class="precio precio-grande">' + Number(data.precio).toFixed(0) + ' €</span>';
+
+      var botonHtml = '<button class="boton-reservar" onclick="irAReserva()">' + TXT.botonReservar + '</button>';
+
+      resultado.innerHTML =
+        '<div class="tarjeta-resultado">' +
+          fotoHtml +
+          '<div class="tarjeta-resultado-info">' +
+            '<div class="tarjeta-resultado-nombre">' + (catData ? (catData.nombre_traducido || catData.nombre) : categoriaTexto) + '</div>' +
+            '<div class="tarjeta-resultado-datos">' + paxHtml + '</div>' +
+          '</div>' +
+          '<div class="tarjeta-resultado-precio-bloque">' +
+            precioHtml +
+            '<span class="badge-aproximado">' + TXT.badgeAprox + '</span>' +
+            '<div class="tarjeta-resultado-nota">' + TXT.notaTaxi + '</div>' +
+          '</div>' +
+          botonHtml +
+        '</div>' +
+        '<p style="text-align:center;font-size:0.82rem;color:#6b5c44;margin:12px 0 0 0;">' + TXT.verOtrasCats + '</p>';
+    });
+}
+
+function irAReserva() {
+  var desde = document.getElementById('desde').value;
+  var hasta = document.getElementById('hasta').value;
+  var categoriaId = document.getElementById('categoria').value;
+  var params = new URLSearchParams({ desde: desde, hasta: hasta, categoria_id: categoriaId });
+  window.location.href = RUTA_RESERVA + '?' + params.toString();
+}
+
+document.getElementById('ver-precio').addEventListener('click', verPrecio);
+
+function abrirFormCotizacion() {
+  var modal = document.getElementById('modal-cotizacion');
+  modal.style.display = 'flex';
+  // Siempre limpio al abrir
+  document.getElementById('cotiz-origen').value = '';
+  document.getElementById('cotiz-destino').value = '';
+  document.getElementById('cotiz-fecha').value = '';
+  document.getElementById('cotiz-pax').value = '';
+  document.getElementById('cotiz-email').value = '';
+  document.getElementById('cotiz-error').style.display = 'none';
+  document.getElementById('cotiz-ok').style.display = 'none';
+  var btnEnviar = document.getElementById('btn-enviar-cotizacion');
+  var btnCancelar = document.getElementById('btn-cancelar-cotizacion');
+  if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = TXT.enviarSolicitud; btnEnviar.style.display = ''; }
+  if (btnCancelar) btnCancelar.textContent = TXT.cancelar;
+}
+
+function cerrarFormCotizacion() {
+  document.getElementById('modal-cotizacion').style.display = 'none';
+  // Restaurar botones para próxima vez
+  var btnEnviar = document.getElementById('btn-enviar-cotizacion');
+  var btnCancelar = document.getElementById('btn-cancelar-cotizacion');
+  if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = TXT.enviarSolicitud; btnEnviar.style.display = ''; }
+  if (btnCancelar) btnCancelar.textContent = TXT.cancelar;
+  document.getElementById('cotiz-origen').value = '';
+  document.getElementById('cotiz-destino').value = '';
+  document.getElementById('cotiz-fecha').value = '';
+  document.getElementById('cotiz-pax').value = '';
+  document.getElementById('cotiz-email').value = '';
+  document.getElementById('cotiz-error').style.display = 'none';
+  document.getElementById('cotiz-ok').style.display = 'none';
+}
+
+function enviarCotizacion() {
+  var origen  = document.getElementById('cotiz-origen').value.trim();
+  var destino = document.getElementById('cotiz-destino').value.trim();
+  var email   = document.getElementById('cotiz-email').value.trim();
+  var fecha   = document.getElementById('cotiz-fecha').value;
+  var pax     = document.getElementById('cotiz-pax').value;
+  var err     = document.getElementById('cotiz-error');
+  var ok      = document.getElementById('cotiz-ok');
+
+  err.style.display = 'none';
+  ok.style.display = 'none';
+
+  if (!origen || !destino || !email) {
+    err.textContent = TXT.errCampos;
+    err.style.display = 'block';
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    err.textContent = TXT.errEmailModal;
+    err.style.display = 'block';
+    return;
+  }
+
+  // Deshabilitar botón para evitar doble envío
+  var btnEnviar = document.getElementById('btn-enviar-cotizacion');
+  var btnCancelar = document.getElementById('btn-cancelar-cotizacion');
+  if (btnEnviar) { btnEnviar.disabled = true; btnEnviar.textContent = TXT.enviando; }
+
+  fetch('/api/cotizaciones', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ origen: origen, destino: destino, fecha_aproximada: fecha || null, num_pasajeros: pax ? Number(pax) : null, email_cliente: email, lang: LANG })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) {
+      err.textContent = data.error;
+      err.style.display = 'block';
+      if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = TXT.enviarSolicitud; }
+      return;
+    }
+    // Ocultar botones y mostrar mensaje de éxito
+    if (btnEnviar) btnEnviar.style.display = 'none';
+    if (btnCancelar) btnCancelar.textContent = TXT.cerrar;
+    ok.innerHTML = TXT.okMsg.replace('{email}', '<strong>' + email + '</strong>');
+    ok.style.display = 'block';
+  })
+  .catch(function() {
+    err.textContent = TXT.errConexion;
+    err.style.display = 'block';
+    if (btnEnviar) { btnEnviar.disabled = false; btnEnviar.textContent = TXT.enviarSolicitud; }
+  });
+}
+
+// Cerrar modal al pulsar fuera
+document.getElementById('modal-cotizacion').addEventListener('click', function(e) {
+  if (e.target === this) cerrarFormCotizacion();
+});
+
+// ── Extras ──────────────────────────────────────────────────────────────────
+function toggleExtra(id) {
+  var ex = extrasData.find(function(e){ return e.id === id; });
+  var idx = extrasSeleccionados.findIndex(function(e){ return e.id === id; });
+  var item = document.getElementById('extra-' + id);
+  var check = document.getElementById('check-' + id);
+  if (idx === -1) { extrasSeleccionados.push(ex); item.classList.add('seleccionado'); check.textContent = '✓'; }
+  else { extrasSeleccionados.splice(idx,1); item.classList.remove('seleccionado'); check.textContent = ''; }
+  var total = extrasSeleccionados.reduce(function(s,e){ return s + Number(e.precio); }, 0);
+  var box = document.getElementById('total-extras');
+  box.style.display = extrasSeleccionados.length ? 'flex' : 'none';
+  document.getElementById('total-extras-precio').textContent = total.toFixed(2) + ' €';
+}
+
+// ── Navegación ──────────────────────────────────────────────────────────────
+function irAPaso(n) {
+  for (var i = 1; i <= 3; i++) {
+    var num = document.getElementById('num-' + i);
+    var cuerpo = document.getElementById('cuerpo-' + i);
+    var cab = document.getElementById('cab-' + i);
+    if (i < n) {
+      num.className = 'paso-numero completado'; num.textContent = '✓';
+      cuerpo.classList.remove('visible');
+      // Hacer clickable para volver
+      (function(paso){ cab.className = 'paso-cabecera clickable'; cab.onclick = function(){ irAPaso(paso); }; })(i);
+    } else if (i === n) {
+      num.className = 'paso-numero activo'; num.textContent = i;
+      cuerpo.classList.add('visible');
+      cab.className = 'paso-cabecera'; cab.onclick = null;
+    } else {
+      num.className = 'paso-numero'; num.textContent = i;
+      cuerpo.classList.remove('visible');
+      cab.className = 'paso-cabecera'; cab.onclick = null;
+    }
+  }
+  pasoActual = n;
+  document.getElementById('paso-' + n).scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+// ── Validaciones por paso ───────────────────────────────────────────────────
+function siguientePaso(desde) {
+  if (desde === 1 && !validarPaso1()) return;
+  if (desde === 2 && !validarPaso2()) return;
+  if (desde === 1) {
+    var fecha = document.getElementById('fecha').value;
+    var fechaTexto = new Date(fecha + 'T12:00:00').toLocaleDateString(LOCALE, {day:'numeric',month:'long',year:'numeric'});
+    document.getElementById('resumen-1').textContent = fechaTexto;
+    rellenarResumenPermiso();
+  }
+  if (desde === 2) {
+    var quienViaja = document.getElementById('es-para-otra-persona').checked
+      ? document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim()
+      : document.getElementById('contacto-nombre').value.trim();
+    document.getElementById('resumen-2').textContent = quienViaja;
+  }
+  irAPaso(desde + 1);
+}
+
+function validarPaso1() {
+  var ok = true;
+  var fecha = document.getElementById('fecha').value;
+  document.getElementById('err-fecha').style.display = fecha ? 'none' : 'block';
+  if (!fecha) ok = false;
+
+  if (origenEsAero) {
+    var h = document.getElementById('hora-llegada-vuelo').value;
+    document.getElementById('err-hora-llegada').style.display = h ? 'none' : 'block';
+    if (!h) ok = false;
+  } else if (origenEsPuerto) {
+    var h = document.getElementById('hora-atraque').value;
+    document.getElementById('err-hora-atraque').style.display = h ? 'none' : 'block';
+    if (!h) ok = false;
+  } else {
+    var h = document.getElementById('hora-recogida').value;
+    document.getElementById('err-hora-recogida').style.display = h ? 'none' : 'block';
+    if (!h) ok = false;
+    var dOrigen = document.getElementById('direccion-origen').value.trim();
+    document.getElementById('err-dir-origen').style.display = dOrigen ? 'none' : 'block';
+    if (!dOrigen) ok = false;
+  }
+
+  if (!destinoEsAero && !destinoEsPuerto) {
+    var dDestino = document.getElementById('direccion-destino').value.trim();
+    document.getElementById('err-dir-destino').style.display = dDestino ? 'none' : 'block';
+    if (!dDestino) ok = false;
+  }
+  return ok;
+}
+
+function validarPaso2() {
+  var ok = true;
+  // Titular (quien reserva)
+  var nombre = document.getElementById('contacto-nombre').value.trim();
+  var telNum = document.getElementById('telefono-numero').value.trim().replace(/\s/g,'');
+  var email = document.getElementById('contacto-email').value.trim();
+  var telValido = telNum.length >= 7 && /^\d+$/.test(telNum);
+  var emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  document.getElementById('err-contacto-nombre').style.display = nombre ? 'none' : 'block';
+  document.getElementById('err-telefono').style.display = telValido ? 'none' : 'block';
+  document.getElementById('err-email').style.display = emailValido ? 'none' : 'block';
+  if (!nombre || !telValido || !emailValido) ok = false;
+  // Quien viaja (si la reserva es para otra persona)
+  if (document.getElementById('es-para-otra-persona').checked) {
+    var pNombre = document.getElementById('pasajero-nombre').value.trim();
+    var pApellidos = document.getElementById('pasajero-apellidos').value.trim();
+    var otraTelNum2 = document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'');
+    var otraEmail2 = document.getElementById('otra-persona-email').value.trim();
+    var otraTelValido2 = otraTelNum2.length >= 7 && /^\d+$/.test(otraTelNum2);
+    var otraEmailValido2 = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(otraEmail2);
+    document.getElementById('err-pasajero-nombre').style.display = pNombre ? 'none' : 'block';
+    document.getElementById('err-pasajero-apellidos').style.display = pApellidos ? 'none' : 'block';
+    document.getElementById('err-otra-persona-telefono').style.display = otraTelValido2 ? 'none' : 'block';
+    document.getElementById('err-otra-persona-email').style.display = otraEmailValido2 ? 'none' : 'block';
+    if (!pNombre || !pApellidos || !otraTelValido2 || !otraEmailValido2) ok = false;
+  }
+  // Pasaporte/DNI: solo en recogidas en aeropuerto o puerto — del cliente o de quien viaja
+  if (origenEsAero || origenEsPuerto) {
+    if (document.getElementById('es-para-otra-persona').checked) {
+      var pasaporteOtra = document.getElementById('otra-persona-pasaporte').value.trim();
+      document.getElementById('err-otra-persona-pasaporte').style.display = pasaporteOtra ? 'none' : 'block';
+      if (!pasaporteOtra) ok = false;
+    } else {
+      var pasaporte = document.getElementById('pasajero-pasaporte').value.trim();
+      document.getElementById('err-pasajero-pasaporte').style.display = pasaporte ? 'none' : 'block';
+      if (!pasaporte) ok = false;
+    }
+  }
+  return ok;
+}
+
+function toggleOtraPersona(marcado) {
+  document.getElementById('bloque-otra-persona').classList.toggle('bloque-oculto', !marcado);
+  // El pasaporte del cliente solo se muestra si viaja él (y la recogida es en aeropuerto/puerto)
+  if (origenEsAero || origenEsPuerto) {
+    document.getElementById('bloque-pasaporte').style.display = marcado ? 'none' : 'block';
+    if (marcado) document.getElementById('err-pasajero-pasaporte').style.display = 'none';
+  }
+  if (!marcado) {
+    document.getElementById('pasajero-nombre').value = '';
+    document.getElementById('pasajero-apellidos').value = '';
+    document.getElementById('otra-persona-pasaporte').value = '';
+    document.getElementById('otra-persona-telefono').value = '';
+    document.getElementById('otra-persona-prefijo').value = '+34';
+    document.getElementById('otra-persona-email').value = '';
+    document.getElementById('err-pasajero-nombre').style.display = 'none';
+    document.getElementById('err-pasajero-apellidos').style.display = 'none';
+    document.getElementById('err-otra-persona-pasaporte').style.display = 'none';
+    document.getElementById('err-otra-persona-telefono').style.display = 'none';
+    document.getElementById('err-otra-persona-email').style.display = 'none';
+  }
+}
+
+// ── Resumen y envío ─────────────────────────────────────────────────────────
+function mostrarResumen() {
+  if (!validarPaso2()) { irAPaso(2); return; }
+  var nombre = document.getElementById('contacto-nombre').value.trim();
+  var telNum = document.getElementById('telefono-numero').value.trim().replace(/\s/g,'');
+  var email = document.getElementById('contacto-email').value.trim();
+
+  var esOtraPersona = document.getElementById('es-para-otra-persona').checked;
+  var otraTelNum = document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'');
+  var otraTel = document.getElementById('otra-persona-prefijo').value + ' ' + otraTelNum;
+  var otraEmail = document.getElementById('otra-persona-email').value.trim();
+
+  var fecha = document.getElementById('fecha').value;
+  var fechaTexto = new Date(fecha + 'T12:00:00').toLocaleDateString(LOCALE, {day:'numeric',month:'long',year:'numeric'});
+  var horaTexto = origenEsAero ? TXT.resLlegadaVuelo + ' ' + document.getElementById('hora-llegada-vuelo').value
+    : origenEsPuerto ? TXT.resAtraque + ' ' + document.getElementById('hora-atraque').value
+    : document.getElementById('hora-recogida').value;
+  var pasajero = esOtraPersona
+    ? document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim()
+    : nombre;
+  var tel = document.getElementById('telefono-prefijo').value + ' ' + telNum;
+  var dirDestino = (!destinoEsAero && !destinoEsPuerto) ? document.getElementById('direccion-destino').value.trim() : '';
+  var dirOrigen = (!origenEsAero && !origenEsPuerto) ? document.getElementById('direccion-origen').value.trim() : '';
+
+  if (!pnrGenerado) pnrGenerado = generarPNR();
+
+  var html =
+    '<strong>' + TXT.resNumero + '</strong> ' + pnrGenerado + '<br>' +
+    '<strong>' + TXT.resOrigen + '</strong> ' + paramOrigen + (dirOrigen ? ' — ' + dirOrigen : '') + '<br>' +
+    '<strong>' + TXT.resDestino + '</strong> ' + paramDestino + (dirDestino ? ' — ' + dirDestino : '') + '<br>' +
+    (categoriaNombre ? '<strong>' + TXT.resCategoria + '</strong> ' + categoriaNombre + '<br>' : '') +
+    '<strong>' + TXT.resFecha + '</strong> ' + fechaTexto + '<br>' +
+    '<strong>' + TXT.resHora + '</strong> ' + horaTexto + '<br>' +
+    '<strong>' + TXT.resPasajeros + '</strong> ' + document.getElementById('num-pasajeros').value + '<br>' +
+    (precioEstimado ? '<strong>' + TXT.resPrecio + '</strong> ' + Number(precioEstimado).toFixed(0) + ' €<br>' : '') +
+    (extrasSeleccionados.length ? '<strong>' + TXT.resExtras + '</strong> ' + extrasSeleccionados.map(function(e){ return e.nombre + ' (' + Number(e.precio).toFixed(2) + ' €)'; }).join(', ') + '<br>' : '') +
+    '<strong>' + TXT.resPasajero + '</strong> ' + pasajero + '<br>' +
+    ((origenEsAero || origenEsPuerto) ? '<strong>' + TXT.resPasaporte + '</strong> ' + (esOtraPersona ? document.getElementById('otra-persona-pasaporte').value.trim() : document.getElementById('pasajero-pasaporte').value.trim()) + '<br>' : '') +
+    (esOtraPersona ? '<strong>' + TXT.resOtraPersona + '</strong> — ' + TXT.resContactoViaja + ' ' + otraTel + ' · ' + otraEmail + '<br>' : '') +
+    '<strong>' + TXT.resContacto + '</strong> ' + nombre + ' · ' + tel + ' · ' + email;
+
+  document.getElementById('resumen-final-contenido').innerHTML = html;
+  document.getElementById('resumen-titulo').innerHTML = TXT.resumenTitulo + '<br><span style="font-family:\'JetBrains Mono\',monospace;font-size:16px;letter-spacing:2px;color:var(--terracota);">' + pnrGenerado + '</span>';
+  document.getElementById('resumen-final').style.display = 'block';
+  var btn = document.getElementById('boton-enviar');
+  btn.textContent = TXT.botonConfirmar;
+  btn.onclick = confirmarEnvio;
+}
+
+function confirmarEnvio() {
+  var btn = document.getElementById('boton-enviar');
+  btn.disabled = true; btn.textContent = TXT.enviando;
+
+  var tel = document.getElementById('telefono-prefijo').value + ' ' + document.getElementById('telefono-numero').value.trim().replace(/\s/g,'');
+  var dirOrigen = (!origenEsAero && !origenEsPuerto) ? document.getElementById('direccion-origen').value.trim() : '';
+  var dirDestino = (!destinoEsAero && !destinoEsPuerto) ? document.getElementById('direccion-destino').value.trim() : '';
+  var hora = origenEsAero ? document.getElementById('hora-llegada-vuelo').value
+    : origenEsPuerto ? document.getElementById('hora-atraque').value
+    : document.getElementById('hora-recogida').value;
+
+  var datos = {
+    numero_reserva_cliente: pnrGenerado,
+    origen: paramOrigen + (dirOrigen ? ' — ' + dirOrigen : ''),
+    destino: paramDestino + (dirDestino ? ' — ' + dirDestino : ''),
+    categoria_id: paramCategoriaId,
+    precio_estimado: precioEstimado,
+    fecha: document.getElementById('fecha').value,
+    hora: hora,
+    tipo_llegada: origenEsAero ? 'aeropuerto' : origenEsPuerto ? 'puerto' : 'otra',
+    numero_vuelo: document.getElementById('vuelo-llegada') ? document.getElementById('vuelo-llegada').value.trim() : '',
+    hora_llegada_vuelo: origenEsAero ? document.getElementById('hora-llegada-vuelo').value : '',
+    nombre_barco: origenEsPuerto ? document.getElementById('barco-llegada').value.trim() : '',
+    hora_atraque: origenEsPuerto ? document.getElementById('hora-atraque').value : '',
+    num_pasajeros: document.getElementById('num-pasajeros').value,
+    pasajero_nombre: document.getElementById('es-para-otra-persona').checked
+      ? document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim()
+      : document.getElementById('contacto-nombre').value.trim(),
+    pasaporte_dni: (origenEsAero || origenEsPuerto)
+      ? (document.getElementById('es-para-otra-persona').checked
+          ? document.getElementById('otra-persona-pasaporte').value.trim()
+          : document.getElementById('pasajero-pasaporte').value.trim())
+      : '',
+    notas: document.getElementById('pasajero-notas').value.trim(),
+    nombre_cliente: document.getElementById('contacto-nombre').value.trim(),
+    telefono_cliente: tel,
+    email_cliente: document.getElementById('contacto-email').value.trim(),
+    es_para_otra_persona: document.getElementById('es-para-otra-persona').checked,
+    nombre_pasajero_otro: document.getElementById('es-para-otra-persona').checked
+      ? document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim()
+      : '',
+    telefono_pasajero_otro: document.getElementById('es-para-otra-persona').checked
+      ? document.getElementById('otra-persona-prefijo').value + ' ' + document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'')
+      : '',
+    email_pasajero_otro: document.getElementById('otra-persona-email').value.trim(),
+    extras: extrasSeleccionados.map(function(e){ return { id: e.id, precio: e.precio }; })
+  };
+
+  fetch('/api/reservas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok) {
+      document.querySelectorAll('.paso').forEach(function(p){ p.style.display = 'none'; });
+      document.getElementById('tarjeta-traslado').style.display = 'none';
+      if (d.numero_reserva) {
+        document.getElementById('numero-reserva-mostrar').textContent = d.numero_reserva;
+      }
+      document.getElementById('confirmacion').style.display = 'block';
+      window.scrollTo({ top:0, behavior:'smooth' });
+    } else {
+      document.getElementById('err-envio').textContent = d.error || TXT.errEnvio;
+      document.getElementById('err-envio').style.display = 'block';
+      btn.disabled = false; btn.textContent = TXT.botonConfirmar;
+    }
+  })
+  .catch(function(){
+    document.getElementById('err-envio').textContent = TXT.errConexion;
+    document.getElementById('err-envio').style.display = 'block';
+    btn.disabled = false; btn.textContent = TXT.botonConfirmar;
+  });
+}
+
+function rellenarResumenPermiso() {
+  if (!tocaAeropuerto && !tocaPuerto) return;
+  var fecha = document.getElementById('fecha').value;
+  var fechaTexto = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString(LOCALE, {day:'numeric',month:'long',year:'numeric'}) : '';
+  var horaTexto = origenEsAero ? document.getElementById('hora-llegada-vuelo').value
+    : origenEsPuerto ? document.getElementById('hora-atraque').value
+    : document.getElementById('hora-recogida').value;
+  var vueloTexto = origenEsAero ? document.getElementById('vuelo-llegada').value.trim() : '';
+  var barcoTexto = origenEsPuerto ? document.getElementById('barco-llegada').value.trim() : '';
+
+  var html =
+    '<strong>' + TXT.resOrigen + '</strong> ' + paramOrigen + '<br>' +
+    '<strong>' + TXT.resDestino + '</strong> ' + paramDestino + '<br>' +
+    '<strong>' + TXT.resFecha + '</strong> ' + fechaTexto + '<br>' +
+    (origenEsAero ? '<strong>' + TXT.resVuelo + '</strong> ' + (vueloTexto || '—') + '<br>' : '') +
+    (origenEsPuerto ? '<strong>' + TXT.resBarco + '</strong> ' + (barcoTexto || '—') + '<br>' : '') +
+    '<strong>' + TXT.resHora + '</strong> ' + (horaTexto || '—') + '<br>' +
+    '<strong>' + TXT.resPasajeros + '</strong> ' + document.getElementById('num-pasajeros').value;
+
+}
+
+
+
+// ── Autocompletado de direcciones con Nominatim ─────────────────────────────
+var nominatimTimers = {};
+
+function buscarDireccion(campo) {
+  var inputId = campo === 'origen' ? 'direccion-origen' : 'direccion-destino';
+  var listaId = campo === 'origen' ? 'sugerencias-origen' : 'sugerencias-destino';
+  var input = document.getElementById(inputId);
+  var lista = document.getElementById(listaId);
+  var texto = input.value.trim();
+
+  if (texto.length < 3) { lista.style.display = 'none'; return; }
+
+  clearTimeout(nominatimTimers[campo]);
+  nominatimTimers[campo] = setTimeout(function() {
+    var base = 'https://nominatim.openstreetmap.org/search?format=json&limit=8&accept-language=' + LANG +
+      '&countrycodes=es&viewbox=-18.6,29.6,-13.0,27.2&bounded=1&q=';
+    // Municipio de la ruta para acotar la búsqueda (origen o destino según el campo)
+    var municipio = campo === 'origen' ? (paramOrigen || '') : (paramDestino || '');
+
+    function pintar(resultados) {
+      lista.innerHTML = '';
+      if (!resultados.length) { lista.style.display = 'none'; return; }
+      resultados.forEach(function(r) {
+        var nombre = r.display_name.split(',').slice(0, 4).join(',').trim();
+        var div = document.createElement('div');
+        div.className = 'sugerencia-item';
+        div.textContent = nombre;
+        div.onclick = function() {
+          input.value = nombre;
+          lista.style.display = 'none';
+        };
+        lista.appendChild(div);
+      });
+      lista.style.display = 'block';
+    }
+
+    // 1º: búsqueda acotada al municipio; 2º: si no hay nada, se amplía a Canarias
+    fetch(base + encodeURIComponent(municipio ? texto + ', ' + municipio : texto), { headers: { 'Accept-Language': LANG } })
+      .then(function(r){ return r.json(); })
+      .then(function(resultados) {
+        if (resultados.length || !municipio) { pintar(resultados); return; }
+        fetch(base + encodeURIComponent(texto), { headers: { 'Accept-Language': LANG } })
+          .then(function(r){ return r.json(); })
+          .then(pintar)
+          .catch(function(){ lista.style.display = 'none'; });
+      })
+      .catch(function(){ lista.style.display = 'none'; });
+  }, 400);
+}
+
+// Cerrar sugerencias al hacer clic fuera
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.campo-grupo')) {
+    document.querySelectorAll('.sugerencias-lista').forEach(function(l){ l.style.display = 'none'; });
+  }
+});
+
+function reiniciarFormulario() {
+  if (confirm(TXT.confirmReiniciar)) {
+    window.location.href = clienteConSesion ? RUTA_RESERVA : URL_HOME;
+  }
+}
+
+// ── Navegación según sesión ─────────────────────────────────────────────────
+// Si el cliente tiene la sesión abierta, todo lo devuelve a su panel,
+// nunca a la web pública. La única salida es "Cerrar sesión" en el panel.
+var clienteConSesion = false;
+fetch('/api/cliente/sesion').then(function(r){ return r.json(); }).then(function(s){
+  if (!s.autenticado) return;
+  clienteConSesion = true;
+  var volver = document.querySelector('.boton-volver');
+  if (volver) {
+    volver.textContent = TXT.volverPanel;
+    volver.href = '/cliente/portal';
+  }
+  var linkFinal = document.getElementById('link-final-inicio');
+  if (linkFinal) {
+    linkFinal.textContent = TXT.volverPanelFin;
+    linkFinal.href = '/cliente/portal';
+  }
+});
+</script>
+
+</body>
+</html>
