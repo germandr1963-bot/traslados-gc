@@ -77,32 +77,6 @@
     .texto-destino ul { padding-left: 20px; margin: 0 0 14px; }
     .texto-destino li { margin-bottom: 6px; }
 
-    /* Llamada a reservar */
-    .cta-reserva {
-      text-align: center;
-      margin: 6px 0 34px;
-      padding: 28px 24px;
-      background: #fff;
-      border: 1px solid var(--gris-borde, #e3ddd3);
-      border-radius: 12px;
-    }
-    .cta-reserva .cta-texto {
-      font-size: 17px;
-      color: var(--texto-oscuro);
-      margin-bottom: 16px;
-    }
-    .cta-reserva a.cta-boton {
-      display: inline-block;
-      background: #C1502E;
-      color: #fff;
-      text-decoration: none;
-      font-size: 15px;
-      font-weight: 600;
-      padding: 12px 28px;
-      border-radius: 8px;
-    }
-    .cta-reserva a.cta-boton:hover { opacity: 0.88; }
-
     /* Tres fotos */
     .fotos-grid {
       display: grid;
@@ -197,14 +171,6 @@
         // Texto descriptivo
         if (d.texto_descripcion) {
           html += '<div class="texto-destino">' + d.texto_descripcion + '</div>';
-        }
-
-        // Llamada a reservar el viaje a este destino
-        if (d.cta_texto && d.url_reserva) {
-          html += '<div class="cta-reserva">' +
-            '<div class="cta-texto">' + d.cta_texto + ' <strong>' + d.nombre + '</strong></div>' +
-            '<a class="cta-boton" href="' + d.url_reserva + '">' + (d.cta_boton || '') + '</a>' +
-          '</div>';
         }
 
         // Tres fotos

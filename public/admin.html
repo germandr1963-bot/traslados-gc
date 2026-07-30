@@ -248,6 +248,30 @@ table.tabla-precios input {
         <tbody id="tabla-destinos"></tbody>
       </table>
 
+      <!-- Panel de traducciones de destinos -->
+      <div style="margin-top:2.5rem;">
+        <h2 style="font-size:1.1rem;margin-bottom:0.5rem;">Traducciones de destinos</h2>
+        <p class="subtitulo" style="margin-bottom:1rem;">Nombres de los destinos en cada idioma activo. Se usan en selectores y listados. El SEO de cada ruta se traduce por separado.</p>
+        <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
+          <select id="select-lang-destinos" class="campo" style="width:200px;height:40px;" onchange="cargarTraduccionesDestinos()"></select>
+          <button class="boton-costa" onclick="traducirDestinosIA()">✨ Sugerir con IA los que faltan</button>
+        </div>
+        <div id="aviso-traducciones-destinos" style="margin-bottom:1rem;display:none;"></div>
+        <table class="tabla-admin">
+          <thead>
+            <tr>
+              <th style="width:35%">Nombre en español</th>
+              <th style="width:15%;text-align:center">Estado</th>
+              <th>Traducción</th>
+              <th style="width:100px"></th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo-traducciones-destinos"></tbody>
+        </table>
+        <div style="margin-top:1rem;display:flex;justify-content:flex-end;">
+          <button class="boton-primario" onclick="guardarTodasTraduccionesDestinos()">💾 Guardar todo</button>
+        </div>
+      </div>
     </div>
 
     <div id="seccion-precios" class="oculto">
@@ -354,31 +378,6 @@ table.tabla-precios input {
       </table>
 
       <div id="editor-texto-interfaz" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
-
-      <!-- Panel de traducciones de destinos -->
-      <div style="margin-top:2.5rem;">
-        <h2 style="font-size:1.1rem;margin-bottom:0.5rem;">Traducciones de destinos</h2>
-        <p class="subtitulo" style="margin-bottom:1rem;">Nombres de los destinos en cada idioma activo. Se usan en selectores y listados. El SEO de cada ruta se traduce por separado.</p>
-        <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
-          <select id="select-lang-destinos" class="campo" style="width:200px;height:40px;" onchange="cargarTraduccionesDestinos()"></select>
-          <button class="boton-costa" onclick="traducirDestinosIA()">✨ Sugerir con IA los que faltan</button>
-        </div>
-        <div id="aviso-traducciones-destinos" style="margin-bottom:1rem;display:none;"></div>
-        <table class="tabla-admin">
-          <thead>
-            <tr>
-              <th style="width:35%">Nombre en español</th>
-              <th style="width:15%;text-align:center">Estado</th>
-              <th>Traducción</th>
-              <th style="width:100px"></th>
-            </tr>
-          </thead>
-          <tbody id="cuerpo-traducciones-destinos"></tbody>
-        </table>
-        <div style="margin-top:1rem;display:flex;justify-content:flex-end;">
-          <button class="boton-primario" onclick="guardarTodasTraduccionesDestinos()">💾 Guardar todo</button>
-        </div>
-      </div>
     </div>
 
     <!-- ─── CALCULADOR DE TARIFAS ─────────────────────────────────────────── -->
@@ -1660,14 +1659,14 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
     if (boton.dataset.seccion === 'seo') cargarSEO();
-    if (boton.dataset.seccion === 'idiomas') { cargarTextosInterfaz(); cargarSelectorLangDestinos(); }
+    if (boton.dataset.seccion === 'idiomas') cargarTextosInterfaz();
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
     if (boton.dataset.seccion === 'configuracion') cargarConfiguracionNoshow();
     if (boton.dataset.seccion === 'contacto') cargarContacto();
     if (boton.dataset.seccion === 'facturacion') cargarFacturacion();
     if (boton.dataset.seccion === 'whatsapp') { cargarImagenesWhatsapp(); }
     if (boton.dataset.seccion === 'notificaciones') cargarNotificaciones();
-    if (boton.dataset.seccion === 'destinos') { cargarDestinos(); }
+    if (boton.dataset.seccion === 'destinos') { cargarDestinos(); cargarSelectorLangDestinos(); }
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
     if (boton.dataset.seccion === 'cotizaciones') cargarCotizaciones();
     if (boton.dataset.seccion === 'reservas') cargarReservas();
