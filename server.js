@@ -6360,6 +6360,16 @@ app.get('/admin/destinos/traducciones/:lang', requireAdmin, asyncHandler(async (
   res.json({ destinos: resultado });
 }));
 
+// Lee una traducción individual de un destino (para el editor de Idiomas)
+app.get('/admin/destinos/:id/traduccion/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const { id, lang } = req.params;
+  const result = await pool.query(
+    'SELECT nombre FROM destinos_traducciones WHERE destino_id = $1 AND lang_code = $2',
+    [id, lang]
+  );
+  res.json({ nombre: result.rows.length > 0 ? result.rows[0].nombre : '' });
+}));
+
 // Guarda una traducción individual
 app.post('/admin/destinos/:id/traduccion/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const { id, lang } = req.params;
