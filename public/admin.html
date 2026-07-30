@@ -355,9 +355,16 @@ table.tabla-precios input {
 
       <div id="editor-texto-interfaz" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
 
-      <!-- Panel de traducciones de destinos -->
-      <div style="margin-top:2.5rem;">
-        <h2 style="font-size:1.1rem;margin-bottom:0.5rem;">Traducciones de destinos</h2>
+      <!-- Destinos: colapsable con el mismo formato que los módulos de textos -->
+      <div style="margin-top:14px;">
+        <div id="cabecera-destinos-idiomas"
+             style="background:var(--gris-fondo);cursor:pointer;padding:10px 14px;font-weight:600;font-size:13px;user-select:none;border-radius:6px;"
+             onclick="toggleSeccionDestinosIdiomas(this)">
+          <span id="icono-destinos-idiomas">▶</span> Destinos
+          <span id="recuento-destinos-idiomas" style="font-size:11px;font-weight:400;color:var(--texto-muted);"></span>
+          <span id="pct-destinos-idiomas" style="float:right;font-size:12px;"></span>
+        </div>
+        <div id="panel-destinos-idiomas" style="display:none;padding-top:14px;">
         <p class="subtitulo" style="margin-bottom:1rem;">Nombres de los destinos en cada idioma activo. Se usan en selectores y listados. El SEO de cada ruta se traduce por separado.</p>
         <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
           <select id="select-lang-destinos" class="campo" style="width:200px;height:40px;" onchange="cargarTraduccionesDestinos()"></select>
@@ -377,6 +384,7 @@ table.tabla-precios input {
         </table>
         <div style="margin-top:1rem;display:flex;justify-content:flex-end;">
           <button class="boton-primario" onclick="guardarTodasTraduccionesDestinos()">💾 Guardar todo</button>
+        </div>
         </div>
       </div>
     </div>
@@ -1660,7 +1668,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
     if (boton.dataset.seccion === 'seo') cargarSEO();
-    if (boton.dataset.seccion === 'idiomas') { cargarTextosInterfaz(); cargarSelectorLangDestinos(); }
+    if (boton.dataset.seccion === 'idiomas') { cargarTextosInterfaz(); cargarResumenDestinosIdiomas(); }
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
     if (boton.dataset.seccion === 'configuracion') cargarConfiguracionNoshow();
     if (boton.dataset.seccion === 'contacto') cargarContacto();
@@ -4856,6 +4864,36 @@ function eliminarTemporada(id, nombre) {
 
 // ─── Destinos: traducciones ───────────────────────────────────────────────────
 var destinosTradCache = []; // cache de propuestas IA pendientes de guardar
+
+// Cabecera del colapsable Destinos: recuento y porcentaje, como los módulos
+function cargarResumenDestinosIdiomas() {
+  fetch('/admin/destinos/traducciones-todas')
+    .then(function (r) { return r.json(); })
+    .then(function (datos) {
+      var destinos = datos.destinos || [];
+      var langs = IDIOMAS_TEXTOS || [];
+      var traducidos = 0;
+      destinos.forEach(function (d) {
+        langs.forEach(function (l) { if (d.traducciones[l]) traducidos++; });
+      });
+      var total = destinos.length * langs.length;
+      var pct = total > 0 ? Math.round(traducidos / total * 100) : 0;
+      var colorPct = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
+      document.getElementById('recuento-destinos-idiomas').textContent = '(' + destinos.length + ' destinos)';
+      var pctEl = document.getElementById('pct-destinos-idiomas');
+      pctEl.textContent = pct + '% traducido';
+      pctEl.style.color = colorPct;
+    });
+}
+
+function toggleSeccionDestinosIdiomas(cabecera) {
+  var panel = document.getElementById('panel-destinos-idiomas');
+  var icono = document.getElementById('icono-destinos-idiomas');
+  var abrir = panel.style.display === 'none';
+  panel.style.display = abrir ? 'block' : 'none';
+  icono.textContent = abrir ? '\u25BC' : '\u25B6';
+  if (abrir) cargarSelectorLangDestinos();
+}
 
 function cargarSelectorLangDestinos() {
   fetch('/admin/idiomas').then(function(r) { return r.json(); }).then(function(idiomas) {
