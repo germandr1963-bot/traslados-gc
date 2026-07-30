@@ -141,11 +141,13 @@
 
   <script>
     var partes = window.location.pathname.split('/');
-    // /es/destino/gran-canaria/maspalomas
+    // URL: /es/destino/gran-canaria/maspalomas
+    //       [0] [1] [2]       [3]       [4]
+    var lang = partes[1] || 'es';  // idioma de la URL
     var isla = partes[3] || '';
     var slug = partes[4] || '';
 
-    fetch('/api/destino-publico/' + isla + '/' + slug)
+    fetch('/api/destino-publico/' + isla + '/' + slug + '?lang=' + lang)
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (!d || d.error) {
