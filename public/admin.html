@@ -3707,23 +3707,65 @@ function abrirPanelIdiomas() {
       '</tr>';
     }).join('');
 
-    panel.innerHTML =
-      '<h3 style="margin-top:0">🌐 Idiomas de la web</h3>' +
-      '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">El orden aquí es el orden en que aparecen las píldoras de idioma en la web pública.</p>' +
-      '<table class="tabla-admin" style="margin-bottom:20px;">' +
-      '<thead><tr><th>Nombre</th><th>Código</th><th>Palabra rutas (URL)</th><th>Palabra reserva (URL)</th><th>Orden</th><th>Acción</th></tr></thead>' +
-      '<tbody>' + filas + '</tbody></table>' +
+    // Cargar palabras de páginas y montar el panel completo
+    fetch('/admin/palabras-paginas').then(function(r) { return r.json(); }).then(function(palabras) {
+      var porPagina = {};
+      palabras.forEach(function(p) {
+        if (!porPagina[p.pagina]) porPagina[p.pagina] = {};
+        porPagina[p.pagina][p.lang_code] = p.palabra;
+      });
 
-      '<h3>➕ Añadir idioma nuevo</h3>' +
-      '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">Al añadirlo, se crean automáticamente las fichas SEO vacías de este idioma en todas las rutas, listas para traducir.</p>' +
-      '<div class="fila-form">' +
-      '<div><label class="etiqueta">Código (2 letras)</label><input type="text" id="nuevo-idioma-codigo" class="campo" placeholder="ru" maxlength="2"></div>' +
-      '<div><label class="etiqueta">Nombre</label><input type="text" id="nuevo-idioma-nombre" class="campo" placeholder="Ruso"></div>' +
-      '<div><label class="etiqueta">Palabra para la URL</label><input type="text" id="nuevo-idioma-palabra" class="campo" placeholder="transfer"></div>' +
-      '<button class="boton-primario" onclick="anadirIdioma()">Añadir</button>' +
-      '</div>' +
-      '<div id="mensaje-nuevo-idioma" style="margin-top:10px;"></div>' +
-      '<button class="boton-secundario" style="margin-top:16px;" onclick="document.getElementById(\'panel-gestion-idiomas\').classList.add(\'oculto\')">Cerrar</button>';
+      var PAGINAS_ETIQUETAS = {
+        destino:  'Destino (página individual)',
+        destinos: 'Destinos (listado)',
+        rutas:    'Rutas',
+        flota:    'Flota',
+        contacto: 'Contacto'
+      };
+
+      var cabecerasIdiomas = idiomas.map(function(idi) {
+        return '<th style="text-align:center;">' + escapar(idi.codigo.toUpperCase()) + '</th>';
+      }).join('');
+
+      var filaspp = Object.keys(PAGINAS_ETIQUETAS).map(function(pagina) {
+        var celdas = idiomas.map(function(idi) {
+          var valor = (porPagina[pagina] && porPagina[pagina][idi.codigo]) ? porPagina[pagina][idi.codigo] : '';
+          return '<td style="font-family:monospace;font-size:12px;color:var(--texto-muted);text-align:center;">' +
+            escapar(valor) +
+            ' <button class="boton-secundario" style="padding:2px 6px;font-size:0.7rem;" ' +
+            'data-lang="' + escapar(idi.codigo) + '" data-pagina="' + pagina + '" data-valor="' + escapar(valor) + '" ' +
+            'onclick="editarPalabraPagina(this.dataset.lang,this.dataset.pagina,this.dataset.valor)">✏️</button>' +
+            '</td>';
+        }).join('');
+        return '<tr><td><strong>' + PAGINAS_ETIQUETAS[pagina] + '</strong></td>' + celdas + '</tr>';
+      }).join('');
+
+      panel.innerHTML =
+        '<h3 style="margin-top:0">🌐 Idiomas de la web</h3>' +
+        '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">El orden aquí es el orden en que aparecen las píldoras de idioma en la web pública.</p>' +
+        '<table class="tabla-admin" style="margin-bottom:20px;">' +
+        '<thead><tr><th>Nombre</th><th>Código</th><th>Palabra rutas (URL)</th><th>Palabra reserva (URL)</th><th>Orden</th><th>Acción</th></tr></thead>' +
+        '<tbody>' + filas + '</tbody></table>' +
+
+        '<h3>🔗 Palabras de URL por página</h3>' +
+        '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">Palabras que forman las URLs públicas de cada página en cada idioma. Edítalas cuando lo necesites — el cambio es inmediato.</p>' +
+        '<div style="overflow-x:auto;margin-bottom:24px;">' +
+        '<table class="tabla-admin">' +
+        '<thead><tr><th>Página</th>' + cabecerasIdiomas + '</tr></thead>' +
+        '<tbody>' + filaspp + '</tbody>' +
+        '</table></div>' +
+
+        '<h3>➕ Añadir idioma nuevo</h3>' +
+        '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">Al añadirlo, se crean automáticamente las fichas SEO vacías de este idioma en todas las rutas, listas para traducir.</p>' +
+        '<div class="fila-form">' +
+        '<div><label class="etiqueta">Código (2 letras)</label><input type="text" id="nuevo-idioma-codigo" class="campo" placeholder="ru" maxlength="2"></div>' +
+        '<div><label class="etiqueta">Nombre</label><input type="text" id="nuevo-idioma-nombre" class="campo" placeholder="Ruso"></div>' +
+        '<div><label class="etiqueta">Palabra para la URL</label><input type="text" id="nuevo-idioma-palabra" class="campo" placeholder="transfer"></div>' +
+        '<button class="boton-primario" onclick="anadirIdioma()">Añadir</button>' +
+        '</div>' +
+        '<div id="mensaje-nuevo-idioma" style="margin-top:10px;"></div>' +
+        '<button class="boton-secundario" style="margin-top:16px;" onclick="document.getElementById(\'panel-gestion-idiomas\').classList.add(\'oculto\')">Cerrar</button>';
+    });
   });
 }
 
@@ -3738,6 +3780,21 @@ function editarPalabraIdioma(codigo, campo, valorActual) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(cuerpo)
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (!respuesta.ok) alert(respuesta.error || 'Error al guardar');
+    abrirPanelIdiomas();
+  });
+}
+
+function editarPalabraPagina(lang, pagina, valorActual) {
+  var etiquetas = { destino: 'destino (pág. individual)', destinos: 'destinos (listado)', rutas: 'rutas', flota: 'flota', contacto: 'contacto' };
+  var etiqueta = etiquetas[pagina] || pagina;
+  var nueva = prompt('Palabra para "' + etiqueta + '" en la URL del idioma ' + lang.toUpperCase() + ' (solo letras, números y guiones):', valorActual || '');
+  if (nueva === null) return;
+  fetch('/admin/palabras-paginas/' + lang + '/' + pagina, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ palabra: nueva })
+  }).then(function(r) { return r.json(); }).then(function(respuesta) {
     if (!respuesta.ok) alert(respuesta.error || 'Error al guardar');
     abrirPanelIdiomas();
   });
