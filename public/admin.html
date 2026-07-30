@@ -355,22 +355,6 @@ table.tabla-precios input {
 
       <div id="editor-texto-interfaz" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
 
-      <!-- Destinos: colapsable con el mismo formato que los módulos de textos -->
-      <div style="margin-top:14px;">
-        <div id="cabecera-destinos-idiomas"
-             style="background:var(--gris-fondo);cursor:pointer;padding:10px 14px;font-weight:600;font-size:13px;user-select:none;border-radius:6px;"
-             onclick="toggleSeccionDestinosIdiomas(this)">
-          <span id="icono-destinos-idiomas">▶</span> Destinos
-          <span id="recuento-destinos-idiomas" style="font-size:11px;font-weight:400;color:var(--texto-muted);"></span>
-          <span id="pct-destinos-idiomas" style="float:right;font-size:12px;"></span>
-        </div>
-        <div id="panel-destinos-idiomas" style="display:none;padding-top:14px;">
-          <table class="tabla-admin">
-            <thead id="thead-destinos-idiomas"></thead>
-            <tbody id="cuerpo-destinos-idiomas"></tbody>
-          </table>
-        </div>
-      </div>
     </div>
 
     <!-- ─── CALCULADOR DE TARIFAS ─────────────────────────────────────────── -->
@@ -1652,7 +1636,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
     if (boton.dataset.seccion === 'seo') cargarSEO();
-    if (boton.dataset.seccion === 'idiomas') { cargarTextosInterfaz(); cargarResumenDestinosIdiomas(); }
+    if (boton.dataset.seccion === 'idiomas') { cargarTextosInterfaz(); }
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
     if (boton.dataset.seccion === 'configuracion') cargarConfiguracionNoshow();
     if (boton.dataset.seccion === 'contacto') cargarContacto();
@@ -3500,7 +3484,50 @@ function cargarTextosInterfaz() {
   }).then(function (r) { return r.json(); }).then(function (datos) {
     textosCache = datos;
     renderizarTablaTextos(datos);
+    // Destinos: una sección más de la misma tabla, con el mismo formato
+    return fetch('/admin/destinos/traducciones-todas');
+  }).then(function (r) { return r.json(); }).then(function (datos) {
+    destinosIdiomasCache = datos.destinos || [];
+    anexarSeccionDestinos();
   });
+}
+
+function anexarSeccionDestinos() {
+  var cuerpo = document.getElementById('tabla-textos-cuerpo');
+  if (!cuerpo || !destinosIdiomasCache) return;
+  var totalCols = 2 + IDIOMAS_TEXTOS.length + 1;
+  var seccionId = 'modulo-sec-destinos';
+
+  var traducidos = 0;
+  destinosIdiomasCache.forEach(function (d) {
+    IDIOMAS_TEXTOS.forEach(function (l) { if (d.traducciones[l]) traducidos++; });
+  });
+  var total = destinosIdiomasCache.length * IDIOMAS_TEXTOS.length;
+  var pct = total > 0 ? Math.round(traducidos / total * 100) : 0;
+  var colorPct = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
+
+  var html = '<tr style="background:var(--gris-fondo);cursor:pointer;" onclick="toggleSeccionTextos(\'' + seccionId + '\', this)">' +
+    '<td colspan="' + totalCols + '" style="padding:10px 14px;font-weight:600;font-size:13px;user-select:none;">' +
+      '<span id="' + seccionId + '-icono">▶</span> Destinos' +
+      ' <span style="font-size:11px;font-weight:400;color:var(--texto-muted);">(' + destinosIdiomasCache.length + ' destinos)</span>' +
+      ' <span style="float:right;font-size:12px;color:' + colorPct + ';">' + pct + '% traducido</span>' +
+    '</td>' +
+  '</tr>';
+
+  destinosIdiomasCache.forEach(function (d) {
+    var celdas = IDIOMAS_TEXTOS.map(function (lang) {
+      var ok = d.traducciones[lang];
+      return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+    }).join('');
+    html += '<tr class="' + seccionId + '" style="display:none;">' +
+      '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(d.nombre_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">destino_' + d.id + '</span></td>' +
+      '<td style="font-size:12px;color:var(--texto-muted);">Destinos</td>' +
+      celdas +
+      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorDestinoIdiomas(' + d.id + ')">✏️ Editar</button></td>' +
+    '</tr>';
+  });
+
+  cuerpo.innerHTML += html;
 }
 
 function renderizarTablaTextos(datos) {
@@ -3874,11 +3901,6 @@ function guardarRevisionIA(lang) {
     var total = traducciones.length + propuestasDestinos.length;
     msg.innerHTML = '<div class="aviso-ok">✅ Guardadas ' + total + ' traducciones</div>';
     cargarTextosInterfaz();
-    cargarResumenDestinosIdiomas();
-    var panelDest = document.getElementById('panel-destinos-idiomas');
-    if (panelDest && panelDest.style.display !== 'none') {
-      cargarTablaDestinosIdiomas();
-    }
     setTimeout(function () { document.getElementById('editor-texto-interfaz').classList.add('oculto'); }, 1200);
   });
 }
@@ -4889,69 +4911,7 @@ function eliminarTemporada(id, nombre) {
 // ─── Destinos: traducciones ───────────────────────────────────────────────────
 var destinosTradCache = []; // cache de propuestas IA pendientes de guardar
 
-// Cabecera del colapsable Destinos: recuento y porcentaje, como los módulos
-function cargarResumenDestinosIdiomas() {
-  fetch('/admin/destinos/traducciones-todas')
-    .then(function (r) { return r.json(); })
-    .then(function (datos) {
-      var destinos = datos.destinos || [];
-      var langs = IDIOMAS_TEXTOS || [];
-      var traducidos = 0;
-      destinos.forEach(function (d) {
-        langs.forEach(function (l) { if (d.traducciones[l]) traducidos++; });
-      });
-      var total = destinos.length * langs.length;
-      var pct = total > 0 ? Math.round(traducidos / total * 100) : 0;
-      var colorPct = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
-      document.getElementById('recuento-destinos-idiomas').textContent = '(' + destinos.length + ' destinos)';
-      var pctEl = document.getElementById('pct-destinos-idiomas');
-      pctEl.textContent = pct + '% traducido';
-      pctEl.style.color = colorPct;
-    });
-}
-
-function toggleSeccionDestinosIdiomas(cabecera) {
-  var panel = document.getElementById('panel-destinos-idiomas');
-  var icono = document.getElementById('icono-destinos-idiomas');
-  var abrir = panel.style.display === 'none';
-  panel.style.display = abrir ? 'block' : 'none';
-  icono.textContent = abrir ? '\u25BC' : '\u25B6';
-  if (abrir) cargarTablaDestinosIdiomas();
-}
-
 var destinosIdiomasCache = null;
-
-function cargarTablaDestinosIdiomas() {
-  var cuerpo = document.getElementById('cuerpo-destinos-idiomas');
-  cuerpo.innerHTML = '<tr><td colspan="12" style="color:var(--texto-muted)">Cargando...</td></tr>';
-  fetch('/admin/destinos/traducciones-todas')
-    .then(function (r) { return r.json(); })
-    .then(function (datos) {
-      destinosIdiomasCache = datos.destinos || [];
-      renderizarTablaDestinosIdiomas();
-    });
-}
-
-function renderizarTablaDestinosIdiomas() {
-  var thead = document.getElementById('thead-destinos-idiomas');
-  thead.innerHTML = '<tr><th>Texto</th><th>Módulo</th>' +
-    IDIOMAS_TEXTOS.map(function (l) { return '<th style="text-align:center">' + l.toUpperCase() + '</th>'; }).join('') +
-    '<th>Acción</th></tr>';
-  var html = '';
-  destinosIdiomasCache.forEach(function (d) {
-    var celdas = IDIOMAS_TEXTOS.map(function (lang) {
-      var ok = d.traducciones[lang];
-      return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
-    }).join('');
-    html += '<tr>' +
-      '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(d.nombre_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">destino_' + d.id + '</span></td>' +
-      '<td style="font-size:12px;color:var(--texto-muted);">Destinos</td>' +
-      celdas +
-      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorDestinoIdiomas(' + d.id + ')">✏️ Editar</button></td>' +
-    '</tr>';
-  });
-  document.getElementById('cuerpo-destinos-idiomas').innerHTML = html;
-}
 
 function abrirEditorDestinoIdiomas(destinoId) {
   var d = destinosIdiomasCache && destinosIdiomasCache.find(function (x) { return x.id === destinoId; });
@@ -5001,8 +4961,7 @@ function guardarTraduccionDestinoIdiomas(destinoId, lang) {
       msg.innerHTML = '<div class="aviso-ok">✅ Guardado</div>';
       var d = destinosIdiomasCache.find(function (x) { return x.id === destinoId; });
       if (valor && valor.trim()) { d.traducciones[lang] = valor; } else { delete d.traducciones[lang]; }
-      renderizarTablaDestinosIdiomas();
-      cargarResumenDestinosIdiomas();
+      cargarTextosInterfaz();
       setTimeout(function () { msg.innerHTML = ''; }, 2000);
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
