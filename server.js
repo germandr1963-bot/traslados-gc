@@ -878,6 +878,18 @@ async function initSchema() {
     );
   }
 
+  // Sincronizar nombres de todos los destinos como textos traducibles
+  const todosDestinos = await pool.query('SELECT id, nombre FROM destinos ORDER BY nombre');
+  for (const dest of todosDestinos.rows) {
+    const claveDestino = 'destino_nombre_' + dest.id;
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Destinos', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+      [claveDestino, 'Nombre del destino "' + dest.nombre + '" tal como aparece en selectores y páginas públicas', dest.nombre]
+    );
+  }
+
   await cargarTextosCache();
 
   // ─── Tarifario de precios ─────────────────────────────────────────────────
@@ -4860,6 +4872,21 @@ app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req
      ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
     [req.params.id, req.params.lang, req.body.texto || '']
   );
+  // Si es un destino, sincronizar también en destinos_traducciones (fuente que lee la web pública)
+  const filaTexto = await pool.query('SELECT clave FROM textos_interfaz WHERE id = $1', [req.params.id]);
+  if (filaTexto.rows.length > 0) {
+    const clave = filaTexto.rows[0].clave;
+    const match = clave.match(/^destino_nombre_(\d+)$/);
+    if (match) {
+      const destinoId = match[1];
+      await pool.query(
+        `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW()`,
+        [destinoId, req.params.lang, req.body.texto || '']
+      );
+    }
+  }
   await cargarTextosCache();
   res.json({ ok: true });
 }));
@@ -4928,6 +4955,19 @@ app.post('/admin/textos/guardar-lote', requireAdmin, asyncHandler(async (req, re
        ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
       [item.texto_id, lang, item.texto || '']
     );
+    // Si es un destino, sincronizar también en destinos_traducciones
+    if (item.clave) {
+      const match = item.clave.match(/^destino_nombre_(\d+)$/);
+      if (match) {
+        const destinoId = match[1];
+        await pool.query(
+          `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW()`,
+          [destinoId, lang, item.texto || '']
+        );
+      }
+    }
     guardadas++;
   }
   await cargarTextosCache();
@@ -5960,7 +6000,15 @@ app.post('/admin/destinos', requireAdmin, asyncHandler(async (req, res) => {
     [nombre.trim()]
   );
   if (existe.rows.length) return res.status(400).json({ error: 'Ya existe un destino con ese nombre.' });
-  await pool.query('INSERT INTO destinos (nombre) VALUES ($1)', [nombre.trim()]);
+  const nuevo = await pool.query('INSERT INTO destinos (nombre) VALUES ($1) RETURNING id', [nombre.trim()]);
+  const nuevoId = nuevo.rows[0].id;
+  await pool.query(
+    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+     VALUES ($1, 'Destinos', $2, $3)
+     ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+    ['destino_nombre_' + nuevoId, 'Nombre del destino "' + nombre.trim() + '" tal como aparece en selectores y páginas públicas', nombre.trim()]
+  );
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
@@ -5973,6 +6021,13 @@ app.post('/admin/destinos/:id/editar', requireAdmin, asyncHandler(async (req, re
   );
   if (existe.rows.length) return res.status(400).json({ error: 'Ya existe un destino con ese nombre.' });
   await pool.query('UPDATE destinos SET nombre = $1 WHERE id = $2', [nombre.trim(), req.params.id]);
+  await pool.query(
+    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+     VALUES ($1, 'Destinos', $2, $3)
+     ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+    ['destino_nombre_' + req.params.id, 'Nombre del destino "' + nombre.trim() + '" tal como aparece en selectores y páginas públicas', nombre.trim()]
+  );
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
@@ -6464,13 +6519,28 @@ app.post('/admin/destinos/traducciones/guardar-lote', requireAdmin, asyncHandler
   if (!lang || !Array.isArray(propuestas)) return res.status(400).json({ error: 'Datos no válidos' });
   for (const p of propuestas) {
     if (!p.id || !p.nombre) continue;
+    // Guardar en destinos_traducciones (fuente que lee la web pública)
     await pool.query(
       `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre)
        VALUES ($1, $2, $3)
        ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW()`,
       [p.id, lang, p.nombre]
     );
+    // Sincronizar también en textos_interfaz_traducciones (para que los ✓ aparezcan en Idiomas)
+    const filaTi = await pool.query(
+      'SELECT id FROM textos_interfaz WHERE clave = $1',
+      ['destino_nombre_' + p.id]
+    );
+    if (filaTi.rows.length > 0) {
+      await pool.query(
+        `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
+        [filaTi.rows[0].id, lang, p.nombre]
+      );
+    }
   }
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
