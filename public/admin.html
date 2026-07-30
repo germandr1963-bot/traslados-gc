@@ -4941,12 +4941,18 @@ function abrirEditorDestinoIdiomas(destinoId) {
 function cambiarIdiomaEditorDestino(destinoId, lang, botonTab) {
   document.querySelectorAll('#editor-texto-interfaz .tab-idioma').forEach(function (b) { b.classList.remove('activo'); });
   if (botonTab) botonTab.classList.add('activo');
-  var d = destinosIdiomasCache.find(function (x) { return x.id === destinoId; });
+
   var campo = document.getElementById('destino-campo-editor');
-  campo.innerHTML =
-    '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
-    '<textarea class="campo" id="destino-traduccion" rows="2" placeholder="Todavía sin traducir...">' + escapar(d.traducciones[lang] || '') + '</textarea>' +
-    '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionDestinoIdiomas(' + destinoId + ', \'' + lang + '\')">💾 Guardar</button>';
+  campo.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+
+  fetch('/admin/destinos/' + destinoId + '/traduccion/' + lang)
+    .then(function (r) { return r.json(); })
+    .then(function (datos) {
+      campo.innerHTML =
+        '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
+        '<textarea class="campo" id="destino-traduccion" rows="2" placeholder="Todavía sin traducir...">' + escapar(datos.nombre || '') + '</textarea>' +
+        '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionDestinoIdiomas(' + destinoId + ', \'' + lang + '\')">💾 Guardar</button>';
+    });
 }
 
 function guardarTraduccionDestinoIdiomas(destinoId, lang) {
