@@ -368,7 +368,7 @@ table.tabla-precios input {
         <p class="subtitulo" style="margin-bottom:1rem;">Nombres de los destinos en cada idioma activo. Se usan en selectores y listados. El SEO de cada ruta se traduce por separado.</p>
         <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
           <select id="select-lang-destinos" class="campo" style="width:200px;height:40px;" onchange="cargarTraduccionesDestinos()"></select>
-          <button class="boton-costa" onclick="traducirDestinosIA()">✨ Sugerir con IA los que faltan</button>
+          <span style="font-size:12px;color:var(--texto-muted);">La traducción con IA se hace desde el botón 🤖 de arriba, junto con los textos.</span>
         </div>
         <div id="aviso-traducciones-destinos" style="margin-bottom:1rem;display:none;"></div>
         <table class="tabla-admin">
@@ -3791,28 +3791,33 @@ function anadirIdioma() {
 function traducirConIA() {
   var lang = document.getElementById('select-idioma-ia').value;
   var msg = document.getElementById('mensaje-textos');
-  msg.innerHTML = '<div class="aviso-ok">🤖 Traduciendo con IA, puede tardar unos segundos...</div>';
+  msg.innerHTML = '<div class="aviso-ok">🤖 Traduciendo con IA (textos y destinos), puede tardar unos segundos...</div>';
 
-  fetch('/admin/textos/traducir-ia/' + lang, { method: 'POST' })
-    .then(function (r) { return r.json(); })
-    .then(function (respuesta) {
-      if (!respuesta.ok) {
-        msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al traducir') + '</div>';
-        return;
-      }
-      if (respuesta.propuestas.length === 0) {
-        msg.innerHTML = '<div class="aviso-ok">✅ Ya estaba todo traducido en ' + lang.toUpperCase() + '.</div>';
-        return;
-      }
-      msg.innerHTML = '';
-      mostrarRevisionIA(lang, respuesta.propuestas);
-    })
-    .catch(function () {
-      msg.innerHTML = '<div class="aviso-error">No se pudo conectar con la IA. Inténtalo de nuevo.</div>';
-    });
+  // Una sola IA para toda la pestaña: textos de la web y nombres de destinos
+  Promise.all([
+    fetch('/admin/textos/traducir-ia/' + lang, { method: 'POST' }).then(function (r) { return r.json(); }),
+    fetch('/admin/destinos/traducir-ia/' + lang, { method: 'POST' }).then(function (r) { return r.json(); })
+  ]).then(function (resultados) {
+    var rTextos = resultados[0];
+    var rDestinos = resultados[1];
+    if (!rTextos.ok) {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(rTextos.error || 'Error al traducir') + '</div>';
+      return;
+    }
+    var propTextos = rTextos.propuestas || [];
+    var propDestinos = (rDestinos && rDestinos.ok && rDestinos.propuestas) ? rDestinos.propuestas : [];
+    if (propTextos.length === 0 && propDestinos.length === 0) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Ya estaba todo traducido en ' + lang.toUpperCase() + ' (textos y destinos).</div>';
+      return;
+    }
+    msg.innerHTML = '';
+    mostrarRevisionIA(lang, propTextos, propDestinos);
+  }).catch(function () {
+    msg.innerHTML = '<div class="aviso-error">No se pudo conectar con la IA. Inténtalo de nuevo.</div>';
+  });
 }
 
-function mostrarRevisionIA(lang, propuestas) {
+function mostrarRevisionIA(lang, propuestas, propuestasDestinos) {
   var editor = document.getElementById('editor-texto-interfaz');
   editor.classList.remove('oculto');
 
@@ -3825,10 +3830,20 @@ function mostrarRevisionIA(lang, propuestas) {
     '</div>';
   }).join('');
 
+  var filasDestinos = (propuestasDestinos || []).map(function (p) {
+    return '<div style="border-bottom:1px solid var(--gris-borde);padding:12px 0;">' +
+      '<div style="font-size:13px;color:var(--texto-muted);margin-bottom:6px;">🇪🇸 ' + escapar(p.nombre_es) + '</div>' +
+      '<textarea class="campo revision-ia-destino" data-destino-id="' + p.id + '" rows="1" style="width:100%;">' + escapar(p.nombre) + '</textarea>' +
+    '</div>';
+  }).join('');
+  if (filasDestinos) {
+    filasDestinos = '<div style="background:var(--gris-fondo);padding:8px 12px;font-weight:600;font-size:13px;border-radius:6px;margin-top:10px;">Destinos</div>' + filasDestinos;
+  }
+
   editor.innerHTML =
     '<h2 style="margin-top:0">🤖 Revisión — traducción IA al ' + lang.toUpperCase() + '</h2>' +
     '<p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Revisa cada propuesta antes de guardar. Puedes editar cualquier texto antes de confirmar.</p>' +
-    '<div style="max-height:400px;overflow-y:auto;">' + filas + '</div>' +
+    '<div style="max-height:400px;overflow-y:auto;">' + filas + filasDestinos + '</div>' +
     '<div id="revision-ia-msg" style="margin:12px 0;"></div>' +
     '<button class="boton-primario" onclick="guardarRevisionIA(\'' + lang + '\')">💾 Guardar todas</button> ' +
     '<button class="boton-secundario" onclick="document.getElementById(\'editor-texto-interfaz\').classList.add(\'oculto\')">Cancelar</button>';
@@ -3844,18 +3859,44 @@ function guardarRevisionIA(lang) {
   var msg = document.getElementById('revision-ia-msg');
   msg.innerHTML = 'Guardando...';
 
-  fetch('/admin/textos/guardar-lote', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lang: lang, traducciones: traducciones })
-  }).then(function (r) { return r.json(); }).then(function (respuesta) {
-    if (respuesta.ok) {
-      msg.innerHTML = '<div class="aviso-ok">✅ Guardadas ' + respuesta.guardadas + ' traducciones</div>';
-      cargarTextosInterfaz();
-      setTimeout(function () { document.getElementById('editor-texto-interfaz').classList.add('oculto'); }, 1200);
-    } else {
-      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
+  // Destinos revisados en la misma pantalla
+  var tasDestinos = document.querySelectorAll('.revision-ia-destino');
+  var propuestasDestinos = Array.prototype.map.call(tasDestinos, function (ta) {
+    return { id: parseInt(ta.dataset.destinoId, 10), nombre: ta.value };
+  }).filter(function (p) { return p.nombre && p.nombre.trim(); });
+
+  var guardados = [];
+  if (traducciones.length > 0) {
+    guardados.push(fetch('/admin/textos/guardar-lote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang: lang, traducciones: traducciones })
+    }).then(function (r) { return r.json(); }));
+  }
+  if (propuestasDestinos.length > 0) {
+    guardados.push(fetch('/admin/destinos/traducciones/guardar-lote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang: lang, propuestas: propuestasDestinos })
+    }).then(function (r) { return r.json(); }));
+  }
+
+  Promise.all(guardados).then(function (respuestas) {
+    var fallo = respuestas.find(function (r) { return !r.ok; });
+    if (fallo) {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(fallo.error || 'Error al guardar') + '</div>';
+      return;
     }
+    var total = traducciones.length + propuestasDestinos.length;
+    msg.innerHTML = '<div class="aviso-ok">✅ Guardadas ' + total + ' traducciones</div>';
+    cargarTextosInterfaz();
+    cargarResumenDestinosIdiomas();
+    var panelDest = document.getElementById('panel-destinos-idiomas');
+    var selDest = document.getElementById('select-lang-destinos');
+    if (panelDest && panelDest.style.display !== 'none' && selDest && selDest.value === lang) {
+      cargarTraduccionesDestinos();
+    }
+    setTimeout(function () { document.getElementById('editor-texto-interfaz').classList.add('oculto'); }, 1200);
   });
 }
 
