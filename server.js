@@ -828,21 +828,6 @@ async function initSchema() {
     }
   }
 
-  // ─── Texto de la llamada a reservar en las páginas de destino ───────────
-  // El botón reutiliza la clave existente home_boton_reservar (no duplicar).
-  const filaCta = await pool.query(
-    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
-     VALUES ('destino_cta_texto', 'Páginas de destino', 'Texto de la llamada a reservar al final de cada página de destino, seguido del nombre del destino', 'Reserve aquí su viaje a:')
-     ON CONFLICT (clave) DO UPDATE SET modulo = 'Páginas de destino'
-     RETURNING id`
-  );
-  await pool.query(
-    `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
-     VALUES ($1, 'en', 'Book your transfer to:')
-     ON CONFLICT (texto_id, lang_code) DO NOTHING`,
-    [filaCta.rows[0].id]
-  );
-
   // Sincronizar nombres de categorías activas como textos traducibles
   const catsActivas = await pool.query('SELECT id, nombre, capacidad_maletas FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
   for (const cat of catsActivas.rows) {
@@ -5131,14 +5116,7 @@ app.get('/api/destino-publico/:isla/:slug', asyncHandler(async (req, res) => {
      ORDER BY orden ASC NULLS LAST LIMIT 3`,
     [dest.id]
   );
-  res.json({
-    ...dest,
-    fotos: fotos.rows,
-    // Llamada a reservar: textos desde Idiomas y enlace con el destino puesto
-    cta_texto: obtenerTexto('destino_cta_texto', 'es'),
-    cta_boton: obtenerTexto('home_boton_reservar', 'es'),
-    url_reserva: '/reserva?hasta=' + encodeURIComponent(dest.nombre)
-  });
+  res.json({ ...dest, fotos: fotos.rows });
 }));
 
 // Página pública de destino individual
