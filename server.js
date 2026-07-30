@@ -181,6 +181,7 @@ app.use(session({
 let IDIOMAS_PERMITIDOS = [];
 let SECCIONES_TRASLADO = {};
 let SECCIONES_RESERVA = {};
+let PALABRAS_PAGINAS = {}; // { lang: { destino, destinos, rutas, flota, contacto } }
 let IDIOMA_BASE = 'es';
 
 async function cargarIdiomasCache() {
@@ -196,6 +197,14 @@ async function cargarIdiomasCache() {
     if (fila.es_base) IDIOMA_BASE = fila.codigo;
   }
   IDIOMAS_TRADUCIBLES = IDIOMAS_PERMITIDOS.filter(function (l) { return l !== IDIOMA_BASE; });
+
+  // Cargar palabras de páginas (destino, destinos, rutas, flota, contacto)
+  const pp = await pool.query('SELECT lang_code, pagina, palabra FROM palabras_paginas');
+  PALABRAS_PAGINAS = {};
+  for (const fila of pp.rows) {
+    if (!PALABRAS_PAGINAS[fila.lang_code]) PALABRAS_PAGINAS[fila.lang_code] = {};
+    PALABRAS_PAGINAS[fila.lang_code][fila.pagina] = fila.palabra;
+  }
 }
 
 // URL base del sitio — se usa para construir canonical y hreflang
@@ -929,6 +938,42 @@ async function initSchema() {
        WHERE codigo = $1 AND (palabra_reserva IS NULL OR palabra_reserva = '')`,
       [codigo, PALABRAS_RESERVA_SEMILLA[codigo]]
     );
+  }
+
+  // ─── Palabras de URL por página ─────────────────────────────────────────────
+  // Tabla única para gestionar las palabras que aparecen en las URLs de cada
+  // página pública (destino, destinos, rutas, flota, contacto) en cada idioma.
+  // Editable desde el admin → Gestionar idiomas. Solo siembra si está vacío.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS palabras_paginas (
+      id         SERIAL PRIMARY KEY,
+      lang_code  TEXT NOT NULL,
+      pagina     TEXT NOT NULL,
+      palabra    TEXT NOT NULL,
+      UNIQUE(lang_code, pagina)
+    )
+  `);
+  const SEMILLA_PALABRAS_PAGINAS = {
+    es: { destino: 'destino',       destinos: 'destinos',      rutas: 'rutas',       flota: 'flota',       contacto: 'contacto' },
+    en: { destino: 'destination',   destinos: 'destinations',  rutas: 'routes',      flota: 'fleet',       contacto: 'contact' },
+    de: { destino: 'reiseziel',     destinos: 'reiseziele',    rutas: 'routen',      flota: 'fuhrpark',    contacto: 'kontakt' },
+    sv: { destino: 'destination',   destinos: 'destinationer', rutas: 'rutter',      flota: 'fordonspark', contacto: 'kontakt' },
+    no: { destino: 'destinasjon',   destinos: 'destinasjoner', rutas: 'ruter',       flota: 'bilpark',     contacto: 'kontakt' },
+    nl: { destino: 'bestemming',    destinos: 'bestemmingen',  rutas: 'routes',      flota: 'wagenpark',   contacto: 'contact' },
+    it: { destino: 'destinazione',  destinos: 'destinazioni',  rutas: 'itinerari',   flota: 'parco-auto',  contacto: 'contatti' },
+    fr: { destino: 'destination',   destinos: 'destinations',  rutas: 'itineraires', flota: 'flotte',      contacto: 'contact' },
+    fi: { destino: 'kohde',         destinos: 'kohteet',       rutas: 'reitit',      flota: 'kalusto',     contacto: 'yhteystiedot' },
+    ru: { destino: 'napravlenie',   destinos: 'napravleniya',  rutas: 'marshruty',   flota: 'avtopark',    contacto: 'kontakty' }
+  };
+  for (const lang of Object.keys(SEMILLA_PALABRAS_PAGINAS)) {
+    for (const [pagina, palabra] of Object.entries(SEMILLA_PALABRAS_PAGINAS[lang])) {
+      await pool.query(
+        `INSERT INTO palabras_paginas (lang_code, pagina, palabra)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (lang_code, pagina) DO NOTHING`,
+        [lang, pagina, palabra]
+      );
+    }
   }
 
   await cargarIdiomasCache();
@@ -3499,7 +3544,7 @@ app.get('/admin/seo/destinos/:id/completo', requireAdmin, asyncHandler(async (re
       `INSERT INTO destinos_seo_settings (destino_id, lang_code, slug_url, canonical_url)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (destino_id, lang_code) DO NOTHING`,
-      [req.params.id, row.codigo, slug, BASE_URL + '/destino/' + slugify(isla) + '/' + slug]
+      [req.params.id, row.codigo, slug, BASE_URL + '/' + row.codigo + '/' + ((PALABRAS_PAGINAS[row.codigo] && PALABRAS_PAGINAS[row.codigo].destino) ? PALABRAS_PAGINAS[row.codigo].destino : 'destino') + '/' + slugify(isla) + '/' + slug]
     );
   }
   const result = await pool.query(
@@ -4221,9 +4266,9 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
   function limpiarSegmento(s) {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   }
-  const palabraDestino = limpiarSegmento(resultado.palabra_destino || 'destino');
+  const palabraDestino = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].destino) ? PALABRAS_PAGINAS[lang].destino : 'destino';
   const nombreIsla     = limpiarSegmento(resultado.nombre_isla || slugify(d.isla || 'gran-canaria'));
-  const urlPublicaGenerada = '/' + lang + '/destino/' + nombreIsla + '/' + slugGenerado;
+  const urlPublicaGenerada = '/' + lang + '/' + palabraDestino + '/' + nombreIsla + '/' + slugGenerado;
 
   const textaTarjeta = (resultado.texto_tarjeta || '').slice(0, 200);
 
@@ -4646,6 +4691,32 @@ app.post('/admin/idiomas', requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 // Mueve un idioma hacia arriba o hacia abajo en el orden de aparición
+// Edita una palabra de URL de página (destino, destinos, rutas, flota, contacto)
+// Guarda en palabras_paginas y recarga caché — cambio inmediato sin redesplegar.
+app.post('/admin/palabras-paginas/:lang/:pagina', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang, pagina } = req.params;
+  const PAGINAS_PERMITIDAS = ['destino', 'destinos', 'rutas', 'flota', 'contacto'];
+  if (!PAGINAS_PERMITIDAS.includes(pagina)) {
+    return res.status(400).json({ error: 'Página no válida' });
+  }
+  const palabra = String(req.body.palabra || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (!palabra) return res.status(400).json({ error: 'La palabra no puede quedar vacía' });
+  await pool.query(
+    `INSERT INTO palabras_paginas (lang_code, pagina, palabra)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (lang_code, pagina) DO UPDATE SET palabra = EXCLUDED.palabra`,
+    [lang, pagina, palabra]
+  );
+  await cargarIdiomasCache();
+  res.json({ ok: true });
+}));
+
+// Devuelve todas las palabras de páginas para el admin
+app.get('/admin/palabras-paginas', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT lang_code, pagina, palabra FROM palabras_paginas ORDER BY lang_code, pagina');
+  res.json(result.rows);
+}));
+
 // Edita las palabras de URL de un idioma existente (traslado y/o reserva)
 // y recarga la caché para que el cambio sea inmediato, sin redesplegar.
 app.post('/admin/idiomas/:codigo/palabras', requireAdmin, asyncHandler(async (req, res) => {
