@@ -1018,6 +1018,11 @@ function cargarRutas() {
     });
     poblarSelect(document.getElementById('desde'), origenes);
     poblarSelect(document.getElementById('hasta'), destinos);
+    // Si la dirección trae origen o destino (p. ej. desde una página de
+    // destino o de ruta), dejarlos ya elegidos — el cliente rellena el resto
+    if (paramOrigen) document.getElementById('desde').value = paramOrigen;
+    if (paramDestino) document.getElementById('hasta').value = paramDestino;
+    if (paramOrigen || paramDestino) actualizarCategoriasSegunRuta();
     if (rutas.length === 0) {
       document.getElementById('resultado-precio').textContent = TXT.sinRutas;
     }
