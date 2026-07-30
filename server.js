@@ -5190,10 +5190,53 @@ app.get('/api/destino-publico/:isla/:slug', asyncHandler(async (req, res) => {
   res.json({ ...dest, fotos: fotos.rows });
 }));
 
-// Página pública de destino individual
+// Página pública de destino individual — español (ruta fija legacy)
 app.get('/es/destino/:isla/:slug', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'destino-pagina.html'));
 });
+
+// Página pública de destino individual — todos los idiomas
+//
+// La palabra que aparece en la URL ("destino", "destination", "reiseziel"...)
+// es diferente en cada idioma y se gestiona desde:
+//   Admin → Gestionar idiomas → "Palabras de URL por página" → fila "Destino (página individual)"
+//
+// Esas palabras se guardan en la tabla `palabras_paginas` de Neon y se cargan
+// en la variable PALABRAS_PAGINAS al arrancar el servidor. Si cambias una palabra
+// desde el admin, el cambio es inmediato sin redesplegar.
+//
+// Ejemplo de URLs que resuelve esta ruta:
+//   /en/destination/gran-canaria/maspalomas
+//   /de/reiseziel/gran-canaria/maspalomas
+//   /ru/napravlenie/gran-kanaria/maspalomas
+//   /fi/kohde/gran-canaria/maspalomas
+app.get('/:lang([a-z]{2})/:palabra/:isla/:slug', asyncHandler(async (req, res) => {
+  const { lang, palabra, isla, slug } = req.params;
+
+  // Verificar que el idioma es válido
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+
+  // Verificar que la palabra de la URL corresponde a "destino" en ese idioma
+  const palabraDestino = PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].destino;
+  if (!palabraDestino || palabra !== palabraDestino) {
+    return res.status(404).send('Página no encontrada');
+  }
+
+  // Verificar que existe un destino publicado con ese slug e idioma
+  const resultado = await pool.query(
+    `SELECT dss.id FROM destinos_seo_settings dss
+     WHERE dss.lang_code = $1 AND dss.slug_url = $2 AND dss.activo = TRUE
+     LIMIT 1`,
+    [lang, slug]
+  );
+  if (resultado.rows.length === 0) {
+    return res.status(404).send('Destino no encontrado');
+  }
+
+  res.sendFile(path.join(__dirname, 'public', 'destino-pagina.html'));
+}));
 
 app.get('/flota', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'flota.html'));
