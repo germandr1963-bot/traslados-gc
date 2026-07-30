@@ -6419,7 +6419,14 @@ app.post('/admin/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (
   const limpio = texto.replace(/```json|```/g, '').trim();
   const propuestas = JSON.parse(limpio);
 
-  res.json({ ok: true, propuestas });
+  // Añadir el nombre español a cada propuesta, para la pantalla de revisión
+  const mapaNombres = {};
+  for (const p of pendientes) mapaNombres[p.id] = p.nombre;
+  const propuestasConEs = propuestas.map(function (p) {
+    return { id: p.id, nombre: p.nombre, nombre_es: mapaNombres[p.id] || '' };
+  });
+
+  res.json({ ok: true, propuestas: propuestasConEs });
 }));
 
 // Resumen de traducciones de destinos en todos los idiomas (para la
