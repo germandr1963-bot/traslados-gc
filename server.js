@@ -4711,6 +4711,13 @@ app.post('/admin/palabras-paginas/:lang/:pagina', requireAdmin, asyncHandler(asy
   res.json({ ok: true });
 }));
 
+// API pública: devuelve las palabras de URL de páginas para un idioma dado.
+// Usada por las páginas HTML para construir enlaces correctos en el footer/cabecera.
+app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
+  const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
+  res.json(PALABRAS_PAGINAS[lang] || {});
+}));
+
 // Devuelve todas las palabras de páginas para el admin
 app.get('/admin/palabras-paginas', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT lang_code, pagina, palabra FROM palabras_paginas ORDER BY lang_code, pagina');
@@ -5070,16 +5077,22 @@ app.get('/api/destinos-publicos', asyncHandler(async (req, res) => {
   res.json({ islas: porIsla });
 }));
 
+// API pública del listado de destinos por idioma.
+// Recibe ?lang=xx para devolver slugs y reseñas en ese idioma.
+// Si no se pasa lang o no existe contenido en ese idioma, usa español como fallback.
 app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
+  const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
   const result = await pool.query(`
     SELECT DISTINCT d.id, d.nombre, d.isla, d.zona, d.orden,
-           dss.slug_url, dss.resena_breve,
+           COALESCE(dss_lang.slug_url, dss_es.slug_url) AS slug_url,
+           COALESCE(dss_lang.resena_breve, dss_es.resena_breve) AS resena_breve,
            (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
     FROM destinos d
-    JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = 'es'
-    WHERE d.visible_rutas = TRUE
+    JOIN destinos_seo_settings dss_es ON dss_es.destino_id = d.id AND dss_es.lang_code = 'es'
+    LEFT JOIN destinos_seo_settings dss_lang ON dss_lang.destino_id = d.id AND dss_lang.lang_code = $1 AND dss_lang.activo = TRUE
+    WHERE d.visible_rutas = TRUE AND dss_es.activo = TRUE
     ORDER BY d.isla, d.orden, d.nombre
-  `);
+  `, [lang]);
   const porIsla = {};
   for (const d of result.rows) {
     const isla = d.isla || 'Gran Canaria';
@@ -5093,7 +5106,8 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
       resena_breve: d.resena_breve || ''
     });
   }
-  res.json({ islas: porIsla });
+  const palabraDestino = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].destino) ? PALABRAS_PAGINAS[lang].destino : 'destino';
+  res.json({ islas: porIsla, palabra_destino: palabraDestino });
 }));
 
 // ─── Página de inicio — renderizada en servidor con EJS ──────────────────
@@ -5133,28 +5147,65 @@ async function renderReserva(req, res, lang) {
   });
 }
 
-// Direcciones de reserva por idioma (/en/booking, /ru/bronirovanie...).
-// La palabra por idioma vive en idiomas_web.palabra_reserva y es editable
-// desde el admin. Red de seguridad: /xx/reserva redirige siempre a la
-// dirección correcta del idioma, para no perder enlaces antiguos o mal escritos.
+// Rutas de sección por idioma: reserva, destinos, rutas, flota, contacto.
+//
+// Cada página pública tiene su propia palabra por idioma, gestionada desde:
+//   Admin → Gestionar idiomas → "Palabras de URL por página"
+//   Las palabras de reserva viven en idiomas_web.palabra_reserva
+//   Las demás palabras viven en la tabla palabras_paginas
+//
+// Ejemplos:
+//   /en/booking        → página de reserva en inglés
+//   /en/destinations   → listado de destinos en inglés
+//   /de/routen         → listado de rutas en alemán
+//   /fi/kalusto        → flota en finés
+//   /nl/contact        → contacto en holandés
 app.get('/:lang([a-z]{2})/:seccion', asyncHandler(async (req, res) => {
   const { lang, seccion } = req.params;
   if (!IDIOMAS_PERMITIDOS.includes(lang)) {
     return res.status(404).send('Página no encontrada');
   }
-  const palabra = SECCIONES_RESERVA[lang] || 'reserva';
+
   const idx = req.originalUrl.indexOf('?');
   const query = idx !== -1 ? req.originalUrl.slice(idx) : '';
+  const pp = PALABRAS_PAGINAS[lang] || {};
 
-  if (lang === 'es' && (seccion === palabra || seccion === 'reserva')) {
+  // ── Reserva ──────────────────────────────────────────────────────────────
+  const palabraReserva = SECCIONES_RESERVA[lang] || 'reserva';
+  if (lang === 'es' && (seccion === palabraReserva || seccion === 'reserva')) {
     return res.redirect(301, '/reserva' + query);
   }
-  if (seccion === palabra) {
+  if (seccion === palabraReserva) {
     return renderReserva(req, res, lang);
   }
   if (seccion === 'reserva') {
-    return res.redirect(301, '/' + lang + '/' + palabra + query);
+    return res.redirect(301, '/' + lang + '/' + palabraReserva + query);
   }
+
+  // ── Destinos (listado) ───────────────────────────────────────────────────
+  const palabraDestinos = pp.destinos || 'destinos';
+  if (seccion === palabraDestinos) {
+    return res.sendFile(path.join(__dirname, 'public', 'destinos.html'));
+  }
+
+  // ── Rutas ────────────────────────────────────────────────────────────────
+  const palabraRutas = pp.rutas || 'rutas';
+  if (seccion === palabraRutas) {
+    return res.sendFile(path.join(__dirname, 'public', 'rutas.html'));
+  }
+
+  // ── Flota ────────────────────────────────────────────────────────────────
+  const palabraFlota = pp.flota || 'flota';
+  if (seccion === palabraFlota) {
+    return res.sendFile(path.join(__dirname, 'public', 'flota.html'));
+  }
+
+  // ── Contacto ─────────────────────────────────────────────────────────────
+  const palabraContacto = pp.contacto || 'contacto';
+  if (seccion === palabraContacto) {
+    return res.sendFile(path.join(__dirname, 'public', 'contacto.html'));
+  }
+
   return res.status(404).send('Página no encontrada');
 }));
 
