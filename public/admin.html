@@ -3542,9 +3542,11 @@ function renderizarTablaTextos(datos) {
   }
 
   // Agrupar por módulo manteniendo orden de aparición
+  // El módulo 'Destinos' se pinta aparte en anexarSeccionDestinos (al final de la tabla)
   var modulos = [];
   var porModulo = {};
   datos.textos.forEach(function(t) {
+    if (t.modulo === 'Destinos') return;
     if (!porModulo[t.modulo]) {
       porModulo[t.modulo] = [];
       modulos.push(t.modulo);
