@@ -365,26 +365,10 @@ table.tabla-precios input {
           <span id="pct-destinos-idiomas" style="float:right;font-size:12px;"></span>
         </div>
         <div id="panel-destinos-idiomas" style="display:none;padding-top:14px;">
-        <p class="subtitulo" style="margin-bottom:1rem;">Nombres de los destinos en cada idioma activo. Se usan en selectores y listados. El SEO de cada ruta se traduce por separado.</p>
-        <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
-          <select id="select-lang-destinos" class="campo" style="width:200px;height:40px;" onchange="cargarTraduccionesDestinos()"></select>
-          <span style="font-size:12px;color:var(--texto-muted);">La traducción con IA se hace desde el botón 🤖 de arriba, junto con los textos.</span>
-        </div>
-        <div id="aviso-traducciones-destinos" style="margin-bottom:1rem;display:none;"></div>
-        <table class="tabla-admin">
-          <thead>
-            <tr>
-              <th style="width:35%">Nombre en español</th>
-              <th style="width:15%;text-align:center">Estado</th>
-              <th>Traducción</th>
-              <th style="width:100px"></th>
-            </tr>
-          </thead>
-          <tbody id="cuerpo-traducciones-destinos"></tbody>
-        </table>
-        <div style="margin-top:1rem;display:flex;justify-content:flex-end;">
-          <button class="boton-primario" onclick="guardarTodasTraduccionesDestinos()">💾 Guardar todo</button>
-        </div>
+          <table class="tabla-admin">
+            <thead id="thead-destinos-idiomas"></thead>
+            <tbody id="cuerpo-destinos-idiomas"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -3892,9 +3876,8 @@ function guardarRevisionIA(lang) {
     cargarTextosInterfaz();
     cargarResumenDestinosIdiomas();
     var panelDest = document.getElementById('panel-destinos-idiomas');
-    var selDest = document.getElementById('select-lang-destinos');
-    if (panelDest && panelDest.style.display !== 'none' && selDest && selDest.value === lang) {
-      cargarTraduccionesDestinos();
+    if (panelDest && panelDest.style.display !== 'none') {
+      cargarTablaDestinosIdiomas();
     }
     setTimeout(function () { document.getElementById('editor-texto-interfaz').classList.add('oculto'); }, 1200);
   });
@@ -4933,7 +4916,98 @@ function toggleSeccionDestinosIdiomas(cabecera) {
   var abrir = panel.style.display === 'none';
   panel.style.display = abrir ? 'block' : 'none';
   icono.textContent = abrir ? '\u25BC' : '\u25B6';
-  if (abrir) cargarSelectorLangDestinos();
+  if (abrir) cargarTablaDestinosIdiomas();
+}
+
+var destinosIdiomasCache = null;
+
+function cargarTablaDestinosIdiomas() {
+  var cuerpo = document.getElementById('cuerpo-destinos-idiomas');
+  cuerpo.innerHTML = '<tr><td colspan="12" style="color:var(--texto-muted)">Cargando...</td></tr>';
+  fetch('/admin/destinos/traducciones-todas')
+    .then(function (r) { return r.json(); })
+    .then(function (datos) {
+      destinosIdiomasCache = datos.destinos || [];
+      renderizarTablaDestinosIdiomas();
+    });
+}
+
+function renderizarTablaDestinosIdiomas() {
+  var thead = document.getElementById('thead-destinos-idiomas');
+  thead.innerHTML = '<tr><th>Texto</th><th>Módulo</th>' +
+    IDIOMAS_TEXTOS.map(function (l) { return '<th style="text-align:center">' + l.toUpperCase() + '</th>'; }).join('') +
+    '<th>Acción</th></tr>';
+  var html = '';
+  destinosIdiomasCache.forEach(function (d) {
+    var celdas = IDIOMAS_TEXTOS.map(function (lang) {
+      var ok = d.traducciones[lang];
+      return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+    }).join('');
+    html += '<tr>' +
+      '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(d.nombre_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">destino_' + d.id + '</span></td>' +
+      '<td style="font-size:12px;color:var(--texto-muted);">Destinos</td>' +
+      celdas +
+      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorDestinoIdiomas(' + d.id + ')">✏️ Editar</button></td>' +
+    '</tr>';
+  });
+  document.getElementById('cuerpo-destinos-idiomas').innerHTML = html;
+}
+
+function abrirEditorDestinoIdiomas(destinoId) {
+  var d = destinosIdiomasCache && destinosIdiomasCache.find(function (x) { return x.id === destinoId; });
+  if (!d) return;
+  var editor = document.getElementById('editor-texto-interfaz');
+  editor.classList.remove('oculto');
+  var tabs = IDIOMAS_TEXTOS.map(function (lang, i) {
+    var ok = d.traducciones[lang];
+    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? '' : ' tab-idioma-rojo') + '" ' +
+      'onclick="cambiarIdiomaEditorDestino(' + destinoId + ', \'' + lang + '\', this)">' +
+      lang.toUpperCase() + (ok ? '' : ' ⚠️') + '</button>';
+  }).join('');
+  editor.innerHTML =
+    '<h2 style="margin-top:0">✏️ ' + escapar(d.nombre_es) + '</h2>' +
+    '<div style="background:var(--gris-fondo);padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px;">' +
+    '<strong>Español (original):</strong> ' + escapar(d.nombre_es) + '<br>' +
+    '<span style="color:var(--texto-muted);font-size:12px;"><strong>Contexto:</strong> Nombre del destino tal como aparece en selectores y listados de la web. El nombre en español se edita en la pestaña Destino Inicial.</span>' +
+    '</div>' +
+    '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
+    '<div id="destino-campo-editor"></div>' +
+    '<div id="destino-mensaje-editor" style="margin-top:8px;"></div>' +
+    '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-texto-interfaz\').classList.add(\'oculto\')">Cerrar</button>';
+  cambiarIdiomaEditorDestino(destinoId, IDIOMAS_TEXTOS[0], editor.querySelector('.tab-idioma'));
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cambiarIdiomaEditorDestino(destinoId, lang, botonTab) {
+  document.querySelectorAll('#editor-texto-interfaz .tab-idioma').forEach(function (b) { b.classList.remove('activo'); });
+  if (botonTab) botonTab.classList.add('activo');
+  var d = destinosIdiomasCache.find(function (x) { return x.id === destinoId; });
+  var campo = document.getElementById('destino-campo-editor');
+  campo.innerHTML =
+    '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
+    '<input type="text" class="campo" id="destino-traduccion" placeholder="Todavía sin traducir..." value="' + escapar(d.traducciones[lang] || '') + '">' +
+    '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionDestinoIdiomas(' + destinoId + ', \'' + lang + '\')">💾 Guardar</button>';
+}
+
+function guardarTraduccionDestinoIdiomas(destinoId, lang) {
+  var valor = document.getElementById('destino-traduccion').value;
+  var msg = document.getElementById('destino-mensaje-editor');
+  fetch('/admin/destinos/' + destinoId + '/traduccion/' + lang, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre: valor })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Guardado</div>';
+      var d = destinosIdiomasCache.find(function (x) { return x.id === destinoId; });
+      if (valor && valor.trim()) { d.traducciones[lang] = valor; } else { delete d.traducciones[lang]; }
+      renderizarTablaDestinosIdiomas();
+      cargarResumenDestinosIdiomas();
+      setTimeout(function () { msg.innerHTML = ''; }, 2000);
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
+    }
+  });
 }
 
 function cargarSelectorLangDestinos() {
