@@ -6422,6 +6422,23 @@ app.post('/admin/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (
   res.json({ ok: true, propuestas });
 }));
 
+// Resumen de traducciones de destinos en todos los idiomas (para la
+// cabecera del colapsable "Destinos" en la pestaña Idiomas)
+app.get('/admin/destinos/traducciones-todas', requireAdmin, asyncHandler(async (req, res) => {
+  const destinos = await pool.query('SELECT id, nombre FROM destinos ORDER BY nombre');
+  const trads = await pool.query("SELECT destino_id, lang_code, nombre FROM destinos_traducciones WHERE COALESCE(nombre, '') <> ''");
+  const mapa = {};
+  for (const t of trads.rows) {
+    if (!mapa[t.destino_id]) mapa[t.destino_id] = {};
+    mapa[t.destino_id][t.lang_code] = t.nombre;
+  }
+  res.json({
+    destinos: destinos.rows.map(function (d) {
+      return { id: d.id, nombre_es: d.nombre, traducciones: mapa[d.id] || {} };
+    })
+  });
+}));
+
 // Guarda en bloque las propuestas de traducciones de destinos revisadas
 app.post('/admin/destinos/traducciones/guardar-lote', requireAdmin, asyncHandler(async (req, res) => {
   const { lang, propuestas } = req.body;
