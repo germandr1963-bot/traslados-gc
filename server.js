@@ -6380,7 +6380,9 @@ app.post('/admin/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (
     return res.status(400).json({ error: 'Idioma no válido' });
   }
 
-  const destinos = await pool.query('SELECT id, nombre FROM destinos WHERE activo = TRUE ORDER BY nombre');
+  // Todos los destinos: 'activo' solo controla la visibilidad en la web,
+  // la traducción debe existir siempre
+  const destinos = await pool.query('SELECT id, nombre FROM destinos ORDER BY nombre');
   const traducciones = await pool.query(
     'SELECT destino_id, nombre FROM destinos_traducciones WHERE lang_code = $1',
     [lang]
