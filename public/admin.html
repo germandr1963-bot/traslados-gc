@@ -4925,7 +4925,7 @@ function abrirEditorDestinoIdiomas(destinoId) {
       lang.toUpperCase() + (ok ? '' : ' ⚠️') + '</button>';
   }).join('');
   editor.innerHTML =
-    '<h2 style="margin-top:0">✏️ ' + escapar(d.nombre_es) + '</h2>' +
+    '<h2 style="margin-top:0">✏️ destino_' + d.id + '</h2>' +
     '<div style="background:var(--gris-fondo);padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px;">' +
     '<strong>Español (original):</strong> ' + escapar(d.nombre_es) + '<br>' +
     '<span style="color:var(--texto-muted);font-size:12px;"><strong>Contexto:</strong> Nombre del destino tal como aparece en selectores y listados de la web. El nombre en español se edita en la pestaña Destino Inicial.</span>' +
@@ -4945,12 +4945,12 @@ function cambiarIdiomaEditorDestino(destinoId, lang, botonTab) {
   var campo = document.getElementById('destino-campo-editor');
   campo.innerHTML =
     '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
-    '<input type="text" class="campo" id="destino-traduccion" placeholder="Todavía sin traducir..." value="' + escapar(d.traducciones[lang] || '') + '">' +
+    '<textarea class="campo" id="destino-traduccion" rows="2" placeholder="Todavía sin traducir...">' + escapar(d.traducciones[lang] || '') + '</textarea>' +
     '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionDestinoIdiomas(' + destinoId + ', \'' + lang + '\')">💾 Guardar</button>';
 }
 
 function guardarTraduccionDestinoIdiomas(destinoId, lang) {
-  var valor = document.getElementById('destino-traduccion').value;
+  var valor = (document.getElementById('destino-traduccion').value || '').trim();
   var msg = document.getElementById('destino-mensaje-editor');
   fetch('/admin/destinos/' + destinoId + '/traduccion/' + lang, {
     method: 'POST',
