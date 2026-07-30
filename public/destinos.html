@@ -161,9 +161,9 @@
 </head>
 <body>
   <header class="app">
-    <a href="/" class="nav izquierda">Inicio</a>
+    <a href="javascript:history.back()" class="nav izquierda">← Inicio</a>
     <a href="/" class="marca">TRASLADOS · GC</a>
-    <a href="/contacto" class="nav derecha">Contacto</a>
+    <a id="link-contacto-header" href="/contacto" class="nav derecha">Contacto</a>
   </header>
 
   <div class="contenido">
@@ -182,10 +182,10 @@
 
   <footer>
     <div class="footer-links">
-      <a href="/rutas">Rutas</a>
-      <a href="/destinos">Destinos</a>
-      <a href="/flota">Flota</a>
-      <a href="/contacto">Contacto</a>
+      <a id="footer-rutas" href="/rutas">Rutas</a>
+      <a id="footer-destinos" href="/destinos">Destinos</a>
+      <a id="footer-flota" href="/flota">Flota</a>
+      <a id="footer-contacto" href="/contacto">Contacto</a>
       <a href="/chofer/acceso/alta">Alta choferes</a>
       <a href="/chofer/acceso">Acceso a choferes</a>
       <a href="/mi-reserva">Acceso clientes</a>
@@ -194,10 +194,33 @@
   </footer>
 
   <script>
-    fetch('/api/destinos-pagina')
+    // Detectar idioma de la URL actual: /en/destinations, /de/reiseziele, etc.
+    // Si estamos en /destinos (sin idioma), usamos 'es' por defecto.
+    var partes = window.location.pathname.split('/');
+    var lang = (partes[1] && partes[1].length === 2) ? partes[1] : 'es';
+
+    // La palabra "destino" en la URL varía por idioma y se gestiona desde
+    // Admin → Gestionar idiomas → Palabras de URL por página.
+    // La API nos la devuelve junto con los destinos.
+    // Actualizar enlaces del footer y cabecera al idioma detectado
+    fetch('/api/palabras-paginas-publico?lang=' + lang)
+      .then(function(r) { return r.json(); })
+      .then(function(pp) {
+        if (lang !== 'es') {
+          var base = '/' + lang + '/';
+          document.getElementById('footer-rutas').href     = base + (pp.rutas    || 'rutas');
+          document.getElementById('footer-destinos').href  = base + (pp.destinos || 'destinos');
+          document.getElementById('footer-flota').href     = base + (pp.flota    || 'flota');
+          document.getElementById('footer-contacto').href  = base + (pp.contacto || 'contacto');
+          document.getElementById('link-contacto-header').href = base + (pp.contacto || 'contacto');
+        }
+      }).catch(function() {});
+
+    fetch('/api/destinos-pagina?lang=' + lang)
       .then(function(r) { return r.json(); })
       .then(function(d) {
         var islas = d.islas || {};
+        var palabraDestino = d.palabra_destino || 'destino'; // palabra en el idioma actual
         var nombres = Object.keys(islas);
         if (nombres.length === 0) {
           document.getElementById('contenido-destinos').innerHTML =
@@ -213,7 +236,7 @@
           destinos.forEach(function(dest) {
             var slug = dest.slug || dest.nombre.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
             var isla = (dest.isla || 'Gran Canaria').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-            var url = '/es/destino/' + isla + '/' + slug;
+            var url = '/' + lang + '/' + palabraDestino + '/' + isla + '/' + slug;
             html += '<a href="' + url + '" class="tarjeta-destino">';
             html += '<div class="td-foto">';
             if (dest.foto_cabecera_id) html += '<img src="/destino-foto/' + dest.foto_cabecera_id + '" alt="' + dest.nombre + '">';
