@@ -5167,25 +5167,31 @@ app.get('/destinos', (req, res) => {
 });
 
 // API pública de un destino por isla y slug
+// API pública de un destino por isla, slug e idioma.
+// Recibe ?lang=xx para devolver el contenido en el idioma correcto.
+// Si no se pasa lang o no es válido, usa español como fallback.
 app.get('/api/destino-publico/:isla/:slug', asyncHandler(async (req, res) => {
   const { isla, slug } = req.params;
+  const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
   const result = await pool.query(
     `SELECT d.id, d.nombre, d.isla, d.zona,
             dss.texto_descripcion, dss.meta_title, dss.meta_description,
             (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
      FROM destinos d
-     JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = 'es'
+     JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = $2
      WHERE dss.slug_url = $1
      LIMIT 1`,
-    [slug]
+    [slug, lang]
   );
   if (result.rows.length === 0) return res.status(404).json({ error: 'No encontrado' });
   const dest = result.rows[0];
   const fotos = await pool.query(
-    `SELECT id, alt_texto FROM destinos_fotos
-     WHERE destino_id = $1 AND (es_principal = FALSE OR es_principal IS NULL)
-     ORDER BY orden ASC NULLS LAST LIMIT 3`,
-    [dest.id]
+    `SELECT df.id, COALESCE(dfa.alt_texto, df.alt_texto) AS alt_texto
+     FROM destinos_fotos df
+     LEFT JOIN destinos_fotos_alt dfa ON dfa.foto_id = df.id AND dfa.lang_code = $2
+     WHERE df.destino_id = $1 AND (df.es_principal = FALSE OR df.es_principal IS NULL)
+     ORDER BY df.orden ASC NULLS LAST LIMIT 3`,
+    [dest.id, lang]
   );
   res.json({ ...dest, fotos: fotos.rows });
 }));
