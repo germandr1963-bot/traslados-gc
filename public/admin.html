@@ -3484,52 +3484,50 @@ function cargarTextosInterfaz() {
   }).then(function (r) { return r.json(); }).then(function (datos) {
     textosCache = datos;
     renderizarTablaTextos(datos);
-    // Destinos: una sección más de la misma tabla, con el mismo formato
-    return fetch('/admin/destinos/traducciones-todas');
-  }).then(function (r) { return r.json(); }).then(function (datos) {
-    destinosIdiomasCache = datos.destinos || [];
+    // Destinos: sección adicional — lee de textosCache (módulo 'Destinos'), igual que el resto
     anexarSeccionDestinos();
+    // Cargar cache de destinos para la IA de traducción (en paralelo, no bloquea el render)
+    fetch('/admin/destinos/traducciones-todas').then(function (r) { return r.json(); }).then(function (datos) {
+      destinosIdiomasCache = datos.destinos || [];
+    });
   });
 }
 
 function anexarSeccionDestinos() {
   var cuerpo = document.getElementById('tabla-textos-cuerpo');
-  if (!cuerpo || !destinosIdiomasCache) return;
+  if (!cuerpo || !textosCache || !textosCache.textos) return;
   var totalCols = 2 + IDIOMAS_TEXTOS.length + 1;
   var seccionId = 'modulo-sec-destinos';
 
-  var traducidos = 0;
-  destinosIdiomasCache.forEach(function (d) {
-    IDIOMAS_TEXTOS.forEach(function (l) { if (d.traducciones[l]) traducidos++; });
-  });
-  var total = destinosIdiomasCache.length * IDIOMAS_TEXTOS.length;
+  // Usar textosCache igual que el resto de módulos — fuente única y fiable
+  var textos = textosCache.textos.filter(function (t) { return t.modulo === 'Destinos'; });
+  if (textos.length === 0) return;
+
+  var traducidos = textos.reduce(function (sum, t) {
+    return sum + IDIOMAS_TEXTOS.filter(function (l) { return t.estado[l]; }).length;
+  }, 0);
+  var total = textos.length * IDIOMAS_TEXTOS.length;
   var pct = total > 0 ? Math.round(traducidos / total * 100) : 0;
   var colorPct = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
 
   var html = '<tr style="background:var(--gris-fondo);cursor:pointer;" onclick="toggleSeccionTextos(\'' + seccionId + '\', this)">' +
     '<td colspan="' + totalCols + '" style="padding:10px 14px;font-weight:600;font-size:13px;user-select:none;">' +
       '<span id="' + seccionId + '-icono">▶</span> Destinos' +
-      ' <span style="font-size:11px;font-weight:400;color:var(--texto-muted);">(' + destinosIdiomasCache.length + ' destinos)</span>' +
+      ' <span style="font-size:11px;font-weight:400;color:var(--texto-muted);">(' + textos.length + ' destinos)</span>' +
       ' <span style="float:right;font-size:12px;color:' + colorPct + ';">' + pct + '% traducido</span>' +
     '</td>' +
   '</tr>';
 
-  destinosIdiomasCache.forEach(function (d) {
+  textos.forEach(function (t) {
     var celdas = IDIOMAS_TEXTOS.map(function (lang) {
-      var ok = d.traducciones[lang];
+      var ok = t.estado[lang];
       return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
     }).join('');
-    // Buscar el id en textos_interfaz para usar el editor unificado
-    var claveTi = 'destino_nombre_' + d.id;
-    var textoTi = textosCache && textosCache.textos && textosCache.textos.find(function (t) { return t.clave === claveTi; });
-    var botonEditar = textoTi
-      ? '<button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + textoTi.id + ')">✏️ Editar</button>'
-      : '<span style="font-size:11px;color:var(--texto-muted);">Pendiente de sync</span>';
     html += '<tr class="' + seccionId + '" style="display:none;">' +
-      '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(d.nombre_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">destino_nombre_' + d.id + '</span></td>' +
+      '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
       '<td style="font-size:12px;color:var(--texto-muted);">Destinos</td>' +
       celdas +
-      '<td>' + botonEditar + '</td>' +
+      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
     '</tr>';
   });
 
