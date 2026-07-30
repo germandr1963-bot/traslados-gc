@@ -5118,7 +5118,9 @@ async function renderHome(req, res, lang) {
   const t = function(clave) { return obtenerTexto(clave, lang); };
   const idiomas = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
   const rutaReserva = lang === 'es' ? '/reserva' : '/' + lang + '/' + (SECCIONES_RESERVA[lang] || 'reserva');
-  res.render('index', { lang, t, idiomas: idiomas.rows, BASE_URL, rutaReserva });
+  // Palabras de URL de páginas para construir los enlaces del footer en el idioma correcto
+  const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
+  res.render('index', { lang, t, idiomas: idiomas.rows, BASE_URL, rutaReserva, palabrasPaginas });
 }
 
 app.get('/', asyncHandler(async (req, res) => {
