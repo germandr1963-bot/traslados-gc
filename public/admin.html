@@ -355,6 +355,30 @@ table.tabla-precios input {
 
       <div id="editor-texto-interfaz" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
 
+      <!-- Panel de traducciones de destinos -->
+      <div style="margin-top:2.5rem;">
+        <h2 style="font-size:1.1rem;margin-bottom:0.5rem;">Traducciones de destinos</h2>
+        <p class="subtitulo" style="margin-bottom:1rem;">Nombres de los destinos en cada idioma activo. Se usan en selectores y listados. El SEO de cada ruta se traduce por separado.</p>
+        <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
+          <select id="select-lang-destinos" class="campo" style="width:200px;height:40px;" onchange="cargarTraduccionesDestinos()"></select>
+          <button class="boton-costa" onclick="traducirDestinosIA()">✨ Sugerir con IA los que faltan</button>
+        </div>
+        <div id="aviso-traducciones-destinos" style="margin-bottom:1rem;display:none;"></div>
+        <table class="tabla-admin">
+          <thead>
+            <tr>
+              <th style="width:35%">Nombre en español</th>
+              <th style="width:15%;text-align:center">Estado</th>
+              <th>Traducción</th>
+              <th style="width:100px"></th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo-traducciones-destinos"></tbody>
+        </table>
+        <div style="margin-top:1rem;display:flex;justify-content:flex-end;">
+          <button class="boton-primario" onclick="guardarTodasTraduccionesDestinos()">💾 Guardar todo</button>
+        </div>
+      </div>
     </div>
 
     <!-- ─── CALCULADOR DE TARIFAS ─────────────────────────────────────────── -->
@@ -1636,7 +1660,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
     if (boton.dataset.seccion === 'seo') cargarSEO();
-    if (boton.dataset.seccion === 'idiomas') { cargarTextosInterfaz(); }
+    if (boton.dataset.seccion === 'idiomas') { cargarTextosInterfaz(); cargarSelectorLangDestinos(); }
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
     if (boton.dataset.seccion === 'configuracion') cargarConfiguracionNoshow();
     if (boton.dataset.seccion === 'contacto') cargarContacto();
@@ -3484,54 +3508,7 @@ function cargarTextosInterfaz() {
   }).then(function (r) { return r.json(); }).then(function (datos) {
     textosCache = datos;
     renderizarTablaTextos(datos);
-    // Destinos: sección adicional — lee de textosCache (módulo 'Destinos'), igual que el resto
-    anexarSeccionDestinos();
-    // Cargar cache de destinos para la IA de traducción (en paralelo, no bloquea el render)
-    fetch('/admin/destinos/traducciones-todas').then(function (r) { return r.json(); }).then(function (datos) {
-      destinosIdiomasCache = datos.destinos || [];
-    });
   });
-}
-
-function anexarSeccionDestinos() {
-  var cuerpo = document.getElementById('tabla-textos-cuerpo');
-  if (!cuerpo || !textosCache || !textosCache.textos) return;
-  var totalCols = 2 + IDIOMAS_TEXTOS.length + 1;
-  var seccionId = 'modulo-sec-destinos';
-
-  // Usar textosCache igual que el resto de módulos — fuente única y fiable
-  var textos = textosCache.textos.filter(function (t) { return t.modulo === 'Destinos'; });
-  if (textos.length === 0) return;
-
-  var traducidos = textos.reduce(function (sum, t) {
-    return sum + IDIOMAS_TEXTOS.filter(function (l) { return t.estado[l]; }).length;
-  }, 0);
-  var total = textos.length * IDIOMAS_TEXTOS.length;
-  var pct = total > 0 ? Math.round(traducidos / total * 100) : 0;
-  var colorPct = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
-
-  var html = '<tr style="background:var(--gris-fondo);cursor:pointer;" onclick="toggleSeccionTextos(\'' + seccionId + '\', this)">' +
-    '<td colspan="' + totalCols + '" style="padding:10px 14px;font-weight:600;font-size:13px;user-select:none;">' +
-      '<span id="' + seccionId + '-icono">▶</span> Destinos' +
-      ' <span style="font-size:11px;font-weight:400;color:var(--texto-muted);">(' + textos.length + ' destinos)</span>' +
-      ' <span style="float:right;font-size:12px;color:' + colorPct + ';">' + pct + '% traducido</span>' +
-    '</td>' +
-  '</tr>';
-
-  textos.forEach(function (t) {
-    var celdas = IDIOMAS_TEXTOS.map(function (lang) {
-      var ok = t.estado[lang];
-      return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
-    }).join('');
-    html += '<tr class="' + seccionId + '" style="display:none;">' +
-      '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
-      '<td style="font-size:12px;color:var(--texto-muted);">Destinos</td>' +
-      celdas +
-      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
-    '</tr>';
-  });
-
-  cuerpo.innerHTML += html;
 }
 
 function renderizarTablaTextos(datos) {
@@ -3542,11 +3519,9 @@ function renderizarTablaTextos(datos) {
   }
 
   // Agrupar por módulo manteniendo orden de aparición
-  // El módulo 'Destinos' se pinta aparte en anexarSeccionDestinos (al final de la tabla)
   var modulos = [];
   var porModulo = {};
   datos.textos.forEach(function(t) {
-    if (t.modulo === 'Destinos') return;
     if (!porModulo[t.modulo]) {
       porModulo[t.modulo] = [];
       modulos.push(t.modulo);
@@ -3808,33 +3783,28 @@ function anadirIdioma() {
 function traducirConIA() {
   var lang = document.getElementById('select-idioma-ia').value;
   var msg = document.getElementById('mensaje-textos');
-  msg.innerHTML = '<div class="aviso-ok">🤖 Traduciendo con IA (textos y destinos), puede tardar unos segundos...</div>';
+  msg.innerHTML = '<div class="aviso-ok">🤖 Traduciendo con IA, puede tardar unos segundos...</div>';
 
-  // Una sola IA para toda la pestaña: textos de la web y nombres de destinos
-  Promise.all([
-    fetch('/admin/textos/traducir-ia/' + lang, { method: 'POST' }).then(function (r) { return r.json(); }),
-    fetch('/admin/destinos/traducir-ia/' + lang, { method: 'POST' }).then(function (r) { return r.json(); })
-  ]).then(function (resultados) {
-    var rTextos = resultados[0];
-    var rDestinos = resultados[1];
-    if (!rTextos.ok) {
-      msg.innerHTML = '<div class="aviso-error">' + escapar(rTextos.error || 'Error al traducir') + '</div>';
-      return;
-    }
-    var propTextos = rTextos.propuestas || [];
-    var propDestinos = (rDestinos && rDestinos.ok && rDestinos.propuestas) ? rDestinos.propuestas : [];
-    if (propTextos.length === 0 && propDestinos.length === 0) {
-      msg.innerHTML = '<div class="aviso-ok">✅ Ya estaba todo traducido en ' + lang.toUpperCase() + ' (textos y destinos).</div>';
-      return;
-    }
-    msg.innerHTML = '';
-    mostrarRevisionIA(lang, propTextos, propDestinos);
-  }).catch(function () {
-    msg.innerHTML = '<div class="aviso-error">No se pudo conectar con la IA. Inténtalo de nuevo.</div>';
-  });
+  fetch('/admin/textos/traducir-ia/' + lang, { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (respuesta) {
+      if (!respuesta.ok) {
+        msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al traducir') + '</div>';
+        return;
+      }
+      if (respuesta.propuestas.length === 0) {
+        msg.innerHTML = '<div class="aviso-ok">✅ Ya estaba todo traducido en ' + lang.toUpperCase() + '.</div>';
+        return;
+      }
+      msg.innerHTML = '';
+      mostrarRevisionIA(lang, respuesta.propuestas);
+    })
+    .catch(function () {
+      msg.innerHTML = '<div class="aviso-error">No se pudo conectar con la IA. Inténtalo de nuevo.</div>';
+    });
 }
 
-function mostrarRevisionIA(lang, propuestas, propuestasDestinos) {
+function mostrarRevisionIA(lang, propuestas) {
   var editor = document.getElementById('editor-texto-interfaz');
   editor.classList.remove('oculto');
 
@@ -3847,20 +3817,10 @@ function mostrarRevisionIA(lang, propuestas, propuestasDestinos) {
     '</div>';
   }).join('');
 
-  var filasDestinos = (propuestasDestinos || []).map(function (p) {
-    return '<div style="border-bottom:1px solid var(--gris-borde);padding:12px 0;">' +
-      '<div style="font-size:13px;color:var(--texto-muted);margin-bottom:6px;">🇪🇸 ' + escapar(p.nombre_es) + '</div>' +
-      '<textarea class="campo revision-ia-destino" data-destino-id="' + p.id + '" rows="1" style="width:100%;">' + escapar(p.nombre) + '</textarea>' +
-    '</div>';
-  }).join('');
-  if (filasDestinos) {
-    filasDestinos = '<div style="background:var(--gris-fondo);padding:8px 12px;font-weight:600;font-size:13px;border-radius:6px;margin-top:10px;">Destinos</div>' + filasDestinos;
-  }
-
   editor.innerHTML =
     '<h2 style="margin-top:0">🤖 Revisión — traducción IA al ' + lang.toUpperCase() + '</h2>' +
     '<p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Revisa cada propuesta antes de guardar. Puedes editar cualquier texto antes de confirmar.</p>' +
-    '<div style="max-height:400px;overflow-y:auto;">' + filas + filasDestinos + '</div>' +
+    '<div style="max-height:400px;overflow-y:auto;">' + filas + '</div>' +
     '<div id="revision-ia-msg" style="margin:12px 0;"></div>' +
     '<button class="boton-primario" onclick="guardarRevisionIA(\'' + lang + '\')">💾 Guardar todas</button> ' +
     '<button class="boton-secundario" onclick="document.getElementById(\'editor-texto-interfaz\').classList.add(\'oculto\')">Cancelar</button>';
@@ -3876,38 +3836,18 @@ function guardarRevisionIA(lang) {
   var msg = document.getElementById('revision-ia-msg');
   msg.innerHTML = 'Guardando...';
 
-  // Destinos revisados en la misma pantalla
-  var tasDestinos = document.querySelectorAll('.revision-ia-destino');
-  var propuestasDestinos = Array.prototype.map.call(tasDestinos, function (ta) {
-    return { id: parseInt(ta.dataset.destinoId, 10), nombre: ta.value };
-  }).filter(function (p) { return p.nombre && p.nombre.trim(); });
-
-  var guardados = [];
-  if (traducciones.length > 0) {
-    guardados.push(fetch('/admin/textos/guardar-lote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lang: lang, traducciones: traducciones })
-    }).then(function (r) { return r.json(); }));
-  }
-  if (propuestasDestinos.length > 0) {
-    guardados.push(fetch('/admin/destinos/traducciones/guardar-lote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lang: lang, propuestas: propuestasDestinos })
-    }).then(function (r) { return r.json(); }));
-  }
-
-  Promise.all(guardados).then(function (respuestas) {
-    var fallo = respuestas.find(function (r) { return !r.ok; });
-    if (fallo) {
-      msg.innerHTML = '<div class="aviso-error">' + escapar(fallo.error || 'Error al guardar') + '</div>';
-      return;
+  fetch('/admin/textos/guardar-lote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang: lang, traducciones: traducciones })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Guardadas ' + respuesta.guardadas + ' traducciones</div>';
+      cargarTextosInterfaz();
+      setTimeout(function () { document.getElementById('editor-texto-interfaz').classList.add('oculto'); }, 1200);
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
     }
-    var total = traducciones.length + propuestasDestinos.length;
-    msg.innerHTML = '<div class="aviso-ok">✅ Guardadas ' + total + ' traducciones</div>';
-    cargarTextosInterfaz();
-    setTimeout(function () { document.getElementById('editor-texto-interfaz').classList.add('oculto'); }, 1200);
   });
 }
 
@@ -4916,70 +4856,6 @@ function eliminarTemporada(id, nombre) {
 
 // ─── Destinos: traducciones ───────────────────────────────────────────────────
 var destinosTradCache = []; // cache de propuestas IA pendientes de guardar
-
-var destinosIdiomasCache = null;
-
-function abrirEditorDestinoIdiomas(destinoId) {
-  var d = destinosIdiomasCache && destinosIdiomasCache.find(function (x) { return x.id === destinoId; });
-  if (!d) return;
-  var editor = document.getElementById('editor-texto-interfaz');
-  editor.classList.remove('oculto');
-  var tabs = IDIOMAS_TEXTOS.map(function (lang, i) {
-    var ok = d.traducciones[lang];
-    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? '' : ' tab-idioma-rojo') + '" ' +
-      'onclick="cambiarIdiomaEditorDestino(' + destinoId + ', \'' + lang + '\', this)">' +
-      lang.toUpperCase() + (ok ? '' : ' ⚠️') + '</button>';
-  }).join('');
-  editor.innerHTML =
-    '<h2 style="margin-top:0">✏️ destino_' + d.id + '</h2>' +
-    '<div style="background:var(--gris-fondo);padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px;">' +
-    '<strong>Español (original):</strong> ' + escapar(d.nombre_es) + '<br>' +
-    '<span style="color:var(--texto-muted);font-size:12px;"><strong>Contexto:</strong> Nombre del destino tal como aparece en selectores y listados de la web. El nombre en español se edita en la pestaña Destino Inicial.</span>' +
-    '</div>' +
-    '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
-    '<div id="destino-campo-editor"></div>' +
-    '<div id="destino-mensaje-editor" style="margin-top:8px;"></div>' +
-    '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-texto-interfaz\').classList.add(\'oculto\')">Cerrar</button>';
-  cambiarIdiomaEditorDestino(destinoId, IDIOMAS_TEXTOS[0], editor.querySelector('.tab-idioma'));
-  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function cambiarIdiomaEditorDestino(destinoId, lang, botonTab) {
-  document.querySelectorAll('#editor-texto-interfaz .tab-idioma').forEach(function (b) { b.classList.remove('activo'); });
-  if (botonTab) botonTab.classList.add('activo');
-
-  var campo = document.getElementById('destino-campo-editor');
-  campo.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
-
-  fetch('/admin/destinos/' + destinoId + '/traduccion/' + lang)
-    .then(function (r) { return r.json(); })
-    .then(function (datos) {
-      campo.innerHTML =
-        '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
-        '<textarea class="campo" id="destino-traduccion" rows="2" placeholder="Todavía sin traducir...">' + escapar(datos.nombre || '') + '</textarea>' +
-        '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionDestinoIdiomas(' + destinoId + ', \'' + lang + '\')">💾 Guardar</button>';
-    });
-}
-
-function guardarTraduccionDestinoIdiomas(destinoId, lang) {
-  var valor = (document.getElementById('destino-traduccion').value || '').trim();
-  var msg = document.getElementById('destino-mensaje-editor');
-  fetch('/admin/destinos/' + destinoId + '/traduccion/' + lang, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nombre: valor })
-  }).then(function (r) { return r.json(); }).then(function (respuesta) {
-    if (respuesta.ok) {
-      msg.innerHTML = '<div class="aviso-ok">✅ Guardado</div>';
-      var d = destinosIdiomasCache.find(function (x) { return x.id === destinoId; });
-      if (valor && valor.trim()) { d.traducciones[lang] = valor; } else { delete d.traducciones[lang]; }
-      cargarTextosInterfaz();
-      setTimeout(function () { msg.innerHTML = ''; }, 2000);
-    } else {
-      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
-    }
-  });
-}
 
 function cargarSelectorLangDestinos() {
   fetch('/admin/idiomas').then(function(r) { return r.json(); }).then(function(idiomas) {
