@@ -4731,8 +4731,11 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
   const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
   res.json({
     ...(PALABRAS_PAGINAS[lang] || {}),
-    proximamente_titulo:    obtenerTexto('destinos_proximamente_titulo',    lang),
-    proximamente_subtitulo: obtenerTexto('destinos_proximamente_subtitulo', lang)
+    proximamente_titulo:    obtenerTexto('destinos_proximamente_titulo',       lang),
+    proximamente_subtitulo: obtenerTexto('destinos_proximamente_subtitulo',    lang),
+    footer_alta_choferes:   obtenerTexto('home_footer_alta_choferes',          lang),
+    footer_acceso_choferes: obtenerTexto('home_footer_acceso_choferes',        lang),
+    footer_acceso_clientes: obtenerTexto('home_footer_acceso_clientes',        lang)
   });
 }));
 
