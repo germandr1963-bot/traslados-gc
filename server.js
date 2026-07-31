@@ -685,6 +685,7 @@ async function initSchema() {
     { clave: 'home_texto_ver_otras_cats',contexto: 'Nota bajo el resultado del buscador para ver otras categorías', es: 'Para ver el precio de otras categorías, selecciónala y pulsa Ver precio.', en: 'To see prices for other categories, select one and press See price.' },
     { clave: 'home_pax_sufijo',          contexto: 'Sufijo tras el número de pasajeros en el resultado del buscador', es: 'pasajeros', en: 'passengers' },
     { clave: 'home_maletas',             contexto: 'Palabra maletas en la tarjeta de resultado del buscador', es: 'maletas', en: 'suitcases' },
+    { clave: 'home_footer_rutas', contexto: 'Enlace Rutas en el footer', es: 'Rutas', en: 'Routes', de: 'Routen', sv: 'Rutter', no: 'Ruter', nl: 'Routes', it: 'Percorsi', fr: 'Trajets', fi: 'Reitit' },
     { clave: 'home_footer_destinos',     contexto: 'Enlace Destinos en el footer', es: 'Destinos', en: 'Destinations' },
     { clave: 'home_footer_flota',        contexto: 'Enlace Flota en el footer', es: 'Flota', en: 'Fleet' },
     { clave: 'home_footer_contacto',     contexto: 'Enlace Contacto en el footer', es: 'Contacto', en: 'Contact' },
@@ -701,13 +702,16 @@ async function initSchema() {
       [tx.clave, tx.contexto, tx.es]
     );
     const textoId = fila.rows[0].id;
-    if (tx.en) {
-      await pool.query(
-        `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
-         VALUES ($1, 'en', $2)
-         ON CONFLICT (texto_id, lang_code) DO NOTHING`,
-        [textoId, tx.en]
-      );
+    const LANGS_SEMILLA = ['en', 'de', 'sv', 'no', 'nl', 'it', 'fr', 'fi'];
+    for (const l of LANGS_SEMILLA) {
+      if (tx[l]) {
+        await pool.query(
+          `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (texto_id, lang_code) DO NOTHING`,
+          [textoId, l, tx[l]]
+        );
+      }
     }
   }
 
@@ -4731,11 +4735,15 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
   const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
   res.json({
     ...(PALABRAS_PAGINAS[lang] || {}),
-    proximamente_titulo:    obtenerTexto('destinos_proximamente_titulo',       lang),
-    proximamente_subtitulo: obtenerTexto('destinos_proximamente_subtitulo',    lang),
-    footer_alta_choferes:   obtenerTexto('home_footer_alta_choferes',          lang),
-    footer_acceso_choferes: obtenerTexto('home_footer_acceso_choferes',        lang),
-    footer_acceso_clientes: obtenerTexto('home_footer_acceso_clientes',        lang)
+    proximamente_titulo:    obtenerTexto('destinos_proximamente_titulo',    lang),
+    proximamente_subtitulo: obtenerTexto('destinos_proximamente_subtitulo', lang),
+    footer_rutas:           obtenerTexto('home_footer_rutas',               lang),
+    footer_destinos:        obtenerTexto('home_footer_destinos',            lang),
+    footer_flota:           obtenerTexto('home_footer_flota',               lang),
+    footer_contacto:        obtenerTexto('home_footer_contacto',            lang),
+    footer_alta_choferes:   obtenerTexto('home_footer_alta_choferes',       lang),
+    footer_acceso_choferes: obtenerTexto('home_footer_acceso_choferes',     lang),
+    footer_acceso_clientes: obtenerTexto('home_footer_acceso_clientes',     lang)
   });
 }));
 
