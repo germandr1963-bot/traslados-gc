@@ -175,8 +175,8 @@
     </div>
 
     <div class="bloque-proximamente">
-      <div class="prox-titulo">Próximamente · Otras islas</div>
-      <p class="prox-sub">Estamos ampliando el servicio al resto del archipiélago. Muy pronto, más islas.</p>
+      <div class="prox-titulo" id="prox-titulo">Próximamente · Otras islas</div>
+      <p class="prox-sub" id="prox-subtitulo">Estamos ampliando el servicio al resto del archipiélago. Muy pronto, más islas.</p>
     </div>
   </div>
 
@@ -214,6 +214,8 @@
           document.getElementById('footer-contacto').href  = base + (pp.contacto || 'contacto');
           document.getElementById('link-contacto-header').href = base + (pp.contacto || 'contacto');
         }
+        if (pp.proximamente_titulo)    document.getElementById('prox-titulo').textContent    = pp.proximamente_titulo;
+        if (pp.proximamente_subtitulo) document.getElementById('prox-subtitulo').textContent = pp.proximamente_subtitulo;
       }).catch(function() {});
 
     fetch('/api/destinos-pagina?lang=' + lang)
