@@ -872,6 +872,20 @@ async function initSchema() {
     );
   }
 
+  // Textos del bloque "Próximamente" en la página de listado de destinos
+  const TEXTOS_PROXIMAMENTE = [
+    { clave: 'destinos_proximamente_titulo',    contexto: 'Título del bloque "Próximamente" al final de la página de listado de destinos', es: 'Próximamente · Otras islas' },
+    { clave: 'destinos_proximamente_subtitulo', contexto: 'Subtítulo del bloque "Próximamente" al final de la página de listado de destinos', es: 'Estamos ampliando el servicio al resto del archipiélago. Muy pronto, más islas.' },
+  ];
+  for (const tx of TEXTOS_PROXIMAMENTE) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Páginas de destino', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Páginas de destino', contexto = $2, texto_es = $3`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
   await cargarTextosCache();
 
   // ─── Tarifario de precios ─────────────────────────────────────────────────
