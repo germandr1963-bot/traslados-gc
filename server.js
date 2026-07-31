@@ -5086,10 +5086,12 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
     SELECT DISTINCT d.id, d.nombre, d.isla, d.zona, d.orden,
            COALESCE(dss_lang.slug_url, dss_es.slug_url) AS slug_url,
            COALESCE(dss_lang.resena_breve, dss_es.resena_breve) AS resena_breve,
-           (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
+           (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id,
+           COALESCE(dt.nombre, d.nombre) AS nombre_mostrar
     FROM destinos d
     JOIN destinos_seo_settings dss_es ON dss_es.destino_id = d.id AND dss_es.lang_code = 'es'
     LEFT JOIN destinos_seo_settings dss_lang ON dss_lang.destino_id = d.id AND dss_lang.lang_code = $1 AND dss_lang.activo = TRUE
+    LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1
     WHERE d.visible_rutas = TRUE AND dss_es.activo = TRUE
     ORDER BY d.isla, d.orden, d.nombre
   `, [lang]);
@@ -5099,7 +5101,7 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
     if (!porIsla[isla]) porIsla[isla] = [];
     porIsla[isla].push({
       id: d.id,
-      nombre: d.nombre,
+      nombre: d.nombre_mostrar,
       zona: d.zona,
       slug: d.slug_url || slugify(d.nombre),
       foto_cabecera_id: d.foto_cabecera_id || null,
@@ -5227,11 +5229,12 @@ app.get('/api/destino-publico/:isla/:slug', asyncHandler(async (req, res) => {
   const { isla, slug } = req.params;
   const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
   const result = await pool.query(
-    `SELECT d.id, d.nombre, d.isla, d.zona,
+    `SELECT d.id, COALESCE(dt.nombre, d.nombre) AS nombre, d.isla, d.zona,
             dss.texto_descripcion, dss.meta_title, dss.meta_description,
             (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
      FROM destinos d
      JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = $2
+     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $2
      WHERE dss.slug_url = $1
      LIMIT 1`,
     [slug, lang]
