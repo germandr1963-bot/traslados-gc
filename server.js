@@ -4729,7 +4729,11 @@ app.post('/admin/palabras-paginas/:lang/:pagina', requireAdmin, asyncHandler(asy
 // Usada por las páginas HTML para construir enlaces correctos en el footer/cabecera.
 app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
   const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
-  res.json(PALABRAS_PAGINAS[lang] || {});
+  res.json({
+    ...(PALABRAS_PAGINAS[lang] || {}),
+    proximamente_titulo:    obtenerTexto('destinos_proximamente_titulo',    lang),
+    proximamente_subtitulo: obtenerTexto('destinos_proximamente_subtitulo', lang)
+  });
 }));
 
 // Devuelve todas las palabras de páginas para el admin
