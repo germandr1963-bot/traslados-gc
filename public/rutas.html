@@ -174,20 +174,20 @@
     </div>
 
     <div class="bloque-proximamente">
-      <div class="prox-titulo">Próximamente · Otras islas</div>
-      <p class="prox-sub">Estamos ampliando el servicio al resto del archipiélago. Muy pronto, más islas.</p>
+      <div class="prox-titulo" id="prox-titulo">Próximamente · Otras islas</div>
+      <p class="prox-sub" id="prox-subtitulo">Estamos ampliando el servicio al resto del archipiélago. Muy pronto, más islas.</p>
     </div>
   </div>
 
   <footer>
     <div class="footer-links">
-      <a href="/rutas">Rutas</a>
-      <a href="/destinos">Destinos</a>
-      <a href="/flota">Flota</a>
-      <a href="/contacto">Contacto</a>
-      <a href="/chofer/acceso/alta">Alta choferes</a>
-      <a href="/chofer/acceso">Acceso a choferes</a>
-      <a href="/mi-reserva">Acceso clientes</a>
+      <a id="footer-rutas" href="/rutas">Rutas</a>
+      <a id="footer-destinos" href="/destinos">Destinos</a>
+      <a id="footer-flota" href="/flota">Flota</a>
+      <a id="footer-contacto" href="/contacto">Contacto</a>
+      <a id="footer-alta-choferes" href="/chofer/acceso/alta">Alta choferes</a>
+      <a id="footer-acceso-choferes" href="/chofer/acceso">Acceso a choferes</a>
+      <a id="footer-acceso-clientes" href="/mi-reserva">Acceso clientes</a>
     </div>
     Traslados · GC — Gran Canaria
   </footer>
@@ -231,6 +231,32 @@
         document.getElementById('contenido-destinos').innerHTML =
           '<p style="text-align:center;color:var(--texto-muted);font-size:14px;padding:40px 0;">No se pudieron cargar los destinos.</p>';
       });
+  
+    // Traducir footer al idioma de la URL
+    (function() {
+      var partes = window.location.pathname.split('/');
+      var lang = (partes[1] && partes[1].length === 2) ? partes[1] : 'es';
+      fetch('/api/palabras-paginas-publico?lang=' + lang)
+        .then(function(r) { return r.json(); })
+        .then(function(pp) {
+          if (lang !== 'es') {
+            var base = '/' + lang + '/';
+            document.getElementById('footer-rutas').href          = base + (pp.rutas    || 'rutas');
+            document.getElementById('footer-destinos').href       = base + (pp.destinos || 'destinos');
+            document.getElementById('footer-flota').href          = base + (pp.flota    || 'flota');
+            document.getElementById('footer-contacto').href       = base + (pp.contacto || 'contacto');
+          }
+          if (pp.footer_rutas)           document.getElementById('footer-rutas').textContent           = pp.footer_rutas;
+          if (pp.footer_destinos)        document.getElementById('footer-destinos').textContent        = pp.footer_destinos;
+          if (pp.footer_flota)           document.getElementById('footer-flota').textContent           = pp.footer_flota;
+          if (pp.footer_contacto)        document.getElementById('footer-contacto').textContent        = pp.footer_contacto;
+          if (pp.footer_alta_choferes)   document.getElementById('footer-alta-choferes').textContent   = pp.footer_alta_choferes;
+          if (pp.footer_acceso_choferes) document.getElementById('footer-acceso-choferes').textContent = pp.footer_acceso_choferes;
+          if (pp.footer_acceso_clientes) document.getElementById('footer-acceso-clientes').textContent = pp.footer_acceso_clientes;
+          if (pp.proximamente_titulo)    document.getElementById('prox-titulo').textContent             = pp.proximamente_titulo;
+          if (pp.proximamente_subtitulo) document.getElementById('prox-subtitulo').textContent          = pp.proximamente_subtitulo;
+        }).catch(function() {});
+    })();
   </script>
 </body>
 </html>
