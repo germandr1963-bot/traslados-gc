@@ -113,23 +113,22 @@
           if (pp.contacto_subtitulo)     document.getElementById('contacto-subtitulo').textContent     = pp.contacto_subtitulo;
           if (pp.contacto_cargando)      document.getElementById('contacto-cargando') && (document.getElementById('contacto-cargando').textContent = pp.contacto_cargando);
 
-          // Guardar etiquetas para usarlas cuando carguen los datos de contacto
-          window._textos_contacto = pp;
+          // Cargar datos de contacto después de tener los textos
+          fetch('/api/contacto').then(function(r) { return r.json(); }).then(function(d) {
+            var tx = pp;
+            var tarjetas = [];
+            if (d.nombre_empresa) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">🏢</div><div class="etiqueta">' + (tx.contacto_etiqueta_empresa  || 'Empresa')   + '</div><div class="valor">' + d.nombre_empresa + '</div></div>');
+            if (d.telefono)       tarjetas.push('<div class="tarjeta-contacto"><div class="icono">📞</div><div class="etiqueta">' + (tx.contacto_etiqueta_telefono || 'Teléfono')  + '</div><div class="valor"><a href="tel:' + d.telefono + '">' + d.telefono + '</a></div></div>');
+            if (d.whatsapp)       tarjetas.push('<div class="tarjeta-contacto"><div class="icono">💬</div><div class="etiqueta">' + (tx.contacto_etiqueta_whatsapp || 'WhatsApp')  + '</div><div class="valor"><a href="https://wa.me/' + d.whatsapp.replace(/\s|\+/g,'') + '" target="_blank">' + d.whatsapp + '</a></div></div>');
+            if (d.email)          tarjetas.push('<div class="tarjeta-contacto"><div class="icono">✉️</div><div class="etiqueta">' + (tx.contacto_etiqueta_email    || 'Email')     + '</div><div class="valor"><a href="mailto:' + d.email + '">' + d.email + '</a></div></div>');
+            if (tx.contacto_horario) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">🕐</div><div class="etiqueta">' + (tx.contacto_etiqueta_horario || 'Horario') + '</div><div class="valor">' + tx.contacto_horario + '</div></div>');
+            if (d.direccion)      tarjetas.push('<div class="tarjeta-contacto"><div class="icono">📍</div><div class="etiqueta">' + (tx.contacto_etiqueta_direccion|| 'Dirección') + '</div><div class="valor">' + d.direccion + '</div></div>');
+            document.getElementById('tarjetas-contacto').innerHTML = tarjetas.length
+              ? tarjetas.join('')
+              : '<div class="tarjeta-contacto"><div class="vacio">' + (tx.contacto_vacio || 'Información de contacto no disponible.') + '</div></div>';
+          });
         }).catch(function() {});
     })();
-    fetch('/api/contacto').then(function(r) { return r.json(); }).then(function(d) {
-      var tx = window._textos_contacto || {};
-      var tarjetas = [];
-      if (d.nombre_empresa) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">🏢</div><div class="etiqueta">' + (tx.contacto_etiqueta_empresa  || 'Empresa')   + '</div><div class="valor">' + d.nombre_empresa + '</div></div>');
-      if (d.telefono)       tarjetas.push('<div class="tarjeta-contacto"><div class="icono">📞</div><div class="etiqueta">' + (tx.contacto_etiqueta_telefono || 'Teléfono')  + '</div><div class="valor"><a href="tel:' + d.telefono + '">' + d.telefono + '</a></div></div>');
-      if (d.whatsapp)       tarjetas.push('<div class="tarjeta-contacto"><div class="icono">💬</div><div class="etiqueta">' + (tx.contacto_etiqueta_whatsapp || 'WhatsApp')  + '</div><div class="valor"><a href="https://wa.me/' + d.whatsapp.replace(/\s|\+/g,'') + '" target="_blank">' + d.whatsapp + '</a></div></div>');
-      if (d.email)          tarjetas.push('<div class="tarjeta-contacto"><div class="icono">✉️</div><div class="etiqueta">' + (tx.contacto_etiqueta_email    || 'Email')     + '</div><div class="valor"><a href="mailto:' + d.email + '">' + d.email + '</a></div></div>');
-      if (tx.contacto_horario) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">🕐</div><div class="etiqueta">' + (tx.contacto_etiqueta_horario || 'Horario') + '</div><div class="valor">' + tx.contacto_horario + '</div></div>');
-      if (d.direccion)      tarjetas.push('<div class="tarjeta-contacto"><div class="icono">📍</div><div class="etiqueta">' + (tx.contacto_etiqueta_direccion|| 'Dirección') + '</div><div class="valor">' + d.direccion + '</div></div>');
-      document.getElementById('tarjetas-contacto').innerHTML = tarjetas.length
-        ? tarjetas.join('')
-        : '<div class="tarjeta-contacto"><div class="vacio">' + (tx.contacto_vacio || 'Información de contacto no disponible.') + '</div></div>';
-    });
   </script>
 </body>
 </html>
