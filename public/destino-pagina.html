@@ -116,7 +116,7 @@
 <body>
   <header class="app">
     <a id="link-volver-destinos" href="/destinos" class="nav izquierda">← Destinos</a>
-    <a href="/" class="marca">TRASLADOS · GC</a>
+    <a id="link-logo-header" href="/" class="marca">TRASLADOS · GC</a>
     <a id="link-contacto-header" href="/contacto" class="nav derecha">Contacto</a>
   </header>
 
@@ -153,6 +153,7 @@
       .then(function(pp) {
         if (lang !== 'es') {
           var base = '/' + lang + '/';
+          document.getElementById('link-logo-header').href      = '/' + lang + '/';
           document.getElementById('link-volver-destinos').href  = base + (pp.destinos || 'destinos');
           document.getElementById('link-contacto-header').href  = base + (pp.contacto || 'contacto');
           document.getElementById('footer-rutas').href          = base + (pp.rutas    || 'rutas');

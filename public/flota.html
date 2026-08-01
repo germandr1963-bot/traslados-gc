@@ -45,9 +45,9 @@
 </head>
 <body>
   <header class="app">
-    <a href="/" class="nav izquierda">Inicio</a>
-    <a href="/" class="marca">TRASLADOS · GC</a>
-    <a href="/contacto" class="nav derecha">Contacto</a>
+    <a id="link-inicio-header" href="/" class="nav izquierda">Inicio</a>
+    <a id="link-logo-header" href="/" class="marca">TRASLADOS · GC</a>
+    <a id="link-contacto-header" href="/contacto" class="nav derecha">Contacto</a>
   </header>
   <div class="contenido">
     <h1>Flota</h1>
@@ -76,6 +76,9 @@
         .then(function(pp) {
           if (lang !== 'es') {
             var base = '/' + lang + '/';
+            document.getElementById('link-inicio-header').href   = '/' + lang + '/';
+            document.getElementById('link-logo-header').href     = '/' + lang + '/';
+            document.getElementById('link-contacto-header').href = base + (pp.contacto || 'contacto');
             document.getElementById('footer-rutas').href          = base + (pp.rutas    || 'rutas');
             document.getElementById('footer-destinos').href       = base + (pp.destinos || 'destinos');
             document.getElementById('footer-flota').href          = base + (pp.flota    || 'flota');
