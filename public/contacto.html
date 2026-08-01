@@ -64,10 +64,10 @@
     <a id="link-contacto-header" href="/contacto" class="nav derecha">Contacto</a>
   </header>
   <div class="contenido">
-    <h1>Contacto</h1>
-    <p class="subtitulo">Estamos aquí para ayudarte en lo que necesites</p>
+    <h1 id="contacto-titulo">Contacto</h1>
+    <p class="subtitulo" id="contacto-subtitulo">Estamos aquí para ayudarte en lo que necesites</p>
     <div class="tarjetas" id="tarjetas-contacto">
-      <div class="tarjeta-contacto"><div class="icono">⏳</div><div class="vacio">Cargando...</div></div>
+      <div class="tarjeta-contacto"><div class="icono">⏳</div><div class="vacio" id="contacto-cargando">Cargando...</div></div>
     </div>
   </div>
   <footer>
@@ -92,9 +92,9 @@
         .then(function(pp) {
           if (lang !== 'es') {
             var base = '/' + lang + '/';
-            document.getElementById('link-inicio-header').href   = '/' + lang + '/';
-            document.getElementById('link-logo-header').href     = '/' + lang + '/';
-            document.getElementById('link-contacto-header').href = base + (pp.contacto || 'contacto');
+            document.getElementById('link-inicio-header').href    = '/' + lang + '/';
+            document.getElementById('link-logo-header').href      = '/' + lang + '/';
+            document.getElementById('link-contacto-header').href  = base + (pp.contacto || 'contacto');
             document.getElementById('footer-rutas').href          = base + (pp.rutas    || 'rutas');
             document.getElementById('footer-destinos').href       = base + (pp.destinos || 'destinos');
             document.getElementById('footer-flota').href          = base + (pp.flota    || 'flota');
@@ -107,19 +107,26 @@
           if (pp.footer_alta_choferes)   document.getElementById('footer-alta-choferes').textContent   = pp.footer_alta_choferes;
           if (pp.footer_acceso_choferes) document.getElementById('footer-acceso-choferes').textContent = pp.footer_acceso_choferes;
           if (pp.footer_acceso_clientes) document.getElementById('footer-acceso-clientes').textContent = pp.footer_acceso_clientes;
+          if (pp.contacto_titulo)        document.getElementById('contacto-titulo').textContent        = pp.contacto_titulo;
+          if (pp.contacto_subtitulo)     document.getElementById('contacto-subtitulo').textContent     = pp.contacto_subtitulo;
+          if (pp.contacto_cargando)      document.getElementById('contacto-cargando') && (document.getElementById('contacto-cargando').textContent = pp.contacto_cargando);
+
+          // Guardar etiquetas para usarlas cuando carguen los datos de contacto
+          window._textos_contacto = pp;
         }).catch(function() {});
     })();
     fetch('/api/contacto').then(function(r) { return r.json(); }).then(function(d) {
+      var tx = window._textos_contacto || {};
       var tarjetas = [];
-      if (d.nombre_empresa) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">🏢</div><div class="etiqueta">Empresa</div><div class="valor">' + d.nombre_empresa + '</div></div>');
-      if (d.telefono) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">📞</div><div class="etiqueta">Teléfono</div><div class="valor"><a href="tel:' + d.telefono + '">' + d.telefono + '</a></div></div>');
-      if (d.whatsapp) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">💬</div><div class="etiqueta">WhatsApp</div><div class="valor"><a href="https://wa.me/' + d.whatsapp.replace(/\s|\+/g,'') + '" target="_blank">' + d.whatsapp + '</a></div></div>');
-      if (d.email) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">✉️</div><div class="etiqueta">Email</div><div class="valor"><a href="mailto:' + d.email + '">' + d.email + '</a></div></div>');
-      if (d.horario) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">🕐</div><div class="etiqueta">Horario</div><div class="valor">' + d.horario + '</div></div>');
-      if (d.direccion) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">📍</div><div class="etiqueta">Dirección</div><div class="valor">' + d.direccion + '</div></div>');
+      if (d.nombre_empresa) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">🏢</div><div class="etiqueta">' + (tx.contacto_etiqueta_empresa  || 'Empresa')   + '</div><div class="valor">' + d.nombre_empresa + '</div></div>');
+      if (d.telefono)       tarjetas.push('<div class="tarjeta-contacto"><div class="icono">📞</div><div class="etiqueta">' + (tx.contacto_etiqueta_telefono || 'Teléfono')  + '</div><div class="valor"><a href="tel:' + d.telefono + '">' + d.telefono + '</a></div></div>');
+      if (d.whatsapp)       tarjetas.push('<div class="tarjeta-contacto"><div class="icono">💬</div><div class="etiqueta">' + (tx.contacto_etiqueta_whatsapp || 'WhatsApp')  + '</div><div class="valor"><a href="https://wa.me/' + d.whatsapp.replace(/\s|\+/g,'') + '" target="_blank">' + d.whatsapp + '</a></div></div>');
+      if (d.email)          tarjetas.push('<div class="tarjeta-contacto"><div class="icono">✉️</div><div class="etiqueta">' + (tx.contacto_etiqueta_email    || 'Email')     + '</div><div class="valor"><a href="mailto:' + d.email + '">' + d.email + '</a></div></div>');
+      if (d.horario)        tarjetas.push('<div class="tarjeta-contacto"><div class="icono">🕐</div><div class="etiqueta">' + (tx.contacto_etiqueta_horario  || 'Horario')   + '</div><div class="valor">' + d.horario + '</div></div>');
+      if (d.direccion)      tarjetas.push('<div class="tarjeta-contacto"><div class="icono">📍</div><div class="etiqueta">' + (tx.contacto_etiqueta_direccion|| 'Dirección') + '</div><div class="valor">' + d.direccion + '</div></div>');
       document.getElementById('tarjetas-contacto').innerHTML = tarjetas.length
         ? tarjetas.join('')
-        : '<div class="tarjeta-contacto"><div class="vacio">Información de contacto no disponible.</div></div>';
+        : '<div class="tarjeta-contacto"><div class="vacio">' + (tx.contacto_vacio || 'Información de contacto no disponible.') + '</div></div>';
     });
   </script>
 </body>
