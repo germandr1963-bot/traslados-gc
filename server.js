@@ -901,6 +901,7 @@ async function initSchema() {
     { clave: 'contacto_etiqueta_email',    contexto: 'Etiqueta de la tarjeta Email en la página de contacto', es: 'Email' },
     { clave: 'contacto_etiqueta_horario',  contexto: 'Etiqueta de la tarjeta Horario en la página de contacto', es: 'Horario' },
     { clave: 'contacto_etiqueta_direccion',contexto: 'Etiqueta de la tarjeta Dirección en la página de contacto', es: 'Dirección' },
+    { clave: 'contacto_horario',           contexto: 'Horario de atención mostrado en la página de contacto. Edítalo aquí en cada idioma cuando cambie o en festivos.', es: 'De lunes a viernes de 08:00 - 18:00' },
     { clave: 'contacto_vacio',             contexto: 'Texto cuando no hay datos de contacto disponibles', es: 'Información de contacto no disponible.' },
   ];
   for (const tx of TEXTOS_CONTACTO) {
@@ -4775,6 +4776,7 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
     contacto_etiqueta_email:   obtenerTexto('contacto_etiqueta_email',         lang),
     contacto_etiqueta_horario: obtenerTexto('contacto_etiqueta_horario',       lang),
     contacto_etiqueta_direccion:obtenerTexto('contacto_etiqueta_direccion',    lang),
+    contacto_horario:          obtenerTexto('contacto_horario',                lang),
     contacto_vacio:            obtenerTexto('contacto_vacio',                  lang)
   });
 }));
