@@ -122,7 +122,7 @@
       if (d.telefono)       tarjetas.push('<div class="tarjeta-contacto"><div class="icono">📞</div><div class="etiqueta">' + (tx.contacto_etiqueta_telefono || 'Teléfono')  + '</div><div class="valor"><a href="tel:' + d.telefono + '">' + d.telefono + '</a></div></div>');
       if (d.whatsapp)       tarjetas.push('<div class="tarjeta-contacto"><div class="icono">💬</div><div class="etiqueta">' + (tx.contacto_etiqueta_whatsapp || 'WhatsApp')  + '</div><div class="valor"><a href="https://wa.me/' + d.whatsapp.replace(/\s|\+/g,'') + '" target="_blank">' + d.whatsapp + '</a></div></div>');
       if (d.email)          tarjetas.push('<div class="tarjeta-contacto"><div class="icono">✉️</div><div class="etiqueta">' + (tx.contacto_etiqueta_email    || 'Email')     + '</div><div class="valor"><a href="mailto:' + d.email + '">' + d.email + '</a></div></div>');
-      if (d.horario)        tarjetas.push('<div class="tarjeta-contacto"><div class="icono">🕐</div><div class="etiqueta">' + (tx.contacto_etiqueta_horario  || 'Horario')   + '</div><div class="valor">' + d.horario + '</div></div>');
+      if (tx.contacto_horario) tarjetas.push('<div class="tarjeta-contacto"><div class="icono">🕐</div><div class="etiqueta">' + (tx.contacto_etiqueta_horario || 'Horario') + '</div><div class="valor">' + tx.contacto_horario + '</div></div>');
       if (d.direccion)      tarjetas.push('<div class="tarjeta-contacto"><div class="icono">📍</div><div class="etiqueta">' + (tx.contacto_etiqueta_direccion|| 'Dirección') + '</div><div class="valor">' + d.direccion + '</div></div>');
       document.getElementById('tarjetas-contacto').innerHTML = tarjetas.length
         ? tarjetas.join('')
