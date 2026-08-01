@@ -389,6 +389,11 @@
         // Cabecera textos
         if (pp.nav_inicio)   document.getElementById('link-inicio-header').textContent   = pp.nav_inicio;
         if (pp.nav_contacto) document.getElementById('link-contacto-header').textContent = pp.nav_contacto;
+        // Footer acceso clientes con URL por idioma
+        if (lang !== 'es') {
+          var base = '/' + lang + '/';
+          document.getElementById('footer-acceso-clientes').href = base + (pp.palabra_mi_reserva || 'mi-reserva');
+        }
         // Título y subtítulo
         if (pp.acceso_titulo)    document.getElementById('acceso-titulo').textContent    = pp.acceso_titulo;
         if (pp.acceso_subtitulo) document.getElementById('acceso-subtitulo').textContent = pp.acceso_subtitulo;
