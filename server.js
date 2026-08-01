@@ -4860,6 +4860,7 @@ app.get('/admin/textos', requireAdmin, asyncHandler(async (req, res) => {
 
   const lista = textos.rows.map(function (t) {
     const estado = {};
+    estado['es'] = !!(t.texto_es && t.texto_es.trim());
     for (const lang of IDIOMAS_TRADUCIBLES) {
       const valor = traduccionesPorTexto[t.id] && traduccionesPorTexto[t.id][lang];
       estado[lang] = !!(valor && valor.trim());
@@ -4974,6 +4975,19 @@ app.get('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req,
     [req.params.id, req.params.lang]
   );
   res.json({ texto: result.rows.length ? result.rows[0].texto : '' });
+}));
+
+// Editar el texto base en español de cualquier clave desde el admin
+app.post('/admin/textos/:id/es', requireAdmin, asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const resultado = await pool.query('SELECT clave FROM textos_interfaz WHERE id = $1', [id]);
+  if (!resultado.rows.length) return res.status(404).json({ error: 'Texto no encontrado' });
+  await pool.query(
+    'UPDATE textos_interfaz SET texto_es = $1 WHERE id = $2',
+    [req.body.texto || '', id]
+  );
+  await cargarTextosCache();
+  res.json({ ok: true });
 }));
 
 app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
