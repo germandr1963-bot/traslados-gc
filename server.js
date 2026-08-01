@@ -5176,6 +5176,7 @@ async function renderReserva(req, res, lang) {
   res.render('reserva', {
     lang, t, idiomas: idiomas.rows, BASE_URL,
     palabrasReserva: SECCIONES_RESERVA,
+    palabrasPaginas: PALABRAS_PAGINAS[lang] || {},
     rutaReserva, urlHome
   });
 }
