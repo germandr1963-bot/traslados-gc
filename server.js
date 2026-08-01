@@ -884,10 +884,36 @@ async function initSchema() {
   const TEXTOS_PROXIMAMENTE = [
     { clave: 'destinos_proximamente_titulo',    contexto: 'Título del bloque "Próximamente" al final de la página de listado de destinos', es: 'Próximamente · Otras islas' },
     { clave: 'destinos_proximamente_subtitulo', contexto: 'Subtítulo del bloque "Próximamente" al final de la página de listado de destinos', es: 'Estamos ampliando el servicio al resto del archipiélago. Muy pronto, más islas.' },
-    { clave: 'rutas_subtitulo',    contexto: 'Frase bajo el título de la página de Rutas', es: 'Todos los trayectos intermunicipales de Gran Canaria, con precio fijo' },
-    { clave: 'destinos_subtitulo', contexto: 'Frase bajo el título de la página de Destinos', es: 'Descubre los destinos más solicitados de Gran Canaria' },
   ];
   for (const tx of TEXTOS_PROXIMAMENTE) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Páginas de destino', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Páginas de destino', contexto = $2, texto_es = $3`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
+  // ─── Textos de la página de Rutas ────────────────────────────────────────
+  const TEXTOS_RUTAS = [
+    { clave: 'rutas_titulo',    contexto: 'Título principal de la página de Rutas', es: 'Rutas' },
+    { clave: 'rutas_subtitulo', contexto: 'Frase bajo el título de la página de Rutas', es: 'Todos los trayectos intermunicipales de Gran Canaria, a tu medida' },
+  ];
+  for (const tx of TEXTOS_RUTAS) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Página de ruta', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de ruta', contexto = $2, texto_es = $3`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
+  // ─── Textos de la página de Destinos ─────────────────────────────────────
+  const TEXTOS_DESTINOS_PAGINA = [
+    { clave: 'destinos_titulo',    contexto: 'Título principal de la página de Destinos', es: 'Destinos' },
+    { clave: 'destinos_subtitulo', contexto: 'Frase bajo el título de la página de Destinos', es: 'Descubre los destinos más solicitados de Gran Canaria' },
+  ];
+  for (const tx of TEXTOS_DESTINOS_PAGINA) {
     await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, 'Páginas de destino', $2, $3)
@@ -4821,7 +4847,9 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
     ...(PALABRAS_PAGINAS[lang] || {}),
     proximamente_titulo:       obtenerTexto('destinos_proximamente_titulo',    lang),
     proximamente_subtitulo:    obtenerTexto('destinos_proximamente_subtitulo', lang),
+    rutas_titulo:              obtenerTexto('rutas_titulo',                    lang),
     rutas_subtitulo:           obtenerTexto('rutas_subtitulo',                 lang),
+    destinos_titulo:           obtenerTexto('destinos_titulo',                 lang),
     destinos_subtitulo:        obtenerTexto('destinos_subtitulo',              lang),
     footer_rutas:              obtenerTexto('home_footer_rutas',               lang),
     footer_destinos:           obtenerTexto('home_footer_destinos',            lang),
