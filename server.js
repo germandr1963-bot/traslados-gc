@@ -917,6 +917,61 @@ async function initSchema() {
     );
   }
 
+  // ─── Textos de la página de acceso clientes (mi-reserva.html) ──────────────
+  const TEXTOS_ACCESO_CLIENTES = [
+    // Cabecera y título
+    { clave: 'acceso_titulo',                 contexto: 'Título principal de la página de acceso clientes', es: 'Acceso clientes' },
+    { clave: 'acceso_subtitulo',              contexto: 'Subtítulo bajo el título de la página de acceso clientes', es: 'Consulta y gestiona todas tus reservas' },
+    // Pantalla login
+    { clave: 'acceso_label_email',            contexto: 'Etiqueta del campo email en la pantalla de login', es: 'Tu email' },
+    { clave: 'acceso_ph_email',               contexto: 'Placeholder del campo email en la pantalla de login', es: 'tucorreo@email.com' },
+    { clave: 'acceso_label_password',         contexto: 'Etiqueta del campo contraseña en la pantalla de login', es: 'Contraseña' },
+    { clave: 'acceso_ph_password',            contexto: 'Placeholder del campo contraseña en la pantalla de login', es: 'Tu contraseña' },
+    { clave: 'acceso_btn_entrar',             contexto: 'Botón de login', es: 'Entrar' },
+    { clave: 'acceso_btn_entrando',           contexto: 'Texto del botón de login mientras se procesa', es: 'Entrando...' },
+    { clave: 'acceso_link_primera_vez',       contexto: 'Enlace para acceder con número de reserva (primera vez)', es: '¿Primera vez? Accede con tu número de reserva' },
+    { clave: 'acceso_link_olvide_password',   contexto: 'Enlace para recuperar contraseña olvidada', es: '¿Olvidaste tu contraseña?' },
+    // Pantalla recuperar contraseña
+    { clave: 'acceso_rec_info',               contexto: 'Texto informativo en la pantalla de recuperar contraseña', es: 'Te enviaremos un enlace a tu email para crear una nueva contraseña.' },
+    { clave: 'acceso_rec_label_email',        contexto: 'Etiqueta del campo email en la pantalla de recuperar contraseña', es: 'Tu email' },
+    { clave: 'acceso_rec_ph_email',           contexto: 'Placeholder del campo email en recuperar contraseña', es: 'El email con el que reservaste' },
+    { clave: 'acceso_rec_btn_enviar',         contexto: 'Botón de envío en la pantalla de recuperar contraseña', es: 'Enviar enlace de recuperación' },
+    { clave: 'acceso_rec_btn_enviando',       contexto: 'Texto del botón mientras se envía el enlace de recuperación', es: 'Enviando...' },
+    { clave: 'acceso_rec_ok',                 contexto: 'Mensaje de éxito tras enviar el enlace de recuperación', es: 'Te hemos enviado a tu email registrado el acceso de recuperación.' },
+    { clave: 'acceso_rec_err_email',          contexto: 'Error cuando no se indica email en recuperar contraseña', es: 'Indica tu email.' },
+    // Pantalla solicitar acceso (primera vez con número de reserva)
+    { clave: 'acceso_sol_label_pnr',          contexto: 'Etiqueta del campo número de reserva en la pantalla de solicitar acceso', es: 'Número de reserva' },
+    { clave: 'acceso_sol_ph_pnr',             contexto: 'Placeholder del campo número de reserva', es: 'Ej: GCA123' },
+    { clave: 'acceso_sol_label_email',        contexto: 'Etiqueta del campo email en la pantalla de solicitar acceso', es: 'Tu email' },
+    { clave: 'acceso_sol_ph_email',           contexto: 'Placeholder del campo email en solicitar acceso', es: 'El email con el que reservaste' },
+    { clave: 'acceso_sol_btn_enviar',         contexto: 'Botón de envío en la pantalla de solicitar acceso', es: 'Enviar contraseña provisional' },
+    { clave: 'acceso_sol_btn_enviando',       contexto: 'Texto del botón mientras se envía la contraseña provisional', es: 'Enviando...' },
+    { clave: 'acceso_sol_ok',                 contexto: 'Mensaje de éxito tras solicitar acceso con número de reserva', es: 'Te hemos enviado la contraseña provisional. Revisa tu email.' },
+    // Pantalla cambiar contraseña (primer acceso)
+    { clave: 'acceso_cambiar_info',           contexto: 'Texto informativo en la pantalla de cambiar contraseña (primer acceso)', es: 'Es tu primera vez. Elige una contraseña propia para acceder en el futuro.' },
+    { clave: 'acceso_cambiar_label_pwd',      contexto: 'Etiqueta del campo nueva contraseña', es: 'Nueva contraseña' },
+    { clave: 'acceso_cambiar_ph_pwd',         contexto: 'Placeholder del campo nueva contraseña', es: 'Mínimo 6 caracteres' },
+    { clave: 'acceso_cambiar_label_pwd2',     contexto: 'Etiqueta del campo repetir contraseña', es: 'Repite la contraseña' },
+    { clave: 'acceso_cambiar_ph_pwd2',        contexto: 'Placeholder del campo repetir contraseña', es: 'Repite la contraseña' },
+    { clave: 'acceso_cambiar_btn',            contexto: 'Botón de guardar nueva contraseña y entrar', es: 'Guardar y entrar' },
+    { clave: 'acceso_cambiar_btn_guardando',  contexto: 'Texto del botón mientras se guarda la nueva contraseña', es: 'Guardando...' },
+    // Mensajes de error comunes
+    { clave: 'acceso_err_campos',             contexto: 'Error cuando faltan campos obligatorios', es: 'Rellena todos los campos.' },
+    { clave: 'acceso_err_pwd_corta',          contexto: 'Error cuando la contraseña es demasiado corta', es: 'Mínimo 6 caracteres.' },
+    { clave: 'acceso_err_pwd_no_coincide',    contexto: 'Error cuando las dos contraseñas no coinciden', es: 'Las contraseñas no coinciden.' },
+    { clave: 'acceso_err_conexion',           contexto: 'Error de conexión genérico en la página de acceso', es: 'Error de conexión. Inténtalo de nuevo.' },
+    // Enlace volver
+    { clave: 'acceso_link_volver',            contexto: 'Enlace para volver a la pantalla de login desde cualquier otra pantalla', es: '← Volver al acceso' },
+  ];
+  for (const tx of TEXTOS_ACCESO_CLIENTES) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Acceso clientes', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Acceso clientes', contexto = $2, texto_es = $3`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
   await cargarTextosCache();
 
   // ─── Tarifario de precios ─────────────────────────────────────────────────
@@ -4785,7 +4840,43 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
     contacto_etiqueta_horario: obtenerTexto('contacto_etiqueta_horario',       lang),
     contacto_etiqueta_direccion:obtenerTexto('contacto_etiqueta_direccion',    lang),
     contacto_horario:          obtenerTexto('contacto_horario',                lang),
-    contacto_vacio:            obtenerTexto('contacto_vacio',                  lang)
+    contacto_vacio:            obtenerTexto('contacto_vacio',                  lang),
+    acceso_titulo:             obtenerTexto('acceso_titulo',                   lang),
+    acceso_subtitulo:          obtenerTexto('acceso_subtitulo',                lang),
+    acceso_label_email:        obtenerTexto('acceso_label_email',              lang),
+    acceso_ph_email:           obtenerTexto('acceso_ph_email',                 lang),
+    acceso_label_password:     obtenerTexto('acceso_label_password',           lang),
+    acceso_ph_password:        obtenerTexto('acceso_ph_password',              lang),
+    acceso_btn_entrar:         obtenerTexto('acceso_btn_entrar',               lang),
+    acceso_btn_entrando:       obtenerTexto('acceso_btn_entrando',             lang),
+    acceso_link_primera_vez:   obtenerTexto('acceso_link_primera_vez',         lang),
+    acceso_link_olvide_password:obtenerTexto('acceso_link_olvide_password',    lang),
+    acceso_rec_info:           obtenerTexto('acceso_rec_info',                 lang),
+    acceso_rec_label_email:    obtenerTexto('acceso_rec_label_email',          lang),
+    acceso_rec_ph_email:       obtenerTexto('acceso_rec_ph_email',             lang),
+    acceso_rec_btn_enviar:     obtenerTexto('acceso_rec_btn_enviar',           lang),
+    acceso_rec_btn_enviando:   obtenerTexto('acceso_rec_btn_enviando',         lang),
+    acceso_rec_ok:             obtenerTexto('acceso_rec_ok',                   lang),
+    acceso_rec_err_email:      obtenerTexto('acceso_rec_err_email',            lang),
+    acceso_sol_label_pnr:      obtenerTexto('acceso_sol_label_pnr',            lang),
+    acceso_sol_ph_pnr:         obtenerTexto('acceso_sol_ph_pnr',               lang),
+    acceso_sol_label_email:    obtenerTexto('acceso_sol_label_email',          lang),
+    acceso_sol_ph_email:       obtenerTexto('acceso_sol_ph_email',             lang),
+    acceso_sol_btn_enviar:     obtenerTexto('acceso_sol_btn_enviar',           lang),
+    acceso_sol_btn_enviando:   obtenerTexto('acceso_sol_btn_enviando',         lang),
+    acceso_sol_ok:             obtenerTexto('acceso_sol_ok',                   lang),
+    acceso_cambiar_info:       obtenerTexto('acceso_cambiar_info',             lang),
+    acceso_cambiar_label_pwd:  obtenerTexto('acceso_cambiar_label_pwd',        lang),
+    acceso_cambiar_ph_pwd:     obtenerTexto('acceso_cambiar_ph_pwd',           lang),
+    acceso_cambiar_label_pwd2: obtenerTexto('acceso_cambiar_label_pwd2',       lang),
+    acceso_cambiar_ph_pwd2:    obtenerTexto('acceso_cambiar_ph_pwd2',          lang),
+    acceso_cambiar_btn:        obtenerTexto('acceso_cambiar_btn',              lang),
+    acceso_cambiar_btn_guardando:obtenerTexto('acceso_cambiar_btn_guardando',  lang),
+    acceso_err_campos:         obtenerTexto('acceso_err_campos',               lang),
+    acceso_err_pwd_corta:      obtenerTexto('acceso_err_pwd_corta',            lang),
+    acceso_err_pwd_no_coincide:obtenerTexto('acceso_err_pwd_no_coincide',      lang),
+    acceso_err_conexion:       obtenerTexto('acceso_err_conexion',             lang),
+    acceso_link_volver:        obtenerTexto('acceso_link_volver',              lang)
   });
 }));
 
