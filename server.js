@@ -1054,16 +1054,16 @@ async function initSchema() {
     )
   `);
   const SEMILLA_PALABRAS_PAGINAS = {
-    es: { destino: 'destino',       destinos: 'destinos',      rutas: 'rutas',       flota: 'flota',       contacto: 'contacto' },
-    en: { destino: 'destination',   destinos: 'destinations',  rutas: 'routes',      flota: 'fleet',       contacto: 'contact' },
-    de: { destino: 'reiseziel',     destinos: 'reiseziele',    rutas: 'routen',      flota: 'fuhrpark',    contacto: 'kontakt' },
-    sv: { destino: 'destination',   destinos: 'destinationer', rutas: 'rutter',      flota: 'fordonspark', contacto: 'kontakt' },
-    no: { destino: 'destinasjon',   destinos: 'destinasjoner', rutas: 'ruter',       flota: 'bilpark',     contacto: 'kontakt' },
-    nl: { destino: 'bestemming',    destinos: 'bestemmingen',  rutas: 'routes',      flota: 'wagenpark',   contacto: 'contact' },
-    it: { destino: 'destinazione',  destinos: 'destinazioni',  rutas: 'itinerari',   flota: 'parco-auto',  contacto: 'contatti' },
-    fr: { destino: 'destination',   destinos: 'destinations',  rutas: 'itineraires', flota: 'flotte',      contacto: 'contact' },
-    fi: { destino: 'kohde',         destinos: 'kohteet',       rutas: 'reitit',      flota: 'kalusto',     contacto: 'yhteystiedot' },
-    ru: { destino: 'napravlenie',   destinos: 'napravleniya',  rutas: 'marshruty',   flota: 'avtopark',    contacto: 'kontakty' }
+    es: { destino: 'destino',       destinos: 'destinos',      rutas: 'rutas',       flota: 'flota',       contacto: 'contacto',    'mi-reserva': 'mi-reserva' },
+    en: { destino: 'destination',   destinos: 'destinations',  rutas: 'routes',      flota: 'fleet',       contacto: 'contact',     'mi-reserva': 'my-booking' },
+    de: { destino: 'reiseziel',     destinos: 'reiseziele',    rutas: 'routen',      flota: 'fuhrpark',    contacto: 'kontakt',     'mi-reserva': 'meine-buchung' },
+    sv: { destino: 'destination',   destinos: 'destinationer', rutas: 'rutter',      flota: 'fordonspark', contacto: 'kontakt',     'mi-reserva': 'min-bokning' },
+    no: { destino: 'destinasjon',   destinos: 'destinasjoner', rutas: 'ruter',       flota: 'bilpark',     contacto: 'kontakt',     'mi-reserva': 'min-bestilling' },
+    nl: { destino: 'bestemming',    destinos: 'bestemmingen',  rutas: 'routes',      flota: 'wagenpark',   contacto: 'contact',     'mi-reserva': 'mijn-boeking' },
+    it: { destino: 'destinazione',  destinos: 'destinazioni',  rutas: 'itinerari',   flota: 'parco-auto',  contacto: 'contatti',    'mi-reserva': 'la-mia-prenotazione' },
+    fr: { destino: 'destination',   destinos: 'destinations',  rutas: 'itineraires', flota: 'flotte',      contacto: 'contact',     'mi-reserva': 'ma-reservation' },
+    fi: { destino: 'kohde',         destinos: 'kohteet',       rutas: 'reitit',      flota: 'kalusto',     contacto: 'yhteystiedot','mi-reserva': 'varaukseni' },
+    ru: { destino: 'napravlenie',   destinos: 'napravleniya',  rutas: 'marshruty',   flota: 'avtopark',    contacto: 'kontakty',    'mi-reserva': 'moya-bronyа' }
   };
   for (const lang of Object.keys(SEMILLA_PALABRAS_PAGINAS)) {
     for (const [pagina, palabra] of Object.entries(SEMILLA_PALABRAS_PAGINAS[lang])) {
@@ -4876,7 +4876,8 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
     acceso_err_pwd_corta:      obtenerTexto('acceso_err_pwd_corta',            lang),
     acceso_err_pwd_no_coincide:obtenerTexto('acceso_err_pwd_no_coincide',      lang),
     acceso_err_conexion:       obtenerTexto('acceso_err_conexion',             lang),
-    acceso_link_volver:        obtenerTexto('acceso_link_volver',              lang)
+    acceso_link_volver:        obtenerTexto('acceso_link_volver',              lang),
+    palabra_mi_reserva:        (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang]['mi-reserva']) || 'mi-reserva'
   });
 }));
 
@@ -8823,6 +8824,16 @@ app.get('/mi-reserva', (req, res) => {
   if (req.session && req.session.clienteReservaId) return res.redirect('/cliente/portal');
   res.sendFile(path.join(__dirname, 'public', 'mi-reserva.html'));
 });
+
+// Ruta de acceso clientes en todos los idiomas (/en/my-booking, /de/meine-buchung, etc.)
+app.get('/:lang([a-z]{2})/:palabra', asyncHandler(async (req, res, next) => {
+  const { lang, palabra } = req.params;
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) return next();
+  const palabraMiReserva = PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang]['mi-reserva'];
+  if (!palabraMiReserva || palabra !== palabraMiReserva) return next();
+  if (req.session && req.session.clienteReservaId) return res.redirect('/cliente/portal');
+  res.sendFile(path.join(__dirname, 'public', 'mi-reserva.html'));
+}));
 
 app.get('/restablecer-password', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'restablecer-password.html'));
