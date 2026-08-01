@@ -890,6 +890,28 @@ async function initSchema() {
     );
   }
 
+  // ─── Textos de la página de contacto (contacto.html) ────────────────────
+  const TEXTOS_CONTACTO = [
+    { clave: 'contacto_titulo',            contexto: 'Título principal de la página de contacto', es: 'Contacto' },
+    { clave: 'contacto_subtitulo',         contexto: 'Frase bajo el título de la página de contacto', es: 'Estamos aquí para ayudarte en lo que necesites' },
+    { clave: 'contacto_cargando',          contexto: 'Texto de carga mientras se obtienen los datos de contacto', es: 'Cargando...' },
+    { clave: 'contacto_etiqueta_empresa',  contexto: 'Etiqueta de la tarjeta Empresa en la página de contacto', es: 'Empresa' },
+    { clave: 'contacto_etiqueta_telefono', contexto: 'Etiqueta de la tarjeta Teléfono en la página de contacto', es: 'Teléfono' },
+    { clave: 'contacto_etiqueta_whatsapp', contexto: 'Etiqueta de la tarjeta WhatsApp en la página de contacto', es: 'WhatsApp' },
+    { clave: 'contacto_etiqueta_email',    contexto: 'Etiqueta de la tarjeta Email en la página de contacto', es: 'Email' },
+    { clave: 'contacto_etiqueta_horario',  contexto: 'Etiqueta de la tarjeta Horario en la página de contacto', es: 'Horario' },
+    { clave: 'contacto_etiqueta_direccion',contexto: 'Etiqueta de la tarjeta Dirección en la página de contacto', es: 'Dirección' },
+    { clave: 'contacto_vacio',             contexto: 'Texto cuando no hay datos de contacto disponibles', es: 'Información de contacto no disponible.' },
+  ];
+  for (const tx of TEXTOS_CONTACTO) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Página de contacto', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de contacto', contexto = $2, texto_es = $3`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
   await cargarTextosCache();
 
   // ─── Tarifario de precios ─────────────────────────────────────────────────
@@ -4735,15 +4757,25 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
   const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
   res.json({
     ...(PALABRAS_PAGINAS[lang] || {}),
-    proximamente_titulo:    obtenerTexto('destinos_proximamente_titulo',    lang),
-    proximamente_subtitulo: obtenerTexto('destinos_proximamente_subtitulo', lang),
-    footer_rutas:           obtenerTexto('home_footer_rutas',               lang),
-    footer_destinos:        obtenerTexto('home_footer_destinos',            lang),
-    footer_flota:           obtenerTexto('home_footer_flota',               lang),
-    footer_contacto:        obtenerTexto('home_footer_contacto',            lang),
-    footer_alta_choferes:   obtenerTexto('home_footer_alta_choferes',       lang),
-    footer_acceso_choferes: obtenerTexto('home_footer_acceso_choferes',     lang),
-    footer_acceso_clientes: obtenerTexto('home_footer_acceso_clientes',     lang)
+    proximamente_titulo:       obtenerTexto('destinos_proximamente_titulo',    lang),
+    proximamente_subtitulo:    obtenerTexto('destinos_proximamente_subtitulo', lang),
+    footer_rutas:              obtenerTexto('home_footer_rutas',               lang),
+    footer_destinos:           obtenerTexto('home_footer_destinos',            lang),
+    footer_flota:              obtenerTexto('home_footer_flota',               lang),
+    footer_contacto:           obtenerTexto('home_footer_contacto',            lang),
+    footer_alta_choferes:      obtenerTexto('home_footer_alta_choferes',       lang),
+    footer_acceso_choferes:    obtenerTexto('home_footer_acceso_choferes',     lang),
+    footer_acceso_clientes:    obtenerTexto('home_footer_acceso_clientes',     lang),
+    contacto_titulo:           obtenerTexto('contacto_titulo',                 lang),
+    contacto_subtitulo:        obtenerTexto('contacto_subtitulo',              lang),
+    contacto_cargando:         obtenerTexto('contacto_cargando',               lang),
+    contacto_etiqueta_empresa: obtenerTexto('contacto_etiqueta_empresa',       lang),
+    contacto_etiqueta_telefono:obtenerTexto('contacto_etiqueta_telefono',      lang),
+    contacto_etiqueta_whatsapp:obtenerTexto('contacto_etiqueta_whatsapp',      lang),
+    contacto_etiqueta_email:   obtenerTexto('contacto_etiqueta_email',         lang),
+    contacto_etiqueta_horario: obtenerTexto('contacto_etiqueta_horario',       lang),
+    contacto_etiqueta_direccion:obtenerTexto('contacto_etiqueta_direccion',    lang),
+    contacto_vacio:            obtenerTexto('contacto_vacio',                  lang)
   });
 }));
 
