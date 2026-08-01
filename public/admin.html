@@ -2599,7 +2599,7 @@ function cargarListaIdiomasDinamica() {
   return fetch('/admin/idiomas').then(function (r) { return r.json(); }).then(function (idiomas) {
     var activos = idiomas.filter(function (i) { return i.activo; });
     IDIOMAS_SEO = activos.map(function (i) { return i.codigo; });
-    IDIOMAS_TEXTOS = activos.filter(function (i) { return !i.es_base; }).map(function (i) { return i.codigo; });
+    IDIOMAS_TEXTOS = activos.map(function (i) { return i.codigo; });
     SECCIONES_TRASLADO_JS = {};
     NOMBRES_IDIOMA = {};
     activos.forEach(function (i) {
@@ -3590,10 +3590,11 @@ function abrirEditorTexto(textoId) {
       lang.toUpperCase() + (ok ? '' : ' ⚠️') + '</button>';
   }).join('');
 
+  var esEditable = texto.clave === 'contacto_horario';
+
   editor.innerHTML =
     '<h2 style="margin-top:0">✏️ ' + escapar(texto.clave) + '</h2>' +
     '<div style="background:var(--gris-fondo);padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px;">' +
-    '<strong>Español (original):</strong> ' + escapar(texto.texto_es) + '<br>' +
     (texto.contexto ? '<span style="color:var(--texto-muted);font-size:12px;"><strong>Contexto:</strong> ' + escapar(texto.contexto) + '</span>' : '') +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
@@ -3624,20 +3625,33 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
   var campo = document.getElementById('texto-campo-editor');
   campo.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
 
-  fetch('/admin/textos/' + textoId + '/idioma/' + lang)
-    .then(function (r) { return r.json(); })
-    .then(function (datos) {
-      campo.innerHTML =
-        '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
-        '<textarea class="campo" id="texto-traduccion" rows="3" placeholder="Todavía sin traducir...">' + escapar(datos.texto || '') + '</textarea>' +
-        '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar</button>';
-    });
+  if (lang === 'es') {
+    // El español se carga del texto_es en caché
+    var texto = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
+    var valorEs = texto ? (texto.texto_es || '') : '';
+    campo.innerHTML =
+      '<label class="etiqueta">Texto en Español</label>' +
+      '<textarea class="campo" id="texto-traduccion" rows="3">' + escapar(valorEs) + '</textarea>' +
+      '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'es\')">💾 Guardar</button>';
+  } else {
+    fetch('/admin/textos/' + textoId + '/idioma/' + lang)
+      .then(function (r) { return r.json(); })
+      .then(function (datos) {
+        campo.innerHTML =
+          '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
+          '<textarea class="campo" id="texto-traduccion" rows="3" placeholder="Todavía sin traducir...">' + escapar(datos.texto || '') + '</textarea>' +
+          '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar</button>';
+      });
+  }
 }
 
 function guardarTraduccionTexto(textoId, lang) {
   var valor = document.getElementById('texto-traduccion').value;
   var msg = document.getElementById('texto-mensaje-editor');
-  fetch('/admin/textos/' + textoId + '/idioma/' + lang, {
+  var url = lang === 'es'
+    ? '/admin/textos/' + textoId + '/es'
+    : '/admin/textos/' + textoId + '/idioma/' + lang;
+  fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto: valor })
