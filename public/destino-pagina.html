@@ -161,6 +161,8 @@
           document.getElementById('footer-flota').href          = base + (pp.flota    || 'flota');
           document.getElementById('footer-contacto').href       = base + (pp.contacto || 'contacto');
             document.getElementById('footer-acceso-clientes').href = base + (pp.palabra_mi_reserva || 'mi-reserva');
+          document.getElementById('footer-alta-choferes').style.display   = 'none';
+          document.getElementById('footer-acceso-choferes').style.display = 'none';
         }
         if (pp.footer_rutas)           document.getElementById('footer-rutas').textContent           = pp.footer_rutas;
         if (pp.footer_destinos)        document.getElementById('footer-destinos').textContent        = pp.footer_destinos;

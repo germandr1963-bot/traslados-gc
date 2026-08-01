@@ -393,6 +393,8 @@
         if (lang !== 'es') {
           var base = '/' + lang + '/';
           document.getElementById('footer-acceso-clientes').href = base + (pp.palabra_mi_reserva || 'mi-reserva');
+          document.getElementById('footer-alta-choferes').style.display   = 'none';
+          document.getElementById('footer-acceso-choferes').style.display = 'none';
         }
         // Título y subtítulo
         if (pp.acceso_titulo)    document.getElementById('acceso-titulo').textContent    = pp.acceso_titulo;
