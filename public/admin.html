@@ -3730,11 +3730,12 @@ function abrirPanelIdiomas() {
       });
 
       var PAGINAS_ETIQUETAS = {
-        destino:  'Destino (página individual)',
-        destinos: 'Destinos (listado)',
-        rutas:    'Rutas',
-        flota:    'Flota',
-        contacto: 'Contacto'
+        destino:      'Destino (página individual)',
+        destinos:     'Destinos (listado)',
+        rutas:        'Rutas',
+        flota:        'Flota',
+        contacto:     'Contacto',
+        'mi-reserva': 'Acceso clientes (mi reserva)'
       };
 
       var cabecerasIdiomas = idiomas.map(function(idi) {
@@ -3800,7 +3801,7 @@ function editarPalabraIdioma(codigo, campo, valorActual) {
 }
 
 function editarPalabraPagina(lang, pagina, valorActual) {
-  var etiquetas = { destino: 'destino (pág. individual)', destinos: 'destinos (listado)', rutas: 'rutas', flota: 'flota', contacto: 'contacto' };
+  var etiquetas = { destino: 'destino (pág. individual)', destinos: 'destinos (listado)', rutas: 'rutas', flota: 'flota', contacto: 'contacto', 'mi-reserva': 'acceso clientes' };
   var etiqueta = etiquetas[pagina] || pagina;
   var nueva = prompt('Palabra para "' + etiqueta + '" en la URL del idioma ' + lang.toUpperCase() + ' (solo letras, números y guiones):', valorActual || '');
   if (nueva === null) return;
