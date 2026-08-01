@@ -166,8 +166,8 @@
   </header>
 
   <div class="contenido">
-    <h1>Rutas</h1>
-    <p class="subtitulo" id="subtitulo-rutas">Todos los trayectos intermunicipales de Gran Canaria, con precio fijo</p>
+    <h1 id="titulo-rutas">Rutas</h1>
+    <p class="subtitulo" id="subtitulo-rutas">Todos los trayectos intermunicipales de Gran Canaria, a tu medida</p>
 
     <div id="contenido-destinos">
       <div class="cargando">⏳ Cargando destinos...</div>
@@ -261,6 +261,7 @@
           if (pp.footer_acceso_clientes) document.getElementById('footer-acceso-clientes').textContent = pp.footer_acceso_clientes;
           if (pp.nav_inicio)   document.getElementById('link-inicio-header').textContent   = pp.nav_inicio;
           if (pp.nav_contacto) document.getElementById('link-contacto-header').textContent = pp.nav_contacto;
+          if (pp.rutas_titulo)           document.getElementById('titulo-rutas').textContent            = pp.rutas_titulo;
           if (pp.rutas_subtitulo)        document.getElementById('subtitulo-rutas').textContent         = pp.rutas_subtitulo;
           if (pp.proximamente_titulo)    document.getElementById('prox-titulo').textContent             = pp.proximamente_titulo;
           if (pp.proximamente_subtitulo) document.getElementById('prox-subtitulo').textContent          = pp.proximamente_subtitulo;
