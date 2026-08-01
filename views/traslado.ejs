@@ -246,7 +246,7 @@ footer {
 
 <div class="hero" id="hero">
   <div class="nav-superior">
-    <a href="/" style="text-decoration:none;color:inherit;">
+    <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" style="text-decoration:none;color:inherit;">
       <span class="titular" style="font-size:18px;"><%= nombreMarca %></span>
     </a>
     <div style="display:flex;align-items:center;gap:16px;">
@@ -266,7 +266,7 @@ footer {
         <% }); %>
       </div>
       <% } %>
-      <a href="/" class="nav-links" style="text-decoration:none;color:inherit;"><%= t('nav_volver_rutas') %></a>
+      <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="nav-links" style="text-decoration:none;color:inherit;"><%= t('nav_volver_rutas') %></a>
     </div>
   </div>
 
@@ -276,7 +276,7 @@ footer {
       <%= seo.origen %> <span class="acento">→</span><br><%= seo.destino %>
     </h1>
     <p class="subtitulo-ruta"><%= t('subtitulo_hero') %></p>
-    <a href="/" class="boton-reservar"><%= t('boton_solicitar_traslado') %></a>
+    <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="boton-reservar"><%= t('boton_solicitar_traslado') %></a>
   </div>
 </div>
 
@@ -314,7 +314,7 @@ footer {
   <p style="color:var(--texto-muted);font-size:14px;"><%= t('texto_consulta_disponibilidad') %></p>
   <% } %>
   <p style="margin-top:20px;">
-    <a href="/" class="boton-reservar"><%= t('boton_solicitar_traslado') %></a>
+    <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="boton-reservar"><%= t('boton_solicitar_traslado') %></a>
   </p>
 </div>
 
