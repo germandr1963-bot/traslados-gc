@@ -692,6 +692,10 @@ async function initSchema() {
     { clave: 'home_footer_alta_choferes',contexto: 'Enlace Alta choferes en el footer', es: 'Alta choferes', en: 'Driver sign-up' },
     { clave: 'home_footer_acceso_choferes', contexto: 'Enlace Acceso a choferes en el footer', es: 'Acceso a choferes', en: 'Driver access' },
     { clave: 'home_footer_acceso_clientes', contexto: 'Enlace Acceso clientes en el footer', es: 'Acceso clientes', en: 'Client access' },
+    { clave: 'nav_inicio',          contexto: 'Texto del enlace Inicio en la cabecera de todas las páginas', es: 'Inicio', en: 'Home' },
+    { clave: 'nav_inicio_flecha',   contexto: 'Texto del enlace ← Inicio en la cabecera (páginas de destinos)', es: '← Inicio', en: '← Home' },
+    { clave: 'nav_destinos_flecha', contexto: 'Texto del enlace ← Destinos en la cabecera de la página de destino individual', es: '← Destinos', en: '← Destinations' },
+    { clave: 'nav_contacto',        contexto: 'Texto del enlace Contacto en la cabecera de todas las páginas', es: 'Contacto', en: 'Contact' },
   ];
   for (const tx of TEXTOS_HOME) {
     const fila = await pool.query(
@@ -4767,6 +4771,10 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
     footer_alta_choferes:      obtenerTexto('home_footer_alta_choferes',       lang),
     footer_acceso_choferes:    obtenerTexto('home_footer_acceso_choferes',     lang),
     footer_acceso_clientes:    obtenerTexto('home_footer_acceso_clientes',     lang),
+    nav_inicio:                obtenerTexto('nav_inicio',                      lang),
+    nav_inicio_flecha:         obtenerTexto('nav_inicio_flecha',               lang),
+    nav_destinos_flecha:       obtenerTexto('nav_destinos_flecha',             lang),
+    nav_contacto:              obtenerTexto('nav_contacto',                    lang),
     contacto_titulo:           obtenerTexto('contacto_titulo',                 lang),
     contacto_subtitulo:        obtenerTexto('contacto_subtitulo',              lang),
     contacto_cargando:         obtenerTexto('contacto_cargando',               lang),
