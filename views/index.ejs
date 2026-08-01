@@ -287,7 +287,7 @@ footer {
 <div class="hero" id="hero">
   <div class="nav-superior">
     <span class="titular" style="font-size:18px;">Traslados · GC</span>
-    <nav class="nav-links"><a href="/mi-reserva" style="color:rgba(255,255,255,0.6);text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='#C1502E'" onmouseout="this.style.color='rgba(255,255,255,0.6)'""><%= t('home_nav_acceso_clientes') %></a></nav>
+    <nav class="nav-links"><a href="<%= lang === 'es' ? '/mi-reserva' : '/' + lang + '/' + (palabrasPaginas['mi-reserva'] || 'mi-reserva') %>" style="color:rgba(255,255,255,0.6);text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color='#C1502E'" onmouseout="this.style.color='rgba(255,255,255,0.6)'""><%= t('home_nav_acceso_clientes') %></a></nav>
   </div>
 
   <div class="lang-bar">
@@ -394,7 +394,7 @@ footer {
     <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/' + (palabrasPaginas.contacto || 'contacto') %>" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_contacto') %></a>
     <a href="/chofer/acceso/alta" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_alta_choferes') %></a>
     <a href="/chofer/acceso" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_acceso_choferes') %></a>
-    <a href="/mi-reserva" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_acceso_clientes') %></a>
+    <a href="<%= lang === 'es' ? '/mi-reserva' : '/' + lang + '/' + (palabrasPaginas['mi-reserva'] || 'mi-reserva') %>" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_acceso_clientes') %></a>
   </div>
   Traslados · GC — Gran Canaria
 </footer>

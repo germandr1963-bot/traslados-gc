@@ -740,7 +740,7 @@ footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13
     <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/' + (palabrasPaginas.contacto || 'contacto') %>" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_contacto') %></a>
     <a href="/chofer/acceso/alta" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_alta_choferes') %></a>
     <a href="/chofer/acceso" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_acceso_choferes') %></a>
-    <a href="/mi-reserva" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_acceso_clientes') %></a>
+    <a href="<%= lang === 'es' ? '/mi-reserva' : '/' + lang + '/' + (palabrasPaginas['mi-reserva'] || 'mi-reserva') %>" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_acceso_clientes') %></a>
   </div>
   Traslados · GC — Gran Canaria
 </footer>
