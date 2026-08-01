@@ -5388,6 +5388,13 @@ app.get('/:lang([a-z]{2})/:seccion', asyncHandler(async (req, res) => {
     return res.sendFile(path.join(__dirname, 'public', 'contacto.html'));
   }
 
+  // ── Acceso clientes (mi reserva) ─────────────────────────────────────────
+  const palabraMiReserva = pp['mi-reserva'] || 'mi-reserva';
+  if (seccion === palabraMiReserva) {
+    if (req.session && req.session.clienteReservaId) return res.redirect('/cliente/portal');
+    return res.sendFile(path.join(__dirname, 'public', 'mi-reserva.html'));
+  }
+
   return res.status(404).send('Página no encontrada');
 }));
 
