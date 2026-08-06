@@ -1,4 +1,5 @@
 const express = require('express');
+const iaPrompts = require('./ia-prompts');
 const Stripe = require('stripe');
 const { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, VerticalAlignSection } = require('docx');
 const session = require('express-session');
@@ -3782,15 +3783,7 @@ app.post('/admin/seo/destinos/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(
   const nombreIdioma = await getNombreIdioma(lang);
   const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
-  const prompt = `Eres un experto en SEO de imágenes para webs de turismo y transporte.
-Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y devuelve dos cosas:
-
-1. nombre_archivo: Un nombre de archivo SEO optimizado en ${lang === 'es' ? 'español' : nombreIdioma}, en minúsculas, con guiones en lugar de espacios, sin tildes ni caracteres especiales, con extensión .webp. Debe describir lo que se ve en la imagen e incluir el nombre del destino. Ejemplo: "maspalomas-dunas-atardecer-gran-canaria.webp"
-
-2. alt_texto: Un texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe con detalle lo que se ve en la imagen — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto.
-
-Responde ÚNICAMENTE con JSON válido, sin markdown, con esta forma exacta:
-{"nombre_archivo": "...", "alt_texto": "..."}`;
+  const prompt = iaPrompts.GENERADOR_ALT_NUEVO_ES(d.nombre, d.isla, lang, nombreIdioma);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -3929,17 +3922,7 @@ app.post('/admin/seo/destinos/:id/fotos/nueva/alt/generar-todos', requireAdmin, 
     return i.codigo + ' (' + i.nombre + ')';
   }).join(', ');
   const codigos = idiomas.rows.map(function(i) { return '"' + i.codigo + '": "..."'; }).join(', ');
-  const prompt = `Eres un experto en SEO de imagenes para webs de turismo y transporte. Trabajas para multiples mercados europeos.
-Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text para cada uno de estos idiomas: ${listaIdiomas}.
-
-Para cada idioma:
-- Escribe de forma completamente nativa — como lo escribiria un SEO local de ese mercado, NO como una traduccion del espanol
-- Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino
-- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto
-- Maximo 125 caracteres
-
-Responde UNICAMENTE con JSON valido, sin markdown:
-{${codigos}}`;
+  const prompt = iaPrompts.GENERADOR_ALT_NUEVO_TODOS(d.nombre, d.isla, listaIdiomas, codigos);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -3996,17 +3979,7 @@ app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt/:lang/sugerir-ia', requireAd
   const nombreIdioma = await getNombreIdioma(lang);
   const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
-  const prompt = `Eres un experto en SEO de imágenes para webs de turismo y transporte. Trabajas en el mercado de habla ${esBase ? 'español' : nombreIdioma}.
-Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text.
-
-El alt text debe:
-- Estar escrito en ${esBase ? 'español' : nombreIdioma} de forma completamente nativa — como lo escribiría un SEO local de ese mercado, no como una traducción
-- Describir lo que se ve en la imagen de forma natural e incluir el nombre del destino
-- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto
-- Máximo 125 caracteres
-
-Responde ÚNICAMENTE con JSON válido, sin markdown:
-{"alt_texto": "..."}`;
+  const prompt = iaPrompts.GENERADOR_ALT_EXISTENTE_LANG(d.nombre, d.isla, esBase, nombreIdioma);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -4228,98 +4201,9 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
   const maxCharsDesc   = MAX_CHARS_DESC[lang]   || 148;
 
 
-  const prompt = `# INSTRUCCIONES GENERALES DE REDACCIÓN SEO LOCAL Y METADATOS MULTIIDIOMA
+  const prompt = iaPrompts.GENERADOR_DESTINO_TODO(d.nombre, d.isla, nombreIdioma, reglasSlug);
 
-Actúa como un Experto en SEO Local y Redactor Creativo Nativo. Tu trabajo consiste en redactar metadatos y contenidos altamente persuasivos, escritos de "humano a humano", para una página de captación del destino "${d.nombre}" (${d.isla}, Islas Canarias) de una empresa de traslados y transportes privados intermunicipales.
-
-REGLA DE NATIVIDAD (NO TRADUCIR):
-No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo busca, piensa y reserva un usuario real de ese idioma cuando planifica su viaje a "${d.nombre}".
-
----
-
-## CONCEPTO Y OBJETIVO DE LA PÁGINA
-Esta página es una landing de atracción/captación. Su objetivo es inspirar al cliente a visitar "${d.nombre}" y presentar el servicio de traslado/transporte privado como la opción más cómoda, rápida y directa para llegar hasta allí (desde aeropuertos, hoteles u otros puntos).
-
----
-
-## REGLAS DE ORO Y ESTILO (HUMAN-LIKE)
-
-1. ENFOQUE HACIA EL DESTINO:
-Todo el contenido (Título, Descripción, Tarjeta y Texto Principal) debe enfocar el viaje y transporte privado HACIA "${d.nombre}".
-
-2. LÍMITES ESTRICTOS DE CARACTERES (INFRANQUEABLES):
-Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido para aprovechar el espacio SEO, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO en ${nombreIdioma}. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter.
-
-Límites de caracteres por idioma:
-- Español (ES): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)
-- Inglés (EN): Título (54-60 chars | MÁX 62) | Descripción (150-157 chars | MÁX 160)
-- Alemán (DE): Título (48-53 chars | MÁX 55) | Descripción (130-137 chars | MÁX 140)
-- Francés (FR): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)
-- Italiano (IT): Título (52-58 chars | MÁX 60) | Descripción (148-155 chars | MÁX 158)
-- Neerlandés (NL): Título (50-55 chars | MÁX 57) | Descripción (138-145 chars | MÁX 148)
-- Sueco (SV): Título (50-55 chars | MÁX 57) | Descripción (140-147 chars | MÁX 150)
-- Noruego (NO): Título (50-55 chars | MÁX 57) | Descripción (142-149 chars | MÁX 152)
-- Finlandés (FI): Título (46-52 chars | MÁX 54) | Descripción (128-135 chars | MÁX 138)
-- Ruso (RU): Título (42-48 chars | MÁX 50) | Descripción (118-125 chars | MÁX 128)
-
-3. ESTILO NATURAL Y PROHIBICIONES DE IA:
-- Prohibido usar palabras y clichés típicos de IA como: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido".
-- Usa un tono cercano, natural y conversacional (de persona local a viajero).
-- Alterna la longitud de las frases (cortas y directas con explicativas) para dar un ritmo de lectura 100% humano.
-
-### REGLAS OBLIGATORIAS SOBRE PRECIOS Y TARIFAS:
-1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):
-   Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
-2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
-   "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".
-
----
-
-## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
-
-1. SLUG:
-URL amigable para este destino. ${reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
-
-2. PALABRA_DESTINO:
-La palabra "destino" (lugar al que se viaja) traducida a ${nombreIdioma}, en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico. Solo la palabra.
-
-3. NOMBRE_ISLA:
-El nombre de la isla "${d.isla}" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente.
-
-4. META_TITLE (campo: meta_title):
-- Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
-- Formato habitual: [Traslado / Taxi Privado a ${d.nombre}] | [Propuesta de Valor] | [CTA o Garantía]
-
-5. META_DESCRIPTION (campo: meta_description):
-- Redactada como una solución persuasiva de transporte para el viajero.
-- Formato habitual: [Solución/Promesa de llegada a ${d.nombre}] + [Ventajas: tarifas competitivas, comodidad, sin colas] + [Llamada a la Acción corta].
-
-6. TEXTO INTRODUCTORIO PARA TARJETA DE DESTINO (campo: texto_tarjeta):
-- EXTENSIÓN: Entre 150 y 200 caracteres (MÁXIMO ABSOLUTO: 200 caracteres, incluidos espacios).
-- OBJETIVO: Pincelada corta y atractiva para la ficha previa del destino con botón hacia la página completa.
-- ESTRUCTURA (2 frases): [Frase 1: Atractivo principal de ${d.nombre}] + [Frase 2: Ventaja del traslado privado + CTA de clic].
-
-7. TEXTO PRINCIPAL DEL DESTINO (campo: texto_descripcion):
-EXTENSIÓN TOTAL OBLIGATORIA: Entre 400 y 550 palabras (LÍMITE MÁXIMO ABSOLUTO: 600 palabras).
-FORMATO: HTML válido. Usa <h2>, <h3>, <p>, <ul>, <li>, <strong>. NUNCA <h1>. NUNCA Markdown.
-ESTRUCTURA:
-- <h2> Encabezado Principal: 1 frase potente.
-- <h2> Descubre ${d.nombre} + <p>: Máximo 1 párrafo (aprox. 60-80 palabras).
-- <h2> Qué ver y hacer en ${d.nombre} + <p> o <ul><li>: Máximo 2-3 bloques breves (aprox. 120-150 palabras).
-- <h2> La mejor forma de llegar a ${d.nombre} + <p>: Máximo 2 párrafos (aprox. 100-120 palabras).
-- <h2> Consejos del Local + <ul><li>: 2-3 tips breves (aprox. 60-80 palabras).
-- <h2> Reserva tu traslado + <p>: 1 párrafo final con CTA (aprox. 40-50 palabras).
-
----
-
-## AUTOCONTROL DE CARACTERES
-Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) del meta_title, meta_description y texto_tarjeta. Si superan por 1 solo carácter el límite máximo, reescríbelos.
-
----
-
-## FORMATO DE SALIDA (OBLIGATORIO)
-Responde ÚNICAMENTE con JSON válido, sin markdown:
-{"slug": "...", "palabra_destino": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "texto_tarjeta": "...", "texto_descripcion": "..."}`;  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
@@ -4435,24 +4319,7 @@ app.post('/admin/seo/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(asy
 
   const nombreIdioma = await getNombreIdioma(lang);
 
-  const prompt = `Eres un experto en SEO de destinos turísticos. Tu tarea es escribir contenido SEO en ${nombreIdioma} para una web de traslados privados intermunicipales en Gran Canaria (Islas Canarias, España).
-
-Escribe como lo haría un profesional SEO nativo de ${nombreIdioma} — con el ritmo, las expresiones y las palabras clave que usa de verdad alguien de ese mercado cuando busca un traslado privado en Gran Canaria. No traduces. Creas desde cero.
-
-Para cada destino genera:
-- meta_title: Título para Google. Máximo 600px reales (Arial 20px). Usa términos de búsqueda reales de ese mercado. En idiomas con palabras largas (alemán, neerlandés, finés) usa menos palabras. NUNCA superes 600px.
-- meta_description: Descripción para Google. Máximo 920px reales (Arial 13px). Invita al clic con tono natural de ese mercado. NUNCA superes 920px.
-- texto_descripcion: Exactamente 3 párrafos para la página pública del destino. Contenido:
-  Párrafo 1 — Describe el destino: qué se puede ver, qué hacer, gastronomía, ambiente, qué lo hace especial. Concreto y sensorial, nada genérico.
-  Párrafo 2 — Cómo llegar: menciona que se puede llegar desde cualquier punto de Gran Canaria con nuestro servicio de traslado privado. Cómodo, sin esperas, ideal con equipaje o en familia. Sin inventar tiempos ni precios.
-  Párrafo 3 — Invitación a reservar: cálida y directa. El precio depende del tipo de vehículo elegido, siempre asequible. Que reserves y nosotros nos encargamos del trayecto.
-  Sin listas. Solo párrafos fluidos. Sin frases hechas tipo "joya escondida" o "paraíso".
-
-Destinos (JSON con id, nombre, isla, zona):
-${JSON.stringify(items, null, 2)}
-
-Responde EXCLUSIVAMENTE con JSON válido, sin markdown, con esta estructura exacta donde la clave es el destino_id:
-{"1": {"meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}, "2": {...}}`;
+  const prompt = iaPrompts.GENERADOR_DESTINO_LOTE(nombreIdioma, items);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -4688,15 +4555,7 @@ async function traducirConClaudeIA(items, nombreIdioma) {
     throw new Error('Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.');
   }
 
-  const prompt = 'Traduce los siguientes textos de una web de traslados privados en Gran Canaria, ' +
-    'del español al ' + nombreIdioma + '. Cada texto incluye una clave única y un contexto que explica ' +
-    'dónde aparece en la web — úsalo para elegir la traducción más natural (por ejemplo, un botón necesita ' +
-    'un tono distinto a un párrafo explicativo). Mantén un tono profesional pero cercano.\n' +
-    '- Traduce TODOS los textos sin excepción, incluidos nombres de categorías como "Business", "Económico", "Confort", "Premium" — tradúcelos a su equivalente natural en ' + nombreIdioma + '.\n\n' +
-    'Textos a traducir (JSON):\n' + JSON.stringify(items, null, 2) + '\n\n' +
-    'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, ' +
-    'sin bloques de markdown ni comillas triples, con esta forma exacta: ' +
-    '{"clave1": "traducción1", "clave2": "traducción2"}';
+  const prompt = iaPrompts.GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -4732,15 +4591,7 @@ async function traducirSEOConClaudeIA(items, nombreIdioma) {
     throw new Error('Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.');
   }
 
-  const prompt = 'Eres un experto en SEO que trabaja en el mercado de habla ' + nombreIdioma + '. Conoces cómo busca la gente en ' + nombreIdioma + ' cuando quiere contratar un traslado privado en Gran Canaria — qué términos usan, qué intención tienen, cómo se expresan. No traduces. Creas cada texto desde cero en ' + nombreIdioma + ', pensando como un SEO nativo de ese mercado. El texto en español es solo una referencia de contenido, no una plantilla.\n\n' +
-    'Para cada ruta, escribe en ' + nombreIdioma + ':\n' +
-    '- meta_title: Título para Google. Límite: 600px reales (fuente Arial 20px). Usa las expresiones reales con las que alguien de ese mercado buscaría ese traslado. Para nombres de lugares usa la forma más natural en ' + nombreIdioma + ' (ej: "Gran Canaria Airport" en inglés). En idiomas con palabras largas (alemán, neerlandés, polaco) usa menos palabras. NUNCA superes 600px.\n' +
-    '- meta_description: Descripción para Google. Límite: 920px reales (fuente Arial 13px). Debe invitar al clic con tono y expresiones naturales de ese mercado. En idiomas con palabras largas sé más conciso. NUNCA superes 920px.\n' +
-    'Los slugs de URL nunca se tocan.\n\n' +
-    'Datos (JSON) — titulo_es y descripcion_es son solo referencia de contenido:\n' + JSON.stringify(items, null, 2) + '\n\n' +
-    'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, sin bloques de markdown, ' +
-    'usando el route_id de cada ruta como clave, con esta forma exacta: ' +
-    '{\"3\": {\"meta_title\": \"...\", \"meta_description\": \"...\"}, \"18\": {\"meta_title\": \"...\", \"meta_description\": \"...\"}}';
+  const prompt = iaPrompts.GENERADOR_RUTAS_SEO(nombreIdioma, items);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -6767,12 +6618,7 @@ app.post('/admin/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY en Render.' });
 
-  const prompt = 'Traduce los siguientes nombres de lugares turísticos de Gran Canaria del español al ' + nombreIdioma + '.\n' +
-    'Usa la forma más natural y reconocida en ese idioma (ej: "Aeropuerto de Gran Canaria" → "Gran Canaria Airport" en inglés).\n' +
-    'Si el nombre no tiene traducción establecida, devuélvelo igual en español.\n\n' +
-    'Lugares a traducir (JSON con id y nombre en español):\n' + JSON.stringify(pendientes) + '\n\n' +
-    'Responde EXCLUSIVAMENTE con un JSON válido, sin texto adicional, sin markdown, con esta forma exacta:\n' +
-    '[{"id": 1, "nombre": "..."}, {"id": 2, "nombre": "..."}]';
+  const prompt = iaPrompts.GENERADOR_NOMBRES_DESTINOS(nombreIdioma, pendientes);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
