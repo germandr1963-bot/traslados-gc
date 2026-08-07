@@ -226,7 +226,7 @@
       // CTA — enlace al inicio con el destino preseleccionado en el buscador
       if (pp.destino_cta_texto) {
         var urlBase = lang !== 'es' ? '/' + lang + '/' : '/';
-        var urlCta = urlBase + '?hasta=' + encodeURIComponent(d.nombre_es);
+        var urlCta = urlBase + '?hasta=' + encodeURIComponent(d.nombre_es).replace(/%20/g, '+');
         html += '<div class="cta-destino">' +
           '<a href="' + urlCta + '" class="cta-destino-btn">' + pp.destino_cta_texto + ' ' + d.nombre + '</a>' +
           '</div>';
