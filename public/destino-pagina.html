@@ -223,6 +223,15 @@
         html += '<div class="texto-destino">' + d.texto_descripcion + '</div>';
       }
 
+      // CTA — enlace al inicio con el destino preseleccionado en el buscador
+      if (pp.destino_cta_texto) {
+        var urlBase = lang !== 'es' ? '/' + lang + '/' : '/';
+        var urlCta = urlBase + '?hasta=' + encodeURIComponent(d.nombre_es || d.nombre);
+        html += '<div class="cta-destino">' +
+          '<a href="' + urlCta + '" class="cta-destino-btn">' + pp.destino_cta_texto + ' ' + d.nombre + '</a>' +
+          '</div>';
+      }
+
       // Tres fotos
       if (d.fotos && d.fotos.length > 0) {
         html += '<div class="fotos-grid">';
