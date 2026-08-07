@@ -5298,7 +5298,7 @@ app.get('/api/destino-publico/:isla/:slug', asyncHandler(async (req, res) => {
   const { isla, slug } = req.params;
   const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
   const result = await pool.query(
-    `SELECT d.id, COALESCE(dt.nombre, d.nombre) AS nombre, d.nombre AS nombre_es, d.isla, d.zona,
+    `SELECT d.id, COALESCE(dt.nombre, d.nombre) AS nombre, d.isla, d.zona,
             dss.texto_descripcion, dss.meta_title, dss.meta_description,
             (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
      FROM destinos d
