@@ -226,7 +226,7 @@
       // CTA — enlace al inicio con el destino preseleccionado en el buscador
       if (pp.destino_cta_texto) {
         var urlBase = lang !== 'es' ? '/' + lang + '/' : '/';
-        var urlCta = urlBase + '?hasta=' + encodeURIComponent(d.nombre_es || d.nombre);
+        var urlCta = urlBase + '?hasta=' + encodeURIComponent(d.nombre);
         html += '<div class="cta-destino">' +
           '<a href="' + urlCta + '" class="cta-destino-btn">' + pp.destino_cta_texto + ' ' + d.nombre + '</a>' +
           '</div>';
@@ -239,15 +239,6 @@
           html += '<div class="foto-item"><img src="/destino-foto/' + f.id + '" alt="' + (f.alt_texto || d.nombre) + '"></div>';
         });
         html += '</div>';
-      }
-
-      // CTA — enlace al buscador con el destino preseleccionado
-      if (pp.destino_cta_texto) {
-        var palabraReserva = pp['reserva'] || 'reserva';
-        var urlCta = '/' + (lang !== 'es' ? lang + '/' : '') + palabraReserva + '?hasta=' + encodeURIComponent(d.nombre);
-        html += '<div class="cta-destino">' +
-          '<a href="' + urlCta + '" class="cta-destino-btn">' + pp.destino_cta_texto + ' ' + d.nombre + '</a>' +
-          '</div>';
       }
 
       document.getElementById('contenido-destino').innerHTML = html;
