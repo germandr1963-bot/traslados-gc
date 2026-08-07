@@ -97,6 +97,25 @@
       display: block;
     }
 
+    /* CTA reserva */
+    .cta-destino {
+      text-align: center;
+      margin: 0 0 48px;
+    }
+    .cta-destino-btn {
+      display: inline-block;
+      background: var(--terracota);
+      color: #fff;
+      text-decoration: none;
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 20px;
+      letter-spacing: 1px;
+      padding: 16px 40px;
+      border-radius: 8px;
+      transition: opacity 0.2s;
+    }
+    .cta-destino-btn:hover { opacity: 0.88; }
+
     .cargando { text-align: center; color: var(--texto-muted); font-size: 14px; padding: 80px 0; }
     .error-msg { text-align: center; color: var(--texto-muted); font-size: 14px; padding: 80px 0; }
 
@@ -210,6 +229,15 @@
             html += '<div class="foto-item"><img src="/destino-foto/' + f.id + '" alt="' + (f.alt_texto || d.nombre) + '"></div>';
           });
           html += '</div>';
+        }
+
+        // CTA — enlace al buscador con el destino preseleccionado
+        if (pp && pp.destino_cta_texto) {
+          var palabraReserva = (pp && pp['reserva']) || 'reserva';
+          var urlCta = '/' + (lang !== 'es' ? lang + '/' : '') + palabraReserva + '?hasta=' + encodeURIComponent(d.nombre);
+          html += '<div class="cta-destino">' +
+            '<a href="' + urlCta + '" class="cta-destino-btn">' + pp.destino_cta_texto + ' ' + d.nombre + '</a>' +
+            '</div>';
         }
 
         document.getElementById('contenido-destino').innerHTML = html;
