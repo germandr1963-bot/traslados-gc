@@ -461,6 +461,11 @@ function cargarRutas() {
     });
     poblarSelect(document.getElementById('desde'), origenes);
     poblarSelect(document.getElementById('hasta'), destinos);
+    var paramHasta = new URLSearchParams(window.location.search).get('hasta');
+    if (paramHasta) {
+      document.getElementById('hasta').value = paramHasta;
+      actualizarCategoriasSegunRuta();
+    }
     if (rutas.length === 0) {
       document.getElementById('resultado-precio').textContent = TXT.eligeRuta;
     }
