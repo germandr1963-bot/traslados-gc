@@ -4760,7 +4760,8 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
     acceso_err_pwd_no_coincide:obtenerTexto('acceso_err_pwd_no_coincide',      lang),
     acceso_err_conexion:       obtenerTexto('acceso_err_conexion',             lang),
     acceso_link_volver:        obtenerTexto('acceso_link_volver',              lang),
-    palabra_mi_reserva:        (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang]['mi-reserva']) || 'mi-reserva'
+    palabra_mi_reserva:        (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang]['mi-reserva']) || 'mi-reserva',
+    destino_cta_texto:         obtenerTexto('destino_cta_texto', lang)
   });
 }));
 
