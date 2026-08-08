@@ -3335,6 +3335,57 @@ app.post('/admin/rutas/:id/sitemap-config', requireAdmin, asyncHandler(async (re
   res.json({ ok: true });
 }));
 
+// Genera con IA el título y descripción SEO de una ruta para un idioma concreto
+app.post('/admin/seo/rutas/:id/generar-ia', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { lang } = req.body;
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) return res.status(400).json({ error: 'Idioma no válido.' });
+
+  const rutaResult = await pool.query('SELECT origen, destino FROM rutas WHERE id = $1', [req.params.id]);
+  if (rutaResult.rows.length === 0) return res.status(404).json({ error: 'Ruta no encontrada.' });
+  const { origen, destino } = rutaResult.rows[0];
+  const nombreIdioma = await getNombreIdioma(lang);
+
+  const items = [{ route_id: parseInt(req.params.id), origen, destino, titulo_es: '', descripcion_es: '' }];
+  const traduccionesIA = await traducirSEOConClaudeIA(items, nombreIdioma);
+  const t = traduccionesIA[req.params.id] || traduccionesIA[String(req.params.id)] || {};
+
+  let metaTitle = t.meta_title || '';
+  let metaDesc  = t.meta_description || '';
+
+  // Verificar píxeles — si se pasa, un intento de acortar
+  const pxT = medirPxTitulo(metaTitle);
+  const pxD = medirPxDescripcion(metaDesc);
+  if (pxT > 600 || pxD > 920) {
+    const instrucciones = [];
+    if (pxT > 600) {
+      const charsMax = Math.floor(metaTitle.length * 600 / pxT) - 2;
+      instrucciones.push('TÍTULO: MÁXIMO ' + charsMax + ' caracteres. Texto: "' + metaTitle + '"');
+    }
+    if (pxD > 920) {
+      const charsMax = Math.floor(metaDesc.length * 920 / pxD) - 2;
+      instrucciones.push('DESCRIPCIÓN: MÁXIMO ' + charsMax + ' caracteres. Texto: "' + metaDesc + '"');
+    }
+    const promptAcortar = 'Acorta estos textos SEO en ' + nombreIdioma + '. Límite en número de caracteres. Mantén tono nativo y palabras clave.\n\n' + instrucciones.join('\n\n') + '\n\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"meta_title": "...", "meta_description": "..."}';
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 400, messages: [{ role: 'user', content: promptAcortar }] })
+      });
+      if (r.ok) {
+        const rData = await r.json();
+        const rJson = JSON.parse(rData.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim());
+        if (medirPxTitulo(metaTitle) > 600 && rJson.meta_title) metaTitle = rJson.meta_title;
+        if (medirPxDescripcion(metaDesc) > 920 && rJson.meta_description) metaDesc = rJson.meta_description;
+      }
+    } catch(e) { /* si falla el acorte, devolvemos lo que hay */ }
+  }
+
+  res.json({ ok: true, meta_title: metaTitle, meta_description: metaDesc });
+}));
+
 // Guarda los datos SEO de una ruta en un idioma concreto
 app.post('/admin/seo/rutas/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
   if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
@@ -3457,7 +3508,7 @@ app.post('/admin/seo/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, 
 // Guarda en bloque las propuestas de título/descripción revisadas
 app.post('/admin/seo/guardar-lote', requireAdmin, asyncHandler(async (req, res) => {
   const { lang, propuestas } = req.body;
-  if (!IDIOMAS_TRADUCIBLES.includes(lang) || !Array.isArray(propuestas)) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang) || !Array.isArray(propuestas)) {
     return res.status(400).json({ error: 'Datos no válidos' });
   }
   let guardadas = 0;
