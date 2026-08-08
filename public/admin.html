@@ -3475,6 +3475,8 @@ function generarIARuta(rutaId, lang) {
       var desc   = document.getElementById('seo-desc');
       if (titulo) { titulo.value = d.meta_title || ''; contarPxSEO(titulo, 'seo-titulo-count', 600, '20px arial'); }
       if (desc)   { desc.value   = d.meta_description || ''; contarPxSEO(desc, 'seo-desc-count', 920, '13px arial'); }
+      var slugInput = document.getElementById('seo-slug');
+      if (slugInput && d.slug) { slugInput.value = d.slug; }
       if (msg) msg.textContent = '✅ Generado — revisa y guarda';
     } else {
       if (msg) msg.innerHTML = '<span style="color:var(--rojo-error);">❌ ' + escapar(d.error || 'Error') + '</span>';
