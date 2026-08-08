@@ -5138,6 +5138,54 @@ app.get('/api/destinos-publicos', asyncHandler(async (req, res) => {
   res.json({ islas: porIsla });
 }));
 
+// API pública de rutas para la página de listado público.
+// Devuelve rutas activas con slug en el idioma pedido y la palabra_traslado
+// para construir la URL correcta hacia traslado.ejs.
+app.get('/api/rutas-publicas', asyncHandler(async (req, res) => {
+  const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
+  const palabraTraslado = SECCIONES_TRASLADO[lang] || 'traslado';
+
+  const result = await pool.query(
+    `SELECT r.id, r.origen, r.destino,
+            COALESCE(rss_lang.slug_url, rss_es.slug_url) AS slug_url,
+            COALESCE(rss_lang.activo, FALSE) AS activo_lang
+     FROM rutas r
+     LEFT JOIN route_seo_settings rss_lang
+           ON rss_lang.route_id = r.id AND rss_lang.lang_code = $1
+     LEFT JOIN route_seo_settings rss_es
+           ON rss_es.route_id   = r.id AND rss_es.lang_code  = 'es'
+     WHERE r.activa = TRUE
+     ORDER BY r.origen, r.destino`,
+    [lang]
+  );
+
+  // Si el idioma no es español, intentar devolver nombres traducidos de destinos
+  let mapaDestinos = {};
+  if (lang !== 'es') {
+    const trad = await pool.query(
+      `SELECT d.nombre AS nombre_es, dt.nombre AS nombre_traducido
+       FROM destinos d
+       LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1`,
+      [lang]
+    );
+    for (const d of trad.rows) {
+      mapaDestinos[d.nombre_es] = (d.nombre_traducido && d.nombre_traducido.trim()) ? d.nombre_traducido : d.nombre_es;
+    }
+  }
+
+  const rutas = result.rows
+    .filter(r => r.slug_url)  // Solo rutas que tienen slug generado
+    .map(r => ({
+      id:       r.id,
+      origen:   mapaDestinos[r.origen]  || r.origen,
+      destino:  mapaDestinos[r.destino] || r.destino,
+      slug_url: r.slug_url,
+      url:      '/' + lang + '/' + palabraTraslado + '/' + r.slug_url
+    }));
+
+  res.json({ rutas, palabra_traslado: palabraTraslado });
+}));
+
 // API pública del listado de destinos por idioma.
 // Recibe ?lang=xx para devolver slugs y reseñas en ese idioma.
 // Si no se pasa lang o no existe contenido en ese idioma, usa español como fallback.
