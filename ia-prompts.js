@@ -74,11 +74,13 @@ function GENERADOR_RUTAS_SEO(nombreIdioma, items) {
     '  Español (ES): MÁX 155 | Inglés (EN): MÁX 160 | Alemán (DE): MÁX 140 | Francés (FR): MÁX 155 | Italiano (IT): MÁX 158 | Neerlandés (NL): MÁX 148 | Sueco (SV): MÁX 150 | Noruego (NO): MÁX 152 | Finlandés (FI): MÁX 138 | Ruso (RU): MÁX 128\n' +
     '  Debe invitar al clic con tono y expresiones naturales de ese mercado. En idiomas con palabras largas sé más conciso. NUNCA superes el límite de tu idioma.\n' +
     '- PROHIBICIÓN ABSOLUTA: Está ESTRICTAMENTE PROHIBIDO usar "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía. Alternativas permitidas: "tarifas competitivas", "sin costes ocultos", "precio oficial".\n' +
-    'Los slugs de URL nunca se tocan.\n\n' +
+    'Para cada ruta, genera también un slug de URL siguiendo las reglas que vienen en el campo reglasSlug de cada item. ' +
+    'El slug debe usar solo caracteres a-z y guiones. Sin tildes, sin acentos, sin caracteres especiales. ' +
+    'Si el idioma usa alfabeto cirílico u otro no latino, transliterar al latín.\n\n' +
     'Datos (JSON) — titulo_es y descripcion_es son solo referencia de contenido:\n' + JSON.stringify(items, null, 2) + '\n\n' +
     'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, sin bloques de markdown, ' +
     'usando el route_id de cada ruta como clave, con esta forma exacta: ' +
-    '{\"3\": {\"meta_title\": \"...\", \"meta_description\": \"...\"}, \"18\": {\"meta_title\": \"...\", \"meta_description\": \"...\"}}';
+    '{\"3\": {\"slug\": \"...\", \"meta_title\": \"...\", \"meta_description\": \"...\"}, \"18\": {\"slug\": \"...\", \"meta_title\": \"...\", \"meta_description\": \"...\"}}';
 }
 
 
