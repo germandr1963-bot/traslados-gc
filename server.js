@@ -3347,9 +3347,27 @@ app.post('/admin/seo/rutas/:id/generar-ia', requireAdmin, asyncHandler(async (re
   const { origen, destino } = rutaResult.rows[0];
   const nombreIdioma = await getNombreIdioma(lang);
 
-  const items = [{ route_id: parseInt(req.params.id), origen, destino, titulo_es: '', descripcion_es: '' }];
+  const ALFABETO_LATINO = ['es','en','de','fr','it','nl','sv','no','fi','pt','pl','cs','ro','hu','sk','hr','sl','da'];
+  const ALFABETO_CIRILI = ['ru','bg','uk','sr','mk'];
+  let reglasSlug = '';
+  if (ALFABETO_LATINO.includes(lang)) {
+    reglasSlug = `El slug debe estar en ${nombreIdioma}, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). Debe describir el trayecto de origen a destino. Ejemplo en inglés para "Aeropuerto de Gran Canaria → Las Palmas": "gran-canaria-airport-to-las-palmas".`;
+  } else if (ALFABETO_CIRILI.includes(lang)) {
+    reglasSlug = `El slug debe ser una transliteración al latín del trayecto en ${nombreIdioma}, usando solo a-z y guiones. Ejemplo en ruso para "Aeropuerto → Las Palmas": "aeroport-gran-kanaria-v-las-palmas".`;
+  } else {
+    reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones. Describe el trayecto de origen a destino en inglés.`;
+  }
+
+  const items = [{ route_id: parseInt(req.params.id), origen, destino, titulo_es: '', descripcion_es: '', reglasSlug }];
   const traduccionesIA = await traducirSEOConClaudeIA(items, nombreIdioma);
   const t = traduccionesIA[req.params.id] || traduccionesIA[String(req.params.id)] || {};
+
+  const slugGenerado = String(t.slug || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 
   let metaTitle = t.meta_title || '';
   let metaDesc  = t.meta_description || '';
@@ -3383,7 +3401,7 @@ app.post('/admin/seo/rutas/:id/generar-ia', requireAdmin, asyncHandler(async (re
     } catch(e) { /* si falla el acorte, devolvemos lo que hay */ }
   }
 
-  res.json({ ok: true, meta_title: metaTitle, meta_description: metaDesc });
+  res.json({ ok: true, slug: slugGenerado, meta_title: metaTitle, meta_description: metaDesc });
 }));
 
 // Guarda los datos SEO de una ruta en un idioma concreto
