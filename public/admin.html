@@ -315,11 +315,7 @@ table.tabla-precios input {
         Por defecto ambos se generan solos con los datos actuales. Si tu SEO necesita un ajuste manual, puede editarlos y guardarlos aquí.
       </p>
 
-      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
-        <span style="font-size:13px;">🤖 Traducir título y descripción de las rutas con IA:</span>
-        <select id="select-idioma-ia-seo" class="campo" style="height:34px;width:auto;"></select>
-        <button class="boton-costa" onclick="traducirSEOConIA()">Traducir lo que falte</button>
-      </div>
+      <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">🤖 Generar título y descripción de las rutas con IA — usa el botón dentro de cada ficha de ruta.</p>
 
       <div id="editor-archivo-manual" class="tarjeta oculto" style="margin-bottom:20px;"></div>
       <div id="panel-salud-seo" class="tarjeta oculto" style="margin-bottom:20px;"></div>
@@ -2684,12 +2680,25 @@ function abrirEditorSEO(rutaId) {
       editorSEOCache[rutaId] = porIdioma;
 
       var tabs = IDIOMAS_SEO.map(function (lang, i) {
-        var excede = porIdioma[lang] && porIdioma[lang].excede;
+        var datos_lang = porIdioma[lang] || {};
+        var excede  = datos_lang.excede;
+        var tieneTexto = !!(datos_lang.meta_title && datos_lang.meta_title.trim());
         var clases = 'tab-idioma' + (i === 0 ? ' activo' : '') + (excede ? ' tab-idioma-rojo' : '');
+        var estilo = '';
+        var icono  = '';
+        if (excede) {
+          icono = ' ⚠️';
+        } else if (tieneTexto) {
+          estilo = 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;';
+          icono  = ' ✓';
+        } else {
+          estilo = 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
+        }
         return '<button class="' + clases + '" id="tab-idioma-' + lang + '" ' +
+          'style="' + estilo + '" ' +
           'onclick="cambiarIdiomaEditorSEO(' + rutaId + ', \'' + lang + '\', this)" ' +
-          'title="' + (excede ? 'Título o descripción pasados de píxeles' : '') + '">' +
-          lang.toUpperCase() + (excede ? ' ⚠️' : '') + '</button>';
+          'title="' + (excede ? 'Título o descripción pasados de píxeles' : (tieneTexto ? 'Completado' : 'Sin traducción')) + '">' +
+          lang.toUpperCase() + icono + '</button>';
       }).join('');
 
       var prioridadActual = infoRuta.sitemap_prioridad != null ? Number(infoRuta.sitemap_prioridad) : 0.8;
@@ -2990,8 +2999,18 @@ function guardarSEO(rutaId, lang) {
       // Actualiza la pestaña de este idioma en vivo, sin tener que cerrar y reabrir el editor
       var tab = document.getElementById('tab-idioma-' + lang);
       if (tab) {
+        var tieneTextoGuardado = !!(datos.meta_title && datos.meta_title.trim());
         tab.classList.toggle('tab-idioma-rojo', excede);
-        tab.innerHTML = lang.toUpperCase() + (excede ? ' ⚠️' : '');
+        if (excede) {
+          tab.style.background = ''; tab.style.color = ''; tab.style.borderColor = '';
+          tab.innerHTML = lang.toUpperCase() + ' ⚠️';
+        } else if (tieneTextoGuardado) {
+          tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
+          tab.innerHTML = lang.toUpperCase() + ' ✓';
+        } else {
+          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
+          tab.innerHTML = lang.toUpperCase();
+        }
       }
       if (editorSEOCache[rutaId] && editorSEOCache[rutaId][lang]) {
         editorSEOCache[rutaId][lang].excede = excede;
@@ -3019,12 +3038,21 @@ function toggleActivarSEO(rutaId, lang, activar) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ activo: activar })
   }).then(function () {
-    // Actualizar solo el badge de estado en la tabla principal sin recargar toda la sección
+    // Solo actualiza el badge en la tabla — no toca los campos del editor
     actualizarBadgeSEO(rutaId, lang, activar);
-    // Refrescar los campos del editor abierto
-    fetch('/admin/seo/rutas/' + rutaId + '/idioma/' + lang)
-      .then(function (r) { return r.json(); })
-      .then(function (datos) { renderizarCamposSEO(rutaId, lang, datos); });
+    // Actualiza el botón activar/desactivar y el enlace copiar sin rerenderizar todo
+    var btnActivar = document.querySelector('#seo-campos-editor button[onclick*="toggleActivarSEO"]');
+    if (btnActivar) {
+      btnActivar.textContent = activar ? 'Desactivar' : 'Activar';
+      btnActivar.className   = activar ? 'boton-peligro' : 'boton-costa';
+      btnActivar.setAttribute('onclick', 'toggleActivarSEO(' + rutaId + ', '' + lang + '', ' + (!activar) + ')');
+    }
+    var spanEstado = document.querySelector('#seo-campos-editor span[style*="font-size:14px"]');
+    if (spanEstado) {
+      spanEstado.innerHTML = activar
+        ? '🟢 Esta página <strong>está activa</strong> en internet'
+        : '⚪ Esta página <strong>está desactivada</strong>';
+    }
   });
 }
 
