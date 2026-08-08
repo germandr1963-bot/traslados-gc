@@ -3394,7 +3394,7 @@ app.post('/admin/seo/idioma/:lang/activar-todas', requireAdmin, asyncHandler(asy
 // rutas para un idioma — no guarda nada todavía, devuelve propuestas para revisar
 app.post('/admin/seo/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const lang = req.params.lang;
-  if (!IDIOMAS_TRADUCIBLES.includes(lang)) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
     return res.status(400).json({ error: 'Idioma no válido' });
   }
 
@@ -3428,7 +3428,7 @@ app.post('/admin/seo/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, 
         titulo_es: base.meta_title || '', descripcion_es: base.meta_description || ''
       };
     })
-    .filter(function (i) { return i.titulo_es && i.descripcion_es; }); // sin base en español no hay nada que traducir
+    .filter(function (i) { return i.origen && i.destino; }); // solo necesitamos origen y destino
 
   if (items.length === 0) {
     return res.json({ ok: true, propuestas: [] });
