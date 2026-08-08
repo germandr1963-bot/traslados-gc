@@ -193,43 +193,33 @@
   </footer>
 
   <script>
-    fetch('/api/destinos-publicos')
+    // Detectar idioma de la URL actual
+    var partesPath = window.location.pathname.split('/');
+    var langActual = (partesPath[1] && partesPath[1].length === 2) ? partesPath[1] : 'es';
+
+    fetch('/api/rutas-publicas?lang=' + langActual)
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        var islas = d.islas || {};
-        var nombres = Object.keys(islas);
-        if (nombres.length === 0) {
+        var rutas = d.rutas || [];
+        if (rutas.length === 0) {
           document.getElementById('contenido-destinos').innerHTML =
             '<p style="text-align:center;color:var(--texto-muted);font-size:14px;padding:40px 0;">Próximamente los destinos disponibles.</p>';
           return;
         }
         var html = '';
-        nombres.forEach(function(isla) {
-          var destinos = islas[isla];
-          html += '<div class="isla-bloque">';
-          html += '<div class="isla-titulo">' + isla + ' <span class="isla-label">Isla</span></div>';
-          html += '<div class="grid-destinos">';
-          destinos.forEach(function(dest) {
-            var slug = dest.slug || dest.nombre.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-            var url = '/rutas/gran-canaria/' + slug;
-            var rutasTexto = dest.rutas === 1 ? '1 ruta disponible' : (dest.rutas > 1 ? dest.rutas + ' rutas disponibles' : 'Próximamente');
-            html += '<a href="' + url + '" class="tarjeta-destino">';
-            html += '<div class="td-foto">';
-            if (dest.zona) html += '<span class="td-zona">' + dest.zona + '</span>';
-            html += '</div>';
-            html += '<div class="td-body">';
-            html += '<div class="td-nombre">' + dest.nombre + '</div>';
-            html += '<div class="td-rutas">' + rutasTexto + '</div>';
-            html += '</div>';
-            html += '</a>';
-          });
-          html += '</div></div>';
+        rutas.forEach(function(ruta) {
+          html += '<a href="' + ruta.url + '" class="tarjeta-destino">';
+          html += '<div class="td-foto"></div>';
+          html += '<div class="td-body">';
+          html += '<div class="td-nombre">' + ruta.origen + ' → ' + ruta.destino + '</div>';
+          html += '</div>';
+          html += '</a>';
         });
-        document.getElementById('contenido-destinos').innerHTML = html;
+        document.getElementById('contenido-destinos').innerHTML = '<div class="grid-destinos">' + html + '</div>';
       })
       .catch(function() {
         document.getElementById('contenido-destinos').innerHTML =
-          '<p style="text-align:center;color:var(--texto-muted);font-size:14px;padding:40px 0;">No se pudieron cargar los destinos.</p>';
+          '<p style="text-align:center;color:var(--texto-muted);font-size:14px;padding:40px 0;">No se pudieron cargar las rutas.</p>';
       });
   
     // Traducir footer al idioma de la URL
