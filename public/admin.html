@@ -2887,8 +2887,10 @@ function verSchemaRuta(rutaId, lang) {
     });
 }
 
-function copiarEnlacePublico(lang, slug, boton) {
+function copiarEnlacePublico(lang, boton) {
   var seccion = SECCIONES_TRASLADO_JS[lang] || 'traslado';
+  var slugInput = document.getElementById('seo-slug');
+  var slug = slugInput ? slugInput.value.trim() : '';
   var url = window.location.origin + '/' + lang + '/' + seccion + '/' + slug;
 
   navigator.clipboard.writeText(url).then(function () {
@@ -2915,7 +2917,7 @@ function renderizarCamposSEO(rutaId, lang, datos) {
       '<button class="' + (activo ? 'boton-peligro' : 'boton-costa') + '" style="padding:6px 14px;font-size:0.82rem;" ' +
         'onclick="toggleActivarSEO(' + rutaId + ', \'' + lang + '\', ' + (!activo) + ')">' +
         (activo ? 'Desactivar' : 'Activar') + '</button>' +
-      (activo ? '<button class="boton-secundario" style="padding:6px 14px;font-size:0.82rem;" onclick="copiarEnlacePublico(\'' + lang + '\', \'' + slug + '\', this)">🔗 Copiar enlace</button>' : '') +
+      (activo ? '<button class="boton-secundario" style="padding:6px 14px;font-size:0.82rem;" onclick="copiarEnlacePublico(\'' + lang + '\', this)">🔗 Copiar enlace</button>' : '') +
     '</div>' +
 
     '<label class="etiqueta">URL amigable (slug)</label>' +
