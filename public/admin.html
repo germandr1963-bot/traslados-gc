@@ -3045,7 +3045,7 @@ function toggleActivarSEO(rutaId, lang, activar) {
     if (btnActivar) {
       btnActivar.textContent = activar ? 'Desactivar' : 'Activar';
       btnActivar.className   = activar ? 'boton-peligro' : 'boton-costa';
-      btnActivar.setAttribute('onclick', 'toggleActivarSEO(' + rutaId + ', '' + lang + '', ' + (!activar) + ')');
+      btnActivar.setAttribute('onclick', 'toggleActivarSEO(' + rutaId + ', \'' + lang + '\', ' + (!activar) + ')');
     }
     var spanEstado = document.querySelector('#seo-campos-editor span[style*="font-size:14px"]');
     if (spanEstado) {
