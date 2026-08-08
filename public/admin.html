@@ -2915,6 +2915,12 @@ function renderizarCamposSEO(rutaId, lang, datos) {
       'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;">' +
     '<div id="seo-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
 
+    '<div style="margin-bottom:14px;">' +
+    '<button class="boton-costa" style="padding:7px 16px;font-size:0.85rem;" id="btn-generar-ia-ruta" ' +
+      'onclick="generarIARuta(' + rutaId + ', \'' + lang + '\')">🤖 Generar con IA</button>' +
+    '<span id="seo-ia-msg" style="font-size:12px;color:var(--texto-muted);margin-left:10px;"></span>' +
+    '</div>' +
+
     '<label class="etiqueta">Título para Google (máx. 600px de ancho real)</label>' +
     '<input class="campo" id="seo-titulo" type="text" value="' + titulo + '" ' +
       'oninput="contarPxSEO(this,\'seo-titulo-count\',600,\'20px arial\')" style="margin-bottom:4px;">' +
@@ -3420,6 +3426,33 @@ function guardarRevisionSEOIA(lang) {
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
     }
+  });
+}
+
+function generarIARuta(rutaId, lang) {
+  var btn = document.getElementById('btn-generar-ia-ruta');
+  var msg = document.getElementById('seo-ia-msg');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generando...'; }
+  if (msg) msg.textContent = '';
+
+  fetch('/admin/seo/rutas/' + rutaId + '/generar-ia', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang: lang })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 Generar con IA'; }
+    if (d.ok) {
+      var titulo = document.getElementById('seo-titulo');
+      var desc   = document.getElementById('seo-desc');
+      if (titulo) { titulo.value = d.meta_title || ''; contarPxSEO(titulo, 'seo-titulo-count', 600, '20px arial'); }
+      if (desc)   { desc.value   = d.meta_description || ''; contarPxSEO(desc, 'seo-desc-count', 920, '13px arial'); }
+      if (msg) msg.textContent = '✅ Generado — revisa y guarda';
+    } else {
+      if (msg) msg.innerHTML = '<span style="color:var(--rojo-error);">❌ ' + escapar(d.error || 'Error') + '</span>';
+    }
+  }).catch(function() {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 Generar con IA'; }
+    if (msg) msg.innerHTML = '<span style="color:var(--rojo-error);">❌ Error de conexión</span>';
   });
 }
 
