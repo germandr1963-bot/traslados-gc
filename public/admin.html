@@ -3380,7 +3380,8 @@ function activarMasivo(activar) {
 
 // ─── Traducción con IA del título y descripción de las rutas (SEO) ───────────
 function traducirSEOConIA() {
-  var lang = document.getElementById('select-idioma-ia-seo').value;
+  var selectEl = document.getElementById('select-idioma-ia-seo');
+  var lang = selectEl ? selectEl.value : '';
   if (!lang) return;
   var nombreIdioma = NOMBRES_IDIOMA[lang] || lang.toUpperCase();
   var msg = document.getElementById('mensaje-seo');
