@@ -2959,6 +2959,12 @@ function renderizarCamposSEO(rutaId, lang, datos) {
       'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;">' +
     '<div id="seo-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
 
+    '<label class="etiqueta">URL pública de esta página</label>' +
+    '<input class="campo" id="seo-url-publica" type="text" value="' + escapar(datos.canonical_url || '') + '" ' +
+    'placeholder="/es/traslado/aeropuerto-de-gran-canaria-a-las-palmas-de-gran-canaria" ' +
+    'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;color:var(--terracota);">' +
+    '<div style="font-size:11px;color:var(--texto-muted);margin-bottom:16px;">Esta URL se guarda tal como la ves al pulsar Guardar</div>' +
+
     '<div style="margin-bottom:14px;">' +
     '<button class="boton-costa" style="padding:7px 16px;font-size:0.85rem;" id="btn-generar-ia-ruta" ' +
       'onclick="generarIARuta(' + rutaId + ', \'' + lang + '\')">🤖 Generar con IA</button>' +
@@ -2974,12 +2980,6 @@ function renderizarCamposSEO(rutaId, lang, datos) {
     '<textarea class="campo" id="seo-desc" rows="3" ' +
       'oninput="contarPxSEO(this,\'seo-desc-count\',920,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
     '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-desc-count">' + medirPx(desc, '13px arial') + ' / 920 px</div>' +
-
-    // URL pública
-    '<label class="etiqueta">URL pública de esta página — generada por la IA, revísala y corrígela si es necesario</label>' +
-    '<input class="campo" id="seo-url-publica" type="text" value="' + escapar(datos.canonical_url || '') + '" ' +
-    'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;color:var(--terracota);">' +
-    '<div style="font-size:11px;color:var(--texto-muted);margin-bottom:16px;">Esta URL se guarda tal como la ves al pulsar Guardar</div>' +
 
     // Reseña breve
     '<label class="etiqueta">Reseña breve para tarjeta (máx. 200 caracteres)</label>' +
