@@ -2784,6 +2784,7 @@ function abrirEditorSEO(rutaId) {
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
         '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" onclick="sugerirFotoRutaIA(' + rutaId + ')">&#10024; Sugerir en ES con IA</button>' +
+        '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;background:var(--verde-ok);" onclick="generarTodosAltFotoRuta(' + rutaId + ')">&#10024; Generar todos los idiomas con IA</button>' +
         '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" onclick="confirmarSubidaFotoRuta(' + rutaId + ')">&#128190; Guardar foto</button>' +
         '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 12px;" onclick="cancelarNuevaFotoRuta(' + rutaId + ')">Cancelar</button>' +
         '<span id="msg-foto-ruta-' + rutaId + '" style="font-size:12px;align-self:center;"></span>' +
@@ -8509,6 +8510,28 @@ function sugerirFotoRutaIA(rutaId) {
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = 'Revisa y ajusta si hace falta'; }
     } else {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al analizar.'; }
+    }
+  }).catch(function() {
+    if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexión.'; }
+  });
+}
+
+function generarTodosAltFotoRuta(rutaId) {
+  var imagen = _fotoRutaData[rutaId];
+  if (!imagen) return;
+  var msg = document.getElementById('msg-foto-ruta-' + rutaId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Generando alt texts en todos los idiomas...'; }
+  fetch('/admin/seo/rutas/' + rutaId + '/fotos/nueva/alt/generar-todos', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imagen: imagen })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      var altEs = d.alts && d.alts['es'];
+      var altInput = document.getElementById('nueva-foto-ruta-alt-' + rutaId);
+      if (altInput && altEs) { altInput.value = altEs; contarChars(altInput, 'nueva-foto-ruta-alt-cnt-' + rutaId, 125); }
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Alt texts generados en ' + Object.keys(d.alts || {}).length + ' idiomas. Revisa y guarda la foto.'; }
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al generar.'; }
     }
   }).catch(function() {
     if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexión.'; }
