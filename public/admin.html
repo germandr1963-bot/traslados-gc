@@ -2594,14 +2594,23 @@ var seoCache = null;
 // la pestaña SEO o Idiomas, así que un idioma añadido aparece al instante,
 // sin tener que recargar la página ni tocar código.
 function cargarListaIdiomasDinamica() {
-  return fetch('/admin/idiomas').then(function (r) { return r.json(); }).then(function (idiomas) {
+  return Promise.all([
+    fetch('/admin/idiomas').then(function (r) { return r.json(); }),
+    fetch('/admin/palabras-paginas').then(function (r) { return r.json(); })
+  ]).then(function (resultados) {
+    var idiomas = resultados[0];
+    var palabras = resultados[1];
+    var palabraTraslado = {};
+    palabras.forEach(function (p) {
+      if (p.pagina === 'traslado') palabraTraslado[p.lang_code] = p.palabra;
+    });
     var activos = idiomas.filter(function (i) { return i.activo; });
     IDIOMAS_SEO = activos.map(function (i) { return i.codigo; });
     IDIOMAS_TEXTOS = activos.map(function (i) { return i.codigo; });
     SECCIONES_TRASLADO_JS = {};
     NOMBRES_IDIOMA = {};
     activos.forEach(function (i) {
-      SECCIONES_TRASLADO_JS[i.codigo] = i.palabra_traslado;
+      SECCIONES_TRASLADO_JS[i.codigo] = palabraTraslado[i.codigo] || i.palabra_traslado;
       NOMBRES_IDIOMA[i.codigo] = i.nombre;
     });
   });
@@ -2855,7 +2864,9 @@ function eliminarImagenOG(rutaId) {
     .then(function () { abrirEditorSEO(rutaId); });
 }
 
+var seoLangActual = 'es';
 function cambiarIdiomaEditorSEO(rutaId, lang, botonTab) {
+  seoLangActual = lang;
   document.querySelectorAll('.tab-idioma').forEach(function (b) { b.classList.remove('activo'); });
   if (botonTab) botonTab.classList.add('activo');
 
@@ -2960,10 +2971,11 @@ function renderizarCamposSEO(rutaId, lang, datos) {
     '<div id="seo-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
 
     '<label class="etiqueta">URL pública de esta página</label>' +
-    '<input class="campo" id="seo-url-publica" type="text" value="' + escapar(datos.canonical_url || '') + '" ' +
+    '<input class="campo" id="seo-url-publica" type="text" readonly ' +
+    'value="/' + lang + '/' + (SECCIONES_TRASLADO_JS[lang] || 'traslado') + '/' + (datos.slug_url || '') + '" ' +
     'placeholder="/es/traslado/aeropuerto-de-gran-canaria-a-las-palmas-de-gran-canaria" ' +
-    'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;color:var(--terracota);">' +
-    '<div style="font-size:11px;color:var(--texto-muted);margin-bottom:16px;">Esta URL se guarda tal como la ves al pulsar Guardar</div>' +
+    'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;color:var(--terracota);background:var(--gris-fondo);">' +
+    '<div style="font-size:11px;color:var(--texto-muted);margin-bottom:16px;">Se genera automáticamente a partir del slug y la palabra de URL configurada</div>' +
 
     '<div style="margin-bottom:14px;">' +
     '<button class="boton-costa" style="padding:7px 16px;font-size:0.85rem;" id="btn-generar-ia-ruta" ' +
@@ -3018,6 +3030,11 @@ function validarSlugEnVivo(input) {
   } else {
     aviso.innerHTML = '<span style="color:#2e7d32;">✓ URL válida</span>';
     input.style.borderColor = '#2e7d32';
+  }
+  var urlInput = document.getElementById('seo-url-publica');
+  if (urlInput) {
+    var seccion = SECCIONES_TRASLADO_JS[seoLangActual] || 'traslado';
+    urlInput.value = '/' + seoLangActual + '/' + seccion + '/' + input.value.trim();
   }
 }
 
