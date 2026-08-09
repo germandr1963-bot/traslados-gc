@@ -3442,15 +3442,19 @@ app.post('/admin/seo/rutas/:id/idioma/:lang', requireAdmin, asyncHandler(async (
   if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
     return res.status(400).json({ error: 'Idioma no válido' });
   }
-  const { slug_url, meta_title, meta_description, og_title, og_description, robots_status } = req.body;
+  const { slug_url, meta_title, meta_description, og_title, og_description, robots_status, canonical_url, resena_breve, texto_descripcion } = req.body;
   const slugLimpio = slug_url ? slugify(slug_url) : null;
-  const canonical = BASE_URL + '/' + req.params.lang + '/' + SECCIONES_TRASLADO[req.params.lang] + '/' + (slugLimpio || '');
+  // Si el admin envía una URL pública manual se respeta; si no, se genera automáticamente
+  const canonical = canonical_url && canonical_url.trim()
+    ? canonical_url.trim()
+    : BASE_URL + '/' + req.params.lang + '/' + SECCIONES_TRASLADO[req.params.lang] + '/' + (slugLimpio || '');
   await pool.query(
     `UPDATE route_seo_settings
      SET slug_url = $1, meta_title = $2, meta_description = $3,
          og_title = $4, og_description = $5, robots_status = $6,
-         canonical_url = $7, updated_at = NOW()
-     WHERE route_id = $8 AND lang_code = $9`,
+         canonical_url = $7, resena_breve = $8, texto_descripcion = $9,
+         updated_at = NOW()
+     WHERE route_id = $10 AND lang_code = $11`,
     [
       slugLimpio || null,
       meta_title || null,
@@ -3459,6 +3463,8 @@ app.post('/admin/seo/rutas/:id/idioma/:lang', requireAdmin, asyncHandler(async (
       og_description || meta_description || null,
       robots_status || 'index,follow',
       canonical,
+      resena_breve || null,
+      texto_descripcion || null,
       req.params.id,
       req.params.lang
     ]
@@ -4160,6 +4166,131 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
   }
   res.json({ ok: true, alts: resultado });
 }));
+
+// ─── ENDPOINTS DE FOTOS DE RUTAS ─────────────────────────────────────────────
+
+// Sube una foto al carrusel de una ruta
+app.post('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
+  const { imagen, alt_texto, nombre_archivo } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/') || imagen.length > 10000000) {
+    return res.status(400).json({ error: 'Imagen no válida o demasiado grande (máx. ~7MB).' });
+  }
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato de imagen no válido.' });
+  const buffer = Buffer.from(matches[2], 'base64');
+  const webpBuffer = await sharp(buffer).webp({ quality: 85 }).toBuffer();
+  const webpHex = '\\x' + webpBuffer.toString('hex');
+  const maxOrden = await pool.query('SELECT COALESCE(MAX(orden), 0) AS m FROM rutas_fotos WHERE ruta_id = $1', [req.params.id]);
+  const inserted = await pool.query(
+    `INSERT INTO rutas_fotos (ruta_id, imagen, mime_type, nombre_archivo, alt_texto, orden)
+     VALUES ($1, $2::bytea, 'image/webp', $3, $4, $5) RETURNING id`,
+    [req.params.id, webpHex, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1]
+  );
+  if (alt_texto && inserted.rows[0]) {
+    await pool.query(
+      `INSERT INTO rutas_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, 'es', $2)
+       ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $2`,
+      [inserted.rows[0].id, alt_texto]
+    );
+  }
+  res.json({ ok: true });
+}));
+
+// Lista las fotos del carrusel de una ruta
+app.get('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, alt_texto, nombre_archivo, orden, es_principal FROM rutas_fotos WHERE ruta_id = $1 ORDER BY orden`,
+    [req.params.id]
+  );
+  res.json({ fotos: result.rows });
+}));
+
+// Sirve una foto de ruta públicamente por su id
+app.get('/ruta-foto/:fotoId', asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT imagen, mime_type FROM rutas_fotos WHERE id = $1', [req.params.fotoId]);
+  if (result.rows.length === 0) return res.status(404).send('No encontrado');
+  let imgBuffer;
+  const raw = result.rows[0].imagen;
+  if (Buffer.isBuffer(raw)) {
+    imgBuffer = raw;
+  } else if (typeof raw === 'string' && raw.startsWith('\\x')) {
+    imgBuffer = Buffer.from(raw.slice(2), 'hex');
+  } else {
+    imgBuffer = Buffer.from(raw);
+  }
+  res.setHeader('Content-Type', result.rows[0].mime_type || 'image/webp');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(imgBuffer);
+}));
+
+// Elimina una foto del carrusel de una ruta
+app.post('/admin/seo/rutas/:id/fotos/:fotoId/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM rutas_fotos WHERE id = $1 AND ruta_id = $2', [req.params.fotoId, req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Marca una foto de ruta como cabecera
+app.post('/admin/seo/rutas/:id/fotos/:fotoId/principal', requireAdmin, asyncHandler(async (req, res) => {
+  const rutaId = req.params.id;
+  const fotoId = parseInt(req.params.fotoId);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      'UPDATE rutas_fotos SET es_principal = FALSE, orden = NULL WHERE ruta_id = $1',
+      [rutaId]
+    );
+    await client.query(
+      'UPDATE rutas_fotos SET es_principal = TRUE, orden = 0 WHERE id = $1 AND ruta_id = $2',
+      [fotoId, rutaId]
+    );
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch(e) {
+    await client.query('ROLLBACK');
+    console.error('[principal ruta] Error:', e.message);
+    res.status(500).json({ error: 'Error al cambiar cabecera.' });
+  } finally {
+    client.release();
+  }
+}));
+
+// Actualiza el orden de una foto de ruta individual
+app.post('/admin/seo/rutas/:id/fotos/:fotoId/orden', requireAdmin, asyncHandler(async (req, res) => {
+  const { orden } = req.body;
+  const ordenNum = parseInt(orden);
+  if (isNaN(ordenNum) || ordenNum < 1 || ordenNum > 99) return res.status(400).json({ error: 'El orden debe ser un número entre 1 y 99.' });
+  const foto = await pool.query('SELECT es_principal FROM rutas_fotos WHERE id = $1 AND ruta_id = $2', [req.params.fotoId, req.params.id]);
+  if (foto.rows.length === 0) return res.status(404).json({ error: 'Foto no encontrada.' });
+  if (foto.rows[0].es_principal) return res.status(400).json({ error: 'La foto cabecera no tiene orden editable.' });
+  await pool.query('UPDATE rutas_fotos SET orden = $1 WHERE id = $2 AND ruta_id = $3', [ordenNum, req.params.fotoId, req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Obtiene los alt texts de una foto de ruta en todos los idiomas activos
+app.get('/admin/seo/rutas/:id/fotos/:fotoId/alt', requireAdmin, asyncHandler(async (req, res) => {
+  const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
+  const alts = await pool.query(
+    'SELECT lang_code, alt_texto FROM rutas_fotos_alt WHERE foto_id = $1',
+    [req.params.fotoId]
+  );
+  const mapa = {};
+  for (const a of alts.rows) mapa[a.lang_code] = a.alt_texto;
+  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa });
+}));
+
+// Guarda el alt text de una foto de ruta en un idioma concreto
+app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const { alt_texto } = req.body;
+  await pool.query(
+    `INSERT INTO rutas_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
+     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
+    [req.params.fotoId, req.params.lang, alt_texto || '']
+  );
+  res.json({ ok: true });
+}));
+
+// ─── FIN ENDPOINTS FOTOS RUTAS ────────────────────────────────────────────────
 
 // Genera texto descriptivo del destino con IA — con directivas SEO explícitas
 app.post('/admin/seo/destinos/:id/generar-texto', requireAdmin, asyncHandler(async (req, res) => {
