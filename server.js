@@ -4911,7 +4911,7 @@ app.post('/admin/idiomas', requireAdmin, asyncHandler(async (req, res) => {
 // Guarda en palabras_paginas y recarga caché — cambio inmediato sin redesplegar.
 app.post('/admin/palabras-paginas/:lang/:pagina', requireAdmin, asyncHandler(async (req, res) => {
   const { lang, pagina } = req.params;
-  const PAGINAS_PERMITIDAS = ['destino', 'destinos', 'rutas', 'flota', 'contacto'];
+  const PAGINAS_PERMITIDAS = ['destino', 'destinos', 'rutas', 'flota', 'contacto', 'traslado'];
   if (!PAGINAS_PERMITIDAS.includes(pagina)) {
     return res.status(400).json({ error: 'Página no válida' });
   }
