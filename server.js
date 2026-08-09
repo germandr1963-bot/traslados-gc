@@ -415,7 +415,8 @@ async function initSchema() {
     ALTER TABLE rutas
       ADD COLUMN IF NOT EXISTS sitemap_prioridad NUMERIC(2,1) DEFAULT 0.8,
       ADD COLUMN IF NOT EXISTS sitemap_frecuencia VARCHAR(20) DEFAULT 'monthly',
-      ADD COLUMN IF NOT EXISTS imagen_og TEXT
+      ADD COLUMN IF NOT EXISTS imagen_og TEXT,
+      ADD COLUMN IF NOT EXISTS visible_en_listado BOOLEAN DEFAULT TRUE
   `);
 
   await pool.query(`
@@ -3318,7 +3319,7 @@ app.get('/admin/seo/rutas/:id/completo', requireAdmin, asyncHandler(async (req, 
   }
 
   const ruta = await pool.query(
-    'SELECT sitemap_prioridad, sitemap_frecuencia, (imagen_og IS NOT NULL) AS tiene_imagen FROM rutas WHERE id = $1',
+    'SELECT sitemap_prioridad, sitemap_frecuencia, (imagen_og IS NOT NULL) AS tiene_imagen, visible_en_listado FROM rutas WHERE id = $1',
     [req.params.id]
   );
 
@@ -3367,9 +3368,10 @@ app.post('/admin/rutas/:id/sitemap-config', requireAdmin, asyncHandler(async (re
   if (![1.0, 0.8, 0.5].includes(prioridad) || !frecuenciasValidas.includes(frecuencia)) {
     return res.status(400).json({ error: 'Valores no válidos.' });
   }
+  const visibleEnListado = req.body.visible_en_listado !== undefined ? !!req.body.visible_en_listado : true;
   await pool.query(
-    'UPDATE rutas SET sitemap_prioridad = $1, sitemap_frecuencia = $2 WHERE id = $3',
-    [prioridad, frecuencia, req.params.id]
+    'UPDATE rutas SET sitemap_prioridad = $1, sitemap_frecuencia = $2, visible_en_listado = $3 WHERE id = $4',
+    [prioridad, frecuencia, visibleEnListado, req.params.id]
   );
   res.json({ ok: true });
 }));
