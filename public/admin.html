@@ -2783,6 +2783,7 @@ function abrirEditorSEO(rutaId) {
         '</div>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+        '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" onclick="sugerirFotoRutaIA(' + rutaId + ')">&#10024; Sugerir en ES con IA</button>' +
         '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" onclick="confirmarSubidaFotoRuta(' + rutaId + ')">&#128190; Guardar foto</button>' +
         '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 12px;" onclick="cancelarNuevaFotoRuta(' + rutaId + ')">Cancelar</button>' +
         '<span id="msg-foto-ruta-' + rutaId + '" style="font-size:12px;align-self:center;"></span>' +
@@ -8483,6 +8484,32 @@ function confirmarSubidaFotoRuta(rutaId) {
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.ok) { cancelarNuevaFotoRuta(rutaId); cargarFotosRuta(rutaId); }
     else { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; } }
+  }).catch(function() {
+    if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexión.'; }
+  });
+}
+
+function sugerirFotoRutaIA(rutaId) {
+  var imagen = _fotoRutaData[rutaId];
+  if (!imagen) return;
+  var msg = document.getElementById('msg-foto-ruta-' + rutaId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Analizando imagen...'; }
+  fetch('/admin/seo/rutas/' + rutaId + '/fotos/sugerir-ia', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imagen: imagen, lang: 'es' })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      var nombre = document.getElementById('nueva-foto-ruta-nombre-' + rutaId);
+      var alt = document.getElementById('nueva-foto-ruta-alt-' + rutaId);
+      if (nombre) nombre.value = d.nombre_archivo || '';
+      if (alt) {
+        alt.value = d.alt_texto || '';
+        contarChars(alt, 'nueva-foto-ruta-alt-cnt-' + rutaId, 125);
+      }
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = 'Revisa y ajusta si hace falta'; }
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al analizar.'; }
+    }
   }).catch(function() {
     if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexión.'; }
   });
