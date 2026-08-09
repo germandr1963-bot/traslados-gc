@@ -143,6 +143,23 @@ function GENERADOR_ALT_FOTO_RUTA_TODOS(origen, destino, listaIdiomas, codigos) {
 }
 
 
+// ─── GENERADOR 11 ────────────────────────────────────────────────────────────
+// Alt text foto existente de ruta — por idioma
+// Endpoint: POST /admin/seo/rutas/:id/fotos/:fotoId/alt/:lang/sugerir-ia
+// Botón admin: ✨ Sugerir con IA
+function GENERADOR_ALT_EXISTENTE_RUTA(origen, destino, esBase, nombreIdioma) {
+  return 'Eres un experto en SEO de imagenes para webs de turismo y transporte. Trabajas en el mercado de habla ' + (esBase ? 'español' : nombreIdioma) + '.\n' +
+    'Analiza esta imagen de la ruta de traslado privado de "' + origen + '" a "' + destino + '" en Gran Canaria y escribe un alt text.\n\n' +
+    'El alt text debe:\n' +
+    '- Estar escrito en ' + (esBase ? 'español' : nombreIdioma) + ' de forma completamente nativa — como lo escribiría un SEO local de ese mercado, no como una traducción\n' +
+    '- Describir lo que se ve en la imagen de forma natural y vincularlo al traslado de "' + origen + '" a "' + destino + '"\n' +
+    '- Describir con detalle lo que se ve — paisaje, luz, elementos visuales — e incluir la ruta y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto\n' +
+    '- Máximo 125 caracteres\n\n' +
+    'Responde ÚNICAMENTE con JSON válido, sin markdown:\n' +
+    '{"alt_texto": "..."}';
+}
+
+
 // =============================================================================
 module.exports = {
   GENERADOR_ALT_NUEVO_ES,
@@ -154,5 +171,6 @@ module.exports = {
   GENERADOR_INTERFAZ_TEXTOS,
   GENERADOR_NOMBRES_DESTINOS,
   GENERADOR_ALT_FOTO_RUTA,
-  GENERADOR_ALT_FOTO_RUTA_TODOS
+  GENERADOR_ALT_FOTO_RUTA_TODOS,
+  GENERADOR_ALT_EXISTENTE_RUTA
 };

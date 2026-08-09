@@ -4239,6 +4239,62 @@ app.post('/admin/seo/rutas/:id/fotos/nueva/alt/generar-todos', requireAdmin, asy
   res.json({ ok: true, alts: resultado });
 }));
 
+// Devuelve la imagen de una foto de ruta en base64 (para sugerir alt con IA)
+app.get('/admin/seo/rutas/:id/fotos/:fotoId/imagen-base64', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT imagen, mime_type FROM rutas_fotos WHERE id = $1 AND ruta_id = $2', [req.params.fotoId, req.params.id]);
+  if (result.rows.length === 0) return res.status(404).json({ ok: false, error: 'Foto no encontrada.' });
+  const row = result.rows[0];
+  let imgBuffer;
+  if (Buffer.isBuffer(row.imagen)) {
+    imgBuffer = row.imagen;
+  } else if (typeof row.imagen === 'string' && row.imagen.startsWith('\\x')) {
+    imgBuffer = Buffer.from(row.imagen.slice(2), 'hex');
+  } else {
+    imgBuffer = Buffer.from(row.imagen);
+  }
+  const base64 = imgBuffer.toString('base64');
+  const dataUrl = 'data:' + (row.mime_type || 'image/webp') + ';base64,' + base64;
+  res.json({ ok: true, imagen: dataUrl });
+}));
+
+// Sugiere con IA el alt text de una foto de ruta en el idioma activo
+app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt/:lang/sugerir-ia', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { imagen } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
+  const lang = req.params.lang;
+  const ruta = await pool.query('SELECT origen, destino FROM rutas WHERE id = $1', [req.params.id]);
+  if (ruta.rows.length === 0) return res.status(404).json({ error: 'Ruta no encontrada.' });
+  const r = ruta.rows[0];
+  const nombreIdioma = await getNombreIdioma(lang);
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
+  const esBase = lang === 'es';
+  const prompt = iaPrompts.GENERADOR_ALT_EXISTENTE_RUTA(r.origen, r.destino, esBase, nombreIdioma);
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: 100,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+        { type: 'text', text: prompt }
+      ]}]
+    })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
+  const data = await response.json();
+  const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  const resultado = JSON.parse(texto);
+  await pool.query(
+    `INSERT INTO rutas_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
+     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
+    [req.params.fotoId, lang, resultado.alt_texto || '']
+  );
+  res.json({ ok: true, alt_texto: resultado.alt_texto || '' });
+}));
+
 // Sube una foto al carrusel de una ruta
 app.post('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
   const { imagen, alt_texto, nombre_archivo, alts_idiomas } = req.body;
