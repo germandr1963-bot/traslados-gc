@@ -4241,7 +4241,7 @@ app.post('/admin/seo/rutas/:id/fotos/nueva/alt/generar-todos', requireAdmin, asy
 
 // Sube una foto al carrusel de una ruta
 app.post('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
-  const { imagen, alt_texto, nombre_archivo } = req.body;
+  const { imagen, alt_texto, nombre_archivo, alts_idiomas } = req.body;
   if (!imagen || !imagen.startsWith('data:image/') || imagen.length > 10000000) {
     return res.status(400).json({ error: 'Imagen no válida o demasiado grande (máx. ~7MB).' });
   }
@@ -4256,12 +4256,25 @@ app.post('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, re
      VALUES ($1, $2::bytea, 'image/webp', $3, $4, $5) RETURNING id`,
     [req.params.id, webpHex, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1]
   );
-  if (alt_texto && inserted.rows[0]) {
-    await pool.query(
-      `INSERT INTO rutas_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, 'es', $2)
-       ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $2`,
-      [inserted.rows[0].id, alt_texto]
-    );
+  const fotoId = inserted.rows[0] && inserted.rows[0].id;
+  if (fotoId) {
+    if (alt_texto) {
+      await pool.query(
+        `INSERT INTO rutas_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, 'es', $2)
+         ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $2`,
+        [fotoId, alt_texto]
+      );
+    }
+    if (alts_idiomas && typeof alts_idiomas === 'object') {
+      for (const [lang, texto] of Object.entries(alts_idiomas)) {
+        if (!texto || !texto.trim()) continue;
+        await pool.query(
+          `INSERT INTO rutas_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
+           ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
+          [fotoId, lang, texto.trim()]
+        );
+      }
+    }
   }
   res.json({ ok: true });
 }));
