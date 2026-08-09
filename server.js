@@ -4206,6 +4206,39 @@ app.post('/admin/seo/rutas/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(asy
   res.json({ ok: true, nombre_archivo: resultado.nombre_archivo || '', alt_texto: resultado.alt_texto || '' });
 }));
 
+// Genera alt texts para foto nueva de ruta en todos los idiomas a la vez
+app.post('/admin/seo/rutas/:id/fotos/nueva/alt/generar-todos', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { imagen } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
+  const ruta = await pool.query('SELECT origen, destino FROM rutas WHERE id = $1', [req.params.id]);
+  if (ruta.rows.length === 0) return res.status(404).json({ error: 'Ruta no encontrada.' });
+  const r = ruta.rows[0];
+  const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
+  const listaIdiomas = idiomas.rows.map(function(i) { return i.codigo + ' (' + i.nombre + ')'; }).join(', ');
+  const codigos = idiomas.rows.map(function(i) { return '"' + i.codigo + '": "..."'; }).join(', ');
+  const prompt = iaPrompts.GENERADOR_ALT_FOTO_RUTA_TODOS(r.origen, r.destino, listaIdiomas, codigos);
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: 600,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+        { type: 'text', text: prompt }
+      ]}]
+    })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
+  const data = await response.json();
+  const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  const resultado = JSON.parse(texto);
+  res.json({ ok: true, alts: resultado });
+}));
+
 // Sube una foto al carrusel de una ruta
 app.post('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
   const { imagen, alt_texto, nombre_archivo } = req.body;
