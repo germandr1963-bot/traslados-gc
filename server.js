@@ -199,12 +199,18 @@ async function cargarIdiomasCache() {
   }
   IDIOMAS_TRADUCIBLES = IDIOMAS_PERMITIDOS.filter(function (l) { return l !== IDIOMA_BASE; });
 
-  // Cargar palabras de páginas (destino, destinos, rutas, flota, contacto)
+  // Cargar palabras de páginas (destino, destinos, rutas, flota, contacto, traslado)
   const pp = await pool.query('SELECT lang_code, pagina, palabra FROM palabras_paginas');
   PALABRAS_PAGINAS = {};
   for (const fila of pp.rows) {
     if (!PALABRAS_PAGINAS[fila.lang_code]) PALABRAS_PAGINAS[fila.lang_code] = {};
     PALABRAS_PAGINAS[fila.lang_code][fila.pagina] = fila.palabra;
+  }
+  // Sincronizar SECCIONES_TRASLADO desde palabras_paginas (editable en Admin → Palabras de URL)
+  for (const lang of Object.keys(PALABRAS_PAGINAS)) {
+    if (PALABRAS_PAGINAS[lang].traslado) {
+      SECCIONES_TRASLADO[lang] = PALABRAS_PAGINAS[lang].traslado;
+    }
   }
 }
 
@@ -1083,16 +1089,16 @@ async function initSchema() {
     )
   `);
   const SEMILLA_PALABRAS_PAGINAS = {
-    es: { destino: 'destino',       destinos: 'destinos',      rutas: 'rutas',       flota: 'flota',       contacto: 'contacto',    'mi-reserva': 'mi-reserva' },
-    en: { destino: 'destination',   destinos: 'destinations',  rutas: 'routes',      flota: 'fleet',       contacto: 'contact',     'mi-reserva': 'my-booking' },
-    de: { destino: 'reiseziel',     destinos: 'reiseziele',    rutas: 'routen',      flota: 'fuhrpark',    contacto: 'kontakt',     'mi-reserva': 'meine-buchung' },
-    sv: { destino: 'destination',   destinos: 'destinationer', rutas: 'rutter',      flota: 'fordonspark', contacto: 'kontakt',     'mi-reserva': 'min-bokning' },
-    no: { destino: 'destinasjon',   destinos: 'destinasjoner', rutas: 'ruter',       flota: 'bilpark',     contacto: 'kontakt',     'mi-reserva': 'min-bestilling' },
-    nl: { destino: 'bestemming',    destinos: 'bestemmingen',  rutas: 'routes',      flota: 'wagenpark',   contacto: 'contact',     'mi-reserva': 'mijn-boeking' },
-    it: { destino: 'destinazione',  destinos: 'destinazioni',  rutas: 'itinerari',   flota: 'parco-auto',  contacto: 'contatti',    'mi-reserva': 'la-mia-prenotazione' },
-    fr: { destino: 'destination',   destinos: 'destinations',  rutas: 'itineraires', flota: 'flotte',      contacto: 'contact',     'mi-reserva': 'ma-reservation' },
-    fi: { destino: 'kohde',         destinos: 'kohteet',       rutas: 'reitit',      flota: 'kalusto',     contacto: 'yhteystiedot','mi-reserva': 'varaukseni' },
-    ru: { destino: 'napravlenie',   destinos: 'napravleniya',  rutas: 'marshruty',   flota: 'avtopark',    contacto: 'kontakty',    'mi-reserva': 'moya-bronyа' }
+    es: { destino: 'destino',       destinos: 'destinos',      rutas: 'rutas',       flota: 'flota',       contacto: 'contacto',    'mi-reserva': 'mi-reserva',         traslado: 'traslado' },
+    en: { destino: 'destination',   destinos: 'destinations',  rutas: 'routes',      flota: 'fleet',       contacto: 'contact',     'mi-reserva': 'my-booking',         traslado: 'transfer' },
+    de: { destino: 'reiseziel',     destinos: 'reiseziele',    rutas: 'routen',      flota: 'fuhrpark',    contacto: 'kontakt',     'mi-reserva': 'meine-buchung',      traslado: 'transfer' },
+    sv: { destino: 'destination',   destinos: 'destinationer', rutas: 'rutter',      flota: 'fordonspark', contacto: 'kontakt',     'mi-reserva': 'min-bokning',        traslado: 'transfer' },
+    no: { destino: 'destinasjon',   destinos: 'destinasjoner', rutas: 'ruter',       flota: 'bilpark',     contacto: 'kontakt',     'mi-reserva': 'min-bestilling',     traslado: 'transfer' },
+    nl: { destino: 'bestemming',    destinos: 'bestemmingen',  rutas: 'routes',      flota: 'wagenpark',   contacto: 'contact',     'mi-reserva': 'mijn-boeking',       traslado: 'transfer' },
+    it: { destino: 'destinazione',  destinos: 'destinazioni',  rutas: 'itinerari',   flota: 'parco-auto',  contacto: 'contatti',    'mi-reserva': 'la-mia-prenotazione',traslado: 'trasferimento' },
+    fr: { destino: 'destination',   destinos: 'destinations',  rutas: 'itineraires', flota: 'flotte',      contacto: 'contact',     'mi-reserva': 'ma-reservation',     traslado: 'transfert' },
+    fi: { destino: 'kohde',         destinos: 'kohteet',       rutas: 'reitit',      flota: 'kalusto',     contacto: 'yhteystiedot','mi-reserva': 'varaukseni',         traslado: 'kuljetus' },
+    ru: { destino: 'napravlenie',   destinos: 'napravleniya',  rutas: 'marshruty',   flota: 'avtopark',    contacto: 'kontakty',    'mi-reserva': 'moya-bronyа',        traslado: 'transfer' }
   };
   for (const lang of Object.keys(SEMILLA_PALABRAS_PAGINAS)) {
     for (const [pagina, palabra] of Object.entries(SEMILLA_PALABRAS_PAGINAS[lang])) {
