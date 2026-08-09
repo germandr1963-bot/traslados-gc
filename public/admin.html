@@ -2681,23 +2681,25 @@ function abrirEditorSEO(rutaId) {
 
       var tabs = IDIOMAS_SEO.map(function (lang, i) {
         var datos_lang = porIdioma[lang] || {};
-        var excede  = datos_lang.excede;
-        var tieneTexto = !!(datos_lang.meta_title && datos_lang.meta_title.trim());
-        var clases = 'tab-idioma' + (i === 0 ? ' activo' : '') + (excede ? ' tab-idioma-rojo' : '');
-        var estilo = '';
-        var icono  = '';
-        if (excede) {
-          icono = ' ⚠️';
-        } else if (tieneTexto) {
-          estilo = 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;';
-          icono  = ' ✓';
-        } else {
-          estilo = 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
-        }
+        var excede     = datos_lang.excede;
+        var tieneTitulo = !!(datos_lang.meta_title && datos_lang.meta_title.trim());
+        var tieneDesc   = !!(datos_lang.meta_description && datos_lang.meta_description.trim());
+        var tieneTexto  = !!(datos_lang.texto_descripcion && datos_lang.texto_descripcion.trim());
+        var completo = tieneTitulo && tieneDesc && tieneTexto;
+        var parcial  = (tieneTitulo || tieneDesc || tieneTexto) && !completo;
+        var clases = 'tab-idioma' + (i === 0 ? ' activo' : '');
+        var estilo = excede
+          ? 'background:#fdecea;color:#c0392b;border-color:#e74c3c;'
+          : completo
+            ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
+            : parcial
+              ? 'background:#fff8e1;color:#b8860b;border-color:#f9a825;'
+              : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
+        var icono = excede ? ' ⚠️' : completo ? ' ✓' : parcial ? ' ·' : '';
         return '<button class="' + clases + '" id="tab-idioma-' + lang + '" ' +
           'style="' + estilo + '" ' +
           'onclick="cambiarIdiomaEditorSEO(' + rutaId + ', \'' + lang + '\', this)" ' +
-          'title="' + (excede ? 'Título o descripción pasados de píxeles' : (tieneTexto ? 'Completado' : 'Sin traducción')) + '">' +
+          'title="' + (excede ? 'Título o descripción pasados de píxeles' : (completo ? 'Completado' : parcial ? 'Parcial' : 'Sin traducción')) + '">' +
           lang.toUpperCase() + icono + '</button>';
       }).join('');
 
@@ -2745,11 +2747,42 @@ function abrirEditorSEO(rutaId) {
         '<span id="imagen-og-msg" style="font-size:12px;"></span>' +
         '</div>' +
 
+        // Fotos carrusel de ruta
+        '<div style="background:var(--gris-fondo);padding:12px 14px;border-radius:8px;margin-bottom:18px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+        '<label class="etiqueta" style="font-size:11px;">Fotos de la ruta — la primera es la portada</label>' +
+        '<label class="boton-secundario" style="cursor:pointer;padding:5px 12px;font-size:0.78rem;">' +
+        '+ A&#241;adir foto <input type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style="display:none;" onchange="previsualizarFotoRuta(' + rutaId + ', this)"></label>' +
+        '</div>' +
+        '<div id="panel-nueva-foto-ruta-' + rutaId + '" style="display:none;background:#fff;border:1px solid var(--gris-borde);border-radius:8px;padding:12px;margin-bottom:10px;">' +
+        '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">' +
+        '<img id="preview-foto-ruta-' + rutaId + '" style="width:120px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--gris-borde);">' +
+        '<div style="flex:1;min-width:200px;">' +
+        '<label class="etiqueta" style="font-size:11px;">Nombre de archivo (.webp)</label>' +
+        '<input class="campo" id="nueva-foto-ruta-nombre-' + rutaId + '" type="text" placeholder="ej: las-palmas-maspalomas-gran-canaria.webp" style="margin-bottom:8px;font-family:monospace;font-size:12px;">' +
+        '<label class="etiqueta" style="font-size:11px;">Alt text (español) — máx. 125 caracteres</label>' +
+        '<input class="campo" id="nueva-foto-ruta-alt-' + rutaId + '" type="text" placeholder="Descripción de la imagen para Google" ' +
+        'oninput="contarChars(this,\'nueva-foto-ruta-alt-cnt-' + rutaId + '\',125)">' +
+        '<div id="nueva-foto-ruta-alt-cnt-' + rutaId + '" style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:4px;">0 / 125</div>' +
+        '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+        '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" onclick="confirmarSubidaFotoRuta(' + rutaId + ')">&#128190; Guardar foto</button>' +
+        '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 12px;" onclick="cancelarNuevaFotoRuta(' + rutaId + ')">Cancelar</button>' +
+        '<span id="msg-foto-ruta-' + rutaId + '" style="font-size:12px;align-self:center;"></span>' +
+        '</div>' +
+        '</div>' +
+        '<div id="fotos-ruta-' + rutaId + '" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;min-height:40px;">' +
+        '<span style="font-size:12px;color:var(--texto-muted);">Cargando fotos...</span>' +
+        '</div>' +
+        '</div>' +
+
         '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
         '<div id="seo-campos-editor"></div>' +
         '<div id="seo-mensaje-editor" style="margin-top:8px;"></div>' +
         '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-seo\').classList.add(\'oculto\')">Cerrar</button>';
 
+      cargarFotosRuta(rutaId);
       cambiarIdiomaEditorSEO(rutaId, 'es', editor.querySelector('.tab-idioma'));
     });
 }
@@ -2942,9 +2975,37 @@ function renderizarCamposSEO(rutaId, lang, datos) {
       'oninput="contarPxSEO(this,\'seo-desc-count\',920,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
     '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-desc-count">' + medirPx(desc, '13px arial') + ' / 920 px</div>' +
 
+    // URL pública
+    '<label class="etiqueta">URL pública de esta página — generada por la IA, revísala y corrígela si es necesario</label>' +
+    '<input class="campo" id="seo-url-publica" type="text" value="' + escapar(datos.canonical_url || '') + '" ' +
+    'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;color:var(--terracota);">' +
+    '<div style="font-size:11px;color:var(--texto-muted);margin-bottom:16px;">Esta URL se guarda tal como la ves al pulsar Guardar</div>' +
+
+    // Reseña breve
+    '<label class="etiqueta">Reseña breve para tarjeta (máx. 200 caracteres)</label>' +
+    '<textarea class="campo" id="seo-resena" rows="3" maxlength="200" ' +
+    'oninput="contarCharsResenaRuta()" style="margin-bottom:4px;">' + escapar(datos.resena_breve || '') + '</textarea>' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-resena-count">' + (datos.resena_breve ? datos.resena_breve.length : 0) + ' / 200</div>' +
+
+    // Texto descriptivo
+    '<label class="etiqueta">Texto descriptivo de la ruta (visible en la página pública)</label>' +
+    '<div style="display:flex;gap:6px;margin-bottom:6px;">' +
+    '<button type="button" id="btn-vista-preview-ruta" onclick="toggleVistaTextoRuta(\'preview\')" style="padding:4px 12px;font-size:12px;border:1px solid var(--gris-borde);border-radius:6px;cursor:pointer;background:var(--charcoal);color:white;font-weight:700;">👁️ Vista previa</button>' +
+    '<button type="button" id="btn-vista-html-ruta" onclick="toggleVistaTextoRuta(\'html\')" style="padding:4px 12px;font-size:12px;border:1px solid var(--gris-borde);border-radius:6px;cursor:pointer;background:var(--gris-fondo);color:var(--texto-muted);">&#9999;&#65039; Editar HTML</button>' +
+    '</div>' +
+    '<div id="seo-texto-preview" style="border:1px solid var(--gris-borde);border-radius:8px;padding:16px 20px;min-height:180px;margin-bottom:16px;font-size:14px;line-height:1.7;background:#fff;display:block;"></div>' +
+    '<textarea class="campo" id="seo-texto" rows="10" style="margin-bottom:16px;font-size:12px;line-height:1.5;font-family:monospace;display:none;">' + escapar(datos.texto_descripcion || '') + '</textarea>' +
+
     '<button class="boton-primario" onclick="guardarSEO(' + rutaId + ', \'' + lang + '\')">💾 Guardar</button> ' +
     '<button class="boton-secundario" onclick="verSchemaRuta(' + rutaId + ', \'' + lang + '\')">👁️ Ver datos estructurados</button>' +
     '<div id="schema-ruta-vista" style="margin-top:14px;"></div>';
+
+  // Mostrar preview si hay texto
+  var textoActual = datos.texto_descripcion || '';
+  if (textoActual) {
+    var previewRuta = document.getElementById('seo-texto-preview');
+    if (previewRuta) { previewRuta.innerHTML = textoActual; }
+  }
 }
 
 function validarSlugEnVivo(input) {
@@ -2985,8 +3046,11 @@ function guardarSEO(rutaId, lang) {
 
   var datos = {
     slug_url:         slugVal,
+    canonical_url:    (document.getElementById('seo-url-publica') || {}).value || '',
     meta_title:       document.getElementById('seo-titulo').value.trim(),
-    meta_description: document.getElementById('seo-desc').value.trim()
+    meta_description: document.getElementById('seo-desc').value.trim(),
+    resena_breve:     (document.getElementById('seo-resena') || {}).value || '',
+    texto_descripcion: (document.getElementById('seo-texto') || {}).value || ''
   };
   fetch('/admin/seo/rutas/' + rutaId + '/idioma/' + lang, {
     method: 'POST',
@@ -3001,14 +3065,21 @@ function guardarSEO(rutaId, lang) {
       // Actualiza la pestaña de este idioma en vivo, sin tener que cerrar y reabrir el editor
       var tab = document.getElementById('tab-idioma-' + lang);
       if (tab) {
-        var tieneTextoGuardado = !!(datos.meta_title && datos.meta_title.trim());
+        var tieneTitulo = !!(datos.meta_title && datos.meta_title.trim());
+        var tieneDesc   = !!(datos.meta_description && datos.meta_description.trim());
+        var tieneTexto  = !!(datos.texto_descripcion && datos.texto_descripcion.trim());
+        var completo = tieneTitulo && tieneDesc && tieneTexto;
+        var parcial  = (tieneTitulo || tieneDesc || tieneTexto) && !completo;
         tab.classList.toggle('tab-idioma-rojo', excede);
         if (excede) {
-          tab.style.background = ''; tab.style.color = ''; tab.style.borderColor = '';
+          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
           tab.innerHTML = lang.toUpperCase() + ' ⚠️';
-        } else if (tieneTextoGuardado) {
+        } else if (completo) {
           tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
           tab.innerHTML = lang.toUpperCase() + ' ✓';
+        } else if (parcial) {
+          tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825';
+          tab.innerHTML = lang.toUpperCase() + ' ·';
         } else {
           tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
           tab.innerHTML = lang.toUpperCase();
@@ -8350,7 +8421,272 @@ function copiarEnlaceDestino(boton) {
   }).catch(function() { prompt('Copia el enlace manualmente:', url); });
 }
 
+// ─── FUNCIONES DE FOTOS DE RUTAS ─────────────────────────────────────────────
 
+var _fotoRutaData = {};
+
+function previsualizarFotoRuta(rutaId, input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    _fotoRutaData[rutaId] = e.target.result;
+    var preview = document.getElementById('preview-foto-ruta-' + rutaId);
+    if (preview) preview.src = e.target.result;
+    var panel = document.getElementById('panel-nueva-foto-ruta-' + rutaId);
+    if (panel) panel.style.display = 'block';
+    var nombre = document.getElementById('nueva-foto-ruta-nombre-' + rutaId);
+    var alt = document.getElementById('nueva-foto-ruta-alt-' + rutaId);
+    if (nombre) nombre.value = '';
+    if (alt) alt.value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function confirmarSubidaFotoRuta(rutaId) {
+  var imagen = _fotoRutaData[rutaId];
+  if (!imagen) return;
+  var nombre = (document.getElementById('nueva-foto-ruta-nombre-' + rutaId) || {}).value || '';
+  var alt = (document.getElementById('nueva-foto-ruta-alt-' + rutaId) || {}).value || '';
+  var msg = document.getElementById('msg-foto-ruta-' + rutaId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Subiendo...'; }
+  fetch('/admin/seo/rutas/' + rutaId + '/fotos', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imagen: imagen, alt_texto: alt, nombre_archivo: nombre })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) { cancelarNuevaFotoRuta(rutaId); cargarFotosRuta(rutaId); }
+    else { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; } }
+  }).catch(function() {
+    if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexión.'; }
+  });
+}
+
+function cancelarNuevaFotoRuta(rutaId) {
+  delete _fotoRutaData[rutaId];
+  var panel = document.getElementById('panel-nueva-foto-ruta-' + rutaId);
+  if (panel) panel.style.display = 'none';
+}
+
+function cargarFotosRuta(rutaId) {
+  fetch('/admin/seo/rutas/' + rutaId + '/fotos')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var cont = document.getElementById('fotos-ruta-' + rutaId);
+      if (!cont) return;
+      if (!d.fotos || d.fotos.length === 0) {
+        cont.innerHTML = '<span style="font-size:12px;color:var(--texto-muted);">Sin fotos todavía.</span>';
+        return;
+      }
+      cont.innerHTML = d.fotos.map(function(f) {
+        var esPrincipal = !!f.es_principal;
+        var bordeColor = esPrincipal ? '2px solid var(--terracota)' : '1px solid var(--gris-borde)';
+        return '<div id="foto-ruta-card-' + f.id + '" style="border:' + bordeColor + ';border-radius:8px;overflow:hidden;">' +
+          '<div style="position:relative;height:80px;background:var(--charcoal);">' +
+          '<img src="/ruta-foto/' + f.id + '" style="width:100%;height:100%;object-fit:cover;">' +
+          (esPrincipal ? '<span style="position:absolute;top:4px;left:4px;background:var(--terracota);color:#fff;font-size:9px;padding:2px 6px;border-radius:3px;">⭐ CABECERA</span>' : '') +
+          '<button onclick="eliminarFotoRuta(' + rutaId + ',' + f.id + ')" ' +
+          'style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:3px;padding:1px 6px;font-size:11px;cursor:pointer;">✕</button>' +
+          '</div>' +
+          '<div style="padding:6px 8px;">' +
+          '<div style="font-size:10px;color:var(--texto-muted);margin-bottom:2px;">Nombre</div>' +
+          '<div style="font-size:10px;font-family:monospace;word-break:break-all;margin-bottom:6px;">' + escapar(f.nombre_archivo || '—') + '</div>' +
+          '<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;">' +
+          '<span style="font-size:10px;color:var(--texto-muted);">Orden:</span>' +
+          (esPrincipal
+            ? '<span style="font-size:11px;font-weight:700;color:var(--terracota);padding:2px 6px;">Cabecera</span>'
+            : ('<input type="number" min="1" max="99" value="' + (f.orden != null ? f.orden : '') + '" placeholder="1-3" id="orden-foto-ruta-' + f.id + '" ' +
+              'style="width:44px;font-size:11px;padding:2px 4px;border:1px solid var(--gris-borde);border-radius:4px;">' +
+              '<button onclick="guardarOrdenFotoRuta(' + rutaId + ',' + f.id + ')" ' +
+              'style="font-size:10px;padding:2px 6px;border:1px solid var(--gris-borde);border-radius:4px;cursor:pointer;background:var(--gris-fondo);">OK</button>' +
+              '<span id="msg-orden-ruta-' + f.id + '" style="font-size:10px;"></span>')
+          ) +
+          '</div>' +
+          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;margin-bottom:4px;" onclick="abrirAltTextosFotoRuta(' + rutaId + ',' + f.id + ')">✎ Alt texts por idioma</button>' +
+          '<button style="width:100%;font-size:10px;padding:3px 6px;border:1px solid ' + (esPrincipal ? 'var(--terracota)' : 'var(--gris-borde)') + ';border-radius:6px;cursor:pointer;background:' + (esPrincipal ? '#fff5f2' : 'var(--gris-fondo)') + ';color:' + (esPrincipal ? 'var(--terracota)' : 'var(--texto-muted)') + ';" ' +
+          'onclick="marcarCabeceraFotoRuta(' + rutaId + ',' + f.id + ')">' + (esPrincipal ? '⭐ Cabecera actual' : 'Marcar como cabecera') + '</button>' +
+          '</div>' +
+          '</div>';
+      }).join('');
+    });
+}
+
+function marcarCabeceraFotoRuta(rutaId, fotoId) {
+  fetch('/admin/seo/rutas/' + rutaId + '/fotos/' + fotoId + '/principal', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) { cargarFotosRuta(rutaId); }
+    else { alert(d.error || 'Error al marcar cabecera.'); }
+  });
+}
+
+function guardarOrdenFotoRuta(rutaId, fotoId) {
+  var input = document.getElementById('orden-foto-ruta-' + fotoId);
+  var msg = document.getElementById('msg-orden-ruta-' + fotoId);
+  if (!input) return;
+  var orden = parseInt(input.value);
+  if (isNaN(orden) || orden < 1) { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Número no válido'; } return; }
+  fetch('/admin/seo/rutas/' + rutaId + '/fotos/' + fotoId + '/orden', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orden: orden })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓'; setTimeout(function() { if (msg) msg.textContent = ''; }, 2000); }
+      cargarFotosRuta(rutaId);
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error'; }
+    }
+  });
+}
+
+function eliminarFotoRuta(rutaId, fotoId) {
+  if (!confirm('¿Eliminar esta foto?')) return;
+  fetch('/admin/seo/rutas/' + rutaId + '/fotos/' + fotoId + '/eliminar', { method: 'POST' })
+    .then(function() { cargarFotosRuta(rutaId); });
+}
+
+function abrirAltTextosFotoRuta(rutaId, fotoId) {
+  var cont = document.getElementById('fotos-ruta-' + rutaId);
+  var panelId = 'panel-alt-foto-ruta-' + fotoId;
+  var existing = document.getElementById(panelId);
+  if (existing) { existing.remove(); return; }
+  var panel = document.createElement('div');
+  panel.id = panelId;
+  panel.style.cssText = 'background:var(--gris-fondo);border:1px solid var(--gris-borde);border-radius:8px;padding:14px;margin-top:10px;';
+  panel.innerHTML = '<p style="font-size:12px;color:var(--texto-muted);">Cargando alt texts...</p>';
+  cont.parentNode.insertBefore(panel, cont.nextSibling);
+  fetch('/admin/seo/rutas/' + rutaId + '/fotos/' + fotoId + '/alt')
+    .then(function(r) { return r.json(); })
+    .then(function(d) { renderizarAltTextosFotoRuta(rutaId, fotoId, d, panel); });
+}
+
+function renderizarAltTextosFotoRuta(rutaId, fotoId, d, panel) {
+  var idiomas = d.idiomas || [];
+  var alts = d.alts || {};
+  var tabs = idiomas.map(function(i, idx) {
+    var tieneTexto = !!(alts[i.codigo] && alts[i.codigo].trim());
+    var estiloTab = tieneTexto
+      ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
+      : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
+    var icono = tieneTexto ? ' ✓' : ' ⚠️';
+    return '<button class="tab-idioma' + (idx === 0 ? ' activo' : '') + '" ' +
+      'id="tab-alt-foto-ruta-' + fotoId + '-' + i.codigo + '" ' +
+      'style="' + estiloTab + '" ' +
+      'data-fotoid="' + fotoId + '" data-lang="' + i.codigo + '" data-rutaid="' + rutaId + '" ' +
+      'onclick="cambiarTabAltFotoRutaBtn(this)">' +
+      i.codigo.toUpperCase() + icono + '</button>';
+  }).join('');
+  panel.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+    '<strong style="font-size:12px;">Alt texts por idioma — foto #' + fotoId + '</strong>' +
+    '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" data-panelid="panel-alt-foto-ruta-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">✕ Cerrar</button>' +
+    '</div>' +
+    '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
+    '<div id="alt-foto-ruta-campos-' + fotoId + '"></div>' +
+    '<div id="alt-foto-ruta-msg-' + fotoId + '" style="margin-top:8px;font-size:12px;"></div>';
+  panel._altData = d;
+  panel._rutaId = rutaId;
+  if (idiomas.length > 0) cambiarTabAltFotoRuta(fotoId, idiomas[0].codigo, panel.querySelector('.tab-idioma'), d);
+}
+
+function cambiarTabAltFotoRutaBtn(boton) {
+  var fotoId = parseInt(boton.dataset.fotoid);
+  var lang = boton.dataset.lang;
+  cambiarTabAltFotoRuta(fotoId, lang, boton);
+}
+
+function cambiarTabAltFotoRuta(fotoId, lang, boton, dataOverride) {
+  document.querySelectorAll('#panel-alt-foto-ruta-' + fotoId + ' .tab-idioma').forEach(function(b) { b.classList.remove('activo'); });
+  if (boton) boton.classList.add('activo');
+  var panel = document.getElementById('panel-alt-foto-ruta-' + fotoId);
+  if (!panel) return;
+  var rutaId = panel._rutaId;
+  var d = dataOverride || panel._altData || {};
+  var alts = d.alts || {};
+  var altActual = alts[lang] || '';
+  var n = altActual.length;
+  var colorCont = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+  var campos = document.getElementById('alt-foto-ruta-campos-' + fotoId);
+  if (!campos) return;
+  campos.innerHTML =
+    '<label class="etiqueta" style="font-size:11px;">Alt text en ' + lang.toUpperCase() + ' — máx. 125 caracteres</label>' +
+    '<input class="campo" id="alt-foto-ruta-input-' + fotoId + '" type="text" value="' + escapar(altActual) + '" ' +
+    'oninput="actualizarContadorAltFotoRuta(this,' + fotoId + ')" ' +
+    'style="margin-bottom:4px;">' +
+    '<div id="cnt-alt-foto-ruta-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:' + colorCont + ';">' + n + ' / 125</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-rutaid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoRutaBtn(this)">💾 Guardar</button>' +
+    '</div>';
+}
+
+function actualizarContadorAltFotoRuta(input, fotoId) {
+  var n = input.value.length;
+  var el = document.getElementById('cnt-alt-foto-ruta-' + fotoId);
+  if (!el) return;
+  el.textContent = n + ' / 125';
+  el.style.color = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+}
+
+function guardarAltFotoRutaBtn(boton) {
+  var rutaId = parseInt(boton.dataset.rutaid);
+  var fotoId = parseInt(boton.dataset.fotoid);
+  var lang = boton.dataset.lang;
+  var input = document.getElementById('alt-foto-ruta-input-' + fotoId);
+  var altTexto = input ? input.value.trim() : '';
+  var msg = document.getElementById('alt-foto-ruta-msg-' + fotoId);
+  fetch('/admin/seo/rutas/' + rutaId + '/fotos/' + fotoId + '/alt/' + lang, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alt_texto: altTexto })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      var panel = document.getElementById('panel-alt-foto-ruta-' + fotoId);
+      if (panel && panel._altData) panel._altData.alts[lang] = altTexto;
+      var tab = document.getElementById('tab-alt-foto-ruta-' + fotoId + '-' + lang);
+      if (tab) {
+        if (altTexto) {
+          tab.textContent = lang.toUpperCase() + ' ✓';
+          tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
+        } else {
+          tab.textContent = lang.toUpperCase() + ' ⚠️';
+          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
+        }
+      }
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado'; setTimeout(function() { if (msg) msg.textContent = ''; }, 2000); }
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
+    }
+  });
+}
+
+// ─── FUNCIONES AUXILIARES PARA RUTAS ──────────────────────────────────────────
+
+function toggleVistaTextoRuta(modo) {
+  var preview = document.getElementById('seo-texto-preview');
+  var textarea = document.getElementById('seo-texto');
+  var btnPreview = document.getElementById('btn-vista-preview-ruta');
+  var btnHtml = document.getElementById('btn-vista-html-ruta');
+  if (!preview || !textarea) return;
+  if (modo === 'preview') {
+    preview.innerHTML = textarea.value;
+    preview.style.display = 'block';
+    textarea.style.display = 'none';
+    if (btnPreview) { btnPreview.style.background = 'var(--charcoal)'; btnPreview.style.color = 'white'; btnPreview.style.fontWeight = '700'; }
+    if (btnHtml)    { btnHtml.style.background = 'var(--gris-fondo)'; btnHtml.style.color = 'var(--texto-muted)'; btnHtml.style.fontWeight = ''; }
+  } else {
+    preview.style.display = 'none';
+    textarea.style.display = 'block';
+    if (btnPreview) { btnPreview.style.background = 'var(--gris-fondo)'; btnPreview.style.color = 'var(--texto-muted)'; btnPreview.style.fontWeight = ''; }
+    if (btnHtml)    { btnHtml.style.background = 'var(--charcoal)'; btnHtml.style.color = 'white'; btnHtml.style.fontWeight = '700'; }
+  }
+}
+
+function contarCharsResenaRuta() {
+  var el = document.getElementById('seo-resena');
+  var cnt = document.getElementById('seo-resena-count');
+  if (!el || !cnt) return;
+  var n = el.value.length;
+  cnt.textContent = n + ' / 200';
+  cnt.style.color = n > 200 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+}
 
 </script>
 
