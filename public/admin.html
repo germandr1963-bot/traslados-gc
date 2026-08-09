@@ -2731,13 +2731,20 @@ function abrirEditorSEO(rutaId) {
       editor.innerHTML =
         '<h2 style="margin-top:0">✏️ SEO: ' + escapar(ruta.origen) + ' → ' + escapar(ruta.destino) + '</h2>' +
 
-        '<div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;background:var(--gris-fondo);padding:12px 14px;border-radius:8px;margin-bottom:18px;">' +
+        '<div style="background:var(--gris-fondo);padding:12px 14px;border-radius:8px;margin-bottom:18px;">' +
+        '<div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;">' +
         '<div><label class="etiqueta" style="font-size:11px;">Prioridad en el sitemap</label>' +
         '<select id="sitemap-prioridad" class="campo" style="height:32px;">' + opcionesPrioridad() + '</select></div>' +
         '<div><label class="etiqueta" style="font-size:11px;">Frecuencia de actualización</label>' +
         '<select id="sitemap-frecuencia" class="campo" style="height:32px;">' + opcionesFrecuencia() + '</select></div>' +
-        '<button class="boton-costa" style="padding:7px 14px;font-size:0.82rem;" onclick="guardarSitemapConfig(' + rutaId + ')">Guardar</button>' +
+        '<button class="boton-costa" style="padding:7px 14px;font-size:0.82rem;" onclick="guardarSitemapConfig(' + rutaId + ')">Guardar config</button>' +
         '<span id="sitemap-config-msg" style="font-size:12px;"></span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:12px;">' +
+        '<label style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;">' +
+        '<input type="checkbox" id="ruta-visible-listado" ' + (infoRuta.visible_en_listado !== false ? 'checked' : '') + '> Visible en página /rutas</label>' +
+        '<span style="font-size:12px;color:var(--texto-muted);">— Si está desmarcado no aparece en la web aunque tenga páginas activas</span>' +
+        '</div>' +
         '</div>' +
 
         '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:var(--gris-fondo);padding:12px 14px;border-radius:8px;margin-bottom:18px;">' +
@@ -2799,11 +2806,13 @@ function abrirEditorSEO(rutaId) {
 function guardarSitemapConfig(rutaId) {
   var prioridad = document.getElementById('sitemap-prioridad').value;
   var frecuencia = document.getElementById('sitemap-frecuencia').value;
+  var visibleEl = document.getElementById('ruta-visible-listado');
+  var visible = visibleEl ? visibleEl.checked : true;
   var msg = document.getElementById('sitemap-config-msg');
   fetch('/admin/rutas/' + rutaId + '/sitemap-config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prioridad: prioridad, frecuencia: frecuencia })
+    body: JSON.stringify({ prioridad: prioridad, frecuencia: frecuencia, visible_en_listado: visible })
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
     msg.innerHTML = respuesta.ok
       ? '<span style="color:#2e7d32;">✓ Guardado</span>'
