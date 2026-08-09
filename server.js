@@ -4924,6 +4924,15 @@ app.post('/admin/palabras-paginas/:lang/:pagina', requireAdmin, asyncHandler(asy
     [lang, pagina, palabra]
   );
   await cargarIdiomasCache();
+  // Si cambia la palabra de traslado, recalcular todas las canonical_url de ese idioma
+  if (pagina === 'traslado') {
+    await pool.query(
+      `UPDATE route_seo_settings
+       SET canonical_url = '/' || lang_code || '/' || $1 || '/' || slug_url
+       WHERE lang_code = $2 AND slug_url IS NOT NULL`,
+      [palabra, lang]
+    );
+  }
   res.json({ ok: true });
 }));
 
