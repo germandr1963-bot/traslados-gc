@@ -8558,7 +8558,7 @@ function generarTodosAltFotoRuta(rutaId) {
         return '<div style="display:grid;grid-template-columns:40px 1fr auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--gris-borde);' + colorFila + 'padding-left:8px;">' +
           '<span style="font-size:11px;font-weight:700;color:var(--charcoal);">' + lang.toUpperCase() + '</span>' +
           '<input class="campo" id="nuevafoto-alt-ruta-' + rutaId + '-' + lang + '" type="text" value="' + val + '" maxlength="130" ' +
-          'oninput="actualizarContadorAltFotoRuta(this,'nf-' + rutaId + '-' + lang + '')" ' +
+          'oninput="actualizarContadorAltFotoRuta(this,&quot;nf-' + rutaId + '-' + lang + '&quot;)" ' +
           'style="margin:0;font-size:12px;height:30px;">' +
           '<span id="cnt-alt-ruta-nf-' + rutaId + '-' + lang + '" style="font-size:10px;color:' + colorCont + ';white-space:nowrap;">' + n + '/125</span>' +
           '</div>';
@@ -8691,7 +8691,7 @@ function renderizarAltTextosFotoRuta(rutaId, fotoId, d, panel) {
     return '<div style="display:grid;grid-template-columns:40px 1fr auto auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--gris-borde);' + colorFila + 'padding-left:8px;">' +
       '<span style="font-size:11px;font-weight:700;color:var(--charcoal);">' + i.codigo.toUpperCase() + '</span>' +
       '<input class="campo" id="alt-ruta-' + fotoId + '-' + i.codigo + '" type="text" value="' + val + '" maxlength="130" ' +
-      'oninput="actualizarContadorAltFotoRuta(this,'' + fotoId + '-' + i.codigo + '')" ' +
+      'oninput="actualizarContadorAltFotoRuta(this,&quot;' + fotoId + '-' + i.codigo + '&quot;)" ' +
       'style="margin:0;font-size:12px;height:30px;">' +
       '<span id="cnt-alt-ruta-' + fotoId + '-' + i.codigo + '" style="font-size:10px;color:' + colorCont + ';white-space:nowrap;">' + n + '/125</span>' +
       '<button class="boton-primario" style="font-size:0.72rem;padding:3px 8px;white-space:nowrap;" ' +
