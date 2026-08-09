@@ -2247,6 +2247,39 @@ Pulsa el botón para crear una nueva contraseña:
     )
   `);
 
+  // ─── Rutas fotos: carrusel de imágenes por ruta (idéntico a destinos_fotos) ──
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS rutas_fotos (
+      id SERIAL PRIMARY KEY,
+      ruta_id INT NOT NULL REFERENCES rutas(id) ON DELETE CASCADE,
+      imagen BYTEA NOT NULL,
+      mime_type TEXT DEFAULT 'image/webp',
+      nombre_archivo TEXT DEFAULT '',
+      alt_texto TEXT DEFAULT '',
+      es_principal BOOLEAN DEFAULT FALSE,
+      orden INT,
+      creado_en TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  await pool.query(`ALTER TABLE rutas_fotos ADD COLUMN IF NOT EXISTS mime_type TEXT DEFAULT 'image/webp'`);
+  await pool.query(`ALTER TABLE rutas_fotos ADD COLUMN IF NOT EXISTS nombre_archivo TEXT DEFAULT ''`);
+  await pool.query(`ALTER TABLE rutas_fotos ADD COLUMN IF NOT EXISTS es_principal BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE rutas_fotos ALTER COLUMN orden DROP NOT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE route_seo_settings ADD COLUMN IF NOT EXISTS resena_breve TEXT`);
+  await pool.query(`ALTER TABLE route_seo_settings ADD COLUMN IF NOT EXISTS texto_descripcion TEXT`);
+
+  // ─── Alt text de fotos de rutas por idioma (idéntico a destinos_fotos_alt) ──
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS rutas_fotos_alt (
+      id SERIAL PRIMARY KEY,
+      foto_id INT NOT NULL REFERENCES rutas_fotos(id) ON DELETE CASCADE,
+      lang_code VARCHAR(2) NOT NULL,
+      alt_texto TEXT DEFAULT '',
+      creado_en TIMESTAMP DEFAULT NOW(),
+      UNIQUE(foto_id, lang_code)
+    )
+  `);
+
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
     await pool.query(
