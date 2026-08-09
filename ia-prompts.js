@@ -117,6 +117,15 @@ function GENERADOR_NOMBRES_DESTINOS(nombreIdioma, pendientes) {
 }
 
 
+// ─── GENERADOR 9 ─────────────────────────────────────────────────────────────
+// Alt text foto nueva de ruta — 1 idioma
+// Endpoint: POST /admin/seo/rutas/:id/fotos/sugerir-ia
+// Botón admin: ✨ Sugerir en ES con IA
+function GENERADOR_ALT_FOTO_RUTA(origen, destino, lang, nombreIdioma) {
+  return `Eres un experto en SEO de imágenes para webs de turismo y transporte.\nAnaliza esta imagen relacionada con la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y devuelve dos cosas:\n\n1. nombre_archivo: Un nombre de archivo SEO optimizado en ${lang === 'es' ? 'español' : nombreIdioma}, en minúsculas, con guiones en lugar de espacios, sin tildes ni caracteres especiales, con extensión .webp. Debe describir lo que se ve en la imagen e incluir origen y destino. Ejemplo: "las-palmas-gran-canaria-maspalomas-traslado-privado.webp"\n\n2. alt_texto: Un texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe con detalle lo que se ve en la imagen — paisaje, luz, elementos visuales — y vincúlalo al traslado privado de "${origen}" a "${destino}". Debe tener entre 110 y 125 caracteres como máximo absoluto.\n\nResponde ÚNICAMENTE con JSON válido, sin markdown, con esta forma exacta:\n{"nombre_archivo": "...", "alt_texto": "..."}`;
+}
+
+
 // =============================================================================
 module.exports = {
   GENERADOR_ALT_NUEVO_ES,
@@ -126,5 +135,6 @@ module.exports = {
   GENERADOR_DESTINO_LOTE,
   GENERADOR_RUTAS_SEO,
   GENERADOR_INTERFAZ_TEXTOS,
-  GENERADOR_NOMBRES_DESTINOS
+  GENERADOR_NOMBRES_DESTINOS,
+  GENERADOR_ALT_FOTO_RUTA
 };

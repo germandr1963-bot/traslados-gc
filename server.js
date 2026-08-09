@@ -4175,6 +4175,37 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
 
 // ─── ENDPOINTS DE FOTOS DE RUTAS ─────────────────────────────────────────────
 
+// Sugiere nombre de archivo y alt text para una foto nueva de ruta usando IA
+app.post('/admin/seo/rutas/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { imagen, lang } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
+  const ruta = await pool.query('SELECT origen, destino FROM rutas WHERE id = $1', [req.params.id]);
+  if (ruta.rows.length === 0) return res.status(404).json({ error: 'Ruta no encontrada.' });
+  const r = ruta.rows[0];
+  const nombreIdioma = await getNombreIdioma(lang || 'es');
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
+  const prompt = iaPrompts.GENERADOR_ALT_FOTO_RUTA(r.origen, r.destino, lang || 'es', nombreIdioma);
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: 200,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+        { type: 'text', text: prompt }
+      ]}]
+    })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
+  const data = await response.json();
+  const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  const resultado = JSON.parse(texto);
+  res.json({ ok: true, nombre_archivo: resultado.nombre_archivo || '', alt_texto: resultado.alt_texto || '' });
+}));
+
 // Sube una foto al carrusel de una ruta
 app.post('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
   const { imagen, alt_texto, nombre_archivo } = req.body;
