@@ -3445,9 +3445,7 @@ app.post('/admin/seo/rutas/:id/idioma/:lang', requireAdmin, asyncHandler(async (
   const { slug_url, meta_title, meta_description, og_title, og_description, robots_status, canonical_url, resena_breve, texto_descripcion } = req.body;
   const slugLimpio = slug_url ? slugify(slug_url) : null;
   // Si el admin envía una URL pública manual se respeta; si no, se genera automáticamente
-  const canonical = canonical_url && canonical_url.trim()
-    ? canonical_url.trim()
-    : BASE_URL + '/' + req.params.lang + '/' + SECCIONES_TRASLADO[req.params.lang] + '/' + (slugLimpio || '');
+  const canonical = '/' + req.params.lang + '/' + SECCIONES_TRASLADO[req.params.lang] + '/' + (slugLimpio || '');
   await pool.query(
     `UPDATE route_seo_settings
      SET slug_url = $1, meta_title = $2, meta_description = $3,
