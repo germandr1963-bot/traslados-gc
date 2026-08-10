@@ -5529,7 +5529,9 @@ app.get('/api/rutas-publicas', asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT r.id, r.origen, r.destino,
             COALESCE(rss_lang.slug_url, rss_es.slug_url) AS slug_url,
-            COALESCE(rss_lang.activo, FALSE) AS activo_lang
+            COALESCE(rss_lang.activo, FALSE) AS activo_lang,
+            COALESCE(rss_lang.resena_breve, rss_es.resena_breve) AS resena_breve,
+            (SELECT id FROM rutas_fotos WHERE ruta_id = r.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
      FROM rutas r
      LEFT JOIN route_seo_settings rss_lang
            ON rss_lang.route_id = r.id AND rss_lang.lang_code = $1
@@ -5557,11 +5559,13 @@ app.get('/api/rutas-publicas', asyncHandler(async (req, res) => {
   const rutas = result.rows
     .filter(r => r.slug_url)  // Solo rutas que tienen slug generado
     .map(r => ({
-      id:       r.id,
-      origen:   mapaDestinos[r.origen]  || r.origen,
-      destino:  mapaDestinos[r.destino] || r.destino,
-      slug_url: r.slug_url,
-      url:      '/' + lang + '/' + palabraTraslado + '/' + r.slug_url
+      id:              r.id,
+      origen:          mapaDestinos[r.origen]  || r.origen,
+      destino:         mapaDestinos[r.destino] || r.destino,
+      slug_url:        r.slug_url,
+      url:             '/' + lang + '/' + palabraTraslado + '/' + r.slug_url,
+      foto_cabecera_id: r.foto_cabecera_id || null,
+      resena_breve:    r.resena_breve || ''
     }));
 
   res.json({ rutas, palabra_traslado: palabraTraslado });
