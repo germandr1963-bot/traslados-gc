@@ -90,11 +90,7 @@ header.app .marca {
 header.app a.nav { color: rgba(255,255,255,0.65); text-decoration: none; font-size: 14px; }
 header.app a.nav:hover { color: #fff; }
 header.app a.nav.izquierda { justify-self: start; }
-header.app .derecha-header { justify-self: end; display: flex; align-items: center; gap: 16px; }
-.langs-header { display: flex; gap: 8px; font-size: 12px; color: rgba(255,255,255,0.65); }
-.langs-header a { color: rgba(255,255,255,0.65); text-decoration: none; text-transform: uppercase; }
-.langs-header a:hover { color: #fff; }
-.langs-header .lang-activo { color: #fff; font-weight: 700; text-transform: uppercase; }
+header.app .derecha-header { justify-self: end; }
 
 /* ── Contenido principal ── */
 .contenido {
@@ -149,7 +145,7 @@ h1.titulo-ruta .acento { color: var(--terracota); }
   transition: opacity 0.2s;
 }
 .boton-reservar:hover { opacity: 0.88; }
-.cta-ruta { text-align: center; margin-bottom: 48px; }
+
 
 /* ── Secciones de contenido ── */
 .seccion {
@@ -243,18 +239,6 @@ footer {
   <a href="<%= lang === 'es' ? '/rutas' : '/' + lang + '/rutas' %>" class="nav izquierda"><%= t('nav_volver_rutas') %></a>
   <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="marca"><%= nombreMarca %></a>
   <div class="derecha-header">
-    <% if (alternates && alternates.length > 1) { %>
-    <div class="langs-header">
-      <% alternates.forEach(function(alt, i) { %>
-        <% if (alt.lang_code === lang) { %>
-          <span class="lang-activo"><%= lang %></span>
-        <% } else { %>
-          <a href="/<%= alt.lang_code %>/<%= SECCIONES_TRASLADO[alt.lang_code] %>/<%= alt.slug_url %>"><%= alt.lang_code %></a>
-        <% } %>
-        <% if (i < alternates.length - 1) { %><span style="opacity:0.4;">|</span><% } %>
-      <% }); %>
-    </div>
-    <% } %>
     <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/contacto' %>" class="nav"><%= t('nav_contacto') %></a>
   </div>
 </header>
@@ -270,9 +254,6 @@ footer {
     <%= seo.origen %> <span class="acento">→</span> <%= seo.destino %>
   </h1>
   <p class="subtitulo-ruta"><%= t('subtitulo_hero') %></p>
-  <div class="cta-ruta">
-    <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="boton-reservar"><%= t('boton_solicitar_traslado') %></a>
-  </div>
 
 <div class="seccion">
   <h2><%= t('titulo_tarifas') %></h2>
