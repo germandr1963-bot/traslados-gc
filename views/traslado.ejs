@@ -180,8 +180,9 @@ h1.titulo-ruta .acento { color: var(--terracota); }
   border-bottom: 1px solid var(--gris-borde);
   color: var(--texto-oscuro);
 }
-.tabla-tarifas tr:last-child td { border-bottom: none; }
-.tabla-tarifas tr:hover td { background: var(--gris-fondo); }
+.tabla-tarifas th:nth-child(4),
+.tabla-tarifas td:nth-child(4) { text-align: right; }
+
 .precio-fijo {
   font-weight: 500;
   font-size: 16px;
