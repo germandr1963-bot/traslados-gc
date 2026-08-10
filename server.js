@@ -3399,19 +3399,32 @@ app.post('/admin/seo/rutas/:id/generar-ia', requireAdmin, asyncHandler(async (re
     reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones. Describe el trayecto de origen a destino en inglés.`;
   }
 
-  const items = [{ route_id: parseInt(req.params.id), origen, destino, titulo_es: '', descripcion_es: '', reglasSlug }];
-  const traduccionesIA = await traducirSEOConClaudeIA(items, nombreIdioma);
-  const t = traduccionesIA[req.params.id] || traduccionesIA[String(req.params.id)] || {};
+  const items = [{ route_id: parseInt(req.params.id), origen, destino, reglasSlug }];
+  const prompt = iaPrompts.GENERADOR_RUTAS_SEO(nombreIdioma, items);
 
-  const slugGenerado = String(t.slug || '')
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error al conectar con la IA.' });
+  const data = await response.json();
+  const limpio = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  let resultado = {};
+  try { resultado = JSON.parse(limpio); } catch(e) {
+    console.error('[generar-ia-ruta] JSON inválido:', limpio.slice(0, 300));
+    return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' });
+  }
+
+  const slugGenerado = String(resultado.slug || '')
     .toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9-]/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
 
-  let metaTitle = t.meta_title || '';
-  let metaDesc  = t.meta_description || '';
+  let metaTitle = resultado.meta_title || '';
+  let metaDesc  = resultado.meta_description || '';
 
   // Verificar píxeles — si se pasa, un intento de acortar
   const pxT = medirPxTitulo(metaTitle);
@@ -3442,7 +3455,7 @@ app.post('/admin/seo/rutas/:id/generar-ia', requireAdmin, asyncHandler(async (re
     } catch(e) { /* si falla el acorte, devolvemos lo que hay */ }
   }
 
-  res.json({ ok: true, slug: slugGenerado, meta_title: metaTitle, meta_description: metaDesc });
+  res.json({ ok: true, slug: slugGenerado, meta_title: metaTitle, meta_description: metaDesc, resena_breve: resultado.resena_breve || '', texto_descripcion: resultado.texto_descripcion || '' });
 }));
 
 // Guarda los datos SEO de una ruta en un idioma concreto
