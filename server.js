@@ -9013,6 +9013,15 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
   const origenTraducido = mapaDestinos[seo.origen] || seo.origen;
   const destinoTraducido = mapaDestinos[seo.destino] || seo.destino;
 
+  const fotosRuta = await pool.query(
+    `SELECT rf.id, COALESCE(rfa.alt_texto, rf.alt_texto, '') AS alt_texto
+     FROM rutas_fotos rf
+     LEFT JOIN rutas_fotos_alt rfa ON rfa.foto_id = rf.id AND rfa.lang_code = $2
+     WHERE rf.ruta_id = $1 AND rf.es_principal = FALSE
+     ORDER BY rf.orden, rf.id`,
+    [seo.ruta_id, lang]
+  );
+
   const fotoCabecera = await pool.query(
     'SELECT id FROM rutas_fotos WHERE ruta_id = $1 AND es_principal = TRUE LIMIT 1',
     [seo.ruta_id]
@@ -9037,6 +9046,7 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
     SECCIONES_TRASLADO,
     nombreMarca,
     fotoCabeceraId,
+    fotosRuta: fotosRuta.rows,
     palabrasPaginas: PALABRAS_PAGINAS[lang] || {},
     tieneImagenDefecto: !!globales.imagen_og_defecto,
     twitterActivo: !!globales.twitter_activo,
