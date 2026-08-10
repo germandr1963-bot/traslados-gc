@@ -115,7 +115,7 @@ Límites de caracteres por idioma:
 ## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
 
 1. SLUG:
-URL amigable para esta ruta (ejemplo tipico: origen-a-destino). ${items[0].reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
+URL amigable para esta ruta (ejemplo tipico: origen-a-destino). ${items[0].reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio. IMPORTANTE: usa los nombres completos de origen y destino tal como se indican — nunca los abrevies (ejemplo correcto: "las-palmas-de-gran-canaria-a-maspalomas", nunca "las-palmas-a-maspalomas").
 
 2. PALABRA_RUTA:
 La palabra o expresión para "ruta" o "trayecto" (ejemplo: traslado, transferencia, taxi o ruta según aplique mejor al contexto) traducida a ${nombreIdioma}, en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico. Solo la palabra o expresión clave.
