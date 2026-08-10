@@ -60,9 +60,9 @@ function GENERADOR_DESTINO_LOTE(nombreIdioma, items) {
 
 
 // ─── GENERADOR 6 ─────────────────────────────────────────────────────────────
-// SEO de rutas — por idioma
+// Contenido completo de ruta (Origen -> Destino) — todo de una vez
 // Función: traducirSEOConClaudeIA()
-// Botón admin: Traducir con IA — pestaña SEO rutas
+// Botón admin: 🤖 Generar con IA — ficha SEO de cada ruta
 // Línea original server.js: ~4735
 function GENERADOR_RUTAS_SEO(nombreIdioma, items) {
   return `# INSTRUCCIONES GENERALES DE REDACCIÓN SEO LOCAL Y METADATOS MULTIIDIOMA

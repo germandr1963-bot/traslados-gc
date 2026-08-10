@@ -3442,7 +3442,7 @@ app.post('/admin/seo/rutas/:id/generar-ia', requireAdmin, asyncHandler(async (re
     } catch(e) { /* si falla el acorte, devolvemos lo que hay */ }
   }
 
-  res.json({ ok: true, slug: slugGenerado, meta_title: metaTitle, meta_description: metaDesc });
+  res.json({ ok: true, slug: slugGenerado, meta_title: metaTitle, meta_description: metaDesc, resena_breve: t.resena_breve || '', texto_descripcion: t.texto_descripcion || '' });
 }));
 
 // Guarda los datos SEO de una ruta en un idioma concreto
