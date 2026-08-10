@@ -9013,6 +9013,12 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
   const origenTraducido = mapaDestinos[seo.origen] || seo.origen;
   const destinoTraducido = mapaDestinos[seo.destino] || seo.destino;
 
+  const fotoCabecera = await pool.query(
+    'SELECT id FROM rutas_fotos WHERE ruta_id = $1 AND es_principal = TRUE LIMIT 1',
+    [seo.ruta_id]
+  );
+  const fotoCabeceraId = fotoCabecera.rows.length > 0 ? fotoCabecera.rows[0].id : null;
+
   res.render('traslado', {
     seo: Object.assign({}, seo, { origen: origenTraducido, destino: destinoTraducido }),
     precios: precios.rows.map(function(p) {
@@ -9027,6 +9033,7 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
     BASE_URL,
     SECCIONES_TRASLADO,
     nombreMarca,
+    fotoCabeceraId,
     tieneImagenDefecto: !!globales.imagen_og_defecto,
     twitterActivo: !!globales.twitter_activo,
     schemaTaxiService,
