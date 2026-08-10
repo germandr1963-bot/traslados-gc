@@ -215,6 +215,39 @@ footer {
   margin-top: 40px;
 }
 
+/* ── Texto descriptivo ── */
+.texto-ruta {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--texto-oscuro);
+  margin-bottom: 48px;
+}
+.texto-ruta h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 24px; margin: 28px 0 10px; }
+.texto-ruta h3 { font-family: 'Big Shoulders Display', sans-serif; font-size: 20px; margin: 22px 0 8px; }
+.texto-ruta p  { margin: 0 0 14px; }
+.texto-ruta ul { padding-left: 20px; margin: 0 0 14px; }
+.texto-ruta li { margin-bottom: 6px; }
+
+/* ── Grid de fotos ── */
+.fotos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 48px;
+}
+.foto-item {
+  height: 220px;
+  background: var(--charcoal);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.foto-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 /* ── Responsive móvil ── */
 @media (max-width: 560px) {
   header.app { padding: 12px 14px; }
@@ -225,6 +258,8 @@ footer {
   h1.titulo-ruta { font-size: clamp(24px, 7vw, 36px); }
   .boton-reservar { display: block; text-align: center; padding: 14px 20px; font-size: 17px; }
   .seccion { padding: 0 14px; margin: 28px auto; }
+  .fotos-grid { grid-template-columns: 1fr; }
+  .foto-item { height: 200px; }
   .tabla-tarifas { font-size: 13px; }
   .tabla-tarifas th,
   .tabla-tarifas td { padding: 8px 8px; }
@@ -320,6 +355,24 @@ footer {
     <a href="/<%= lang %>/<%= SECCIONES_TRASLADO[lang] %>/<%= r.slug_url %>" class="tarjeta" style="text-decoration:none;color:inherit;display:block;">
       <strong><%= seo.origen %> → <%= r.destino %></strong>
     </a>
+    <% }); %>
+  </div>
+</div>
+<% } %>
+
+<% if (seo.texto_descripcion) { %>
+<div class="seccion">
+  <div class="texto-ruta"><%- seo.texto_descripcion %></div>
+</div>
+<% } %>
+
+<% if (fotosRuta && fotosRuta.length > 0) { %>
+<div class="seccion">
+  <div class="fotos-grid">
+    <% fotosRuta.forEach(function(f) { %>
+    <div class="foto-item">
+      <img src="/ruta-foto/<%= f.id %>" alt="<%= f.alt_texto %>">
+    </div>
     <% }); %>
   </div>
 </div>
