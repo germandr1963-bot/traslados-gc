@@ -237,10 +237,10 @@ footer {
 <body>
 
 <header class="app">
-  <a href="<%= lang === 'es' ? '/rutas' : '/' + lang + '/rutas' %>" class="nav izquierda"><%= t('nav_volver_rutas') %></a>
+  <a href="/<%= lang %>/<%= palabrasPaginas.rutas || 'rutas' %>" class="nav izquierda"><%= t('nav_volver_rutas') %></a>
   <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="marca"><%= nombreMarca %></a>
   <div class="derecha-header">
-    <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/contacto' %>" class="nav"><%= t('nav_contacto') %></a>
+    <a href="/<%= lang %>/<%= palabrasPaginas.contacto || 'contacto' %>" class="nav"><%= t('nav_contacto') %></a>
   </div>
 </header>
 
