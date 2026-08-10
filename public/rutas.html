@@ -124,6 +124,7 @@
       line-height: 1.1;
     }
     .td-rutas { font-size: 12px; color: var(--texto-muted); }
+    .td-resena { font-size: 12px; color: var(--texto-muted); line-height: 1.4; margin-top: 4px; }
 
     .bloque-proximamente {
       margin-top: 24px;
@@ -209,9 +210,12 @@
         var html = '';
         rutas.forEach(function(ruta) {
           html += '<a href="' + ruta.url + '" class="tarjeta-destino">';
-          html += '<div class="td-foto"></div>';
+          html += '<div class="td-foto">';
+          if (ruta.foto_cabecera_id) html += '<img src="/ruta-foto/' + ruta.foto_cabecera_id + '" alt="' + ruta.origen + ' - ' + ruta.destino + '">';
+          html += '</div>';
           html += '<div class="td-body">';
           html += '<div class="td-nombre">' + ruta.origen + ' → ' + ruta.destino + '</div>';
+          if (ruta.resena_breve) html += '<div class="td-resena">' + ruta.resena_breve + '</div>';
           html += '</div>';
           html += '</a>';
         });
