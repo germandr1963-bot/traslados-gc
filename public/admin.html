@@ -3577,7 +3577,15 @@ function generarIARuta(rutaId, lang) {
       if (titulo) { titulo.value = d.meta_title || ''; contarPxSEO(titulo, 'seo-titulo-count', 600, '20px arial'); }
       if (desc)   { desc.value   = d.meta_description || ''; contarPxSEO(desc, 'seo-desc-count', 920, '13px arial'); }
       var slugInput = document.getElementById('seo-slug');
-      if (slugInput && d.slug) { slugInput.value = d.slug; }
+      if (slugInput && d.slug) { slugInput.value = d.slug; validarSlugEnVivo(slugInput); }
+      var resena = document.getElementById('seo-resena');
+      if (resena && d.resena_breve) { resena.value = d.resena_breve; contarCharsResenaRuta(); }
+      var texto = document.getElementById('seo-texto');
+      if (texto && d.texto_descripcion) {
+        texto.value = d.texto_descripcion;
+        var preview = document.getElementById('seo-texto-preview');
+        if (preview) { preview.innerHTML = d.texto_descripcion; }
+      }
       if (msg) msg.textContent = '✅ Generado — revisa y guarda';
     } else {
       if (msg) msg.innerHTML = '<span style="color:var(--rojo-error);">❌ ' + escapar(d.error || 'Error') + '</span>';
