@@ -65,22 +65,98 @@ function GENERADOR_DESTINO_LOTE(nombreIdioma, items) {
 // Botón admin: Traducir con IA — pestaña SEO rutas
 // Línea original server.js: ~4735
 function GENERADOR_RUTAS_SEO(nombreIdioma, items) {
-  return 'Eres un experto en SEO que trabaja en el mercado de habla ' + nombreIdioma + '. Conoces cómo busca la gente en ' + nombreIdioma + ' cuando quiere contratar un traslado privado en Gran Canaria — qué términos usan, qué intención tienen, cómo se expresan. No traduces. Creas cada texto desde cero en ' + nombreIdioma + ', pensando como un SEO nativo de ese mercado. El texto en español es solo una referencia de contenido, no una plantilla.\n\n' +
-    'Para cada ruta, escribe en ' + nombreIdioma + ':\n' +
-    '- meta_title: Título para Google. Límites de caracteres por idioma (MÁXIMOS ABSOLUTOS, nunca superarlos):\n' +
-    '  Español (ES): MÁX 60 | Inglés (EN): MÁX 62 | Alemán (DE): MÁX 55 | Francés (FR): MÁX 60 | Italiano (IT): MÁX 60 | Neerlandés (NL): MÁX 57 | Sueco (SV): MÁX 57 | Noruego (NO): MÁX 57 | Finlandés (FI): MÁX 54 | Ruso (RU): MÁX 50\n' +
-    '  Usa las expresiones reales con las que alguien de ese mercado buscaría ese traslado. Para nombres de lugares usa la forma más natural en ' + nombreIdioma + ' (ej: "Gran Canaria Airport" en inglés). En idiomas con palabras largas (alemán, neerlandés, francés) usa menos palabras.\n' +
-    '- meta_description: Descripción para Google. Límites de caracteres por idioma (MÁXIMOS ABSOLUTOS, nunca superarlos):\n' +
-    '  Español (ES): MÁX 155 | Inglés (EN): MÁX 160 | Alemán (DE): MÁX 140 | Francés (FR): MÁX 155 | Italiano (IT): MÁX 158 | Neerlandés (NL): MÁX 148 | Sueco (SV): MÁX 150 | Noruego (NO): MÁX 152 | Finlandés (FI): MÁX 138 | Ruso (RU): MÁX 128\n' +
-    '  Debe invitar al clic con tono y expresiones naturales de ese mercado. En idiomas con palabras largas sé más conciso. NUNCA superes el límite de tu idioma.\n' +
-    '- PROHIBICIÓN ABSOLUTA: Está ESTRICTAMENTE PROHIBIDO usar "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía. Alternativas permitidas: "tarifas competitivas", "sin costes ocultos", "precio oficial".\n' +
-    'Para cada ruta, genera también un slug de URL siguiendo las reglas que vienen en el campo reglasSlug de cada item. ' +
-    'El slug debe usar solo caracteres a-z y guiones. Sin tildes, sin acentos, sin caracteres especiales. ' +
-    'Si el idioma usa alfabeto cirílico u otro no latino, transliterar al latín.\n\n' +
-    'Datos (JSON) — titulo_es y descripcion_es son solo referencia de contenido:\n' + JSON.stringify(items, null, 2) + '\n\n' +
-    'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, sin bloques de markdown, ' +
-    'usando el route_id de cada ruta como clave, con esta forma exacta: ' +
-    '{\"3\": {\"slug\": \"...\", \"meta_title\": \"...\", \"meta_description\": \"...\"}, \"18\": {\"slug\": \"...\", \"meta_title\": \"...\", \"meta_description\": \"...\"}}';
+  return `# INSTRUCCIONES GENERALES DE REDACCIÓN SEO LOCAL Y METADATOS MULTIIDIOMA
+
+Actúa como un Experto en SEO Local y Redactor Creativo Nativo. Tu trabajo consiste en redactar metadatos y contenidos altamente persuasivos, escritos de "humano a humano", para una página de captación de la ruta de transporte/traslado desde "${items[0].origen}" hasta "${items[0].destino}" (Gran Canaria, Islas Canarias) de una empresa de traslados y transportes privados intermunicipales.
+
+REGLA DE NATIVIDAD (NO TRADUCIR):
+No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo busca, piensa y reserva un usuario real de ese idioma cuando planifica su trayecto de "${items[0].origen}" a "${items[0].destino}".
+
+---
+
+## CONCEPTO Y OBJETIVO DE LA PÁGINA
+Esta página es una landing de atracción/captación para la ruta específica entre dos puntos. Su objetivo es responder a la intención de búsqueda directa del usuario que necesita trasladarse desde "${items[0].origen}" hasta "${items[0].destino}" y presentar el servicio de traslado/transporte privado como la opción más cómoda, rápida, segura y directa para realizar este trayecto sin complicaciones.
+
+---
+
+## REGLAS DE ORO Y ESTILO (HUMAN-LIKE)
+
+1. ENFOQUE HACIA LA RUTA:
+Todo el contenido (Título, Descripción, Tarjeta y Texto Principal) debe enfocar el trayecto de transporte privado DESDE "${items[0].origen}" HASTA "${items[0].destino}".
+
+2. LÍMITES ESTRICTOS DE CARACTERES (INFRANQUEABLES):
+Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido para aprovechar el espacio SEO, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO en ${nombreIdioma}. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter.
+
+Límites de caracteres por idioma:
+- Español (ES): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)
+- Inglés (EN): Título (54-60 chars | MÁX 62) | Descripción (150-157 chars | MÁX 160)
+- Alemán (DE): Título (48-53 chars | MÁX 55) | Descripción (130-137 chars | MÁX 140)
+- Francés (FR): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)
+- Italiano (IT): Título (52-58 chars | MÁX 60) | Descripción (148-155 chars | MÁX 158)
+- Neerlandés (NL): Título (50-55 chars | MÁX 57) | Descripción (138-145 chars | MÁX 148)
+- Sueco (SV): Título (50-55 chars | MÁX 57) | Descripción (140-147 chars | MÁX 150)
+- Noruego (NO): Título (50-55 chars | MÁX 57) | Descripción (142-149 chars | MÁX 152)
+- Finlandés (FI): Título (46-52 chars | MÁX 54) | Descripción (128-135 chars | MÁX 138)
+- Ruso (RU): Título (42-48 chars | MÁX 50) | Descripción (118-125 chars | MÁX 128)
+
+3. ESTILO NATURAL Y PROHIBICIONES DE IA:
+- Prohibido usar palabras y clichés típicos de IA como: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido".
+- Usa un tono cercano, natural y conversacional (de persona local a viajero).
+- Alterna la longitud de las frases (cortas y directas con explicativas) para dar un ritmo de lectura 100% humano.
+
+### REGLAS OBLIGATORIAS SOBRE PRECIOS Y TARIFAS:
+1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):
+   Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
+2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
+   "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".
+
+---
+
+## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
+
+1. SLUG:
+URL amigable para esta ruta (ejemplo tipico: origen-a-destino). ${items[0].reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
+
+2. PALABRA_RUTA:
+La palabra o expresión para "ruta" o "trayecto" (ejemplo: traslado, transferencia, taxi o ruta según aplique mejor al contexto) traducida a ${nombreIdioma}, en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico. Solo la palabra o expresión clave.
+
+3. NOMBRE_ISLA:
+El nombre de la isla "Gran Canaria" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente.
+
+4. META_TITLE (campo: meta_title):
+- Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
+- Formato habitual: [Traslado / Taxi de ${items[0].origen} a ${items[0].destino}] | [Propuesta de Valor] | [CTA o Garantía]
+
+5. META_DESCRIPTION (campo: meta_description):
+- Redactada como una solución directa de transporte para el viajero que necesita hacer este trayecto.
+- Formato habitual: [Solución de traslado desde ${items[0].origen} a ${items[0].destino}] + [Ventajas: tiempo, comodidad, tarifas competitivas, sin esperas] + [Llamada a la Acción corta].
+
+6. RESEÑA BREVE PARA TARJETA DE RUTA (campo: resena_breve):
+- EXTENSIÓN: Entre 150 y 200 caracteres (MÁXIMO ABSOLUTO: 200 caracteres, incluidos espacios).
+- OBJETIVO: Pincelada corta y atractiva para la ficha previa de la ruta con botón hacia la página completa.
+- ESTRUCTURA (2 frases): [Frase 1: Solución de conexión rápida de ${items[0].origen} a ${items[0].destino}] + [Frase 2: Ventaja del traslado privado + CTA de clic].
+
+7. TEXTO PRINCIPAL DE LA RUTA (campo: texto_descripcion):
+EXTENSIÓN TOTAL OBLIGATORIA: Entre 400 y 550 palabras (LÍMITE MÁXIMO ABSOLUTO: 600 palabras).
+FORMATO: HTML válido. Usa <h2>, <h3>, <p>, <ul>, <li>, <strong>. NUNCA <h1>. NUNCA Markdown.
+ESTRUCTURA:
+- <h2> Encabezado Principal: 1 frase potente enfocado en la ruta ${items[0].origen} a ${items[0].destino}.
+- <h2> Traslado privado de ${items[0].origen} a ${items[0].destino} + <p>: Máximo 1 párrafo introduciendo el trayecto, distancia/comodidad (aprox. 60-80 palabras).
+- <h2> Ventajas de este trayecto directo + <p> o <ul><li>: Máximo 2-3 puntos o bloques breves sobre por qué elegir transporte privado para ir de ${items[0].origen} a ${items[0].destino} frente a alternativas públicas (aprox. 120-150 palabras).
+- <h2> Qué esperar de tu viaje entre ${items[0].origen} y ${items[0].destino} + <p>: Máximo 2 párrafos describiendo la experiencia a bordo, recogida puntual y llegada al punto exacto (aprox. 100-120 palabras).
+- <h2> Consejos para tu ruta + <ul><li>: 2-3 tips breves para el viaje (duración estimada, equipaje, recomendaciones) (aprox. 60-80 palabras).
+- <h2> Reserva tu traslado de ${items[0].origen} a ${items[0].destino} + <p>: 1 párrafo final con CTA (aprox. 40-50 palabras).
+
+---
+
+## AUTOCONTROL DE CARACTERES
+Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) del meta_title, meta_description y resena_breve. Si superan por 1 solo carácter el límite máximo, reescríbelos.
+
+---
+
+## FORMATO DE SALIDA (OBLIGATORIO)
+Responde ÚNICAMENTE con JSON válido, sin markdown:
+{"slug": "...", "palabra_ruta": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "resena_breve": "...", "texto_descripcion": "..."}`;
 }
 
 
