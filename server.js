@@ -9034,6 +9034,7 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
     SECCIONES_TRASLADO,
     nombreMarca,
     fotoCabeceraId,
+    palabrasPaginas: PALABRAS_PAGINAS[lang] || {},
     tieneImagenDefecto: !!globales.imagen_og_defecto,
     twitterActivo: !!globales.twitter_activo,
     schemaTaxiService,
