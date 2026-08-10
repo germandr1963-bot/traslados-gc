@@ -9022,7 +9022,10 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
   res.render('traslado', {
     seo: Object.assign({}, seo, { origen: origenTraducido, destino: destinoTraducido }),
     precios: precios.rows.map(function(p) {
-      return Object.assign({}, p, { nombre: mapaCategorias[p.nombre] || p.nombre });
+      return Object.assign({}, p, {
+        nombre: mapaCategorias[p.nombre] || p.nombre,
+        capacidad_maletas: mapaCategorias[p.capacidad_maletas] || p.capacidad_maletas
+      });
     }),
     alternates: alternates.rows,
     relacionadas: relacionadas.rows.map(function(r) {
