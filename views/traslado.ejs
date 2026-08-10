@@ -84,6 +84,7 @@
   max-width: 900px;
   margin: 0 auto;
   width: 100%;
+  text-align: center;
 }
 .nav-superior {
   display: flex;
@@ -111,7 +112,7 @@
   font-size: 15px;
   opacity: 0.85;
   max-width: 440px;
-  margin-bottom: 28px;
+  margin: 0 auto 28px;
 }
 .boton-reservar {
   display: inline-block;
@@ -273,7 +274,7 @@ footer {
   <div class="hero-overlay">
     <div class="etiqueta-ruta titular"><%= t('etiqueta_categoria_ruta') %></div>
     <h1 class="titulo-ruta titular">
-      <%= seo.origen %> <span class="acento">→</span><br><%= seo.destino %>
+      <%= seo.origen %> <span class="acento">→</span> <%= seo.destino %>
     </h1>
     <p class="subtitulo-ruta"><%= t('subtitulo_hero') %></p>
     <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="boton-reservar"><%= t('boton_solicitar_traslado') %></a>
