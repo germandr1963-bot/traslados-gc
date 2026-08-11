@@ -8904,7 +8904,169 @@ app.get('/admin/seo/salud', requireAdmin, asyncHandler(async (req, res) => {
   res.json(stats);
 }));
 
-// ─── Páginas públicas por ruta (SSR) ─────────────────────────────────────────
+// ─── API pública: datos de una ruta para traslado.html ───────────────────────
+// Devuelve en JSON todo lo necesario para pintar la página de ruta.
+// La llama traslado.html desde el navegador, igual que destino-pagina.html
+// llama a /api/destino-publico.
+app.get('/api/ruta-publica/:lang/:slug', asyncHandler(async (req, res) => {
+  const { lang, slug } = req.params;
+
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).json({ error: 'Idioma no válido' });
+  }
+
+  const seoResult = await pool.query(
+    `SELECT rss.*, r.origen, r.destino, r.id AS ruta_id, (r.imagen_og IS NOT NULL) AS tiene_imagen
+     FROM route_seo_settings rss
+     JOIN rutas r ON r.id = rss.route_id
+     WHERE rss.lang_code = $1 AND rss.slug_url = $2 AND rss.activo = TRUE AND r.activa = TRUE`,
+    [lang, slug]
+  );
+
+  if (seoResult.rows.length === 0) {
+    return res.status(404).json({ error: 'Ruta no encontrada' });
+  }
+
+  const seo = seoResult.rows[0];
+
+  const precios = await pool.query(
+    `SELECT cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, rp.precio
+     FROM rutas_precios rp
+     JOIN categorias_vehiculos cv ON cv.id = rp.categoria_id
+     WHERE rp.ruta_id = $1 AND cv.disponible = TRUE
+     ORDER BY cv.orden, cv.nombre`,
+    [seo.ruta_id]
+  );
+
+  const alternates = await pool.query(
+    `SELECT lang_code, slug_url FROM route_seo_settings
+     WHERE route_id = $1 AND activo = TRUE`,
+    [seo.ruta_id]
+  );
+
+  const ajustesGlobales = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
+  const globales = ajustesGlobales.rows[0] || { nombre_marca: 'Traslados · GC', imagen_og_defecto: null, twitter_activo: false };
+  const nombreMarca = globales.nombre_marca || 'Traslados · GC';
+
+  const relacionadas = await pool.query(
+    `SELECT r.destino, rss.slug_url
+     FROM rutas r
+     JOIN route_seo_settings rss ON rss.route_id = r.id
+     WHERE r.origen = $1 AND r.id != $2 AND r.activa = TRUE
+       AND rss.lang_code = $3 AND rss.activo = TRUE
+     ORDER BY RANDOM()
+     LIMIT 4`,
+    [seo.origen, seo.ruta_id, lang]
+  );
+
+  // Traducciones de destinos
+  const destinosTrad = await pool.query(
+    `SELECT d.nombre AS nombre_es, dt.nombre AS nombre_traducido
+     FROM destinos d
+     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1`,
+    [lang]
+  );
+  const mapaDestinos = {};
+  for (const d of destinosTrad.rows) {
+    mapaDestinos[d.nombre_es] = (d.nombre_traducido && d.nombre_traducido.trim()) ? d.nombre_traducido : d.nombre_es;
+  }
+
+  // Traducciones de categorías
+  const catsTrad = await pool.query(
+    `SELECT ti.texto_es, COALESCE(tit.texto, ti.texto_es) AS nombre_traducido
+     FROM textos_interfaz ti
+     LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+     WHERE ti.modulo = 'Categorías de vehículo'`,
+    [lang]
+  );
+  const mapaCategorias = {};
+  for (const c of catsTrad.rows) {
+    mapaCategorias[c.texto_es] = c.nombre_traducido;
+  }
+
+  const origenTraducido  = mapaDestinos[seo.origen]  || seo.origen;
+  const destinoTraducido = mapaDestinos[seo.destino] || seo.destino;
+
+  const fotosRuta = await pool.query(
+    `SELECT rf.id, COALESCE(rfa.alt_texto, rf.alt_texto, '') AS alt_texto
+     FROM rutas_fotos rf
+     LEFT JOIN rutas_fotos_alt rfa ON rfa.foto_id = rf.id AND rfa.lang_code = $2
+     WHERE rf.ruta_id = $1 AND rf.es_principal = FALSE
+     ORDER BY rf.orden, rf.id`,
+    [seo.ruta_id, lang]
+  );
+
+  const fotoCabecera = await pool.query(
+    'SELECT id FROM rutas_fotos WHERE ruta_id = $1 AND es_principal = TRUE LIMIT 1',
+    [seo.ruta_id]
+  );
+  const fotoCabeceraId = fotoCabecera.rows.length > 0 ? fotoCabecera.rows[0].id : null;
+
+  const urlActual = BASE_URL + '/' + lang + '/' + (SECCIONES_TRASLADO[lang] || 'traslado') + '/' + slug;
+  const { schemaTaxiService, schemaBreadcrumb } = construirSchemaRuta(
+    Object.assign({}, seo, { origen: origenTraducido, destino: destinoTraducido }),
+    precios.rows, nombreMarca, globales, BASE_URL, urlActual
+  );
+
+  // Textos de interfaz para la página de ruta
+  const t = function (clave) { return obtenerTexto(clave, lang); };
+
+  res.json({
+    seo: Object.assign({}, seo, { origen: origenTraducido, destino: destinoTraducido }),
+    precios: precios.rows.map(function(p) {
+      return Object.assign({}, p, {
+        nombre:            mapaCategorias[p.nombre]            || p.nombre,
+        capacidad_maletas: mapaCategorias[p.capacidad_maletas] || p.capacidad_maletas
+      });
+    }),
+    alternates:  alternates.rows,
+    relacionadas: relacionadas.rows.map(function(r) {
+      return { destino: mapaDestinos[r.destino] || r.destino, slug_url: r.slug_url };
+    }),
+    fotos:        fotosRuta.rows,
+    fotoCabeceraId,
+    nombreMarca,
+    BASE_URL,
+    tieneImagenDefecto: !!globales.imagen_og_defecto,
+    twitterActivo:      !!globales.twitter_activo,
+    schemaTaxiService,
+    schemaBreadcrumb,
+    palabrasPaginas: PALABRAS_PAGINAS[lang] || {},
+    seccionTraslado: SECCIONES_TRASLADO[lang] || 'traslado',
+    textos: {
+      titulo_tarifas:            t('titulo_tarifas'),
+      tabla_columna_categoria:   t('tabla_columna_categoria'),
+      tabla_columna_pasajeros:   t('tabla_columna_pasajeros'),
+      tabla_columna_equipaje:    t('tabla_columna_equipaje'),
+      tabla_columna_precio:      t('tabla_columna_precio'),
+      sufijo_pax:                t('sufijo_pax'),
+      badge_precio_fijo:         t('badge_precio_fijo'),
+      texto_a_consultar:         t('texto_a_consultar'),
+      texto_consulta_disponibilidad: t('texto_consulta_disponibilidad'),
+      boton_solicitar_traslado:  t('boton_solicitar_traslado'),
+      subtitulo_hero:            t('subtitulo_hero'),
+      titulo_como_funciona:      t('titulo_como_funciona'),
+      paso1_titulo:              t('paso1_titulo'),
+      paso1_texto:               t('paso1_texto'),
+      paso2_titulo:              t('paso2_titulo'),
+      paso2_texto:               t('paso2_texto'),
+      paso3_titulo:              t('paso3_titulo'),
+      paso3_texto:               t('paso3_texto'),
+      titulo_rutas_relacionadas: t('titulo_rutas_relacionadas'),
+      nav_volver_rutas:          t('nav_volver_rutas'),
+      nav_contacto:              t('nav_contacto'),
+      home_footer_rutas:         t('home_footer_rutas'),
+      home_footer_destinos:      t('home_footer_destinos'),
+      home_footer_flota:         t('home_footer_flota'),
+      home_footer_contacto:      t('home_footer_contacto'),
+      home_footer_alta_choferes: t('home_footer_alta_choferes'),
+      home_footer_acceso_choferes: t('home_footer_acceso_choferes'),
+      home_footer_acceso_clientes: t('home_footer_acceso_clientes')
+    }
+  });
+}));
+
+// ─── Páginas públicas por ruta (HTML estático) ───────────────────────────────
 // URL: /:lang/traslado/:slug  (ej: /es/traslado/las-palmas-a-maspalomas)
 // El patrón de la URL solo exige 2 letras minúsculas — qué idiomas son
 // válidos de verdad se comprueba dentro contra la lista cargada de la base
@@ -9028,31 +9190,7 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
   );
   const fotoCabeceraId = fotoCabecera.rows.length > 0 ? fotoCabecera.rows[0].id : null;
 
-  res.render('traslado', {
-    seo: Object.assign({}, seo, { origen: origenTraducido, destino: destinoTraducido }),
-    precios: precios.rows.map(function(p) {
-      return Object.assign({}, p, {
-        nombre: mapaCategorias[p.nombre] || p.nombre,
-        capacidad_maletas: mapaCategorias[p.capacidad_maletas] || p.capacidad_maletas
-      });
-    }),
-    alternates: alternates.rows,
-    relacionadas: relacionadas.rows.map(function(r) {
-      return { destino: mapaDestinos[r.destino] || r.destino, slug_url: r.slug_url };
-    }),
-    t,
-    lang,
-    BASE_URL,
-    SECCIONES_TRASLADO,
-    nombreMarca,
-    fotoCabeceraId,
-    fotosRuta: fotosRuta.rows,
-    palabrasPaginas: PALABRAS_PAGINAS[lang] || {},
-    tieneImagenDefecto: !!globales.imagen_og_defecto,
-    twitterActivo: !!globales.twitter_activo,
-    schemaTaxiService,
-    schemaBreadcrumb
-  });
+  res.sendFile(path.join(__dirname, 'public', 'traslado.html'));
 }));
 
 
