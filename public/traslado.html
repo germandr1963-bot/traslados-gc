@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="page-title">Traslados GC</title>
+  <meta id="meta-description" name="description" content="">
+  <meta id="meta-robots" name="robots" content="index,follow">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta id="og-site-name" property="og:site_name" content="Traslados GC">
+  <meta id="og-title" property="og:title" content="">
+  <meta id="og-description" property="og:description" content="">
+  <meta id="og-url" property="og:url" content="">
+  <meta id="og-image" property="og:image" content="">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter -->
+  <meta id="tw-card" name="twitter:card" content="summary_large_image">
+  <meta id="tw-title" name="twitter:title" content="">
+  <meta id="tw-description" name="twitter:description" content="">
+  <meta id="tw-image" name="twitter:image" content="">
+
+  <!-- Canonical -->
+  <link id="link-canonical" rel="canonical" href="">
+
+  <!-- Hreflang: se inyectan desde JS -->
+
+  <!-- Schema.org: se inyectan desde JS -->
+
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/estilos.css">
+  <style>
+    body { background: var(--gris-fondo); color: var(--texto-oscuro); min-height: 100vh; }
+
+    /* ── Cinta superior — idéntica a destino-pagina.html ── */
+    header.app {
+      background: var(--charcoal);
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      border-bottom: 3px solid var(--terracota);
+    }
+    header.app .marca {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--texto-claro);
+      letter-spacing: 2px;
+      text-decoration: none;
+      text-align: center;
+      justify-self: center;
+    }
+    header.app a.nav { color: rgba(255,255,255,0.65); text-decoration: none; font-size: 14px; }
+    header.app a.nav:hover { color: #fff; }
+    header.app a.nav.izquierda { justify-self: start; }
+    header.app .derecha-header { justify-self: end; }
+
+    /* ── Contenido ── */
+    .contenido { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+    /* ── Foto de cabecera ── */
+    .foto-cabecera {
+      width: 100%;
+      height: 400px;
+      background: var(--charcoal);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+    .foto-cabecera img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* ── Título ── */
+    h1.titulo-ruta {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: clamp(32px, 6vw, 52px);
+      margin-bottom: 16px;
+      line-height: 1.1;
+      text-align: center;
+    }
+    h1.titulo-ruta .acento { color: var(--terracota); }
+
+    /* ── Subtítulo y botón ── */
+    .subtitulo-ruta { font-size: 15px; color: var(--texto-muted); text-align: center; margin-bottom: 24px; }
+    .boton-reservar {
+      display: inline-block;
+      background: var(--terracota);
+      color: white;
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 20px;
+      letter-spacing: 1px;
+      padding: 16px 40px;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .boton-reservar:hover { opacity: 0.88; }
+
+    /* ── Secciones ── */
+    .seccion { margin: 40px 0; padding: 0; }
+    .seccion > h2 {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-weight: 500;
+      font-size: 24px;
+      margin-bottom: 18px;
+      color: var(--texto-oscuro);
+    }
+
+    /* ── Tabla de tarifas ── */
+    .tabla-tarifas { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .tabla-tarifas th {
+      background: var(--charcoal);
+      color: var(--texto-claro);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 500;
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .tabla-tarifas td { padding: 10px 14px; border-bottom: 1px solid var(--gris-borde); color: var(--texto-oscuro); }
+    .tabla-tarifas th:nth-child(4),
+    .tabla-tarifas td:nth-child(4) { text-align: right; }
+    .precio-fijo { font-weight: 500; font-size: 16px; color: var(--texto-oscuro); }
+    .badge-fijo {
+      background: var(--oro);
+      color: var(--oro-texto);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 9px;
+      border-radius: 10px;
+      margin-left: 8px;
+    }
+    .consultar { color: var(--texto-muted); font-style: italic; }
+
+    /* ── Tres columnas (cómo funciona, rutas relacionadas) ── */
+    .tres-columnas {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+    }
+
+    /* ── Texto descriptivo ── */
+    .texto-ruta {
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--texto-oscuro);
+      margin-bottom: 48px;
+    }
+    .texto-ruta h2 {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 24px;
+      font-weight: 500;
+      margin: 28px 0 10px;
+      color: var(--texto-oscuro);
+    }
+    .texto-ruta h3 {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 20px;
+      font-weight: 500;
+      margin: 22px 0 8px;
+      color: var(--texto-oscuro);
+    }
+    .texto-ruta p  { margin: 0 0 14px; }
+    .texto-ruta ul { padding-left: 20px; margin: 0 0 14px; }
+    .texto-ruta li { margin-bottom: 6px; }
+
+    /* ── Grid de fotos secundarias ── */
+    .fotos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 48px; }
+    .foto-item { height: 220px; background: var(--charcoal); border-radius: 10px; overflow: hidden; }
+    .foto-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* ── Footer ── */
+    footer { text-align: center; padding: 30px; color: var(--texto-muted); font-size: 13px; }
+    footer a { color: var(--texto-muted); text-decoration: none; margin: 0 12px; font-size: 13px; }
+    footer a:hover { color: var(--texto-oscuro); }
+    .footer-links { margin-bottom: 12px; }
+
+    /* ── Estado cargando / error ── */
+    .cargando { text-align: center; color: var(--texto-muted); font-size: 14px; padding: 80px 0; }
+    .error-msg { text-align: center; color: var(--texto-muted); font-size: 14px; padding: 80px 0; }
+
+    /* ── Responsive móvil ── */
+    @media (max-width: 560px) {
+      header.app { padding: 12px 14px; }
+      header.app .marca { font-size: 19px; letter-spacing: 1px; }
+      header.app a.nav { font-size: 12px; }
+      .contenido { padding: 24px 16px 60px; }
+      .foto-cabecera { height: 220px; border-radius: 8px; }
+      h1.titulo-ruta { font-size: clamp(24px, 7vw, 36px); }
+      .boton-reservar { display: block; text-align: center; padding: 14px 20px; font-size: 17px; }
+      .seccion { padding: 0 14px; margin: 28px auto; }
+      .fotos-grid { grid-template-columns: 1fr; }
+      .foto-item { height: 200px; }
+      .tabla-tarifas { font-size: 13px; }
+      .tabla-tarifas th, .tabla-tarifas td { padding: 8px 8px; }
+      .tabla-tarifas th:nth-child(3), .tabla-tarifas td:nth-child(3) { display: none; }
+      .tres-columnas { grid-template-columns: 1fr; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="app">
+    <a id="link-volver-rutas" href="/rutas" class="nav izquierda">← Rutas</a>
+    <a id="link-logo" href="/" class="marca">TRASLADOS · GC</a>
+    <div class="derecha-header">
+      <a id="link-contacto" href="/contacto" class="nav">Contacto</a>
+    </div>
+  </header>
+
+  <div class="contenido">
+    <div id="contenido-ruta">
+      <div class="cargando">⏳ Cargando...</div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-links">
+      <a id="footer-rutas"             href="/rutas">Rutas</a>
+      <a id="footer-destinos"          href="/destinos">Destinos</a>
+      <a id="footer-flota"             href="/flota">Flota</a>
+      <a id="footer-contacto"          href="/contacto">Contacto</a>
+      <a id="footer-alta-choferes"     href="/chofer/acceso/alta">Alta choferes</a>
+      <a id="footer-acceso-choferes"   href="/chofer/acceso">Acceso a choferes</a>
+      <a id="footer-acceso-clientes"   href="/mi-reserva">Acceso clientes</a>
+    </div>
+    <span id="footer-marca">Traslados · GC</span> — Gran Canaria
+  </footer>
+
+  <script>
+    // URL: /es/traslado/slug-de-la-ruta
+    //       [0] [1]  [2]       [3]
+    var partes = window.location.pathname.split('/');
+    var lang   = partes[1] || 'es';
+    var slug   = partes[3] || '';
+
+    fetch('/api/ruta-publica/' + lang + '/' + slug)
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (!d || d.error) {
+          document.getElementById('contenido-ruta').innerHTML =
+            '<div class="error-msg">Ruta no encontrada.</div>';
+          return;
+        }
+
+        var pp = d.palabrasPaginas;
+        var tx = d.textos;
+        var seo = d.seo;
+        var base = lang !== 'es' ? '/' + lang + '/' : '/';
+
+        // ── Meta tags y título ──────────────────────────────────────────────
+        document.getElementById('page-title').textContent =
+          seo.meta_title || (seo.origen + ' → ' + seo.destino + ' — ' + d.nombreMarca);
+
+        if (seo.meta_description) {
+          document.getElementById('meta-description').setAttribute('content', seo.meta_description);
+        }
+        document.getElementById('meta-robots').setAttribute('content', seo.robots_status || 'index,follow');
+
+        // Open Graph
+        document.getElementById('og-site-name').setAttribute('content', d.nombreMarca);
+        document.getElementById('og-title').setAttribute('content', seo.og_title || seo.meta_title || (seo.origen + ' → ' + seo.destino));
+        if (seo.og_description || seo.meta_description) {
+          document.getElementById('og-description').setAttribute('content', seo.og_description || seo.meta_description);
+        }
+        if (seo.canonical_url) {
+          document.getElementById('og-url').setAttribute('content', seo.canonical_url);
+          document.getElementById('link-canonical').setAttribute('href', seo.canonical_url);
+        }
+        if (seo.tiene_imagen) {
+          document.getElementById('og-image').setAttribute('content', d.BASE_URL + '/ruta-imagen/' + seo.ruta_id);
+          document.getElementById('tw-image').setAttribute('content', d.BASE_URL + '/ruta-imagen/' + seo.ruta_id);
+        } else if (d.tieneImagenDefecto) {
+          document.getElementById('og-image').setAttribute('content', d.BASE_URL + '/imagen-og-defecto');
+          document.getElementById('tw-image').setAttribute('content', d.BASE_URL + '/imagen-og-defecto');
+        }
+
+        // Twitter
+        if (d.twitterActivo) {
+          document.getElementById('tw-title').setAttribute('content', seo.og_title || seo.meta_title || (seo.origen + ' → ' + seo.destino));
+          if (seo.og_description || seo.meta_description) {
+            document.getElementById('tw-description').setAttribute('content', seo.og_description || seo.meta_description);
+          }
+        }
+
+        // Hreflang
+        var head = document.head;
+        d.alternates.forEach(function(alt) {
+          var link = document.createElement('link');
+          link.rel = 'alternate';
+          link.setAttribute('hreflang', alt.lang_code);
+          link.href = d.BASE_URL + '/' + alt.lang_code + '/' + (d.seccionTraslado || 'traslado') + '/' + alt.slug_url;
+          head.appendChild(link);
+        });
+        var linkDefault = document.createElement('link');
+        linkDefault.rel = 'alternate';
+        linkDefault.setAttribute('hreflang', 'x-default');
+        linkDefault.href = d.BASE_URL + '/es/' + (d.seccionTraslado || 'traslado') + '/' + seo.slug_url;
+        head.appendChild(linkDefault);
+
+        // Schema.org
+        var s1 = document.createElement('script');
+        s1.type = 'application/ld+json';
+        s1.textContent = JSON.stringify(d.schemaTaxiService);
+        head.appendChild(s1);
+        var s2 = document.createElement('script');
+        s2.type = 'application/ld+json';
+        s2.textContent = JSON.stringify(d.schemaBreadcrumb);
+        head.appendChild(s2);
+
+        // ── Cabecera y footer ───────────────────────────────────────────────
+        document.getElementById('link-logo').href = base;
+        document.getElementById('link-logo').textContent = d.nombreMarca;
+        document.getElementById('link-volver-rutas').href = base + (pp.rutas || 'rutas');
+        document.getElementById('link-volver-rutas').textContent = tx.nav_volver_rutas || '← Rutas';
+        document.getElementById('link-contacto').href = base + (pp.contacto || 'contacto');
+        document.getElementById('link-contacto').textContent = tx.nav_contacto || 'Contacto';
+
+        document.getElementById('footer-rutas').href    = base + (pp.rutas    || 'rutas');
+        document.getElementById('footer-destinos').href = base + (pp.destinos || 'destinos');
+        document.getElementById('footer-flota').href    = base + (pp.flota    || 'flota');
+        document.getElementById('footer-contacto').href = base + (pp.contacto || 'contacto');
+        document.getElementById('footer-acceso-clientes').href = base + (pp['mi-reserva'] || 'mi-reserva');
+
+        if (tx.home_footer_rutas)    document.getElementById('footer-rutas').textContent    = tx.home_footer_rutas;
+        if (tx.home_footer_destinos) document.getElementById('footer-destinos').textContent = tx.home_footer_destinos;
+        if (tx.home_footer_flota)    document.getElementById('footer-flota').textContent    = tx.home_footer_flota;
+        if (tx.home_footer_contacto) document.getElementById('footer-contacto').textContent = tx.home_footer_contacto;
+        if (tx.home_footer_acceso_clientes) document.getElementById('footer-acceso-clientes').textContent = tx.home_footer_acceso_clientes;
+        if (tx.home_footer_alta_choferes)   document.getElementById('footer-alta-choferes').textContent   = tx.home_footer_alta_choferes;
+        if (tx.home_footer_acceso_choferes) document.getElementById('footer-acceso-choferes').textContent = tx.home_footer_acceso_choferes;
+        if (d.nombreMarca) document.getElementById('footer-marca').textContent = d.nombreMarca;
+
+        // Alta/acceso choferes: solo en español
+        if (lang !== 'es') {
+          document.getElementById('footer-alta-choferes').style.display   = 'none';
+          document.getElementById('footer-acceso-choferes').style.display = 'none';
+        }
+
+        // ── Contenido principal ─────────────────────────────────────────────
+        var html = '';
+
+        // Foto de cabecera
+        html += '<div class="foto-cabecera">';
+        if (d.fotoCabeceraId) {
+          html += '<img src="/ruta-foto/' + d.fotoCabeceraId + '" alt="' + esc(seo.origen) + ' → ' + esc(seo.destino) + '">';
+        }
+        html += '</div>';
+
+        // Título
+        html += '<h1 class="titulo-ruta">' + esc(seo.origen) + ' <span class="acento">→</span> ' + esc(seo.destino) + '</h1>';
+
+        // Subtítulo
+        html += '<p class="subtitulo-ruta">' + esc(tx.subtitulo_hero || '') + '</p>';
+
+        // Tabla de tarifas
+        html += '<div class="seccion">';
+        html += '<h2>' + esc(tx.titulo_tarifas || '') + '</h2>';
+        if (d.precios && d.precios.length > 0) {
+          html += '<table class="tabla-tarifas"><thead><tr>';
+          html += '<th>' + esc(tx.tabla_columna_categoria  || '') + '</th>';
+          html += '<th>' + esc(tx.tabla_columna_pasajeros  || '') + '</th>';
+          html += '<th>' + esc(tx.tabla_columna_equipaje   || '') + '</th>';
+          html += '<th>' + esc(tx.tabla_columna_precio     || '') + '</th>';
+          html += '</tr></thead><tbody>';
+          d.precios.forEach(function(p) {
+            html += '<tr>';
+            html += '<td><strong>' + esc(p.nombre) + '</strong></td>';
+            html += '<td>' + esc(p.capacidad_pasajeros) + ' ' + esc(tx.sufijo_pax || '') + '</td>';
+            html += '<td>' + esc(p.capacidad_maletas) + '</td>';
+            html += '<td>';
+            if (p.precio) {
+              html += '<span class="precio-fijo">' + Number(p.precio).toFixed(0) + ' €</span>';
+              html += '<span class="badge-fijo">' + esc(tx.badge_precio_fijo || '') + '</span>';
+            } else {
+              html += '<span class="consultar">' + esc(tx.texto_a_consultar || '') + '</span>';
+            }
+            html += '</td></tr>';
+          });
+          html += '</tbody></table>';
+        } else {
+          html += '<p style="color:var(--texto-muted);font-size:14px;">' + esc(tx.texto_consulta_disponibilidad || '') + '</p>';
+        }
+        var urlInicio = lang !== 'es' ? '/' + lang + '/' : '/';
+        html += '<p style="margin-top:20px;"><a href="' + urlInicio + '" class="boton-reservar">' + esc(tx.boton_solicitar_traslado || '') + '</a></p>';
+        html += '</div>';
+
+        // Cómo funciona
+        html += '<div class="seccion">';
+        html += '<h2>' + esc(tx.titulo_como_funciona || '') + '</h2>';
+        html += '<div class="tres-columnas">';
+        html += '<div class="tarjeta"><strong>' + esc(tx.paso1_titulo || '') + '</strong><p style="margin-top:8px;font-size:14px;color:var(--texto-muted);">' + esc(tx.paso1_texto || '') + '</p></div>';
+        html += '<div class="tarjeta"><strong>' + esc(tx.paso2_titulo || '') + '</strong><p style="margin-top:8px;font-size:14px;color:var(--texto-muted);">' + esc(tx.paso2_texto || '') + '</p></div>';
+        html += '<div class="tarjeta"><strong>' + esc(tx.paso3_titulo || '') + '</strong><p style="margin-top:8px;font-size:14px;color:var(--texto-muted);">' + esc(tx.paso3_texto || '') + '</p></div>';
+        html += '</div></div>';
+
+        // Rutas relacionadas
+        if (d.relacionadas && d.relacionadas.length > 0) {
+          html += '<div class="seccion">';
+          html += '<h2>' + esc(tx.titulo_rutas_relacionadas || '') + ' ' + esc(seo.origen) + '</h2>';
+          html += '<div class="tres-columnas">';
+          d.relacionadas.forEach(function(r) {
+            html += '<a href="/' + lang + '/' + d.seccionTraslado + '/' + r.slug_url + '" class="tarjeta" style="text-decoration:none;color:inherit;display:block;">';
+            html += '<strong>' + esc(seo.origen) + ' → ' + esc(r.destino) + '</strong>';
+            html += '</a>';
+          });
+          html += '</div></div>';
+        }
+
+        // Texto descriptivo (innerHTML: contiene HTML generado por IA)
+        if (seo.texto_descripcion) {
+          html += '<div class="seccion"><div class="texto-ruta">' + seo.texto_descripcion + '</div></div>';
+        }
+
+        // Grid de fotos secundarias
+        if (d.fotos && d.fotos.length > 0) {
+          html += '<div class="seccion"><div class="fotos-grid">';
+          d.fotos.forEach(function(f) {
+            html += '<div class="foto-item"><img src="/ruta-foto/' + f.id + '" alt="' + esc(f.alt_texto || '') + '"></div>';
+          });
+          html += '</div></div>';
+        }
+
+        document.getElementById('contenido-ruta').innerHTML = html;
+      })
+      .catch(function() {
+        document.getElementById('contenido-ruta').innerHTML =
+          '<div class="error-msg">No se pudo cargar la ruta.</div>';
+      });
+
+    // Escapa caracteres HTML para uso en atributos y texto plano
+    function esc(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>
