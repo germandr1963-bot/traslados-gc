@@ -728,6 +728,51 @@ async function initSchema() {
     }
   }
 
+  // ─── Textos de la página de flota (traducibles desde Idiomas) ───────────
+  const TEXTOS_FLOTA = [
+    { clave: 'flota_page_title',            contexto: 'Título de la pestaña del navegador en la página de flota', es: 'Flota — Traslados GC' },
+    { clave: 'flota_h1',                    contexto: 'Título principal H1 de la página', es: 'Flota' },
+    { clave: 'flota_subtitulo',             contexto: 'Párrafo de subtítulo bajo el H1', es: 'Vehículos modernos, 100% inspeccionados, adaptados a tus necesidades de espacio y comprometidos con la conservación natural de nuestra isla. Tu viaje desde el Aeropuerto de Gran Canaria (LPA) con la máxima seguridad.' },
+    { clave: 'flota_badge_licencias',       contexto: 'Badge 1 de los 4 que aparecen bajo el subtítulo', es: 'Licencias VT / Taxi Oficial' },
+    { clave: 'flota_badge_eco',             contexto: 'Badge 2 de los 4 que aparecen bajo el subtítulo', es: 'Opción Eco / Híbridos' },
+    { clave: 'flota_badge_pmr',             contexto: 'Badge 3 de los 4 que aparecen bajo el subtítulo', es: 'EuroTaxi Adaptado (PMR)' },
+    { clave: 'flota_badge_deportivo',       contexto: 'Badge 4 de los 4 que aparecen bajo el subtítulo', es: 'Espacio Surf, Bici & Golf' },
+    { clave: 'flota_selector_titulo',       contexto: 'Título del bloque asistente de selección de vehículo', es: 'Asistente de Selección de Vehículo' },
+    { clave: 'flota_selector_bajada',       contexto: 'Frase en negrita bajo el título del selector', es: '¿Qué vehículo necesitas?' },
+    { clave: 'flota_selector_descripcion',  contexto: 'Texto descriptivo del selector, bajo la frase en negrita', es: 'Selecciona tu equipaje y pasajeros y te recomendamos la categoría ideal' },
+    { clave: 'flota_selector_label_pax',    contexto: 'Etiqueta del desplegable de pasajeros en el selector', es: 'Pasajeros' },
+    { clave: 'flota_selector_label_mal',    contexto: 'Etiqueta del desplegable de maletas en el selector', es: 'Maletas grandes' },
+    { clave: 'flota_selector_label_esp',    contexto: 'Etiqueta del desplegable de equipaje especial en el selector', es: 'Equipaje especial' },
+    { clave: 'flota_selector_btn',          contexto: 'Texto del botón del asistente de selección', es: 'Ver vehículo recomendado' },
+    { clave: 'flota_selector_intro',        contexto: 'Texto introductorio que aparece en el bloque de resultados del selector', es: 'Según tus parámetros de búsqueda, los vehículos recomendados pueden ser estos:' },
+    { clave: 'flota_catalogo_cargando',     contexto: 'Texto que aparece mientras se cargan las categorías de vehículos', es: 'Cargando vehículos...' },
+    { clave: 'flota_catalogo_vacio',        contexto: 'Texto que aparece si no hay categorías activas en la flota', es: 'Próximamente más vehículos disponibles.' },
+    { clave: 'flota_catalogo_error',        contexto: 'Texto que aparece si hay un error al cargar las categorías', es: 'No se pudieron cargar los vehículos.' },
+    { clave: 'flota_catalogo_btn_reservar', contexto: 'Texto del botón de reserva en cada tarjeta de categoría', es: 'Reservar' },
+    { clave: 'flota_eco_titulo',            contexto: 'Título del bloque verde de compromiso con la Biosfera', es: '🌱 Nuestro Compromiso con la Biosfera de Gran Canaria' },
+    { clave: 'flota_eco_texto',             contexto: 'Texto del bloque verde de compromiso con la Biosfera', es: 'Gran Canaria es Reserva de la Biosfera por la UNESCO. Toda nuestra flota cumple con las normativas europeas más estrictas sobre emisiones (Euro 6d e Híbridos). Optimizamos nuestras rutas mediante sistemas de navegación inteligente para reducir trayectos en vacío, recortando hasta un 20% el consumo de combustible respecto al servicio tradicional.' },
+    { clave: 'flota_faq_titulo',            contexto: 'Título de la sección de preguntas frecuentes', es: 'Preguntas Frecuentes sobre la Flota' },
+    { clave: 'flota_faq1_p',               contexto: 'Pregunta 1 del FAQ de flota', es: '¿Cómo puedo garantizar que me asignen un vehículo con espacio para mi bicicleta o tabla de surf?' },
+    { clave: 'flota_faq1_r',               contexto: 'Respuesta a la pregunta 1 del FAQ de flota', es: 'Durante el proceso de reserva, selecciona la opción "Sports & Outdoor" e indica en las notas el número de cajas de bicicleta o fundas de surf. Te asignaremos automáticamente un vehículo acondicionado.' },
+    { clave: 'flota_faq2_p',               contexto: 'Pregunta 2 del FAQ de flota', es: '¿Tienen costo adicional las sillas de bebé o elevadores infantiles?' },
+    { clave: 'flota_faq2_r',               contexto: 'Respuesta a la pregunta 2 del FAQ de flota', es: 'No, las sillas homologadas para bebés y niños son totalmente gratuitas. Solo debes solicitarla al hacer tu reserva indicando la edad del menor.' },
+    { clave: 'flota_faq3_p',               contexto: 'Pregunta 3 del FAQ de flota', es: '¿El EuroTaxi permite viajar en la misma silla de ruedas sin desmontarla?' },
+    { clave: 'flota_faq3_r',               contexto: 'Respuesta a la pregunta 3 del FAQ de flota', es: 'Sí, nuestros EuroTaxis cuentan con rampas antideslizantes de fácil acceso y un sistema de anclaje de 4 puntos que asegura la silla de ruedas directamente al chasis del vehículo.' },
+    { clave: 'flota_faq4_p',               contexto: 'Pregunta 4 del FAQ de flota', es: '¿Puedo transportar mi bicicleta o tabla de surf?' },
+    { clave: 'flota_faq4_r',               contexto: 'Respuesta a la pregunta 4 del FAQ de flota', es: 'Al hacer tu reserva, indícanos en las notas el tipo de equipaje deportivo (caja de bicicleta, funda de surf, bolsa de golf) y te asignaremos un vehículo con espacio adecuado para transportarlo con seguridad.' },
+    { clave: 'flota_faq5_p',               contexto: 'Pregunta 5 del FAQ de flota', es: '¿Aceptan pago con tarjeta de crédito?' },
+    { clave: 'flota_faq5_r',               contexto: 'Respuesta a la pregunta 5 del FAQ de flota', es: 'Sí, todos los vehículos están equipados con datáfono para aceptar pagos con Visa, Mastercard, Maestro, Apple Pay y Google Pay.' },
+  ];
+
+  for (const t of TEXTOS_FLOTA) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Página de flota', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de flota', contexto = $2, texto_es = $3`,
+      [t.clave, t.contexto, t.es]
+    );
+  }
+
   // ─── Textos de la página de reserva (traducibles desde Idiomas) ──────────
   // Los textos que la página de reserva clona de la portada (buscador de rutas,
   // modal de cotización, tarjeta de precio) NO se duplican aquí: en la versión
