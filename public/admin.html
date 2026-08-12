@@ -1794,7 +1794,11 @@ function formularioCategoria(cat) {
     '<label class="etiqueta">Bajada de bandera diurna (€, 6:00-22:00)</label>' +
     '<input class="campo" id="cat-bajada-diurna" type="number" step="0.01" min="0" value="' + Number(cat.bajada_diurna || 0).toFixed(2) + '" style="margin-bottom:10px">' +
     '<label class="etiqueta">Bajada de bandera nocturna (€, 22:00-6:00)</label>' +
-    '<input class="campo" id="cat-bajada-nocturna" type="number" step="0.01" min="0" value="' + Number(cat.bajada_nocturna || 0).toFixed(2) + '" style="margin-bottom:10px">';
+    '<input class="campo" id="cat-bajada-nocturna" type="number" step="0.01" min="0" value="' + Number(cat.bajada_nocturna || 0).toFixed(2) + '" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Descripción larga (texto para la página de flota)</label>' +
+    '<textarea class="campo" id="cat-descripcion-larga" rows="4" style="margin-bottom:10px;resize:vertical">' + escapar(cat.descripcion_larga || '') + '</textarea>' +
+    '<label class="etiqueta">Características (una por línea, se muestran con ✓)</label>' +
+    '<textarea class="campo" id="cat-caracteristicas" rows="4" style="margin-bottom:10px;resize:vertical">' + escapar(cat.caracteristicas || '') + '</textarea>';
 }
 
 function editarCategoria(id) {
@@ -1832,7 +1836,9 @@ function guardarCategoria(id) {
     limite_sillas: document.getElementById('cat-sillas').value,
     descripcion: document.getElementById('cat-descripcion').value,
     bajada_diurna: document.getElementById('cat-bajada-diurna').value,
-    bajada_nocturna: document.getElementById('cat-bajada-nocturna').value
+    bajada_nocturna: document.getElementById('cat-bajada-nocturna').value,
+    descripcion_larga: document.getElementById('cat-descripcion-larga').value,
+    caracteristicas: document.getElementById('cat-caracteristicas').value
   };
   var url = id ? '/admin/categorias/' + id + '/editar' : '/admin/categorias';
   fetch(url, {
