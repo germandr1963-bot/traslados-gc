@@ -2543,18 +2543,11 @@ app.get('/api/extras-publicos', asyncHandler(async (req, res) => {
 }));
 
 app.get('/api/extras-flota', asyncHandler(async (req, res) => {
-  // Devuelve extras aprobados (gratis o pago) por al menos un conductor activo
+  // Devuelve extras aprobados (gratis o pago) por al menos un conductor aprobado
+  // Incluye las categoria_id de los conductores que aprueban cada extra
   const result = await pool.query(`
-    SELECT DISTINCT e.id, e.nombre, e.precio, e.bloque, e.orden,
-      CASE
-        WHEN EXISTS (
-          SELECT 1 FROM conductor_extras ce2
-          JOIN conductores c2 ON c2.id = ce2.conductor_id
-          WHERE ce2.extra_id = e.id AND ce2.estado = 'gratis' AND c2.estado = 'aprobado'
-        ) THEN 'gratis'
-        ELSE 'pago'
-      END AS disponibilidad,
-      COUNT(ce.conductor_id) AS num_conductores
+    SELECT e.id, e.nombre, e.bloque, e.orden,
+      array_agg(DISTINCT c.categoria_id) FILTER (WHERE c.categoria_id IS NOT NULL) AS categorias
     FROM extras e
     JOIN conductor_extras ce ON ce.extra_id = e.id
     JOIN conductores c ON c.id = ce.conductor_id
@@ -2562,7 +2555,7 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
       AND e.depende_chofer = TRUE
       AND ce.estado IN ('gratis', 'pago')
       AND c.estado = 'aprobado'
-    GROUP BY e.id, e.nombre, e.precio, e.bloque, e.orden
+    GROUP BY e.id, e.nombre, e.bloque, e.orden
     ORDER BY e.bloque, e.orden, e.id
   `);
   res.json(result.rows);
