@@ -2542,6 +2542,32 @@ app.get('/api/extras-publicos', asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
+app.get('/api/extras-flota', asyncHandler(async (req, res) => {
+  // Devuelve extras aprobados (gratis o pago) por al menos un conductor activo
+  const result = await pool.query(`
+    SELECT DISTINCT e.id, e.nombre, e.precio, e.bloque, e.orden,
+      CASE
+        WHEN EXISTS (
+          SELECT 1 FROM conductor_extras ce2
+          JOIN conductores c2 ON c2.id = ce2.conductor_id
+          WHERE ce2.extra_id = e.id AND ce2.estado = 'gratis' AND c2.activo = TRUE
+        ) THEN 'gratis'
+        ELSE 'pago'
+      END AS disponibilidad,
+      COUNT(ce.conductor_id) AS num_conductores
+    FROM extras e
+    JOIN conductor_extras ce ON ce.extra_id = e.id
+    JOIN conductores c ON c.id = ce.conductor_id
+    WHERE e.activo = TRUE
+      AND e.depende_chofer = TRUE
+      AND ce.estado IN ('gratis', 'pago')
+      AND c.activo = TRUE
+    GROUP BY e.id, e.nombre, e.precio, e.bloque, e.orden
+    ORDER BY e.bloque, e.orden, e.id
+  `);
+  res.json(result.rows);
+}));
+
 app.get('/api/marcas-vehiculos', asyncHandler(async (req, res) => {
   const marcas = await pool.query('SELECT id, nombre FROM marcas_vehiculos ORDER BY nombre');
   const modelos = await pool.query('SELECT id, marca_id, nombre FROM modelos_vehiculos ORDER BY nombre');
