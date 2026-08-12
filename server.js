@@ -395,7 +395,8 @@ async function initSchema() {
       ADD COLUMN IF NOT EXISTS disponible BOOLEAN DEFAULT TRUE,
       ADD COLUMN IF NOT EXISTS bajada_diurna NUMERIC(10,2) DEFAULT 0,
       ADD COLUMN IF NOT EXISTS bajada_nocturna NUMERIC(10,2) DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS foto TEXT
+      ADD COLUMN IF NOT EXISTS foto TEXT,
+      ADD COLUMN IF NOT EXISTS en_flota BOOLEAN DEFAULT TRUE
   `);
 
   await pool.query(`
@@ -2436,6 +2437,16 @@ app.get('/api/categorias', asyncHandler(async (req, res) => {
     }
   }
 
+  res.json(result.rows);
+}));
+
+app.get('/api/flota', asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas, foto
+     FROM categorias_vehiculos
+     WHERE activa = TRUE AND en_flota = TRUE
+     ORDER BY orden, nombre`
+  );
   res.json(result.rows);
 }));
 
