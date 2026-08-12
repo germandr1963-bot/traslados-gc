@@ -155,11 +155,6 @@
           <label for="sel-especial">Equipaje especial</label>
           <select id="sel-especial">
             <option value="ninguno">Ninguno</option>
-            <option value="pmr">Silla de ruedas</option>
-            <option value="bici">Caja de bicicleta</option>
-            <option value="surf">Tabla de surf</option>
-            <option value="golf">Bolsa de golf</option>
-            <option value="bebe">Carrito de bebé</option>
           </select>
         </div>
       </div>
@@ -235,9 +230,40 @@
 }
 </script>
 <script>
-  // Cargar categorías desde /api/flota
+  // Lista blanca de extras que influyen en la elección de vehículo
+  var EXTRAS_SELECTOR = [
+    'Tabla de surf / bodyboard',
+    'Tabla de windsurf / kitesurf',
+    'Bicicleta',
+    'Esquís / Snowboard',
+    'Maleta extra grande adicional',
+    'Bulto voluminoso',
+    'Instrumento musical grande',
+    'Viajo con silla de ruedas eléctrica'
+  ];
+
   var categoriasFlota = [];
 
+  // Cargar extras aprobados por conductores y poblar el selector
+  fetch('/api/extras-flota')
+    .then(function(r) { return r.json(); })
+    .then(function(extras) {
+      var sel = document.getElementById('sel-especial');
+      var aptos = extras.filter(function(e) {
+        return EXTRAS_SELECTOR.indexOf(e.nombre) !== -1;
+      });
+      if (aptos.length > 0) {
+        aptos.forEach(function(e) {
+          var opt = document.createElement('option');
+          opt.value = e.id;
+          opt.textContent = e.nombre;
+          sel.appendChild(opt);
+        });
+      }
+    })
+    .catch(function() {});
+
+  // Cargar categorías desde /api/flota
   fetch('/api/flota')
     .then(function(r) { return r.json(); })
     .then(function(cats) {
@@ -293,11 +319,8 @@
 
     var aptas = [];
 
-    if (especial === 'pmr') {
-      // Para PMR mostramos todas — el cliente indica sus necesidades al reservar
-      aptas = ordenadas;
-    } else if (especial === 'bici' || especial === 'surf' || especial === 'golf' || especial === 'bebe') {
-      // Para equipaje especial mostramos todas
+    if (especial !== 'ninguno') {
+      // Con equipaje especial mostramos todas las categorías disponibles
       aptas = ordenadas;
     } else {
       // Filtrar por pasajeros y maletas
