@@ -288,7 +288,7 @@
           ? '<img src="' + c.foto + '" alt="' + c.nombre + '">'
           : '<span>Sin foto</span>';
         var clsFoto = c.foto ? 'tarjeta-cat-foto' : 'tarjeta-cat-foto sin-foto';
-        var desc = c.descripcion ? '<p style="font-style:italic;color:var(--texto-muted);font-size:13px;margin-bottom:8px;">' + c.descripcion + '</p>' : '';
+        var desc = c.descripcion ? '<p style="font-style:italic;font-weight:700;color:var(--texto-muted);font-size:15px;margin-bottom:8px;">' + c.descripcion + '</p>' : '';
         var descLarga = c.descripcion_larga ? '<p style="font-size:13px;color:var(--texto-oscuro);line-height:1.6;margin-bottom:8px;">' + c.descripcion_larga.replace(/\n/g, '<br>') + '</p>' : '';
         var caract = '';
         if (c.caracteristicas) {
