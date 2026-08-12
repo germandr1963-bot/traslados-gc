@@ -396,7 +396,9 @@ async function initSchema() {
       ADD COLUMN IF NOT EXISTS bajada_diurna NUMERIC(10,2) DEFAULT 0,
       ADD COLUMN IF NOT EXISTS bajada_nocturna NUMERIC(10,2) DEFAULT 0,
       ADD COLUMN IF NOT EXISTS foto TEXT,
-      ADD COLUMN IF NOT EXISTS en_flota BOOLEAN DEFAULT TRUE
+      ADD COLUMN IF NOT EXISTS en_flota BOOLEAN DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS descripcion_larga TEXT,
+      ADD COLUMN IF NOT EXISTS caracteristicas TEXT
   `);
 
   await pool.query(`
@@ -2487,7 +2489,7 @@ app.get('/api/categorias', asyncHandler(async (req, res) => {
 
 app.get('/api/flota', asyncHandler(async (req, res) => {
   const result = await pool.query(
-    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas, foto
+    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas, foto, descripcion_larga, caracteristicas
      FROM categorias_vehiculos
      WHERE activa = TRUE AND en_flota = TRUE
      ORDER BY orden, nombre`
@@ -2906,11 +2908,12 @@ app.post('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
     await pool.query(
       `INSERT INTO categorias_vehiculos
          (nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas, descripcion,
-          bajada_diurna, bajada_nocturna, activa, disponible)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, FALSE)`,
+          bajada_diurna, bajada_nocturna, descripcion_larga, caracteristicas, activa, disponible)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, FALSE)`,
       [nombre, parseInt(d.capacidad_pasajeros, 10) || 4, (d.capacidad_maletas || '').trim() || '—',
        parseInt(d.limite_sillas, 10) || 0, (d.descripcion || '').trim(),
-       parseFloat(d.bajada_diurna) || 0, parseFloat(d.bajada_nocturna) || 0]
+       parseFloat(d.bajada_diurna) || 0, parseFloat(d.bajada_nocturna) || 0,
+       (d.descripcion_larga || '').trim(), (d.caracteristicas || '').trim()]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -2929,11 +2932,12 @@ app.post('/admin/categorias/:id/editar', requireAdmin, asyncHandler(async (req, 
     await pool.query(
       `UPDATE categorias_vehiculos
        SET nombre = $1, capacidad_pasajeros = $2, capacidad_maletas = $3, limite_sillas = $4, descripcion = $5,
-           bajada_diurna = $6, bajada_nocturna = $7
-       WHERE id = $8`,
+           bajada_diurna = $6, bajada_nocturna = $7, descripcion_larga = $8, caracteristicas = $9
+       WHERE id = $10`,
       [nombre, parseInt(d.capacidad_pasajeros, 10) || 4, (d.capacidad_maletas || '').trim() || '—',
        parseInt(d.limite_sillas, 10) || 0, (d.descripcion || '').trim(),
-       parseFloat(d.bajada_diurna) || 0, parseFloat(d.bajada_nocturna) || 0, req.params.id]
+       parseFloat(d.bajada_diurna) || 0, parseFloat(d.bajada_nocturna) || 0,
+       (d.descripcion_larga || '').trim(), (d.caracteristicas || '').trim(), req.params.id]
     );
     res.json({ ok: true });
   } catch (err) {
