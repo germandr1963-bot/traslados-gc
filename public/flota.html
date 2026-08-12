@@ -245,9 +245,11 @@
   var categoriasFlota = [];
 
   // Cargar extras aprobados por conductores y poblar el selector
+  var extrasFlota = [];
   fetch('/api/extras-flota')
     .then(function(r) { return r.json(); })
     .then(function(extras) {
+      extrasFlota = extras;
       var sel = document.getElementById('sel-especial');
       var aptos = extras.filter(function(e) {
         return EXTRAS_SELECTOR.indexOf(e.nombre) !== -1;
@@ -300,7 +302,10 @@
       document.getElementById('grid-flota').innerHTML = '<p style="text-align:center;color:var(--texto-muted);padding:40px 0;">No se pudieron cargar los vehículos.</p>';
     });
 
-  // Selector de vehículo
+  // Selector de vehículo — filtro acumulativo
+  // Paso 1: pasajeros (capacidad_pasajeros de la categoría)
+  // Paso 2: + maletas (capacidad_maletas de la categoría)
+  // Paso 3: + equipaje especial (categorías de conductores que aprobaron ese extra)
   function recomendar() {
     var pasajeros = parseInt(document.getElementById('sel-pasajeros').value);
     var maletas   = parseInt(document.getElementById('sel-maletas').value);
@@ -317,22 +322,29 @@
       return a.capacidad_pasajeros - b.capacidad_pasajeros;
     });
 
-    var aptas = [];
+    // Paso 1 + 2: filtrar por pasajeros y maletas
+    var aptas = ordenadas.filter(function(c) {
+      var capMaletas = parseInt(c.capacidad_maletas) || 0;
+      var okPax = c.capacidad_pasajeros >= pasajeros;
+      var okMal = maletas === 0 || capMaletas >= maletas;
+      return okPax && okMal;
+    });
+    if (aptas.length === 0) aptas = ordenadas;
 
+    // Paso 3: si hay equipaje especial, filtrar por categorías de conductores que lo aprueban
     if (especial !== 'ninguno') {
-      // Con equipaje especial mostramos todas las categorías disponibles
-      aptas = ordenadas;
-    } else {
-      // Filtrar por pasajeros y maletas
-      for (var i = 0; i < ordenadas.length; i++) {
-        var c = ordenadas[i];
-        var capMaletas = parseInt(c.capacidad_maletas) || 0;
-        if (c.capacidad_pasajeros >= pasajeros && (maletas === 0 || capMaletas >= maletas)) {
-          aptas.push(c);
-        }
+      var extraId = parseInt(especial);
+      var extra = extrasFlota.filter(function(e) { return e.id === extraId; })[0];
+      if (extra && extra.categorias && extra.categorias.length > 0) {
+        var catIds = extra.categorias.map(function(id) { return parseInt(id); });
+        var aptasConExtra = aptas.filter(function(c) {
+          return catIds.indexOf(c.id) !== -1;
+        });
+        // Si ninguna categoría de las aptas tiene conductor con ese extra, mostrar las del extra sin filtro de pax/mal
+        aptas = aptasConExtra.length > 0 ? aptasConExtra : categoriasFlota.filter(function(c) {
+          return catIds.indexOf(c.id) !== -1;
+        });
       }
-      // Si ninguna cumple, mostrar todas
-      if (aptas.length === 0) aptas = ordenadas;
     }
 
     var textoPax = pasajeros + ' pasajero' + (pasajeros > 1 ? 's' : '');
