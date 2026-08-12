@@ -2892,6 +2892,7 @@ app.get('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas, descripcion,
             activa, disponible, bajada_diurna, bajada_nocturna, orden,
+            descripcion_larga, caracteristicas,
             (foto IS NOT NULL) AS tiene_foto
      FROM categorias_vehiculos ORDER BY orden, nombre`
   );
