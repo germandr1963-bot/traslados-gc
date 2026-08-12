@@ -132,13 +132,6 @@
           <label for="sel-pasajeros">Pasajeros</label>
           <select id="sel-pasajeros">
             <option value="1">1 pasajero</option>
-            <option value="2">2 pasajeros</option>
-            <option value="3">3 pasajeros</option>
-            <option value="4" selected>4 pasajeros</option>
-            <option value="5">5 pasajeros</option>
-            <option value="6">6 pasajeros</option>
-            <option value="7">7 pasajeros</option>
-            <option value="8">8 pasajeros</option>
           </select>
         </div>
         <div class="selector-campo">
@@ -279,6 +272,23 @@
     .then(function(r) { return r.json(); })
     .then(function(cats) {
       categoriasFlota = cats;
+
+      // Poblar select de pasajeros dinámicamente hasta el máximo de las categorías activas
+      var maxPax = 0;
+      cats.forEach(function(c) {
+        var p = parseInt(c.capacidad_pasajeros) || 0;
+        if (p > maxPax) maxPax = p;
+      });
+      var selPax = document.getElementById('sel-pasajeros');
+      selPax.innerHTML = '';
+      for (var p = 1; p <= maxPax; p++) {
+        var opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p === 1 ? '1 pasajero' : p + ' pasajeros';
+        if (p === 1) opt.selected = true;
+        selPax.appendChild(opt);
+      }
+
       var grid = document.getElementById('grid-flota');
       if (!cats || cats.length === 0) {
         grid.innerHTML = '<p style="text-align:center;color:var(--texto-muted);padding:40px 0;">Próximamente más vehículos disponibles.</p>';
