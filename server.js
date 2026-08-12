@@ -2550,7 +2550,7 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
         WHEN EXISTS (
           SELECT 1 FROM conductor_extras ce2
           JOIN conductores c2 ON c2.id = ce2.conductor_id
-          WHERE ce2.extra_id = e.id AND ce2.estado = 'gratis' AND c2.activo = TRUE
+          WHERE ce2.extra_id = e.id AND ce2.estado = 'gratis' AND c2.estado = 'activo'
         ) THEN 'gratis'
         ELSE 'pago'
       END AS disponibilidad,
@@ -2561,7 +2561,7 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
     WHERE e.activo = TRUE
       AND e.depende_chofer = TRUE
       AND ce.estado IN ('gratis', 'pago')
-      AND c.activo = TRUE
+      AND c.estado = 'activo'
     GROUP BY e.id, e.nombre, e.precio, e.bloque, e.orden
     ORDER BY e.bloque, e.orden, e.id
   `);
