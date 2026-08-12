@@ -47,7 +47,8 @@
 
     /* Selector */
     .selector-flota { background: #fff; border: 1px solid var(--gris-borde); border-radius: 12px; padding: 24px; margin-bottom: 48px; }
-    .selector-flota h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 22px; margin-bottom: 6px; color: var(--texto-oscuro); }
+    .selector-flota h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 28px; margin-bottom: 4px; color: var(--texto-oscuro); }
+    .selector-bajada { font-size: 15px; font-weight: 600; color: var(--texto-oscuro); margin-bottom: 4px !important; }
     .selector-flota p { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; }
     .selector-campos { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
     .selector-campo label { display: block; font-size: 11px; font-weight: 600; color: var(--texto-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
@@ -122,7 +123,8 @@
 
     <!-- SELECTOR -->
     <div class="selector-flota">
-      <h2>¿Qué vehículo necesitas?</h2>
+      <h2>Asistente de Selección de Vehículo</h2>
+      <p class="selector-bajada">¿Qué vehículo necesitas?</p>
       <p>Selecciona tu equipaje y pasajeros y te recomendamos la categoría ideal</p>
       <div class="selector-campos">
         <div class="selector-campo">
@@ -279,35 +281,52 @@
     var especial  = document.getElementById('sel-especial').value;
     var resultado = document.getElementById('selector-resultado');
 
-    if (especial === 'pmr') {
-      resultado.innerHTML = '<strong>EuroTaxi / Movilidad Reducida (PMR)</strong>Vehículo adaptado con rampa y anclajes homologados para silla de ruedas.';
-      resultado.className = 'selector-resultado visible';
-      return;
-    }
-    if (especial === 'bici' || especial === 'surf' || especial === 'golf') {
-      resultado.innerHTML = '<strong>Vehículo Sports & Outdoor</strong>Con espacio XL para equipaje deportivo voluminoso. Indícalo en las notas de tu reserva.';
+    if (categoriasFlota.length === 0) {
+      resultado.innerHTML = 'Cargando vehículos... Por favor espera un momento y vuelve a intentarlo.';
       resultado.className = 'selector-resultado visible';
       return;
     }
 
-    // Buscar por pasajeros
-    var recomendada = null;
-    if (categoriasFlota.length > 0) {
-      var ordenadas = categoriasFlota.slice().sort(function(a, b) { return a.capacidad_pasajeros - b.capacidad_pasajeros; });
+    var ordenadas = categoriasFlota.slice().sort(function(a, b) {
+      return a.capacidad_pasajeros - b.capacidad_pasajeros;
+    });
+
+    var aptas = [];
+
+    if (especial === 'pmr') {
+      // Para PMR mostramos todas — el cliente indica sus necesidades al reservar
+      aptas = ordenadas;
+    } else if (especial === 'bici' || especial === 'surf' || especial === 'golf' || especial === 'bebe') {
+      // Para equipaje especial mostramos todas
+      aptas = ordenadas;
+    } else {
+      // Filtrar por pasajeros y maletas
       for (var i = 0; i < ordenadas.length; i++) {
-        if (ordenadas[i].capacidad_pasajeros >= pasajeros) {
-          recomendada = ordenadas[i];
-          break;
+        var c = ordenadas[i];
+        var capMaletas = parseInt(c.capacidad_maletas) || 0;
+        if (c.capacidad_pasajeros >= pasajeros && (maletas === 0 || capMaletas >= maletas)) {
+          aptas.push(c);
         }
       }
-      if (!recomendada) recomendada = ordenadas[ordenadas.length - 1];
+      // Si ninguna cumple, mostrar todas
+      if (aptas.length === 0) aptas = ordenadas;
     }
 
-    if (recomendada) {
-      resultado.innerHTML = '<strong>' + recomendada.nombre + '</strong>La opción más adecuada para ' + pasajeros + ' pasajero' + (pasajeros > 1 ? 's' : '') + (maletas > 0 ? ' y ' + maletas + ' maleta' + (maletas > 1 ? 's' : '') : '') + '.';
-    } else {
-      resultado.innerHTML = 'Indícanos tus necesidades al hacer la reserva y te asignaremos el vehículo más adecuado.';
+    var textoPax = pasajeros + ' pasajero' + (pasajeros > 1 ? 's' : '');
+    var textoMal = maletas > 0 ? ' y ' + maletas + ' maleta' + (maletas > 1 ? 's' : '') : '';
+    var html = '<p style="margin-bottom:10px;font-size:13px;color:var(--texto-muted);">Según tus parámetros de búsqueda, los vehículos recomendados pueden ser estos:</p>';
+    html += '<ul style="list-style:none;padding:0;margin:0;text-align:left;">';
+    for (var j = 0; j < aptas.length; j++) {
+      var cat = aptas[j];
+      var cap = 'Hasta ' + cat.capacidad_pasajeros + ' pasajeros';
+      if (cat.capacidad_maletas && cat.capacidad_maletas !== '—') cap += ' · ' + cat.capacidad_maletas + ' maletas';
+      html += '<li style="padding:8px 0;border-bottom:1px solid var(--gris-borde);">'
+            + '<strong style="color:var(--texto-oscuro);font-size:14px;">' + cat.nombre + '</strong>'
+            + '<span style="color:var(--texto-muted);font-size:12px;margin-left:8px;">' + cap + '</span>'
+            + '</li>';
     }
+    html += '</ul>';
+    resultado.innerHTML = html;
     resultado.className = 'selector-resultado visible';
   }
 
