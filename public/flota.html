@@ -287,7 +287,17 @@
           ? '<img src="' + c.foto + '" alt="' + c.nombre + '">'
           : '<span>Sin foto</span>';
         var clsFoto = c.foto ? 'tarjeta-cat-foto' : 'tarjeta-cat-foto sin-foto';
-        var desc = c.descripcion ? '<p>' + c.descripcion + '</p>' : '';
+        var desc = c.descripcion ? '<p style="font-style:italic;color:var(--texto-muted);font-size:13px;margin-bottom:8px;">' + c.descripcion + '</p>' : '';
+        var descLarga = c.descripcion_larga ? '<p style="font-size:13px;color:var(--texto-oscuro);line-height:1.6;margin-bottom:8px;">' + c.descripcion_larga + '</p>' : '';
+        var caract = '';
+        if (c.caracteristicas) {
+          var lineas = c.caracteristicas.split('\n').filter(function(l) { return l.trim(); });
+          caract = '<p style="font-size:12px;color:var(--texto-oscuro);margin:0;line-height:1.8;">' +
+            lineas.map(function(l) {
+              return '<span style="margin-right:14px;white-space:nowrap;"><span style="color:var(--terracota);font-weight:700;">✓</span> ' + l.trim() + '</span>';
+            }).join('') +
+          '</p>';
+        }
         var cap = 'Hasta ' + c.capacidad_pasajeros + ' pasajeros';
         if (c.capacidad_maletas && c.capacidad_maletas !== '—') cap += ' · ' + c.capacidad_maletas + ' maletas';
         return '<div class="tarjeta-cat" data-pasajeros="' + c.capacidad_pasajeros + '" data-id="' + c.id + '">'
@@ -299,7 +309,7 @@
           +   '<a href="/?categoria=' + c.id + '" class="btn-reservar-cat">Reservar</a>'
           + '</div>'
           + '<div class="tarjeta-cat-body">'
-          +   '<div class="tarjeta-cat-desc">' + desc + '</div>'
+          +   '<div class="tarjeta-cat-desc">' + desc + descLarga + caract + '</div>'
           +   '<div class="' + clsFoto + '">' + fotoHtml + '</div>'
           + '</div>'
           + '</div>';
