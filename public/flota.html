@@ -112,30 +112,30 @@
   </header>
   <div class="contenido">
 
-    <h1>Flota</h1>
-    <p class="subtitulo">Vehículos modernos, 100% inspeccionados, adaptados a tus necesidades de espacio y comprometidos con la conservación natural de nuestra isla. Tu viaje desde el Aeropuerto de Gran Canaria (LPA) con la máxima seguridad.</p>
+    <h1 id="flota-h1">Flota</h1>
+    <p class="subtitulo" id="flota-subtitulo">Vehículos modernos, 100% inspeccionados, adaptados a tus necesidades de espacio y comprometidos con la conservación natural de nuestra isla. Tu viaje desde el Aeropuerto de Gran Canaria (LPA) con la máxima seguridad.</p>
 
     <div class="badges-flota">
-      <span class="badge-flota"><span class="badge-icono">🛡️</span>Licencias VT / Taxi Oficial</span>
-      <span class="badge-flota"><span class="badge-icono">🌿</span>Opción Eco / Híbridos</span>
-      <span class="badge-flota"><span class="badge-icono">♿</span>EuroTaxi Adaptado (PMR)</span>
-      <span class="badge-flota"><span class="badge-icono">🏄</span>Espacio Surf, Bici &amp; Golf</span>
+      <span class="badge-flota"><span class="badge-icono">🛡️</span><span id="flota-badge-licencias">Licencias VT / Taxi Oficial</span></span>
+      <span class="badge-flota"><span class="badge-icono">🌿</span><span id="flota-badge-eco">Opción Eco / Híbridos</span></span>
+      <span class="badge-flota"><span class="badge-icono">♿</span><span id="flota-badge-pmr">EuroTaxi Adaptado (PMR)</span></span>
+      <span class="badge-flota"><span class="badge-icono">🏄</span><span id="flota-badge-deportivo">Espacio Surf, Bici &amp; Golf</span></span>
     </div>
 
     <!-- SELECTOR -->
     <div class="selector-flota">
-      <h2>Asistente de Selección de Vehículo</h2>
-      <p class="selector-bajada">¿Qué vehículo necesitas?</p>
-      <p>Selecciona tu equipaje y pasajeros y te recomendamos la categoría ideal</p>
+      <h2 id="flota-selector-titulo">Asistente de Selección de Vehículo</h2>
+      <p class="selector-bajada" id="flota-selector-bajada">¿Qué vehículo necesitas?</p>
+      <p id="flota-selector-descripcion">Selecciona tu equipaje y pasajeros y te recomendamos la categoría ideal</p>
       <div class="selector-campos">
         <div class="selector-campo">
-          <label for="sel-pasajeros">Pasajeros</label>
+          <label for="sel-pasajeros" id="flota-label-pax">Pasajeros</label>
           <select id="sel-pasajeros">
             <option value="1">1 pasajero</option>
           </select>
         </div>
         <div class="selector-campo">
-          <label for="sel-maletas">Maletas grandes</label>
+          <label for="sel-maletas" id="flota-label-mal">Maletas grandes</label>
           <select id="sel-maletas">
             <option value="0">Sin maletas</option>
             <option value="1">1 maleta</option>
@@ -146,65 +146,65 @@
           </select>
         </div>
         <div class="selector-campo">
-          <label for="sel-especial">Equipaje especial</label>
+          <label for="sel-especial" id="flota-label-esp">Equipaje especial</label>
           <select id="sel-especial">
             <option value="ninguno">Ninguno</option>
           </select>
         </div>
       </div>
-      <button class="btn-recomendar" onclick="recomendar()">Ver vehículo recomendado</button>
+      <button class="btn-recomendar" id="flota-selector-btn" onclick="recomendar()">Ver vehículo recomendado</button>
       <div class="selector-resultado" id="selector-resultado"></div>
     </div>
 
     <!-- CATÁLOGO -->
-    <h2 style="font-family:'Big Shoulders Display',sans-serif;font-size:28px;color:var(--texto-oscuro);margin-bottom:20px;text-align:center;">Nuestras Categorías de Vehículos</h2>
+    <h2 id="flota-catalogo-titulo" style="font-family:'Big Shoulders Display',sans-serif;font-size:28px;color:var(--texto-oscuro);margin-bottom:20px;text-align:center;">Nuestras Categorías de Vehículos</h2>
     <div class="grid-flota" id="grid-flota">
       <div class="cargando">Cargando vehículos...</div>
     </div>
 
     <!-- BLOQUE ECO -->
     <div class="bloque-eco">
-      <h2>🌱 Nuestro Compromiso con la Biosfera de Gran Canaria</h2>
-      <p>Gran Canaria es Reserva de la Biosfera por la UNESCO. Toda nuestra flota cumple con las normativas europeas más estrictas sobre emisiones (Euro 6d e Híbridos). Optimizamos nuestras rutas mediante sistemas de navegación inteligente para reducir trayectos en vacío, recortando hasta un 20% el consumo de combustible respecto al servicio tradicional.</p>
+      <h2 id="flota-eco-titulo">🌱 Nuestro Compromiso con la Biosfera de Gran Canaria</h2>
+      <p id="flota-eco-texto">Gran Canaria es Reserva de la Biosfera por la UNESCO. Toda nuestra flota cumple con las normativas europeas más estrictas sobre emisiones (Euro 6d e Híbridos). Optimizamos nuestras rutas mediante sistemas de navegación inteligente para reducir trayectos en vacío, recortando hasta un 20% el consumo de combustible respecto al servicio tradicional.</p>
     </div>
 
     <!-- FAQ -->
     <div class="faq-flota">
-      <h2>Preguntas Frecuentes sobre la Flota</h2>
+      <h2 id="flota-faq-titulo">Preguntas Frecuentes sobre la Flota</h2>
       <div class="faq-item">
         <button class="faq-pregunta" onclick="toggleFaq(this)">
-          ¿Cómo puedo garantizar que me asignen un vehículo con espacio para mi bicicleta o tabla de surf?
+          <span id="flota-faq1-p">¿Cómo puedo garantizar que me asignen un vehículo con espacio para mi bicicleta o tabla de surf?</span>
           <span class="faq-icono">+</span>
         </button>
-        <div class="faq-respuesta">Durante el proceso de reserva, selecciona la opción "Sports & Outdoor" e indica en las notas el número de cajas de bicicleta o fundas de surf. Te asignaremos automáticamente un vehículo acondicionado.</div>
+        <div class="faq-respuesta" id="flota-faq1-r">Durante el proceso de reserva, selecciona la opción "Sports & Outdoor" e indica en las notas el número de cajas de bicicleta o fundas de surf. Te asignaremos automáticamente un vehículo acondicionado.</div>
       </div>
       <div class="faq-item">
         <button class="faq-pregunta" onclick="toggleFaq(this)">
-          ¿Tienen costo adicional las sillas de bebé o elevadores infantiles?
+          <span id="flota-faq2-p">¿Tienen costo adicional las sillas de bebé o elevadores infantiles?</span>
           <span class="faq-icono">+</span>
         </button>
-        <div class="faq-respuesta">No, las sillas homologadas para bebés y niños son totalmente gratuitas. Solo debes solicitarla al hacer tu reserva indicando la edad del menor.</div>
+        <div class="faq-respuesta" id="flota-faq2-r">No, las sillas homologadas para bebés y niños son totalmente gratuitas. Solo debes solicitarla al hacer tu reserva indicando la edad del menor.</div>
       </div>
       <div class="faq-item">
         <button class="faq-pregunta" onclick="toggleFaq(this)">
-          ¿El EuroTaxi permite viajar en la misma silla de ruedas sin desmontarla?
+          <span id="flota-faq3-p">¿El EuroTaxi permite viajar en la misma silla de ruedas sin desmontarla?</span>
           <span class="faq-icono">+</span>
         </button>
-        <div class="faq-respuesta">Sí, nuestros EuroTaxis cuentan con rampas antideslizantes de fácil acceso y un sistema de anclaje de 4 puntos que asegura la silla de ruedas directamente al chasis del vehículo.</div>
+        <div class="faq-respuesta" id="flota-faq3-r">Sí, nuestros EuroTaxis cuentan con rampas antideslizantes de fácil acceso y un sistema de anclaje de 4 puntos que asegura la silla de ruedas directamente al chasis del vehículo.</div>
       </div>
       <div class="faq-item">
         <button class="faq-pregunta" onclick="toggleFaq(this)">
-          ¿Puedo transportar mi bicicleta o tabla de surf?
+          <span id="flota-faq4-p">¿Puedo transportar mi bicicleta o tabla de surf?</span>
           <span class="faq-icono">+</span>
         </button>
-        <div class="faq-respuesta">Al hacer tu reserva, indícanos en las notas el tipo de equipaje deportivo (caja de bicicleta, funda de surf, bolsa de golf) y te asignaremos un vehículo con espacio adecuado para transportarlo con seguridad.</div>
+        <div class="faq-respuesta" id="flota-faq4-r">Al hacer tu reserva, indícanos en las notas el tipo de equipaje deportivo (caja de bicicleta, funda de surf, bolsa de golf) y te asignaremos un vehículo con espacio adecuado para transportarlo con seguridad.</div>
       </div>
       <div class="faq-item">
         <button class="faq-pregunta" onclick="toggleFaq(this)">
-          ¿Aceptan pago con tarjeta de crédito?
+          <span id="flota-faq5-p">¿Aceptan pago con tarjeta de crédito?</span>
           <span class="faq-icono">+</span>
         </button>
-        <div class="faq-respuesta">Sí, todos los vehículos están equipados con datáfono para aceptar pagos con Visa, Mastercard, Maestro, Apple Pay y Google Pay.</div>
+        <div class="faq-respuesta" id="flota-faq5-r">Sí, todos los vehículos están equipados con datáfono para aceptar pagos con Visa, Mastercard, Maestro, Apple Pay y Google Pay.</div>
       </div>
     </div>
 
@@ -441,6 +441,56 @@
           if (pp.footer_acceso_clientes) document.getElementById('footer-acceso-clientes').textContent = pp.footer_acceso_clientes;
           if (pp.nav_inicio)   document.getElementById('link-inicio-header').textContent   = pp.nav_inicio;
           if (pp.nav_contacto) document.getElementById('link-contacto-header').textContent = pp.nav_contacto;
+          // Textos de la página de flota
+          if (pp.flota_h1)                   document.getElementById('flota-h1').textContent                   = pp.flota_h1;
+          if (pp.flota_subtitulo)            document.getElementById('flota-subtitulo').textContent            = pp.flota_subtitulo;
+          if (pp.flota_badge_licencias)      document.getElementById('flota-badge-licencias').textContent      = pp.flota_badge_licencias;
+          if (pp.flota_badge_eco)            document.getElementById('flota-badge-eco').textContent            = pp.flota_badge_eco;
+          if (pp.flota_badge_pmr)            document.getElementById('flota-badge-pmr').textContent            = pp.flota_badge_pmr;
+          if (pp.flota_badge_deportivo)      document.getElementById('flota-badge-deportivo').textContent      = pp.flota_badge_deportivo;
+          if (pp.flota_selector_titulo)      document.getElementById('flota-selector-titulo').textContent      = pp.flota_selector_titulo;
+          if (pp.flota_selector_bajada)      document.getElementById('flota-selector-bajada').textContent      = pp.flota_selector_bajada;
+          if (pp.flota_selector_descripcion) document.getElementById('flota-selector-descripcion').textContent = pp.flota_selector_descripcion;
+          if (pp.flota_selector_label_pax)   document.getElementById('flota-label-pax').textContent            = pp.flota_selector_label_pax;
+          if (pp.flota_selector_label_mal)   document.getElementById('flota-label-mal').textContent            = pp.flota_selector_label_mal;
+          if (pp.flota_selector_label_esp)   document.getElementById('flota-label-esp').textContent            = pp.flota_selector_label_esp;
+          if (pp.flota_selector_btn)         document.getElementById('flota-selector-btn').textContent         = pp.flota_selector_btn;
+          if (pp.flota_catalogo_titulo)      document.getElementById('flota-catalogo-titulo').textContent      = pp.flota_catalogo_titulo;
+          if (pp.flota_eco_titulo)           document.getElementById('flota-eco-titulo').textContent           = pp.flota_eco_titulo;
+          if (pp.flota_eco_texto)            document.getElementById('flota-eco-texto').textContent            = pp.flota_eco_texto;
+          if (pp.flota_faq_titulo)           document.getElementById('flota-faq-titulo').textContent           = pp.flota_faq_titulo;
+          if (pp.flota_faq1_p)              document.getElementById('flota-faq1-p').textContent              = pp.flota_faq1_p;
+          if (pp.flota_faq1_r)              document.getElementById('flota-faq1-r').textContent              = pp.flota_faq1_r;
+          if (pp.flota_faq2_p)              document.getElementById('flota-faq2-p').textContent              = pp.flota_faq2_p;
+          if (pp.flota_faq2_r)              document.getElementById('flota-faq2-r').textContent              = pp.flota_faq2_r;
+          if (pp.flota_faq3_p)              document.getElementById('flota-faq3-p').textContent              = pp.flota_faq3_p;
+          if (pp.flota_faq3_r)              document.getElementById('flota-faq3-r').textContent              = pp.flota_faq3_r;
+          if (pp.flota_faq4_p)              document.getElementById('flota-faq4-p').textContent              = pp.flota_faq4_p;
+          if (pp.flota_faq4_r)              document.getElementById('flota-faq4-r').textContent              = pp.flota_faq4_r;
+          if (pp.flota_faq5_p)              document.getElementById('flota-faq5-p').textContent              = pp.flota_faq5_p;
+          if (pp.flota_faq5_r)              document.getElementById('flota-faq5-r').textContent              = pp.flota_faq5_r;
+          // Opciones del selector de maletas
+          if (pp.flota_selector_mal_0 || pp.flota_selector_mal_1) {
+            var selMal = document.getElementById('sel-maletas');
+            if (selMal) {
+              var opcionesMal = [
+                pp.flota_selector_mal_0 || 'Sin maletas',
+                pp.flota_selector_mal_1 || '1 maleta',
+                pp.flota_selector_mal_2 || '2 maletas',
+                pp.flota_selector_mal_3 || '3 maletas',
+                pp.flota_selector_mal_4 || '4 maletas',
+                pp.flota_selector_mal_5 || '5 o más maletas'
+              ];
+              for (var i = 0; i < selMal.options.length; i++) {
+                if (opcionesMal[i]) selMal.options[i].textContent = opcionesMal[i];
+              }
+            }
+          }
+          // Opción por defecto del selector de equipaje especial
+          if (pp.flota_selector_esp_ninguno) {
+            var selEsp = document.getElementById('sel-especial');
+            if (selEsp && selEsp.options[0]) selEsp.options[0].textContent = pp.flota_selector_esp_ninguno;
+          }
         }).catch(function() {});
     })();
   </script>
