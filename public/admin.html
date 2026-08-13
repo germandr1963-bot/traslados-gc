@@ -1789,12 +1789,14 @@ function formularioCategoria(cat) {
     '<input class="campo" id="cat-maletas" type="text" value="' + escapar(cat.capacidad_maletas || '') + '" style="margin-bottom:10px">' +
     '<label class="etiqueta">Sillas de bebé (máximo)</label>' +
     '<input class="campo" id="cat-sillas" type="number" min="0" max="6" value="' + (cat.limite_sillas || 0) + '" style="margin-bottom:10px">' +
-    '<label class="etiqueta">Descripción</label>' +
-    '<input class="campo" id="cat-descripcion" type="text" value="' + escapar(cat.descripcion || '') + '" style="margin-bottom:10px">' +
     '<label class="etiqueta">Bajada de bandera diurna (€, 6:00-22:00)</label>' +
     '<input class="campo" id="cat-bajada-diurna" type="number" step="0.01" min="0" value="' + Number(cat.bajada_diurna || 0).toFixed(2) + '" style="margin-bottom:10px">' +
     '<label class="etiqueta">Bajada de bandera nocturna (€, 22:00-6:00)</label>' +
     '<input class="campo" id="cat-bajada-nocturna" type="number" step="0.01" min="0" value="' + Number(cat.bajada_nocturna || 0).toFixed(2) + '" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Descripción vehículo</label>' +
+    '<input class="campo" id="cat-descripcion" type="text" value="' + escapar(cat.descripcion || '') + '" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Subtítulo</label>' +
+    '<input class="campo" id="cat-subtitulo" type="text" value="' + escapar(cat.subtitulo || '') + '" style="margin-bottom:10px">' +
     '<label class="etiqueta">Descripción larga (texto para la página de flota)</label>' +
     '<textarea class="campo" id="cat-descripcion-larga" rows="4" style="margin-bottom:10px;resize:vertical">' + escapar(cat.descripcion_larga || '') + '</textarea>' +
     '<label class="etiqueta">Características (una por línea, se muestran con ✓)</label>' +
@@ -1837,6 +1839,7 @@ function guardarCategoria(id) {
     descripcion: document.getElementById('cat-descripcion').value,
     bajada_diurna: document.getElementById('cat-bajada-diurna').value,
     bajada_nocturna: document.getElementById('cat-bajada-nocturna').value,
+    subtitulo: document.getElementById('cat-subtitulo').value,
     descripcion_larga: document.getElementById('cat-descripcion-larga').value,
     caracteristicas: document.getElementById('cat-caracteristicas').value
   };
