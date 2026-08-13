@@ -2489,7 +2489,7 @@ app.get('/api/categorias', asyncHandler(async (req, res) => {
 
 app.get('/api/flota', asyncHandler(async (req, res) => {
   const result = await pool.query(
-    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas, foto, descripcion_larga, caracteristicas
+    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas, foto, descripcion_larga, caracteristicas, subtitulo
      FROM categorias_vehiculos
      WHERE activa = TRUE AND en_flota = TRUE
      ORDER BY orden, nombre`
@@ -2892,7 +2892,7 @@ app.get('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas, descripcion,
             activa, disponible, bajada_diurna, bajada_nocturna, orden,
-            descripcion_larga, caracteristicas,
+            descripcion_larga, caracteristicas, subtitulo,
             (foto IS NOT NULL) AS tiene_foto
      FROM categorias_vehiculos ORDER BY orden, nombre`
   );
@@ -2933,12 +2933,13 @@ app.post('/admin/categorias/:id/editar', requireAdmin, asyncHandler(async (req, 
     await pool.query(
       `UPDATE categorias_vehiculos
        SET nombre = $1, capacidad_pasajeros = $2, capacidad_maletas = $3, limite_sillas = $4, descripcion = $5,
-           bajada_diurna = $6, bajada_nocturna = $7, descripcion_larga = $8, caracteristicas = $9
-       WHERE id = $10`,
+           bajada_diurna = $6, bajada_nocturna = $7, descripcion_larga = $8, caracteristicas = $9, subtitulo = $10
+       WHERE id = $11`,
       [nombre, parseInt(d.capacidad_pasajeros, 10) || 4, (d.capacidad_maletas || '').trim() || '—',
        parseInt(d.limite_sillas, 10) || 0, (d.descripcion || '').trim(),
        parseFloat(d.bajada_diurna) || 0, parseFloat(d.bajada_nocturna) || 0,
-       (d.descripcion_larga || '').trim(), (d.caracteristicas || '').trim(), req.params.id]
+       (d.descripcion_larga || '').trim(), (d.caracteristicas || '').trim(),
+       (d.subtitulo || '').trim(), req.params.id]
     );
     res.json({ ok: true });
   } catch (err) {
