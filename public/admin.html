@@ -381,12 +381,20 @@ table.tabla-precios input {
       <div style="margin-top:32px;border-top:2px solid var(--gris-borde);padding-top:24px;">
         <h2 style="font-size:18px;margin-bottom:4px;">Contenido de categorías de flota</h2>
         <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Genera con IA la descripción, subtítulo, texto largo y características de cada categoría de vehículo. El contenido en español se guarda en la ficha de la categoría. El de otros idiomas se guarda en la tabla de traducciones.</p>
+
         <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
           <span style="font-size:13px;">🤖 Generar contenido de categorías con IA:</span>
           <select id="select-idioma-categorias" class="campo" style="height:34px;width:auto;"></select>
           <button class="boton-costa" onclick="generarCategoriasConIA()">Generar lo que falta</button>
         </div>
+
         <div id="mensaje-categorias-ia" style="margin-bottom:12px;"></div>
+
+        <table class="tabla-admin">
+          <thead id="thead-categorias-ia"></thead>
+          <tbody id="tabla-categorias-ia-cuerpo"></tbody>
+        </table>
+
         <div id="editor-categorias-ia" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
       </div>
 
@@ -3679,6 +3687,7 @@ function eliminarRedireccion(id) {
 // ─── Idiomas — Textos de la interfaz ──────────────────────────────────────────
 var IDIOMAS_TEXTOS = []; // se rellena en tiempo real desde /admin/idiomas (excluye el idioma base)
 var textosCache = null;
+var categoriasIACache = null;
 
 function renderizarCabeceraTextos() {
   var thead = document.getElementById('thead-textos');
@@ -3712,8 +3721,127 @@ function cargarTextosInterfaz() {
   }).then(function (r) { return r.json(); }).then(function (datos) {
     textosCache = datos;
     renderizarTablaTextos(datos);
+    cargarTablaCategoriasIA();
   });
 }
+
+function cargarTablaCategoriasIA() {
+  document.getElementById('tabla-categorias-ia-cuerpo').innerHTML = '<tr><td colspan="12" style="color:var(--texto-muted)">Cargando...</td></tr>';
+  fetch('/admin/categorias/estado-ia')
+    .then(function (r) { return r.json(); })
+    .then(function (datos) {
+      categoriasIACache = datos;
+      renderizarCabeceraCategoriasIA(datos.idiomas);
+      renderizarTablaCategoriasIA(datos);
+    });
+}
+
+function renderizarCabeceraCategoriasIA(idiomas) {
+  var thead = document.getElementById('thead-categorias-ia');
+  if (!thead) return;
+  thead.innerHTML = '<tr><th>Categoría</th>' +
+    idiomas.map(function (l) { return '<th style="text-align:center">' + l.toUpperCase() + '</th>'; }).join('') +
+    '<th>Acción</th></tr>';
+}
+
+function renderizarTablaCategoriasIA(datos) {
+  var cuerpo = document.getElementById('tabla-categorias-ia-cuerpo');
+  if (!datos.categorias || datos.categorias.length === 0) {
+    cuerpo.innerHTML = '<tr><td colspan="12">No hay categorías activas.</td></tr>';
+    return;
+  }
+  var html = datos.categorias.map(function (c) {
+    var celdas = datos.idiomas.map(function (lang) {
+      var ok = c.estado[lang];
+      return '<td style="text-align:center">' + (ok
+        ? '<span style="color:#2e7d32;font-weight:600;">✓</span>'
+        : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+    }).join('');
+    return '<tr>' +
+      '<td><strong>' + escapar(c.nombre) + '</strong></td>' +
+      celdas +
+      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorCategoriaIA(' + c.id + ')">✏️ Editar</button></td>' +
+    '</tr>';
+  }).join('');
+  cuerpo.innerHTML = html;
+}
+
+function abrirEditorCategoriaIA(catId) {
+  var datos = categoriasIACache;
+  var cat = datos && datos.categorias.find(function (c) { return c.id === catId; });
+  if (!cat) return;
+  var editor = document.getElementById('editor-categorias-ia');
+  editor.classList.remove('oculto');
+
+  var tabs = datos.idiomas.map(function (lang, i) {
+    var ok = cat.estado[lang];
+    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? '' : ' tab-idioma-rojo') + '" ' +
+      'onclick="cambiarIdiomaEditorCategoriaIA(' + catId + ', \'' + lang + '\', this)">' +
+      lang.toUpperCase() + (ok ? '' : ' ⚠️') + '</button>';
+  }).join('');
+
+  editor.innerHTML =
+    '<h2 style="margin-top:0">✏️ ' + escapar(cat.nombre) + '</h2>' +
+    '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
+    '<div id="cat-ia-campos"></div>' +
+    '<div id="cat-ia-msg" style="margin-top:8px;"></div>' +
+    '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-categorias-ia\').classList.add(\'oculto\')">Cerrar</button>';
+
+  cambiarIdiomaEditorCategoriaIA(catId, datos.idiomas[0], editor.querySelector('.tab-idioma'));
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cambiarIdiomaEditorCategoriaIA(catId, lang, botonTab) {
+  document.querySelectorAll('#editor-categorias-ia .tab-idioma').forEach(function (b) { b.classList.remove('activo'); });
+  if (botonTab) botonTab.classList.add('activo');
+
+  var campos = document.getElementById('cat-ia-campos');
+  campos.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+
+  var url = '/admin/categorias/contenido-ia/' + catId + '/' + lang;
+  fetch(url).then(function (r) { return r.json(); }).then(function (d) {
+    campos.innerHTML =
+      '<div style="display:grid;gap:10px;">' +
+        '<div><label class="etiqueta">Descripción vehículo</label>' +
+        '<input type="text" id="cat-ia-descripcion" class="campo" value="' + escapar(d.descripcion || '') + '" style="width:100%;"></div>' +
+        '<div><label class="etiqueta">Subtítulo</label>' +
+        '<input type="text" id="cat-ia-subtitulo" class="campo" value="' + escapar(d.subtitulo || '') + '" style="width:100%;"></div>' +
+        '<div><label class="etiqueta">Descripción larga</label>' +
+        '<textarea id="cat-ia-desc-larga" class="campo" rows="3" style="width:100%;">' + escapar(d.descripcion_larga || '') + '</textarea></div>' +
+        '<div><label class="etiqueta">Características (una por línea)</label>' +
+        '<textarea id="cat-ia-caract" class="campo" rows="3" style="width:100%;">' + escapar(d.caracteristicas || '') + '</textarea></div>' +
+      '</div>' +
+      '<button class="boton-primario" style="margin-top:12px;" onclick="guardarCategoriaIA(' + catId + ', \'' + lang + '\')">💾 Guardar</button>';
+  });
+}
+
+function guardarCategoriaIA(catId, lang) {
+  var msg = document.getElementById('cat-ia-msg');
+  var datos = {
+    lang: lang,
+    propuestas: [{
+      categoria_id: catId,
+      descripcion:      document.getElementById('cat-ia-descripcion').value,
+      subtitulo:        document.getElementById('cat-ia-subtitulo').value,
+      descripcion_larga: document.getElementById('cat-ia-desc-larga').value,
+      caracteristicas:  document.getElementById('cat-ia-caract').value
+    }]
+  };
+  msg.innerHTML = 'Guardando...';
+  fetch('/admin/categorias/guardar-ia-lote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+      cargarTablaCategoriasIA();
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
+    }
+  });
+}
+
 
 function renderizarTablaTextos(datos) {
   var cuerpo = document.getElementById('tabla-textos-cuerpo');
