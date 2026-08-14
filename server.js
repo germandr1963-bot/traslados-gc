@@ -5092,6 +5092,168 @@ async function traducirSEOConClaudeIA(items, nombreIdioma) {
   return JSON.parse(limpio2);
 }
 
+// Genera contenido comercial nativo de categorías de vehículo con IA (Generador 12).
+// Recibe un array de categorías con sus datos y devuelve un objeto { id: { campos } }.
+async function generarCategoriasConIA(items, nombreIdioma) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.');
+  }
+
+  const prompt = iaPrompts.GENERADOR_CATEGORIAS_FLOTA(nombreIdioma, items);
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+
+  if (!response.ok) {
+    const cuerpoError = await response.text();
+    throw new Error('Error de la API de Claude (' + response.status + '): ' + cuerpoError.slice(0, 200));
+  }
+
+  const data3 = await response.json();
+  const textoRespuesta3 = data3.content.map(function (b) { return b.text || ''; }).join('');
+  const limpio3 = textoRespuesta3.replace(/```json|```/g, '').trim();
+  return JSON.parse(limpio3);
+}
+
+// Genera con IA el contenido comercial (descripcion, subtitulo, descripcion_larga,
+// caracteristicas) de todas las categorías que aún no tienen contenido en el idioma
+// solicitado. Devuelve propuestas para revisión antes de guardar.
+// Línea server.js: ~5097
+app.post('/admin/categorias/generar-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  const todosLangs = ['es', ...IDIOMAS_TRADUCIBLES];
+  if (!todosLangs.includes(lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+
+  // Cargar todas las categorías activas con sus datos
+  const cats = await pool.query(
+    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas
+     FROM categorias_vehiculos
+     WHERE activa = TRUE
+     ORDER BY orden, nombre`
+  );
+
+  if (cats.rows.length === 0) {
+    return res.json({ ok: true, propuestas: [] });
+  }
+
+  // Cargar traducciones ya existentes para este idioma
+  let yaGeneradas = {};
+  if (lang === 'es') {
+    // Para español usamos los campos directos de la tabla
+    const esRows = await pool.query(
+      `SELECT id, descripcion, subtitulo, descripcion_larga, caracteristicas
+       FROM categorias_vehiculos WHERE activa = TRUE`
+    );
+    for (const r of esRows.rows) {
+      if (r.descripcion && r.descripcion.trim()) yaGeneradas[r.id] = true;
+    }
+  } else {
+    const tradRows = await pool.query(
+      `SELECT categoria_id FROM categorias_vehiculos_traducciones WHERE lang_code = $1`,
+      [lang]
+    );
+    for (const r of tradRows.rows) yaGeneradas[r.categoria_id] = true;
+  }
+
+  // Filtrar solo las que faltan
+  const pendientes = cats.rows.filter(function (c) { return !yaGeneradas[c.id]; });
+
+  if (pendientes.length === 0) {
+    return res.json({ ok: true, propuestas: [] });
+  }
+
+  const nombreIdioma = await getNombreIdioma(lang);
+  let generado;
+  try {
+    generado = await generarCategoriasConIA(pendientes, nombreIdioma);
+  } catch (err) {
+    console.error('Error generando categorías con IA:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+
+  // Construir propuestas para revisión
+  const propuestas = pendientes.map(function (c) {
+    const resultado = generado[String(c.id)] || {};
+    return {
+      categoria_id: c.id,
+      nombre: c.nombre,
+      descripcion:      resultado.descripcion      || '',
+      subtitulo:        resultado.subtitulo         || '',
+      descripcion_larga: resultado.descripcion_larga || '',
+      caracteristicas:  resultado.caracteristicas   || ''
+    };
+  });
+
+  res.json({ ok: true, propuestas, lang });
+}));
+
+// Guarda en bloque el contenido de categorías revisado tras la propuesta de IA.
+// Para español guarda en categorias_vehiculos directamente.
+// Para otros idiomas guarda en categorias_vehiculos_traducciones.
+// Línea server.js: ~5180
+app.post('/admin/categorias/guardar-ia-lote', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang, propuestas } = req.body;
+  const todosLangs = ['es', ...IDIOMAS_TRADUCIBLES];
+  if (!todosLangs.includes(lang) || !Array.isArray(propuestas)) {
+    return res.status(400).json({ error: 'Datos no válidos' });
+  }
+
+  let guardadas = 0;
+  for (const p of propuestas) {
+    if (!p.categoria_id) continue;
+    if (lang === 'es') {
+      // Guardar en la tabla principal
+      await pool.query(
+        `UPDATE categorias_vehiculos
+         SET descripcion = $1, subtitulo = $2, descripcion_larga = $3, caracteristicas = $4
+         WHERE id = $5`,
+        [
+          (p.descripcion || '').trim(),
+          (p.subtitulo || '').trim(),
+          (p.descripcion_larga || '').trim(),
+          (p.caracteristicas || '').trim(),
+          p.categoria_id
+        ]
+      );
+    } else {
+      // Guardar en tabla de traducciones
+      await pool.query(
+        `INSERT INTO categorias_vehiculos_traducciones
+           (categoria_id, lang_code, descripcion, subtitulo, descripcion_larga, caracteristicas, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())
+         ON CONFLICT (categoria_id, lang_code) DO UPDATE
+           SET descripcion = $3, subtitulo = $4, descripcion_larga = $5,
+               caracteristicas = $6, updated_at = NOW()`,
+        [
+          p.categoria_id,
+          lang,
+          (p.descripcion || '').trim(),
+          (p.subtitulo || '').trim(),
+          (p.descripcion_larga || '').trim(),
+          (p.caracteristicas || '').trim()
+        ]
+      );
+    }
+    guardadas++;
+  }
+
+  res.json({ ok: true, guardadas });
+}));
+
 // Lista todos los textos con su estado de traducción por idioma (para las
 // insignias de colores: verde traducido, rojo falta)
 // ─── Gestión de idiomas de la web ────────────────────────────────────────────

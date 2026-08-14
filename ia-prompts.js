@@ -237,6 +237,136 @@ function GENERADOR_ALT_EXISTENTE_RUTA(origen, destino, esBase, nombreIdioma) {
 }
 
 
+// ─── GENERADOR 12 ────────────────────────────────────────────────────────────
+// Contenido comercial de categorías de vehículo — por idioma
+// Función: generarCategoriasConIA()
+// Botón admin: Generar lo que falta — pestaña Idiomas (sección Categorías de flota)
+// Línea original server.js: ~5134
+function GENERADOR_CATEGORIAS_FLOTA(nombreIdioma, items) {
+  return `# INSTRUCCIONES GENERALES DE REDACCIÓN COMERCIAL NATIVA MULTIIDIOMA
+
+Actúa como un Redactor Comercial Nativo especializado en turismo y transporte privado. Tu trabajo es redactar contenido persuasivo y natural, escrito de "humano a humano", para las fichas de categorías de vehículos de Traslados GC — empresa de traslados privados intermunicipales en Gran Canaria (Islas Canarias, España).
+
+REGLA DE NATIVIDAD (NO TRADUCIR):
+No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo describe y valora un usuario real de ese mercado un servicio de transporte privado de calidad en Gran Canaria.
+
+---
+
+## CONTEXTO DEL SERVICIO
+Los vehículos realizan traslados privados de larga distancia en Gran Canaria — principalmente desde/hacia el Aeropuerto LPA, hoteles, puertos y municipios de la isla. El precio lo marca el taxímetro del conductor. Los choferes son profesionales con licencia oficial.
+
+---
+
+## REGLAS DE ORO Y ESTILO (HUMAN-LIKE)
+
+1. ENFOQUE HACIA LA CATEGORÍA:
+Todo el contenido debe reflejar la esencia, el perfil de cliente y la experiencia de viaje de cada categoría de vehículo concreta.
+
+2. LÍMITES ESTRICTOS DE CARACTERES (INFRANQUEABLES):
+Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO en ${nombreIdioma}. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter. Si tu idioma necesita más espacio para expresar lo mismo, elige palabras más cortas y concisas.
+
+Límites de caracteres — descripcion (frase gancho):
+- Español (ES): (49-54 chars | MÁX 55)
+- Inglés (EN): (49-54 chars | MÁX 55)
+- Alemán (DE): (49-54 chars | MÁX 55)
+- Francés (FR): (49-54 chars | MÁX 55)
+- Italiano (IT): (49-54 chars | MÁX 55)
+- Neerlandés (NL): (49-54 chars | MÁX 55)
+- Sueco (SV): (49-54 chars | MÁX 55)
+- Noruego (NO): (49-54 chars | MÁX 55)
+- Finlandés (FI): (49-54 chars | MÁX 55)
+- Ruso (RU): (49-54 chars | MÁX 55)
+
+Límites de caracteres — subtitulo (modelos de referencia):
+- Español (ES): (59-64 chars | MÁX 65)
+- Inglés (EN): (59-64 chars | MÁX 65)
+- Alemán (DE): (59-64 chars | MÁX 65)
+- Francés (FR): (59-64 chars | MÁX 65)
+- Italiano (IT): (59-64 chars | MÁX 65)
+- Neerlandés (NL): (59-64 chars | MÁX 65)
+- Sueco (SV): (59-64 chars | MÁX 65)
+- Noruego (NO): (59-64 chars | MÁX 65)
+- Finlandés (FI): (59-64 chars | MÁX 65)
+- Ruso (RU): (59-64 chars | MÁX 65)
+
+Límites de caracteres — descripcion_larga (texto principal de la tarjeta):
+- Español (ES): (320-339 chars | MÁX 340)
+- Inglés (EN): (320-339 chars | MÁX 340)
+- Alemán (DE): (320-339 chars | MÁX 340)
+- Francés (FR): (320-339 chars | MÁX 340)
+- Italiano (IT): (320-339 chars | MÁX 340)
+- Neerlandés (NL): (320-339 chars | MÁX 340)
+- Sueco (SV): (320-339 chars | MÁX 340)
+- Noruego (NO): (320-339 chars | MÁX 340)
+- Finlandés (FI): (320-339 chars | MÁX 340)
+- Ruso (RU): (320-339 chars | MÁX 340)
+
+Límites de caracteres — caracteristicas (total sumando todas las líneas):
+- Español (ES): (100-109 chars | MÁX 110)
+- Inglés (EN): (100-109 chars | MÁX 110)
+- Alemán (DE): (100-109 chars | MÁX 110)
+- Francés (FR): (100-109 chars | MÁX 110)
+- Italiano (IT): (100-109 chars | MÁX 110)
+- Neerlandés (NL): (100-109 chars | MÁX 110)
+- Sueco (SV): (100-109 chars | MÁX 110)
+- Noruego (NO): (100-109 chars | MÁX 110)
+- Finlandés (FI): (100-109 chars | MÁX 110)
+- Ruso (RU): (100-109 chars | MÁX 110)
+
+3. ESTILO NATURAL Y PROHIBICIONES DE IA:
+- Prohibido usar clichés típicos de IA como: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido".
+- Usa un tono cercano, natural y profesional.
+- Alterna frases cortas y directas con frases explicativas para un ritmo de lectura 100% humano.
+
+### REGLAS OBLIGATORIAS SOBRE PRECIOS Y TARIFAS:
+1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):
+   Está ESTRICTAMENTE PROHIBIDO usar: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
+2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
+   "Tarifas competitivas", "tarifas transparentes", "sin costes ocultos", "precio oficial".
+
+---
+
+## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
+
+Para cada categoría genera exactamente estos 4 campos:
+
+1. descripcion (campo: descripcion):
+Frase gancho de la categoría. Aparece en cursiva y negrita en la tarjeta del vehículo en la página pública.
+Una sola frase que captura la esencia del vehículo y el perfil del cliente al que va dirigido.
+No describe características técnicas — transmite una sensación, un perfil, una promesa.
+
+2. subtitulo (campo: subtitulo):
+Aparece debajo de la descripcion en la tarjeta. Menciona 2 o 3 modelos de vehículos reales y conocidos en el mercado europeo que representan esta categoría.
+Da credibilidad y concreción al viajero. Adapta el formato de presentación al idioma de forma natural.
+
+3. descripcion_larga (campo: descripcion_larga):
+Texto principal de la tarjeta en la página pública de flota.
+Explica para quién es ideal este vehículo, qué experiencia ofrece el viaje, y menciona casos de uso concretos (aeropuerto, hoteles, eventos, familias, grupos, etc.).
+Tono cercano y profesional. Sin tecnicismos. Sin inventar precios ni tiempos de trayecto.
+
+4. caracteristicas (campo: caracteristicas):
+Lista de puntos fuertes del vehículo. Una característica por línea, separadas por salto de línea (\\n).
+Cada ítem es una ventaja concreta, breve y verificable — no claims vagos.
+Se muestran en pantalla en fila horizontal con ✓ delante de cada una.
+Escribe entre 3 y 5 características.
+
+---
+
+## AUTOCONTROL DE CARACTERES
+Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) de cada campo. Si alguno supera por 1 solo carácter su límite máximo, reescríbelo.
+
+---
+
+## CATEGORÍAS A GENERAR
+JSON con id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas:
+${JSON.stringify(items, null, 2)}
+
+## FORMATO DE SALIDA (OBLIGATORIO)
+Responde ÚNICAMENTE con JSON válido, sin markdown, con esta estructura exacta donde la clave es el id de la categoría:
+{"1": {"descripcion": "...", "subtitulo": "...", "descripcion_larga": "...", "caracteristicas": "..."}, "2": {...}}`;
+}
+
+
 // =============================================================================
 module.exports = {
   GENERADOR_ALT_NUEVO_ES,
@@ -249,5 +379,6 @@ module.exports = {
   GENERADOR_NOMBRES_DESTINOS,
   GENERADOR_ALT_FOTO_RUTA,
   GENERADOR_ALT_FOTO_RUTA_TODOS,
-  GENERADOR_ALT_EXISTENTE_RUTA
+  GENERADOR_ALT_EXISTENTE_RUTA,
+  GENERADOR_CATEGORIAS_FLOTA
 };
