@@ -3695,13 +3695,11 @@ function renderizarSelectIA() {
     return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
   }).join('');
   // Poblar también el selector del Bloque 2 — categorías de flota
-  // Incluye español porque la IA también genera el contenido en ES
+  // IDIOMAS_TEXTOS ya incluye todos los idiomas activos (incluyendo español)
   var selectCats = document.getElementById('select-idioma-categorias');
   if (!selectCats) return;
-  var todosLangs = ['es'].concat(IDIOMAS_TEXTOS);
-  selectCats.innerHTML = todosLangs.map(function (l) {
-    var nombre = l === 'es' ? 'Español' : (NOMBRES_IDIOMA[l] || l.toUpperCase());
-    return '<option value="' + l + '">' + nombre + '</option>';
+  selectCats.innerHTML = IDIOMAS_TEXTOS.map(function (l) {
+    return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
   }).join('');
 }
 
