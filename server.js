@@ -5174,6 +5174,7 @@ async function generarCategoriasConIA(items, nombreIdioma) {
   const data3 = await response.json();
   const textoRespuesta3 = data3.content.map(function (b) { return b.text || ''; }).join('');
   const limpio3 = textoRespuesta3.replace(/```json|```/g, '').trim();
+  console.log('[GEN12] Respuesta IA:', limpio3.slice(0, 500));
   return JSON.parse(limpio3);
 }
 
