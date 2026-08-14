@@ -268,7 +268,8 @@
     .catch(function() {});
 
   // Cargar categorías desde /api/flota
-  fetch('/api/flota')
+  var langFlota = (function() { var p = window.location.pathname.split('/'); return (p[1] && p[1].length === 2) ? p[1] : 'es'; })();
+  fetch('/api/flota?lang=' + langFlota)
     .then(function(r) { return r.json(); })
     .then(function(cats) {
       categoriasFlota = cats;
