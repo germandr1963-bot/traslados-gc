@@ -2496,11 +2496,19 @@ app.get('/api/categorias', asyncHandler(async (req, res) => {
 }));
 
 app.get('/api/flota', asyncHandler(async (req, res) => {
+  const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
   const result = await pool.query(
-    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas, foto, descripcion_larga, caracteristicas, subtitulo
-     FROM categorias_vehiculos
-     WHERE activa = TRUE AND en_flota = TRUE
-     ORDER BY orden, nombre`
+    `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.limite_sillas, cv.foto,
+            COALESCE(cvt.descripcion,       cv.descripcion)       AS descripcion,
+            COALESCE(cvt.subtitulo,         cv.subtitulo)         AS subtitulo,
+            COALESCE(cvt.descripcion_larga, cv.descripcion_larga) AS descripcion_larga,
+            COALESCE(cvt.caracteristicas,   cv.caracteristicas)   AS caracteristicas
+     FROM categorias_vehiculos cv
+     LEFT JOIN categorias_vehiculos_traducciones cvt
+           ON cvt.categoria_id = cv.id AND cvt.lang_code = $1
+     WHERE cv.activa = TRUE AND cv.en_flota = TRUE
+     ORDER BY cv.orden, cv.nombre`,
+    [lang]
   );
   res.json(result.rows);
 }));
