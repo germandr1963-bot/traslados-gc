@@ -4335,7 +4335,7 @@ function mostrarRevisionCategorias(lang, propuestas) {
   editor.innerHTML =
     '<h2 style="margin-top:0">🤖 Revisión — categorías de flota en ' + lang.toUpperCase() + '</h2>' +
     '<p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Revisa el contenido generado antes de guardar. Puedes editar cualquier campo.</p>' +
-    '<div style="max-height:500px;overflow-y:auto;">' + filas + '</div>' +
+    '<div style="max-height:500px;overflow-y:auto;overflow-x:hidden;">' + filas + '</div>' +
     '<div id="revision-categorias-msg" style="margin:12px 0;"></div>' +
     '<button class="boton-primario" onclick="guardarRevisionCategorias(\'' + lang + '\')">💾 Guardar todas</button> ' +
     '<button class="boton-secundario" onclick="document.getElementById(\'editor-categorias-ia\').classList.add(\'oculto\')">Cancelar</button>';
