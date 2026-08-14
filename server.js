@@ -5092,7 +5092,57 @@ async function traducirSEOConClaudeIA(items, nombreIdioma) {
   return JSON.parse(limpio2);
 }
 
-// Genera contenido comercial nativo de categorías de vehículo con IA (Generador 12).
+// Devuelve el contenido generado de una categoría en un idioma concreto para el editor.
+app.get('/admin/categorias/contenido-ia/:id/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const { id, lang } = req.params;
+  if (lang === 'es') {
+    const r = await pool.query(
+      'SELECT descripcion, subtitulo, descripcion_larga, caracteristicas FROM categorias_vehiculos WHERE id = $1',
+      [id]
+    );
+    return res.json(r.rows[0] || {});
+  }
+  const r = await pool.query(
+    'SELECT descripcion, subtitulo, descripcion_larga, caracteristicas FROM categorias_vehiculos_traducciones WHERE categoria_id = $1 AND lang_code = $2',
+    [id, lang]
+  );
+  res.json(r.rows[0] || {});
+}));
+
+// Devuelve el estado de contenido generado por IA de todas las categorías activas
+// por idioma — para mostrar la tabla de estado en Admin → Idiomas (Bloque 2).
+// Línea server.js: ~5097
+app.get('/admin/categorias/estado-ia', requireAdmin, asyncHandler(async (req, res) => {
+  const cats = await pool.query(
+    `SELECT id, nombre, descripcion, subtitulo, descripcion_larga, caracteristicas
+     FROM categorias_vehiculos
+     WHERE activa = TRUE
+     ORDER BY orden, nombre`
+  );
+  const trads = await pool.query(
+    `SELECT categoria_id, lang_code, descripcion
+     FROM categorias_vehiculos_traducciones`
+  );
+
+  const tradPorCat = {};
+  for (const fila of trads.rows) {
+    if (!tradPorCat[fila.categoria_id]) tradPorCat[fila.categoria_id] = {};
+    tradPorCat[fila.categoria_id][fila.lang_code] = !!(fila.descripcion && fila.descripcion.trim());
+  }
+
+  const todosLangs = ['es', ...IDIOMAS_TRADUCIBLES];
+  const lista = cats.rows.map(function (c) {
+    const estado = {};
+    estado['es'] = !!(c.descripcion && c.descripcion.trim());
+    for (const lang of IDIOMAS_TRADUCIBLES) {
+      estado[lang] = !!(tradPorCat[c.id] && tradPorCat[c.id][lang]);
+    }
+    return { id: c.id, nombre: c.nombre, estado };
+  });
+
+  res.json({ categorias: lista, idiomas: todosLangs });
+}));
+
 // Recibe un array de categorías con sus datos y devuelve un objeto { id: { campos } }.
 async function generarCategoriasConIA(items, nombreIdioma) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
