@@ -357,9 +357,9 @@ table.tabla-precios input {
       <div id="panel-palabras-url" class="tarjeta oculto" style="margin-bottom:18px;"></div>
 
       <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
-        <span style="font-size:13px;">🤖 Traducir automáticamente con IA:</span>
+        <span style="font-size:13px;">🤖 Generar textos de interfaz con IA:</span>
         <select id="select-idioma-ia" class="campo" style="height:34px;width:auto;"></select>
-        <button class="boton-costa" onclick="traducirConIA()">Traducir lo que falte</button>
+        <button class="boton-costa" onclick="traducirConIA()">Generar lo que falta</button>
       </div>
 
       <div id="mensaje-textos" style="margin-bottom:12px;"></div>
@@ -376,6 +376,20 @@ table.tabla-precios input {
       </table>
 
       <div id="editor-texto-interfaz" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
+
+      <!-- ─── BLOQUE 2 — Contenido de categorías de flota ──────────────────── -->
+      <div style="margin-top:32px;border-top:2px solid var(--gris-borde);padding-top:24px;">
+        <h2 style="font-size:18px;margin-bottom:4px;">Contenido de categorías de flota</h2>
+        <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Genera con IA la descripción, subtítulo, texto largo y características de cada categoría de vehículo. El contenido en español se guarda en la ficha de la categoría. El de otros idiomas se guarda en la tabla de traducciones.</p>
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
+          <span style="font-size:13px;">🤖 Generar contenido de categorías con IA:</span>
+          <select id="select-idioma-categorias" class="campo" style="height:34px;width:auto;"></select>
+          <button class="boton-costa" onclick="generarCategoriasConIA()">Generar lo que falta</button>
+        </div>
+        <div id="mensaje-categorias-ia" style="margin-bottom:12px;"></div>
+        <div id="editor-categorias-ia" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
+      </div>
+
     </div>
 
     <!-- ─── CALCULADOR DE TARIFAS ─────────────────────────────────────────── -->
@@ -3680,6 +3694,15 @@ function renderizarSelectIA() {
   select.innerHTML = IDIOMAS_TEXTOS.map(function (l) {
     return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
   }).join('');
+  // Poblar también el selector del Bloque 2 — categorías de flota
+  // Incluye español porque la IA también genera el contenido en ES
+  var selectCats = document.getElementById('select-idioma-categorias');
+  if (!selectCats) return;
+  var todosLangs = ['es'].concat(IDIOMAS_TEXTOS);
+  selectCats.innerHTML = todosLangs.map(function (l) {
+    var nombre = l === 'es' ? 'Español' : (NOMBRES_IDIOMA[l] || l.toUpperCase());
+    return '<option value="' + l + '">' + nombre + '</option>';
+  }).join('');
 }
 
 function cargarTextosInterfaz() {
@@ -4122,6 +4145,110 @@ function guardarRevisionIA(lang) {
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
     }
+  });
+}
+
+// ─── Generador IA — Contenido de categorías de flota ─────────────────────────
+function generarCategoriasConIA() {
+  var lang = document.getElementById('select-idioma-categorias').value;
+  var msg = document.getElementById('mensaje-categorias-ia');
+  if (!lang) {
+    msg.innerHTML = '<div class="aviso-error">Selecciona un idioma.</div>';
+    return;
+  }
+  msg.innerHTML = '<div class="aviso-ok">🤖 Generando contenido de categorías con IA, puede tardar unos segundos...</div>';
+  document.getElementById('editor-categorias-ia').classList.add('oculto');
+
+  fetch('/admin/categorias/generar-ia/' + lang, { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (respuesta) {
+      if (!respuesta.ok) {
+        msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al generar') + '</div>';
+        return;
+      }
+      if (respuesta.propuestas.length === 0) {
+        msg.innerHTML = '<div class="aviso-ok">✅ Ya está todo generado en ' + lang.toUpperCase() + '.</div>';
+        return;
+      }
+      msg.innerHTML = '';
+      mostrarRevisionCategorias(lang, respuesta.propuestas);
+    })
+    .catch(function () {
+      msg.innerHTML = '<div class="aviso-error">No se pudo conectar con la IA. Inténtalo de nuevo.</div>';
+    });
+}
+
+function mostrarRevisionCategorias(lang, propuestas) {
+  var editor = document.getElementById('editor-categorias-ia');
+  editor.classList.remove('oculto');
+
+  var filas = propuestas.map(function (p) {
+    return '<div style="border-bottom:1px solid var(--gris-borde);padding:16px 0;">' +
+      '<div style="font-size:13px;font-weight:700;color:var(--texto-oscuro);margin-bottom:10px;">📦 ' + escapar(p.nombre) + '</div>' +
+      '<div style="display:grid;gap:8px;">' +
+        '<div>' +
+          '<label class="etiqueta">Descripción vehículo</label>' +
+          '<input type="text" class="campo cat-ia-descripcion" data-cat-id="' + p.categoria_id + '" value="' + escapar(p.descripcion) + '" style="width:100%;">' +
+        '</div>' +
+        '<div>' +
+          '<label class="etiqueta">Subtítulo</label>' +
+          '<input type="text" class="campo cat-ia-subtitulo" data-cat-id="' + p.categoria_id + '" value="' + escapar(p.subtitulo) + '" style="width:100%;">' +
+        '</div>' +
+        '<div>' +
+          '<label class="etiqueta">Descripción larga</label>' +
+          '<textarea class="campo cat-ia-desc-larga" data-cat-id="' + p.categoria_id + '" rows="3" style="width:100%;">' + escapar(p.descripcion_larga) + '</textarea>' +
+        '</div>' +
+        '<div>' +
+          '<label class="etiqueta">Características (una por línea)</label>' +
+          '<textarea class="campo cat-ia-caract" data-cat-id="' + p.categoria_id + '" rows="3" style="width:100%;">' + escapar(p.caracteristicas) + '</textarea>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  editor.innerHTML =
+    '<h2 style="margin-top:0">🤖 Revisión — categorías de flota en ' + lang.toUpperCase() + '</h2>' +
+    '<p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Revisa el contenido generado antes de guardar. Puedes editar cualquier campo.</p>' +
+    '<div style="max-height:500px;overflow-y:auto;">' + filas + '</div>' +
+    '<div id="revision-categorias-msg" style="margin:12px 0;"></div>' +
+    '<button class="boton-primario" onclick="guardarRevisionCategorias(\'' + lang + '\')">💾 Guardar todas</button> ' +
+    '<button class="boton-secundario" onclick="document.getElementById(\'editor-categorias-ia\').classList.add(\'oculto\')">Cancelar</button>';
+
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function guardarRevisionCategorias(lang) {
+  var msg = document.getElementById('revision-categorias-msg');
+  var descripciones  = document.querySelectorAll('.cat-ia-descripcion');
+  var subtitulos     = document.querySelectorAll('.cat-ia-subtitulo');
+  var descsLargas    = document.querySelectorAll('.cat-ia-desc-larga');
+  var caracteristicas = document.querySelectorAll('.cat-ia-caract');
+
+  var propuestas = Array.prototype.map.call(descripciones, function (el, i) {
+    return {
+      categoria_id:    parseInt(el.dataset.catId, 10),
+      descripcion:     el.value,
+      subtitulo:       subtitulos[i]      ? subtitulos[i].value      : '',
+      descripcion_larga: descsLargas[i]   ? descsLargas[i].value     : '',
+      caracteristicas: caracteristicas[i] ? caracteristicas[i].value : ''
+    };
+  });
+
+  msg.innerHTML = 'Guardando...';
+
+  fetch('/admin/categorias/guardar-ia-lote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang: lang, propuestas: propuestas })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Guardadas ' + respuesta.guardadas + ' categorías en ' + lang.toUpperCase() + '</div>';
+      setTimeout(function () { document.getElementById('editor-categorias-ia').classList.add('oculto'); }, 1500);
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
+    }
+  }).catch(function () {
+    msg.innerHTML = '<div class="aviso-error">Error de conexión. Inténtalo de nuevo.</div>';
   });
 }
 
