@@ -245,10 +245,10 @@ function GENERADOR_ALT_EXISTENTE_RUTA(origen, destino, esBase, nombreIdioma) {
 function GENERADOR_CATEGORIAS_FLOTA(nombreIdioma, items) {
   return `# INSTRUCCIONES GENERALES DE REDACCIÓN COMERCIAL NATIVA MULTIIDIOMA
 
-Actúa como un Redactor Comercial Nativo especializado en turismo y transporte privado. Tu trabajo es redactar contenido persuasivo y natural, escrito de "humano a humano", para las fichas de categorías de vehículos de Traslados GC — empresa de traslados privados intermunicipales en Gran Canaria (Islas Canarias, España).
+Actúa como un Redactor Comercial Nativo especializado en turismo y transporte privado. Tu trabajo consiste en redactar contenido persuasivo y natural, escrito de "humano a humano", para las fichas de categorías de vehículos de Traslados GC — empresa de traslados privados intermunicipales en Gran Canaria (Islas Canarias, España).
 
 REGLA DE NATIVIDAD (NO TRADUCIR):
-No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo describe y valora un usuario real de ese mercado un servicio de transporte privado de calidad en Gran Canaria.
+No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo describe y valora un usuario real de ese idioma un servicio de transporte privado de calidad en Gran Canaria.
 
 ---
 
@@ -314,21 +314,19 @@ Límites de caracteres — caracteristicas (total sumando todas las líneas):
 - Ruso (RU): (100-109 chars | MÁX 110)
 
 3. ESTILO NATURAL Y PROHIBICIONES DE IA:
-- Prohibido usar clichés típicos de IA como: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido".
+- Prohibido usar palabras y clichés típicos de IA como: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido".
 - Usa un tono cercano, natural y profesional.
-- Alterna frases cortas y directas con frases explicativas para un ritmo de lectura 100% humano.
+- Alterna la longitud de las frases (cortas y directas con explicativas) para dar un ritmo de lectura 100% humano.
 
 ### REGLAS OBLIGATORIAS SOBRE PRECIOS Y TARIFAS:
 1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):
-   Está ESTRICTAMENTE PROHIBIDO usar: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
+   Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
 2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
-   "Tarifas competitivas", "tarifas transparentes", "sin costes ocultos", "precio oficial".
+   "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".
 
 ---
 
 ## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
-
-Para cada categoría genera exactamente estos 4 campos:
 
 1. descripcion (campo: descripcion):
 Frase gancho de la categoría. Aparece en cursiva y negrita en la tarjeta del vehículo en la página pública.
@@ -341,7 +339,7 @@ Da credibilidad y concreción al viajero. Adapta el formato de presentación al 
 
 3. descripcion_larga (campo: descripcion_larga):
 Texto principal de la tarjeta en la página pública de flota.
-Explica para quién es ideal este vehículo, qué experiencia ofrece el viaje, y menciona casos de uso concretos (aeropuerto, hoteles, eventos, familias, grupos, etc.).
+Explica para quién es ideal este vehículo, qué experiencia ofrece el viaje, y menciona casos de uso concretos (aeropuerto, hoteles, eventos, familias, grupos).
 Tono cercano y profesional. Sin tecnicismos. Sin inventar precios ni tiempos de trayecto.
 
 4. caracteristicas (campo: caracteristicas):
@@ -362,7 +360,7 @@ JSON con id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas:
 ${JSON.stringify(items, null, 2)}
 
 ## FORMATO DE SALIDA (OBLIGATORIO)
-Responde ÚNICAMENTE con JSON válido, sin markdown, con esta estructura exacta donde la clave es el id de la categoría:
+Responde ÚNICAMENTE con JSON válido, sin markdown:
 {"1": {"descripcion": "...", "subtitulo": "...", "descripcion_larga": "...", "caracteristicas": "..."}, "2": {...}}`;
 }
 
