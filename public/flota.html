@@ -233,17 +233,6 @@
 </script>
 <script>
   // Lista blanca de extras que influyen en la elección de vehículo
-  var EXTRAS_SELECTOR = [
-    'Tabla de surf / bodyboard',
-    'Tabla de windsurf / kitesurf',
-    'Bicicleta',
-    'Esquís / Snowboard',
-    'Maleta extra grande adicional',
-    'Bulto voluminoso',
-    'Instrumento musical grande',
-    'Viajo con silla de ruedas eléctrica'
-  ];
-
   var categoriasFlota = [];
 
   // Cargar extras aprobados por conductores y poblar el selector
@@ -253,11 +242,8 @@
     .then(function(extras) {
       extrasFlota = extras;
       var sel = document.getElementById('sel-especial');
-      var aptos = extras.filter(function(e) {
-        return EXTRAS_SELECTOR.indexOf(e.nombre) !== -1;
-      });
-      if (aptos.length > 0) {
-        aptos.forEach(function(e) {
+      if (extras.length > 0) {
+        extras.forEach(function(e) {
           var opt = document.createElement('option');
           opt.value = e.id;
           opt.textContent = e.nombre;
