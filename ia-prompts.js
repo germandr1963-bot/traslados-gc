@@ -241,9 +241,23 @@ function GENERADOR_ALT_EXISTENTE_RUTA(origen, destino, esBase, nombreIdioma) {
 // Contenido comercial de categorías de vehículo — por idioma
 // Función: generarCategoriasConIA()
 // Botón admin: Generar lo que falta — pestaña Idiomas (sección Categorías de flota)
-// Línea original server.js: ~5134
+// Línea original server.js: ~5156
 function GENERADOR_CATEGORIAS_FLOTA(nombreIdioma, items) {
   const item = items[0];
+
+  const LIMITES_GEN12 = {
+    "Español":    { desc: "49-54", descMax: 55, sub: "59-64", subMax: 65, larga: "320-339", largaMax: 340, carac: "100-109", caracMax: 110 },
+    "Inglés":     { desc: "49-54", descMax: 55, sub: "59-64", subMax: 65, larga: "320-339", largaMax: 340, carac: "100-109", caracMax: 110 },
+    "Alemán":     { desc: "45-50", descMax: 51, sub: "55-60", subMax: 61, larga: "300-320", largaMax: 325, carac: "90-100",  caracMax: 102 },
+    "Francés":    { desc: "48-53", descMax: 54, sub: "58-63", subMax: 64, larga: "315-335", largaMax: 338, carac: "98-107",  caracMax: 108 },
+    "Italiano":   { desc: "49-54", descMax: 55, sub: "59-64", subMax: 65, larga: "320-339", largaMax: 340, carac: "100-109", caracMax: 110 },
+    "Neerlandés": { desc: "47-52", descMax: 53, sub: "57-62", subMax: 63, larga: "310-330", largaMax: 333, carac: "95-104",  caracMax: 105 },
+    "Sueco":      { desc: "48-53", descMax: 54, sub: "58-63", subMax: 64, larga: "315-335", largaMax: 338, carac: "98-107",  caracMax: 108 },
+    "Noruego":    { desc: "48-53", descMax: 54, sub: "58-63", subMax: 64, larga: "315-335", largaMax: 338, carac: "98-107",  caracMax: 108 },
+    "Finlandés":  { desc: "42-47", descMax: 48, sub: "52-57", subMax: 58, larga: "290-310", largaMax: 312, carac: "85-95",   caracMax: 96  },
+    "Ruso":       { desc: "38-43", descMax: 44, sub: "48-53", subMax: 54, larga: "260-280", largaMax: 285, carac: "80-90",   caracMax: 92  }
+  };
+  const L = LIMITES_GEN12[nombreIdioma] || LIMITES_GEN12["Español"];
 
   return `# INSTRUCCIONES GENERALES DE REDACCIÓN COMERCIAL NATIVA MULTIIDIOMA
 
@@ -264,56 +278,13 @@ Los vehículos realizan traslados privados de larga distancia en Gran Canaria �
 1. ENFOQUE HACIA LA CATEGORÍA:
 Todo el contenido debe reflejar la esencia, el perfil de cliente y la experiencia de viaje de la categoría "${item.nombre}".
 
-2. LÍMITES ESTRICTOS DE CARACTERES (INFRANQUEABLES):
-Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO en ${nombreIdioma}. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter. Si tu idioma necesita más espacio para expresar lo mismo, elige palabras más cortas y concisas.
+2. LÍMITES ESTRICTOS DE CARACTERES PARA ${nombreIdioma} (INFRANQUEABLES):
+Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter. Si tu idioma necesita más espacio para expresar lo mismo, elige palabras más cortas y concisas.
 
-Límites de caracteres — descripcion (frase gancho):
-- Español (ES): (49-54 chars | MÁX 55)
-- Inglés (EN): (49-54 chars | MÁX 55)
-- Alemán (DE): (49-54 chars | MÁX 55)
-- Francés (FR): (49-54 chars | MÁX 55)
-- Italiano (IT): (49-54 chars | MÁX 55)
-- Neerlandés (NL): (49-54 chars | MÁX 55)
-- Sueco (SV): (49-54 chars | MÁX 55)
-- Noruego (NO): (49-54 chars | MÁX 55)
-- Finlandés (FI): (49-54 chars | MÁX 55)
-- Ruso (RU): (49-54 chars | MÁX 55)
-
-Límites de caracteres — subtitulo (modelos de referencia):
-- Español (ES): (59-64 chars | MÁX 65)
-- Inglés (EN): (59-64 chars | MÁX 65)
-- Alemán (DE): (59-64 chars | MÁX 65)
-- Francés (FR): (59-64 chars | MÁX 65)
-- Italiano (IT): (59-64 chars | MÁX 65)
-- Neerlandés (NL): (59-64 chars | MÁX 65)
-- Sueco (SV): (59-64 chars | MÁX 65)
-- Noruego (NO): (59-64 chars | MÁX 65)
-- Finlandés (FI): (59-64 chars | MÁX 65)
-- Ruso (RU): (49-54 chars | MÁX 55)
-
-Límites de caracteres — descripcion_larga (texto principal de la tarjeta):
-- Español (ES): (320-339 chars | MÁX 340)
-- Inglés (EN): (320-339 chars | MÁX 340)
-- Alemán (DE): (320-339 chars | MÁX 340)
-- Francés (FR): (320-339 chars | MÁX 340)
-- Italiano (IT): (320-339 chars | MÁX 340)
-- Neerlandés (NL): (320-339 chars | MÁX 340)
-- Sueco (SV): (320-339 chars | MÁX 340)
-- Noruego (NO): (320-339 chars | MÁX 340)
-- Finlandés (FI): (320-339 chars | MÁX 340)
-- Ruso (RU): (320-339 chars | MÁX 340)
-
-Límites de caracteres — caracteristicas (total sumando todas las líneas):
-- Español (ES): (100-109 chars | MÁX 110)
-- Inglés (EN): (100-109 chars | MÁX 110)
-- Alemán (DE): (100-109 chars | MÁX 110)
-- Francés (FR): (100-109 chars | MÁX 110)
-- Italiano (IT): (100-109 chars | MÁX 110)
-- Neerlandés (NL): (100-109 chars | MÁX 110)
-- Sueco (SV): (100-109 chars | MÁX 110)
-- Noruego (NO): (100-109 chars | MÁX 110)
-- Finlandés (FI): (100-109 chars | MÁX 110)
-- Ruso (RU): (100-109 chars | MÁX 110)
+- descripcion:       ${L.desc} chars (MÁXIMO ABSOLUTO: ${L.descMax})
+- subtitulo:         ${L.sub} chars (MÁXIMO ABSOLUTO: ${L.subMax})
+- descripcion_larga: ${L.larga} chars (MÁXIMO ABSOLUTO: ${L.largaMax})
+- caracteristicas:   ${L.carac} chars en total sumando todas las líneas (MÁXIMO ABSOLUTO: ${L.caracMax})
 
 3. ESTILO NATURAL Y PROHIBICIONES DE IA:
 - Prohibido usar palabras y clichés típicos de IA como: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido".
