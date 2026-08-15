@@ -2521,7 +2521,15 @@ app.get('/api/flota', asyncHandler(async (req, res) => {
      ORDER BY cv.orden, cv.nombre`,
     [lang]
   );
-  res.json(result.rows);
+  const rows = result.rows.map(function(cat) {
+    const nombreTrad  = obtenerTexto('categoria_nombre_'  + cat.id, lang);
+    const maletasTrad = obtenerTexto('categoria_maletas_' + cat.id, lang);
+    return Object.assign({}, cat, {
+      nombre:            nombreTrad  || cat.nombre,
+      capacidad_maletas: maletasTrad || cat.capacidad_maletas
+    });
+  });
+  res.json(rows);
 }));
 
 app.get('/api/idiomas-activos', asyncHandler(async (req, res) => {
@@ -2619,6 +2627,7 @@ app.get('/api/extras-publicos', asyncHandler(async (req, res) => {
 app.get('/api/extras-flota', asyncHandler(async (req, res) => {
   // Devuelve extras aprobados (gratis o pago) por al menos un conductor aprobado
   // Incluye las categoria_id de los conductores que aprueban cada extra
+  const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
   const result = await pool.query(`
     SELECT e.id, e.nombre, e.bloque, e.orden,
       array_agg(DISTINCT c.categoria_id) FILTER (WHERE c.categoria_id IS NOT NULL) AS categorias
@@ -2632,7 +2641,11 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
     GROUP BY e.id, e.nombre, e.bloque, e.orden
     ORDER BY e.bloque, e.orden, e.id
   `);
-  res.json(result.rows);
+  const rows = result.rows.map(function(ex) {
+    const nombreTrad = obtenerTexto('extra_nombre_' + ex.id, lang);
+    return Object.assign({}, ex, { nombre: nombreTrad || ex.nombre });
+  });
+  res.json(rows);
 }));
 
 app.get('/api/marcas-vehiculos', asyncHandler(async (req, res) => {
