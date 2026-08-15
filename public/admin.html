@@ -380,23 +380,30 @@ table.tabla-precios input {
 
       <!-- ─── BLOQUE 2 — Contenido de categorías de flota ──────────────────── -->
       <div style="margin-top:32px;border-top:2px solid var(--gris-borde);padding-top:24px;">
-        <h2 style="font-size:18px;margin-bottom:4px;">Contenido de categorías de flota</h2>
-        <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Genera con IA la descripción, subtítulo, texto largo y características de cada categoría de vehículo. El contenido en español se guarda en la ficha de la categoría. El de otros idiomas se guarda en la tabla de traducciones.</p>
-
-        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
-          <span style="font-size:13px;">🤖 Generar contenido de categorías con IA:</span>
-          <select id="select-idioma-categorias" class="campo" style="height:34px;width:auto;"></select>
-          <button class="boton-costa" onclick="generarCategoriasConIA()">Generar lo que falta</button>
+        <div style="cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none;" onclick="toggleBloque2Flota()">
+          <span id="bloque2-flota-icono" style="font-size:14px;">▶</span>
+          <h2 style="font-size:18px;margin:0;">Contenido de categorías de flota</h2>
+          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
         </div>
 
-        <div id="mensaje-categorias-ia" style="margin-bottom:12px;"></div>
+        <div id="bloque2-flota-contenido" style="display:none;margin-top:16px;">
+          <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Genera con IA la descripción, subtítulo, texto largo y características de cada categoría de vehículo. El contenido en español se guarda en la ficha de la categoría. El de otros idiomas se guarda en la tabla de traducciones.</p>
 
-        <table class="tabla-admin">
-          <thead id="thead-categorias-ia"></thead>
-          <tbody id="tabla-categorias-ia-cuerpo"></tbody>
-        </table>
+          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
+            <span style="font-size:13px;">🤖 Generar contenido de categorías con IA:</span>
+            <select id="select-idioma-categorias" class="campo" style="height:34px;width:auto;"></select>
+            <button class="boton-costa" onclick="generarCategoriasConIA()">Generar lo que falta</button>
+          </div>
 
-        <div id="editor-categorias-ia" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
+          <div id="mensaje-categorias-ia" style="margin-bottom:12px;"></div>
+
+          <table class="tabla-admin">
+            <thead id="thead-categorias-ia"></thead>
+            <tbody id="tabla-categorias-ia-cuerpo"></tbody>
+          </table>
+
+          <div id="editor-categorias-ia" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
+        </div>
       </div>
 
     </div>
@@ -3907,6 +3914,15 @@ function toggleSeccionTextos(seccionId, cabeceraEl) {
   var icono = document.getElementById(seccionId + '-icono');
   var visible = filas.length > 0 && filas[0].style.display !== 'none';
   filas.forEach(function(f) { f.style.display = visible ? 'none' : ''; });
+  if (icono) icono.textContent = visible ? '▶' : '▼';
+}
+
+function toggleBloque2Flota() {
+  var contenido = document.getElementById('bloque2-flota-contenido');
+  var icono = document.getElementById('bloque2-flota-icono');
+  if (!contenido) return;
+  var visible = contenido.style.display !== 'none';
+  contenido.style.display = visible ? 'none' : 'block';
   if (icono) icono.textContent = visible ? '▶' : '▼';
 }
 
