@@ -243,6 +243,8 @@ function GENERADOR_ALT_EXISTENTE_RUTA(origen, destino, esBase, nombreIdioma) {
 // Botón admin: Generar lo que falta — pestaña Idiomas (sección Categorías de flota)
 // Línea original server.js: ~5134
 function GENERADOR_CATEGORIAS_FLOTA(nombreIdioma, items) {
+  const item = items[0];
+
   return `# INSTRUCCIONES GENERALES DE REDACCIÓN COMERCIAL NATIVA MULTIIDIOMA
 
 Actúa como un Redactor Comercial Nativo especializado en turismo y transporte privado. Tu trabajo consiste en redactar contenido persuasivo y natural, escrito de "humano a humano", para las fichas de categorías de vehículos de Traslados GC — empresa de traslados privados intermunicipales en Gran Canaria (Islas Canarias, España).
@@ -260,7 +262,7 @@ Los vehículos realizan traslados privados de larga distancia en Gran Canaria �
 ## REGLAS DE ORO Y ESTILO (HUMAN-LIKE)
 
 1. ENFOQUE HACIA LA CATEGORÍA:
-Todo el contenido debe reflejar la esencia, el perfil de cliente y la experiencia de viaje de cada categoría de vehículo concreta.
+Todo el contenido debe reflejar la esencia, el perfil de cliente y la experiencia de viaje de la categoría "${item.nombre}".
 
 2. LÍMITES ESTRICTOS DE CARACTERES (INFRANQUEABLES):
 Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO en ${nombreIdioma}. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter. Si tu idioma necesita más espacio para expresar lo mismo, elige palabras más cortas y concisas.
@@ -287,7 +289,7 @@ Límites de caracteres — subtitulo (modelos de referencia):
 - Sueco (SV): (59-64 chars | MÁX 65)
 - Noruego (NO): (59-64 chars | MÁX 65)
 - Finlandés (FI): (59-64 chars | MÁX 65)
-- Ruso (RU): (59-64 chars | MÁX 65)
+- Ruso (RU): (49-54 chars | MÁX 55)
 
 Límites de caracteres — descripcion_larga (texto principal de la tarjeta):
 - Español (ES): (320-339 chars | MÁX 340)
@@ -355,13 +357,13 @@ Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacio
 
 ---
 
-## CATEGORÍAS A GENERAR
+## CATEGORÍA A GENERAR
 JSON con id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas:
-${JSON.stringify(items, null, 2)}
+${JSON.stringify(item, null, 2)}
 
 ## FORMATO DE SALIDA (OBLIGATORIO)
 Responde ÚNICAMENTE con JSON válido, sin markdown:
-{"1": {"descripcion": "...", "subtitulo": "...", "descripcion_larga": "...", "caracteristicas": "..."}, "2": {...}}`;
+{"${item.id}": {"descripcion": "...", "subtitulo": "...", "descripcion_larga": "...", "caracteristicas": "..."}}`;
 }
 
 

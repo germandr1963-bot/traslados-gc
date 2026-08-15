@@ -5152,38 +5152,46 @@ app.get('/admin/categorias/estado-ia', requireAdmin, asyncHandler(async (req, re
 }));
 
 // Recibe un array de categorías con sus datos y devuelve un objeto { id: { campos } }.
+// Procesa una categoría a la vez para mayor fiabilidad — el generador recibe items[0].
 async function generarCategoriasConIA(items, nombreIdioma) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error('Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.');
   }
 
-  const prompt = iaPrompts.GENERADOR_CATEGORIAS_FLOTA(nombreIdioma, items);
+  const resultado = {};
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4000,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
+  for (const item of items) {
+    const prompt = iaPrompts.GENERADOR_CATEGORIAS_FLOTA(nombreIdioma, [item]);
 
-  if (!response.ok) {
-    const cuerpoError = await response.text();
-    throw new Error('Error de la API de Claude (' + response.status + '): ' + cuerpoError.slice(0, 200));
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!response.ok) {
+      const cuerpoError = await response.text();
+      throw new Error('Error de la API de Claude (' + response.status + '): ' + cuerpoError.slice(0, 200));
+    }
+
+    const data3 = await response.json();
+    const textoRespuesta3 = data3.content.map(function (b) { return b.text || ''; }).join('');
+    const limpio3 = textoRespuesta3.replace(/```json|```/g, '').trim();
+    console.log('[GEN12] Categoría', item.id, '— Respuesta IA:', limpio3.slice(0, 300));
+    const parcial = JSON.parse(limpio3);
+    Object.assign(resultado, parcial);
   }
 
-  const data3 = await response.json();
-  const textoRespuesta3 = data3.content.map(function (b) { return b.text || ''; }).join('');
-  const limpio3 = textoRespuesta3.replace(/```json|```/g, '').trim();
-  console.log('[GEN12] Respuesta IA:', limpio3.slice(0, 500));
-  return JSON.parse(limpio3);
+  return resultado;
 }
 
 // Genera con IA el contenido comercial (descripcion, subtitulo, descripcion_larga,
