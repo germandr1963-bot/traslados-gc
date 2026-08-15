@@ -363,7 +363,7 @@ ${JSON.stringify(item, null, 2)}
 
 ## FORMATO DE SALIDA (OBLIGATORIO)
 Responde ÚNICAMENTE con JSON válido, sin markdown:
-{"${item.id}": {"descripcion": "...", "subtitulo": "...", "descripcion_larga": "...", "caracteristicas": "..."}}`;
+{"descripcion": "...", "subtitulo": "...", "descripcion_larga": "...", "caracteristicas": "..."}`;
 }
 
 
