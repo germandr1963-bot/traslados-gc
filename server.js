@@ -5217,31 +5217,9 @@ app.post('/admin/categorias/generar-ia/:lang', requireAdmin, asyncHandler(async 
     return res.json({ ok: true, propuestas: [] });
   }
 
-  // Cargar traducciones ya existentes para este idioma
-  let yaGeneradas = {};
-  if (lang === 'es') {
-    // Para español usamos los campos directos de la tabla
-    const esRows = await pool.query(
-      `SELECT id, descripcion, subtitulo, descripcion_larga, caracteristicas
-       FROM categorias_vehiculos WHERE activa = TRUE`
-    );
-    for (const r of esRows.rows) {
-      if (r.descripcion && r.descripcion.trim()) yaGeneradas[r.id] = true;
-    }
-  } else {
-    const tradRows = await pool.query(
-      `SELECT categoria_id FROM categorias_vehiculos_traducciones WHERE lang_code = $1`,
-      [lang]
-    );
-    for (const r of tradRows.rows) yaGeneradas[r.categoria_id] = true;
-  }
-
-  // Filtrar solo las que faltan
-  const pendientes = cats.rows.filter(function (c) { return !yaGeneradas[c.id]; });
-
-  if (pendientes.length === 0) {
-    return res.json({ ok: true, propuestas: [] });
-  }
+  // Genera siempre todas las categorías activas — sin filtrar por contenido existente.
+  // El panel de revisión permite al admin decidir qué guardar antes de sobreescribir.
+  const pendientes = cats.rows;
 
   const nombreIdioma = await getNombreIdioma(lang);
   let generado;
