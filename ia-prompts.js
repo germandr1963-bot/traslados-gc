@@ -323,17 +323,18 @@ Escribe entre 3 y 5 características.
 
 ---
 
-## AUTOCONTROL DE CARACTERES
-Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) de cada campo. Si alguno supera por 1 solo carácter su límite máximo, reescríbelo.
-
----
+## AUTOCONTROL DE CARACTERES (PROCESO INTERNO — NO ESCRIBAS NADA HASTA TENER EL JSON FINAL)
+Antes de responder, verifica internamente que cada campo cumple su límite máximo.
+Si alguno se pasa, corrígelo. Este proceso es interno — no aparece en la respuesta.
 
 ## CATEGORÍA A GENERAR
 JSON con id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas:
 ${JSON.stringify(item, null, 2)}
 
-## FORMATO DE SALIDA (OBLIGATORIO)
-Responde ÚNICAMENTE con JSON válido, sin markdown:
+## FORMATO DE SALIDA (OBLIGATORIO — LEE ESTO CON ATENCIÓN)
+Tu respuesta completa es ÚNICAMENTE el objeto JSON. Nada antes, nada después.
+PROHIBIDO: borradores, conteos, explicaciones, pasos intermedios, markdown, texto de ningún tipo.
+SOLO esto:
 {"descripcion": "...", "subtitulo": "...", "descripcion_larga": "...", "caracteristicas": "..."}`;
 }
 
