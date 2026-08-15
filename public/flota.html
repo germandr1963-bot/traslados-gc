@@ -269,6 +269,11 @@
 
   // Cargar categorías desde /api/flota
   var langFlota = (function() { var p = window.location.pathname.split('/'); return (p[1] && p[1].length === 2) ? p[1] : 'es'; })();
+  // Variables globales para textos traducidos de las tarjetas
+  var txtHasta      = 'Hasta';
+  var txtPasajeros  = 'pasajeros';
+  var txtMaletas    = 'maletas';
+  var txtReservar   = 'Reservar';
   fetch('/api/flota?lang=' + langFlota)
     .then(function(r) { return r.json(); })
     .then(function(cats) {
@@ -312,15 +317,15 @@
             }).join('') +
           '</p>';
         }
-        var cap = 'Hasta ' + c.capacidad_pasajeros + ' pasajeros';
-        if (c.capacidad_maletas && c.capacidad_maletas !== '—') cap += ' · ' + c.capacidad_maletas + ' maletas';
+        var cap = txtHasta + ' ' + c.capacidad_pasajeros + ' ' + txtPasajeros;
+        if (c.capacidad_maletas && c.capacidad_maletas !== '—') cap += ' · ' + c.capacidad_maletas + ' ' + txtMaletas;
         return '<div class="tarjeta-cat" data-pasajeros="' + c.capacidad_pasajeros + '" data-id="' + c.id + '">'
           + '<div class="tarjeta-cat-top">'
           +   '<div>'
           +     '<div class="tarjeta-cat-nombre">' + c.nombre + '</div>'
           +     '<div class="tarjeta-cat-cap">' + cap + '</div>'
           +   '</div>'
-          +   '<a href="/?categoria=' + c.id + '" class="btn-reservar-cat">Reservar</a>'
+          +   '<a href="/?categoria=' + c.id + '" class="btn-reservar-cat">' + txtReservar + '</a>'
           + '</div>'
           + '<div class="tarjeta-cat-body">'
           +   '<div class="tarjeta-cat-desc">' + desc + subtitulo + descLarga + '</div>'
@@ -470,6 +475,11 @@
           if (pp.flota_faq4_r)              document.getElementById('flota-faq4-r').textContent              = pp.flota_faq4_r;
           if (pp.flota_faq5_p)              document.getElementById('flota-faq5-p').textContent              = pp.flota_faq5_p;
           if (pp.flota_faq5_r)              document.getElementById('flota-faq5-r').textContent              = pp.flota_faq5_r;
+          // Textos traducidos para las tarjetas de categorías
+          if (pp.flota_catalogo_hasta)      txtHasta     = pp.flota_catalogo_hasta;
+          if (pp.flota_catalogo_pasajeros)  txtPasajeros = pp.flota_catalogo_pasajeros;
+          if (pp.flota_catalogo_maletas)    txtMaletas   = pp.flota_catalogo_maletas;
+          if (pp.flota_catalogo_btn_reservar) txtReservar = pp.flota_catalogo_btn_reservar;
           // Opciones del selector de maletas
           if (pp.flota_selector_mal_0 || pp.flota_selector_mal_1) {
             var selMal = document.getElementById('sel-maletas');
