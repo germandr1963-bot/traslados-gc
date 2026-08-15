@@ -772,6 +772,9 @@ async function initSchema() {
     { clave: 'flota_selector_mal_4',        contexto: 'Opción 4 maletas del selector de maletas', es: '4 maletas' },
     { clave: 'flota_selector_mal_5',        contexto: 'Opción 5 o más maletas del selector de maletas', es: '5 o más maletas' },
     { clave: 'flota_selector_esp_ninguno',  contexto: 'Opción por defecto del selector de equipaje especial', es: 'Ninguno' },
+    { clave: 'flota_catalogo_hasta',        contexto: 'Palabra "Hasta" que precede a la capacidad de pasajeros en cada tarjeta de categoría', es: 'Hasta' },
+    { clave: 'flota_catalogo_pasajeros',    contexto: 'Palabra "pasajeros" en la capacidad de cada tarjeta de categoría (plural)', es: 'pasajeros' },
+    { clave: 'flota_catalogo_maletas',      contexto: 'Palabra "maletas" en la capacidad de cada tarjeta de categoría', es: 'maletas' },
   ];
 
   for (const t of TEXTOS_FLOTA) {
