@@ -248,7 +248,7 @@
 
   // Cargar extras aprobados por conductores y poblar el selector
   var extrasFlota = [];
-  fetch('/api/extras-flota')
+  fetch('/api/extras-flota?lang=' + langFlota)
     .then(function(r) { return r.json(); })
     .then(function(extras) {
       extrasFlota = extras;
