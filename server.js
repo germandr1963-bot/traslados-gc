@@ -776,6 +776,13 @@ async function initSchema() {
     { clave: 'flota_catalogo_pasajero',     contexto: 'Palabra "pasajero" en singular — para "1 pasajero" en el selector y tarjetas', es: 'pasajero' },
     { clave: 'flota_catalogo_pasajeros',    contexto: 'Palabra "pasajeros" en plural — para "2 pasajeros", "4 pasajeros" etc.', es: 'pasajeros' },
     { clave: 'flota_catalogo_maletas',      contexto: 'Palabra "maletas" en la capacidad de cada tarjeta de categoría', es: 'maletas' },
+    { clave: 'flota_pax_1',                contexto: 'Texto completo para 1 pasajero en el selector de la página de flota', es: '1 pasajero' },
+    { clave: 'flota_pax_2',                contexto: 'Texto completo para 2 pasajeros en el selector de la página de flota', es: '2 pasajeros' },
+    { clave: 'flota_pax_3',                contexto: 'Texto completo para 3 pasajeros en el selector de la página de flota', es: '3 pasajeros' },
+    { clave: 'flota_pax_4',                contexto: 'Texto completo para 4 pasajeros en el selector de la página de flota', es: '4 pasajeros' },
+    { clave: 'flota_pax_5',                contexto: 'Texto completo para 5 pasajeros en el selector de la página de flota', es: '5 pasajeros' },
+    { clave: 'flota_pax_6',                contexto: 'Texto completo para 6 pasajeros en el selector de la página de flota', es: '6 pasajeros' },
+    { clave: 'flota_pax_7',                contexto: 'Texto completo para 7 pasajeros en el selector de la página de flota', es: '7 pasajeros' },
   ];
 
   for (const t of TEXTOS_FLOTA) {
@@ -5477,6 +5484,13 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
     flota_catalogo_pasajeros:   obtenerTexto('flota_catalogo_pasajeros',    lang),
     flota_catalogo_maletas:     obtenerTexto('flota_catalogo_maletas',      lang),
     flota_selector_intro:       obtenerTexto('flota_selector_intro',        lang),
+    flota_pax_1:                obtenerTexto('flota_pax_1',                 lang),
+    flota_pax_2:                obtenerTexto('flota_pax_2',                 lang),
+    flota_pax_3:                obtenerTexto('flota_pax_3',                 lang),
+    flota_pax_4:                obtenerTexto('flota_pax_4',                 lang),
+    flota_pax_5:                obtenerTexto('flota_pax_5',                 lang),
+    flota_pax_6:                obtenerTexto('flota_pax_6',                 lang),
+    flota_pax_7:                obtenerTexto('flota_pax_7',                 lang),
     flota_eco_titulo:           obtenerTexto('flota_eco_titulo',            lang),
     flota_eco_texto:            obtenerTexto('flota_eco_texto',             lang),
     flota_faq_titulo:           obtenerTexto('flota_faq_titulo',            lang),
