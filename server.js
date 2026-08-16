@@ -2641,9 +2641,19 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
     GROUP BY e.id, e.nombre, e.bloque, e.orden
     ORDER BY e.bloque, e.orden, e.id
   `);
+  const extrasTrad = await pool.query(
+    `SELECT ti.texto_es, COALESCE(tit.texto, ti.texto_es) AS nombre_traducido
+     FROM textos_interfaz ti
+     LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+     WHERE ti.modulo = 'Extras'`,
+    [lang]
+  );
+  const mapaExtras = {};
+  for (const e of extrasTrad.rows) {
+    mapaExtras[e.texto_es] = e.nombre_traducido;
+  }
   const rows = result.rows.map(function(ex) {
-    const nombreTrad = obtenerTexto('extra_nombre_' + ex.id, lang);
-    return Object.assign({}, ex, { nombre: nombreTrad || ex.nombre });
+    return Object.assign({}, ex, { nombre: mapaExtras[ex.nombre] || ex.nombre });
   });
   res.json(rows);
 }));
