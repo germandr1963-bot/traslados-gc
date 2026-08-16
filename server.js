@@ -2627,7 +2627,6 @@ app.get('/api/extras-publicos', asyncHandler(async (req, res) => {
 app.get('/api/extras-flota', asyncHandler(async (req, res) => {
   // Devuelve extras aprobados (gratis o pago) por al menos un conductor aprobado
   // Incluye las categoria_id de los conductores que aprueban cada extra
-  // Traduce con JOIN directo a BD (igual que extras-publicos) para no depender del caché
   const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
   const result = await pool.query(`
     SELECT e.id, e.nombre, e.bloque, e.orden,
@@ -2642,23 +2641,11 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
     GROUP BY e.id, e.nombre, e.bloque, e.orden
     ORDER BY e.bloque, e.orden, e.id
   `);
-  if (lang !== 'es') {
-    const extrasTrad = await pool.query(
-      `SELECT ti.texto_es, COALESCE(tit.texto, ti.texto_es) AS nombre_traducido
-       FROM textos_interfaz ti
-       LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
-       WHERE ti.modulo = 'Extras'`,
-      [lang]
-    );
-    const mapaExtras = {};
-    for (const e of extrasTrad.rows) {
-      mapaExtras[e.texto_es] = e.nombre_traducido;
-    }
-    for (const r of result.rows) {
-      r.nombre = mapaExtras[r.nombre] || r.nombre;
-    }
-  }
-  res.json(result.rows);
+  const rows = result.rows.map(function(ex) {
+    const nombreTrad = obtenerTexto('extra_nombre_' + ex.id, lang);
+    return Object.assign({}, ex, { nombre: nombreTrad || ex.nombre });
+  });
+  res.json(rows);
 }));
 
 app.get('/api/marcas-vehiculos', asyncHandler(async (req, res) => {
