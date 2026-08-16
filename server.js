@@ -922,7 +922,7 @@ async function initSchema() {
   }
 
   // Sincronizar nombres de categorías activas como textos traducibles
-  const catsActivas = await pool.query('SELECT id, nombre, capacidad_maletas FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
+  const catsActivas = await pool.query('SELECT id, nombre, capacidad_pasajeros, capacidad_maletas FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
   for (const cat of catsActivas.rows) {
     const clave = 'categoria_nombre_' + cat.id;
     await pool.query(
@@ -940,6 +940,15 @@ async function initSchema() {
          VALUES ($1, 'Categorías de vehículo', $2, $3)
          ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
         [claveMaletas, 'Texto de maletas de la categoría "' + cat.nombre + '" tal como aparece en la web pública', maletasTxt]
+      );
+      // Texto completo de capacidad para la página de flota — traducible como texto completo
+      const claveFlotaCap = 'flota_cap_' + cat.id;
+      const textoFlotaCap = 'Hasta ' + cat.capacidad_pasajeros + ' pasajeros · ' + maletasTxt + ' maletas';
+      await pool.query(
+        `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+         VALUES ($1, 'Página de flota', $2, $3)
+         ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+        [claveFlotaCap, 'Capacidad de la categoría "' + cat.nombre + '" tal como aparece en la página de flota — traducir el texto completo', textoFlotaCap]
       );
     }
   }
@@ -5516,6 +5525,14 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
     flota_pax_5:                obtenerTexto('flota_pax_5',                 lang),
     flota_pax_6:                obtenerTexto('flota_pax_6',                 lang),
     flota_pax_7:                obtenerTexto('flota_pax_7',                 lang),
+    flota_cap_2:                obtenerTexto('flota_cap_2',                 lang),
+    flota_cap_3:                obtenerTexto('flota_cap_3',                 lang),
+    flota_cap_4:                obtenerTexto('flota_cap_4',                 lang),
+    flota_cap_5:                obtenerTexto('flota_cap_5',                 lang),
+    flota_cap_6:                obtenerTexto('flota_cap_6',                 lang),
+    flota_cap_7:                obtenerTexto('flota_cap_7',                 lang),
+    flota_cap_8:                obtenerTexto('flota_cap_8',                 lang),
+    flota_cap_9:                obtenerTexto('flota_cap_9',                 lang),
     flota_eco_titulo:           obtenerTexto('flota_eco_titulo',            lang),
     flota_eco_texto:            obtenerTexto('flota_eco_texto',             lang),
     flota_faq_titulo:           obtenerTexto('flota_faq_titulo',            lang),
