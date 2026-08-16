@@ -233,20 +233,12 @@
 </script>
 <script>
   // Lista blanca de extras que influyen en la elección de vehículo
-  var EXTRAS_SELECTOR = [
-    'Tabla de surf / bodyboard',
-    'Tabla de windsurf / kitesurf',
-    'Bicicleta',
-    'Esquís / Snowboard',
-    'Maleta extra grande adicional',
-    'Bulto voluminoso',
-    'Instrumento musical grande',
-    'Viajo con silla de ruedas eléctrica'
-  ];
+  var langFlota = (function() { var p = window.location.pathname.split('/'); return (p[1] && p[1].length === 2) ? p[1] : 'es'; })();
 
   var categoriasFlota = [];
 
   // Cargar extras aprobados por conductores y poblar el selector
+  // Bloques C, D y E son los que influyen en la elección de vehículo
   var extrasFlota = [];
   fetch('/api/extras-flota?lang=' + langFlota)
     .then(function(r) { return r.json(); })
@@ -254,7 +246,7 @@
       extrasFlota = extras;
       var sel = document.getElementById('sel-especial');
       var aptos = extras.filter(function(e) {
-        return EXTRAS_SELECTOR.indexOf(e.nombre) !== -1;
+        return ['C','D','E'].indexOf(e.bloque) !== -1;
       });
       if (aptos.length > 0) {
         aptos.forEach(function(e) {
@@ -268,7 +260,6 @@
     .catch(function() {});
 
   // Cargar categorías desde /api/flota
-  var langFlota = (function() { var p = window.location.pathname.split('/'); return (p[1] && p[1].length === 2) ? p[1] : 'es'; })();
   // Variables globales para textos traducidos de las tarjetas
   var txtHasta      = 'Hasta';
   var txtPasajeros  = 'pasajeros';
