@@ -396,7 +396,8 @@
     html += '<ul style="list-style:none;padding:0;margin:0;text-align:left;">';
     for (var j = 0; j < aptas.length; j++) {
       var cat = aptas[j];
-      var cap = pp['flota_cap_' + cat.id] || (txtHasta + ' ' + cat.capacidad_pasajeros + ' ' + txtPasajeros);
+      var cap = txtHasta + ' ' + cat.capacidad_pasajeros + ' ' + txtPasajeros;
+      if (cat.capacidad_maletas && cat.capacidad_maletas !== '—') cap += ' · ' + cat.capacidad_maletas + ' ' + txtMaletas;
       html += '<li style="padding:8px 0;border-bottom:1px solid var(--gris-borde);">'
             + '<strong style="color:var(--texto-oscuro);font-size:14px;">' + cat.nombre + '</strong>'
             + '<span style="color:var(--texto-muted);font-size:12px;margin-left:8px;">' + cap + '</span>'
