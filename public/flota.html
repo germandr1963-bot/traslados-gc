@@ -232,9 +232,6 @@
 }
 </script>
 <script>
-  // Detectar idioma desde la URL — debe declararse antes de cualquier fetch
-  var langFlota = (function() { var p = window.location.pathname.split('/'); return (p[1] && p[1].length === 2) ? p[1] : 'es'; })();
-
   // Lista blanca de extras que influyen en la elección de vehículo
   var EXTRAS_SELECTOR = [
     'Tabla de surf / bodyboard',
@@ -271,6 +268,7 @@
     .catch(function() {});
 
   // Cargar categorías desde /api/flota
+  var langFlota = (function() { var p = window.location.pathname.split('/'); return (p[1] && p[1].length === 2) ? p[1] : 'es'; })();
   // Variables globales para textos traducidos de las tarjetas
   var txtHasta      = 'Hasta';
   var txtPasajeros  = 'pasajeros';
