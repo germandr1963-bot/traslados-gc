@@ -922,7 +922,7 @@ async function initSchema() {
   }
 
   // Sincronizar nombres de categorías activas como textos traducibles
-  const catsActivas = await pool.query('SELECT id, nombre, capacidad_pasajeros, capacidad_maletas FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
+  const catsActivas = await pool.query('SELECT id, nombre, capacidad_maletas FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
   for (const cat of catsActivas.rows) {
     const clave = 'categoria_nombre_' + cat.id;
     await pool.query(
@@ -931,16 +931,15 @@ async function initSchema() {
        ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
       [clave, 'Nombre de la categoría "' + cat.nombre + '" tal como aparece en emails y páginas públicas', cat.nombre]
     );
-    // Texto completo de capacidad (ej. "Hasta 4 pasajeros · 3 maletas grandes") — traducible como texto completo
+    // El texto de maletas (ej. "3 grandes") también es traducible
     const maletasTxt = (cat.capacidad_maletas || '').trim();
     if (maletasTxt && maletasTxt !== '—') {
       const claveMaletas = 'categoria_maletas_' + cat.id;
-      const textoCapacidad = 'Hasta ' + cat.capacidad_pasajeros + ' pasajeros · ' + maletasTxt;
       await pool.query(
         `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
          VALUES ($1, 'Categorías de vehículo', $2, $3)
          ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
-        [claveMaletas, 'Capacidad de la categoría "' + cat.nombre + '" tal como aparece en la web pública — traducir el texto completo', textoCapacidad]
+        [claveMaletas, 'Texto de maletas de la categoría "' + cat.nombre + '" tal como aparece en la web pública', maletasTxt]
       );
     }
   }
