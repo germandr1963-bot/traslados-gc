@@ -325,8 +325,7 @@
             }).join('') +
           '</p>';
         }
-        var cap = txtHasta + ' ' + c.capacidad_pasajeros + ' ' + txtPasajeros;
-        if (c.capacidad_maletas && c.capacidad_maletas !== '—') cap += ' · ' + c.capacidad_maletas + ' ' + txtMaletas;
+        var cap = c.capacidad_maletas || (txtHasta + ' ' + c.capacidad_pasajeros + ' ' + txtPasajeros);
         return '<div class="tarjeta-cat" data-pasajeros="' + c.capacidad_pasajeros + '" data-id="' + c.id + '">'
           + '<div class="tarjeta-cat-top">'
           +   '<div>'
@@ -397,8 +396,7 @@
     html += '<ul style="list-style:none;padding:0;margin:0;text-align:left;">';
     for (var j = 0; j < aptas.length; j++) {
       var cat = aptas[j];
-      var cap = txtHasta + ' ' + cat.capacidad_pasajeros + ' ' + txtPasajeros;
-      if (cat.capacidad_maletas && cat.capacidad_maletas !== '—') cap += ' · ' + cat.capacidad_maletas + ' ' + txtMaletas;
+      var cap = cat.capacidad_maletas || (txtHasta + ' ' + cat.capacidad_pasajeros + ' ' + txtPasajeros);
       html += '<li style="padding:8px 0;border-bottom:1px solid var(--gris-borde);">'
             + '<strong style="color:var(--texto-oscuro);font-size:14px;">' + cat.nombre + '</strong>'
             + '<span style="color:var(--texto-muted);font-size:12px;margin-left:8px;">' + cap + '</span>'
