@@ -266,7 +266,8 @@
   var txtPasajero   = 'pasajero';
   var txtMaletas    = 'maletas';
   var txtReservar   = 'Reservar';
-  var txtIntroSelector = 'Según tus parámetros de búsqueda, los vehículos recomendados pueden ser estos:';
+  var txtIntroSelector  = 'Según tus parámetros de búsqueda, los vehículos recomendados pueden ser estos:';
+  var txtSinResultado   = 'No encontramos ningún vehículo que se ajuste a tu selección. Por favor, modifica los parámetros — revisa el número de pasajeros, maletas o el equipaje especial indicado.';
   Promise.all([
     fetch('/api/flota?lang=' + langFlota).then(function(r) { return r.json(); }),
     fetch('/api/palabras-paginas-publico?lang=' + langFlota).then(function(r) { return r.json(); })
@@ -280,7 +281,8 @@
       if (pp.flota_catalogo_pasajero)     txtPasajero     = pp.flota_catalogo_pasajero;
       if (pp.flota_catalogo_maletas)      txtMaletas      = pp.flota_catalogo_maletas;
       if (pp.flota_catalogo_btn_reservar) txtReservar     = pp.flota_catalogo_btn_reservar;
-      if (pp.flota_selector_intro)        txtIntroSelector = pp.flota_selector_intro;
+      if (pp.flota_selector_intro)           txtIntroSelector = pp.flota_selector_intro;
+      if (pp.flota_selector_sin_resultado)  txtSinResultado  = pp.flota_selector_sin_resultado;
 
       categoriasFlota = cats;
 
@@ -382,13 +384,15 @@
         var aptasConExtra = aptas.filter(function(c) {
           return catIds.indexOf(c.id) !== -1;
         });
-        // Si ninguna categoría de las aptas tiene conductor con ese extra, mostrar las del extra sin filtro de pax/mal
-        aptas = aptasConExtra.length > 0 ? aptasConExtra : categoriasFlota.filter(function(c) {
-          return catIds.indexOf(c.id) !== -1;
-        });
+        aptas = aptasConExtra;
       }
     }
 
+    if (aptas.length === 0) {
+      resultado.innerHTML = '<p style="font-size:13px;color:var(--terracota);font-weight:600;">' + txtSinResultado + '</p>';
+      resultado.className = 'selector-resultado visible';
+      return;
+    }
     var html = '<p style="margin-bottom:10px;font-size:13px;color:var(--texto-muted);">' + txtIntroSelector + '</p>';
     html += '<ul style="list-style:none;padding:0;margin:0;text-align:left;">';
     for (var j = 0; j < aptas.length; j++) {
