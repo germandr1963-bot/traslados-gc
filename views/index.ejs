@@ -466,10 +466,6 @@ function cargarRutas() {
       document.getElementById('hasta').value = paramHasta;
       actualizarCategoriasSegunRuta();
     }
-    var paramCategoria = new URLSearchParams(window.location.search).get('categoria');
-    if (paramCategoria) {
-      document.getElementById('categoria').value = paramCategoria;
-    }
     if (rutas.length === 0) {
       document.getElementById('resultado-precio').textContent = TXT.eligeRuta;
     }
@@ -479,7 +475,20 @@ function cargarRutas() {
 function cargarCategorias() {
   fetch('/api/categorias?lang=' + LANG).then(function (r) { return r.json(); }).then(function (categorias) {
     categoriasDisponibles = categorias;
-    actualizarCategoriasSegunRuta();
+    var paramCategoria = new URLSearchParams(window.location.search).get('categoria');
+    if (paramCategoria) {
+      var select = document.getElementById('categoria');
+      select.innerHTML = '<option value="">' + TXT.selecciona + '</option>';
+      categorias.forEach(function (c) {
+        var opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = (c.nombre_traducido || c.nombre) + ' (' + c.capacidad_pasajeros + ' ' + TXT.paxSufijo + ')';
+        if (String(c.id) === String(paramCategoria)) opt.selected = true;
+        select.appendChild(opt);
+      });
+    } else {
+      actualizarCategoriasSegunRuta();
+    }
   });
 }
 
@@ -487,7 +496,7 @@ function actualizarCategoriasSegunRuta() {
   var desdeVal = document.getElementById('desde').value;
   var hastaVal = document.getElementById('hasta').value;
   var select = document.getElementById('categoria');
-  var valorActual = select.value;
+  var valorActual = select.value || new URLSearchParams(window.location.search).get('categoria') || '';
 
   var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; })
           || rutasDisponibles.find(function (r) { return r.origen === hastaVal && r.destino === desdeVal; });
