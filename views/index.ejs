@@ -461,7 +461,9 @@ function cargarRutas() {
     });
     poblarSelect(document.getElementById('desde'), origenes);
     poblarSelect(document.getElementById('hasta'), destinos);
+    var paramDesde = new URLSearchParams(window.location.search).get('desde');
     var paramHasta = new URLSearchParams(window.location.search).get('hasta');
+    if (paramDesde) document.getElementById('desde').value = paramDesde;
     if (paramHasta) {
       document.getElementById('hasta').value = paramHasta;
       actualizarCategoriasSegunRuta();
