@@ -5946,6 +5946,8 @@ app.get('/api/rutas-publicas', asyncHandler(async (req, res) => {
      LEFT JOIN route_seo_settings rss_es
            ON rss_es.route_id   = r.id AND rss_es.lang_code  = 'es'
      WHERE r.activa = TRUE AND r.visible_en_listado = TRUE
+     AND EXISTS (SELECT 1 FROM destinos WHERE nombre = r.origen AND activo = TRUE)
+     AND EXISTS (SELECT 1 FROM destinos WHERE nombre = r.destino AND activo = TRUE)
      ORDER BY r.origen, r.destino`,
     [lang]
   );
