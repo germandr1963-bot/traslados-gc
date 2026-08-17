@@ -9407,7 +9407,7 @@ app.get('/api/ruta-publica/:lang/:slug', asyncHandler(async (req, res) => {
   const t = function (clave) { return obtenerTexto(clave, lang); };
 
   res.json({
-    seo: Object.assign({}, seo, { origen: origenTraducido, destino: destinoTraducido }),
+    seo: Object.assign({}, seo, { origen: origenTraducido, destino: destinoTraducido, origen_es: seo.origen, destino_es: seo.destino }),
     precios: precios.rows.map(function(p) {
       return Object.assign({}, p, {
         nombre:            mapaCategorias[p.nombre]            || p.nombre,
