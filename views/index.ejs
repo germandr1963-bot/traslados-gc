@@ -466,6 +466,10 @@ function cargarRutas() {
       document.getElementById('hasta').value = paramHasta;
       actualizarCategoriasSegunRuta();
     }
+    var paramCategoria = new URLSearchParams(window.location.search).get('categoria');
+    if (paramCategoria) {
+      document.getElementById('categoria').value = paramCategoria;
+    }
     if (rutas.length === 0) {
       document.getElementById('resultado-precio').textContent = TXT.eligeRuta;
     }
