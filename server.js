@@ -5994,7 +5994,7 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
     JOIN destinos_seo_settings dss_es ON dss_es.destino_id = d.id AND dss_es.lang_code = 'es'
     LEFT JOIN destinos_seo_settings dss_lang ON dss_lang.destino_id = d.id AND dss_lang.lang_code = $1 AND dss_lang.activo = TRUE
     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1
-    WHERE d.visible_rutas = TRUE AND dss_es.activo = TRUE
+    WHERE d.activo = TRUE AND d.visible_rutas = TRUE AND dss_es.activo = TRUE
     ORDER BY d.isla, d.orden, d.nombre
   `, [lang]);
   const porIsla = {};
