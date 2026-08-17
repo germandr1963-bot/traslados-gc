@@ -332,7 +332,7 @@
           +     '<div class="tarjeta-cat-nombre">' + c.nombre + '</div>'
           +     '<div class="tarjeta-cat-cap">' + cap + '</div>'
           +   '</div>'
-          +   '<a href="/?categoria=' + c.id + '" class="btn-reservar-cat">' + txtReservar + '</a>'
+          +   '<a href="' + (langFlota !== 'es' ? '/' + langFlota + '/' : '/') + '?categoria=' + c.id + '" class="btn-reservar-cat">' + txtReservar + '</a>'
           + '</div>'
           + '<div class="tarjeta-cat-body">'
           +   '<div class="tarjeta-cat-desc">' + desc + subtitulo + descLarga + '</div>'
