@@ -831,8 +831,6 @@ async function initSchema() {
     { clave: 'reserva_label_hora_recogida', contexto: 'Etiqueta del campo hora de recogida', es: 'Hora de recogida *', en: 'Pick-up time *' },
     { clave: 'reserva_err_hora_recogida',   contexto: 'Error si falta la hora de recogida', es: 'Indica la hora de recogida', en: 'Enter the pick-up time' },
     { clave: 'reserva_label_num_pasajeros', contexto: 'Etiqueta del selector de número de pasajeros', es: 'Número de pasajeros', en: 'Number of passengers' },
-    { clave: 'reserva_pax_singular',        contexto: 'Palabra tras el número en el selector de pasajeros, singular (1). En idiomas con declinaciones puede usarse una abreviatura invariable', es: 'pasajero', en: 'passenger' },
-    { clave: 'reserva_pax_plural',          contexto: 'Palabra tras el número en el selector de pasajeros, plural (2 o más). En idiomas con declinaciones puede usarse una abreviatura invariable', es: 'pasajeros', en: 'passengers' },
     { clave: 'reserva_label_dir_origen',    contexto: 'Etiqueta del campo dirección exacta de recogida', es: 'Dirección exacta de recogida *', en: 'Exact pick-up address *' },
     { clave: 'reserva_ph_dir_origen',       contexto: 'Placeholder del campo dirección de recogida', es: 'Calle, número, hotel, municipio...', en: 'Street, number, hotel, municipality...' },
     { clave: 'reserva_err_dir_origen',      contexto: 'Error si falta la dirección de recogida', es: 'Indica la dirección de recogida', en: 'Enter the pick-up address' },
