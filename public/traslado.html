@@ -374,7 +374,7 @@
         } else {
           html += '<p style="color:var(--texto-muted);font-size:14px;">' + esc(tx.texto_consulta_disponibilidad || '') + '</p>';
         }
-        var urlInicio = (lang !== 'es' ? '/' + lang + '/' : '/') + '?desde=' + encodeURIComponent(seo.origen).replace(/%20/g, '+') + '&hasta=' + encodeURIComponent(seo.destino).replace(/%20/g, '+');
+        var urlInicio = (lang !== 'es' ? '/' + lang + '/' : '/') + '?desde=' + encodeURIComponent(seo.origen_es).replace(/%20/g, '+') + '&hasta=' + encodeURIComponent(seo.destino_es).replace(/%20/g, '+');
         html += '<p style="margin-top:20px;"><a href="' + urlInicio + '" class="boton-reservar">' + esc(tx.boton_solicitar_traslado || '') + '</a></p>';
         html += '</div>';
 
