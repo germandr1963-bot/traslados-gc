@@ -2685,6 +2685,17 @@ function renderizarCabeceraSEO() {
 
 function cargarSEO() {
   document.getElementById('tabla-seo-cuerpo').innerHTML = '<tr><td colspan="10" style="color:var(--texto-muted)">Cargando...</td></tr>';
+  // Cargar palabras de URL por idioma para construir URLs correctas en el editor de categorías
+  fetch('/admin/palabras-paginas')
+    .then(function(r) { return r.json(); })
+    .then(function(filas) {
+      window._palabrasPaginas = {};
+      filas.forEach(function(f) {
+        if (!window._palabrasPaginas[f.lang_code]) window._palabrasPaginas[f.lang_code] = {};
+        window._palabrasPaginas[f.lang_code][f.pagina] = f.palabra;
+      });
+    })
+    .catch(function() {});
   cargarListaIdiomasDinamica().then(function () {
     renderizarCabeceraSEO();
     renderizarSelectIASEO();
