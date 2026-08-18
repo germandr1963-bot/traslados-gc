@@ -2563,9 +2563,11 @@ function cargarPreciosGrid() {
       });
       html += '<td style="white-space:nowrap;">';
       if (esActiva) {
+        html += '<span style="font-size:0.78rem;color:#10808F;font-weight:600;margin-right:8px;">✔ Activa</span>';
         html += '<button class="boton-peligro" style="font-size:0.78rem;padding:0.25rem 0.6rem;margin-right:4px;" onclick="desactivarRuta(' + r.id + ', \'' + (r.origen + ' → ' + r.destino).replace(/'/g, "\\'") + '\')">⏸ Desactivar</button>';
       } else {
-        html += '<button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.6rem;margin-right:4px;" onclick="activarRuta(' + r.id + ')">Desactivada</button>';
+        html += '<span style="font-size:0.78rem;color:#C0392B;font-weight:600;margin-right:8px;">⏸ Desactivada</span>';
+        html += '<button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.6rem;margin-right:4px;" onclick="activarRuta(' + r.id + ')">▶ Activar</button>';
       }
       html += '<button class="boton-peligro" style="font-size:0.78rem;padding:0.25rem 0.6rem;" onclick="eliminarRuta(' + r.id + ', \'' + (r.origen + ' → ' + r.destino).replace(/'/g, "\\'") + '\')">🗑 Eliminar</button>';
       html += '</td></tr>';
