@@ -3499,6 +3499,12 @@ app.get('/ruta-imagen/:id', asyncHandler(async (req, res) => {
   res.send(Buffer.from(match[2], 'base64'));
 }));
 
+app.post('/admin/rutas/:id/visible-listado', requireAdmin, asyncHandler(async (req, res) => {
+  const visible = req.body.visible_en_listado === true || req.body.visible_en_listado === 'true';
+  await pool.query('UPDATE rutas SET visible_en_listado = $1 WHERE id = $2', [visible, req.params.id]);
+  res.json({ ok: true });
+}));
+
 // Guarda la prioridad/frecuencia de sitemap de una ruta (vale para sus 9 idiomas)
 app.post('/admin/rutas/:id/sitemap-config', requireAdmin, asyncHandler(async (req, res) => {
   const prioridad = parseFloat(req.body.prioridad);
