@@ -399,7 +399,7 @@ Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y sig
 ## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
 
 1. SLUG (campo: slug):
-URL amigable para esta categoría. ${item.reglasSlug} Solo letras minúsculas a-z y guiones. Sin tildes, sin caracteres especiales, sin números salvo que sean parte del nombre propio. Debe identificar la categoría de forma clara y reconocible. Ejemplos orientativos: "business-class", "economy", "minivan-familiar", "van-premium".
+URL amigable para esta categoría. ${item.reglasSlug} Solo letras minúsculas a-z y guiones. Sin tildes, sin caracteres especiales, sin números salvo que sean parte del nombre propio. Debe ser el nombre de la categoría únicamente — NUNCA añadas palabras como "traslado", "transfer", "taxi", "gran-canaria" ni ninguna otra palabra que no sea el nombre de la categoría. Ejemplos correctos: "business", "business-class", "economy", "confort", "confort-plus", "minivan", "van-premium". Ejemplos incorrectos: "traslado-confort", "transfer-business", "taxi-economy".
 
 2. META_TITLE (campo: meta_title):
 - Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
