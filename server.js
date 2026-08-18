@@ -3507,7 +3507,7 @@ app.post('/admin/rutas/:id/sitemap-config', requireAdmin, asyncHandler(async (re
   if (![1.0, 0.8, 0.5].includes(prioridad) || !frecuenciasValidas.includes(frecuencia)) {
     return res.status(400).json({ error: 'Valores no válidos.' });
   }
-  const visibleEnListado = req.body.visible_en_listado !== undefined ? !!req.body.visible_en_listado : true;
+  const visibleEnListado = req.body.visible_en_listado === true || req.body.visible_en_listado === 'true';
   await pool.query(
     'UPDATE rutas SET sitemap_prioridad = $1, sitemap_frecuencia = $2, visible_en_listado = $3 WHERE id = $4',
     [prioridad, frecuencia, visibleEnListado, req.params.id]
