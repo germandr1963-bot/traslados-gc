@@ -4003,6 +4003,12 @@ app.post('/admin/seo/destinos/:id/idioma/:lang/activar', requireAdmin, asyncHand
   res.json({ ok: true });
 }));
 
+app.post('/admin/destinos/:id/visible', requireAdmin, asyncHandler(async (req, res) => {
+  const visible = req.body.visible_rutas === true || req.body.visible_rutas === 'true';
+  await pool.query('UPDATE destinos SET visible_rutas = $1 WHERE id = $2', [visible, req.params.id]);
+  res.json({ ok: true });
+}));
+
 // Guarda configuración del destino: zona, orden, isla, visible_rutas, sitemap
 app.post('/admin/seo/destinos/:id/config', requireAdmin, asyncHandler(async (req, res) => {
   const { zona, orden, isla, visible_rutas, sitemap_prioridad, sitemap_frecuencia } = req.body;
