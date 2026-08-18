@@ -2530,7 +2530,8 @@ app.get('/api/flota', asyncHandler(async (req, res) => {
             COALESCE(cvt.descripcion,       cv.descripcion)       AS descripcion,
             COALESCE(cvt.subtitulo,         cv.subtitulo)         AS subtitulo,
             COALESCE(cvt.descripcion_larga, cv.descripcion_larga) AS descripcion_larga,
-            COALESCE(cvt.caracteristicas,   cv.caracteristicas)   AS caracteristicas
+            COALESCE(cvt.caracteristicas,   cv.caracteristicas)   AS caracteristicas,
+            CASE WHEN cvt.activo = TRUE THEN cvt.slug_url ELSE NULL END AS slug_url
      FROM categorias_vehiculos cv
      LEFT JOIN categorias_vehiculos_traducciones cvt
            ON cvt.categoria_id = cv.id AND cvt.lang_code = $1
@@ -2538,12 +2539,14 @@ app.get('/api/flota', asyncHandler(async (req, res) => {
      ORDER BY cv.orden, cv.nombre`,
     [lang]
   );
+  const palabraFlota = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
   const rows = result.rows.map(function(cat) {
     const nombreTrad  = obtenerTexto('categoria_nombre_'  + cat.id, lang);
     const maletasTrad = obtenerTexto('categoria_maletas_' + cat.id, lang);
     return Object.assign({}, cat, {
       nombre:            nombreTrad  || cat.nombre,
-      capacidad_maletas: maletasTrad || cat.capacidad_maletas
+      capacidad_maletas: maletasTrad || cat.capacidad_maletas,
+      palabraFlota
     });
   });
   res.json(rows);
