@@ -339,6 +339,96 @@ SOLO esto:
 }
 
 
+// ─── GENERADOR 13 ────────────────────────────────────────────────────────────
+// SEO de páginas públicas de categoría de vehículo — por idioma
+// Función: endpoint POST /admin/seo/categorias/:id/generar-ia
+// Botón admin: 🤖 Generar con IA — sección SEO Categorías de flota
+function GENERADOR_CATEGORIAS_SEO(nombreIdioma, item) {
+  const LIMITES = {
+    'Español':    { tRango: '52-58', tMax: 60, dRango: '145-152', dMax: 155 },
+    'Inglés':     { tRango: '54-60', tMax: 62, dRango: '150-157', dMax: 160 },
+    'Alemán':     { tRango: '48-53', tMax: 55, dRango: '130-137', dMax: 140 },
+    'Francés':    { tRango: '52-58', tMax: 60, dRango: '145-152', dMax: 155 },
+    'Italiano':   { tRango: '52-58', tMax: 60, dRango: '148-155', dMax: 158 },
+    'Neerlandés': { tRango: '50-55', tMax: 57, dRango: '138-145', dMax: 148 },
+    'Sueco':      { tRango: '50-55', tMax: 57, dRango: '140-147', dMax: 150 },
+    'Noruego':    { tRango: '50-55', tMax: 57, dRango: '142-149', dMax: 152 },
+    'Finlandés':  { tRango: '46-52', tMax: 54, dRango: '128-135', dMax: 138 },
+    'Ruso':       { tRango: '42-48', tMax: 50, dRango: '118-125', dMax: 128 }
+  };
+  const L = LIMITES[nombreIdioma] || LIMITES['Español'];
+
+  return `# INSTRUCCIONES GENERALES DE REDACCIÓN SEO LOCAL Y METADATOS MULTIIDIOMA
+
+Actúa como un Experto en SEO Local y Redactor Creativo Nativo. Tu trabajo consiste en redactar metadatos optimizados para Google, escritos de "humano a humano", para la página pública de la categoría de vehículo "${item.nombre}" de Traslados GC — empresa de traslados privados intermunicipales en Gran Canaria (Islas Canarias, España).
+
+REGLA DE NATIVIDAD (NO TRADUCIR):
+No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo busca y decide un viajero real de ese idioma cuando elige un vehículo para su traslado privado en Gran Canaria.
+
+---
+
+## CONCEPTO Y OBJETIVO DE LA PÁGINA
+Esta página es una ficha de captación para la categoría de vehículo "${item.nombre}". Su objetivo es responder a la intención de búsqueda de un viajero que quiere conocer qué tipo de vehículo se adapta mejor a sus necesidades para un traslado privado intermunicipal en Gran Canaria — y convencerle de reservar.
+
+---
+
+## REGLAS DE ORO Y ESTILO (HUMAN-LIKE)
+
+1. ENFOQUE HACIA LA CATEGORÍA:
+Todo el contenido (slug, meta_title, meta_description) debe girar en torno a la categoría "${item.nombre}", su perfil de cliente, su capacidad (${item.capacidad_pasajeros} pasajeros) y la experiencia de viaje que ofrece en Gran Canaria.
+
+2. LÍMITES ESTRICTOS DE CARACTERES PARA ${nombreIdioma} (INFRANQUEABLES):
+Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido para aprovechar el espacio SEO, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter.
+
+- meta_title:       ${L.tRango} chars (MÁXIMO ABSOLUTO: ${L.tMax})
+- meta_description: ${L.dRango} chars (MÁXIMO ABSOLUTO: ${L.dMax})
+
+3. ESTILO NATURAL Y PROHIBICIONES DE IA:
+- Prohibido usar palabras y clichés típicos de IA como: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido".
+- Usa un tono cercano, natural y profesional (de experto local a viajero).
+- Alterna la longitud de las frases (cortas y directas con explicativas) para dar un ritmo de lectura 100% humano.
+
+### REGLAS OBLIGATORIAS SOBRE PRECIOS Y TARIFAS:
+1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):
+   Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
+2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
+   "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".
+
+---
+
+## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
+
+1. SLUG (campo: slug):
+URL amigable para esta categoría. ${item.reglasSlug} Solo letras minúsculas a-z y guiones. Sin tildes, sin caracteres especiales, sin números salvo que sean parte del nombre propio. Debe identificar la categoría de forma clara y reconocible. Ejemplos orientativos: "business-class", "economy", "minivan-familiar", "van-premium".
+
+2. META_TITLE (campo: meta_title):
+- Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
+- Incluye: nombre de la categoría en ${nombreIdioma} + Gran Canaria + propuesta de valor o marca.
+- Formato habitual: [Categoría ${item.nombre} Gran Canaria] | [Propuesta de Valor] | [Traslados GC]
+
+3. META_DESCRIPTION (campo: meta_description):
+- Redactada como presentación directa del vehículo para el viajero que está eligiendo su traslado.
+- Incluye: tipo de vehículo, capacidad (${item.capacidad_pasajeros} pasajeros), casos de uso concretos (aeropuerto, hotel, grupos, familias), ventaja competitiva y llamada a la acción corta.
+- Formato habitual: [Descripción del vehículo y perfil ideal] + [Ventajas: espacio, comodidad, tarifas competitivas] + [CTA breve].
+
+---
+
+## AUTOCONTROL DE CARACTERES (PROCESO INTERNO — NO ESCRIBAS NADA HASTA TENER EL JSON FINAL)
+Antes de responder, verifica internamente que meta_title y meta_description cumplen sus límites máximos exactos para ${nombreIdioma}. Si alguno se pasa por 1 solo carácter, corrígelo. Este proceso es interno — no aparece en la respuesta.
+
+---
+
+## CATEGORÍA A TRABAJAR
+${JSON.stringify(item, null, 2)}
+
+## FORMATO DE SALIDA (OBLIGATORIO — LEE ESTO CON ATENCIÓN)
+Tu respuesta completa es ÚNICAMENTE el objeto JSON. Nada antes, nada después.
+PROHIBIDO: borradores, conteos, explicaciones, pasos intermedios, markdown, texto de ningún tipo.
+SOLO esto:
+{"slug": "...", "meta_title": "...", "meta_description": "..."}`;
+}
+
+
 // =============================================================================
 module.exports = {
   GENERADOR_ALT_NUEVO_ES,
@@ -352,5 +442,6 @@ module.exports = {
   GENERADOR_ALT_FOTO_RUTA,
   GENERADOR_ALT_FOTO_RUTA_TODOS,
   GENERADOR_ALT_EXISTENTE_RUTA,
-  GENERADOR_CATEGORIAS_FLOTA
+  GENERADOR_CATEGORIAS_FLOTA,
+  GENERADOR_CATEGORIAS_SEO
 };

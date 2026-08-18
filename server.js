@@ -401,6 +401,15 @@ async function initSchema() {
       ADD COLUMN IF NOT EXISTS caracteristicas TEXT
   `);
 
+  // Columnas SEO para páginas públicas de categoría de vehículo por idioma
+  await pool.query(`
+    ALTER TABLE categorias_vehiculos_traducciones
+      ADD COLUMN IF NOT EXISTS slug_url TEXT,
+      ADD COLUMN IF NOT EXISTS meta_title TEXT,
+      ADD COLUMN IF NOT EXISTS meta_description TEXT,
+      ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT FALSE
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rutas (
       id SERIAL PRIMARY KEY,
@@ -3396,6 +3405,162 @@ app.post('/admin/precios-grid', requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 // ─── Admin: SEO ───────────────────────────────────────────────────────────────
+
+// ── SEO Categorías de flota ───────────────────────────────────────────────────
+
+// Lista todas las categorías activas con el estado SEO de cada idioma
+app.get('/admin/seo/categorias', requireAdmin, asyncHandler(async (req, res) => {
+  const cats = await pool.query(
+    'SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre'
+  );
+  const seoData = await pool.query(
+    `SELECT categoria_id, lang_code, slug_url, meta_title, activo
+     FROM categorias_vehiculos_traducciones
+     ORDER BY categoria_id, lang_code`
+  );
+  const seoMap = {};
+  for (const row of seoData.rows) {
+    if (!seoMap[row.categoria_id]) seoMap[row.categoria_id] = {};
+    seoMap[row.categoria_id][row.lang_code] = {
+      slug:   row.slug_url,
+      titulo: row.meta_title,
+      activo: row.activo
+    };
+  }
+  res.json({ categorias: cats.rows, seo: seoMap, idiomas: IDIOMAS_PERMITIDOS });
+}));
+
+// Devuelve los datos SEO de una categoría en un idioma concreto
+app.get('/admin/seo/categorias/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  const result = await pool.query(
+    `SELECT slug_url, meta_title, meta_description, activo
+     FROM categorias_vehiculos_traducciones
+     WHERE categoria_id = $1 AND lang_code = $2`,
+    [req.params.id, req.params.lang]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'No encontrado' });
+  res.json(result.rows[0]);
+}));
+
+// Guarda el slug y meta de una categoría en un idioma concreto
+app.post('/admin/seo/categorias/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  const { slug_url, meta_title, meta_description } = req.body;
+  const slugLimpio = slug_url ? slugify(slug_url) : null;
+  await pool.query(
+    `INSERT INTO categorias_vehiculos_traducciones (categoria_id, lang_code, slug_url, meta_title, meta_description)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (categoria_id, lang_code) DO UPDATE
+       SET slug_url = $3, meta_title = $4, meta_description = $5, updated_at = NOW()`,
+    [req.params.id, req.params.lang, slugLimpio || null, meta_title || null, meta_description || null]
+  );
+  res.json({ ok: true });
+}));
+
+// Activa o desactiva la página pública de una categoría en un idioma concreto
+app.post('/admin/seo/categorias/:id/idioma/:lang/activar', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  await pool.query(
+    `UPDATE categorias_vehiculos_traducciones SET activo = $1
+     WHERE categoria_id = $2 AND lang_code = $3`,
+    [!!req.body.activo, req.params.id, req.params.lang]
+  );
+  res.json({ ok: true });
+}));
+
+// Genera con IA el slug y meta de una categoría en un idioma concreto
+app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { lang } = req.body;
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) return res.status(400).json({ error: 'Idioma no válido.' });
+
+  const catResult = await pool.query(
+    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas FROM categorias_vehiculos WHERE id = $1 AND activa = TRUE',
+    [req.params.id]
+  );
+  if (catResult.rows.length === 0) return res.status(404).json({ error: 'Categoría no encontrada.' });
+  const cat = catResult.rows[0];
+  const nombreIdioma = await getNombreIdioma(lang);
+
+  const ALFABETO_LATINO = ['es','en','de','fr','it','nl','sv','no','fi','pt','pl','cs','ro','hu','sk','hr','sl','da'];
+  const ALFABETO_CIRILI = ['ru','bg','uk','sr','mk'];
+  let reglasSlug = '';
+  if (ALFABETO_LATINO.includes(lang)) {
+    reglasSlug = `El slug debe estar en ${nombreIdioma}, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.).`;
+  } else if (ALFABETO_CIRILI.includes(lang)) {
+    reglasSlug = `El slug debe ser una transliteración al latín del nombre de la categoría en ${nombreIdioma}, usando solo a-z y guiones.`;
+  } else {
+    reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones.`;
+  }
+
+  const item = { id: cat.id, nombre: cat.nombre, capacidad_pasajeros: cat.capacidad_pasajeros, capacidad_maletas: cat.capacidad_maletas, limite_sillas: cat.limite_sillas, reglasSlug };
+  const prompt = iaPrompts.GENERADOR_CATEGORIAS_SEO(nombreIdioma, item);
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 400, messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error al conectar con la IA.' });
+  const data = await response.json();
+  const limpio = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  let resultado = {};
+  try { resultado = JSON.parse(limpio); } catch(e) {
+    console.error('[GEN13] JSON inválido:', limpio.slice(0, 300));
+    return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' });
+  }
+
+  const slugGenerado = String(resultado.slug || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  let metaTitle = resultado.meta_title || '';
+  let metaDesc  = resultado.meta_description || '';
+
+  // Verificar píxeles — si se pasa, un intento de acortar
+  const pxT = medirPxTitulo(metaTitle);
+  const pxD = medirPxDescripcion(metaDesc);
+  if (pxT > 600 || pxD > 920) {
+    const instrucciones = [];
+    if (pxT > 600) {
+      const charsMax = Math.floor(metaTitle.length * 600 / pxT) - 2;
+      instrucciones.push('TÍTULO: MÁXIMO ' + charsMax + ' caracteres. Texto: "' + metaTitle + '"');
+    }
+    if (pxD > 920) {
+      const charsMax = Math.floor(metaDesc.length * 920 / pxD) - 2;
+      instrucciones.push('DESCRIPCIÓN: MÁXIMO ' + charsMax + ' caracteres. Texto: "' + metaDesc + '"');
+    }
+    const promptAcortar = 'Acorta estos textos SEO en ' + nombreIdioma + '. Límite en número de caracteres. Mantén tono nativo y palabras clave.\n\n' + instrucciones.join('\n\n') + '\n\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"meta_title": "...", "meta_description": "..."}';
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 400, messages: [{ role: 'user', content: promptAcortar }] })
+      });
+      if (r.ok) {
+        const rData = await r.json();
+        const rJson = JSON.parse(rData.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim());
+        if (medirPxTitulo(metaTitle) > 600 && rJson.meta_title) metaTitle = rJson.meta_title;
+        if (medirPxDescripcion(metaDesc) > 920 && rJson.meta_description) metaDesc = rJson.meta_description;
+      }
+    } catch(e) { /* si falla el acorte, devolvemos lo que hay */ }
+  }
+
+  res.json({ ok: true, slug: slugGenerado, meta_title: metaTitle, meta_description: metaDesc });
+}));
+
+// ── SEO Rutas ─────────────────────────────────────────────────────────────────
 
 // Lista todas las rutas con el estado SEO de cada idioma.
 // Si alguna ruta todavía no tiene fichas SEO, las crea automáticamente.
@@ -9316,6 +9481,182 @@ app.get('/admin/seo/salud', requireAdmin, asyncHandler(async (req, res) => {
   res.json(stats);
 }));
 
+// ─── API pública: datos de una categoría para categoria-pagina.html ──────────
+// Devuelve en JSON todo lo necesario para pintar la página de categoría.
+// La llama categoria-pagina.html desde el navegador, igual que traslado.html
+// llama a /api/ruta-publica.
+app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
+  const { lang, slug } = req.params;
+
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).json({ error: 'Idioma no válido' });
+  }
+
+  // Buscar la categoría cuyo slug está activo en este idioma
+  // Para español: el slug vive en categorias_vehiculos_traducciones con lang_code='es'
+  // igual que el resto de idiomas — un único lugar de búsqueda.
+  const catResult = await pool.query(
+    `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas,
+            cv.limite_sillas, cv.foto,
+            COALESCE(cvt.descripcion,       cv.descripcion)       AS descripcion,
+            COALESCE(cvt.subtitulo,         cv.subtitulo)         AS subtitulo,
+            COALESCE(cvt.descripcion_larga, cv.descripcion_larga) AS descripcion_larga,
+            COALESCE(cvt.caracteristicas,   cv.caracteristicas)   AS caracteristicas,
+            cvt.slug_url, cvt.meta_title, cvt.meta_description, cvt.activo
+     FROM categorias_vehiculos cv
+     JOIN categorias_vehiculos_traducciones cvt
+          ON cvt.categoria_id = cv.id AND cvt.lang_code = $1
+     WHERE cvt.slug_url = $2 AND cvt.activo = TRUE
+       AND cv.activa = TRUE AND cv.en_flota = TRUE`,
+    [lang, slug]
+  );
+
+  if (catResult.rows.length === 0) {
+    return res.status(404).json({ error: 'Categoría no encontrada' });
+  }
+
+  const cat = catResult.rows[0];
+
+  // Alternates: todos los idiomas con slug activo para esta categoría (para hreflang)
+  const alternates = await pool.query(
+    `SELECT lang_code, slug_url
+     FROM categorias_vehiculos_traducciones
+     WHERE categoria_id = $1 AND activo = TRUE AND slug_url IS NOT NULL`,
+    [cat.id]
+  );
+
+  // Ajustes globales SEO (nombre marca, imagen defecto, twitter)
+  const ajustesGlobales = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
+  const globales = ajustesGlobales.rows[0] || { nombre_marca: 'Traslados · GC', imagen_og_defecto: null, twitter_activo: false };
+  const nombreMarca = globales.nombre_marca || 'Traslados · GC';
+
+  // Rutas con precio para esta categoría (tabla de precios en la página)
+  const precios = await pool.query(
+    `SELECT r.id AS ruta_id, r.origen, r.destino, rp.precio
+     FROM rutas_precios rp
+     JOIN rutas r ON r.id = rp.ruta_id
+     WHERE rp.categoria_id = $1 AND r.activa = TRUE
+     ORDER BY r.origen, r.destino`,
+    [cat.id]
+  );
+
+  // Traducir nombres de destinos para la tabla de precios
+  const destinosTrad = await pool.query(
+    `SELECT d.nombre AS nombre_es, COALESCE(dt.nombre, d.nombre) AS nombre_traducido
+     FROM destinos d
+     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1`,
+    [lang]
+  );
+  const mapaDestinos = {};
+  for (const d of destinosTrad.rows) {
+    mapaDestinos[d.nombre_es] = (d.nombre_traducido && d.nombre_traducido.trim()) ? d.nombre_traducido : d.nombre_es;
+  }
+
+  // Nombre traducido de la categoría (desde textos_interfaz)
+  const nombreTrad = obtenerTexto('categoria_nombre_' + cat.id, lang);
+
+  // URL canónica y palabra de flota en este idioma
+  const palabraFlota = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
+  const urlActual = BASE_URL + (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota + '/' + slug;
+  const canonical_url = (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota + '/' + slug;
+
+  // Schema.org Vehicle + BreadcrumbList
+  const schemaVehicle = {
+    '@context': 'https://schema.org',
+    '@type': 'Vehicle',
+    name: (nombreTrad || cat.nombre) + ' — ' + nombreMarca,
+    description: cat.meta_description || cat.descripcion || undefined,
+    url: urlActual,
+    vehicleSeatingCapacity: cat.capacidad_pasajeros,
+    provider: { '@type': 'Organization', name: nombreMarca, url: BASE_URL },
+    areaServed: { '@type': 'Place', name: 'Gran Canaria' }
+  };
+  if (cat.foto) {
+    schemaVehicle.image = BASE_URL + '/admin/categorias/' + cat.id + '/foto';
+  } else if (globales.imagen_og_defecto) {
+    schemaVehicle.image = BASE_URL + '/imagen-og-defecto';
+  }
+
+  const schemaBreadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Inicio', item: BASE_URL + (lang !== 'es' ? '/' + lang + '/' : '/') },
+      { '@type': 'ListItem', position: 2, name: obtenerTexto('home_footer_flota', lang) || 'Flota', item: BASE_URL + (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota },
+      { '@type': 'ListItem', position: 3, name: nombreTrad || cat.nombre, item: urlActual }
+    ]
+  };
+
+  const t = function (clave) { return obtenerTexto(clave, lang); };
+
+  res.json({
+    categoria: {
+      id:                  cat.id,
+      nombre:              nombreTrad || cat.nombre,
+      capacidad_pasajeros: cat.capacidad_pasajeros,
+      capacidad_maletas:   obtenerTexto('categoria_maletas_' + cat.id, lang) || cat.capacidad_maletas,
+      limite_sillas:       cat.limite_sillas,
+      tiene_foto:          !!cat.foto,
+      descripcion:         cat.descripcion,
+      subtitulo:           cat.subtitulo,
+      descripcion_larga:   cat.descripcion_larga,
+      caracteristicas:     cat.caracteristicas,
+      slug_url:            cat.slug_url,
+      meta_title:          cat.meta_title,
+      meta_description:    cat.meta_description,
+      canonical_url
+    },
+    precios: precios.rows.map(function (p) {
+      return {
+        ruta_id:  p.ruta_id,
+        origen:   mapaDestinos[p.origen]  || p.origen,
+        destino:  mapaDestinos[p.destino] || p.destino,
+        origen_es:  p.origen,
+        destino_es: p.destino,
+        precio:   p.precio
+      };
+    }),
+    alternates:        alternates.rows,
+    nombreMarca,
+    BASE_URL,
+    palabraFlota,
+    tieneImagenDefecto: !!globales.imagen_og_defecto,
+    twitterActivo:      !!globales.twitter_activo,
+    schemaVehicle,
+    schemaBreadcrumb,
+    palabrasPaginas:   PALABRAS_PAGINAS[lang] || {},
+    textos: {
+      titulo_tarifas:              t('titulo_tarifas'),
+      tabla_columna_categoria:     t('tabla_columna_categoria'),
+      tabla_columna_pasajeros:     t('tabla_columna_pasajeros'),
+      tabla_columna_equipaje:      t('tabla_columna_equipaje'),
+      tabla_columna_precio:        t('tabla_columna_precio'),
+      sufijo_pax:                  t('sufijo_pax'),
+      badge_precio_fijo:           t('badge_precio_fijo'),
+      texto_a_consultar:           t('texto_a_consultar'),
+      texto_consulta_disponibilidad: t('texto_consulta_disponibilidad'),
+      boton_solicitar_traslado:    t('boton_solicitar_traslado'),
+      subtitulo_hero:              t('subtitulo_hero'),
+      titulo_como_funciona:        t('titulo_como_funciona'),
+      paso1_titulo:                t('paso1_titulo'),
+      paso1_texto:                 t('paso1_texto'),
+      paso2_titulo:                t('paso2_titulo'),
+      paso2_texto:                 t('paso2_texto'),
+      paso3_titulo:                t('paso3_titulo'),
+      paso3_texto:                 t('paso3_texto'),
+      nav_volver_flota:            t('home_footer_flota'),
+      nav_contacto:                t('nav_contacto'),
+      home_footer_rutas:           t('home_footer_rutas'),
+      home_footer_destinos:        t('home_footer_destinos'),
+      home_footer_flota:           t('home_footer_flota'),
+      home_footer_contacto:        t('home_footer_contacto'),
+      home_footer_alta_choferes:   t('home_footer_alta_choferes'),
+      home_footer_acceso_choferes: t('home_footer_acceso_choferes'),
+      home_footer_acceso_clientes: t('home_footer_acceso_clientes')
+    }
+  });
+}));
+
 // ─── API pública: datos de una ruta para traslado.html ───────────────────────
 // Devuelve en JSON todo lo necesario para pintar la página de ruta.
 // La llama traslado.html desde el navegador, igual que destino-pagina.html
@@ -9478,12 +9819,11 @@ app.get('/api/ruta-publica/:lang/:slug', asyncHandler(async (req, res) => {
   });
 }));
 
-// ─── Páginas públicas por ruta (HTML estático) ───────────────────────────────
-// URL: /:lang/traslado/:slug  (ej: /es/traslado/las-palmas-a-maspalomas)
-// El patrón de la URL solo exige 2 letras minúsculas — qué idiomas son
-// válidos de verdad se comprueba dentro contra la lista cargada de la base
-// de datos, así un idioma nuevo añadido desde el admin funciona al instante,
-// sin tener que redesplegar el servidor.
+// ─── Páginas públicas por ruta o categoría (HTML estático) ───────────────────
+// Patrón compartido: /:lang/:seccion/:slug
+// Se comprueba primero si la sección es la de traslado → traslado.html
+// Si no, se comprueba si es la de flota → categoria-pagina.html
+// Si ninguna coincide → 404
 app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
   const { lang, seccion, slug } = req.params;
 
@@ -9491,21 +9831,19 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
     return res.status(404).send('Página no encontrada');
   }
 
-  // Verificar que la sección del URL corresponde al idioma
-  if (seccion !== SECCIONES_TRASLADO[lang]) {
-    return res.status(404).send('Página no encontrada');
-  }
-
-  // Buscar la ficha SEO activa para este slug e idioma
-  const seoResult = await pool.query(
-    `SELECT rss.*, r.origen, r.destino, r.id AS ruta_id, (r.imagen_og IS NOT NULL) AS tiene_imagen
-     FROM route_seo_settings rss
-     JOIN rutas r ON r.id = rss.route_id
-     WHERE rss.lang_code = $1 AND rss.slug_url = $2 AND rss.activo = TRUE AND r.activa = TRUE`,
-    [lang, slug]
-  );
-
-  if (seoResult.rows.length === 0) {
+  // ── ¿Es una página de traslado/ruta? ────────────────────────────────────
+  if (seccion === SECCIONES_TRASLADO[lang]) {
+    const seoResult = await pool.query(
+      `SELECT rss.route_id
+       FROM route_seo_settings rss
+       JOIN rutas r ON r.id = rss.route_id
+       WHERE rss.lang_code = $1 AND rss.slug_url = $2 AND rss.activo = TRUE AND r.activa = TRUE`,
+      [lang, slug]
+    );
+    if (seoResult.rows.length > 0) {
+      return res.sendFile(path.join(__dirname, 'public', 'traslado.html'));
+    }
+    // No encontrado: buscar redirección 301
     const redirect = await pool.query(
       'SELECT ruta_nueva FROM redirecciones_301 WHERE ruta_antigua = $1',
       [req.path]
@@ -9516,9 +9854,40 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
     return res.status(404).send('Página no encontrada');
   }
 
-  res.sendFile(path.join(__dirname, 'public', 'traslado.html'));
+  // ── ¿Es una página de categoría de flota? ───────────────────────────────
+  const palabraFlota = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
+  if (seccion === palabraFlota) {
+    const catResult = await pool.query(
+      `SELECT cvt.categoria_id FROM categorias_vehiculos_traducciones cvt
+       JOIN categorias_vehiculos cv ON cv.id = cvt.categoria_id
+       WHERE cvt.lang_code = $1 AND cvt.slug_url = $2 AND cvt.activo = TRUE
+         AND cv.activa = TRUE AND cv.en_flota = TRUE`,
+      [lang, slug]
+    );
+    if (catResult.rows.length > 0) {
+      return res.sendFile(path.join(__dirname, 'public', 'categoria-pagina.html'));
+    }
+    return res.status(404).send('Página no encontrada');
+  }
+
+  return res.status(404).send('Página no encontrada');
 }));
 
+// ─── Página de categoría en español: /flota/:slug ────────────────────────────
+app.get('/flota/:slug', asyncHandler(async (req, res) => {
+  const { slug } = req.params;
+  const catResult = await pool.query(
+    `SELECT cvt.categoria_id FROM categorias_vehiculos_traducciones cvt
+     JOIN categorias_vehiculos cv ON cv.id = cvt.categoria_id
+     WHERE cvt.lang_code = 'es' AND cvt.slug_url = $1 AND cvt.activo = TRUE
+       AND cv.activa = TRUE AND cv.en_flota = TRUE`,
+    [slug]
+  );
+  if (catResult.rows.length === 0) {
+    return res.status(404).send('Página no encontrada');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'categoria-pagina.html'));
+}));
 
 // ─── Admin: listado de clientes ──────────────────────────────────────────────
 app.get('/admin/clientes', requireAdmin, asyncHandler(async (req, res) => {
