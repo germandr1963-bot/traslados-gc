@@ -326,6 +326,25 @@ table.tabla-precios input {
 
       <div id="mensaje-seo" style="margin-bottom:12px;"></div>
 
+      <!-- ─── BLOQUE SEO CATEGORÍAS DE FLOTA ─────────────────────────────── -->
+      <div style="margin-bottom:32px;border:1px solid var(--gris-borde);border-radius:10px;overflow:hidden;">
+        <div style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--gris-fondo);user-select:none;" onclick="toggleBloqueSEOCategorias()">
+          <span id="seo-cat-icono" style="font-size:14px;">▶</span>
+          <h2 style="font-size:17px;margin:0;">🚗 SEO — Páginas de categoría de vehículo</h2>
+          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
+        </div>
+        <div id="seo-cat-contenido" style="display:none;padding:18px;">
+          <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Cada categoría de vehículo tiene su propia página pública con URL amigable. Genera el slug y los metadatos con IA, revísalos y activa la página cuando esté lista. Las páginas desactivadas no aparecen en internet.</p>
+          <div id="mensaje-seo-cat" style="margin-bottom:12px;"></div>
+          <table class="tabla-admin">
+            <thead id="thead-seo-cat"></thead>
+            <tbody id="tabla-seo-cat-cuerpo"></tbody>
+          </table>
+          <div id="editor-seo-cat" class="tarjeta oculto" style="margin-top:20px;max-width:760px;"></div>
+        </div>
+      </div>
+
+      <!-- ─── TABLA DE RUTAS SEO ──────────────────────────────────────────── -->
       <table class="tabla-admin">
         <thead id="thead-seo">
           <tr>
@@ -9129,6 +9148,264 @@ function contarCharsResenaRuta() {
   var n = el.value.length;
   cnt.textContent = n + ' / 200';
   cnt.style.color = n > 200 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+}
+
+// ─── SEO Categorías de flota ─────────────────────────────────────────────────
+
+var seoCatCache = null;
+var seoCatLangActual = 'es';
+var seoCatIdActual = null;
+
+function toggleBloqueSEOCategorias() {
+  var contenido = document.getElementById('seo-cat-contenido');
+  var icono = document.getElementById('seo-cat-icono');
+  if (contenido.style.display === 'none') {
+    contenido.style.display = 'block';
+    icono.textContent = '▼';
+    if (!seoCatCache) cargarSEOCategorias();
+  } else {
+    contenido.style.display = 'none';
+    icono.textContent = '▶';
+  }
+}
+
+function cargarSEOCategorias() {
+  document.getElementById('tabla-seo-cat-cuerpo').innerHTML = '<tr><td colspan="12" style="color:var(--texto-muted)">Cargando...</td></tr>';
+  fetch('/admin/seo/categorias')
+    .then(function(r) { return r.json(); })
+    .then(function(datos) {
+      seoCatCache = datos;
+      renderizarTablaSEOCat(datos);
+    });
+}
+
+function badgeSEOCat(langData) {
+  if (!langData) return '<span class="estado-seo-vacio">—</span>';
+  if (langData.activo) return '<span class="estado-seo-ok">✓</span>';
+  if (langData.titulo) return '<span class="estado-seo-draft">✎</span>';
+  return '<span class="estado-seo-vacio">·</span>';
+}
+
+function renderizarTablaSEOCat(datos) {
+  var thead = document.getElementById('thead-seo-cat');
+  var cuerpo = document.getElementById('tabla-seo-cat-cuerpo');
+  if (!datos.categorias || datos.categorias.length === 0) {
+    cuerpo.innerHTML = '<tr><td colspan="12">No hay categorías activas.</td></tr>';
+    return;
+  }
+  var idiomas = datos.idiomas || IDIOMAS_SEO;
+  thead.innerHTML = '<tr><th>Categoría</th>' + idiomas.map(function(l) { return '<th style="text-align:center">' + l.toUpperCase() + '</th>'; }).join('') + '<th>Acción</th></tr>';
+  cuerpo.innerHTML = datos.categorias.map(function(cat) {
+    var seoCat = datos.seo[cat.id] || {};
+    var celdas = idiomas.map(function(lang) {
+      return '<td style="text-align:center">' + badgeSEOCat(seoCat[lang]) + '</td>';
+    }).join('');
+    return '<tr>' +
+      '<td><strong>' + escapar(cat.nombre) + '</strong></td>' +
+      celdas +
+      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorSEOCat(' + cat.id + ')">✏️ Editar</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function abrirEditorSEOCat(catId) {
+  seoCatIdActual = catId;
+  var cat = seoCatCache && seoCatCache.categorias.find(function(c) { return c.id === catId; });
+  if (!cat) return;
+  var editor = document.getElementById('editor-seo-cat');
+  editor.classList.remove('oculto');
+  editor.innerHTML = '<p style="color:var(--texto-muted)">Cargando idiomas...</p>';
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  var idiomas = (seoCatCache && seoCatCache.idiomas) || IDIOMAS_SEO;
+  var seoData = (seoCatCache && seoCatCache.seo[catId]) || {};
+
+  var tabs = idiomas.map(function(lang, i) {
+    var d = seoData[lang] || {};
+    var completo = !!(d.titulo && d.slug);
+    var clases = 'tab-idioma' + (i === 0 ? ' activo' : '');
+    var estilo = completo
+      ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
+      : d.activo
+        ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
+        : d.titulo
+          ? 'background:#fff8e1;color:#b8860b;border-color:#f9a825;'
+          : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
+    var icono = d.activo ? ' ✓' : d.titulo ? ' ·' : '';
+    return '<button class="' + clases + '" id="seo-cat-tab-' + lang + '" style="' + estilo + '" ' +
+      'onclick="cambiarIdiomaEditorSEOCat(' + catId + ', \'' + lang + '\', this)">' +
+      lang.toUpperCase() + icono + '</button>';
+  }).join('');
+
+  editor.innerHTML =
+    '<h2 style="margin-top:0">✏️ SEO Categoría: ' + escapar(cat.nombre) + '</h2>' +
+    '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
+    '<div id="seo-cat-campos-editor"></div>' +
+    '<div id="seo-cat-mensaje-editor" style="margin-top:8px;"></div>' +
+    '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-seo-cat\').classList.add(\'oculto\')">Cerrar</button>';
+
+  seoCatLangActual = idiomas[0] || 'es';
+  cambiarIdiomaEditorSEOCat(catId, seoCatLangActual, editor.querySelector('.tab-idioma'));
+}
+
+function cambiarIdiomaEditorSEOCat(catId, lang, tabEl) {
+  seoCatLangActual = lang;
+  document.querySelectorAll('#editor-seo-cat .tab-idioma').forEach(function(b) { b.classList.remove('activo'); });
+  if (tabEl) tabEl.classList.add('activo');
+  var campos = document.getElementById('seo-cat-campos-editor');
+  if (!campos) return;
+  campos.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+
+  fetch('/admin/seo/categorias/' + catId + '/idioma/' + lang)
+    .then(function(r) { return r.status === 404 ? {} : r.json(); })
+    .then(function(datos) {
+      renderizarCamposSEOCat(catId, lang, datos || {});
+    })
+    .catch(function() { renderizarCamposSEOCat(catId, lang, {}); });
+}
+
+function renderizarCamposSEOCat(catId, lang, datos) {
+  var activo = datos.activo || false;
+  var slug   = escapar(datos.slug_url || '');
+  var titulo = escapar(datos.meta_title || '');
+  var desc   = datos.meta_description || '';
+  var campos = document.getElementById('seo-cat-campos-editor');
+  if (!campos) return;
+
+  var palabraFlota = (window._palabrasPaginas && window._palabrasPaginas[lang] && window._palabrasPaginas[lang].flota) ? window._palabrasPaginas[lang].flota : 'flota';
+  var urlPublica = lang !== 'es' ? '/' + lang + '/' + palabraFlota + '/' + (datos.slug_url || '') : '/flota/' + (datos.slug_url || '');
+
+  campos.innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--gris-fondo);border-radius:8px;margin-bottom:16px;flex-wrap:wrap;">' +
+      '<span style="font-size:14px;">' + (activo ? '🟢 Esta página <strong>está activa</strong> en internet' : '⚪ Esta página <strong>está desactivada</strong>') + '</span>' +
+      '<button class="' + (activo ? 'boton-peligro' : 'boton-costa') + '" style="padding:6px 14px;font-size:0.82rem;" ' +
+        'onclick="toggleActivarSEOCat(' + catId + ', \'' + lang + '\', ' + (!activo) + ')">' + (activo ? 'Desactivar' : 'Activar') + '</button>' +
+      (activo ? '<button class="boton-secundario" style="padding:6px 14px;font-size:0.82rem;" onclick="copiarEnlaceCat(this, \'' + urlPublica + '\')">🔗 Copiar enlace</button>' : '') +
+    '</div>' +
+
+    '<label class="etiqueta">URL amigable (slug)</label>' +
+    '<input class="campo" id="seo-cat-slug" type="text" value="' + slug + '" ' +
+      'oninput="actualizarURLCat(\'' + lang + '\')" ' +
+      'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;">' +
+    '<div id="seo-cat-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
+
+    '<label class="etiqueta">URL pública de esta página</label>' +
+    '<input class="campo" id="seo-cat-url-publica" type="text" readonly value="' + escapar(urlPublica) + '" ' +
+      'style="margin-bottom:16px;font-family:\'JetBrains Mono\',monospace;font-size:13px;color:var(--terracota);background:var(--gris-fondo);">' +
+
+    '<div style="margin-bottom:14px;">' +
+    '<button class="boton-costa" style="padding:7px 16px;font-size:0.85rem;" id="btn-generar-ia-cat" ' +
+      'onclick="generarIACat(' + catId + ', \'' + lang + '\')">🤖 Generar con IA</button>' +
+    '<span id="seo-cat-ia-msg" style="font-size:12px;color:var(--texto-muted);margin-left:10px;"></span>' +
+    '</div>' +
+
+    '<label class="etiqueta">Título para Google (máx. 600px)</label>' +
+    '<input class="campo" id="seo-cat-titulo" type="text" value="' + titulo + '" ' +
+      'oninput="contarPxSEO(this,\'seo-cat-titulo-count\',600,\'20px arial\')" style="margin-bottom:4px;">' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:12px;" id="seo-cat-titulo-count">' + medirPx(datos.meta_title || '', '20px arial') + ' / 600 px</div>' +
+
+    '<label class="etiqueta">Descripción para Google (máx. 920px)</label>' +
+    '<textarea class="campo" id="seo-cat-desc" rows="3" ' +
+      'oninput="contarPxSEO(this,\'seo-cat-desc-count\',920,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-cat-desc-count">' + medirPx(desc, '13px arial') + ' / 920 px</div>' +
+
+    '<button class="boton-primario" onclick="guardarSEOCat(' + catId + ', \'' + lang + '\')">💾 Guardar</button>';
+}
+
+function actualizarURLCat(lang) {
+  var slugInput = document.getElementById('seo-cat-slug');
+  var urlInput  = document.getElementById('seo-cat-url-publica');
+  if (!slugInput || !urlInput) return;
+  var palabraFlota = (window._palabrasPaginas && window._palabrasPaginas[lang] && window._palabrasPaginas[lang].flota) ? window._palabrasPaginas[lang].flota : 'flota';
+  urlInput.value = lang !== 'es' ? '/' + lang + '/' + palabraFlota + '/' + slugInput.value.trim() : '/flota/' + slugInput.value.trim();
+}
+
+function copiarEnlaceCat(boton, url) {
+  navigator.clipboard.writeText(window.location.origin + url).then(function() {
+    var orig = boton.textContent;
+    boton.textContent = '✓ ¡Copiado!';
+    setTimeout(function() { boton.textContent = orig; }, 1800);
+  }).catch(function() { prompt('Copia el enlace:', window.location.origin + url); });
+}
+
+function guardarSEOCat(catId, lang) {
+  var slugInput = document.getElementById('seo-cat-slug');
+  var slugVal   = slugInput ? slugInput.value.trim() : '';
+  var msg       = document.getElementById('seo-cat-mensaje-editor');
+  var errorSlug = validarSlug(slugVal);
+  if (errorSlug) {
+    msg.innerHTML = '<div class="aviso-error">⚠️ URL no válida: ' + errorSlug + '</div>';
+    if (slugInput) { slugInput.style.borderColor = 'var(--rojo-error)'; slugInput.focus(); }
+    return;
+  }
+  if (slugInput) slugInput.style.borderColor = '';
+  var datos = {
+    slug_url:         slugVal,
+    meta_title:       (document.getElementById('seo-cat-titulo') || {}).value || '',
+    meta_description: (document.getElementById('seo-cat-desc') || {}).value || ''
+  };
+  fetch('/admin/seo/categorias/' + catId + '/idioma/' + lang, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  }).then(function(r) { return r.json(); }).then(function(respuesta) {
+    if (respuesta.ok) {
+      msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+      seoCatCache = null;
+      cargarSEOCategorias();
+      setTimeout(function() { msg.innerHTML = ''; }, 3000);
+    } else {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
+    }
+  });
+}
+
+function toggleActivarSEOCat(catId, lang, activar) {
+  fetch('/admin/seo/categorias/' + catId + '/idioma/' + lang + '/activar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo: activar })
+  }).then(function() {
+    seoCatCache = null;
+    cargarSEOCategorias();
+    cambiarIdiomaEditorSEOCat(catId, lang, document.getElementById('seo-cat-tab-' + lang));
+  });
+}
+
+function generarIACat(catId, lang) {
+  var btn = document.getElementById('btn-generar-ia-cat');
+  var msg = document.getElementById('seo-cat-ia-msg');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generando...'; }
+  if (msg) msg.textContent = 'La IA está redactando el slug y los metadatos...';
+
+  fetch('/admin/seo/categorias/' + catId + '/generar-ia', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang: lang })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 Generar con IA'; }
+    if (!d.ok) {
+      if (msg) msg.textContent = d.error || 'Error al generar.';
+      return;
+    }
+    if (msg) msg.textContent = '✓ Generado. Revisa y guarda.';
+    var slugInput = document.getElementById('seo-cat-slug');
+    var tituloInput = document.getElementById('seo-cat-titulo');
+    var descInput = document.getElementById('seo-cat-desc');
+    if (slugInput) { slugInput.value = d.slug || ''; actualizarURLCat(lang); }
+    if (tituloInput) {
+      tituloInput.value = d.meta_title || '';
+      contarPxSEO(tituloInput, 'seo-cat-titulo-count', 600, '20px arial');
+    }
+    if (descInput) {
+      descInput.value = d.meta_description || '';
+      contarPxSEO(descInput, 'seo-cat-desc-count', 920, '13px arial');
+    }
+    setTimeout(function() { if (msg) msg.textContent = ''; }, 4000);
+  }).catch(function() {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 Generar con IA'; }
+    if (msg) msg.textContent = 'Error de conexión.';
+  });
 }
 
 </script>
