@@ -2545,8 +2545,7 @@ app.get('/api/flota', asyncHandler(async (req, res) => {
     const maletasTrad = obtenerTexto('categoria_maletas_' + cat.id, lang);
     return Object.assign({}, cat, {
       nombre:            nombreTrad  || cat.nombre,
-      capacidad_maletas: maletasTrad || cat.capacidad_maletas,
-      palabraFlota
+      capacidad_maletas: maletasTrad || cat.capacidad_maletas
     });
   });
   res.json(rows);
