@@ -266,6 +266,7 @@
   var txtPasajero   = 'pasajero';
   var txtMaletas    = 'maletas';
   var txtReservar   = 'Reservar';
+  var txtConoceMas  = 'Conoce más';
   var txtIntroSelector  = 'Según tus parámetros de búsqueda, los vehículos recomendados pueden ser estos:';
   var txtSinResultado   = 'No encontramos ningún vehículo que se ajuste a tu selección. Por favor, modifica los parámetros — revisa el número de pasajeros, maletas o el equipaje especial indicado.';
   Promise.all([
@@ -281,6 +282,7 @@
       if (pp.flota_catalogo_pasajero)     txtPasajero     = pp.flota_catalogo_pasajero;
       if (pp.flota_catalogo_maletas)      txtMaletas      = pp.flota_catalogo_maletas;
       if (pp.flota_catalogo_btn_reservar) txtReservar     = pp.flota_catalogo_btn_reservar;
+      if (pp.flota_catalogo_btn_conoce_mas) txtConoceMas  = pp.flota_catalogo_btn_conoce_mas;
       if (pp.flota_selector_intro)           txtIntroSelector = pp.flota_selector_intro;
       if (pp.flota_selector_sin_resultado)  txtSinResultado  = pp.flota_selector_sin_resultado;
 
@@ -333,6 +335,7 @@
           +     '<div class="tarjeta-cat-cap">' + cap + '</div>'
           +   '</div>'
           +   '<a href="' + (langFlota !== 'es' ? '/' + langFlota + '/' : '/') + '?categoria=' + c.id + '" class="btn-reservar-cat">' + txtReservar + '</a>'
+          +   (c.slug_url ? '<a href="' + (langFlota !== 'es' ? '/' + langFlota + '/' : '/') + (c.palabraFlota || 'flota') + '/' + c.slug_url + '" class="btn-reservar-cat" style="background:var(--charcoal);">' + txtConoceMas + '</a>' : '')
           + '</div>'
           + '<div class="tarjeta-cat-body">'
           +   '<div class="tarjeta-cat-desc">' + desc + subtitulo + descLarga + '</div>'
