@@ -3029,6 +3029,20 @@ app.post('/admin/categorias/:id/foto', requireAdmin, asyncHandler(async (req, re
   res.json({ ok: true });
 }));
 
+// Sirve la foto de una categoría — accesible públicamente para categoria-pagina.html
+app.get('/admin/categorias/:id/foto', asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT foto FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
+  if (!result.rows.length || !result.rows[0].foto) {
+    return res.status(404).end();
+  }
+  const dataUrl = result.rows[0].foto;
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+  if (!match) return res.status(404).end();
+  res.set('Content-Type', match[1]);
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.send(Buffer.from(match[2], 'base64'));
+}));
+
 app.post('/admin/categorias/:id/activa', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('UPDATE categorias_vehiculos SET activa = $1 WHERE id = $2', [!!req.body.activa, req.params.id]);
   res.json({ ok: true });
