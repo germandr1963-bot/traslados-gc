@@ -2554,19 +2554,18 @@ function cargarPreciosGrid() {
     html += '<th>Acciones</th></tr></thead><tbody>';
     datos.rutas.forEach(function (r) {
       var esActiva = r.activa !== false;
-      var estiloFila = esActiva ? '' : 'opacity:0.5;';
-      html += '<tr style="' + estiloFila + '">';
-      html += '<td>' + r.origen + ' → ' + r.destino + (esActiva ? '' : ' <span style="color:#aaa;font-size:11px;">(inactiva)</span>') + '</td>';
+      html += '<tr>';
+      html += '<td>' + r.origen + ' → ' + r.destino + '</td>';
       datos.categorias.forEach(function (c) {
         var clave = r.id + '-' + c.id;
         var valor = mapaPrecios[clave] !== undefined ? mapaPrecios[clave] : '';
-        html += '<td><input type="number" step="0.01" min="0" data-ruta="' + r.id + '" data-categoria="' + c.id + '" value="' + valor + '" ' + (esActiva ? '' : 'disabled') + '></td>';
+        html += '<td><input type="number" step="0.01" min="0" data-ruta="' + r.id + '" data-categoria="' + c.id + '" value="' + valor + '"></td>';
       });
       html += '<td style="white-space:nowrap;">';
       if (esActiva) {
         html += '<button class="boton-peligro" style="font-size:0.78rem;padding:0.25rem 0.6rem;margin-right:4px;" onclick="desactivarRuta(' + r.id + ', \'' + (r.origen + ' → ' + r.destino).replace(/'/g, "\\'") + '\')">⏸ Desactivar</button>';
       } else {
-        html += '<button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.6rem;margin-right:4px;" onclick="activarRuta(' + r.id + ')">▶ Activar</button>';
+        html += '<button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.6rem;margin-right:4px;" onclick="activarRuta(' + r.id + ')">Desactivada</button>';
       }
       html += '<button class="boton-peligro" style="font-size:0.78rem;padding:0.25rem 0.6rem;" onclick="eliminarRuta(' + r.id + ', \'' + (r.origen + ' → ' + r.destino).replace(/'/g, "\\'") + '\')">🗑 Eliminar</button>';
       html += '</td></tr>';
