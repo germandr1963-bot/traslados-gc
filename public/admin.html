@@ -2863,6 +2863,22 @@ function guardarSitemapConfig(rutaId) {
   });
 }
 
+function guardarVisibleDestino(destinoId, visible) {
+  var msg = document.getElementById('visible-destino-msg-' + destinoId);
+  fetch('/admin/destinos/' + destinoId + '/visible', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ visible_rutas: visible })
+  }).then(function(r) { return r.json(); }).then(function(respuesta) {
+    if (msg) {
+      msg.innerHTML = respuesta.ok
+        ? '<span style="color:#2e7d32;">✓ Guardado</span>'
+        : '<span style="color:var(--rojo-error);">Error</span>';
+      setTimeout(function() { msg.innerHTML = ''; }, 2500);
+    }
+  });
+}
+
 function guardarVisibleListado(rutaId, visible) {
   var msg = document.getElementById('visible-listado-msg-' + rutaId);
   fetch('/admin/rutas/' + rutaId + '/visible-listado', {
@@ -8125,8 +8141,9 @@ function abrirEditorDestino(destinoId) {
         '</div>' +
         '<div style="margin-top:10px;display:flex;align-items:center;gap:12px;">' +
         '<label style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;">' +
-        '<input type="checkbox" id="dest-visible" ' + (primerIdioma.visible_rutas ? 'checked' : '') + '> Visible en página /destinos</label>' +
+        '<input type="checkbox" id="dest-visible" ' + (primerIdioma.visible_rutas ? 'checked' : '') + ' onchange="guardarVisibleDestino(' + destinoId + ', this.checked)"> Visible en página /destinos</label>' +
         '<span style="font-size:12px;color:var(--texto-muted);">— Si está desmarcado no aparece en la web aunque tenga páginas activas</span>' +
+        '<span id="visible-destino-msg-' + destinoId + '" style="font-size:12px;"></span>' +
         '</div>' +
         '</div>' +
 
