@@ -9235,10 +9235,10 @@ function abrirEditorSEOCat(catId) {
     var d = seoData[lang] || {};
     var completo = !!(d.titulo && d.slug);
     var clases = 'tab-idioma' + (i === 0 ? ' activo' : '');
-    var estilo = completo
+    var estilo = d.activo
       ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
-      : d.activo
-        ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
+      : completo
+        ? 'background:#fff8e1;color:#b8860b;border-color:#f9a825;'
         : d.titulo
           ? 'background:#fff8e1;color:#b8860b;border-color:#f9a825;'
           : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
