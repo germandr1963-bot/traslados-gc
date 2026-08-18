@@ -3367,7 +3367,7 @@ app.post('/admin/rutas/:id/eliminar', requireAdmin, asyncHandler(async (req, res
 }));
 
 app.get('/admin/precios-grid', requireAdmin, asyncHandler(async (req, res) => {
-  const rutas = await pool.query('SELECT id, origen, destino FROM rutas WHERE activa = TRUE ORDER BY origen, destino');
+  const rutas = await pool.query('SELECT id, origen, destino, activa FROM rutas ORDER BY origen, destino');
   const categorias = await pool.query('SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
   const precios = await pool.query('SELECT ruta_id, categoria_id, precio FROM rutas_precios');
   res.json({
