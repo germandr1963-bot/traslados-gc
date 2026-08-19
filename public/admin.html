@@ -9770,12 +9770,58 @@ function renderizarCamposSEOCat(catId, lang, datos) {
       'oninput="contarPxSEO(this,\'seo-cat-desc-count\',920,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
     '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-cat-desc-count">' + medirPx(desc, '13px arial') + ' / 920 px</div>' +
 
+    '<label class="etiqueta">Reseña breve para tarjeta (máx. 200 caracteres)</label>' +
+    '<textarea class="campo" id="seo-cat-resena" rows="3" maxlength="200" ' +
+    'oninput="contarCharsSEOCat()" style="margin-bottom:4px;">' + escapar(datos.resena_breve || '') + '</textarea>' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-cat-resena-count">' + (datos.resena_breve ? datos.resena_breve.length : 0) + ' / 200</div>' +
+
+    '<label class="etiqueta">Texto descriptivo (visible en la página pública)</label>' +
+    '<div style="display:flex;gap:6px;margin-bottom:6px;">' +
+    '<button type="button" id="btn-vista-preview-cat" onclick="toggleVistaTextoCat(\'preview\')" style="padding:4px 12px;font-size:12px;border:1px solid var(--gris-borde);border-radius:6px;cursor:pointer;background:var(--charcoal);color:white;font-weight:700;">👁️ Vista previa</button>' +
+    '<button type="button" id="btn-vista-html-cat" onclick="toggleVistaTextoCat(\'html\')" style="padding:4px 12px;font-size:12px;border:1px solid var(--gris-borde);border-radius:6px;cursor:pointer;background:var(--gris-fondo);color:var(--texto-muted);">&#9999;&#65039; Editar HTML</button>' +
+    '</div>' +
+    '<div id="seo-cat-texto-preview" style="border:1px solid var(--gris-borde);border-radius:8px;padding:16px 20px;min-height:180px;margin-bottom:16px;font-size:14px;line-height:1.7;background:#fff;display:block;"></div>' +
+    '<textarea class="campo" id="seo-cat-texto" rows="10" style="margin-bottom:16px;font-size:12px;line-height:1.5;font-family:monospace;display:none;">' + escapar(datos.texto_descripcion || '') + '</textarea>' +
+
     '<button class="boton-primario" onclick="guardarSEOCat(' + catId + ', \'' + lang + '\')">💾 Guardar</button>';
+  // Mostrar preview si hay texto
+  if (datos.texto_descripcion) {
+    var preview = document.getElementById('seo-cat-texto-preview');
+    if (preview) { preview.innerHTML = datos.texto_descripcion; }
+  }
 }
 
 function actualizarURLCat(lang) {
   // La URL pública la construye el servidor al generar con IA o al guardar
   // No se recalcula en el cliente para evitar errores con la isla
+}
+
+function contarCharsSEOCat() {
+  var el = document.getElementById('seo-cat-resena');
+  var cnt = document.getElementById('seo-cat-resena-count');
+  if (!el || !cnt) return;
+  cnt.textContent = el.value.length + ' / 200';
+  cnt.style.color = el.value.length > 200 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+}
+
+function toggleVistaTextoCat(modo) {
+  var preview = document.getElementById('seo-cat-texto-preview');
+  var textarea = document.getElementById('seo-cat-texto');
+  var btnPreview = document.getElementById('btn-vista-preview-cat');
+  var btnHtml = document.getElementById('btn-vista-html-cat');
+  if (!preview || !textarea) return;
+  if (modo === 'preview') {
+    preview.innerHTML = textarea.value;
+    preview.style.display = 'block';
+    textarea.style.display = 'none';
+    if (btnPreview) { btnPreview.style.background = 'var(--charcoal)'; btnPreview.style.color = 'white'; btnPreview.style.fontWeight = '700'; }
+    if (btnHtml)    { btnHtml.style.background = 'var(--gris-fondo)'; btnHtml.style.color = 'var(--texto-muted)'; btnHtml.style.fontWeight = ''; }
+  } else {
+    preview.style.display = 'none';
+    textarea.style.display = 'block';
+    if (btnPreview) { btnPreview.style.background = 'var(--gris-fondo)'; btnPreview.style.color = 'var(--texto-muted)'; btnPreview.style.fontWeight = ''; }
+    if (btnHtml)    { btnHtml.style.background = 'var(--charcoal)'; btnHtml.style.color = 'white'; btnHtml.style.fontWeight = '700'; }
+  }
 }
 
 function copiarEnlaceCat(boton, url) {
@@ -9799,10 +9845,12 @@ function guardarSEOCat(catId, lang) {
   if (slugInput) slugInput.style.borderColor = '';
   var urlPublicaInput = document.getElementById('seo-cat-url-publica');
   var datos = {
-    slug_url:         slugVal,
-    canonical_url:    urlPublicaInput ? urlPublicaInput.value.trim() : '',
-    meta_title:       (document.getElementById('seo-cat-titulo') || {}).value || '',
-    meta_description: (document.getElementById('seo-cat-desc') || {}).value || ''
+    slug_url:          slugVal,
+    canonical_url:     urlPublicaInput ? urlPublicaInput.value.trim() : '',
+    meta_title:        (document.getElementById('seo-cat-titulo') || {}).value || '',
+    meta_description:  (document.getElementById('seo-cat-desc') || {}).value || '',
+    resena_breve:      (document.getElementById('seo-cat-resena') || {}).value || '',
+    texto_descripcion: (document.getElementById('seo-cat-texto') || {}).value || ''
   };
   fetch('/admin/seo/categorias/' + catId + '/idioma/' + lang, {
     method: 'POST',
