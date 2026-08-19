@@ -374,6 +374,24 @@ async function initSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS islas (
+      id SERIAL PRIMARY KEY,
+      nombre VARCHAR(100) NOT NULL,
+      slug VARCHAR(100) NOT NULL UNIQUE,
+      activa BOOLEAN DEFAULT TRUE,
+      orden INT DEFAULT 0,
+      creado_en TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  // Dato inicial: Gran Canaria
+  await pool.query(`
+    INSERT INTO islas (nombre, slug, activa, orden)
+    VALUES ('Gran Canaria', 'gran-canaria', TRUE, 1)
+    ON CONFLICT (slug) DO NOTHING
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS categorias_vehiculos (
       id SERIAL PRIMARY KEY,
       nombre VARCHAR(100) NOT NULL,
@@ -398,7 +416,14 @@ async function initSchema() {
       ADD COLUMN IF NOT EXISTS foto TEXT,
       ADD COLUMN IF NOT EXISTS en_flota BOOLEAN DEFAULT TRUE,
       ADD COLUMN IF NOT EXISTS descripcion_larga TEXT,
-      ADD COLUMN IF NOT EXISTS caracteristicas TEXT
+      ADD COLUMN IF NOT EXISTS caracteristicas TEXT,
+      ADD COLUMN IF NOT EXISTS isla_id INT REFERENCES islas(id) ON DELETE SET NULL
+  `);
+
+  // Asignar Gran Canaria por defecto a todas las categorías sin isla
+  await pool.query(`
+    UPDATE categorias_vehiculos SET isla_id = (SELECT id FROM islas WHERE slug = 'gran-canaria' LIMIT 1)
+    WHERE isla_id IS NULL
   `);
 
   // Columnas SEO para páginas públicas de categoría de vehículo por idioma
@@ -2558,10 +2583,12 @@ app.get('/api/flota', asyncHandler(async (req, res) => {
             COALESCE(cvt.subtitulo,         cv.subtitulo)         AS subtitulo,
             COALESCE(cvt.descripcion_larga, cv.descripcion_larga) AS descripcion_larga,
             COALESCE(cvt.caracteristicas,   cv.caracteristicas)   AS caracteristicas,
-            CASE WHEN cvt.activo = TRUE THEN cvt.slug_url ELSE NULL END AS slug_url
+            CASE WHEN cvt.activo = TRUE THEN cvt.slug_url ELSE NULL END AS slug_url,
+            COALESCE(i.slug, 'gran-canaria') AS isla_slug
      FROM categorias_vehiculos cv
      LEFT JOIN categorias_vehiculos_traducciones cvt
            ON cvt.categoria_id = cv.id AND cvt.lang_code = $1
+     LEFT JOIN islas i ON i.id = cv.isla_id
      WHERE cv.activa = TRUE AND cv.en_flota = TRUE
      ORDER BY cv.orden, cv.nombre`,
     [lang]
@@ -2984,13 +3011,55 @@ app.delete('/admin/fondos/:id', requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 // ─── Admin: categorías de vehículo ───────────────────────────────────────────
+// ─── Endpoints de islas ──────────────────────────────────────────────────────
+
+app.get('/admin/islas', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT id, nombre, slug, activa, orden FROM islas ORDER BY orden, nombre');
+  res.json({ islas: result.rows });
+}));
+
+app.post('/admin/islas', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, slug, orden } = req.body;
+  if (!nombre || !slug) return res.status(400).json({ error: 'Nombre y slug son obligatorios.' });
+  try {
+    await pool.query(
+      'INSERT INTO islas (nombre, slug, activa, orden) VALUES ($1, $2, TRUE, $3)',
+      [nombre.trim(), slug.trim().toLowerCase(), parseInt(orden) || 1]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    if (e.code === '23505') return res.status(400).json({ error: 'Ya existe una isla con ese slug.' });
+    throw e;
+  }
+}));
+
+app.post('/admin/islas/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, slug, orden } = req.body;
+  if (!nombre || !slug) return res.status(400).json({ error: 'Nombre y slug son obligatorios.' });
+  try {
+    await pool.query(
+      'UPDATE islas SET nombre = $1, slug = $2, orden = $3 WHERE id = $4',
+      [nombre.trim(), slug.trim().toLowerCase(), parseInt(orden) || 1, req.params.id]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    if (e.code === '23505') return res.status(400).json({ error: 'Ya existe una isla con ese slug.' });
+    throw e;
+  }
+}));
+
+// ─── Endpoints de categorías de vehículo ─────────────────────────────────────
+
 app.get('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas, descripcion,
-            activa, disponible, bajada_diurna, bajada_nocturna, orden,
-            descripcion_larga, caracteristicas, subtitulo,
-            (foto IS NOT NULL) AS tiene_foto
-     FROM categorias_vehiculos ORDER BY orden, nombre`
+    `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.limite_sillas, cv.descripcion,
+            cv.activa, cv.disponible, cv.bajada_diurna, cv.bajada_nocturna, cv.orden,
+            cv.descripcion_larga, cv.caracteristicas, cv.subtitulo,
+            (cv.foto IS NOT NULL) AS tiene_foto,
+            cv.isla_id, COALESCE(i.nombre, 'Gran Canaria') AS isla_nombre
+     FROM categorias_vehiculos cv
+     LEFT JOIN islas i ON i.id = cv.isla_id
+     ORDER BY cv.orden, cv.nombre`
   );
   res.json(result.rows);
 }));
@@ -3005,12 +3074,13 @@ app.post('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
     await pool.query(
       `INSERT INTO categorias_vehiculos
          (nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas, descripcion,
-          bajada_diurna, bajada_nocturna, descripcion_larga, caracteristicas, activa, disponible)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, FALSE)`,
+          bajada_diurna, bajada_nocturna, descripcion_larga, caracteristicas, activa, disponible, isla_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, FALSE, $10)`,
       [nombre, parseInt(d.capacidad_pasajeros, 10) || 4, (d.capacidad_maletas || '').trim() || '—',
        parseInt(d.limite_sillas, 10) || 0, (d.descripcion || '').trim(),
        parseFloat(d.bajada_diurna) || 0, parseFloat(d.bajada_nocturna) || 0,
-       (d.descripcion_larga || '').trim(), (d.caracteristicas || '').trim()]
+       (d.descripcion_larga || '').trim(), (d.caracteristicas || '').trim(),
+       d.isla_id ? parseInt(d.isla_id) : null]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -3029,13 +3099,14 @@ app.post('/admin/categorias/:id/editar', requireAdmin, asyncHandler(async (req, 
     await pool.query(
       `UPDATE categorias_vehiculos
        SET nombre = $1, capacidad_pasajeros = $2, capacidad_maletas = $3, limite_sillas = $4, descripcion = $5,
-           bajada_diurna = $6, bajada_nocturna = $7, descripcion_larga = $8, caracteristicas = $9, subtitulo = $10
-       WHERE id = $11`,
+           bajada_diurna = $6, bajada_nocturna = $7, descripcion_larga = $8, caracteristicas = $9, subtitulo = $10,
+           isla_id = $11
+       WHERE id = $12`,
       [nombre, parseInt(d.capacidad_pasajeros, 10) || 4, (d.capacidad_maletas || '').trim() || '—',
        parseInt(d.limite_sillas, 10) || 0, (d.descripcion || '').trim(),
        parseFloat(d.bajada_diurna) || 0, parseFloat(d.bajada_nocturna) || 0,
        (d.descripcion_larga || '').trim(), (d.caracteristicas || '').trim(),
-       (d.subtitulo || '').trim(), req.params.id]
+       (d.subtitulo || '').trim(), d.isla_id ? parseInt(d.isla_id) : null, req.params.id]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -9715,8 +9786,7 @@ app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
   }
 
   // Buscar la categoría cuyo slug está activo en este idioma
-  // Para español: el slug vive en categorias_vehiculos_traducciones con lang_code='es'
-  // igual que el resto de idiomas — un único lugar de búsqueda.
+  // Incluye isla para construir la URL correcta
   const catResult = await pool.query(
     `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas,
             cv.limite_sillas, cv.foto,
@@ -9724,10 +9794,12 @@ app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
             COALESCE(cvt.subtitulo,         cv.subtitulo)         AS subtitulo,
             COALESCE(cvt.descripcion_larga, cv.descripcion_larga) AS descripcion_larga,
             COALESCE(cvt.caracteristicas,   cv.caracteristicas)   AS caracteristicas,
-            cvt.slug_url, cvt.meta_title, cvt.meta_description, cvt.activo
+            cvt.slug_url, cvt.meta_title, cvt.meta_description, cvt.activo,
+            i.slug AS isla_slug, i.nombre AS isla_nombre
      FROM categorias_vehiculos cv
      JOIN categorias_vehiculos_traducciones cvt
           ON cvt.categoria_id = cv.id AND cvt.lang_code = $1
+     LEFT JOIN islas i ON i.id = cv.isla_id
      WHERE cvt.slug_url = $2 AND cvt.activo = TRUE
        AND cv.activa = TRUE AND cv.en_flota = TRUE`,
     [lang, slug]
@@ -9779,8 +9851,9 @@ app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
 
   // URL canónica y palabra de flota en este idioma
   const palabraFlota = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
-  const urlActual = BASE_URL + (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota + '/' + slug;
-  const canonical_url = (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota + '/' + slug;
+  const slugIsla = cat.isla_slug || 'gran-canaria';
+  const urlActual = BASE_URL + (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota + '/' + slugIsla + '/' + slug;
+  const canonical_url = (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota + '/' + slugIsla + '/' + slug;
 
   // Schema.org Vehicle + BreadcrumbList
   const schemaVehicle = {
@@ -9837,7 +9910,9 @@ app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
       slug_url:            cat.slug_url,
       meta_title:          cat.meta_title,
       meta_description:    cat.meta_description,
-      canonical_url
+      canonical_url,
+      isla_slug:           cat.isla_slug || 'gran-canaria',
+      isla_nombre:         cat.isla_nombre || 'Gran Canaria'
     },
     precios: precios.rows.map(function (p) {
       return {
@@ -10089,17 +10164,26 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
   }
 
   // ── ¿Es una página de categoría de flota? ───────────────────────────────
+  // Nueva estructura: /:lang/fleet/:isla/:slug
   const palabraFlota = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
   if (seccion === palabraFlota) {
-    const catResult = await pool.query(
-      `SELECT cvt.categoria_id FROM categorias_vehiculos_traducciones cvt
-       JOIN categorias_vehiculos cv ON cv.id = cvt.categoria_id
-       WHERE cvt.lang_code = $1 AND cvt.slug_url = $2 AND cvt.activo = TRUE
-         AND cv.activa = TRUE AND cv.en_flota = TRUE`,
-      [lang, slug]
-    );
-    if (catResult.rows.length > 0) {
-      return res.sendFile(path.join(__dirname, 'public', 'categoria-pagina.html'));
+    // slug aquí es en realidad la isla, el slug real viene en partes[4]
+    const partes = req.path.split('/').filter(Boolean);
+    // partes: [lang, palabraFlota, isla, slug-categoria]
+    const slugIsla = partes[2] || '';
+    const slugCat  = partes[3] || '';
+    if (slugIsla && slugCat) {
+      const catResult = await pool.query(
+        `SELECT cvt.categoria_id FROM categorias_vehiculos_traducciones cvt
+         JOIN categorias_vehiculos cv ON cv.id = cvt.categoria_id
+         JOIN islas i ON i.id = cv.isla_id
+         WHERE cvt.lang_code = $1 AND cvt.slug_url = $2 AND cvt.activo = TRUE
+           AND cv.activa = TRUE AND cv.en_flota = TRUE AND i.slug = $3`,
+        [lang, slugCat, slugIsla]
+      );
+      if (catResult.rows.length > 0) {
+        return res.sendFile(path.join(__dirname, 'public', 'categoria-pagina.html'));
+      }
     }
     return res.status(404).send('Página no encontrada');
   }
@@ -10107,15 +10191,16 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
   return res.status(404).send('Página no encontrada');
 }));
 
-// ─── Página de categoría en español: /flota/:slug ────────────────────────────
-app.get('/flota/:slug', asyncHandler(async (req, res) => {
-  const { slug } = req.params;
+// ─── Página de categoría en español: /flota/:isla/:slug ─────────────────────
+app.get('/flota/:isla/:slug', asyncHandler(async (req, res) => {
+  const { isla, slug } = req.params;
   const catResult = await pool.query(
     `SELECT cvt.categoria_id FROM categorias_vehiculos_traducciones cvt
      JOIN categorias_vehiculos cv ON cv.id = cvt.categoria_id
+     JOIN islas i ON i.id = cv.isla_id
      WHERE cvt.lang_code = 'es' AND cvt.slug_url = $1 AND cvt.activo = TRUE
-       AND cv.activa = TRUE AND cv.en_flota = TRUE`,
-    [slug]
+       AND cv.activa = TRUE AND cv.en_flota = TRUE AND i.slug = $2`,
+    [slug, isla]
   );
   if (catResult.rows.length === 0) {
     return res.status(404).send('Página no encontrada');
