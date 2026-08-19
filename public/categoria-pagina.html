@@ -469,11 +469,7 @@
           }
         }
 
-        // Botón reservar
         var urlReserva = (lang !== 'es' ? '/' + lang + '/' : '/') + '?categoria=' + cat.id;
-        html += '<div class="botones-accion">';
-        html += '<a href="' + urlReserva + '" class="boton-reservar">' + esc(tx.boton_solicitar_traslado || 'Solicitar traslado') + '</a>';
-        html += '</div>';
 
         // Descripción larga
         if (cat.descripcion_larga) {
