@@ -2371,6 +2371,33 @@ Pulsa el botón para crear una nueva contraseña:
     )
   `);
 
+  // ─── Categorías fotos: galería de imágenes por categoría de vehículo ──────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS categorias_fotos (
+      id SERIAL PRIMARY KEY,
+      categoria_id INT NOT NULL REFERENCES categorias_vehiculo(id) ON DELETE CASCADE,
+      imagen BYTEA NOT NULL,
+      mime_type TEXT DEFAULT 'image/webp',
+      nombre_archivo TEXT DEFAULT '',
+      alt_texto TEXT DEFAULT '',
+      es_principal BOOLEAN DEFAULT FALSE,
+      orden INT,
+      creado_en TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  // ─── Alt text de fotos de categorías por idioma ──────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS categorias_fotos_alt (
+      id SERIAL PRIMARY KEY,
+      foto_id INT NOT NULL REFERENCES categorias_fotos(id) ON DELETE CASCADE,
+      lang_code VARCHAR(2) NOT NULL,
+      alt_texto TEXT DEFAULT '',
+      creado_en TIMESTAMP DEFAULT NOW(),
+      UNIQUE(foto_id, lang_code)
+    )
+  `);
+
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
     await pool.query(
@@ -4516,6 +4543,185 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
     }
   }
   res.json({ ok: true, alts: resultado });
+}));
+
+// ─── ENDPOINTS DE FOTOS DE CATEGORÍAS ───────────────────────────────────────
+
+// Sube una foto a la galería de una categoría
+app.post('/admin/categorias/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
+  const { imagen, alt_texto, nombre_archivo } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/') || imagen.length > 10000000) {
+    return res.status(400).json({ error: 'Imagen no válida o demasiado grande (máx. ~7MB).' });
+  }
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato de imagen no válido.' });
+  const buffer = Buffer.from(matches[2], 'base64');
+  const webpBuffer = await sharp(buffer).webp({ quality: 85 }).toBuffer();
+  const webpHex = '\\x' + webpBuffer.toString('hex');
+  const maxOrden = await pool.query('SELECT COALESCE(MAX(orden), 0) AS m FROM categorias_fotos WHERE categoria_id = $1', [req.params.id]);
+  const inserted = await pool.query(
+    `INSERT INTO categorias_fotos (categoria_id, imagen, mime_type, nombre_archivo, alt_texto, orden)
+     VALUES ($1, $2::bytea, 'image/webp', $3, $4, $5) RETURNING id`,
+    [req.params.id, webpHex, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1]
+  );
+  if (alt_texto && inserted.rows[0]) {
+    await pool.query(
+      `INSERT INTO categorias_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, 'es', $2)
+       ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $2`,
+      [inserted.rows[0].id, alt_texto]
+    );
+  }
+  res.json({ ok: true });
+}));
+
+// Sugiere con IA el nombre de archivo SEO y el alt text para una foto nueva de categoría
+app.post('/admin/categorias/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { imagen, lang } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
+  const cat = await pool.query('SELECT nombre FROM categorias_vehiculo WHERE id = $1', [req.params.id]);
+  if (cat.rows.length === 0) return res.status(404).json({ error: 'Categoría no encontrada.' });
+  const nombreCategoria = cat.rows[0].nombre;
+  const nombreIdioma = await getNombreIdioma(lang || 'es');
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
+  const prompt = `Eres un experto en SEO de imágenes para webs de transporte premium. Analiza esta imagen del vehículo de categoría "${nombreCategoria}" y sugiere:
+1. Un nombre de archivo SEO en español (ej: business-class-interior-gran-canaria.webp), en minúsculas, sin espacios, con guiones, extensión .webp
+2. Un alt text en ${nombreIdioma} — describe lo que se ve en la imagen de forma natural e incluye el nombre de la categoría. Máximo 125 caracteres.
+Responde ÚNICAMENTE con JSON válido, sin markdown: {"nombre_archivo": "...", "alt_texto": "..."}`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: 200,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+        { type: 'text', text: prompt }
+      ]}]
+    })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
+  const data = await response.json();
+  const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  const resultado = JSON.parse(texto);
+  res.json({ ok: true, nombre_archivo: resultado.nombre_archivo || '', alt_texto: resultado.alt_texto || '' });
+}));
+
+// Lista las fotos de la galería de una categoría
+app.get('/admin/categorias/:id/fotos', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT id, alt_texto, nombre_archivo, orden, es_principal FROM categorias_fotos WHERE categoria_id = $1 ORDER BY orden`,
+    [req.params.id]
+  );
+  res.json({ fotos: result.rows });
+}));
+
+// Sirve una foto pública de categoría por su id
+app.get('/categoria-foto/:fotoId', asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT imagen, mime_type FROM categorias_fotos WHERE id = $1', [req.params.fotoId]);
+  if (result.rows.length === 0) return res.status(404).send('No encontrado');
+  let imgBuffer;
+  const raw = result.rows[0].imagen;
+  if (Buffer.isBuffer(raw)) {
+    imgBuffer = raw;
+  } else if (typeof raw === 'string' && raw.startsWith('\\x')) {
+    imgBuffer = Buffer.from(raw.slice(2), 'hex');
+  } else {
+    imgBuffer = Buffer.from(raw);
+  }
+  res.setHeader('Content-Type', result.rows[0].mime_type || 'image/webp');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(imgBuffer);
+}));
+
+// Elimina una foto de la galería de categoría
+app.post('/admin/categorias/:id/fotos/:fotoId/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM categorias_fotos WHERE id = $1 AND categoria_id = $2', [req.params.fotoId, req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Actualiza el orden de una foto de categoría
+app.post('/admin/categorias/:id/fotos/:fotoId/orden', requireAdmin, asyncHandler(async (req, res) => {
+  const { orden } = req.body;
+  const ordenNum = parseInt(orden);
+  if (isNaN(ordenNum) || ordenNum < 1 || ordenNum > 99) return res.status(400).json({ error: 'El orden debe ser un número entre 1 y 99.' });
+  await pool.query('UPDATE categorias_fotos SET orden = $1 WHERE id = $2 AND categoria_id = $3', [ordenNum, req.params.fotoId, req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Devuelve la imagen de una foto ya guardada como base64 (para pasarla a la IA)
+app.get('/admin/categorias/:id/fotos/:fotoId/imagen-base64', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT imagen, mime_type FROM categorias_fotos WHERE id = $1 AND categoria_id = $2', [req.params.fotoId, req.params.id]);
+  if (result.rows.length === 0) return res.status(404).json({ ok: false, error: 'Foto no encontrada.' });
+  const row = result.rows[0];
+  let imgBuffer;
+  if (Buffer.isBuffer(row.imagen)) {
+    imgBuffer = row.imagen;
+  } else if (typeof row.imagen === 'string' && row.imagen.startsWith('\\x')) {
+    imgBuffer = Buffer.from(row.imagen.slice(2), 'hex');
+  } else {
+    imgBuffer = Buffer.from(row.imagen);
+  }
+  const base64 = imgBuffer.toString('base64');
+  const dataUrl = 'data:' + (row.mime_type || 'image/webp') + ';base64,' + base64;
+  res.json({ ok: true, imagen: dataUrl });
+}));
+
+// Obtiene los alt texts de una foto de categoría en todos los idiomas activos
+app.get('/admin/categorias/:id/fotos/:fotoId/alt', requireAdmin, asyncHandler(async (req, res) => {
+  const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
+  const alts = await pool.query(
+    'SELECT lang_code, alt_texto FROM categorias_fotos_alt WHERE foto_id = $1',
+    [req.params.fotoId]
+  );
+  const mapa = {};
+  for (const a of alts.rows) mapa[a.lang_code] = a.alt_texto;
+  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa });
+}));
+
+// Guarda el alt text de una foto de categoría en un idioma concreto
+app.post('/admin/categorias/:id/fotos/:fotoId/alt/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const { alt_texto } = req.body;
+  await pool.query(
+    `INSERT INTO categorias_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
+     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
+    [req.params.fotoId, req.params.lang, alt_texto || '']
+  );
+  res.json({ ok: true });
+}));
+
+// Sugiere con IA el alt text de una foto de categoría en el idioma activo
+app.post('/admin/categorias/:id/fotos/:fotoId/alt/:lang/sugerir-ia', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { imagen } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
+  const lang = req.params.lang;
+  const cat = await pool.query('SELECT nombre FROM categorias_vehiculo WHERE id = $1', [req.params.id]);
+  if (cat.rows.length === 0) return res.status(404).json({ error: 'Categoría no encontrada.' });
+  const nombreCategoria = cat.rows[0].nombre;
+  const nombreIdioma = await getNombreIdioma(lang);
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
+  const prompt = `Eres un experto en SEO de imágenes para webs de transporte premium. Analiza esta imagen del vehículo de categoría "${nombreCategoria}" y escribe un alt text en ${nombreIdioma} — de forma completamente nativa, describe lo que se ve e incluye el nombre de la categoría. Máximo 125 caracteres. Responde ÚNICAMENTE con el texto del alt, sin comillas ni explicaciones.`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: 200,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+        { type: 'text', text: prompt }
+      ]}]
+    })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
+  const data = await response.json();
+  const altTexto = data.content.map(function(b) { return b.text || ''; }).join('').trim().replace(/^["“”]+|["“”]+$/g, '');
+  res.json({ ok: true, alt_texto: altTexto });
 }));
 
 // ─── ENDPOINTS DE FOTOS DE RUTAS ─────────────────────────────────────────────
@@ -9605,6 +9811,17 @@ app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
 
   const t = function (clave) { return obtenerTexto(clave, lang); };
 
+  // Fotos de galería de la categoría con alt text en el idioma solicitado
+  const fotosResult = await pool.query(
+    `SELECT cf.id, cf.nombre_archivo, cf.orden,
+            COALESCE(cfa.alt_texto, cf.alt_texto, '') AS alt_texto
+     FROM categorias_fotos cf
+     LEFT JOIN categorias_fotos_alt cfa ON cfa.foto_id = cf.id AND cfa.lang_code = $2
+     WHERE cf.categoria_id = $1
+     ORDER BY cf.orden`,
+    [cat.id, lang]
+  );
+
   res.json({
     categoria: {
       id:                  cat.id,
@@ -9640,6 +9857,7 @@ app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
     twitterActivo:      !!globales.twitter_activo,
     schemaVehicle,
     schemaBreadcrumb,
+    fotosGaleria:      fotosResult.rows,
     palabrasPaginas:   PALABRAS_PAGINAS[lang] || {},
     textos: {
       titulo_tarifas:              t('titulo_tarifas'),
