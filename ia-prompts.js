@@ -343,18 +343,19 @@ SOLO esto:
 // SEO de páginas públicas de categoría de vehículo — por idioma
 // Función: endpoint POST /admin/seo/categorias/:id/generar-ia
 // Botón admin: 🤖 Generar con IA — sección SEO Categorías de flota
+// Línea original server.js: ~3671
 function GENERADOR_CATEGORIAS_SEO(nombreIdioma, item) {
   const LIMITES = {
-    'Español':    { tRango: '52-58', tMax: 60, dRango: '145-152', dMax: 155 },
-    'Inglés':     { tRango: '54-60', tMax: 62, dRango: '150-157', dMax: 160 },
-    'Alemán':     { tRango: '48-53', tMax: 55, dRango: '130-137', dMax: 140 },
-    'Francés':    { tRango: '52-58', tMax: 60, dRango: '145-152', dMax: 155 },
-    'Italiano':   { tRango: '52-58', tMax: 60, dRango: '148-155', dMax: 158 },
-    'Neerlandés': { tRango: '50-55', tMax: 57, dRango: '138-145', dMax: 148 },
-    'Sueco':      { tRango: '50-55', tMax: 57, dRango: '140-147', dMax: 150 },
-    'Noruego':    { tRango: '50-55', tMax: 57, dRango: '142-149', dMax: 152 },
-    'Finlandés':  { tRango: '46-52', tMax: 54, dRango: '128-135', dMax: 138 },
-    'Ruso':       { tRango: '42-48', tMax: 50, dRango: '118-125', dMax: 128 }
+    'Español':    { tRango: '52-58', tMax: 60, dRango: '145-152', dMax: 155, h1Max: 55, subMax: 200, descMax: 260 },
+    'Inglés':     { tRango: '54-60', tMax: 62, dRango: '150-157', dMax: 160, h1Max: 55, subMax: 200, descMax: 260 },
+    'Alemán':     { tRango: '48-53', tMax: 55, dRango: '130-137', dMax: 140, h1Max: 45, subMax: 165, descMax: 210 },
+    'Francés':    { tRango: '52-58', tMax: 60, dRango: '145-152', dMax: 155, h1Max: 50, subMax: 185, descMax: 240 },
+    'Italiano':   { tRango: '52-58', tMax: 60, dRango: '148-155', dMax: 158, h1Max: 50, subMax: 185, descMax: 240 },
+    'Neerlandés': { tRango: '50-55', tMax: 57, dRango: '138-145', dMax: 148, h1Max: 48, subMax: 175, descMax: 225 },
+    'Sueco':      { tRango: '50-55', tMax: 57, dRango: '140-147', dMax: 150, h1Max: 48, subMax: 175, descMax: 225 },
+    'Noruego':    { tRango: '50-55', tMax: 57, dRango: '142-149', dMax: 152, h1Max: 48, subMax: 175, descMax: 225 },
+    'Finlandés':  { tRango: '46-52', tMax: 54, dRango: '128-135', dMax: 138, h1Max: 42, subMax: 155, descMax: 200 },
+    'Ruso':       { tRango: '42-48', tMax: 50, dRango: '118-125', dMax: 128, h1Max: 42, subMax: 155, descMax: 200 }
   };
   const L = LIMITES[nombreIdioma] || LIMITES['Español'];
 
@@ -414,9 +415,46 @@ El nombre de la isla "${item.isla_nombre}" traducido o transliterado a ${nombreI
 - Incluye: tipo de vehículo, capacidad (${item.capacidad_pasajeros} pasajeros), casos de uso concretos (aeropuerto, hotel, grupos, familias), ventaja competitiva y llamada a la acción corta.
 - Formato habitual: [Descripción del vehículo y perfil ideal] + [Ventajas: espacio, comodidad, tarifas competitivas] + [CTA breve].
 
+
+5. H1_SEO (campo: h1_seo):
+- Título principal de la página para Google y para el visitante. Intención de búsqueda transaccional.
+- Fórmula: [Traslado / Transfer / equivalente nativo en ${nombreIdioma}] + [${item.nombre}] + [en ${item.isla_nombre}]
+- MÁXIMO ABSOLUTO: ${L.h1Max} caracteres (espacios incluidos). NUNCA sobrepasar.
+- Redactar 100% nativo en ${nombreIdioma}. No traducir literalmente.
+
+6. SUBTITULO_SEO (campo: subtitulo_seo):
+- Línea de apoyo al H1. Resume la propuesta de valor: vehículo con chófer profesional, desde el aeropuerto LPA hacia los principales destinos de ${item.isla_nombre}. Mencionar puntualidad y tarifas transparentes.
+- MÁXIMO ABSOLUTO: ${L.subMax} caracteres (espacios incluidos). NUNCA sobrepasar.
+- Redactar 100% nativo en ${nombreIdioma}.
+
+7. RESENA_BREVE (campo: resena_breve):
+- Texto corto de captación comercial. Aparece en la página pública justo después de la ficha técnica del vehículo.
+- Objetivo: convencer al visitante de que esta categoría es la ideal para su perfil de viajero. Destacar experiencia de viaje, confort y adecuación.
+- MÁXIMO ABSOLUTO: ${L.descMax} caracteres (espacios incluidos). NUNCA sobrepasar.
+- Redactar 100% nativo en ${nombreIdioma}. Tono cercano, natural y profesional.
+- PROHIBIDO repetir textos de otros campos ya generados.
+
+8. TEXTO_DESCRIPCION (campo: texto_descripcion):
+- Texto SEO enriquecido largo. Aparece al final de la página, después del bloque "Cómo funciona".
+- Objetivo: posicionamiento en Google. Longitud: entre 350 y 450 palabras.
+- Formato HTML limpio (usa <h2>, <h3>, <p>, <ul>, <li>, <strong>). Sin Markdown.
+- Estructura interna obligatoria:
+  a) <h2>: Título del servicio — [equivalente nativo de "Chófer privado / Transfer"] ${item.nombre} en ${item.isla_nombre}
+  b) <p>: Párrafo de diferenciación frente al taxi tradicional del aeropuerto. Incluir: recogida personalizada con cartel en terminal de llegadas, ayuda con el equipaje, monitoreo del vuelo en tiempo real.
+  c) <h3>: Principales destinos y conexiones en ${item.isla_nombre}
+  d) <p> + <ul>: Lista con: Las Palmas de Gran Canaria, Sur de Gran Canaria (Maspalomas, Meloneras, Mogán), Servicios corporativos o eventos.
+  e) <h2>: Preguntas frecuentes sobre el traslado ${item.nombre} en ${item.isla_nombre}
+  f) 4 preguntas en formato <p><strong>Pregunta</strong></p><p>Respuesta</p>:
+     - P1 (todos): retraso del vuelo — seguimiento en tiempo real, espera sin cargos.
+     - P2 (adaptada): Español → factura con IVA; Inglés/Alemán/Neerlandés → precio cerrado sin costes ocultos; Ruso/Francés/Italiano → privacidad y atención VIP; Sueco/Noruego/Finlandés → cómo identificar al conductor.
+     - P3 (todos): sillas de bebé homologadas bajo reserva previa.
+     - P4 (todos): equipamiento y confort — modelos ${item.subtitulo || ''}, Wi-Fi, climatización, cargadores.
+
+
 ---
 
 ## AUTOCONTROL DE CARACTERES (PROCESO INTERNO — NO ESCRIBAS NADA HASTA TENER EL JSON FINAL)
+Antes de responder, verifica internamente que TODOS los campos cumplen sus límites máximos para ${nombreIdioma}. Si alguno se pasa por 1 solo carácter, corrígelo. Este proceso es interno — no aparece en la respuesta.
 Antes de responder, verifica internamente que meta_title y meta_description cumplen sus límites máximos exactos para ${nombreIdioma}. Si alguno se pasa por 1 solo carácter, corrígelo. Este proceso es interno — no aparece en la respuesta.
 
 ---
@@ -428,7 +466,7 @@ ${JSON.stringify(item, null, 2)}
 Tu respuesta completa es ÚNICAMENTE el objeto JSON. Nada antes, nada después.
 PROHIBIDO: borradores, conteos, explicaciones, pasos intermedios, markdown, texto de ningún tipo.
 SOLO esto:
-{"slug": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "..."}`;
+{"slug": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "h1_seo": "...", "subtitulo_seo": "...", "resena_breve": "...", "texto_descripcion": "..."}`;
 }
 
 
