@@ -9734,7 +9734,9 @@ function renderizarCamposSEOCat(catId, lang, datos) {
   if (!campos) return;
 
   var palabraFlota = (window._palabrasPaginas && window._palabrasPaginas[lang] && window._palabrasPaginas[lang].flota) ? window._palabrasPaginas[lang].flota : 'flota';
-  var urlPublica = lang !== 'es' ? '/' + lang + '/' + palabraFlota + '/' + (datos.slug_url || '') : '/flota/' + (datos.slug_url || '');
+  var catActual = seoCatCache && seoCatCache.categorias && seoCatCache.categorias.find(function(c) { return c.id === catId; });
+  var slugIsla = (catActual && catActual.isla_slug) ? catActual.isla_slug : 'gran-canaria';
+  var urlPublica = lang !== 'es' ? '/' + lang + '/' + palabraFlota + '/' + slugIsla + '/' + (datos.slug_url || '') : '/flota/' + slugIsla + '/' + (datos.slug_url || '');
 
   campos.innerHTML =
     '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--gris-fondo);border-radius:8px;margin-bottom:16px;flex-wrap:wrap;">' +
@@ -9778,7 +9780,9 @@ function actualizarURLCat(lang) {
   var urlInput  = document.getElementById('seo-cat-url-publica');
   if (!slugInput || !urlInput) return;
   var palabraFlota = (window._palabrasPaginas && window._palabrasPaginas[lang] && window._palabrasPaginas[lang].flota) ? window._palabrasPaginas[lang].flota : 'flota';
-  urlInput.value = lang !== 'es' ? '/' + lang + '/' + palabraFlota + '/' + slugInput.value.trim() : '/flota/' + slugInput.value.trim();
+  var catActual = seoCatCache && seoCatCache.categorias && seoCatCache.categorias.find(function(c) { return c.id === seoCatIdActual; });
+  var slugIsla = (catActual && catActual.isla_slug) ? catActual.isla_slug : 'gran-canaria';
+  urlInput.value = lang !== 'es' ? '/' + lang + '/' + palabraFlota + '/' + slugIsla + '/' + slugInput.value.trim() : '/flota/' + slugIsla + '/' + slugInput.value.trim();
 }
 
 function copiarEnlaceCat(boton, url) {
@@ -9853,7 +9857,14 @@ function generarIACat(catId, lang) {
     var slugInput = document.getElementById('seo-cat-slug');
     var tituloInput = document.getElementById('seo-cat-titulo');
     var descInput = document.getElementById('seo-cat-desc');
-    if (slugInput) { slugInput.value = d.slug || ''; actualizarURLCat(lang); }
+    if (slugInput) {
+      slugInput.value = d.slug || '';
+      if (d.nombre_isla && seoCatCache && seoCatCache.categorias) {
+        var catEnCache = seoCatCache.categorias.find(function(c) { return c.id === seoCatIdActual; });
+        if (catEnCache) catEnCache.isla_slug = d.nombre_isla;
+      }
+      actualizarURLCat(lang);
+    }
     if (tituloInput) {
       tituloInput.value = d.meta_title || '';
       contarPxSEO(tituloInput, 'seo-cat-titulo-count', 600, '20px arial');
