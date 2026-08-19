@@ -392,6 +392,24 @@ async function initSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS islas (
+      id SERIAL PRIMARY KEY,
+      nombre VARCHAR(100) NOT NULL,
+      slug VARCHAR(100) NOT NULL UNIQUE,
+      activa BOOLEAN DEFAULT TRUE,
+      orden INT DEFAULT 0,
+      creado_en TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  // Dato inicial: Gran Canaria
+  await pool.query(`
+    INSERT INTO islas (nombre, slug, activa, orden)
+    VALUES ('Gran Canaria', 'gran-canaria', TRUE, 1)
+    ON CONFLICT (slug) DO NOTHING
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS categorias_vehiculos (
       id SERIAL PRIMARY KEY,
       nombre VARCHAR(100) NOT NULL,
@@ -3050,6 +3068,45 @@ app.post('/admin/islas/:id/editar', requireAdmin, asyncHandler(async (req, res) 
 
 // ─── Endpoints de categorías de vehículo ─────────────────────────────────────
 
+// ─── Endpoints de islas ──────────────────────────────────────────────────────
+
+app.get('/admin/islas', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT id, nombre, slug, activa, orden FROM islas ORDER BY orden, nombre');
+  res.json({ islas: result.rows });
+}));
+
+app.post('/admin/islas', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, slug, orden } = req.body;
+  if (!nombre || !slug) return res.status(400).json({ error: 'Nombre y slug son obligatorios.' });
+  try {
+    await pool.query(
+      'INSERT INTO islas (nombre, slug, activa, orden) VALUES ($1, $2, TRUE, $3)',
+      [nombre.trim(), slug.trim().toLowerCase(), parseInt(orden) || 1]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    if (e.code === '23505') return res.status(400).json({ error: 'Ya existe una isla con ese slug.' });
+    throw e;
+  }
+}));
+
+app.post('/admin/islas/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, slug, orden } = req.body;
+  if (!nombre || !slug) return res.status(400).json({ error: 'Nombre y slug son obligatorios.' });
+  try {
+    await pool.query(
+      'UPDATE islas SET nombre = $1, slug = $2, orden = $3 WHERE id = $4',
+      [nombre.trim(), slug.trim().toLowerCase(), parseInt(orden) || 1, req.params.id]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    if (e.code === '23505') return res.status(400).json({ error: 'Ya existe una isla con ese slug.' });
+    throw e;
+  }
+}));
+
+// ─── Endpoints de categorías de vehículo ─────────────────────────────────────
+
 app.get('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.limite_sillas, cv.descripcion,
@@ -3525,7 +3582,10 @@ app.post('/admin/precios-grid', requireAdmin, asyncHandler(async (req, res) => {
 // Lista todas las categorías activas con el estado SEO de cada idioma
 app.get('/admin/seo/categorias', requireAdmin, asyncHandler(async (req, res) => {
   const cats = await pool.query(
-    'SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre'
+    `SELECT cv.id, cv.nombre, COALESCE(i.slug, 'gran-canaria') AS isla_slug, COALESCE(i.nombre, 'Gran Canaria') AS isla_nombre
+     FROM categorias_vehiculos cv
+     LEFT JOIN islas i ON i.id = cv.isla_id
+     WHERE cv.activa = TRUE ORDER BY cv.orden, cv.nombre`
   );
   const seoData = await pool.query(
     `SELECT categoria_id, lang_code, slug_url, meta_title, activo
@@ -3597,7 +3657,11 @@ app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(asyn
   if (!IDIOMAS_PERMITIDOS.includes(lang)) return res.status(400).json({ error: 'Idioma no válido.' });
 
   const catResult = await pool.query(
-    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas FROM categorias_vehiculos WHERE id = $1 AND activa = TRUE',
+    `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.limite_sillas,
+            COALESCE(i.slug, 'gran-canaria') AS isla_slug, COALESCE(i.nombre, 'Gran Canaria') AS isla_nombre
+     FROM categorias_vehiculos cv
+     LEFT JOIN islas i ON i.id = cv.isla_id
+     WHERE cv.id = $1 AND cv.activa = TRUE`,
     [req.params.id]
   );
   if (catResult.rows.length === 0) return res.status(404).json({ error: 'Categoría no encontrada.' });
@@ -3615,7 +3679,7 @@ app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(asyn
     reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones.`;
   }
 
-  const item = { id: cat.id, nombre: cat.nombre, capacidad_pasajeros: cat.capacidad_pasajeros, capacidad_maletas: cat.capacidad_maletas, limite_sillas: cat.limite_sillas, reglasSlug };
+  const item = { id: cat.id, nombre: cat.nombre, capacidad_pasajeros: cat.capacidad_pasajeros, capacidad_maletas: cat.capacidad_maletas, limite_sillas: cat.limite_sillas, isla_nombre: cat.isla_nombre || 'Gran Canaria', isla_slug: cat.isla_slug || 'gran-canaria', reglasSlug };
   const prompt = iaPrompts.GENERADOR_CATEGORIAS_SEO(nombreIdioma, item);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -3671,7 +3735,8 @@ app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(asyn
     } catch(e) { /* si falla el acorte, devolvemos lo que hay */ }
   }
 
-  res.json({ ok: true, slug: slugGenerado, meta_title: metaTitle, meta_description: metaDesc });
+  const nombreIslaGenerado = resultado.nombre_isla || cat.isla_slug || 'gran-canaria';
+  res.json({ ok: true, slug: slugGenerado, nombre_isla: nombreIslaGenerado, meta_title: metaTitle, meta_description: metaDesc });
 }));
 
 // ── SEO Rutas ─────────────────────────────────────────────────────────────────

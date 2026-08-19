@@ -401,12 +401,15 @@ Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y sig
 1. SLUG (campo: slug):
 URL amigable para esta categoría. ${item.reglasSlug} Solo letras minúsculas a-z y guiones. Sin tildes, sin caracteres especiales, sin números salvo que sean parte del nombre propio. Debe ser el nombre de la categoría únicamente — NUNCA añadas palabras como "traslado", "transfer", "taxi", "gran-canaria" ni ninguna otra palabra que no sea el nombre de la categoría. Ejemplos correctos: "business", "business-class", "economy", "confort", "confort-plus", "minivan", "van-premium". Ejemplos incorrectos: "traslado-confort", "transfer-business", "taxi-economy".
 
-2. META_TITLE (campo: meta_title):
+2. NOMBRE_ISLA (campo: nombre_isla):
+El nombre de la isla "${item.isla_nombre}" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico. Solo el nombre de la isla.
+
+3. META_TITLE (campo: meta_title):
 - Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
 - Incluye: nombre de la categoría en ${nombreIdioma} + Gran Canaria + propuesta de valor o marca.
 - Formato habitual: [Categoría ${item.nombre} Gran Canaria] | [Propuesta de Valor] | [Traslados GC]
 
-3. META_DESCRIPTION (campo: meta_description):
+4. META_DESCRIPTION (campo: meta_description):
 - Redactada como presentación directa del vehículo para el viajero que está eligiendo su traslado.
 - Incluye: tipo de vehículo, capacidad (${item.capacidad_pasajeros} pasajeros), casos de uso concretos (aeropuerto, hotel, grupos, familias), ventaja competitiva y llamada a la acción corta.
 - Formato habitual: [Descripción del vehículo y perfil ideal] + [Ventajas: espacio, comodidad, tarifas competitivas] + [CTA breve].
@@ -425,7 +428,7 @@ ${JSON.stringify(item, null, 2)}
 Tu respuesta completa es ÚNICAMENTE el objeto JSON. Nada antes, nada después.
 PROHIBIDO: borradores, conteos, explicaciones, pasos intermedios, markdown, texto de ningún tipo.
 SOLO esto:
-{"slug": "...", "meta_title": "...", "meta_description": "..."}`;
+{"slug": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "..."}`;
 }
 
 
