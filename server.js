@@ -10251,9 +10251,10 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
       const catResult = await pool.query(
         `SELECT cvt.categoria_id FROM categorias_vehiculos_traducciones cvt
          JOIN categorias_vehiculos cv ON cv.id = cvt.categoria_id
-         JOIN islas i ON i.id = cv.isla_id
+         LEFT JOIN islas i ON i.id = cv.isla_id
          WHERE cvt.lang_code = $1 AND cvt.slug_url = $2 AND cvt.activo = TRUE
-           AND cv.activa = TRUE AND cv.en_flota = TRUE AND i.slug = $3`,
+           AND cv.activa = TRUE AND cv.en_flota = TRUE
+           AND COALESCE(i.slug, 'gran-canaria') = $3`,
         [lang, slugCat, slugIsla]
       );
       if (catResult.rows.length > 0) {
@@ -10272,9 +10273,10 @@ app.get('/flota/:isla/:slug', asyncHandler(async (req, res) => {
   const catResult = await pool.query(
     `SELECT cvt.categoria_id FROM categorias_vehiculos_traducciones cvt
      JOIN categorias_vehiculos cv ON cv.id = cvt.categoria_id
-     JOIN islas i ON i.id = cv.isla_id
+     LEFT JOIN islas i ON i.id = cv.isla_id
      WHERE cvt.lang_code = 'es' AND cvt.slug_url = $1 AND cvt.activo = TRUE
-       AND cv.activa = TRUE AND cv.en_flota = TRUE AND i.slug = $2`,
+       AND cv.activa = TRUE AND cv.en_flota = TRUE
+       AND COALESCE(i.slug, 'gran-canaria') = $2`,
     [slug, isla]
   );
   if (catResult.rows.length === 0) {
