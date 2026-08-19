@@ -228,6 +228,10 @@
     }
     .breadcrumbs a:hover { text-decoration: underline; }
 
+    /* ── Ficha técnica — nombre y modelos ── */
+    .nombre-categoria-ficha { font-size: 20px; margin-bottom: 4px; margin-top: 20px; }
+    .subtitulo-categoria-ficha { font-size: 14px; color: var(--texto-muted); margin-bottom: 16px; }
+
     /* ── Textos SEO ── */
     .texto-seo-corto p {
       font-size: 16px;
@@ -480,7 +484,11 @@
         }
         html += '</div>';
 
-        // 4. Ficha técnica (capacidad + características)
+        // 4. Ficha técnica — nombre categoría + modelos + capacidad + características
+        html += '<p class="nombre-categoria-ficha"><strong>' + esc(cat.nombre) + '</strong></p>';
+        if (cat.subtitulo) {
+          html += '<p class="subtitulo-categoria-ficha">' + esc(cat.subtitulo) + '</p>';
+        }
         html += '<div class="capacidad-bloque">';
         html += '<div class="capacidad-item"><div class="cap-valor">' + esc(String(cat.capacidad_pasajeros)) + '</div><div class="cap-etiqueta">' + esc(tx.tabla_columna_pasajeros || 'Pasajeros') + '</div></div>';
         html += '<div class="capacidad-item"><div class="cap-valor">' + esc(String(cat.capacidad_maletas)) + '</div><div class="cap-etiqueta">' + esc(tx.tabla_columna_equipaje || 'Maletas') + '</div></div>';
