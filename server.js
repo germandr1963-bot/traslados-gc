@@ -9901,6 +9901,7 @@ app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
             COALESCE(cvt.descripcion_larga, cv.descripcion_larga) AS descripcion_larga,
             COALESCE(cvt.caracteristicas,   cv.caracteristicas)   AS caracteristicas,
             cvt.slug_url, cvt.meta_title, cvt.meta_description, cvt.activo,
+            cvt.resena_breve, cvt.texto_descripcion,
             i.slug AS isla_slug, i.nombre AS isla_nombre
      FROM categorias_vehiculos cv
      JOIN categorias_vehiculos_traducciones cvt
@@ -10018,7 +10019,9 @@ app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
       meta_description:    cat.meta_description,
       canonical_url,
       isla_slug:           cat.isla_slug || 'gran-canaria',
-      isla_nombre:         cat.isla_nombre || 'Gran Canaria'
+      isla_nombre:         cat.isla_nombre || 'Gran Canaria',
+      resena_breve:        cat.resena_breve || '',
+      texto_descripcion:   cat.texto_descripcion || ''
     },
     precios: precios.rows.map(function (p) {
       return {
