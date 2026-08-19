@@ -9250,6 +9250,35 @@ function abrirEditorSEOCat(catId) {
 
   editor.innerHTML =
     '<h2 style="margin-top:0">✏️ SEO Categoría: ' + escapar(cat.nombre) + '</h2>' +
+
+    // Bloque de fotos de galería
+    '<div style="background:var(--gris-fondo);padding:12px 14px;border-radius:8px;margin-bottom:18px;">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+    '<label class="etiqueta" style="font-size:11px;">Fotos de galería — interiores, detalles del vehículo</label>' +
+    '<label class="boton-secundario" style="cursor:pointer;padding:5px 12px;font-size:0.78rem;">' +
+    '+ A&#241;adir foto <input type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style="display:none;" onchange="previsualizarFotoCat(' + catId + ', this)"></label>' +
+    '</div>' +
+    '<div id="panel-nueva-foto-cat-' + catId + '" style="display:none;background:#fff;border:1px solid var(--gris-borde);border-radius:8px;padding:12px;margin-bottom:10px;">' +
+    '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">' +
+    '<img id="preview-foto-cat-' + catId + '" style="width:120px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--gris-borde);">' +
+    '<div style="flex:1;min-width:200px;">' +
+    '<label class="etiqueta" style="font-size:11px;">Nombre de archivo (.webp)</label>' +
+    '<input class="campo" id="nueva-foto-cat-nombre-' + catId + '" type="text" placeholder="ej: business-class-interior.webp" style="margin-bottom:8px;font-family:monospace;font-size:12px;">' +
+    '<label class="etiqueta" style="font-size:11px;">Alt text (español) — máx. 125 caracteres</label>' +
+    '<input class="campo" id="nueva-foto-cat-alt-' + catId + '" type="text" placeholder="Descripción de la imagen para Google" ' +
+    'oninput="contarChars(this,\'nueva-foto-cat-alt-cnt-' + catId + '\',125)">' +
+    '<div id="nueva-foto-cat-alt-cnt-' + catId + '" style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:4px;">0 / 125</div>' +
+    '</div></div>' +
+    '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
+    '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" onclick="sugerirFotoCatIA(' + catId + ')">&#10024; Sugerir en ES con IA</button>' +
+    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" onclick="confirmarSubidaFotoCat(' + catId + ')">&#128190; Guardar foto</button>' +
+    '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 12px;" onclick="cancelarNuevaFotoCat(' + catId + ')">Cancelar</button>' +
+    '<span id="msg-foto-cat-' + catId + '" style="font-size:12px;align-self:center;"></span>' +
+    '</div></div>' +
+    '<div id="fotos-cat-' + catId + '" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;min-height:40px;">' +
+    '<span style="font-size:12px;color:var(--texto-muted);">Cargando fotos...</span>' +
+    '</div></div>' +
+
     '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="seo-cat-campos-editor"></div>' +
     '<div id="seo-cat-mensaje-editor" style="margin-top:8px;"></div>' +
@@ -9257,6 +9286,278 @@ function abrirEditorSEOCat(catId) {
 
   seoCatLangActual = idiomas[0] || 'es';
   cambiarIdiomaEditorSEOCat(catId, seoCatLangActual, editor.querySelector('.tab-idioma'));
+  cargarFotosCat(catId);
+}
+
+// ── Fotos de galería de categoría ────────────────────────────────────────────
+
+var _fotoCatData = {};
+var _fotoAltCatData = {};
+
+function previsualizarFotoCat(catId, input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    _fotoCatData[catId] = e.target.result;
+    var preview = document.getElementById('preview-foto-cat-' + catId);
+    if (preview) preview.src = e.target.result;
+    var panel = document.getElementById('panel-nueva-foto-cat-' + catId);
+    if (panel) panel.style.display = 'block';
+    var nombre = document.getElementById('nueva-foto-cat-nombre-' + catId);
+    var alt = document.getElementById('nueva-foto-cat-alt-' + catId);
+    if (nombre) nombre.value = '';
+    if (alt) alt.value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function sugerirFotoCatIA(catId) {
+  var imagen = _fotoCatData[catId];
+  if (!imagen) return;
+  var msg = document.getElementById('msg-foto-cat-' + catId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Analizando imagen...'; }
+  fetch('/admin/categorias/' + catId + '/fotos/sugerir-ia', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imagen: imagen, lang: 'es' })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      var nombre = document.getElementById('nueva-foto-cat-nombre-' + catId);
+      var alt = document.getElementById('nueva-foto-cat-alt-' + catId);
+      if (nombre) nombre.value = d.nombre_archivo || '';
+      if (alt) { alt.value = d.alt_texto || ''; contarChars(alt, 'nueva-foto-cat-alt-cnt-' + catId, 125); }
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = 'Revisa y ajusta si hace falta'; }
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al analizar.'; }
+    }
+  }).catch(function() {
+    if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexión.'; }
+  });
+}
+
+function confirmarSubidaFotoCat(catId) {
+  var imagen = _fotoCatData[catId];
+  if (!imagen) return;
+  var nombre = (document.getElementById('nueva-foto-cat-nombre-' + catId) || {}).value || '';
+  var alt = (document.getElementById('nueva-foto-cat-alt-' + catId) || {}).value || '';
+  var msg = document.getElementById('msg-foto-cat-' + catId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Subiendo...'; }
+  fetch('/admin/categorias/' + catId + '/fotos', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imagen: imagen, alt_texto: alt, nombre_archivo: nombre })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) { cancelarNuevaFotoCat(catId); cargarFotosCat(catId); }
+    else { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; } }
+  }).catch(function() {
+    if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexión.'; }
+  });
+}
+
+function cancelarNuevaFotoCat(catId) {
+  delete _fotoCatData[catId];
+  var panel = document.getElementById('panel-nueva-foto-cat-' + catId);
+  if (panel) panel.style.display = 'none';
+}
+
+function cargarFotosCat(catId) {
+  fetch('/admin/categorias/' + catId + '/fotos')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var cont = document.getElementById('fotos-cat-' + catId);
+      if (!cont) return;
+      if (!d.fotos || d.fotos.length === 0) {
+        cont.innerHTML = '<span style="font-size:12px;color:var(--texto-muted);">Sin fotos todavía.</span>';
+        return;
+      }
+      cont.innerHTML = d.fotos.map(function(f) {
+        return '<div id="foto-cat-card-' + f.id + '" style="border:1px solid var(--gris-borde);border-radius:8px;overflow:hidden;">' +
+          '<div style="position:relative;height:80px;background:var(--charcoal);">' +
+          '<img src="/categoria-foto/' + f.id + '" style="width:100%;height:100%;object-fit:cover;">' +
+          '<button onclick="eliminarFotoCat(' + catId + ',' + f.id + ')" ' +
+          'style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:3px;padding:1px 6px;font-size:11px;cursor:pointer;">&#10005;</button>' +
+          '</div>' +
+          '<div style="padding:6px 8px;">' +
+          '<div style="font-size:10px;color:var(--texto-muted);margin-bottom:2px;">Nombre</div>' +
+          '<div style="font-size:10px;font-family:monospace;word-break:break-all;margin-bottom:6px;">' + escapar(f.nombre_archivo || '—') + '</div>' +
+          '<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;">' +
+          '<span style="font-size:10px;color:var(--texto-muted);">Orden:</span>' +
+          '<input type="number" min="1" max="99" value="' + (f.orden != null ? f.orden : '') + '" placeholder="1-3" id="orden-foto-cat-' + f.id + '" ' +
+          'style="width:44px;font-size:11px;padding:2px 4px;border:1px solid var(--gris-borde);border-radius:4px;">' +
+          '<button onclick="guardarOrdenFotoCat(' + catId + ',' + f.id + ')" ' +
+          'style="font-size:10px;padding:2px 6px;border:1px solid var(--gris-borde);border-radius:4px;cursor:pointer;background:var(--gris-fondo);">OK</button>' +
+          '<span id="msg-orden-cat-' + f.id + '" style="font-size:10px;"></span>' +
+          '</div>' +
+          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;" onclick="abrirAltTextosFotoCat(' + catId + ',' + f.id + ')">&#9998; Alt texts por idioma</button>' +
+          '</div></div>';
+      }).join('');
+    });
+}
+
+function guardarOrdenFotoCat(catId, fotoId) {
+  var input = document.getElementById('orden-foto-cat-' + fotoId);
+  var msg = document.getElementById('msg-orden-cat-' + fotoId);
+  if (!input) return;
+  var orden = parseInt(input.value);
+  if (isNaN(orden) || orden < 1) { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Número no válido'; } return; }
+  fetch('/admin/categorias/' + catId + '/fotos/' + fotoId + '/orden', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orden: orden })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓'; setTimeout(function() { if (msg) msg.textContent = ''; }, 2000); }
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error'; }
+    }
+  });
+}
+
+function eliminarFotoCat(catId, fotoId) {
+  if (!confirm('¿Eliminar esta foto?')) return;
+  fetch('/admin/categorias/' + catId + '/fotos/' + fotoId + '/eliminar', { method: 'POST' })
+    .then(function() { cargarFotosCat(catId); });
+}
+
+function abrirAltTextosFotoCat(catId, fotoId) {
+  var cont = document.getElementById('fotos-cat-' + catId);
+  var panelId = 'panel-alt-foto-cat-' + fotoId;
+  var existing = document.getElementById(panelId);
+  if (existing) { existing.remove(); return; }
+  var panel = document.createElement('div');
+  panel.id = panelId;
+  panel.style.cssText = 'background:var(--gris-fondo);border:1px solid var(--gris-borde);border-radius:8px;padding:14px;margin-top:10px;';
+  panel.innerHTML = '<p style="font-size:12px;color:var(--texto-muted);">Cargando alt texts...</p>';
+  cont.parentNode.insertBefore(panel, cont.nextSibling);
+  fetch('/admin/categorias/' + catId + '/fotos/' + fotoId + '/alt')
+    .then(function(r) { return r.json(); })
+    .then(function(d) { renderizarAltTextosFotoCat(catId, fotoId, d, panel); });
+}
+
+function renderizarAltTextosFotoCat(catId, fotoId, d, panel) {
+  var idiomas = d.idiomas || [];
+  var alts = d.alts || {};
+  var tabs = idiomas.map(function(i, idx) {
+    var tieneTexto = !!(alts[i.codigo] && alts[i.codigo].trim());
+    var estiloTab = tieneTexto
+      ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
+      : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
+    var icono = tieneTexto ? ' ✓' : ' ⚠️';
+    return '<button class="tab-idioma' + (idx === 0 ? ' activo' : '') + '" ' +
+      'id="tab-alt-foto-cat-' + fotoId + '-' + i.codigo + '" ' +
+      'style="' + estiloTab + '" ' +
+      'data-catid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + i.codigo + '" ' +
+      'onclick="cambiarTabAltFotoCatBtn(this)">' +
+      i.codigo.toUpperCase() + icono + '</button>';
+  }).join('');
+  panel.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+    '<strong style="font-size:12px;">Alt texts por idioma — foto #' + fotoId + '</strong>' +
+    '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" data-panelid="panel-alt-foto-cat-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">&#10005; Cerrar</button>' +
+    '</div>' +
+    '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
+    '<div id="alt-foto-cat-campos-' + fotoId + '"></div>' +
+    '<div id="alt-foto-cat-msg-' + fotoId + '" style="margin-top:8px;font-size:12px;"></div>';
+  panel._altData = d;
+  panel._catId = catId;
+  if (idiomas.length > 0) cambiarTabAltFotoCat(fotoId, idiomas[0].codigo, panel.querySelector('.tab-idioma'), d);
+}
+
+function cambiarTabAltFotoCatBtn(boton) {
+  cambiarTabAltFotoCat(parseInt(boton.dataset.fotoid), boton.dataset.lang, boton);
+}
+
+function cambiarTabAltFotoCat(fotoId, lang, boton, dataOverride) {
+  document.querySelectorAll('#panel-alt-foto-cat-' + fotoId + ' .tab-idioma').forEach(function(b) { b.classList.remove('activo'); });
+  if (boton) boton.classList.add('activo');
+  var panel = document.getElementById('panel-alt-foto-cat-' + fotoId);
+  if (!panel) return;
+  var catId = panel._catId;
+  var d = dataOverride || panel._altData || {};
+  var alts = d.alts || {};
+  var altActual = alts[lang] || '';
+  var n = altActual.length;
+  var colorCont = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+  var campos = document.getElementById('alt-foto-cat-campos-' + fotoId);
+  if (!campos) return;
+  campos.innerHTML =
+    '<label class="etiqueta" style="font-size:11px;">Alt text en ' + lang.toUpperCase() + ' — máx. 125 caracteres</label>' +
+    '<input class="campo" id="alt-foto-cat-input-' + fotoId + '" type="text" value="' + escapar(altActual) + '" ' +
+    'oninput="actualizarContadorAltFotoCat(this,' + fotoId + ')" style="margin-bottom:4px;">' +
+    '<div id="cnt-alt-foto-cat-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:' + colorCont + ';">' + n + ' / 125</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+    '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" data-catid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="sugerirAltFotoCatIABtn(this)">&#10024; Sugerir con IA</button>' +
+    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-catid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoCatBtn(this)">&#128190; Guardar</button>' +
+    '</div>';
+}
+
+function actualizarContadorAltFotoCat(input, fotoId) {
+  var n = input.value.length;
+  var el = document.getElementById('cnt-alt-foto-cat-' + fotoId);
+  if (!el) return;
+  el.textContent = n + ' / 125';
+  el.style.color = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+}
+
+function sugerirAltFotoCatIABtn(boton) {
+  var catId = parseInt(boton.dataset.catid);
+  var fotoId = parseInt(boton.dataset.fotoid);
+  var lang = boton.dataset.lang;
+  var msg = document.getElementById('alt-foto-cat-msg-' + fotoId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Generando con IA...'; }
+  fetch('/admin/categorias/' + catId + '/fotos/' + fotoId + '/imagen-base64')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error.'; } return null; }
+      return fetch('/admin/categorias/' + catId + '/fotos/' + fotoId + '/alt/' + lang + '/sugerir-ia', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imagen: d.imagen })
+      });
+    })
+    .then(function(r) { return r && r.json(); })
+    .then(function(d) {
+      if (!d) return;
+      if (d.ok) {
+        var input = document.getElementById('alt-foto-cat-input-' + fotoId);
+        if (input) { input.value = d.alt_texto || ''; actualizarContadorAltFotoCat(input, fotoId); }
+        var panel = document.getElementById('panel-alt-foto-cat-' + fotoId);
+        if (panel && panel._altData) panel._altData.alts[lang] = d.alt_texto || '';
+        if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Revisa y guarda'; }
+      } else {
+        if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al generar.'; }
+      }
+    }).catch(function() {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexión.'; }
+    });
+}
+
+function guardarAltFotoCatBtn(boton) {
+  var catId = parseInt(boton.dataset.catid);
+  var fotoId = parseInt(boton.dataset.fotoid);
+  var lang = boton.dataset.lang;
+  var input = document.getElementById('alt-foto-cat-input-' + fotoId);
+  var altTexto = input ? input.value.trim() : '';
+  var msg = document.getElementById('alt-foto-cat-msg-' + fotoId);
+  fetch('/admin/categorias/' + catId + '/fotos/' + fotoId + '/alt/' + lang, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alt_texto: altTexto })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      var panel = document.getElementById('panel-alt-foto-cat-' + fotoId);
+      if (panel && panel._altData) panel._altData.alts[lang] = altTexto;
+      var tab = document.getElementById('tab-alt-foto-cat-' + fotoId + '-' + lang);
+      if (tab) {
+        if (altTexto) {
+          tab.textContent = lang.toUpperCase() + ' ✓';
+          tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
+        } else {
+          tab.textContent = lang.toUpperCase() + ' ⚠️';
+          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
+        }
+      }
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado'; setTimeout(function() { if (msg) msg.textContent = ''; }, 2000); }
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
+    }
+  });
 }
 
 function cambiarIdiomaEditorSEOCat(catId, lang, tabEl) {
