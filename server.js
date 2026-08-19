@@ -450,7 +450,8 @@ async function initSchema() {
       ADD COLUMN IF NOT EXISTS slug_url TEXT,
       ADD COLUMN IF NOT EXISTS meta_title TEXT,
       ADD COLUMN IF NOT EXISTS meta_description TEXT,
-      ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT FALSE
+      ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS canonical_url TEXT
   `);
 
   await pool.query(`
@@ -3610,7 +3611,7 @@ app.get('/admin/seo/categorias/:id/idioma/:lang', requireAdmin, asyncHandler(asy
     return res.status(400).json({ error: 'Idioma no válido' });
   }
   const result = await pool.query(
-    `SELECT slug_url, meta_title, meta_description, activo
+    `SELECT slug_url, meta_title, meta_description, activo, canonical_url
      FROM categorias_vehiculos_traducciones
      WHERE categoria_id = $1 AND lang_code = $2`,
     [req.params.id, req.params.lang]
@@ -3624,14 +3625,27 @@ app.post('/admin/seo/categorias/:id/idioma/:lang', requireAdmin, asyncHandler(as
   if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
     return res.status(400).json({ error: 'Idioma no válido' });
   }
-  const { slug_url, meta_title, meta_description } = req.body;
+  const { slug_url, meta_title, meta_description, canonical_url } = req.body;
   const slugLimpio = slug_url ? slugify(slug_url) : null;
+  // Usar canonical_url del cliente si viene, si no construir automático igual que Destinos
+  const catIsla = await pool.query(
+    `SELECT COALESCE(i.slug, 'gran-canaria') AS isla_slug
+     FROM categorias_vehiculos cv
+     LEFT JOIN islas i ON i.id = cv.isla_id
+     WHERE cv.id = $1`, [req.params.id]
+  );
+  const islaSlug = catIsla.rows[0] ? catIsla.rows[0].isla_slug : 'gran-canaria';
+  const lang = req.params.lang;
+  const palabraFlota = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
+  const canonicalFinal = (canonical_url && canonical_url.trim())
+    ? canonical_url.trim()
+    : (lang !== 'es' ? '/' + lang + '/' + palabraFlota : '/flota') + '/' + islaSlug + '/' + (slugLimpio || '');
   await pool.query(
-    `INSERT INTO categorias_vehiculos_traducciones (categoria_id, lang_code, slug_url, meta_title, meta_description)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO categorias_vehiculos_traducciones (categoria_id, lang_code, slug_url, meta_title, meta_description, canonical_url)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (categoria_id, lang_code) DO UPDATE
-       SET slug_url = $3, meta_title = $4, meta_description = $5, updated_at = NOW()`,
-    [req.params.id, req.params.lang, slugLimpio || null, meta_title || null, meta_description || null]
+       SET slug_url = $3, meta_title = $4, meta_description = $5, canonical_url = $6, updated_at = NOW()`,
+    [req.params.id, req.params.lang, slugLimpio || null, meta_title || null, meta_description || null, canonicalFinal]
   );
   res.json({ ok: true });
 }));
@@ -10245,17 +10259,14 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
     // slug aquí es en realidad la isla, el slug real viene en partes[4]
     const partes = req.path.split('/').filter(Boolean);
     // partes: [lang, palabraFlota, isla, slug-categoria]
-    const slugIsla = partes[2] || '';
-    const slugCat  = partes[3] || '';
-    if (slugIsla && slugCat) {
+    const slugCat = partes[3] || '';
+    if (slugCat) {
       const catResult = await pool.query(
         `SELECT cvt.categoria_id FROM categorias_vehiculos_traducciones cvt
          JOIN categorias_vehiculos cv ON cv.id = cvt.categoria_id
-         LEFT JOIN islas i ON i.id = cv.isla_id
          WHERE cvt.lang_code = $1 AND cvt.slug_url = $2 AND cvt.activo = TRUE
-           AND cv.activa = TRUE AND cv.en_flota = TRUE
-           AND COALESCE(i.slug, 'gran-canaria') = $3`,
-        [lang, slugCat, slugIsla]
+           AND cv.activa = TRUE AND cv.en_flota = TRUE`,
+        [lang, slugCat]
       );
       if (catResult.rows.length > 0) {
         return res.sendFile(path.join(__dirname, 'public', 'categoria-pagina.html'));
@@ -10269,15 +10280,13 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
 
 // ─── Página de categoría en español: /flota/:isla/:slug ─────────────────────
 app.get('/flota/:isla/:slug', asyncHandler(async (req, res) => {
-  const { isla, slug } = req.params;
+  const { slug } = req.params;
   const catResult = await pool.query(
     `SELECT cvt.categoria_id FROM categorias_vehiculos_traducciones cvt
      JOIN categorias_vehiculos cv ON cv.id = cvt.categoria_id
-     LEFT JOIN islas i ON i.id = cv.isla_id
      WHERE cvt.lang_code = 'es' AND cvt.slug_url = $1 AND cvt.activo = TRUE
-       AND cv.activa = TRUE AND cv.en_flota = TRUE
-       AND COALESCE(i.slug, 'gran-canaria') = $2`,
-    [slug, isla]
+       AND cv.activa = TRUE AND cv.en_flota = TRUE`,
+    [slug]
   );
   if (catResult.rows.length === 0) {
     return res.status(404).send('Página no encontrada');
