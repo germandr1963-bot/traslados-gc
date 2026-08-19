@@ -3701,7 +3701,7 @@ app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(asyn
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 400, messages: [{ role: 'user', content: prompt }] })
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1500, messages: [{ role: 'user', content: prompt }] })
   });
   if (!response.ok) return res.status(500).json({ error: 'Error al conectar con la IA.' });
   const data = await response.json();
@@ -3755,6 +3755,11 @@ app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(asyn
   function limpiarSegmentoCat(s) {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   }
+  const h1Seo        = resultado.h1_seo || null;
+  const subtituloSeo = resultado.subtitulo_seo || null;
+  const resenaBreve  = resultado.resena_breve || null;
+  const textoDesc    = resultado.texto_descripcion || null;
+
   const nombreIslaLimpio = limpiarSegmentoCat(resultado.nombre_isla || cat.isla_slug || 'gran-canaria');
   const palabraFlotaGen = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
   const urlPublicaGenerada = (lang !== 'es' ? '/' + lang + '/' + palabraFlotaGen : '') + '/flota/' + nombreIslaLimpio + '/' + slugGenerado;
@@ -3762,7 +3767,7 @@ app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(asyn
     ? '/' + lang + '/' + palabraFlotaGen + '/' + nombreIslaLimpio + '/' + slugGenerado
     : '/flota/' + nombreIslaLimpio + '/' + slugGenerado;
 
-  res.json({ ok: true, slug: slugGenerado, nombre_isla: nombreIslaLimpio, url_publica: urlPublicaFinal, meta_title: metaTitle, meta_description: metaDesc });
+  res.json({ ok: true, slug: slugGenerado, nombre_isla: nombreIslaLimpio, url_publica: urlPublicaFinal, meta_title: metaTitle, meta_description: metaDesc, h1_seo: h1Seo, subtitulo_seo: subtituloSeo, resena_breve: resenaBreve, texto_descripcion: textoDesc });
 }));
 
 // ── SEO Rutas ─────────────────────────────────────────────────────────────────
