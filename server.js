@@ -2375,7 +2375,7 @@ Pulsa el botón para crear una nueva contraseña:
   await pool.query(`
     CREATE TABLE IF NOT EXISTS categorias_fotos (
       id SERIAL PRIMARY KEY,
-      categoria_id INT NOT NULL REFERENCES categorias_vehiculo(id) ON DELETE CASCADE,
+      categoria_id INT NOT NULL REFERENCES categorias_vehiculos(id) ON DELETE CASCADE,
       imagen BYTEA NOT NULL,
       mime_type TEXT DEFAULT 'image/webp',
       nombre_archivo TEXT DEFAULT '',
@@ -4580,7 +4580,7 @@ app.post('/admin/categorias/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(as
   if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
   const { imagen, lang } = req.body;
   if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
-  const cat = await pool.query('SELECT nombre FROM categorias_vehiculo WHERE id = $1', [req.params.id]);
+  const cat = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
   if (cat.rows.length === 0) return res.status(404).json({ error: 'Categoría no encontrada.' });
   const nombreCategoria = cat.rows[0].nombre;
   const nombreIdioma = await getNombreIdioma(lang || 'es');
@@ -4699,7 +4699,7 @@ app.post('/admin/categorias/:id/fotos/:fotoId/alt/:lang/sugerir-ia', requireAdmi
   const { imagen } = req.body;
   if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
   const lang = req.params.lang;
-  const cat = await pool.query('SELECT nombre FROM categorias_vehiculo WHERE id = $1', [req.params.id]);
+  const cat = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
   if (cat.rows.length === 0) return res.status(404).json({ error: 'Categoría no encontrada.' });
   const nombreCategoria = cat.rows[0].nombre;
   const nombreIdioma = await getNombreIdioma(lang);
