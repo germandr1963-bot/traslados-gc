@@ -195,16 +195,48 @@ table.tabla-precios input {
 
     <div id="seccion-categorias" class="oculto">
       <h1>Categorías de vehículos</h1>
-      <p class="subtitulo">Activa = existe en el sistema (se ofrece a los choferes en el alta). Disponible = se ofrece HOY al cliente en el selector de vehículo.</p>
-      <table class="tabla-admin">
-        <thead>
-          <tr><th>Categoría</th><th>Pasajeros</th><th>Maletas</th><th>Sillas bebé (máx.)</th><th>Bajada (diurna / nocturna)</th><th>Foto</th><th>Activa</th><th>Disponible</th><th>Acción</th></tr>
-        </thead>
-        <tbody id="tabla-categorias"></tbody>
-      </table>
-      <button id="boton-nueva-categoria" class="boton-primario" style="margin-top:14px;">➕ Crear categoría nueva</button>
 
-      <div class="tarjeta oculto" id="editor-categoria" style="margin-top:16px;max-width:520px;"></div>
+      <!-- ─── BLOQUE ISLAS ─────────────────────────────────────────────────── -->
+      <div class="tarjeta" style="margin-bottom:20px;">
+        <div style="cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none;" onclick="toggleBloqueIslas()">
+          <span id="bloque-islas-icono" style="font-size:14px;">▶</span>
+          <h2 style="font-size:17px;margin:0;">🏝️ Islas / Localidades</h2>
+          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
+        </div>
+        <div id="bloque-islas-contenido" style="display:none;margin-top:16px;">
+          <p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Cada isla o localidad tiene un slug que forma parte de las URLs públicas de las categorías de vehículo (ej: <code>/flota/gran-canaria/business-class</code>).</p>
+          <div id="mensaje-islas" style="margin-bottom:10px;"></div>
+          <table class="tabla-admin">
+            <thead>
+              <tr><th>Nombre</th><th>Slug (URL)</th><th>Activa</th><th>Orden</th><th>Acción</th></tr>
+            </thead>
+            <tbody id="tabla-islas"></tbody>
+          </table>
+          <button class="boton-primario" style="margin-top:14px;" onclick="abrirNuevaIsla()">➕ Añadir isla</button>
+          <div id="editor-isla" class="tarjeta oculto" style="margin-top:16px;max-width:480px;"></div>
+        </div>
+      </div>
+
+      <!-- ─── BLOQUE CATEGORÍAS ─────────────────────────────────────────────── -->
+      <div class="tarjeta" style="margin-bottom:20px;">
+        <div style="cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none;" onclick="toggleBloqueCategorias()">
+          <span id="bloque-categorias-icono" style="font-size:14px;">▶</span>
+          <h2 style="font-size:17px;margin:0;">🚗 Categorías de vehículo</h2>
+          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
+        </div>
+        <div id="bloque-categorias-contenido" style="display:none;margin-top:16px;">
+          <p class="subtitulo" style="margin-bottom:14px;">Activa = existe en el sistema (se ofrece a los choferes en el alta). Disponible = se ofrece HOY al cliente en el selector de vehículo.</p>
+          <table class="tabla-admin">
+            <thead>
+              <tr><th>Categoría</th><th>Isla</th><th>Pasajeros</th><th>Maletas</th><th>Sillas bebé (máx.)</th><th>Bajada (diurna / nocturna)</th><th>Foto</th><th>Activa</th><th>Disponible</th><th>Acción</th></tr>
+            </thead>
+            <tbody id="tabla-categorias"></tbody>
+          </table>
+          <button id="boton-nueva-categoria" class="boton-primario" style="margin-top:14px;">➕ Crear categoría nueva</button>
+          <div class="tarjeta oculto" id="editor-categoria" style="margin-top:16px;max-width:520px;"></div>
+        </div>
+      </div>
+
     </div>
 
     <div id="seccion-conductores" class="oculto">
@@ -1659,6 +1691,7 @@ function mostrarAdmin() {
   document.getElementById('pantalla-login').classList.add('oculto');
   document.getElementById('pantalla-admin').classList.remove('oculto');
   cargarFondos();
+  cargarIslas();
   cargarCategorias();
   cargarConductores();
   cargarPreciosGrid();
@@ -1797,12 +1830,121 @@ function escapar(texto) {
   return div.innerHTML;
 }
 
+// ── Toggles colapsables ─────────────────────────────────────────────────────
+function toggleBloqueIslas() {
+  var cont = document.getElementById('bloque-islas-contenido');
+  var icono = document.getElementById('bloque-islas-icono');
+  var visible = cont.style.display !== 'none';
+  cont.style.display = visible ? 'none' : 'block';
+  icono.textContent = visible ? '▶' : '▼';
+  if (!visible) cargarIslas();
+}
+
+function toggleBloqueCategorias() {
+  var cont = document.getElementById('bloque-categorias-contenido');
+  var icono = document.getElementById('bloque-categorias-icono');
+  var visible = cont.style.display !== 'none';
+  cont.style.display = visible ? 'none' : 'block';
+  icono.textContent = visible ? '▶' : '▼';
+  if (!visible) cargarCategorias();
+}
+
+// ── Gestión de islas ─────────────────────────────────────────────────────────
+function cargarIslas() {
+  fetch('/admin/islas')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      window._islasCache = d.islas || [];
+      var tbody = document.getElementById('tabla-islas');
+      if (!tbody) return;
+      if (!d.islas || d.islas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="color:var(--texto-muted);font-size:13px;">Sin islas configuradas.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = d.islas.map(function(i) {
+        return '<tr>' +
+          '<td><strong>' + escapar(i.nombre) + '</strong></td>' +
+          '<td><code style="font-size:12px;">' + escapar(i.slug) + '</code></td>' +
+          '<td><span class="insignia ' + (i.activa ? 'insignia-ok' : 'insignia-no') + '">' + (i.activa ? 'ACTIVA' : 'inactiva') + '</span></td>' +
+          '<td>' + i.orden + '</td>' +
+          '<td>' +
+            '<button class="boton-costa" style="padding:5px 10px;font-size:0.8rem;" onclick="editarIsla(' + i.id + ')">✏️ Editar</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    });
+}
+
+function abrirNuevaIsla() {
+  renderizarEditorIsla(null);
+}
+
+function editarIsla(id) {
+  var isla = (window._islasCache || []).find(function(i) { return i.id === id; });
+  if (!isla) return;
+  renderizarEditorIsla(isla);
+}
+
+function renderizarEditorIsla(isla) {
+  var editor = document.getElementById('editor-isla');
+  editor.classList.remove('oculto');
+  var esNueva = !isla;
+  editor.innerHTML =
+    '<h2 style="margin-top:0">' + (esNueva ? '➕ Nueva isla' : '✏️ Editar isla') + '</h2>' +
+    '<label class="etiqueta">Nombre (ej: Gran Canaria)</label>' +
+    '<input class="campo" id="isla-nombre" type="text" value="' + escapar(isla ? isla.nombre : '') + '" style="margin-bottom:10px" oninput="generarSlugIsla()">' +
+    '<label class="etiqueta">Slug para URL (ej: gran-canaria) — se genera automáticamente</label>' +
+    '<input class="campo" id="isla-slug" type="text" value="' + escapar(isla ? isla.slug : '') + '" style="margin-bottom:10px;font-family:monospace;">' +
+    '<label class="etiqueta">Orden</label>' +
+    '<input class="campo" id="isla-orden" type="number" min="1" max="99" value="' + (isla ? isla.orden : 1) + '" style="margin-bottom:10px;width:80px;">' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+      '<button class="boton-primario" onclick="guardarIsla(' + (isla ? isla.id : 'null') + ')">💾 Guardar</button>' +
+      '<button class="boton-secundario" onclick="document.getElementById('editor-isla').classList.add('oculto')">Cancelar</button>' +
+    '</div>' +
+    '<div id="msg-isla" style="margin-top:8px;font-size:13px;"></div>';
+  editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function generarSlugIsla() {
+  var nombre = (document.getElementById('isla-nombre') || {}).value || '';
+  var slug = nombre.toLowerCase()
+    .replace(/[áàä]/g, 'a').replace(/[éèë]/g, 'e').replace(/[íìï]/g, 'i')
+    .replace(/[óòö]/g, 'o').replace(/[úùü]/g, 'u').replace(/ñ/g, 'n')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  var slugInput = document.getElementById('isla-slug');
+  if (slugInput) slugInput.value = slug;
+}
+
+function guardarIsla(id) {
+  var datos = {
+    nombre: (document.getElementById('isla-nombre') || {}).value || '',
+    slug:   (document.getElementById('isla-slug')   || {}).value || '',
+    orden:  parseInt((document.getElementById('isla-orden') || {}).value) || 1
+  };
+  var msg = document.getElementById('msg-isla');
+  var url = id ? '/admin/islas/' + id + '/editar' : '/admin/islas';
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      document.getElementById('editor-isla').classList.add('oculto');
+      cargarIslas();
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado'; }
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
+    }
+  });
+}
+
 function cargarCategorias() {
   fetch('/admin/categorias').then(function (r) { return r.json(); }).then(function (categorias) {
     categoriasCache = categorias;
     document.getElementById('tabla-categorias').innerHTML = categorias.map(function (cat) {
       return '<tr>' +
         '<td><strong>' + escapar(cat.nombre) + '</strong></td>' +
+        '<td>' + escapar(cat.isla_nombre || '—') + '</td>' +
         '<td>' + cat.capacidad_pasajeros + '</td>' +
         '<td>' + escapar(cat.capacidad_maletas) + '</td>' +
         '<td>' + cat.limite_sillas + '</td>' +
@@ -1832,6 +1974,12 @@ function formularioCategoria(cat) {
   return '' +
     '<label class="etiqueta">Nombre</label>' +
     '<input class="campo" id="cat-nombre" type="text" value="' + escapar(cat.nombre || '') + '" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Isla / Localidad</label>' +
+    '<select class="campo" id="cat-isla-id" style="margin-bottom:10px">' +
+    (window._islasCache || []).map(function(i) {
+      return '<option value="' + i.id + '"' + (cat.isla_id === i.id ? ' selected' : '') + '>' + escapar(i.nombre) + '</option>';
+    }).join('') +
+    '</select>' +
     '<label class="etiqueta">Pasajeros (capacidad)</label>' +
     '<input class="campo" id="cat-pasajeros" type="number" min="1" max="12" value="' + (cat.capacidad_pasajeros || 4) + '" style="margin-bottom:10px">' +
     '<label class="etiqueta">Maletas (texto libre, ej.: "3 grandes")</label>' +
@@ -1890,7 +2038,8 @@ function guardarCategoria(id) {
     bajada_nocturna: document.getElementById('cat-bajada-nocturna').value,
     subtitulo: document.getElementById('cat-subtitulo').value,
     descripcion_larga: document.getElementById('cat-descripcion-larga').value,
-    caracteristicas: document.getElementById('cat-caracteristicas').value
+    caracteristicas: document.getElementById('cat-caracteristicas').value,
+    isla_id: document.getElementById('cat-isla-id') ? parseInt(document.getElementById('cat-isla-id').value) : null
   };
   var url = id ? '/admin/categorias/' + id + '/editar' : '/admin/categorias';
   fetch(url, {

@@ -335,7 +335,7 @@
           +     '<div class="tarjeta-cat-cap">' + cap + '</div>'
           +   '</div>'
           +   '<a href="' + (langFlota !== 'es' ? '/' + langFlota + '/' : '/') + '?categoria=' + c.id + '" class="btn-reservar-cat">' + txtReservar + '</a>'
-          +   (c.slug_url ? '<a href="' + (langFlota !== 'es' ? '/' + langFlota + '/' : '/') + (pp.flota || 'flota') + '/' + c.slug_url + '" class="btn-reservar-cat" style="background:var(--charcoal);">' + txtConoceMas + '</a>' : '')
+          +   (c.slug_url ? '<a href="' + (langFlota !== 'es' ? '/' + langFlota + '/' : '/') + (pp.flota || 'flota') + '/' + (c.isla_slug || 'gran-canaria') + '/' + c.slug_url + '" class="btn-reservar-cat" style="background:var(--charcoal);">' + txtConoceMas + '</a>' : '')
           + '</div>'
           + '<div class="tarjeta-cat-body">'
           +   '<div class="tarjeta-cat-desc">' + desc + subtitulo + descLarga + '</div>'

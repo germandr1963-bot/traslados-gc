@@ -306,17 +306,17 @@
   </footer>
 
   <script>
-    // URL española:  /flota/:slug       → partes = ['','flota','slug']       lang='es'
-    // URL otro idioma: /:lang/fleet/:slug → partes = ['','en','fleet','slug'] lang='en'
+    // URL española:  /flota/:isla/:slug        → partes = ['','flota','isla','slug']        lang='es'
+    // URL otro idioma: /:lang/fleet/:isla/:slug → partes = ['','en','fleet','isla','slug']  lang='en'
     var partes = window.location.pathname.split('/');
     var lang, slug;
-    if (partes.length === 3) {
-      // /flota/slug
-      lang = 'es';
-      slug = partes[2] || '';
-    } else {
-      // /:lang/palabra-flota/slug
+    if (partes[1] && partes[1].length === 2 && partes[1] !== 'es') {
+      // /:lang/palabra-flota/:isla/:slug
       lang = partes[1] || 'es';
+      slug = partes[4] || '';
+    } else {
+      // /flota/:isla/:slug
+      lang = 'es';
       slug = partes[3] || '';
     }
 
@@ -370,19 +370,20 @@
 
         // Hreflang
         var head = document.head;
+        var slugIsla = cat.isla_slug || 'gran-canaria';
         d.alternates.forEach(function(alt) {
           var link = document.createElement('link');
           link.rel = 'alternate';
           link.setAttribute('hreflang', alt.lang_code);
           var pfx = alt.lang_code !== 'es' ? '/' + alt.lang_code + '/' : '/';
           var pfxFlota = (d.palabrasPaginas && d.palabrasPaginas.flota) ? d.palabrasPaginas.flota : 'flota';
-          link.href = d.BASE_URL + pfx + pfxFlota + '/' + alt.slug_url;
+          link.href = d.BASE_URL + pfx + pfxFlota + '/' + slugIsla + '/' + alt.slug_url;
           head.appendChild(link);
         });
         var linkDefault = document.createElement('link');
         linkDefault.rel = 'alternate';
         linkDefault.setAttribute('hreflang', 'x-default');
-        linkDefault.href = d.BASE_URL + '/flota/' + cat.slug_url;
+        linkDefault.href = d.BASE_URL + '/flota/' + slugIsla + '/' + cat.slug_url;
         head.appendChild(linkDefault);
 
         // Schema.org
