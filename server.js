@@ -6754,13 +6754,28 @@ app.get('/:lang([a-z]{2})/:palabra/:isla/:slug', asyncHandler(async (req, res) =
     return res.status(404).send('Página no encontrada');
   }
 
-  // Verificar que la palabra de la URL corresponde a "destino" en ese idioma
+  // ── ¿Es una página de categoría de flota? ──────────────────────────────
+  const palabraFlotaLang = PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota;
+  if (palabraFlotaLang && palabra === palabraFlotaLang) {
+    const catResult = await pool.query(
+      `SELECT cvt.categoria_id FROM categorias_vehiculos_traducciones cvt
+       JOIN categorias_vehiculos cv ON cv.id = cvt.categoria_id
+       WHERE cvt.lang_code = $1 AND cvt.slug_url = $2 AND cvt.activo = TRUE
+         AND cv.activa = TRUE AND cv.en_flota = TRUE`,
+      [lang, slug]
+    );
+    if (catResult.rows.length > 0) {
+      return res.sendFile(path.join(__dirname, 'public', 'categoria-pagina.html'));
+    }
+    return res.status(404).send('Página no encontrada');
+  }
+
+  // ── ¿Es una página de destino? ───────────────────────────────────────────
   const palabraDestino = PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].destino;
   if (!palabraDestino || palabra !== palabraDestino) {
     return res.status(404).send('Página no encontrada');
   }
 
-  // Verificar que existe un destino publicado con ese slug e idioma
   const resultado = await pool.query(
     `SELECT dss.id FROM destinos_seo_settings dss
      WHERE dss.lang_code = $1 AND dss.slug_url = $2 AND dss.activo = TRUE
