@@ -3735,8 +3735,18 @@ app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(asyn
     } catch(e) { /* si falla el acorte, devolvemos lo que hay */ }
   }
 
-  const nombreIslaGenerado = resultado.nombre_isla || cat.isla_slug || 'gran-canaria';
-  res.json({ ok: true, slug: slugGenerado, nombre_isla: nombreIslaGenerado, meta_title: metaTitle, meta_description: metaDesc });
+  // Construir url_publica en el servidor igual que en destinos — limpia y lista
+  function limpiarSegmentoCat(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  }
+  const nombreIslaLimpio = limpiarSegmentoCat(resultado.nombre_isla || cat.isla_slug || 'gran-canaria');
+  const palabraFlotaGen = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
+  const urlPublicaGenerada = (lang !== 'es' ? '/' + lang + '/' + palabraFlotaGen : '') + '/flota/' + nombreIslaLimpio + '/' + slugGenerado;
+  const urlPublicaFinal = lang !== 'es'
+    ? '/' + lang + '/' + palabraFlotaGen + '/' + nombreIslaLimpio + '/' + slugGenerado
+    : '/flota/' + nombreIslaLimpio + '/' + slugGenerado;
+
+  res.json({ ok: true, slug: slugGenerado, nombre_isla: nombreIslaLimpio, url_publica: urlPublicaFinal, meta_title: metaTitle, meta_description: metaDesc });
 }));
 
 // ── SEO Rutas ─────────────────────────────────────────────────────────────────
