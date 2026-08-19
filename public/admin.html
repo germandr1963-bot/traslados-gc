@@ -9733,11 +9733,8 @@ function renderizarCamposSEOCat(catId, lang, datos) {
   var campos = document.getElementById('seo-cat-campos-editor');
   if (!campos) return;
 
-  var palabraFlota = (window._palabrasPaginas && window._palabrasPaginas[lang] && window._palabrasPaginas[lang].flota) ? window._palabrasPaginas[lang].flota : 'flota';
-  var catActual = seoCatCache && seoCatCache.categorias && seoCatCache.categorias.find(function(c) { return String(c.id) === String(catId); });
-  var slugIslaRaw = (catActual && catActual.isla_slug) ? catActual.isla_slug : 'gran-canaria';
-  var slugIsla = slugIslaRaw.toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'gran-canaria';
-  var urlPublica = lang !== 'es' ? '/' + lang + '/' + palabraFlota + '/' + slugIsla + '/' + (datos.slug_url || '') : '/flota/' + slugIsla + '/' + (datos.slug_url || '');
+  // Usar canonical_url guardada en BD — igual que Destinos
+  var urlPublica = datos.canonical_url || '';
 
   campos.innerHTML =
     '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--gris-fondo);border-radius:8px;margin-bottom:16px;flex-wrap:wrap;">' +
@@ -9754,8 +9751,8 @@ function renderizarCamposSEOCat(catId, lang, datos) {
     '<div id="seo-cat-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
 
     '<label class="etiqueta">URL pública de esta página</label>' +
-    '<input class="campo" id="seo-cat-url-publica" type="text" readonly value="' + escapar(urlPublica) + '" ' +
-      'style="margin-bottom:16px;font-family:\'JetBrains Mono\',monospace;font-size:13px;color:var(--terracota);background:var(--gris-fondo);">' +
+    '<input class="campo" id="seo-cat-url-publica" type="text" value="' + escapar(urlPublica) + '" ' +
+      'style="margin-bottom:16px;font-family:\'JetBrains Mono\',monospace;font-size:13px;color:var(--terracota);">' +
 
     '<div style="margin-bottom:14px;">' +
     '<button class="boton-costa" style="padding:7px 16px;font-size:0.85rem;" id="btn-generar-ia-cat" ' +
@@ -9777,14 +9774,8 @@ function renderizarCamposSEOCat(catId, lang, datos) {
 }
 
 function actualizarURLCat(lang) {
-  var slugInput = document.getElementById('seo-cat-slug');
-  var urlInput  = document.getElementById('seo-cat-url-publica');
-  if (!slugInput || !urlInput) return;
-  var palabraFlota = (window._palabrasPaginas && window._palabrasPaginas[lang] && window._palabrasPaginas[lang].flota) ? window._palabrasPaginas[lang].flota : 'flota';
-  var catActual = seoCatCache && seoCatCache.categorias && seoCatCache.categorias.find(function(c) { return String(c.id) === String(seoCatIdActual); });
-  var slugIslaRaw2 = (catActual && catActual.isla_slug) ? catActual.isla_slug : 'gran-canaria';
-  var slugIsla = slugIslaRaw2.toLowerCase().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'gran-canaria';
-  urlInput.value = lang !== 'es' ? '/' + lang + '/' + palabraFlota + '/' + slugIsla + '/' + slugInput.value.trim() : '/flota/' + slugIsla + '/' + slugInput.value.trim();
+  // La URL pública la construye el servidor al generar con IA o al guardar
+  // No se recalcula en el cliente para evitar errores con la isla
 }
 
 function copiarEnlaceCat(boton, url) {
@@ -9806,8 +9797,10 @@ function guardarSEOCat(catId, lang) {
     return;
   }
   if (slugInput) slugInput.style.borderColor = '';
+  var urlPublicaInput = document.getElementById('seo-cat-url-publica');
   var datos = {
     slug_url:         slugVal,
+    canonical_url:    urlPublicaInput ? urlPublicaInput.value.trim() : '',
     meta_title:       (document.getElementById('seo-cat-titulo') || {}).value || '',
     meta_description: (document.getElementById('seo-cat-desc') || {}).value || ''
   };
