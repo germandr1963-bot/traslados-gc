@@ -9744,6 +9744,14 @@ function renderizarCamposSEOCat(catId, lang, datos) {
       (activo ? '<button class="boton-secundario" style="padding:6px 14px;font-size:0.82rem;" onclick="copiarEnlaceCat(this, \'' + urlPublica + '\')">🔗 Copiar enlace</button>' : '') +
     '</div>' +
 
+    '<label class="etiqueta">H1 SEO (título principal de la página)</label>' +
+    '<input class="campo" id="seo-cat-h1" type="text" value="' + escapar(datos.h1_seo || '') + '" style="margin-bottom:4px;font-size:15px;font-weight:700;">' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:12px;color:var(--texto-muted);" id="seo-cat-h1-count">' + (datos.h1_seo ? datos.h1_seo.length : 0) + ' chars</div>' +
+
+    '<label class="etiqueta">Subtítulo SEO</label>' +
+    '<textarea class="campo" id="seo-cat-subtitulo" rows="2" oninput="contarCharsCampoSEOCat(\'seo-cat-subtitulo\',\'seo-cat-subtitulo-count\')" style="margin-bottom:4px;">' + escapar(datos.subtitulo_seo || '') + '</textarea>' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:12px;color:var(--texto-muted);" id="seo-cat-subtitulo-count">' + (datos.subtitulo_seo ? datos.subtitulo_seo.length : 0) + ' chars</div>' +
+
     '<label class="etiqueta">URL amigable (slug)</label>' +
     '<input class="campo" id="seo-cat-slug" type="text" value="' + slug + '" ' +
       'oninput="actualizarURLCat(\'' + lang + '\')" ' +
@@ -9794,6 +9802,13 @@ function renderizarCamposSEOCat(catId, lang, datos) {
 function actualizarURLCat(lang) {
   // La URL pública la construye el servidor al generar con IA o al guardar
   // No se recalcula en el cliente para evitar errores con la isla
+}
+
+function contarCharsCampoSEOCat(inputId, countId) {
+  var el = document.getElementById(inputId);
+  var cnt = document.getElementById(countId);
+  if (!el || !cnt) return;
+  cnt.textContent = el.value.length + ' chars';
 }
 
 function contarCharsSEOCat() {
@@ -9847,6 +9862,8 @@ function guardarSEOCat(catId, lang) {
   var datos = {
     slug_url:          slugVal,
     canonical_url:     urlPublicaInput ? urlPublicaInput.value.trim() : '',
+    h1_seo:            (document.getElementById('seo-cat-h1') || {}).value || '',
+    subtitulo_seo:     (document.getElementById('seo-cat-subtitulo') || {}).value || '',
     meta_title:        (document.getElementById('seo-cat-titulo') || {}).value || '',
     meta_description:  (document.getElementById('seo-cat-desc') || {}).value || '',
     resena_breve:      (document.getElementById('seo-cat-resena') || {}).value || '',
@@ -9902,13 +9919,20 @@ function generarIACat(catId, lang) {
     var descInput = document.getElementById('seo-cat-desc');
     if (slugInput) {
       slugInput.value = d.slug || '';
-      // Usar url_publica construida por el servidor (ya limpia y con isla correcta)
       var urlPublicaInput = document.getElementById('seo-cat-url-publica');
-      if (urlPublicaInput && d.url_publica) {
-        urlPublicaInput.value = d.url_publica;
-      } else {
-        actualizarURLCat(lang);
-      }
+      if (urlPublicaInput && d.url_publica) urlPublicaInput.value = d.url_publica;
+    }
+    var h1Input = document.getElementById('seo-cat-h1');
+    var subInput = document.getElementById('seo-cat-subtitulo');
+    var resenaInput = document.getElementById('seo-cat-resena');
+    var textoInput = document.getElementById('seo-cat-texto');
+    var textoPreview = document.getElementById('seo-cat-texto-preview');
+    if (h1Input && d.h1_seo) { h1Input.value = d.h1_seo; document.getElementById('seo-cat-h1-count').textContent = d.h1_seo.length + ' chars'; }
+    if (subInput && d.subtitulo_seo) { subInput.value = d.subtitulo_seo; document.getElementById('seo-cat-subtitulo-count').textContent = d.subtitulo_seo.length + ' chars'; }
+    if (resenaInput && d.resena_breve) { resenaInput.value = d.resena_breve; contarCharsSEOCat(); }
+    if (textoInput && d.texto_descripcion) {
+      textoInput.value = d.texto_descripcion;
+      if (textoPreview) textoPreview.innerHTML = d.texto_descripcion;
     }
     if (tituloInput) {
       tituloInput.value = d.meta_title || '';

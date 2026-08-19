@@ -468,9 +468,9 @@
         html += '</nav>';
 
         // 2. H1 + Subtítulo
-        html += '<h1 class="titulo-categoria">' + esc(cat.nombre) + '</h1>';
-        if (cat.subtitulo) {
-          html += '<p class="subtitulo-categoria">' + esc(cat.subtitulo) + '</p>';
+        html += '<h1 class="titulo-categoria">' + esc(cat.h1_seo || cat.nombre) + '</h1>';
+        if (cat.subtitulo_seo || cat.subtitulo) {
+          html += '<p class="subtitulo-categoria">' + esc(cat.subtitulo_seo || cat.subtitulo) + '</p>';
         }
 
         // 3. Foto grande
