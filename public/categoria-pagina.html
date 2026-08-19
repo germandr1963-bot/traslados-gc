@@ -216,6 +216,33 @@
     }
     .consultar { color: var(--texto-muted); font-style: italic; }
 
+    /* ── Breadcrumbs ── */
+    .breadcrumbs {
+      font-size: 13px;
+      color: var(--texto-muted);
+      margin-bottom: 18px;
+    }
+    .breadcrumbs a {
+      color: var(--texto-muted);
+      text-decoration: none;
+    }
+    .breadcrumbs a:hover { text-decoration: underline; }
+
+    /* ── Textos SEO ── */
+    .texto-seo-corto p {
+      font-size: 16px;
+      line-height: 1.7;
+      color: var(--texto-principal);
+    }
+    .texto-seo-largo {
+      font-size: 15px;
+      line-height: 1.8;
+      color: var(--texto-principal);
+    }
+    .texto-seo-largo h2 { margin-top: 24px; margin-bottom: 10px; }
+    .texto-seo-largo p  { margin-bottom: 14px; }
+    .texto-seo-largo ul { padding-left: 20px; margin-bottom: 14px; }
+
     /* ── Galería de fotos adicionales ── */
     .galeria-fotos {
       display: grid;
@@ -428,27 +455,32 @@
         // ── Contenido principal ─────────────────────────────────────────────
         var html = '';
 
-        // Foto de cabecera
+        // 1. Breadcrumbs
+        var palabraFlotaBc = (d.palabrasPaginas && d.palabrasPaginas.flota) ? d.palabrasPaginas.flota : 'flota';
+        var nombreIsla = cat.isla_nombre || 'Gran Canaria';
+        var urlFlota = base + palabraFlotaBc;
+        html += '<nav class="breadcrumbs">';
+        html += '<a href="' + urlFlota + '">' + esc(tx.home_footer_flota || 'Flota') + '</a>';
+        html += '<span> › </span>';
+        html += '<span>' + esc(nombreIsla) + '</span>';
+        html += '<span> › </span>';
+        html += '<span>' + esc(cat.nombre) + '</span>';
+        html += '</nav>';
+
+        // 2. H1 + Subtítulo
+        html += '<h1 class="titulo-categoria">' + esc(cat.nombre) + '</h1>';
+        if (cat.subtitulo) {
+          html += '<p class="subtitulo-categoria">' + esc(cat.subtitulo) + '</p>';
+        }
+
+        // 3. Foto grande
         html += '<div class="foto-cabecera">';
         if (cat.tiene_foto) {
           html += '<img src="/admin/categorias/' + cat.id + '/foto" alt="' + esc(cat.nombre) + '">';
         }
         html += '</div>';
 
-        // Título
-        html += '<h1 class="titulo-categoria">' + esc(cat.nombre) + '</h1>';
-
-        // Subtítulo (modelos de vehículo)
-        if (cat.subtitulo) {
-          html += '<p class="subtitulo-categoria">' + esc(cat.subtitulo) + '</p>';
-        }
-
-        // Descripción corta
-        if (cat.descripcion) {
-          html += '<p class="descripcion-categoria">' + esc(cat.descripcion) + '</p>';
-        }
-
-        // Capacidad
+        // 4. Ficha técnica (capacidad + características)
         html += '<div class="capacidad-bloque">';
         html += '<div class="capacidad-item"><div class="cap-valor">' + esc(String(cat.capacidad_pasajeros)) + '</div><div class="cap-etiqueta">' + esc(tx.tabla_columna_pasajeros || 'Pasajeros') + '</div></div>';
         html += '<div class="capacidad-item"><div class="cap-valor">' + esc(String(cat.capacidad_maletas)) + '</div><div class="cap-etiqueta">' + esc(tx.tabla_columna_equipaje || 'Maletas') + '</div></div>';
@@ -456,8 +488,6 @@
           html += '<div class="capacidad-item"><div class="cap-valor">' + esc(String(cat.limite_sillas)) + '</div><div class="cap-etiqueta">Sillas bebé</div></div>';
         }
         html += '</div>';
-
-        // Características
         if (cat.caracteristicas) {
           var items = cat.caracteristicas.split('\n').filter(function(l) { return l.trim(); });
           if (items.length > 0) {
@@ -471,12 +501,12 @@
 
         var urlReserva = (lang !== 'es' ? '/' + lang + '/' : '/') + '?categoria=' + cat.id;
 
-        // Descripción larga
-        if (cat.descripcion_larga) {
-          html += '<div class="seccion"><p class="descripcion-larga">' + esc(cat.descripcion_larga) + '</p></div>';
+        // 5. Texto SEO corto
+        if (cat.resena_breve) {
+          html += '<div class="seccion texto-seo-corto"><p>' + esc(cat.resena_breve) + '</p></div>';
         }
 
-        // Galería de fotos adicionales
+        // 6. Galería de fotos
         if (d.fotosGaleria && d.fotosGaleria.length > 0) {
           html += '<div class="seccion galeria-fotos">';
           d.fotosGaleria.forEach(function(f) {
@@ -487,7 +517,7 @@
           html += '</div>';
         }
 
-        // Tabla de precios por ruta
+        // 7 + 8. Tabla de tarifas + Botón reservar
         if (d.precios && d.precios.length > 0) {
           html += '<div class="seccion">';
           html += '<h2>' + esc(tx.titulo_tarifas || 'Tarifas') + '</h2>';
@@ -512,7 +542,7 @@
           html += '</div>';
         }
 
-        // Cómo funciona
+        // 9. Cómo funciona
         html += '<div class="seccion">';
         html += '<h2>' + esc(tx.titulo_como_funciona || '') + '</h2>';
         html += '<div class="tres-columnas">';
@@ -520,6 +550,11 @@
         html += '<div class="tarjeta"><strong>' + esc(tx.paso2_titulo || '') + '</strong><p style="margin-top:8px;font-size:14px;color:var(--texto-muted);">' + esc(tx.paso2_texto || '') + '</p></div>';
         html += '<div class="tarjeta"><strong>' + esc(tx.paso3_titulo || '') + '</strong><p style="margin-top:8px;font-size:14px;color:var(--texto-muted);">' + esc(tx.paso3_texto || '') + '</p></div>';
         html += '</div></div>';
+
+        // 10. Texto SEO largo
+        if (cat.texto_descripcion) {
+          html += '<div class="seccion texto-seo-largo">' + cat.texto_descripcion + '</div>';
+        }
 
         document.getElementById('contenido-categoria').innerHTML = html;
       })
