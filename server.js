@@ -451,7 +451,9 @@ async function initSchema() {
       ADD COLUMN IF NOT EXISTS meta_title TEXT,
       ADD COLUMN IF NOT EXISTS meta_description TEXT,
       ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT FALSE,
-      ADD COLUMN IF NOT EXISTS canonical_url TEXT
+      ADD COLUMN IF NOT EXISTS canonical_url TEXT,
+      ADD COLUMN IF NOT EXISTS resena_breve TEXT,
+      ADD COLUMN IF NOT EXISTS texto_descripcion TEXT
   `);
 
   await pool.query(`
@@ -3611,7 +3613,7 @@ app.get('/admin/seo/categorias/:id/idioma/:lang', requireAdmin, asyncHandler(asy
     return res.status(400).json({ error: 'Idioma no válido' });
   }
   const result = await pool.query(
-    `SELECT slug_url, meta_title, meta_description, activo, canonical_url
+    `SELECT slug_url, meta_title, meta_description, activo, canonical_url, resena_breve, texto_descripcion
      FROM categorias_vehiculos_traducciones
      WHERE categoria_id = $1 AND lang_code = $2`,
     [req.params.id, req.params.lang]
@@ -3625,7 +3627,7 @@ app.post('/admin/seo/categorias/:id/idioma/:lang', requireAdmin, asyncHandler(as
   if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) {
     return res.status(400).json({ error: 'Idioma no válido' });
   }
-  const { slug_url, meta_title, meta_description, canonical_url } = req.body;
+  const { slug_url, meta_title, meta_description, canonical_url, resena_breve, texto_descripcion } = req.body;
   const slugLimpio = slug_url ? slugify(slug_url) : null;
   // Usar canonical_url del cliente si viene, si no construir automático igual que Destinos
   const catIsla = await pool.query(
@@ -3641,11 +3643,11 @@ app.post('/admin/seo/categorias/:id/idioma/:lang', requireAdmin, asyncHandler(as
     ? canonical_url.trim()
     : (lang !== 'es' ? '/' + lang + '/' + palabraFlota : '/flota') + '/' + islaSlug + '/' + (slugLimpio || '');
   await pool.query(
-    `INSERT INTO categorias_vehiculos_traducciones (categoria_id, lang_code, slug_url, meta_title, meta_description, canonical_url)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO categorias_vehiculos_traducciones (categoria_id, lang_code, slug_url, meta_title, meta_description, canonical_url, resena_breve, texto_descripcion)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (categoria_id, lang_code) DO UPDATE
-       SET slug_url = $3, meta_title = $4, meta_description = $5, canonical_url = $6, updated_at = NOW()`,
-    [req.params.id, req.params.lang, slugLimpio || null, meta_title || null, meta_description || null, canonicalFinal]
+       SET slug_url = $3, meta_title = $4, meta_description = $5, canonical_url = $6, resena_breve = $7, texto_descripcion = $8, updated_at = NOW()`,
+    [req.params.id, req.params.lang, slugLimpio || null, meta_title || null, meta_description || null, canonicalFinal, resena_breve || null, texto_descripcion || null]
   );
   res.json({ ok: true });
 }));
