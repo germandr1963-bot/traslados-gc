@@ -10222,6 +10222,31 @@ app.get('/api/ruta-publica/:lang/:slug', asyncHandler(async (req, res) => {
 // Se comprueba primero si la sección es la de traslado → traslado.html
 // Si no, se comprueba si es la de flota → categoria-pagina.html
 // Si ninguna coincide → 404
+// ─── Páginas de categoría con isla: /:lang/fleet/:isla/:slug ────────────────
+app.get('/:lang([a-z]{2})/:seccion/:isla/:slug', asyncHandler(async (req, res) => {
+  const { lang, seccion, slug } = req.params;
+
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+
+  const palabraFlota = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
+  if (seccion === palabraFlota) {
+    const catResult = await pool.query(
+      `SELECT cvt.categoria_id FROM categorias_vehiculos_traducciones cvt
+       JOIN categorias_vehiculos cv ON cv.id = cvt.categoria_id
+       WHERE cvt.lang_code = $1 AND cvt.slug_url = $2 AND cvt.activo = TRUE
+         AND cv.activa = TRUE AND cv.en_flota = TRUE`,
+      [lang, slug]
+    );
+    if (catResult.rows.length > 0) {
+      return res.sendFile(path.join(__dirname, 'public', 'categoria-pagina.html'));
+    }
+  }
+
+  return res.status(404).send('Página no encontrada');
+}));
+
 app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
   const { lang, seccion, slug } = req.params;
 
