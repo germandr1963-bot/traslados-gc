@@ -460,6 +460,8 @@
         var nombreIsla = cat.isla_nombre || 'Gran Canaria';
         var urlFlota = base + palabraFlotaBc;
         html += '<nav class="breadcrumbs">';
+        html += '<a href="' + base + '">' + esc(tx.nav_inicio || 'Inicio') + '</a>';
+        html += '<span> › </span>';
         html += '<a href="' + urlFlota + '">' + esc(tx.home_footer_flota || 'Flota') + '</a>';
         html += '<span> › </span>';
         html += '<span>' + esc(nombreIsla) + '</span>';

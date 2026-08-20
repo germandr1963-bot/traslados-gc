@@ -35,6 +35,11 @@
       header.app .marca { font-size: 19px; letter-spacing: 1px; }
       header.app a.nav { font-size: 12px; }
     }
+    /* Breadcrumbs */
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; }
+    .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+    .breadcrumbs a:hover { text-decoration: underline; }
+
     /* Contenido general */
     .contenido { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
     h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: clamp(32px, 6vw, 52px); margin-bottom: 12px; color: var(--texto-oscuro); text-align: center; }
@@ -111,6 +116,8 @@
     <a id="link-contacto-header" href="/contacto" class="nav derecha">Contacto</a>
   </header>
   <div class="contenido">
+
+    <nav class="breadcrumbs"><a id="breadcrumb-inicio" href="/">Inicio</a></nav>
 
     <h1 id="flota-h1">Flota</h1>
     <p class="subtitulo" id="flota-subtitulo">Vehículos modernos, 100% inspeccionados, adaptados a tus necesidades de espacio y comprometidos con la conservación natural de nuestra isla. Tu viaje desde el Aeropuerto de Gran Canaria (LPA) con la máxima seguridad.</p>
@@ -456,6 +463,7 @@
           if (pp.footer_acceso_choferes) document.getElementById('footer-acceso-choferes').textContent = pp.footer_acceso_choferes;
           if (pp.footer_acceso_clientes) document.getElementById('footer-acceso-clientes').textContent = pp.footer_acceso_clientes;
           if (pp.nav_inicio)   document.getElementById('link-inicio-header').textContent   = pp.nav_inicio;
+          if (pp.nav_inicio)   { var bc = document.getElementById('breadcrumb-inicio'); if (bc) bc.textContent = pp.nav_inicio; }
           if (pp.nav_contacto) document.getElementById('link-contacto-header').textContent = pp.nav_contacto;
           if (pp.flota_h1)                   document.getElementById('flota-h1').textContent                   = pp.flota_h1;
           if (pp.flota_subtitulo)            document.getElementById('flota-subtitulo').textContent            = pp.flota_subtitulo;

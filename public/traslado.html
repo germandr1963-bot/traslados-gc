@@ -60,6 +60,9 @@
     header.app .derecha-header { justify-self: end; }
 
     /* ── Contenido ── */
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; }
+    .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+    .breadcrumbs a:hover { text-decoration: underline; }
     .contenido { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
 
     /* ── Foto de cabecera ── */
@@ -332,6 +335,16 @@
 
         // ── Contenido principal ─────────────────────────────────────────────
         var html = '';
+
+        // Breadcrumb
+        var urlRutas = lang !== 'es' ? '/' + lang + '/' + (pp.rutas || 'rutas') : '/rutas';
+        html += '<nav class="breadcrumbs">';
+        html += '<a href="' + (lang !== 'es' ? '/' + lang + '/' : '/') + '">' + (pp.nav_inicio || 'Inicio') + '</a>';
+        html += '<span> › </span>';
+        html += '<a href="' + urlRutas + '">' + (tx.home_footer_rutas || 'Rutas') + '</a>';
+        html += '<span> › </span>';
+        html += '<span>' + esc(seo.origen) + ' → ' + esc(seo.destino) + '</span>';
+        html += '</nav>';
 
         // Foto de cabecera
         html += '<div class="foto-cabecera">';

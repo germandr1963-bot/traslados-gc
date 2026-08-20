@@ -37,6 +37,9 @@
       header.app a.nav { font-size: 12px; }
     }
 
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; }
+    .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+    .breadcrumbs a:hover { text-decoration: underline; }
     .contenido { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
 
     /* Imagen cabecera */
@@ -207,6 +210,16 @@
       document.getElementById('page-title').textContent = d.nombre + ' — Traslados GC';
 
       var html = '';
+
+      // Breadcrumb
+      var urlDestinos = lang !== 'es' ? '/' + lang + '/' + (pp.destinos || 'destinos') : '/destinos';
+      html += '<nav class="breadcrumbs">';
+      html += '<a href="' + (lang !== 'es' ? '/' + lang + '/' : '/') + '">' + (pp.nav_inicio || 'Inicio') + '</a>';
+      html += '<span> › </span>';
+      html += '<a href="' + urlDestinos + '">' + (pp.footer_destinos || 'Destinos') + '</a>';
+      html += '<span> › </span>';
+      html += '<span>' + d.nombre + '</span>';
+      html += '</nav>';
 
       // Foto cabecera
       html += '<div class="foto-cabecera">';

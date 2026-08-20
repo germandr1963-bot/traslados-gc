@@ -36,6 +36,9 @@
       header.app a.nav { font-size: 12px; }
     }
 
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; }
+    .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+    .breadcrumbs a:hover { text-decoration: underline; }
     .contenido { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
 
     h1 {
@@ -167,6 +170,7 @@
   </header>
 
   <div class="contenido">
+    <nav class="breadcrumbs"><a id="breadcrumb-inicio" href="/">Inicio</a></nav>
     <h1 id="titulo-rutas">Rutas</h1>
     <p class="subtitulo" id="subtitulo-rutas">Todos los trayectos intermunicipales de Gran Canaria, a tu medida</p>
 
@@ -254,6 +258,7 @@
           if (pp.footer_acceso_choferes) document.getElementById('footer-acceso-choferes').textContent = pp.footer_acceso_choferes;
           if (pp.footer_acceso_clientes) document.getElementById('footer-acceso-clientes').textContent = pp.footer_acceso_clientes;
           if (pp.nav_inicio)   document.getElementById('link-inicio-header').textContent   = pp.nav_inicio;
+          if (pp.nav_inicio)   { var bc = document.getElementById('breadcrumb-inicio'); if (bc) bc.textContent = pp.nav_inicio; }
           if (pp.nav_contacto) document.getElementById('link-contacto-header').textContent = pp.nav_contacto;
           if (pp.rutas_titulo)           document.getElementById('titulo-rutas').textContent            = pp.rutas_titulo;
           if (pp.rutas_subtitulo)        document.getElementById('subtitulo-rutas').textContent         = pp.rutas_subtitulo;
