@@ -410,6 +410,17 @@ async function initSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS islas_traducciones (
+      id SERIAL PRIMARY KEY,
+      isla_id INT NOT NULL REFERENCES islas(id) ON DELETE CASCADE,
+      lang_code VARCHAR(5) NOT NULL,
+      nombre VARCHAR(150) NOT NULL,
+      slug VARCHAR(150) NOT NULL,
+      UNIQUE(isla_id, lang_code)
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS categorias_vehiculos (
       id SERIAL PRIMARY KEY,
       nombre VARCHAR(100) NOT NULL,
@@ -3108,6 +3119,56 @@ app.post('/admin/islas/:id/editar', requireAdmin, asyncHandler(async (req, res) 
     if (e.code === '23505') return res.status(400).json({ error: 'Ya existe una isla con ese slug.' });
     throw e;
   }
+}));
+
+// ─── Endpoints de traducciones de islas ──────────────────────────────────────
+
+app.get('/admin/islas/:id/traducciones', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT lang_code, nombre, slug FROM islas_traducciones WHERE isla_id = $1 ORDER BY lang_code',
+    [req.params.id]
+  );
+  res.json({ traducciones: result.rows });
+}));
+
+app.post('/admin/islas/:id/traducir-ia', requireAdmin, asyncHandler(async (req, res) => {
+  const islaResult = await pool.query('SELECT id, nombre FROM islas WHERE id = $1', [req.params.id]);
+  if (islaResult.rows.length === 0) return res.status(404).json({ error: 'Isla no encontrada.' });
+  const isla = islaResult.rows[0];
+
+  const prompt = iaPrompts.GENERADOR_ISLAS(isla.nombre);
+  const respuesta = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1000,
+    messages: [{ role: 'user', content: prompt }]
+  });
+
+  const texto = respuesta.content[0].text.trim();
+  let traducciones;
+  try {
+    traducciones = JSON.parse(texto);
+  } catch(e) {
+    return res.status(500).json({ error: 'La IA no devolvió un JSON válido.', raw: texto });
+  }
+
+  res.json({ ok: true, traducciones });
+}));
+
+app.post('/admin/islas/:id/traducciones/guardar', requireAdmin, asyncHandler(async (req, res) => {
+  const { traducciones } = req.body;
+  if (!traducciones) return res.status(400).json({ error: 'Sin datos.' });
+  const langs = Object.keys(traducciones);
+  for (const lang of langs) {
+    const { nombre, slug } = traducciones[lang];
+    if (!nombre || !slug) continue;
+    await pool.query(
+      `INSERT INTO islas_traducciones (isla_id, lang_code, nombre, slug)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (isla_id, lang_code) DO UPDATE SET nombre = $3, slug = $4`,
+      [req.params.id, lang, nombre.trim(), slug.trim().toLowerCase()]
+    );
+  }
+  res.json({ ok: true });
 }));
 
 // ─── Endpoints de categorías de vehículo ─────────────────────────────────────
@@ -9909,11 +9970,14 @@ app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
             COALESCE(cvt.caracteristicas,   cv.caracteristicas)   AS caracteristicas,
             cvt.slug_url, cvt.meta_title, cvt.meta_description, cvt.activo,
             cvt.resena_breve, cvt.texto_descripcion, cvt.h1_seo, cvt.subtitulo_seo,
-            i.slug AS isla_slug, i.nombre AS isla_nombre
+            i.slug AS isla_slug,
+            COALESCE(it.nombre, i.nombre) AS isla_nombre,
+            COALESCE(it.slug,   i.slug)   AS isla_slug_traducido
      FROM categorias_vehiculos cv
      JOIN categorias_vehiculos_traducciones cvt
           ON cvt.categoria_id = cv.id AND cvt.lang_code = $1
      LEFT JOIN islas i ON i.id = cv.isla_id
+     LEFT JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = $1
      WHERE cvt.slug_url = $2 AND cvt.activo = TRUE
        AND cv.activa = TRUE AND cv.en_flota = TRUE`,
     [lang, slug]

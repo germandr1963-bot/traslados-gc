@@ -470,6 +470,40 @@ SOLO esto:
 }
 
 
+
+// ─── GENERADOR 14 ────────────────────────────────────────────────────────────
+// Traducción y transliteración del nombre de isla/localidad — 10 idiomas a la vez
+// Endpoint: POST /admin/islas/:id/traducir-ia
+// Botón admin: 🤖 Traducir a todos los idiomas
+// Línea original server.js: ~3122
+function GENERADOR_ISLAS(nombreIsla) {
+  return `Actúa como un experto en lingüística y transliteración multiidioma. Tu trabajo es generar el nombre de la isla o localidad "${nombreIsla}" en 10 idiomas.
+
+Para cada idioma debes generar dos campos:
+
+1. NOMBRE: Traducción o adaptación nativa en ese idioma, usando el alfabeto propio (cirílico para ruso, etc.). Si no existe traducción oficial, usa la forma más extendida en ese mercado.
+
+2. SLUG: Transliteración al alfabeto latino. Siempre en minúsculas. Sin tildes, sin caracteres especiales, sin cirílico. Los espacios se reemplazan por guiones. Respeta la estructura del nombre: si tiene varias palabras se unen con guión, si es una sola palabra va sin guión.
+
+Ejemplos correctos para "Gran Canaria":
+- es: nombre "Gran Canaria", slug "gran-canaria"
+- fr: nombre "Grande Canarie", slug "grande-canarie"
+- ru: nombre "Гран-Канария", slug "gran-kanariya"
+
+Ejemplos correctos para "Lanzarote":
+- es: nombre "Lanzarote", slug "lanzarote"
+- ru: nombre "Лансароте", slug "lanzarote"
+
+## ISLA A TRABAJAR
+Nombre original: "${nombreIsla}"
+
+## FORMATO DE SALIDA (OBLIGATORIO)
+Tu respuesta completa es ÚNICAMENTE el objeto JSON. Nada antes, nada después.
+PROHIBIDO: borradores, conteos, explicaciones, pasos intermedios, markdown, texto de ningún tipo.
+SOLO esto:
+{"es":{"nombre":"...","slug":"..."},"en":{"nombre":"...","slug":"..."},"de":{"nombre":"...","slug":"..."},"fr":{"nombre":"...","slug":"..."},"it":{"nombre":"...","slug":"..."},"nl":{"nombre":"...","slug":"..."},"sv":{"nombre":"...","slug":"..."},"no":{"nombre":"...","slug":"..."},"fi":{"nombre":"...","slug":"..."},"ru":{"nombre":"...","slug":"..."}}`;
+}
+
 // =============================================================================
 module.exports = {
   GENERADOR_ALT_NUEVO_ES,
@@ -484,5 +518,6 @@ module.exports = {
   GENERADOR_ALT_FOTO_RUTA_TODOS,
   GENERADOR_ALT_EXISTENTE_RUTA,
   GENERADOR_CATEGORIAS_FLOTA,
-  GENERADOR_CATEGORIAS_SEO
+  GENERADOR_CATEGORIAS_SEO,
+  GENERADOR_ISLAS
 };
