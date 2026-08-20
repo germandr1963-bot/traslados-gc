@@ -1942,11 +1942,15 @@ function renderizarEditorIsla(isla) {
           var tab = document.getElementById('isla-tab-' + lang);
           if (!tab) return;
           if (trad && trad.nombre && trad.slug) {
-            // Tiene traducción — amarillo
-            tab.style.background = '#fff8e1';
-            tab.style.color = '#b8860b';
-            tab.style.borderColor = '#f9a825';
-            tab.textContent = lang.toUpperCase() + ' ·';
+            if (trad.revisado) {
+              // Revisado y aprobado — verde
+              tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
+              tab.textContent = lang.toUpperCase() + ' ✓';
+            } else {
+              // Tiene traducción pero pendiente de revisar — amarillo
+              tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825';
+              tab.textContent = lang.toUpperCase() + ' ·';
+            }
           }
           // Sin traducción — rojo (ya está por defecto)
         });
@@ -1984,14 +1988,25 @@ function renderizarCamposIdiomaIsla(islaId, lang, datos) {
   var campos = document.getElementById('isla-campos-idioma');
   if (!campos) return;
   var tieneTraduccion = !!(datos.nombre && datos.slug);
+  var estaRevisado = !!(datos.revisado);
+  var btnAprobar = tieneTraduccion && !estaRevisado
+    ? '<button class="boton-secundario" style="margin-left:8px;" onclick="aprobarTraduccionIsla(' + islaId + ', \'' + lang + '\')">' +
+        '✅ Aprobar' +
+      '</button>'
+    : tieneTraduccion && estaRevisado
+      ? '<span style="margin-left:10px;font-size:13px;color:#2e7d32;">✓ Aprobado</span>'
+      : '';
   campos.innerHTML =
     '<label class="etiqueta">Nombre nativo en ' + lang.toUpperCase() + ' (ej: Гран-Канария en ruso)</label>' +
     '<input class="campo" id="isla-trad-nombre" type="text" value="' + escapar(datos.nombre || '') + '" style="margin-bottom:12px;">' +
     '<label class="etiqueta">Slug transliterado (solo letras latinas minúsculas y guiones)</label>' +
     '<input class="campo" id="isla-trad-slug" type="text" value="' + escapar(datos.slug || '') + '" style="margin-bottom:14px;font-family:monospace;">' +
-    '<button class="boton-primario" onclick="guardarTraduccionIsla(' + islaId + ', \'' + lang + '\')">' +
-      (tieneTraduccion ? '💾 Actualizar' : '💾 Guardar') +
-    '</button>';
+    '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">' +
+      '<button class="boton-primario" onclick="guardarTraduccionIsla(' + islaId + ', \'' + lang + '\')">' +
+        (tieneTraduccion ? '💾 Actualizar' : '💾 Guardar') +
+      '</button>' +
+      btnAprobar +
+    '</div>';
 }
 
 function guardarTraduccionIsla(islaId, lang) {
@@ -2003,20 +2018,45 @@ function guardarTraduccionIsla(islaId, lang) {
     return;
   }
   var traducciones = {};
-  traducciones[lang] = { nombre: nombre, slug: slug.toLowerCase() };
+  traducciones[lang] = { nombre: nombre, slug: slug.toLowerCase(), revisado: false };
   fetch('/admin/islas/' + islaId + '/traducciones/guardar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ traducciones: traducciones })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.ok) {
-      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ Guardado correctamente.'; }
-      // Actualizar pestaña a amarillo — tiene traducción guardada
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ Guardado. Pulsa Aprobar cuando hayas revisado.'; }
+      // Pestaña en amarillo — guardado pero pendiente de revisar
       var tab = document.getElementById('isla-tab-' + lang);
       if (tab) { tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825'; tab.textContent = lang.toUpperCase() + ' ·'; }
-      setTimeout(function() { if (msg) msg.textContent = ''; }, 3000);
+      // Recargar campos para mostrar botón Aprobar
+      renderizarCamposIdiomaIsla(islaId, lang, { nombre: nombre, slug: slug.toLowerCase(), revisado: false });
+      setTimeout(function() { if (msg) msg.textContent = ''; }, 4000);
     } else {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
+    }
+  });
+}
+
+function aprobarTraduccionIsla(islaId, lang) {
+  var msg = document.getElementById('isla-msg-guardar');
+  fetch('/admin/islas/' + islaId + '/traducciones/aprobar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang: lang })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ Aprobado.'; }
+      // Pestaña en verde — revisado y aprobado
+      var tab = document.getElementById('isla-tab-' + lang);
+      if (tab) { tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784'; tab.textContent = lang.toUpperCase() + ' ✓'; }
+      // Recargar campos para ocultar botón Aprobar y mostrar "✓ Aprobado"
+      var nombre = (document.getElementById('isla-trad-nombre') || {}).value || '';
+      var slug   = (document.getElementById('isla-trad-slug')   || {}).value || '';
+      renderizarCamposIdiomaIsla(islaId, lang, { nombre: nombre, slug: slug, revisado: true });
+      setTimeout(function() { if (msg) msg.textContent = ''; }, 3000);
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al aprobar.'; }
     }
   });
 }
