@@ -1899,9 +1899,11 @@ function renderizarEditorIsla(isla) {
     '<input class="campo" id="isla-orden" type="number" min="1" max="99" value="' + (isla ? isla.orden : 1) + '" style="margin-bottom:10px;width:80px;">' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
       '<button class="boton-primario" onclick="guardarIsla(' + (isla ? isla.id : 'null') + ')">💾 Guardar</button>' +
+      (isla ? '<button class="boton-costa" onclick="traducirIslaIA(' + isla.id + ')">🤖 Traducir a todos los idiomas</button>' : '') +
       '<button class="boton-secundario" onclick="document.getElementById(\'editor-isla\').classList.add(\'oculto\')">Cancelar</button>' +
     '</div>' +
-    '<div id="msg-isla" style="margin-top:8px;font-size:13px;"></div>';
+    '<div id="msg-isla" style="margin-top:8px;font-size:13px;"></div>' +
+    '<div id="traducciones-isla" style="margin-top:16px;"></div>';
   editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
@@ -1932,6 +1934,71 @@ function guardarIsla(id) {
       document.getElementById('editor-isla').classList.add('oculto');
       cargarIslas();
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado'; }
+    } else {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
+    }
+  });
+}
+
+function traducirIslaIA(id) {
+  var msg = document.getElementById('msg-isla');
+  var div = document.getElementById('traducciones-isla');
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = '🤖 Generando traducciones con IA...'; }
+  if (div) div.innerHTML = '';
+
+  fetch('/admin/islas/' + id + '/traducir-ia', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) {
+        if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al generar traducciones.'; }
+        return;
+      }
+      if (msg) msg.textContent = '';
+      var langs = { es: 'Español', en: 'Inglés', de: 'Alemán', fr: 'Francés', it: 'Italiano', nl: 'Neerlandés', sv: 'Sueco', no: 'Noruego', fi: 'Finlandés', ru: 'Ruso' };
+      var filas = Object.keys(d.traducciones).map(function(lang) {
+        var t = d.traducciones[lang];
+        return '<tr>' +
+          '<td style="font-size:13px;font-weight:600;width:90px;">' + escapar(langs[lang] || lang) + '</td>' +
+          '<td><input class="campo" style="margin:0;padding:5px 8px;font-size:13px;" id="it-nombre-' + lang + '" value="' + escapar(t.nombre) + '"></td>' +
+          '<td><input class="campo" style="margin:0;padding:5px 8px;font-size:13px;font-family:monospace;" id="it-slug-' + lang + '" value="' + escapar(t.slug) + '"></td>' +
+        '</tr>';
+      }).join('');
+      if (div) div.innerHTML =
+        '<h3 style="margin:0 0 10px;font-size:15px;">🌍 Traducciones generadas — revisa antes de guardar</h3>' +
+        '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+          '<thead><tr>' +
+            '<th style="text-align:left;padding:6px 8px;background:var(--gris-borde);font-size:12px;">Idioma</th>' +
+            '<th style="text-align:left;padding:6px 8px;background:var(--gris-borde);font-size:12px;">Nombre nativo</th>' +
+            '<th style="text-align:left;padding:6px 8px;background:var(--gris-borde);font-size:12px;">Slug (URL)</th>' +
+          '</tr></thead>' +
+          '<tbody>' + filas + '</tbody>' +
+        '</table>' +
+        '<div style="margin-top:12px;display:flex;gap:8px;">' +
+          '<button class="boton-primario" onclick="guardarTraduccionesIsla(' + id + ', ' + JSON.stringify(Object.keys(d.traducciones)) + ')">💾 Guardar traducciones</button>' +
+        '</div>' +
+        '<div id="msg-traducciones-isla" style="margin-top:8px;font-size:13px;"></div>';
+      if (div) div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    })
+    .catch(function() {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'No se pudo conectar con la IA.'; }
+    });
+}
+
+function guardarTraduccionesIsla(id, langs) {
+  var traducciones = {};
+  langs.forEach(function(lang) {
+    var nombre = (document.getElementById('it-nombre-' + lang) || {}).value || '';
+    var slug   = (document.getElementById('it-slug-'   + lang) || {}).value || '';
+    if (nombre && slug) traducciones[lang] = { nombre: nombre, slug: slug };
+  });
+  var msg = document.getElementById('msg-traducciones-isla');
+  fetch('/admin/islas/' + id + '/traducciones/guardar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ traducciones: traducciones })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) {
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ Traducciones guardadas correctamente.'; }
     } else {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
     }
