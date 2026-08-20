@@ -223,8 +223,8 @@
     .breadcrumbs a:hover { text-decoration: underline; }
 
     /* ── Ficha técnica — nombre y modelos ── */
-    .nombre-categoria-ficha { font-size: 20px; margin-bottom: 4px; margin-top: 20px; text-align: center; }
-    .subtitulo-categoria-ficha { font-size: 14px; color: var(--texto-muted); margin-bottom: 16px; text-align: center; }
+    .nombre-categoria-ficha { font-family: 'Big Shoulders Display', sans-serif; font-size: 28px; font-weight: 500; margin-bottom: 8px; margin-top: 20px; text-align: center; }
+    .subtitulo-categoria-ficha { font-size: 16px; color: var(--texto-oscuro); margin-bottom: 16px; text-align: center; }
 
     /* ── Textos SEO ── */
     .texto-seo-corto p {
@@ -481,9 +481,9 @@
         html += '</div>';
 
         // 4. Ficha técnica — nombre categoría + modelos + capacidad + características
-        html += '<p class="nombre-categoria-ficha"><strong>' + esc(cat.nombre) + '</strong></p>';
+        html += '<h3 class="nombre-categoria-ficha">Categoría ' + esc(cat.nombre) + '</h3>';
         if (cat.subtitulo) {
-          html += '<p class="subtitulo-categoria-ficha">' + esc(cat.subtitulo) + '</p>';
+          html += '<p class="subtitulo-categoria-ficha"><strong>Modelos de referencia:</strong> ' + esc(cat.subtitulo.replace(/^Modelos de referencia:\s*/i, '')) + '</p>';
         }
         html += '<div class="capacidad-bloque">';
         html += '<div class="capacidad-item"><div class="cap-valor">' + esc(String(cat.capacidad_pasajeros)) + '</div><div class="cap-etiqueta">' + esc(tx.tabla_columna_pasajeros || 'Pasajeros') + '</div></div>';
