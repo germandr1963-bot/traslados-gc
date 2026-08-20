@@ -1890,12 +1890,12 @@ function renderizarEditorIsla(isla) {
   editor.classList.remove('oculto');
   var esNueva = !isla;
 
-  // Campos básicos: nombre, slug, orden — igual que antes
+  // Campos básicos: nombre español, slug base, orden
   var camposBasicos =
     '<h2 style="margin-top:0">' + (esNueva ? '➕ Nueva isla' : '✏️ Editar isla') + '</h2>' +
-    '<label class="etiqueta">Nombre (ej: Gran Canaria)</label>' +
+    '<label class="etiqueta">Nombre en español (ej: Gran Canaria)</label>' +
     '<input class="campo" id="isla-nombre" type="text" value="' + escapar(isla ? isla.nombre : '') + '" style="margin-bottom:10px" oninput="generarSlugIsla()">' +
-    '<label class="etiqueta">Slug para URL (ej: gran-canaria) — se genera automáticamente</label>' +
+    '<label class="etiqueta">Slug base para URL en español (ej: gran-canaria) — se genera automáticamente</label>' +
     '<input class="campo" id="isla-slug" type="text" value="' + escapar(isla ? isla.slug : '') + '" style="margin-bottom:10px;font-family:monospace;">' +
     '<label class="etiqueta">Orden</label>' +
     '<input class="campo" id="isla-orden" type="number" min="1" max="99" value="' + (isla ? isla.orden : 1) + '" style="margin-bottom:14px;width:80px;">' +
@@ -1905,37 +1905,62 @@ function renderizarEditorIsla(isla) {
     '</div>' +
     '<div id="msg-isla" style="margin-bottom:8px;font-size:13px;"></div>';
 
-  // Si es isla existente, añadir bloque de traducciones por idioma con pestañas
-  var camposTraducciones = '';
+  // Si es isla existente, añadir bloque de traducciones por idioma (sin ES — ya está arriba)
   if (!esNueva) {
-    var idiomas = IDIOMAS_SEO.length ? IDIOMAS_SEO : ['es','en','de','fr','it','nl','sv','no','fi','ru'];
-    var tabs = idiomas.map(function(lang, i) {
+    var idiomasTrad = ['en','de','fr','it','nl','sv','no','fi','ru'];
+
+    // Estructura HTML provisional con pestañas en rojo — los colores reales se cargan en el fetch de abajo
+    var tabsHtml = idiomasTrad.map(function(lang, i) {
       return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + '" id="isla-tab-' + lang + '" ' +
         'style="background:#fdecea;color:#c0392b;border-color:#e74c3c;" ' +
         'onclick="cambiarIdiomaIsla(' + isla.id + ', \'' + lang + '\', this)">' +
         lang.toUpperCase() + '</button>';
     }).join('');
 
-    camposTraducciones =
+    var bloqueTrads =
       '<hr style="margin:18px 0;border:none;border-top:1px solid var(--gris-borde);">' +
       '<h3 style="margin:0 0 10px;font-size:15px;">🌍 Traducciones por idioma</h3>' +
-      '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">🔴 Sin traducción &nbsp; 🟡 Traducido, sin revisar &nbsp; 🟢 Revisado y guardado</p>' +
-      '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">' + tabs + '</div>' +
+      '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">🔴 Sin traducción &nbsp; 🟡 Con traducción guardada</p>' +
+      '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">' + tabsHtml + '</div>' +
       '<div style="margin-bottom:10px;">' +
         '<button class="boton-costa" id="btn-isla-ia" onclick="traducirIslaIA(' + isla.id + ')">🤖 Generar todos los idiomas con IA</button>' +
         '<span id="isla-ia-msg" style="font-size:12px;color:var(--texto-muted);margin-left:10px;"></span>' +
       '</div>' +
       '<div id="isla-campos-idioma"><p style="font-size:13px;color:var(--texto-muted);">Cargando...</p></div>' +
       '<div id="isla-msg-guardar" style="margin-top:8px;font-size:13px;"></div>';
-  }
 
-  editor.innerHTML = camposBasicos + camposTraducciones;
-  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    editor.innerHTML = camposBasicos + bloqueTrads;
+    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  // Cargar primer idioma si es isla existente
-  if (!esNueva) {
-    var primerLang = (IDIOMAS_SEO.length ? IDIOMAS_SEO : ['es'])[0];
-    cambiarIdiomaIsla(isla.id, primerLang, document.getElementById('isla-tab-' + primerLang));
+    // Cargar traducciones existentes para colorear pestañas correctamente
+    fetch('/admin/islas/' + isla.id + '/traducciones')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        var existentes = d.traducciones || [];
+        idiomasTrad.forEach(function(lang) {
+          var trad = existentes.find(function(t) { return t.lang_code === lang; });
+          var tab = document.getElementById('isla-tab-' + lang);
+          if (!tab) return;
+          if (trad && trad.nombre && trad.slug) {
+            // Tiene traducción — amarillo
+            tab.style.background = '#fff8e1';
+            tab.style.color = '#b8860b';
+            tab.style.borderColor = '#f9a825';
+            tab.textContent = lang.toUpperCase() + ' ·';
+          }
+          // Sin traducción — rojo (ya está por defecto)
+        });
+        // Cargar el primer idioma en el panel
+        var primerTrad = existentes.find(function(t) { return t.lang_code === idiomasTrad[0]; }) || {};
+        renderizarCamposIdiomaIsla(isla.id, idiomasTrad[0], primerTrad);
+      })
+      .catch(function() {
+        renderizarCamposIdiomaIsla(isla.id, idiomasTrad[0], {});
+      });
+
+  } else {
+    editor.innerHTML = camposBasicos;
+    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
 
@@ -1945,6 +1970,7 @@ function cambiarIdiomaIsla(islaId, lang, tabEl) {
   var campos = document.getElementById('isla-campos-idioma');
   if (campos) campos.innerHTML = '<p style="font-size:13px;color:var(--texto-muted);">Cargando...</p>';
 
+  // Carga solo el idioma seleccionado desde el endpoint de traducciones
   fetch('/admin/islas/' + islaId + '/traducciones')
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -1985,9 +2011,9 @@ function guardarTraduccionIsla(islaId, lang) {
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.ok) {
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ Guardado correctamente.'; }
-      // Actualizar pestaña a verde
+      // Actualizar pestaña a amarillo — tiene traducción guardada
       var tab = document.getElementById('isla-tab-' + lang);
-      if (tab) { tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784'; tab.textContent = lang.toUpperCase() + ' ✓'; }
+      if (tab) { tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825'; tab.textContent = lang.toUpperCase() + ' ·'; }
       setTimeout(function() { if (msg) msg.textContent = ''; }, 3000);
     } else {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
@@ -2010,9 +2036,9 @@ function traducirIslaIA(islaId) {
         return;
       }
       if (msg) msg.textContent = '✓ Generado. Revisa cada idioma y guarda.';
-      // Rellenar los campos del idioma activo con su traducción
+      // Rellenar los campos del idioma activo (pestaña con clase activo) con su traducción
       var tabActiva = document.querySelector('#editor-isla .tab-idioma.activo');
-      var langActivo = tabActiva ? tabActiva.id.replace('isla-tab-', '') : 'es';
+      var langActivo = tabActiva ? tabActiva.id.replace('isla-tab-', '') : 'en';
       if (d.traducciones[langActivo]) {
         var t = d.traducciones[langActivo];
         var nombreInput = document.getElementById('isla-trad-nombre');
@@ -2020,7 +2046,7 @@ function traducirIslaIA(islaId) {
         if (nombreInput) nombreInput.value = t.nombre;
         if (slugInput)   slugInput.value   = t.slug;
       }
-      // Marcar todas las pestañas en amarillo — generado, pendiente de revisar
+      // Marcar en amarillo solo las pestañas que existen en el DOM (EN..RU, sin ES)
       Object.keys(d.traducciones).forEach(function(lang) {
         var tab = document.getElementById('isla-tab-' + lang);
         if (tab) { tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825'; tab.textContent = lang.toUpperCase() + ' ·'; }
