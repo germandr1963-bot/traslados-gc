@@ -3137,18 +3137,20 @@ app.post('/admin/islas/:id/traducir-ia', requireAdmin, asyncHandler(async (req, 
   const isla = islaResult.rows[0];
 
   const prompt = iaPrompts.GENERADOR_ISLAS(isla.nombre);
-  const respuesta = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1000,
-    messages: [{ role: 'user', content: prompt }]
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
   });
-
-  const texto = respuesta.content[0].text.trim();
+  if (!response.ok) return res.status(500).json({ error: 'Error al conectar con la IA.' });
+  const data = await response.json();
+  const limpio = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
   let traducciones;
   try {
-    traducciones = JSON.parse(texto);
+    traducciones = JSON.parse(limpio);
   } catch(e) {
-    return res.status(500).json({ error: 'La IA no devolvió un JSON válido.', raw: texto });
+    console.error('[GEN14] JSON inválido:', limpio.slice(0, 300));
+    return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' });
   }
 
   res.json({ ok: true, traducciones });
