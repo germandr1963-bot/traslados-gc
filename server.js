@@ -2619,11 +2619,12 @@ app.get('/api/flota', asyncHandler(async (req, res) => {
             COALESCE(cvt.descripcion_larga, cv.descripcion_larga) AS descripcion_larga,
             COALESCE(cvt.caracteristicas,   cv.caracteristicas)   AS caracteristicas,
             CASE WHEN cvt.activo = TRUE THEN cvt.slug_url ELSE NULL END AS slug_url,
-            COALESCE(i.slug, 'gran-canaria') AS isla_slug
+            COALESCE(it.slug, i.slug, 'gran-canaria') AS isla_slug
      FROM categorias_vehiculos cv
      LEFT JOIN categorias_vehiculos_traducciones cvt
            ON cvt.categoria_id = cv.id AND cvt.lang_code = $1
      LEFT JOIN islas i ON i.id = cv.isla_id
+     LEFT JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = $1
      WHERE cv.activa = TRUE AND cv.en_flota = TRUE
      ORDER BY cv.orden, cv.nombre`,
     [lang]
