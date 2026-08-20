@@ -571,7 +571,7 @@
 
         // 10. Texto SEO largo
         if (cat.texto_descripcion) {
-          html += '<div class="seccion texto-seo-largo">' + cat.texto_descripcion + '</div>';
+          html += '<div class="seccion"><div class="texto-seo-largo">' + cat.texto_descripcion + '</div></div>';
         }
 
         document.getElementById('contenido-categoria').innerHTML = html;
