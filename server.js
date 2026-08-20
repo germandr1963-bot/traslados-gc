@@ -416,6 +416,7 @@ async function initSchema() {
       lang_code VARCHAR(5) NOT NULL,
       nombre VARCHAR(150) NOT NULL,
       slug VARCHAR(150) NOT NULL,
+      revisado BOOLEAN DEFAULT FALSE,
       UNIQUE(isla_id, lang_code)
     )
   `);
@@ -3082,6 +3083,16 @@ app.post('/admin/islas/:id/editar', requireAdmin, asyncHandler(async (req, res) 
   }
 }));
 
+app.post('/admin/islas/:id/traducciones/aprobar', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang } = req.body;
+  if (!lang) return res.status(400).json({ error: 'Falta lang.' });
+  await pool.query(
+    `UPDATE islas_traducciones SET revisado = TRUE WHERE isla_id = $1 AND lang_code = $2`,
+    [req.params.id, lang]
+  );
+  res.json({ ok: true });
+}));
+
 // ─── Endpoints de categorías de vehículo ─────────────────────────────────────
 
 // ─── Endpoints de islas ──────────────────────────────────────────────────────
@@ -3125,7 +3136,7 @@ app.post('/admin/islas/:id/editar', requireAdmin, asyncHandler(async (req, res) 
 
 app.get('/admin/islas/:id/traducciones', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT lang_code, nombre, slug FROM islas_traducciones WHERE isla_id = $1 ORDER BY lang_code',
+    'SELECT lang_code, nombre, slug, revisado FROM islas_traducciones WHERE isla_id = $1 ORDER BY lang_code',
     [req.params.id]
   );
   res.json({ traducciones: result.rows });
@@ -3167,10 +3178,10 @@ app.post('/admin/islas/:id/traducciones/guardar', requireAdmin, asyncHandler(asy
     const { nombre, slug } = traducciones[lang];
     if (!nombre || !slug) continue;
     await pool.query(
-      `INSERT INTO islas_traducciones (isla_id, lang_code, nombre, slug)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (isla_id, lang_code) DO UPDATE SET nombre = $3, slug = $4`,
-      [req.params.id, lang, nombre.trim(), slug.trim().toLowerCase()]
+      `INSERT INTO islas_traducciones (isla_id, lang_code, nombre, slug, revisado)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (isla_id, lang_code) DO UPDATE SET nombre = $3, slug = $4, revisado = $5`,
+      [req.params.id, lang, nombre.trim(), slug.trim().toLowerCase(), traducciones[lang].revisado === true]
     );
   }
   res.json({ ok: true });
