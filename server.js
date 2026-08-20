@@ -3132,6 +3132,9 @@ app.get('/admin/islas/:id/traducciones', requireAdmin, asyncHandler(async (req, 
 }));
 
 app.post('/admin/islas/:id/traducir-ia', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+
   const islaResult = await pool.query('SELECT id, nombre FROM islas WHERE id = $1', [req.params.id]);
   if (islaResult.rows.length === 0) return res.status(404).json({ error: 'Isla no encontrada.' });
   const isla = islaResult.rows[0];
