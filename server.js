@@ -4143,6 +4143,44 @@ app.post('/admin/seo/rutas/:id/idioma/:lang/activar', requireAdmin, asyncHandler
   res.json({ ok: true });
 }));
 
+// Activa o desactiva todos los idiomas de una ruta de una vez
+app.post('/admin/seo/rutas/:id/activar-todos', requireAdmin, asyncHandler(async (req, res) => {
+  const activar = !!req.body.activo;
+
+  if (!activar) {
+    await pool.query(
+      `UPDATE route_seo_settings SET activo = FALSE WHERE route_id = $1`,
+      [req.params.id]
+    );
+    return res.json({ ok: true, activados: [], omitidos: [] });
+  }
+
+  const result = await pool.query(
+    `SELECT lang_code, slug_url, meta_title, meta_description, resena_breve, texto_descripcion
+     FROM route_seo_settings WHERE route_id = $1`,
+    [req.params.id]
+  );
+
+  const activados = [];
+  const omitidos = [];
+
+  for (const row of result.rows) {
+    const completo = row.slug_url && row.meta_title && row.meta_description &&
+                     row.resena_breve && row.texto_descripcion;
+    if (completo) {
+      await pool.query(
+        `UPDATE route_seo_settings SET activo = TRUE WHERE route_id = $1 AND lang_code = $2`,
+        [req.params.id, row.lang_code]
+      );
+      activados.push(row.lang_code);
+    } else {
+      omitidos.push(row.lang_code);
+    }
+  }
+
+  res.json({ ok: true, activados, omitidos });
+}));
+
 // Activa o desactiva TODAS las páginas de un idioma de golpe — para cuando
 // terminas de traducir un idioma entero y quieres publicarlo todo de una vez,
 // en vez de ir ruta por ruta. Solo afecta a ese idioma, no a los demás.
