@@ -346,16 +346,16 @@ SOLO esto:
 // Línea original server.js: ~3671
 function GENERADOR_CATEGORIAS_SEO(nombreIdioma, item) {
   const LIMITES = {
-    'Español':    { tRango: '52-58', tMax: 60, dRango: '145-152', dMax: 155, h1Max: 55, subMax: 200, descMax: 260 },
-    'Inglés':     { tRango: '54-60', tMax: 62, dRango: '150-157', dMax: 160, h1Max: 55, subMax: 200, descMax: 260 },
-    'Alemán':     { tRango: '48-53', tMax: 55, dRango: '130-137', dMax: 140, h1Max: 45, subMax: 165, descMax: 210 },
-    'Francés':    { tRango: '52-58', tMax: 60, dRango: '145-152', dMax: 155, h1Max: 50, subMax: 185, descMax: 240 },
-    'Italiano':   { tRango: '52-58', tMax: 60, dRango: '148-155', dMax: 158, h1Max: 50, subMax: 185, descMax: 240 },
-    'Neerlandés': { tRango: '50-55', tMax: 57, dRango: '138-145', dMax: 148, h1Max: 48, subMax: 175, descMax: 225 },
-    'Sueco':      { tRango: '50-55', tMax: 57, dRango: '140-147', dMax: 150, h1Max: 48, subMax: 175, descMax: 225 },
-    'Noruego':    { tRango: '50-55', tMax: 57, dRango: '142-149', dMax: 152, h1Max: 48, subMax: 175, descMax: 225 },
-    'Finlandés':  { tRango: '46-52', tMax: 54, dRango: '128-135', dMax: 138, h1Max: 42, subMax: 155, descMax: 200 },
-    'Ruso':       { tRango: '42-48', tMax: 50, dRango: '118-125', dMax: 128, h1Max: 42, subMax: 155, descMax: 200 }
+    'Español':    { tRango: '52-58', tMax: 60, dRango: '145-152', dMax: 155, h1Max: 55, subMax: 200, descMax: 400 },
+    'Inglés':     { tRango: '54-60', tMax: 62, dRango: '150-157', dMax: 160, h1Max: 55, subMax: 200, descMax: 400 },
+    'Alemán':     { tRango: '48-53', tMax: 55, dRango: '130-137', dMax: 140, h1Max: 45, subMax: 165, descMax: 400 },
+    'Francés':    { tRango: '52-58', tMax: 60, dRango: '145-152', dMax: 155, h1Max: 50, subMax: 185, descMax: 400 },
+    'Italiano':   { tRango: '52-58', tMax: 60, dRango: '148-155', dMax: 158, h1Max: 50, subMax: 185, descMax: 400 },
+    'Neerlandés': { tRango: '50-55', tMax: 57, dRango: '138-145', dMax: 148, h1Max: 48, subMax: 175, descMax: 400 },
+    'Sueco':      { tRango: '50-55', tMax: 57, dRango: '140-147', dMax: 150, h1Max: 48, subMax: 175, descMax: 400 },
+    'Noruego':    { tRango: '50-55', tMax: 57, dRango: '142-149', dMax: 152, h1Max: 48, subMax: 175, descMax: 400 },
+    'Finlandés':  { tRango: '46-52', tMax: 54, dRango: '128-135', dMax: 138, h1Max: 42, subMax: 155, descMax: 400 },
+    'Ruso':       { tRango: '42-48', tMax: 50, dRango: '118-125', dMax: 128, h1Max: 42, subMax: 155, descMax: 400 }
   };
   const L = LIMITES[nombreIdioma] || LIMITES['Español'];
 
