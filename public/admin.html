@@ -9939,6 +9939,21 @@ function renderizarCamposSEOCat(catId, lang, datos) {
   var campos = document.getElementById('seo-cat-campos-editor');
   if (!campos) return;
 
+  // Límites de caracteres por idioma — tomados de GENERADOR_CATEGORIAS_SEO en ia-prompts.js
+  var LIMITES_SEO_CAT = {
+    'es': { h1Max: 55, subMax: 200, descMax: 260 },
+    'en': { h1Max: 55, subMax: 200, descMax: 260 },
+    'de': { h1Max: 45, subMax: 165, descMax: 210 },
+    'fr': { h1Max: 50, subMax: 185, descMax: 240 },
+    'it': { h1Max: 50, subMax: 185, descMax: 240 },
+    'nl': { h1Max: 48, subMax: 175, descMax: 225 },
+    'sv': { h1Max: 48, subMax: 175, descMax: 225 },
+    'no': { h1Max: 48, subMax: 175, descMax: 225 },
+    'fi': { h1Max: 42, subMax: 155, descMax: 200 },
+    'ru': { h1Max: 42, subMax: 155, descMax: 200 }
+  };
+  limitesSEOCat = LIMITES_SEO_CAT[lang] || LIMITES_SEO_CAT['es'];
+
   // Usar canonical_url guardada en BD — igual que Destinos
   var urlPublica = datos.canonical_url || '';
 
@@ -9951,12 +9966,12 @@ function renderizarCamposSEOCat(catId, lang, datos) {
     '</div>' +
 
     '<label class="etiqueta">H1 SEO (título principal de la página)</label>' +
-    '<input class="campo" id="seo-cat-h1" type="text" value="' + escapar(datos.h1_seo || '') + '" style="margin-bottom:4px;font-size:15px;font-weight:700;">' +
-    '<div style="text-align:right;font-size:11px;margin-bottom:12px;color:var(--texto-muted);" id="seo-cat-h1-count">' + (datos.h1_seo ? datos.h1_seo.length : 0) + ' chars</div>' +
+    '<input class="campo" id="seo-cat-h1" type="text" value="' + escapar(datos.h1_seo || '') + '" oninput="contarCharsSEOCatCampo(\'seo-cat-h1\',\'seo-cat-h1-count\',limitesSEOCat.h1Max)" style="margin-bottom:4px;font-size:15px;font-weight:700;">' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:12px;" id="seo-cat-h1-count"></div>' +
 
     '<label class="etiqueta">Subtítulo SEO</label>' +
-    '<textarea class="campo" id="seo-cat-subtitulo" rows="2" oninput="contarCharsCampoSEOCat(\'seo-cat-subtitulo\',\'seo-cat-subtitulo-count\')" style="margin-bottom:4px;">' + escapar(datos.subtitulo_seo || '') + '</textarea>' +
-    '<div style="text-align:right;font-size:11px;margin-bottom:12px;color:var(--texto-muted);" id="seo-cat-subtitulo-count">' + (datos.subtitulo_seo ? datos.subtitulo_seo.length : 0) + ' chars</div>' +
+    '<textarea class="campo" id="seo-cat-subtitulo" rows="2" oninput="contarCharsSEOCatCampo(\'seo-cat-subtitulo\',\'seo-cat-subtitulo-count\',limitesSEOCat.subMax)" style="margin-bottom:4px;">' + escapar(datos.subtitulo_seo || '') + '</textarea>' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:12px;" id="seo-cat-subtitulo-count"></div>' +
 
     '<label class="etiqueta">URL amigable (slug)</label>' +
     '<input class="campo" id="seo-cat-slug" type="text" value="' + slug + '" ' +
@@ -9984,10 +9999,10 @@ function renderizarCamposSEOCat(catId, lang, datos) {
       'oninput="contarPxSEO(this,\'seo-cat-desc-count\',920,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
     '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-cat-desc-count">' + medirPx(desc, '13px arial') + ' / 920 px</div>' +
 
-    '<label class="etiqueta">Reseña breve para tarjeta (máx. 200 caracteres)</label>' +
-    '<textarea class="campo" id="seo-cat-resena" rows="3" maxlength="200" ' +
-    'oninput="contarCharsSEOCat()" style="margin-bottom:4px;">' + escapar(datos.resena_breve || '') + '</textarea>' +
-    '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-cat-resena-count">' + (datos.resena_breve ? datos.resena_breve.length : 0) + ' / 200</div>' +
+    '<label class="etiqueta">Reseña breve para tarjeta (máx. ' + limitesSEOCat.descMax + ' caracteres)</label>' +
+    '<textarea class="campo" id="seo-cat-resena" rows="3" ' +
+    'oninput="contarCharsSEOCatCampo(\'seo-cat-resena\',\'seo-cat-resena-count\',limitesSEOCat.descMax)" style="margin-bottom:4px;">' + escapar(datos.resena_breve || '') + '</textarea>' +
+    '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-cat-resena-count"></div>' +
 
     '<label class="etiqueta">Texto descriptivo (visible en la página pública)</label>' +
     '<div style="display:flex;gap:6px;margin-bottom:6px;">' +
@@ -10003,11 +10018,36 @@ function renderizarCamposSEOCat(catId, lang, datos) {
     var preview = document.getElementById('seo-cat-texto-preview');
     if (preview) { preview.innerHTML = datos.texto_descripcion; }
   }
+
+  // Inicializar contadores al abrir — para que muestren color correcto desde el primer momento
+  var h1El = document.getElementById('seo-cat-h1');
+  var subEl = document.getElementById('seo-cat-subtitulo');
+  var resenaEl = document.getElementById('seo-cat-resena');
+  if (h1El)     contarCharsSEOCatCampo('seo-cat-h1',       'seo-cat-h1-count',       limitesSEOCat.h1Max);
+  if (subEl)    contarCharsSEOCatCampo('seo-cat-subtitulo', 'seo-cat-subtitulo-count', limitesSEOCat.subMax);
+  if (resenaEl) contarCharsSEOCatCampo('seo-cat-resena',    'seo-cat-resena-count',    limitesSEOCat.descMax);
+  var tituloEl = document.getElementById('seo-cat-titulo');
+  var descEl   = document.getElementById('seo-cat-desc');
+  if (tituloEl) contarPxSEO(tituloEl, 'seo-cat-titulo-count', 600, '20px arial');
+  if (descEl)   contarPxSEO(descEl,   'seo-cat-desc-count',   920, '13px arial');
 }
 
 function actualizarURLCat(lang) {
   // La URL pública la construye el servidor al generar con IA o al guardar
   // No se recalcula en el cliente para evitar errores con la isla
+}
+
+// Variable global para los límites del idioma activo en el editor SEO de categorías
+var limitesSEOCat = { h1Max: 55, subMax: 200, descMax: 260 };
+
+// Contador de caracteres con color condicional y límite dinámico por idioma
+function contarCharsSEOCatCampo(inputId, countId, max) {
+  var el = document.getElementById(inputId);
+  var cnt = document.getElementById(countId);
+  if (!el || !cnt) return;
+  var n = el.value.length;
+  cnt.textContent = n + ' / ' + max;
+  cnt.style.color = n > max ? 'var(--rojo-error)' : (n > max * 0.92 ? '#b8860b' : 'var(--texto-muted)');
 }
 
 function contarCharsCampoSEOCat(inputId, countId) {
@@ -10021,8 +10061,8 @@ function contarCharsSEOCat() {
   var el = document.getElementById('seo-cat-resena');
   var cnt = document.getElementById('seo-cat-resena-count');
   if (!el || !cnt) return;
-  cnt.textContent = el.value.length + ' / 200';
-  cnt.style.color = el.value.length > 200 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+  cnt.textContent = el.value.length + ' / ' + limitesSEOCat.descMax;
+  cnt.style.color = el.value.length > limitesSEOCat.descMax ? 'var(--rojo-error)' : 'var(--texto-muted)';
 }
 
 function toggleVistaTextoCat(modo) {
@@ -10170,9 +10210,9 @@ function generarIACat(catId, lang) {
     var resenaInput = document.getElementById('seo-cat-resena');
     var textoInput = document.getElementById('seo-cat-texto');
     var textoPreview = document.getElementById('seo-cat-texto-preview');
-    if (h1Input && d.h1_seo) { h1Input.value = d.h1_seo; document.getElementById('seo-cat-h1-count').textContent = d.h1_seo.length + ' chars'; }
-    if (subInput && d.subtitulo_seo) { subInput.value = d.subtitulo_seo; document.getElementById('seo-cat-subtitulo-count').textContent = d.subtitulo_seo.length + ' chars'; }
-    if (resenaInput && d.resena_breve) { resenaInput.value = d.resena_breve; contarCharsSEOCat(); }
+    if (h1Input && d.h1_seo) { h1Input.value = d.h1_seo; contarCharsSEOCatCampo('seo-cat-h1', 'seo-cat-h1-count', limitesSEOCat.h1Max); }
+    if (subInput && d.subtitulo_seo) { subInput.value = d.subtitulo_seo; contarCharsSEOCatCampo('seo-cat-subtitulo', 'seo-cat-subtitulo-count', limitesSEOCat.subMax); }
+    if (resenaInput && d.resena_breve) { resenaInput.value = d.resena_breve; contarCharsSEOCatCampo('seo-cat-resena', 'seo-cat-resena-count', limitesSEOCat.descMax); }
     if (textoInput && d.texto_descripcion) {
       textoInput.value = d.texto_descripcion;
       if (textoPreview) textoPreview.innerHTML = d.texto_descripcion;
