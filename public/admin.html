@@ -3220,12 +3220,7 @@ function abrirEditorSEO(rutaId) {
         '</div>' +
         '</div>' +
 
-        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">' +
-    '<button class="boton-costa" style="padding:6px 14px;font-size:0.82rem;" onclick="activarTodosCat(' + catId + ', true)">🌐 Activar todos</button>' +
-    '<button class="boton-peligro" style="padding:6px 14px;font-size:0.82rem;" onclick="activarTodosCat(' + catId + ', false)">⭕ Desactivar todos</button>' +
-    '<span style="font-size:12px;color:var(--texto-muted);">— Controla todos los idiomas a la vez</span>' +
-    '</div>' +
-    '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
+        '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
         '<div id="seo-campos-editor"></div>' +
         '<div id="seo-mensaje-editor" style="margin-top:8px;"></div>' +
         '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-seo\').classList.add(\'oculto\')">Cerrar</button>';
@@ -9639,6 +9634,11 @@ function abrirEditorSEOCat(catId) {
     '<span style="font-size:12px;color:var(--texto-muted);">Cargando fotos...</span>' +
     '</div></div>' +
 
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">' +
+    '<button class="boton-costa" style="padding:6px 14px;font-size:0.82rem;" onclick="activarTodosCat(' + catId + ', true)">🌐 Activar todos</button>' +
+    '<button class="boton-peligro" style="padding:6px 14px;font-size:0.82rem;" onclick="activarTodosCat(' + catId + ', false)">⭕ Desactivar todos</button>' +
+    '<span style="font-size:12px;color:var(--texto-muted);">— Controla todos los idiomas a la vez</span>' +
+    '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="seo-cat-campos-editor"></div>' +
     '<div id="seo-cat-mensaje-editor" style="margin-top:8px;"></div>' +
