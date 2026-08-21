@@ -10213,11 +10213,8 @@ function activarTodosDestino(destinoId, activar) {
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (!d.ok) return;
     var msg = document.getElementById('dest-mensaje-editor');
+    // Mostrar aviso
     if (activar) {
-      (d.activados || []).forEach(function(lang) {
-        var tab = document.querySelector('[id="dest-tab-' + lang + '"], .tab-idioma[onclick*="\'' + lang + '\'"]');
-        if (tab) { tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784'; tab.innerHTML = lang.toUpperCase() + ' ✓'; }
-      });
       if (d.omitidos && d.omitidos.length > 0) {
         if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ Activados: ' + (d.activados.join(', ') || 'ninguno') + '. Sin contenido completo (no activados): ' + d.omitidos.join(', ').toUpperCase() + '</div>';
         setTimeout(function() { if (msg) msg.innerHTML = ''; }, 6000);
@@ -10229,9 +10226,10 @@ function activarTodosDestino(destinoId, activar) {
       if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas desactivados</div>';
       setTimeout(function() { if (msg) msg.innerHTML = ''; }, 3000);
     }
-    // Recargar el editor del idioma activo desde la BD para reflejar el nuevo estado
-    cambiarIdiomaEditorDestino(destinoId, destiLangActual, document.querySelector('.tab-idioma.activo'));
-    cargarPaginaRutas();
+    // Recargar el editor del idioma activo — igual que hace toggleActivarDestino
+    fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + destiLangActual)
+      .then(function(r) { return r.json(); })
+      .then(function(datos) { renderizarCamposDestinoSEO(destinoId, destiLangActual, datos); });
   });
 }
 
