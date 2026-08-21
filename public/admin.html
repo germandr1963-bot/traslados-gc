@@ -10227,6 +10227,19 @@ function activarTodosDestino(destinoId, activar) {
       if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas desactivados</div>';
       setTimeout(function() { if (msg) msg.innerHTML = ''; }, 3000);
     }
+    // Actualizar botón y estado del idioma activo en el editor
+    var btnActivarD = document.querySelector('#dest-campos-editor button[onclick*="toggleActivarDestino"]');
+    if (btnActivarD) {
+      var esActivadoD = activar && (d.activados || []).length > 0;
+      btnActivarD.textContent = esActivadoD ? 'Desactivar' : 'Activar';
+      btnActivarD.className   = esActivadoD ? 'boton-peligro' : 'boton-costa';
+    }
+    var spanEstadoD = document.querySelector('#dest-campos-editor span[style*="font-size:14px"]');
+    if (spanEstadoD) {
+      spanEstadoD.innerHTML = (activar && (d.activados || []).length > 0)
+        ? '🟢 Esta página <strong>está activa</strong> en internet'
+        : '⚪ Esta página <strong>está desactivada</strong>';
+    }
     cargarDestinos();
   });
 }
@@ -10260,6 +10273,19 @@ function activarTodosRuta(rutaId, activar) {
       });
       if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas desactivados</div>';
       setTimeout(function() { if (msg) msg.innerHTML = ''; }, 3000);
+    }
+    // Actualizar botón y estado del idioma activo en el editor
+    var btnActivarR = document.querySelector('#seo-campos-editor button[onclick*="toggleActivarSEO"]');
+    if (btnActivarR) {
+      var esActivadoR = activar && (d.activados || []).length > 0;
+      btnActivarR.textContent = esActivadoR ? 'Desactivar' : 'Activar';
+      btnActivarR.className   = esActivadoR ? 'boton-peligro' : 'boton-costa';
+    }
+    var spanEstadoR = document.querySelector('#seo-campos-editor span[style*="font-size:14px"]');
+    if (spanEstadoR) {
+      spanEstadoR.innerHTML = (activar && (d.activados || []).length > 0)
+        ? '🟢 Esta página <strong>está activa</strong> en internet'
+        : '⚪ Esta página <strong>está desactivada</strong>';
     }
     cargarSEO();
   });
