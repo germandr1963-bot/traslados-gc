@@ -3228,11 +3228,12 @@ function abrirEditorSEO(rutaId) {
         '</div>' +
         '</div>' +
 
-        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">' +
+        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">' +
         '<button class="boton-costa" style="padding:6px 14px;font-size:0.82rem;" onclick="activarTodosRuta(' + rutaId + ', true)">🌐 Activar todos</button>' +
         '<button class="boton-peligro" style="padding:6px 14px;font-size:0.82rem;" onclick="activarTodosRuta(' + rutaId + ', false)">⭕ Desactivar todos</button>' +
         '<span style="font-size:12px;color:var(--texto-muted);">— Controla todos los idiomas a la vez</span>' +
         '</div>' +
+        '<div id="seo-aviso-global" style="margin-bottom:10px;"></div>' +
         '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
         '<div id="seo-campos-editor"></div>' +
         '<div id="seo-mensaje-editor" style="margin-top:8px;"></div>' +
@@ -3604,26 +3605,39 @@ function guardarSEO(rutaId, lang) {
 }
 
 function toggleActivarSEO(rutaId, lang, activar) {
+  // Desactivar siempre permitido
+  if (!activar) {
+    fetch('/admin/seo/rutas/' + rutaId + '/idioma/' + lang + '/activar', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activo: false })
+    }).then(function() {
+      actualizarBadgeSEO(rutaId, lang, false);
+      var btnActivar = document.querySelector('#seo-campos-editor button[onclick*="toggleActivarSEO"]');
+      if (btnActivar) { btnActivar.textContent = 'Activar'; btnActivar.className = 'boton-costa'; btnActivar.setAttribute('onclick', 'toggleActivarSEO(' + rutaId + ', \'' + lang + '\', true)'); }
+      var spanEstado = document.querySelector('#seo-campos-editor span[style*="font-size:14px"]');
+      if (spanEstado) spanEstado.innerHTML = '⚪ Esta página <strong>está desactivada</strong>';
+    });
+    return;
+  }
+  // Activar: verificar campos antes
+  var faltan = [];
+  if (!(document.getElementById('seo-slug') && document.getElementById('seo-slug').value.trim()))    faltan.push('URL amigable');
+  if (!(document.getElementById('seo-titulo') && document.getElementById('seo-titulo').value.trim())) faltan.push('Título Google');
+  if (!(document.getElementById('seo-desc') && document.getElementById('seo-desc').value.trim()))     faltan.push('Descripción Google');
+  if (!(document.getElementById('seo-resena') && document.getElementById('seo-resena').value.trim())) faltan.push('Reseña breve');
+  if (!(document.getElementById('seo-texto') && document.getElementById('seo-texto').value.trim()))   faltan.push('Texto descriptivo');
+  if (faltan.length > 0) {
+    var aviso = document.getElementById('seo-aviso-global');
+    if (aviso) { aviso.innerHTML = '<div class="aviso-error">⚠️ No se puede activar. Faltan: ' + faltan.join(', ') + '</div>'; setTimeout(function() { aviso.innerHTML = ''; }, 5000); }
+    return;
+  }
   fetch('/admin/seo/rutas/' + rutaId + '/idioma/' + lang + '/activar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ activo: activar })
-  }).then(function () {
-    // Solo actualiza el badge en la tabla — no toca los campos del editor
-    actualizarBadgeSEO(rutaId, lang, activar);
-    // Actualiza el botón activar/desactivar y el enlace copiar sin rerenderizar todo
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activo: true })
+  }).then(function() {
+    actualizarBadgeSEO(rutaId, lang, true);
     var btnActivar = document.querySelector('#seo-campos-editor button[onclick*="toggleActivarSEO"]');
-    if (btnActivar) {
-      btnActivar.textContent = activar ? 'Desactivar' : 'Activar';
-      btnActivar.className   = activar ? 'boton-peligro' : 'boton-costa';
-      btnActivar.setAttribute('onclick', 'toggleActivarSEO(' + rutaId + ', \'' + lang + '\', ' + (!activar) + ')');
-    }
+    if (btnActivar) { btnActivar.textContent = 'Desactivar'; btnActivar.className = 'boton-peligro'; btnActivar.setAttribute('onclick', 'toggleActivarSEO(' + rutaId + ', \'' + lang + '\', false)'); }
     var spanEstado = document.querySelector('#seo-campos-editor span[style*="font-size:14px"]');
-    if (spanEstado) {
-      spanEstado.innerHTML = activar
-        ? '🟢 Esta página <strong>está activa</strong> en internet'
-        : '⚪ Esta página <strong>está desactivada</strong>';
-    }
+    if (spanEstado) spanEstado.innerHTML = '🟢 Esta página <strong>está activa</strong> en internet';
   });
 }
 
@@ -10272,7 +10286,7 @@ function activarTodosRuta(rutaId, activar) {
     body: JSON.stringify({ activo: activar })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (!d.ok) return;
-    mostrarAvisoActivar(document.getElementById('seo-mensaje-editor'), activar, d);
+    mostrarAvisoActivar(document.getElementById('seo-aviso-global'), activar, d);
     cambiarIdiomaEditorSEO(rutaId, seoLangActual, document.querySelector('#editor-seo .tab-idioma.activo'));
   });
 }
