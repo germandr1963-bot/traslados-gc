@@ -10205,6 +10205,21 @@ function guardarSEOCat(catId, lang) {
   });
 }
 
+function mostrarAvisoActivar(msg, activar, d) {
+  if (!msg || !activar) return;
+  if (d.omitidos && d.omitidos.length > 0) {
+    var lineas = d.omitidos.map(function(o) {
+      return o.lang.toUpperCase() + ': falta ' + o.faltan.join(', ');
+    }).join('<br>');
+    var textoActivados = d.activados.length ? '✅ Activados: ' + d.activados.join(', ').toUpperCase() + '<br>' : '';
+    msg.innerHTML = '<div class="aviso-error">⚠️ ' + textoActivados + 'No activados por campos incompletos:<br>' + lineas + '</div>';
+    setTimeout(function() { msg.innerHTML = ''; }, 8000);
+  } else if (d.activados && d.activados.length > 0) {
+    msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas activados correctamente</div>';
+    setTimeout(function() { msg.innerHTML = ''; }, 3000);
+  }
+}
+
 function activarTodosDestino(destinoId, activar) {
   fetch('/admin/seo/destinos/' + destinoId + '/activar-todos', {
     method: 'POST',
@@ -10212,11 +10227,7 @@ function activarTodosDestino(destinoId, activar) {
     body: JSON.stringify({ activo: activar })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (!d.ok) return;
-    var msg = document.getElementById('dest-mensaje-editor');
-    if (activar && d.omitidos && d.omitidos.length > 0) {
-      if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ Activados: ' + (d.activados.length ? d.activados.join(', ') : 'ninguno') + '. Faltan campos en: ' + d.omitidos.join(', ').toUpperCase() + '</div>';
-      setTimeout(function() { if (msg) msg.innerHTML = ''; }, 6000);
-    }
+    mostrarAvisoActivar(document.getElementById('dest-mensaje-editor'), activar, d);
     fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + destiLangActual)
       .then(function(r) { return r.json(); })
       .then(function(datos) { renderizarCamposDestinoSEO(destinoId, destiLangActual, datos); });
@@ -10230,11 +10241,7 @@ function activarTodosRuta(rutaId, activar) {
     body: JSON.stringify({ activo: activar })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (!d.ok) return;
-    var msg = document.getElementById('seo-mensaje-editor');
-    if (activar && d.omitidos && d.omitidos.length > 0) {
-      if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ Activados: ' + (d.activados.length ? d.activados.join(', ') : 'ninguno') + '. Faltan campos en: ' + d.omitidos.join(', ').toUpperCase() + '</div>';
-      setTimeout(function() { if (msg) msg.innerHTML = ''; }, 6000);
-    }
+    mostrarAvisoActivar(document.getElementById('seo-mensaje-editor'), activar, d);
     cambiarIdiomaEditorSEO(rutaId, seoLangActual, document.querySelector('#editor-seo .tab-idioma.activo'));
   });
 }
@@ -10246,11 +10253,7 @@ function activarTodosCat(catId, activar) {
     body: JSON.stringify({ activo: activar })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (!d.ok) return;
-    var msg = document.getElementById('seo-cat-mensaje-editor');
-    if (activar && d.omitidos && d.omitidos.length > 0) {
-      if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ Activados: ' + (d.activados.length ? d.activados.join(', ') : 'ninguno') + '. Faltan campos en: ' + d.omitidos.join(', ').toUpperCase() + '</div>';
-      setTimeout(function() { if (msg) msg.innerHTML = ''; }, 6000);
-    }
+    mostrarAvisoActivar(document.getElementById('seo-cat-mensaje-editor'), activar, d);
     cambiarIdiomaEditorSEOCat(catId, seoCatLangActual, document.getElementById('seo-cat-tab-' + seoCatLangActual));
     seoCatCache = null;
     cargarSEOCategorias();
