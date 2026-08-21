@@ -4536,6 +4536,44 @@ app.post('/admin/seo/destinos/:id/idioma/:lang/activar', requireAdmin, asyncHand
   res.json({ ok: true });
 }));
 
+// Activa o desactiva todos los idiomas de un destino de una vez
+app.post('/admin/seo/destinos/:id/activar-todos', requireAdmin, asyncHandler(async (req, res) => {
+  const activar = !!req.body.activo;
+
+  if (!activar) {
+    await pool.query(
+      `UPDATE destinos_seo_settings SET activo = FALSE WHERE destino_id = $1`,
+      [req.params.id]
+    );
+    return res.json({ ok: true, activados: [], omitidos: [] });
+  }
+
+  const result = await pool.query(
+    `SELECT lang_code, slug_url, meta_title, meta_description, texto_descripcion, resena_breve
+     FROM destinos_seo_settings WHERE destino_id = $1`,
+    [req.params.id]
+  );
+
+  const activados = [];
+  const omitidos = [];
+
+  for (const row of result.rows) {
+    const completo = row.slug_url && row.meta_title && row.meta_description &&
+                     row.texto_descripcion && row.resena_breve;
+    if (completo) {
+      await pool.query(
+        `UPDATE destinos_seo_settings SET activo = TRUE WHERE destino_id = $1 AND lang_code = $2`,
+        [req.params.id, row.lang_code]
+      );
+      activados.push(row.lang_code);
+    } else {
+      omitidos.push(row.lang_code);
+    }
+  }
+
+  res.json({ ok: true, activados, omitidos });
+}));
+
 app.post('/admin/destinos/:id/visible', requireAdmin, asyncHandler(async (req, res) => {
   const visible = req.body.visible_rutas === true || req.body.visible_rutas === 'true';
   await pool.query('UPDATE destinos SET visible_rutas = $1 WHERE id = $2', [visible, req.params.id]);
