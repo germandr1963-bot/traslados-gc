@@ -9941,14 +9941,14 @@ function renderizarCamposSEOCat(catId, lang, datos) {
 
   // Límites de caracteres por idioma — tomados de GENERADOR_CATEGORIAS_SEO en ia-prompts.js
   var LIMITES_SEO_CAT = {
-    'es': { h1Max: 55, subMax: 200, descMax: 260 },
-    'en': { h1Max: 55, subMax: 200, descMax: 260 },
-    'de': { h1Max: 45, subMax: 165, descMax: 210 },
-    'fr': { h1Max: 50, subMax: 185, descMax: 240 },
-    'it': { h1Max: 50, subMax: 185, descMax: 240 },
-    'nl': { h1Max: 48, subMax: 175, descMax: 225 },
-    'sv': { h1Max: 48, subMax: 175, descMax: 225 },
-    'no': { h1Max: 48, subMax: 175, descMax: 225 },
+    'es': { h1Max: 55, subMax: 200, descMax: 200 },
+    'en': { h1Max: 55, subMax: 200, descMax: 200 },
+    'de': { h1Max: 45, subMax: 165, descMax: 200 },
+    'fr': { h1Max: 50, subMax: 185, descMax: 200 },
+    'it': { h1Max: 50, subMax: 185, descMax: 200 },
+    'nl': { h1Max: 48, subMax: 175, descMax: 200 },
+    'sv': { h1Max: 48, subMax: 175, descMax: 200 },
+    'no': { h1Max: 48, subMax: 175, descMax: 200 },
     'fi': { h1Max: 42, subMax: 155, descMax: 200 },
     'ru': { h1Max: 42, subMax: 155, descMax: 200 }
   };
@@ -10038,7 +10038,7 @@ function actualizarURLCat(lang) {
 }
 
 // Variable global para los límites del idioma activo en el editor SEO de categorías
-var limitesSEOCat = { h1Max: 55, subMax: 200, descMax: 260 };
+var limitesSEOCat = { h1Max: 55, subMax: 200, descMax: 200 };
 
 // Contador de caracteres con color condicional y límite dinámico por idioma
 function contarCharsSEOCatCampo(inputId, countId, max) {
