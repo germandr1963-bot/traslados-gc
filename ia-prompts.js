@@ -430,7 +430,7 @@ El nombre de la isla "${item.isla_nombre}" traducido o transliterado a ${nombreI
 7. RESENA_BREVE (campo: resena_breve):
 - Texto corto de captación comercial. Aparece en la página pública justo después de la ficha técnica del vehículo.
 - Objetivo: convencer al visitante de que esta categoría es la ideal para su perfil de viajero. Destacar experiencia de viaje, confort y adecuación.
-- MÁXIMO ABSOLUTO: ${L.descMax} caracteres (espacios incluidos). NUNCA sobrepasar.
+- RANGO OBLIGATORIO: entre 350 y ${L.descMax} caracteres (espacios incluidos). Aproxímate lo máximo posible al límite superior. NUNCA sobrepasar ${L.descMax} caracteres, NUNCA quedarse por debajo de 350.
 - Redactar 100% nativo en ${nombreIdioma}. Tono cercano, natural y profesional.
 - PROHIBIDO repetir textos de otros campos ya generados.
 
