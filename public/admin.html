@@ -8502,19 +8502,16 @@ function abrirEditorDestino(destinoId) {
       var nombre = primerIdioma.nombre || 'Destino';
       var tabs = idiomas.map(function(lang) {
         var info = d.idiomas[lang] || {};
-        var excede = info.excede;
-        var tieneTitulo = !!(info.meta_title && info.meta_title.trim());
-        var tieneDesc   = !!(info.meta_description && info.meta_description.trim());
-        var tieneTexto  = !!(info.texto_descripcion && info.texto_descripcion.trim());
-        var completo = tieneTitulo && tieneDesc && tieneTexto;
-        var parcial  = (tieneTitulo || tieneDesc || tieneTexto) && !completo;
+        var excede  = info.excede;
+        var completo = info.completo;  // el servidor decide si está completo
+        var parcial  = !completo && !!(info.meta_title || info.meta_description || info.texto_descripcion);
         var estilo = excede
           ? 'background:#fdecea;color:#c0392b;border-color:#e74c3c;'
           : completo
             ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
             : parcial
               ? 'background:#fff8e1;color:#b8860b;border-color:#f9a825;'
-              : '';
+              : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
         var icono = excede ? ' ⚠️' : completo ? ' ✓' : parcial ? ' ·' : '';
         return '<button class="tab-idioma' + (lang === 'es' ? ' activo' : '') + '" ' +
           'id="tab-dest-idioma-' + lang + '" style="' + estilo + '" ' +
