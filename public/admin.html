@@ -376,18 +376,26 @@ table.tabla-precios input {
         </div>
       </div>
 
-      <!-- ─── TABLA DE RUTAS SEO ──────────────────────────────────────────── -->
-      <table class="tabla-admin">
-        <thead id="thead-seo">
-          <tr>
-            <th>Ruta</th>
-            <th>Acción</th>
-          </tr>
-        </thead>
-        <tbody id="tabla-seo-cuerpo"></tbody>
-      </table>
-
-      <div id="editor-seo" class="tarjeta oculto" style="margin-top:20px;max-width:760px;"></div>
+      <!-- ─── BLOQUE SEO RUTAS ──────────────────────────────────────────── -->
+      <div style="margin-bottom:32px;border:1px solid var(--gris-borde);border-radius:10px;overflow:hidden;">
+        <div style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--gris-fondo);user-select:none;" onclick="toggleBloqueSEORutas()">
+          <span id="seo-rutas-icono" style="font-size:14px;">▶</span>
+          <h2 style="font-size:17px;margin:0;">🗺️ SEO — Páginas de rutas</h2>
+          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
+        </div>
+        <div id="seo-rutas-contenido" style="display:none;padding:18px;">
+          <table class="tabla-admin">
+            <thead id="thead-seo">
+              <tr>
+                <th>Ruta</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-seo-cuerpo"></tbody>
+          </table>
+          <div id="editor-seo" class="tarjeta oculto" style="margin-top:20px;max-width:760px;"></div>
+        </div>
+      </div>
     </div>
 
     <div id="seccion-idiomas" class="oculto">
@@ -9521,6 +9529,18 @@ function contarCharsResenaRuta() {
 var seoCatCache = null;
 var seoCatLangActual = 'es';
 var seoCatIdActual = null;
+
+function toggleBloqueSEORutas() {
+  var contenido = document.getElementById('seo-rutas-contenido');
+  var icono = document.getElementById('seo-rutas-icono');
+  if (contenido.style.display === 'none') {
+    contenido.style.display = 'block';
+    icono.textContent = '▼';
+  } else {
+    contenido.style.display = 'none';
+    icono.textContent = '▶';
+  }
+}
 
 function toggleBloqueSEOCategorias() {
   var contenido = document.getElementById('seo-cat-contenido');
