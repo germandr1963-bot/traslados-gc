@@ -10213,20 +10213,10 @@ function activarTodosDestino(destinoId, activar) {
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (!d.ok) return;
     var msg = document.getElementById('dest-mensaje-editor');
-    // Mostrar aviso
-    if (activar) {
-      if (d.omitidos && d.omitidos.length > 0) {
-        if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ Activados: ' + (d.activados.join(', ') || 'ninguno') + '. Sin contenido completo (no activados): ' + d.omitidos.join(', ').toUpperCase() + '</div>';
-        setTimeout(function() { if (msg) msg.innerHTML = ''; }, 6000);
-      } else if (d.activados && d.activados.length > 0) {
-        if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas activados correctamente</div>';
-        setTimeout(function() { if (msg) msg.innerHTML = ''; }, 3000);
-      }
-    } else {
-      if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas desactivados</div>';
-      setTimeout(function() { if (msg) msg.innerHTML = ''; }, 3000);
+    if (activar && d.omitidos && d.omitidos.length > 0) {
+      if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ Activados: ' + (d.activados.length ? d.activados.join(', ') : 'ninguno') + '. Faltan campos en: ' + d.omitidos.join(', ').toUpperCase() + '</div>';
+      setTimeout(function() { if (msg) msg.innerHTML = ''; }, 6000);
     }
-    // Recargar el editor del idioma activo — igual que hace toggleActivarDestino
     fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + destiLangActual)
       .then(function(r) { return r.json(); })
       .then(function(datos) { renderizarCamposDestinoSEO(destinoId, destiLangActual, datos); });
@@ -10241,42 +10231,11 @@ function activarTodosRuta(rutaId, activar) {
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (!d.ok) return;
     var msg = document.getElementById('seo-mensaje-editor');
-    if (activar) {
-      (d.activados || []).forEach(function(lang) {
-        var tab = document.getElementById('tab-idioma-' + lang);
-        if (tab) { tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784'; tab.innerHTML = lang.toUpperCase() + ' ✓'; }
-      });
-      if (d.omitidos && d.omitidos.length > 0) {
-        if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ Activados: ' + (d.activados.join(', ') || 'ninguno') + '. Sin contenido completo (no activados): ' + d.omitidos.join(', ').toUpperCase() + '</div>';
-        setTimeout(function() { if (msg) msg.innerHTML = ''; }, 6000);
-      } else if (d.activados && d.activados.length > 0) {
-        if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas activados correctamente</div>';
-        setTimeout(function() { if (msg) msg.innerHTML = ''; }, 3000);
-      }
-    } else {
-      document.querySelectorAll('#seo-campos-editor .tab-idioma, [id^="tab-idioma-"]').forEach(function(tab) {
-        if (tab.style.background === 'rgb(232, 245, 233)' || tab.innerHTML.includes('✓')) {
-          tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825';
-          tab.innerHTML = tab.innerHTML.replace(' ✓', ' ·');
-        }
-      });
-      if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas desactivados</div>';
-      setTimeout(function() { if (msg) msg.innerHTML = ''; }, 3000);
+    if (activar && d.omitidos && d.omitidos.length > 0) {
+      if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ Activados: ' + (d.activados.length ? d.activados.join(', ') : 'ninguno') + '. Faltan campos en: ' + d.omitidos.join(', ').toUpperCase() + '</div>';
+      setTimeout(function() { if (msg) msg.innerHTML = ''; }, 6000);
     }
-    // Actualizar botón y estado del idioma activo en el editor
-    var btnActivarR = document.querySelector('#seo-campos-editor button[onclick*="toggleActivarSEO"]');
-    if (btnActivarR) {
-      var esActivadoR = activar && (d.activados || []).length > 0;
-      btnActivarR.textContent = esActivadoR ? 'Desactivar' : 'Activar';
-      btnActivarR.className   = esActivadoR ? 'boton-peligro' : 'boton-costa';
-    }
-    var spanEstadoR = document.querySelector('#seo-campos-editor span[style*="font-size:14px"]');
-    if (spanEstadoR) {
-      spanEstadoR.innerHTML = (activar && (d.activados || []).length > 0)
-        ? '🟢 Esta página <strong>está activa</strong> en internet'
-        : '⚪ Esta página <strong>está desactivada</strong>';
-    }
-    cargarSEO();
+    cambiarIdiomaEditorSEO(rutaId, seoLangActual, document.querySelector('#editor-seo .tab-idioma.activo'));
   });
 }
 
@@ -10288,56 +10247,15 @@ function activarTodosCat(catId, activar) {
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (!d.ok) return;
     var msg = document.getElementById('seo-cat-mensaje-editor');
-
-    // Actualizar visualmente los tabs según lo que respondió el servidor
-    var seoData = (seoCatCache && seoCatCache.seo[catId]) || {};
-    if (activar) {
-      // Solo poner verde los que el servidor confirmó que activó
-      (d.activados || []).forEach(function(lang) {
-        var tab = document.getElementById('seo-cat-tab-' + lang);
-        if (tab) { tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784'; tab.innerHTML = lang.toUpperCase() + ' ✓'; }
-      });
-      // Mostrar aviso si hubo idiomas omitidos por falta de contenido
-      if (d.omitidos && d.omitidos.length > 0) {
-        if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ Activados: ' + (d.activados.join(', ') || 'ninguno') + '. Sin contenido completo (no activados): ' + d.omitidos.join(', ').toUpperCase() + '</div>';
-        setTimeout(function() { if (msg) msg.innerHTML = ''; }, 6000);
-      } else if (d.activados && d.activados.length > 0) {
-        if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas activados correctamente</div>';
-        setTimeout(function() { if (msg) msg.innerHTML = ''; }, 3000);
-      }
-    } else {
-      // Desactivar todos — actualizar todos los tabs visualmente
-      var idiomas = (seoCatCache && seoCatCache.idiomas) || IDIOMAS_SEO;
-      idiomas.forEach(function(lang) {
-        var tab = document.getElementById('seo-cat-tab-' + lang);
-        if (!tab) return;
-        var d2 = seoData[lang] || {};
-        if (d2.titulo) {
-          tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825'; tab.innerHTML = lang.toUpperCase() + ' ·';
-        } else {
-          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c'; tab.innerHTML = lang.toUpperCase();
-        }
-      });
+    if (activar && d.omitidos && d.omitidos.length > 0) {
+      if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ Activados: ' + (d.activados.length ? d.activados.join(', ') : 'ninguno') + '. Faltan campos en: ' + d.omitidos.join(', ').toUpperCase() + '</div>';
+      setTimeout(function() { if (msg) msg.innerHTML = ''; }, 6000);
     }
-    // Actualizar el botón y estado del idioma activo en el editor
-    var btnActivar = document.querySelector('#seo-cat-campos-editor button[onclick*="toggleActivarSEOCat"]');
-    if (btnActivar) {
-      btnActivar.textContent = activar ? 'Desactivar' : 'Activar';
-      btnActivar.className   = activar ? 'boton-peligro' : 'boton-costa';
-      var langActual = seoCatLangActual || 'es';
-      btnActivar.setAttribute('onclick', 'toggleActivarSEOCat(' + catId + ', \'' + langActual + '\', ' + (!activar) + ')');
-    }
-    var spanEstado = document.querySelector('#seo-cat-campos-editor span[style*="font-size:14px"]');
-    if (spanEstado) {
-      spanEstado.innerHTML = activar
-        ? '🟢 Esta página <strong>está activa</strong> en internet'
-        : '⚪ Esta página <strong>está desactivada</strong>';
-    }
+    cambiarIdiomaEditorSEOCat(catId, seoCatLangActual, document.getElementById('seo-cat-tab-' + seoCatLangActual));
     seoCatCache = null;
     cargarSEOCategorias();
   });
 }
-
 function toggleActivarSEOCat(catId, lang, activar) {
   fetch('/admin/seo/categorias/' + catId + '/idioma/' + lang + '/activar', {
     method: 'POST',
