@@ -10180,27 +10180,38 @@ function activarTodosCat(catId, activar) {
     body: JSON.stringify({ activo: activar })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (!d.ok) return;
-    // Actualizar visualmente todos los tabs
-    var idiomas = (seoCatCache && seoCatCache.idiomas) || IDIOMAS_SEO;
+    var msg = document.getElementById('seo-cat-mensaje-editor');
+
+    // Actualizar visualmente los tabs según lo que respondió el servidor
     var seoData = (seoCatCache && seoCatCache.seo[catId]) || {};
-    idiomas.forEach(function(lang) {
-      var tab = document.getElementById('seo-cat-tab-' + lang);
-      if (!tab) return;
-      if (activar) {
-        tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
-        if (!tab.innerHTML.includes('✓')) tab.innerHTML = lang.toUpperCase() + ' ✓';
-      } else {
-        var d2 = seoData[lang] || {};
-        var tieneTitulo = !!(d2.titulo);
-        if (tieneTitulo) {
-          tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825';
-          tab.innerHTML = lang.toUpperCase() + ' ·';
-        } else {
-          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
-          tab.innerHTML = lang.toUpperCase();
-        }
+    if (activar) {
+      // Solo poner verde los que el servidor confirmó que activó
+      (d.activados || []).forEach(function(lang) {
+        var tab = document.getElementById('seo-cat-tab-' + lang);
+        if (tab) { tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784'; tab.innerHTML = lang.toUpperCase() + ' ✓'; }
+      });
+      // Mostrar aviso si hubo idiomas omitidos por falta de contenido
+      if (d.omitidos && d.omitidos.length > 0) {
+        if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ Activados: ' + (d.activados.join(', ') || 'ninguno') + '. Sin contenido completo (no activados): ' + d.omitidos.join(', ').toUpperCase() + '</div>';
+        setTimeout(function() { if (msg) msg.innerHTML = ''; }, 6000);
+      } else if (d.activados && d.activados.length > 0) {
+        if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas activados correctamente</div>';
+        setTimeout(function() { if (msg) msg.innerHTML = ''; }, 3000);
       }
-    });
+    } else {
+      // Desactivar todos — actualizar todos los tabs visualmente
+      var idiomas = (seoCatCache && seoCatCache.idiomas) || IDIOMAS_SEO;
+      idiomas.forEach(function(lang) {
+        var tab = document.getElementById('seo-cat-tab-' + lang);
+        if (!tab) return;
+        var d2 = seoData[lang] || {};
+        if (d2.titulo) {
+          tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825'; tab.innerHTML = lang.toUpperCase() + ' ·';
+        } else {
+          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c'; tab.innerHTML = lang.toUpperCase();
+        }
+      });
+    }
     // Actualizar el botón y estado del idioma activo en el editor
     var btnActivar = document.querySelector('#seo-cat-campos-editor button[onclick*="toggleActivarSEOCat"]');
     if (btnActivar) {
