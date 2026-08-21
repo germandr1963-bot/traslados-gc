@@ -9163,10 +9163,35 @@ function guardarDestinoSEO(destinoId, lang) {
 }
 
 function toggleActivarDestino(destinoId, lang, activar) {
+  // Si es desactivar, siempre permitir
+  if (!activar) {
+    fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + lang + '/activar', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activo: false })
+    }).then(function() {
+      fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + lang)
+        .then(function(r) { return r.json(); })
+        .then(function(datos) { renderizarCamposDestinoSEO(destinoId, lang, datos); });
+    });
+    return;
+  }
+  // Si es activar, verificar campos antes de llamar al servidor
+  var faltan = [];
+  if (!(document.getElementById('dest-slug') && document.getElementById('dest-slug').value.trim()))         faltan.push('URL amigable');
+  if (!(document.getElementById('dest-titulo') && document.getElementById('dest-titulo').value.trim()))     faltan.push('Título Google');
+  if (!(document.getElementById('dest-desc') && document.getElementById('dest-desc').value.trim()))         faltan.push('Descripción Google');
+  if (!(document.getElementById('dest-resena') && document.getElementById('dest-resena').value.trim()))     faltan.push('Reseña breve');
+  if (!(document.getElementById('dest-texto') && document.getElementById('dest-texto').value.trim()))       faltan.push('Texto descriptivo');
+  if (faltan.length > 0) {
+    var aviso = document.getElementById('dest-aviso-global');
+    if (aviso) {
+      aviso.innerHTML = '<div class="aviso-error">⚠️ No se puede activar. Faltan: ' + faltan.join(', ') + '</div>';
+      setTimeout(function() { aviso.innerHTML = ''; }, 5000);
+    }
+    return;
+  }
   fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + lang + '/activar', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activo: activar })
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activo: true })
   }).then(function() {
-    // Recarga solo los campos del idioma activo — sin scroll, sin recargar la tabla
     fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + lang)
       .then(function(r) { return r.json(); })
       .then(function(datos) { renderizarCamposDestinoSEO(destinoId, lang, datos); });
