@@ -10206,17 +10206,25 @@ function guardarSEOCat(catId, lang) {
 }
 
 function mostrarAvisoActivar(msg, activar, d) {
-  if (!msg || !activar) return;
+  if (!activar) return;
+  // Si no hay msg en el DOM todavía, usar alert como fallback
+  var mostrar = function(html, texto) {
+    if (msg) {
+      msg.innerHTML = html;
+      setTimeout(function() { msg.innerHTML = ''; }, 8000);
+    } else {
+      alert(texto);
+    }
+  };
   if (d.omitidos && d.omitidos.length > 0) {
     var lineas = d.omitidos.map(function(o) {
       return o.lang.toUpperCase() + ': falta ' + o.faltan.join(', ');
     }).join('<br>');
-    var textoActivados = d.activados.length ? '✅ Activados: ' + d.activados.join(', ').toUpperCase() + '<br>' : '';
-    msg.innerHTML = '<div class="aviso-error">⚠️ ' + textoActivados + 'No activados por campos incompletos:<br>' + lineas + '</div>';
-    setTimeout(function() { msg.innerHTML = ''; }, 8000);
+    var textoActivados = d.activados.length ? '✅ Activados: ' + d.activados.join(', ').toUpperCase() + '\n' : '';
+    var textoPlano = textoActivados + 'No activados por campos incompletos:\n' + d.omitidos.map(function(o){ return o.lang.toUpperCase() + ': falta ' + o.faltan.join(', '); }).join('\n');
+    mostrar('<div class="aviso-error">⚠️ ' + (d.activados.length ? '✅ Activados: ' + d.activados.join(', ').toUpperCase() + '<br>' : '') + 'No activados por campos incompletos:<br>' + lineas + '</div>', textoPlano);
   } else if (d.activados && d.activados.length > 0) {
-    msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas activados correctamente</div>';
-    setTimeout(function() { msg.innerHTML = ''; }, 3000);
+    mostrar('<div class="aviso-ok">✅ Todos los idiomas activados correctamente</div>', 'Todos los idiomas activados correctamente');
   }
 }
 
@@ -10227,10 +10235,13 @@ function activarTodosDestino(destinoId, activar) {
     body: JSON.stringify({ activo: activar })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (!d.ok) return;
-    mostrarAvisoActivar(document.getElementById('dest-mensaje-editor'), activar, d);
+    // Recargar el editor primero, luego mostrar el aviso encima
     fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + destiLangActual)
       .then(function(r) { return r.json(); })
-      .then(function(datos) { renderizarCamposDestinoSEO(destinoId, destiLangActual, datos); });
+      .then(function(datos) {
+        renderizarCamposDestinoSEO(destinoId, destiLangActual, datos);
+        mostrarAvisoActivar(document.getElementById('dest-mensaje-editor'), activar, d);
+      });
   });
 }
 
