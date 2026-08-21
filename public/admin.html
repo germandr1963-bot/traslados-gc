@@ -8575,11 +8575,12 @@ function abrirEditorDestino(destinoId) {
         '</div>' +
 
         // Pestañas idioma
-        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">' +
+        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">' +
         '<button class="boton-costa" style="padding:6px 14px;font-size:0.82rem;" onclick="activarTodosDestino(' + destinoId + ', true)">🌐 Activar todos</button>' +
         '<button class="boton-peligro" style="padding:6px 14px;font-size:0.82rem;" onclick="activarTodosDestino(' + destinoId + ', false)">⭕ Desactivar todos</button>' +
         '<span style="font-size:12px;color:var(--texto-muted);">— Controla todos los idiomas a la vez</span>' +
         '</div>' +
+        '<div id="dest-aviso-global" style="margin-bottom:10px;"></div>' +
         '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
         '<div id="dest-campos-editor"></div>' +
         '<div id="dest-mensaje-editor" style="margin-top:8px;"></div>' +
@@ -10230,13 +10231,12 @@ function activarTodosDestino(destinoId, activar) {
     body: JSON.stringify({ activo: activar })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (!d.ok) return;
-    // Recargar el editor primero, luego mostrar el aviso encima
+    // Mostrar aviso arriba, junto a los botones — siempre visible
+    mostrarAvisoActivar(document.getElementById('dest-aviso-global'), activar, d);
+    // Recargar el editor del idioma activo
     fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + destiLangActual)
       .then(function(r) { return r.json(); })
-      .then(function(datos) {
-        renderizarCamposDestinoSEO(destinoId, destiLangActual, datos);
-        mostrarAvisoActivar(document.getElementById('dest-mensaje-editor'), activar, d);
-      });
+      .then(function(datos) { renderizarCamposDestinoSEO(destinoId, destiLangActual, datos); });
   });
 }
 
