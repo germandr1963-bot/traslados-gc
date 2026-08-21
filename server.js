@@ -3767,16 +3767,22 @@ app.post('/admin/seo/categorias/:id/activar-todos', requireAdmin, asyncHandler(a
   const omitidos = [];
 
   for (const row of result.rows) {
-    const completo = row.slug_url && row.meta_title && row.meta_description &&
-                     row.h1_seo && row.subtitulo_seo && row.resena_breve && row.texto_descripcion;
-    if (completo) {
+    const faltan = [];
+    if (!row.slug_url)          faltan.push('slug');
+    if (!row.h1_seo)            faltan.push('H1');
+    if (!row.subtitulo_seo)     faltan.push('Subtítulo');
+    if (!row.meta_title)        faltan.push('Título Google');
+    if (!row.meta_description)  faltan.push('Descripción Google');
+    if (!row.resena_breve)      faltan.push('Reseña');
+    if (!row.texto_descripcion) faltan.push('Texto descriptivo');
+    if (faltan.length === 0) {
       await pool.query(
         `UPDATE categorias_vehiculos_traducciones SET activo = TRUE WHERE categoria_id = $1 AND lang_code = $2`,
         [req.params.id, row.lang_code]
       );
       activados.push(row.lang_code);
     } else {
-      omitidos.push(row.lang_code);
+      omitidos.push({ lang: row.lang_code, faltan });
     }
   }
 
@@ -4163,16 +4169,20 @@ app.post('/admin/seo/rutas/:id/activar-todos', requireAdmin, asyncHandler(async 
   const omitidos = [];
 
   for (const row of result.rows) {
-    const completo = row.slug_url && row.meta_title && row.meta_description &&
-                     row.resena_breve && row.texto_descripcion;
-    if (completo) {
+    const faltan = [];
+    if (!row.slug_url)          faltan.push('slug');
+    if (!row.meta_title)        faltan.push('Título Google');
+    if (!row.meta_description)  faltan.push('Descripción Google');
+    if (!row.resena_breve)      faltan.push('Reseña');
+    if (!row.texto_descripcion) faltan.push('Texto descriptivo');
+    if (faltan.length === 0) {
       await pool.query(
         `UPDATE route_seo_settings SET activo = TRUE WHERE route_id = $1 AND lang_code = $2`,
         [req.params.id, row.lang_code]
       );
       activados.push(row.lang_code);
     } else {
-      omitidos.push(row.lang_code);
+      omitidos.push({ lang: row.lang_code, faltan });
     }
   }
 
@@ -4556,16 +4566,20 @@ app.post('/admin/seo/destinos/:id/activar-todos', requireAdmin, asyncHandler(asy
   const omitidos = [];
 
   for (const row of result.rows) {
-    const completo = row.slug_url && row.meta_title && row.meta_description &&
-                     row.texto_descripcion && row.resena_breve;
-    if (completo) {
+    const faltan = [];
+    if (!row.slug_url)          faltan.push('slug');
+    if (!row.meta_title)        faltan.push('Título Google');
+    if (!row.meta_description)  faltan.push('Descripción Google');
+    if (!row.texto_descripcion) faltan.push('Texto descriptivo');
+    if (!row.resena_breve)      faltan.push('Reseña');
+    if (faltan.length === 0) {
       await pool.query(
         `UPDATE destinos_seo_settings SET activo = TRUE WHERE destino_id = $1 AND lang_code = $2`,
         [req.params.id, row.lang_code]
       );
       activados.push(row.lang_code);
     } else {
-      omitidos.push(row.lang_code);
+      omitidos.push({ lang: row.lang_code, faltan });
     }
   }
 
