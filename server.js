@@ -3749,7 +3749,6 @@ app.post('/admin/seo/categorias/:id/idioma/:lang/activar', requireAdmin, asyncHa
 app.post('/admin/seo/categorias/:id/activar-todos', requireAdmin, asyncHandler(async (req, res) => {
   const activar = !!req.body.activo;
 
-  // Si es desactivar, desactiva todos sin restricciones
   if (!activar) {
     await pool.query(
       `UPDATE categorias_vehiculos_traducciones SET activo = FALSE WHERE categoria_id = $1`,
@@ -3758,7 +3757,6 @@ app.post('/admin/seo/categorias/:id/activar-todos', requireAdmin, asyncHandler(a
     return res.json({ ok: true, activados: [], omitidos: [] });
   }
 
-  // Si es activar, verificar que cada idioma tiene todos los campos obligatorios
   const result = await pool.query(
     `SELECT lang_code, slug_url, meta_title, meta_description, h1_seo, subtitulo_seo, resena_breve, texto_descripcion
      FROM categorias_vehiculos_traducciones WHERE categoria_id = $1`,
