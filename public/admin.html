@@ -10174,9 +10174,35 @@ function toggleActivarSEOCat(catId, lang, activar) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ activo: activar })
   }).then(function() {
+    // Solo actualiza el botón y el estado visible — no recarga el editor ni borra los campos
+    var btnActivar = document.querySelector('#seo-cat-campos-editor button[onclick*="toggleActivarSEOCat"]');
+    if (btnActivar) {
+      btnActivar.textContent = activar ? 'Desactivar' : 'Activar';
+      btnActivar.className   = activar ? 'boton-peligro' : 'boton-costa';
+      btnActivar.setAttribute('onclick', 'toggleActivarSEOCat(' + catId + ', \'' + lang + '\', ' + (!activar) + ')');
+    }
+    var spanEstado = document.querySelector('#seo-cat-campos-editor span[style*="font-size:14px"]');
+    if (spanEstado) {
+      spanEstado.innerHTML = activar
+        ? '🟢 Esta página <strong>está activa</strong> en internet'
+        : '⚪ Esta página <strong>está desactivada</strong>';
+    }
+    // Mostrar/ocultar el botón Copiar enlace según el nuevo estado
+    var btnCopiar = document.querySelector('#seo-cat-campos-editor button[onclick*="copiarEnlaceCat"]');
+    if (activar && !btnCopiar) {
+      if (btnActivar) {
+        var nuevo = document.createElement('button');
+        nuevo.className = 'boton-secundario';
+        nuevo.style.cssText = 'padding:6px 14px;font-size:0.82rem;';
+        nuevo.setAttribute('onclick', 'copiarEnlaceCat(this)');
+        nuevo.textContent = '🔗 Copiar enlace';
+        btnActivar.parentNode.insertBefore(nuevo, btnActivar.nextSibling);
+      }
+    } else if (!activar && btnCopiar) {
+      btnCopiar.remove();
+    }
     seoCatCache = null;
     cargarSEOCategorias();
-    cambiarIdiomaEditorSEOCat(catId, lang, document.getElementById('seo-cat-tab-' + lang));
   });
 }
 
