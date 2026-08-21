@@ -9941,14 +9941,14 @@ function renderizarCamposSEOCat(catId, lang, datos) {
 
   // Límites de caracteres por idioma — tomados de GENERADOR_CATEGORIAS_SEO en ia-prompts.js
   var LIMITES_SEO_CAT = {
-    'es': { h1Max: 55, subMax: 200, descMax: 200 },
-    'en': { h1Max: 55, subMax: 200, descMax: 200 },
-    'de': { h1Max: 45, subMax: 165, descMax: 200 },
-    'fr': { h1Max: 50, subMax: 185, descMax: 200 },
-    'it': { h1Max: 50, subMax: 185, descMax: 200 },
-    'nl': { h1Max: 48, subMax: 175, descMax: 200 },
-    'sv': { h1Max: 48, subMax: 175, descMax: 200 },
-    'no': { h1Max: 48, subMax: 175, descMax: 200 },
+    'es': { h1Max: 55, subMax: 200, descMax: 260 },
+    'en': { h1Max: 55, subMax: 200, descMax: 260 },
+    'de': { h1Max: 45, subMax: 165, descMax: 210 },
+    'fr': { h1Max: 50, subMax: 185, descMax: 240 },
+    'it': { h1Max: 50, subMax: 185, descMax: 240 },
+    'nl': { h1Max: 48, subMax: 175, descMax: 225 },
+    'sv': { h1Max: 48, subMax: 175, descMax: 225 },
+    'no': { h1Max: 48, subMax: 175, descMax: 225 },
     'fi': { h1Max: 42, subMax: 155, descMax: 200 },
     'ru': { h1Max: 42, subMax: 155, descMax: 200 }
   };
@@ -9965,11 +9965,11 @@ function renderizarCamposSEOCat(catId, lang, datos) {
       (activo ? '<button class="boton-secundario" style="padding:6px 14px;font-size:0.82rem;" onclick="copiarEnlaceCat(this)">🔗 Copiar enlace</button>' : '') +
     '</div>' +
 
-    '<label class="etiqueta">H1 SEO (título principal de la página)</label>' +
+    '<label class="etiqueta">H1 SEO (título principal de la página — máx. ' + limitesSEOCat.h1Max + ' car.)</label>' +
     '<input class="campo" id="seo-cat-h1" type="text" value="' + escapar(datos.h1_seo || '') + '" oninput="contarCharsSEOCatCampo(\'seo-cat-h1\',\'seo-cat-h1-count\',limitesSEOCat.h1Max)" style="margin-bottom:4px;font-size:15px;font-weight:700;">' +
     '<div style="text-align:right;font-size:11px;margin-bottom:12px;" id="seo-cat-h1-count"></div>' +
 
-    '<label class="etiqueta">Subtítulo SEO</label>' +
+    '<label class="etiqueta">Subtítulo SEO (máx. ' + limitesSEOCat.subMax + ' car.)</label>' +
     '<textarea class="campo" id="seo-cat-subtitulo" rows="2" oninput="contarCharsSEOCatCampo(\'seo-cat-subtitulo\',\'seo-cat-subtitulo-count\',limitesSEOCat.subMax)" style="margin-bottom:4px;">' + escapar(datos.subtitulo_seo || '') + '</textarea>' +
     '<div style="text-align:right;font-size:11px;margin-bottom:12px;" id="seo-cat-subtitulo-count"></div>' +
 
@@ -9999,7 +9999,7 @@ function renderizarCamposSEOCat(catId, lang, datos) {
       'oninput="contarPxSEO(this,\'seo-cat-desc-count\',920,\'13px arial\')" style="margin-bottom:4px;">' + escapar(desc) + '</textarea>' +
     '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-cat-desc-count">' + medirPx(desc, '13px arial') + ' / 920 px</div>' +
 
-    '<label class="etiqueta">Reseña breve para tarjeta (máx. ' + limitesSEOCat.descMax + ' caracteres)</label>' +
+    '<label class="etiqueta">Reseña breve para tarjeta (máx. ' + limitesSEOCat.descMax + ' car.)</label>' +
     '<textarea class="campo" id="seo-cat-resena" rows="3" ' +
     'oninput="contarCharsSEOCatCampo(\'seo-cat-resena\',\'seo-cat-resena-count\',limitesSEOCat.descMax)" style="margin-bottom:4px;">' + escapar(datos.resena_breve || '') + '</textarea>' +
     '<div style="text-align:right;font-size:11px;margin-bottom:16px;" id="seo-cat-resena-count"></div>' +
