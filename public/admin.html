@@ -8578,6 +8578,11 @@ function abrirEditorDestino(destinoId) {
         '</div>' +
 
         // Pestañas idioma
+        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">' +
+        '<button class="boton-costa" style="padding:6px 14px;font-size:0.82rem;" onclick="activarTodosDestino(' + destinoId + ', true)">🌐 Activar todos</button>' +
+        '<button class="boton-peligro" style="padding:6px 14px;font-size:0.82rem;" onclick="activarTodosDestino(' + destinoId + ', false)">⭕ Desactivar todos</button>' +
+        '<span style="font-size:12px;color:var(--texto-muted);">— Controla todos los idiomas a la vez</span>' +
+        '</div>' +
         '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
         '<div id="dest-campos-editor"></div>' +
         '<div id="dest-mensaje-editor" style="margin-top:8px;"></div>' +
@@ -10195,6 +10200,34 @@ function guardarSEOCat(catId, lang) {
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
     }
+  });
+}
+
+function activarTodosDestino(destinoId, activar) {
+  fetch('/admin/seo/destinos/' + destinoId + '/activar-todos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo: activar })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.ok) return;
+    var msg = document.getElementById('dest-mensaje-editor');
+    if (activar) {
+      (d.activados || []).forEach(function(lang) {
+        var tab = document.querySelector('[id="dest-tab-' + lang + '"], .tab-idioma[onclick*="\'' + lang + '\'"]');
+        if (tab) { tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784'; tab.innerHTML = lang.toUpperCase() + ' ✓'; }
+      });
+      if (d.omitidos && d.omitidos.length > 0) {
+        if (msg) msg.innerHTML = '<div class="aviso-error">⚠️ Activados: ' + (d.activados.join(', ') || 'ninguno') + '. Sin contenido completo (no activados): ' + d.omitidos.join(', ').toUpperCase() + '</div>';
+        setTimeout(function() { if (msg) msg.innerHTML = ''; }, 6000);
+      } else if (d.activados && d.activados.length > 0) {
+        if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas activados correctamente</div>';
+        setTimeout(function() { if (msg) msg.innerHTML = ''; }, 3000);
+      }
+    } else {
+      if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas desactivados</div>';
+      setTimeout(function() { if (msg) msg.innerHTML = ''; }, 3000);
+    }
+    cargarSEODestinos();
   });
 }
 
