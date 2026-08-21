@@ -4492,7 +4492,7 @@ app.get('/admin/seo/destinos/:id/completo', requireAdmin, asyncHandler(async (re
   const result = await pool.query(
     `SELECT dss.destino_id, dss.lang_code, dss.slug_url, dss.meta_title, dss.meta_description,
             dss.og_title, dss.og_description, dss.robots_status, dss.canonical_url,
-            dss.texto_descripcion, dss.activo, dss.updated_at,
+            dss.texto_descripcion, dss.resena_breve, dss.activo, dss.updated_at,
             d.nombre, d.zona, d.isla, d.orden, d.visible_rutas,
             d.sitemap_prioridad, d.sitemap_frecuencia
      FROM destinos_seo_settings dss
@@ -4505,7 +4505,10 @@ app.get('/admin/seo/destinos/:id/completo', requireAdmin, asyncHandler(async (re
   for (const fila of result.rows) {
     const pxTitulo = medirPxTitulo(fila.meta_title);
     const pxDesc = medirPxDescripcion(fila.meta_description);
-    porIdioma[fila.lang_code] = { ...fila, px_titulo: pxTitulo, px_descripcion: pxDesc, excede: pxTitulo > 600 || pxDesc > 960 };
+    // completo: el servidor decide — si mañana se añade un campo, solo se toca aquí
+    const completo = !!(fila.slug_url && fila.meta_title && fila.meta_description &&
+                        fila.resena_breve && fila.texto_descripcion);
+    porIdioma[fila.lang_code] = { ...fila, px_titulo: pxTitulo, px_descripcion: pxDesc, excede: pxTitulo > 600 || pxDesc > 960, completo };
   }
   res.json({ idiomas: porIdioma });
 }));
