@@ -8955,6 +8955,7 @@ function guardarConfigDestino(destinoId) {
 }
 
 function cambiarIdiomaEditorDestino(destinoId, lang, botonTab) {
+  destiLangActual = lang;
   document.querySelectorAll('.tab-idioma').forEach(function(b) { b.classList.remove('activo'); });
   if (botonTab) botonTab.classList.add('activo');
   fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + lang)
@@ -9538,6 +9539,7 @@ function contarCharsResenaRuta() {
 
 var seoCatCache = null;
 var seoCatLangActual = 'es';
+var destiLangActual = 'es';
 var seoCatIdActual = null;
 
 function toggleBloqueSEORutas() {
@@ -10227,19 +10229,8 @@ function activarTodosDestino(destinoId, activar) {
       if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Todos los idiomas desactivados</div>';
       setTimeout(function() { if (msg) msg.innerHTML = ''; }, 3000);
     }
-    // Actualizar botón y estado del idioma activo en el editor
-    var btnActivarD = document.querySelector('#dest-campos-editor button[onclick*="toggleActivarDestino"]');
-    if (btnActivarD) {
-      var esActivadoD = activar && (d.activados || []).length > 0;
-      btnActivarD.textContent = esActivadoD ? 'Desactivar' : 'Activar';
-      btnActivarD.className   = esActivadoD ? 'boton-peligro' : 'boton-costa';
-    }
-    var spanEstadoD = document.querySelector('#dest-campos-editor span[style*="font-size:14px"]');
-    if (spanEstadoD) {
-      spanEstadoD.innerHTML = (activar && (d.activados || []).length > 0)
-        ? '🟢 Esta página <strong>está activa</strong> en internet'
-        : '⚪ Esta página <strong>está desactivada</strong>';
-    }
+    // Recargar el editor del idioma activo desde la BD para reflejar el nuevo estado
+    cambiarIdiomaEditorDestino(destinoId, destiLangActual, document.querySelector('.tab-idioma.activo'));
     cargarDestinos();
   });
 }
