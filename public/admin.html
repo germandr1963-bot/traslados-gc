@@ -9947,7 +9947,7 @@ function renderizarCamposSEOCat(catId, lang, datos) {
       '<span style="font-size:14px;">' + (activo ? '🟢 Esta página <strong>está activa</strong> en internet' : '⚪ Esta página <strong>está desactivada</strong>') + '</span>' +
       '<button class="' + (activo ? 'boton-peligro' : 'boton-costa') + '" style="padding:6px 14px;font-size:0.82rem;" ' +
         'onclick="toggleActivarSEOCat(' + catId + ', \'' + lang + '\', ' + (!activo) + ')">' + (activo ? 'Desactivar' : 'Activar') + '</button>' +
-      (activo ? '<button class="boton-secundario" style="padding:6px 14px;font-size:0.82rem;" onclick="copiarEnlaceCat(this, \'' + urlPublica + '\')">🔗 Copiar enlace</button>' : '') +
+      (activo ? '<button class="boton-secundario" style="padding:6px 14px;font-size:0.82rem;" onclick="copiarEnlaceCat(this)">🔗 Copiar enlace</button>' : '') +
     '</div>' +
 
     '<label class="etiqueta">H1 SEO (título principal de la página)</label>' +
@@ -10045,12 +10045,14 @@ function toggleVistaTextoCat(modo) {
   }
 }
 
-function copiarEnlaceCat(boton, url) {
-  navigator.clipboard.writeText(window.location.origin + url).then(function() {
+function copiarEnlaceCat(boton) {
+  var urlPublicaInput = document.getElementById('seo-cat-url-publica');
+  var url = window.location.origin + (urlPublicaInput ? urlPublicaInput.value.trim() : '');
+  navigator.clipboard.writeText(url).then(function() {
     var orig = boton.textContent;
     boton.textContent = '✓ ¡Copiado!';
     setTimeout(function() { boton.textContent = orig; }, 1800);
-  }).catch(function() { prompt('Copia el enlace:', window.location.origin + url); });
+  }).catch(function() { prompt('Copia el enlace manualmente:', url); });
 }
 
 function guardarSEOCat(catId, lang) {
@@ -10081,10 +10083,45 @@ function guardarSEOCat(catId, lang) {
     body: JSON.stringify(datos)
   }).then(function(r) { return r.json(); }).then(function(respuesta) {
     if (respuesta.ok) {
-      msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+      var pxTitulo = medirPx(datos.meta_title, '20px arial');
+      var pxDesc   = medirPx(datos.meta_description, '13px arial');
+      var excede   = pxTitulo > 600 || pxDesc > 920;
+
+      // Actualiza el tab de este idioma en vivo sin cerrar el editor
+      var tab = document.getElementById('seo-cat-tab-' + lang);
+      if (tab) {
+        var tieneTitulo = !!(datos.meta_title && datos.meta_title.trim());
+        var tieneDesc   = !!(datos.meta_description && datos.meta_description.trim());
+        var tieneTexto  = !!(datos.texto_descripcion && datos.texto_descripcion.trim());
+        var completo = tieneTitulo && tieneDesc && tieneTexto;
+        var parcial  = (tieneTitulo || tieneDesc || tieneTexto) && !completo;
+        if (excede) {
+          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
+          tab.innerHTML = lang.toUpperCase() + ' ⚠️';
+        } else if (completo) {
+          tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
+          tab.innerHTML = lang.toUpperCase() + ' ✓';
+        } else if (parcial) {
+          tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825';
+          tab.innerHTML = lang.toUpperCase() + ' ·';
+        } else {
+          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
+          tab.innerHTML = lang.toUpperCase();
+        }
+      }
+
+      var avisos = [];
+      if (pxTitulo > 600) avisos.push('el título se pasa de 600px (' + pxTitulo + 'px) y Google podría cortarlo');
+      if (pxDesc   > 920) avisos.push('la descripción se pasa de 920px (' + pxDesc + 'px) y Google podría cortarla');
+      if (avisos.length) {
+        msg.innerHTML = '<div class="aviso-error">✅ Guardado, pero ' + avisos.join(' y ') + '.</div>';
+      } else {
+        msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+      }
+
       seoCatCache = null;
       cargarSEOCategorias();
-      setTimeout(function() { msg.innerHTML = ''; }, 3000);
+      setTimeout(function() { msg.innerHTML = ''; }, 4000);
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
     }
