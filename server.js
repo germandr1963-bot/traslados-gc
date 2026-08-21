@@ -3745,6 +3745,15 @@ app.post('/admin/seo/categorias/:id/idioma/:lang/activar', requireAdmin, asyncHa
   res.json({ ok: true });
 }));
 
+// Activa o desactiva todos los idiomas de una categoría de una vez
+app.post('/admin/seo/categorias/:id/activar-todos', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query(
+    `UPDATE categorias_vehiculos_traducciones SET activo = $1 WHERE categoria_id = $2`,
+    [!!req.body.activo, req.params.id]
+  );
+  res.json({ ok: true });
+}));
+
 // Genera con IA el slug y meta de una categoría en un idioma concreto
 app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(async (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
