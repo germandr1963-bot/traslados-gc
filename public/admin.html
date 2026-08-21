@@ -3220,7 +3220,12 @@ function abrirEditorSEO(rutaId) {
         '</div>' +
         '</div>' +
 
-        '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">' +
+    '<button class="boton-costa" style="padding:6px 14px;font-size:0.82rem;" onclick="activarTodosCat(' + catId + ', true)">🌐 Activar todos</button>' +
+    '<button class="boton-peligro" style="padding:6px 14px;font-size:0.82rem;" onclick="activarTodosCat(' + catId + ', false)">⭕ Desactivar todos</button>' +
+    '<span style="font-size:12px;color:var(--texto-muted);">— Controla todos los idiomas a la vez</span>' +
+    '</div>' +
+    '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
         '<div id="seo-campos-editor"></div>' +
         '<div id="seo-mensaje-editor" style="margin-top:8px;"></div>' +
         '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-seo\').classList.add(\'oculto\')">Cerrar</button>';
@@ -10165,6 +10170,53 @@ function guardarSEOCat(catId, lang) {
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
     }
+  });
+}
+
+function activarTodosCat(catId, activar) {
+  fetch('/admin/seo/categorias/' + catId + '/activar-todos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo: activar })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.ok) return;
+    // Actualizar visualmente todos los tabs
+    var idiomas = (seoCatCache && seoCatCache.idiomas) || IDIOMAS_SEO;
+    var seoData = (seoCatCache && seoCatCache.seo[catId]) || {};
+    idiomas.forEach(function(lang) {
+      var tab = document.getElementById('seo-cat-tab-' + lang);
+      if (!tab) return;
+      if (activar) {
+        tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
+        if (!tab.innerHTML.includes('✓')) tab.innerHTML = lang.toUpperCase() + ' ✓';
+      } else {
+        var d2 = seoData[lang] || {};
+        var tieneTitulo = !!(d2.titulo);
+        if (tieneTitulo) {
+          tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825';
+          tab.innerHTML = lang.toUpperCase() + ' ·';
+        } else {
+          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
+          tab.innerHTML = lang.toUpperCase();
+        }
+      }
+    });
+    // Actualizar el botón y estado del idioma activo en el editor
+    var btnActivar = document.querySelector('#seo-cat-campos-editor button[onclick*="toggleActivarSEOCat"]');
+    if (btnActivar) {
+      btnActivar.textContent = activar ? 'Desactivar' : 'Activar';
+      btnActivar.className   = activar ? 'boton-peligro' : 'boton-costa';
+      var langActual = seoCatLangActual || 'es';
+      btnActivar.setAttribute('onclick', 'toggleActivarSEOCat(' + catId + ', \'' + langActual + '\', ' + (!activar) + ')');
+    }
+    var spanEstado = document.querySelector('#seo-cat-campos-editor span[style*="font-size:14px"]');
+    if (spanEstado) {
+      spanEstado.innerHTML = activar
+        ? '🟢 Esta página <strong>está activa</strong> en internet'
+        : '⚪ Esta página <strong>está desactivada</strong>';
+    }
+    seoCatCache = null;
+    cargarSEOCategorias();
   });
 }
 
