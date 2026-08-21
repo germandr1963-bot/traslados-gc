@@ -3588,10 +3588,20 @@ function guardarSEO(rutaId, lang) {
         editorSEOCache[rutaId][lang].excede = excede;
       }
 
+      var faltan = [];
+      if (!datos.slug_url)          faltan.push('URL amigable');
+      if (!datos.meta_title)        faltan.push('Título Google');
+      if (!datos.meta_description)  faltan.push('Descripción Google');
+      if (!datos.resena_breve)      faltan.push('Reseña breve');
+      if (!datos.texto_descripcion) faltan.push('Texto descriptivo');
+
       var avisos = [];
       if (pxTitulo > 600) avisos.push('el título se pasa de 600px (' + pxTitulo + 'px) y Google podría cortarlo');
       if (pxDesc > 920) avisos.push('la descripción se pasa de 920px (' + pxDesc + 'px) y Google podría cortarla');
-      if (avisos.length) {
+
+      if (faltan.length > 0) {
+        msg.innerHTML = '<div class="aviso-error">✅ Guardado. Faltan: ' + faltan.join(', ') + '</div>';
+      } else if (avisos.length) {
         msg.innerHTML = '<div class="aviso-error">✅ Guardado, pero ' + avisos.join(' y ') + '.</div>';
       } else {
         msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
