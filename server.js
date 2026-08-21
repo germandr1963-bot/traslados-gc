@@ -3747,11 +3747,42 @@ app.post('/admin/seo/categorias/:id/idioma/:lang/activar', requireAdmin, asyncHa
 
 // Activa o desactiva todos los idiomas de una categoría de una vez
 app.post('/admin/seo/categorias/:id/activar-todos', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query(
-    `UPDATE categorias_vehiculos_traducciones SET activo = $1 WHERE categoria_id = $2`,
-    [!!req.body.activo, req.params.id]
+  const activar = !!req.body.activo;
+
+  // Si es desactivar, desactiva todos sin restricciones
+  if (!activar) {
+    await pool.query(
+      `UPDATE categorias_vehiculos_traducciones SET activo = FALSE WHERE categoria_id = $1`,
+      [req.params.id]
+    );
+    return res.json({ ok: true, activados: [], omitidos: [] });
+  }
+
+  // Si es activar, verificar que cada idioma tiene todos los campos obligatorios
+  const result = await pool.query(
+    `SELECT lang_code, slug_url, meta_title, meta_description, h1_seo, subtitulo_seo, resena_breve, texto_descripcion
+     FROM categorias_vehiculos_traducciones WHERE categoria_id = $1`,
+    [req.params.id]
   );
-  res.json({ ok: true });
+
+  const activados = [];
+  const omitidos = [];
+
+  for (const row of result.rows) {
+    const completo = row.slug_url && row.meta_title && row.meta_description &&
+                     row.h1_seo && row.subtitulo_seo && row.resena_breve && row.texto_descripcion;
+    if (completo) {
+      await pool.query(
+        `UPDATE categorias_vehiculos_traducciones SET activo = TRUE WHERE categoria_id = $1 AND lang_code = $2`,
+        [req.params.id, row.lang_code]
+      );
+      activados.push(row.lang_code);
+    } else {
+      omitidos.push(row.lang_code);
+    }
+  }
+
+  res.json({ ok: true, activados, omitidos });
 }));
 
 // Genera con IA el slug y meta de una categoría en un idioma concreto
