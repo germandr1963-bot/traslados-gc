@@ -3508,7 +3508,7 @@ function validarSlugEnVivo(input) {
 
 function validarSlug(slug) {
   if (!slug || slug.trim() === '') return 'El slug no puede estar vacío.';
-  if (slug.length < 5) return 'El slug es demasiado corto (mínimo 5 caracteres).';
+  if (slug.length < 3) return 'El slug es demasiado corto (mínimo 3 caracteres).';
   if (/[^a-z0-9-]/.test(slug)) return 'Solo se permiten letras minúsculas sin tildes, números y guiones normales (-). Sin guiones bajos ni caracteres especiales.';
   if (slug.includes('_')) return 'Los guiones bajos (_) no están permitidos. Usa guiones normales (-).';
   if (slug.startsWith('-') || slug.endsWith('-')) return 'El slug no puede empezar ni terminar con un guión.';
