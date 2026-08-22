@@ -5442,7 +5442,7 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
   let metaTitle = resultado.meta_title || '';
   let metaDesc = resultado.meta_description || '';
 
-  // Verificar px reales — si se pasa, pedir a la IA que acorte
+  // Verificar px reales — si se pasa, pedir a la IA que acorte (en caracteres exactos)
   const pxTitulo = medirPxTitulo(metaTitle);
   const pxDesc = medirPxDescripcion(metaDesc);
   const tituloSePasa = pxTitulo > 600;
@@ -5450,11 +5450,15 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
 
   if (tituloSePasa || descSePasa) {
     const instrucciones = [];
-    if (tituloSePasa) instrucciones.push(`- meta_title actual (${pxTitulo}px, máx 600px): "${metaTitle}" → acórtalo para que no supere 600px reales (Arial 20px). Mantén el significado y las keywords principales.`);
-    if (descSePasa) instrucciones.push(`- meta_description actual (${pxDesc}px, máx 920px): "${metaDesc}" → acórtala para que no supere 920px reales (Arial 13px). Mantén el tono, la invitación al clic y las keywords.`);
-
-    const listaInstrucciones = instrucciones.join('\n');
-    const promptCorto = 'Eres un experto en SEO. Los siguientes textos se pasan de los límites de píxeles reales de Google. Acórtalos manteniendo el significado, el tono nativo en ' + nombreIdioma + ' y las keywords principales. No traduzcas ni cambies el idioma.\n\n' + listaInstrucciones + '\n\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"meta_title": "...", "meta_description": "..."}';
+    if (tituloSePasa) {
+      const charsMax = Math.floor(metaTitle.length * 600 / pxTitulo) - 2;
+      instrucciones.push('TÍTULO: MÁXIMO ' + charsMax + ' caracteres. Texto: "' + metaTitle + '"');
+    }
+    if (descSePasa) {
+      const charsMax = Math.floor(metaDesc.length * 920 / pxDesc) - 2;
+      instrucciones.push('DESCRIPCIÓN: MÁXIMO ' + charsMax + ' caracteres. Texto: "' + metaDesc + '"');
+    }
+    const promptCorto = 'Acorta estos textos SEO en ' + nombreIdioma + '. El límite es en NÚMERO DE CARACTERES — cuenta los caracteres del resultado y no superes el máximo. Mantén tono nativo y palabras clave.\n\n' + instrucciones.join('\n\n') + '\n\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"meta_title": "...", "meta_description": "..."}';
 
     const r2 = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
