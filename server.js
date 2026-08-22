@@ -5365,9 +5365,17 @@ app.post('/admin/seo/destinos/:id/generar-texto', requireAdmin, asyncHandler(asy
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
   const { lang } = req.body;
-  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  const destino = await pool.query(
+    `SELECT d.nombre, d.isla, d.zona,
+            COALESCE(dt.nombre, d.nombre) AS nombre_traducido
+     FROM destinos d
+     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $2
+     WHERE d.id = $1`,
+    [req.params.id, lang]
+  );
   if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado' });
   const d = destino.rows[0];
+  d.nombre = d.nombre_traducido;
   const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || 'español';
   const prompt = `Eres un experto en SEO que trabaja en el mercado de habla ${lang === 'es' ? 'español' : nombreIdioma}. Conoces cómo busca la gente en ${lang === 'es' ? 'español' : nombreIdioma} cuando quiere viajar a Gran Canaria — qué términos usan, qué intención tienen, cómo hablan del transporte privado en ese idioma. No traduces. Creas.
 
@@ -5411,9 +5419,17 @@ app.post('/admin/seo/destinos/:id/generar-titulo-desc', requireAdmin, asyncHandl
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
   const { lang } = req.body;
-  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  const destino = await pool.query(
+    `SELECT d.nombre, d.isla, d.zona,
+            COALESCE(dt.nombre, d.nombre) AS nombre_traducido
+     FROM destinos d
+     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $2
+     WHERE d.id = $1`,
+    [req.params.id, lang]
+  );
   if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado' });
   const d = destino.rows[0];
+  d.nombre = d.nombre_traducido;
   const nombreIdioma = await getNombreIdioma(lang);
   const esBase = lang === 'es';
   const prompt = `Eres un experto en SEO que trabaja en el mercado de habla ${esBase ? 'español' : nombreIdioma}. Conoces cómo busca la gente en ${esBase ? 'español' : nombreIdioma} cuando quiere viajar a Gran Canaria. No traduces. Creas desde cero en ${esBase ? 'español' : nombreIdioma}, pensando como un SEO nativo de ese mercado.
@@ -5479,9 +5495,17 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
   if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
   const { lang } = req.body;
   if (!IDIOMAS_PERMITIDOS.includes(lang)) return res.status(400).json({ error: 'Idioma no válido.' });
-  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  const destino = await pool.query(
+    `SELECT d.nombre, d.isla, d.zona,
+            COALESCE(dt.nombre, d.nombre) AS nombre_traducido
+     FROM destinos d
+     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $2
+     WHERE d.id = $1`,
+    [req.params.id, lang]
+  );
   if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado.' });
   const d = destino.rows[0];
+  d.nombre = d.nombre_traducido;
   const nombreIdioma = await getNombreIdioma(lang);
 
   // Regla de slug según alfabeto del idioma
