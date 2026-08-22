@@ -4482,12 +4482,22 @@ app.get('/admin/seo/destinos/:id/completo', requireAdmin, asyncHandler(async (re
   const slug = slugify(nombre);
   // Crear fichas usando idiomas_web directamente — independiente de route_seo_settings
   const idiomasDB = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE ORDER BY orden');
+  // Obtener isla_id desde la tabla islas usando el nombre de texto del destino
+  const islaRow = await pool.query('SELECT id, slug FROM islas WHERE LOWER(nombre) = LOWER($1) LIMIT 1', [isla]);
+  const islaId = islaRow.rows[0] ? islaRow.rows[0].id : null;
+  const islaSlugBase = islaRow.rows[0] ? islaRow.rows[0].slug : slugify(isla);
   for (const row of idiomasDB.rows) {
+    // Obtener slug de isla traducido para este idioma
+    let islaSlugLang = islaSlugBase;
+    if (islaId) {
+      const islaTrad = await pool.query('SELECT slug FROM islas_traducciones WHERE isla_id = $1 AND lang_code = $2 LIMIT 1', [islaId, row.codigo]);
+      if (islaTrad.rows[0] && islaTrad.rows[0].slug) islaSlugLang = islaTrad.rows[0].slug;
+    }
     await pool.query(
       `INSERT INTO destinos_seo_settings (destino_id, lang_code, slug_url, canonical_url)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (destino_id, lang_code) DO NOTHING`,
-      [req.params.id, row.codigo, slug, BASE_URL + '/' + row.codigo + '/' + ((PALABRAS_PAGINAS[row.codigo] && PALABRAS_PAGINAS[row.codigo].destino) ? PALABRAS_PAGINAS[row.codigo].destino : 'destino') + '/' + slugify(isla) + '/' + slug]
+      [req.params.id, row.codigo, slug, BASE_URL + '/' + row.codigo + '/' + ((PALABRAS_PAGINAS[row.codigo] && PALABRAS_PAGINAS[row.codigo].destino) ? PALABRAS_PAGINAS[row.codigo].destino : 'destino') + '/' + islaSlugLang + '/' + slug]
     );
   }
   const result = await pool.query(
@@ -4521,8 +4531,15 @@ app.post('/admin/seo/destinos/:id/idioma/:lang', requireAdmin, asyncHandler(asyn
   const slugLimpio = slug_url ? slugify(slug_url) : null;
   // La canónica siempre se reconstruye desde el slug — nunca se usa el valor editado del formulario
   const islaDestino = await pool.query('SELECT isla FROM destinos WHERE id = $1', [req.params.id]);
-  const islaSlug = slugify((islaDestino.rows[0] && islaDestino.rows[0].isla) || 'gran-canaria');
+  const islaTexto = (islaDestino.rows[0] && islaDestino.rows[0].isla) || 'gran-canaria';
   const lang = req.params.lang;
+  // Buscar slug de isla traducido para este idioma
+  const islaRowSeo = await pool.query('SELECT id, slug FROM islas WHERE LOWER(nombre) = LOWER($1) LIMIT 1', [islaTexto]);
+  let islaSlug = islaRowSeo.rows[0] ? islaRowSeo.rows[0].slug : slugify(islaTexto);
+  if (islaRowSeo.rows[0]) {
+    const islaTradSeo = await pool.query('SELECT slug FROM islas_traducciones WHERE isla_id = $1 AND lang_code = $2 LIMIT 1', [islaRowSeo.rows[0].id, lang]);
+    if (islaTradSeo.rows[0] && islaTradSeo.rows[0].slug) islaSlug = islaTradSeo.rows[0].slug;
+  }
   const palabraDestinoCanon = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].destino) ? PALABRAS_PAGINAS[lang].destino : 'destino';
   const canonical = BASE_URL + '/' + lang + '/' + palabraDestinoCanon + '/' + islaSlug + '/' + (slugLimpio || '');
   await pool.query(
