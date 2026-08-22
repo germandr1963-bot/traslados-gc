@@ -4469,7 +4469,8 @@ app.get('/admin/seo/destinos/:id/idioma/:lang', requireAdmin, asyncHandler(async
     [req.params.id, req.params.lang]
   );
   if (result.rows.length === 0) return res.status(404).json({ error: 'No encontrado' });
-  res.json(result.rows[0]);
+  const row = result.rows[0];
+  res.json({ ...row, nombre_isla_slug: slugify(row.isla || 'gran-canaria') });
 }));
 
 // Devuelve todos los idiomas de un destino de golpe con medición de píxeles
@@ -4518,10 +4519,12 @@ app.post('/admin/seo/destinos/:id/idioma/:lang', requireAdmin, asyncHandler(asyn
   if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) return res.status(400).json({ error: 'Idioma no válido' });
   const { slug_url, canonical_url, meta_title, meta_description, og_title, og_description, robots_status, texto_descripcion } = req.body;
   const slugLimpio = slug_url ? slugify(slug_url) : null;
-  // Usar canonical_url del cliente si viene (revisado y confirmado por el usuario), si no construir automático
+  // La canónica siempre se reconstruye desde el slug — nunca se usa el valor editado del formulario
   const islaDestino = await pool.query('SELECT isla FROM destinos WHERE id = $1', [req.params.id]);
   const islaSlug = slugify((islaDestino.rows[0] && islaDestino.rows[0].isla) || 'gran-canaria');
-  const canonical = (canonical_url && canonical_url.trim()) ? canonical_url.trim() : ('/destino/' + islaSlug + '/' + (slugLimpio || ''));
+  const lang = req.params.lang;
+  const palabraDestinoCanon = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].destino) ? PALABRAS_PAGINAS[lang].destino : 'destino';
+  const canonical = BASE_URL + '/' + lang + '/' + palabraDestinoCanon + '/' + islaSlug + '/' + (slugLimpio || '');
   await pool.query(
     `UPDATE destinos_seo_settings
      SET slug_url = $1, meta_title = $2, meta_description = $3,
