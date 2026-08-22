@@ -9020,11 +9020,11 @@ function renderizarCamposDestinoSEO(destinoId, lang, datos) {
     '<div id="seo-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
 
     // URL publica
+    (function(){ var _urlDest = '/' + lang + '/' + (PALABRAS_DESTINO_JS[lang] || 'destino') + '/' + (datos.nombre_isla_slug || 'gran-canaria') + '/' + (datos.slug_url || ''); return '' +
     '<label class="etiqueta">URL pública de esta página</label>' +
-    '<input class="campo" id="dest-url-publica" type="text" readonly ' +
-    'value="/' + lang + '/' + (PALABRAS_DESTINO_JS[lang] || \'destino\') + '/' + (datos.nombre_isla_slug || \'gran-canaria\') + '/' + (datos.slug_url || '') + '" ' +
-    'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;color:var(--terracota);background:var(--gris-fondo);">' +
-    '<div style="font-size:11px;color:var(--texto-muted);margin-bottom:16px;">Se genera automáticamente a partir del slug. No es editable.</div>' +
+    '<input class="campo" id="dest-url-publica" type="text" readonly value="' + _urlDest + '" ' +
+    'style="margin-bottom:4px;font-family:monospace;font-size:13px;color:var(--terracota);background:var(--gris-fondo);">' +
+    '<div style="font-size:11px;color:var(--texto-muted);margin-bottom:16px;">Se genera automáticamente a partir del slug. No es editable.</div>'; })() +
 
     // Botón único IA
     '<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;">' +
