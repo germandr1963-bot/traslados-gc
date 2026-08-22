@@ -9158,30 +9158,54 @@ function guardarDestinoSEO(destinoId, lang) {
       if (msg) { msg.innerHTML = '<div class="aviso-error">' + escapar(d.error || 'Error') + '</div>'; setTimeout(function() { msg.innerHTML = ''; }, 4000); }
       return;
     }
-    // Detectar campos vacíos en este idioma y avisar
+    var pxTitulo = medirPx(datos.meta_title, '20px arial');
+    var pxDesc   = medirPx(datos.meta_description, '13px arial');
+    var excede   = pxTitulo > 600 || pxDesc > 920;
+
+    // Actualizar color del tab en vivo
+    var tab = document.getElementById('tab-dest-idioma-' + lang);
+    if (tab) {
+      var tieneTitulo = !!(datos.meta_title && datos.meta_title.trim());
+      var tieneDesc   = !!(datos.meta_description && datos.meta_description.trim());
+      var tieneTexto  = !!(datos.texto_descripcion && datos.texto_descripcion.trim());
+      var completo = tieneTitulo && tieneDesc && tieneTexto;
+      var parcial  = (tieneTitulo || tieneDesc || tieneTexto) && !completo;
+      if (excede) {
+        tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
+        tab.innerHTML = lang.toUpperCase() + ' ⚠️';
+      } else if (completo) {
+        tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
+        tab.innerHTML = lang.toUpperCase() + ' ✓';
+      } else if (parcial) {
+        tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825';
+        tab.innerHTML = lang.toUpperCase() + ' ·';
+      } else {
+        tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
+        tab.innerHTML = lang.toUpperCase();
+      }
+    }
+
+    // Detectar campos vacíos y avisos de px
     var faltan = [];
     if (!datos.slug_url)          faltan.push('URL amigable');
     if (!datos.meta_title)        faltan.push('Título Google');
     if (!datos.meta_description)  faltan.push('Descripción Google');
     if (!datos.resena_breve)      faltan.push('Reseña breve');
     if (!datos.texto_descripcion) faltan.push('Texto descriptivo');
+
+    var avisos = [];
+    if (pxTitulo > 600) avisos.push('el título se pasa de 600px (' + pxTitulo + 'px) y Google podría cortarlo');
+    if (pxDesc   > 920) avisos.push('la descripción se pasa de 920px (' + pxDesc + 'px) y Google podría cortarla');
+
     if (msg) {
       if (faltan.length > 0) {
         msg.innerHTML = '<div class="aviso-error">✅ Guardado. Faltan: ' + faltan.join(', ') + '</div>';
+      } else if (avisos.length) {
+        msg.innerHTML = '<div class="aviso-error">✅ Guardado, pero ' + avisos.join(' y ') + '.</div>';
       } else {
         msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
       }
       setTimeout(function() { msg.innerHTML = ''; }, 4000);
-    }
-    // Actualizar color del tab — misma lógica que al abrir
-    var tab = document.getElementById('tab-dest-idioma-' + lang);
-    if (tab) {
-      var completo = faltan.length === 0;
-      var parcial  = !completo && !!(datos.meta_title || datos.meta_description || datos.texto_descripcion);
-      tab.style.background  = completo ? '#e8f5e9' : parcial ? '#fff8e1' : '#fdecea';
-      tab.style.color       = completo ? '#2e7d32' : parcial ? '#b8860b' : '#c0392b';
-      tab.style.borderColor = completo ? '#81c784' : parcial ? '#f9a825' : '#e74c3c';
-      tab.textContent = lang.toUpperCase() + (completo ? ' ✓' : parcial ? ' ·' : '');
     }
   });
 }
