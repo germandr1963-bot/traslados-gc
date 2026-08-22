@@ -3008,6 +3008,7 @@ document.getElementById('boton-guardar-precios').addEventListener('click', funct
 // ─── SEO ──────────────────────────────────────────────────────────────────────
 var IDIOMAS_SEO = [];          // se rellena en tiempo real desde /admin/idiomas
 var SECCIONES_TRASLADO_JS = {}; // idem
+var PALABRAS_DESTINO_JS = {}; // palabra "destino" por idioma para construir URLs
 var seoCache = null;
 
 // Carga la lista de idiomas activos de la web desde la base de datos y
@@ -3023,8 +3024,10 @@ function cargarListaIdiomasDinamica() {
     var idiomas = resultados[0];
     var palabras = resultados[1];
     var palabraTraslado = {};
+    var palabraDestino = {};
     palabras.forEach(function (p) {
       if (p.pagina === 'traslado') palabraTraslado[p.lang_code] = p.palabra;
+      if (p.pagina === 'destino')  palabraDestino[p.lang_code]  = p.palabra;
     });
     var activos = idiomas.filter(function (i) { return i.activo; });
     IDIOMAS_SEO = activos.map(function (i) { return i.codigo; });
@@ -3033,6 +3036,7 @@ function cargarListaIdiomasDinamica() {
     NOMBRES_IDIOMA = {};
     activos.forEach(function (i) {
       SECCIONES_TRASLADO_JS[i.codigo] = palabraTraslado[i.codigo] || i.palabra_traslado;
+      PALABRAS_DESTINO_JS[i.codigo]   = palabraDestino[i.codigo]  || 'destino';
       NOMBRES_IDIOMA[i.codigo] = i.nombre;
     });
   });
@@ -3517,6 +3521,12 @@ function validarSlugEnVivo(input) {
   if (urlInput) {
     var seccion = SECCIONES_TRASLADO_JS[seoLangActual] || 'traslado';
     urlInput.value = '/' + seoLangActual + '/' + seccion + '/' + input.value.trim();
+  }
+  var destUrlInput = document.getElementById('dest-url-publica');
+  if (destUrlInput) {
+    var palabraDestino = PALABRAS_DESTINO_JS[destiLangActual] || 'destino';
+    var islaActual = destUrlInput.value.split('/')[3] || 'gran-canaria';
+    destUrlInput.value = '/' + destiLangActual + '/' + palabraDestino + '/' + islaActual + '/' + input.value.trim();
   }
 }
 
@@ -9010,10 +9020,11 @@ function renderizarCamposDestinoSEO(destinoId, lang, datos) {
     '<div id="seo-slug-aviso" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>' +
 
     // URL publica
-    '<label class="etiqueta">URL pública de esta página — generada por la IA, revísala y corrígela si es necesario</label>' +
-    '<input class="campo" id="dest-url-publica" type="text" value="' + escapar(datos.canonical_url || '') + '" ' +
-    'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;color:var(--terracota);">' +
-    '<div style="font-size:11px;color:var(--texto-muted);margin-bottom:16px;">Esta URL se guarda tal como la ves al pulsar Guardar</div>' +
+    '<label class="etiqueta">URL pública de esta página</label>' +
+    '<input class="campo" id="dest-url-publica" type="text" readonly ' +
+    'value="/' + lang + '/' + (PALABRAS_DESTINO_JS[lang] || \'destino\') + \'/' + (datos.nombre_isla_slug || \'gran-canaria\') + '/' + (datos.slug_url || '') + '" ' +
+    'style="margin-bottom:4px;font-family:\'JetBrains Mono\',monospace;font-size:13px;color:var(--terracota);background:var(--gris-fondo);">' +
+    '<div style="font-size:11px;color:var(--texto-muted);margin-bottom:16px;">Se genera automáticamente a partir del slug. No es editable.</div>' +
 
     // Botón único IA
     '<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;">' +
@@ -9247,8 +9258,12 @@ function toggleActivarDestino(destinoId, lang, activar) {
 }
 
 function copiarEnlaceDestino(boton) {
+  var slugInput = document.getElementById('dest-slug');
+  var slug = slugInput ? slugInput.value.trim() : '';
+  var palabraDestino = PALABRAS_DESTINO_JS[destiLangActual] || 'destino';
   var urlPublicaInput = document.getElementById('dest-url-publica');
-  var url = window.location.origin + (urlPublicaInput ? urlPublicaInput.value.trim() : '');
+  var islaActual = urlPublicaInput ? (urlPublicaInput.value.split('/')[3] || 'gran-canaria') : 'gran-canaria';
+  var url = window.location.origin + '/' + destiLangActual + '/' + palabraDestino + '/' + islaActual + '/' + slug;
   navigator.clipboard.writeText(url).then(function() {
     var orig = boton.textContent;
     boton.textContent = '✓ ¡Copiado!';
