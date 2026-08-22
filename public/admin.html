@@ -8526,6 +8526,7 @@ function abrirEditorDestino(destinoId) {
   editor.innerHTML = '<p style="color:var(--texto-muted);font-size:13px;">Cargando...</p>';
   editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+  cargarListaIdiomasDinamica().then(function() {
   fetch('/admin/seo/destinos/' + destinoId + '/completo')
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -8624,6 +8625,7 @@ function abrirEditorDestino(destinoId) {
       cargarFotosDestino(destinoId);
       cambiarIdiomaEditorDestino(destinoId, 'es', editor.querySelector('.tab-idioma'));
     });
+  }); // fin cargarListaIdiomasDinamica
 }
 
 function marcarCabeceraFoto(destinoId, fotoId) {
