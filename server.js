@@ -5511,10 +5511,12 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
   const ALFABETO_LATINO = ['es','en','de','fr','it','nl','sv','no','fi','pt','pl','cs','ro','hu','sk','hr','sl','da'];
   const ALFABETO_CIRILI = ['ru','bg','uk','sr','mk'];
   let reglasSlug = '';
-  if (ALFABETO_LATINO.includes(lang)) {
-    reglasSlug = `El slug debe estar en ${nombreIdioma}, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). Ejemplo para "Aeropuerto de Gran Canaria" en inglés: "gran-canaria-airport".`;
+  if (lang === 'fr') {
+    reglasSlug = `El slug debe estar en francés, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales. El nombre de la isla "Gran Canaria" en el slug es siempre "grande-canarie". Ejemplo para "Aeropuerto de Gran Canaria" en francés: "aeroport-de-grande-canarie".`;
   } else if (ALFABETO_CIRILI.includes(lang)) {
-    reglasSlug = `El slug debe ser una transliteración al latín del nombre en ${nombreIdioma}, usando solo a-z y guiones. Ejemplo para "Aeropuerto" en ruso: "aeroport-gran-kanaria".`;
+    reglasSlug = `El slug debe ser una transliteración al latín del nombre en ${nombreIdioma}, usando solo a-z y guiones. En ruso "Aeropuerto de Gran Canaria" se transliteraría como "aeroport-gran-kanariya" — sigue ese mismo criterio para ${nombreIdioma}.`;
+  } else if (ALFABETO_LATINO.includes(lang)) {
+    reglasSlug = `El slug debe estar en ${nombreIdioma}, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). El nombre de la isla "Gran Canaria" en el slug es siempre "gran-canaria". Ejemplo para "Aeropuerto de Gran Canaria": "aeropuerto-gran-canaria".`;
   } else {
     reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones. El nombre del destino en inglés. Ejemplo: "gran-canaria-airport".`;
   }
