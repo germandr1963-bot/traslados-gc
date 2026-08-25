@@ -473,8 +473,10 @@ function cargarRutas() {
     // Filtrado bidireccional: origen filtra destino, destino filtra origen
     document.getElementById('desde').addEventListener('change', function () {
       var origenVal = this.value;
+      var selectHasta = document.getElementById('hasta');
+      var hastaVal = selectHasta.value;
       if (!origenVal) {
-        poblarSelect(document.getElementById('hasta'), destinos);
+        poblarSelect(selectHasta, destinos);
       } else {
         var vistos = {}, filtrados = [];
         rutasDisponibles.forEach(function (r) {
@@ -484,15 +486,18 @@ function cargarRutas() {
           }
         });
         filtrados.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
-        poblarSelect(document.getElementById('hasta'), filtrados);
+        poblarSelect(selectHasta, filtrados);
       }
+      if (hastaVal) selectHasta.value = hastaVal;
       actualizarCategoriasSegunRuta();
     });
 
     document.getElementById('hasta').addEventListener('change', function () {
       var destinoVal = this.value;
+      var selectDesde = document.getElementById('desde');
+      var desdeVal = selectDesde.value;
       if (!destinoVal) {
-        poblarSelect(document.getElementById('desde'), origenes);
+        poblarSelect(selectDesde, origenes);
       } else {
         var vistos = {}, filtrados = [];
         rutasDisponibles.forEach(function (r) {
@@ -502,8 +507,9 @@ function cargarRutas() {
           }
         });
         filtrados.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
-        poblarSelect(document.getElementById('desde'), filtrados);
+        poblarSelect(selectDesde, filtrados);
       }
+      if (desdeVal) selectDesde.value = desdeVal;
       actualizarCategoriasSegunRuta();
     });
   });
