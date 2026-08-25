@@ -463,8 +463,39 @@ function cargarRutas() {
     poblarSelect(document.getElementById('hasta'), destinos);
     var paramDesde = new URLSearchParams(window.location.search).get('desde');
     var paramHasta = new URLSearchParams(window.location.search).get('hasta');
-    if (paramDesde) document.getElementById('desde').value = paramDesde;
-    if (paramHasta) document.getElementById('hasta').value = paramHasta;
+
+    // Si llega destino preseleccionado, filtrar origenes
+    if (paramHasta) {
+      var vistosF = {}, filtradosO = [];
+      rutasDisponibles.forEach(function (r) {
+        if (r.destino === paramHasta && !vistosF[r.origen]) {
+          vistosF[r.origen] = true;
+          filtradosO.push({ valor: r.origen, etiqueta: r.origen_traducido || r.origen });
+        }
+      });
+      if (filtradosO.length > 0) {
+        filtradosO.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
+        poblarSelect(document.getElementById('desde'), filtradosO);
+      }
+      document.getElementById('hasta').value = paramHasta;
+    }
+
+    // Si llega origen preseleccionado, filtrar destinos
+    if (paramDesde) {
+      var vistosF2 = {}, filtradosD = [];
+      rutasDisponibles.forEach(function (r) {
+        if (r.origen === paramDesde && !vistosF2[r.destino]) {
+          vistosF2[r.destino] = true;
+          filtradosD.push({ valor: r.destino, etiqueta: r.destino_traducido || r.destino });
+        }
+      });
+      if (filtradosD.length > 0) {
+        filtradosD.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
+        poblarSelect(document.getElementById('hasta'), filtradosD);
+      }
+      document.getElementById('desde').value = paramDesde;
+    }
+
     if (paramDesde || paramHasta) actualizarCategoriasSegunRuta();
     if (rutas.length === 0) {
       document.getElementById('resultado-precio').textContent = TXT.eligeRuta;
