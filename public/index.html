@@ -413,24 +413,8 @@ function cargarRutas() {
     rutasDisponibles = rutas;
     var origenes = Array.from(new Set(rutas.map(function (r) { return r.origen; })));
     var destinos = Array.from(new Set(rutas.map(function (r) { return r.destino; })));
-
-    // Si viene ?hasta= desde una página de destino, pedir al servidor
-    // solo los orígenes que tienen ruta con precio hacia ese destino
-    var urlParams = new URLSearchParams(window.location.search);
-    var hastaParam = urlParams.get('hasta');
-    if (hastaParam) {
-      poblarSelect(document.getElementById('hasta'), destinos);
-      document.getElementById('hasta').value = hastaParam;
-      fetch('/api/origenes-para-destino?nombre=' + encodeURIComponent(hastaParam))
-        .then(function(r) { return r.json(); })
-        .then(function(origenesFiltrados) {
-          poblarSelect(document.getElementById('desde'), origenesFiltrados.length > 0 ? origenesFiltrados : origenes);
-        });
-    } else {
-      poblarSelect(document.getElementById('desde'), origenes);
-      poblarSelect(document.getElementById('hasta'), destinos);
-    }
-
+    poblarSelect(document.getElementById('desde'), origenes);
+    poblarSelect(document.getElementById('hasta'), destinos);
     if (rutas.length === 0) {
       document.getElementById('resultado-precio').textContent = 'Aún no hay rutas cargadas';
     }
