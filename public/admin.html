@@ -3047,7 +3047,7 @@ function renderizarCabeceraSEO() {
   if (!thead) return;
   thead.innerHTML = '<tr><th>Ruta</th>' +
     IDIOMAS_SEO.map(function (l) { return '<th style="text-align:center">' + l.toUpperCase() + '</th>'; }).join('') +
-    '<th>Acción</th></tr>';
+    '<th style="text-align:center">Fotos</th><th>Acción</th></tr>';
 }
 
 function cargarSEO() {
@@ -3102,6 +3102,7 @@ function renderizarTablaSEO(datos) {
     return '<tr>' +
       '<td><strong>' + escapar(ruta.origen) + ' → ' + escapar(ruta.destino) + '</strong></td>' +
       celdas +
+      '<td style="text-align:center;font-weight:600;">' + (ruta.num_fotos || 0) + '</td>' +
       '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorSEO(' + ruta.id + ')">✏️ Editar</button></td>' +
     '</tr>';
   }).join('');
