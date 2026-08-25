@@ -293,11 +293,11 @@ footer {
       <div class="fila-busqueda">
         <div>
           <label class="etiqueta">Desde</label>
-          <select id="desde" class="campo" onchange="filtrarDestinos()" size="1"><option value="">Selecciona origen</option></select>
+          <select id="desde" class="campo" size="1"><option value="">Selecciona origen</option></select>
         </div>
         <div>
           <label class="etiqueta">Hasta</label>
-          <select id="hasta" class="campo" onchange="filtrarOrigenes()" size="1"><option value="">Selecciona destino</option></select>
+          <select id="hasta" class="campo" size="1"><option value="">Selecciona destino</option></select>
         </div>
         <div>
           <label class="etiqueta">Categoría</label>
@@ -408,6 +408,17 @@ function poblarSelect(select, valores) {
   });
 }
 
+function poblarSelect2(selectId, valores) {
+  var select = document.getElementById(selectId);
+  select.innerHTML = '<option value="">Selecciona</option>';
+  valores.forEach(function (v) {
+    var opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v;
+    select.appendChild(opt);
+  });
+}
+
 function cargarRutas() {
   fetch('/api/rutas').then(function (r) { return r.json(); }).then(function (rutas) {
     rutasDisponibles = rutas;
@@ -415,59 +426,42 @@ function cargarRutas() {
       document.getElementById('resultado-precio').textContent = 'Aún no hay rutas cargadas';
       return;
     }
-    // Al cargar: mostrar todos los orígenes y todos los destinos posibles
+
+    // Poblar ambos selects con todos los valores al cargar
     var todosOrigenes = Array.from(new Set(rutas.map(function (r) { return r.origen; }))).sort();
     var todosDestinos = Array.from(new Set(rutas.map(function (r) { return r.destino; }))).sort();
-    poblarSelectSinEvento(document.getElementById('desde'), todosOrigenes);
-    poblarSelectSinEvento(document.getElementById('hasta'), todosDestinos);
+    poblarSelect2('desde', todosOrigenes);
+    poblarSelect2('hasta', todosDestinos);
+
+    // Añadir listeners DESPUÉS de poblar, una sola vez
+    document.getElementById('desde').addEventListener('change', function () {
+      var origenVal = this.value;
+      if (!origenVal) {
+        poblarSelect2('hasta', Array.from(new Set(rutasDisponibles.map(function (r) { return r.destino; }))).sort());
+      } else {
+        var filtrados = rutasDisponibles
+          .filter(function (r) { return r.origen === origenVal; })
+          .map(function (r) { return r.destino; })
+          .sort();
+        poblarSelect2('hasta', filtrados);
+      }
+      actualizarCategoriasSegunRuta();
+    });
+
+    document.getElementById('hasta').addEventListener('change', function () {
+      var destinoVal = this.value;
+      if (!destinoVal) {
+        poblarSelect2('desde', Array.from(new Set(rutasDisponibles.map(function (r) { return r.origen; }))).sort());
+      } else {
+        var filtrados = rutasDisponibles
+          .filter(function (r) { return r.destino === destinoVal; })
+          .map(function (r) { return r.origen; })
+          .sort();
+        poblarSelect2('desde', filtrados);
+      }
+      actualizarCategoriasSegunRuta();
+    });
   });
-}
-
-// Poblar select sin disparar el onchange
-function poblarSelectSinEvento(select, valores) {
-  var valorActual = select.value;
-  select.innerHTML = '<option value="">Selecciona</option>';
-  valores.forEach(function (v) {
-    var opt = document.createElement('option');
-    opt.value = v;
-    opt.textContent = v;
-    if (v === valorActual) opt.selected = true;
-    select.appendChild(opt);
-  });
-}
-
-// Al elegir ORIGEN → filtrar destinos
-function filtrarDestinos() {
-  var origenVal = document.getElementById('desde').value;
-  var todosDestinos = Array.from(new Set(rutasDisponibles.map(function (r) { return r.destino; }))).sort();
-
-  if (!origenVal) {
-    poblarSelectSinEvento(document.getElementById('hasta'), todosDestinos);
-  } else {
-    var filtrados = rutasDisponibles
-      .filter(function (r) { return r.origen === origenVal; })
-      .map(function (r) { return r.destino; })
-      .sort();
-    poblarSelectSinEvento(document.getElementById('hasta'), filtrados);
-  }
-  actualizarCategoriasSegunRuta();
-}
-
-// Al elegir DESTINO → filtrar origenes
-function filtrarOrigenes() {
-  var destinoVal = document.getElementById('hasta').value;
-  var todosOrigenes = Array.from(new Set(rutasDisponibles.map(function (r) { return r.origen; }))).sort();
-
-  if (!destinoVal) {
-    poblarSelectSinEvento(document.getElementById('desde'), todosOrigenes);
-  } else {
-    var filtrados = rutasDisponibles
-      .filter(function (r) { return r.destino === destinoVal; })
-      .map(function (r) { return r.origen; })
-      .sort();
-    poblarSelectSinEvento(document.getElementById('desde'), filtrados);
-  }
-  actualizarCategoriasSegunRuta();
 }
 
 function cargarCategorias() {
