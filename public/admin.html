@@ -1680,7 +1680,8 @@ table.tabla-precios input {
             <th>Destino</th>
             <th>Isla</th>
             <th>Zona</th>
-            <th>Visible</th>
+            <th style="text-align:center">Visible</th>
+            <th style="text-align:center">Fotos</th>
             <th>Acción</th>
           </tr>
         </thead>
@@ -8508,7 +8509,8 @@ function cargarPaginaRutas() {
           '<td style="max-width:220px;"><strong>' + escapar(dest.nombre) + '</strong><br><div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:2px;">' + badgesIdioma + '</div></td>' +
           '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(dest.isla || 'Gran Canaria') + '</td>' +
           '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(dest.zona || '—') + '</td>' +
-          '<td>' + visibleBadge + '</td>' +
+          '<td style="text-align:center">' + visibleBadge + '</td>' +
+          '<td style="text-align:center;font-weight:600;">' + (dest.num_fotos || 0) + '</td>' +
           '<td style="white-space:nowrap;">' +
           '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 10px;" onclick="abrirEditorDestino(' + dest.id + ')">✏️ Editar</button>' +
           '</td>' +
