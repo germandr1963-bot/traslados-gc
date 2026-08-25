@@ -4439,7 +4439,7 @@ async function crearFichasSEODestinoSiFaltan(destinoId, nombre) {
 
 // Lista todos los destinos con su estado SEO por idioma
 app.get('/admin/seo/destinos', requireAdmin, asyncHandler(async (req, res) => {
-  const destinos = await pool.query('SELECT id, nombre, isla, zona, orden, visible_rutas FROM destinos ORDER BY isla, orden, nombre');
+  const destinos = await pool.query('SELECT d.id, d.nombre, d.isla, d.zona, d.orden, d.visible_rutas, (SELECT COUNT(*) FROM destinos_fotos df WHERE df.destino_id = d.id) AS num_fotos FROM destinos d ORDER BY d.isla, d.orden, d.nombre');
   for (const d of destinos.rows) {
     await crearFichasSEODestinoSiFaltan(d.id, d.nombre);
   }
