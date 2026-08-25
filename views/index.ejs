@@ -307,11 +307,11 @@ footer {
       <div class="fila-busqueda">
         <div>
           <label class="etiqueta"><%= t('home_label_desde') %></label>
-          <select id="desde" class="campo" onchange="actualizarCategoriasSegunRuta()" size="1"><option value=""><%= t('home_label_selecciona') %></option></select>
+          <select id="desde" class="campo" size="1"><option value=""><%= t('home_label_selecciona') %></option></select>
         </div>
         <div>
           <label class="etiqueta"><%= t('home_label_hasta') %></label>
-          <select id="hasta" class="campo" onchange="actualizarCategoriasSegunRuta()" size="1"><option value=""><%= t('home_label_selecciona') %></option></select>
+          <select id="hasta" class="campo" size="1"><option value=""><%= t('home_label_selecciona') %></option></select>
         </div>
         <div>
           <label class="etiqueta"><%= t('home_label_categoria') %></label>
@@ -469,6 +469,43 @@ function cargarRutas() {
     if (rutas.length === 0) {
       document.getElementById('resultado-precio').textContent = TXT.eligeRuta;
     }
+
+    // Filtrado bidireccional: origen filtra destino, destino filtra origen
+    document.getElementById('desde').addEventListener('change', function () {
+      var origenVal = this.value;
+      if (!origenVal) {
+        poblarSelect(document.getElementById('hasta'), destinos);
+      } else {
+        var vistos = {}, filtrados = [];
+        rutasDisponibles.forEach(function (r) {
+          if (r.origen === origenVal && !vistos[r.destino]) {
+            vistos[r.destino] = true;
+            filtrados.push({ valor: r.destino, etiqueta: r.destino_traducido || r.destino });
+          }
+        });
+        filtrados.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
+        poblarSelect(document.getElementById('hasta'), filtrados);
+      }
+      actualizarCategoriasSegunRuta();
+    });
+
+    document.getElementById('hasta').addEventListener('change', function () {
+      var destinoVal = this.value;
+      if (!destinoVal) {
+        poblarSelect(document.getElementById('desde'), origenes);
+      } else {
+        var vistos = {}, filtrados = [];
+        rutasDisponibles.forEach(function (r) {
+          if (r.destino === destinoVal && !vistos[r.origen]) {
+            vistos[r.origen] = true;
+            filtrados.push({ valor: r.origen, etiqueta: r.origen_traducido || r.origen });
+          }
+        });
+        filtrados.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
+        poblarSelect(document.getElementById('desde'), filtrados);
+      }
+      actualizarCategoriasSegunRuta();
+    });
   });
 }
 
