@@ -2969,7 +2969,7 @@ function desactivarRuta(id, nombre) {
 function activarRuta(id) {
   fetch('/admin/rutas/' + id + '/activar', { method: 'POST' })
     .then(function (r) { return r.json(); })
-    .then(function () { cargarPreciosGrid(); });
+    .then(function () { cargarPreciosGrid(); alert('Ruta activada.\n\nRecuerda ir a Admin → SEO → Rutas y activar también las fichas SEO de esta ruta para que aparezca en la web.'); });
 }
 
 function eliminarRuta(id, nombre) {
