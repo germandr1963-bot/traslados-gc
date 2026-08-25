@@ -415,58 +415,58 @@ function cargarRutas() {
       document.getElementById('resultado-precio').textContent = 'Aún no hay rutas cargadas';
       return;
     }
-    // Al cargar: Origen = solo los que aparecen como origen en alguna ruta con precio
-    // Destino = solo los que aparecen como destino en alguna ruta con precio
+    // Al cargar: mostrar todos los orígenes y todos los destinos posibles
     var todosOrigenes = Array.from(new Set(rutas.map(function (r) { return r.origen; }))).sort();
     var todosDestinos = Array.from(new Set(rutas.map(function (r) { return r.destino; }))).sort();
-    poblarSelect(document.getElementById('desde'), todosOrigenes);
-    poblarSelect(document.getElementById('hasta'), todosDestinos);
+    poblarSelectSinEvento(document.getElementById('desde'), todosOrigenes);
+    poblarSelectSinEvento(document.getElementById('hasta'), todosDestinos);
   });
 }
 
-// Al elegir ORIGEN → mostrar solo destinos que tienen ruta desde ese origen
+// Poblar select sin disparar el onchange
+function poblarSelectSinEvento(select, valores) {
+  var valorActual = select.value;
+  select.innerHTML = '<option value="">Selecciona</option>';
+  valores.forEach(function (v) {
+    var opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v;
+    if (v === valorActual) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
+// Al elegir ORIGEN → filtrar destinos
 function filtrarDestinos() {
   var origenVal = document.getElementById('desde').value;
-  var selectHasta = document.getElementById('hasta');
+  var todosDestinos = Array.from(new Set(rutasDisponibles.map(function (r) { return r.destino; }))).sort();
 
   if (!origenVal) {
-    // Sin origen: restaurar todos los destinos posibles
-    var todosDestinos = Array.from(new Set(rutasDisponibles.map(function (r) { return r.destino; }))).sort();
-    poblarSelect(selectHasta, todosDestinos);
-    actualizarCategoriasSegunRuta();
-    return;
+    poblarSelectSinEvento(document.getElementById('hasta'), todosDestinos);
+  } else {
+    var filtrados = rutasDisponibles
+      .filter(function (r) { return r.origen === origenVal; })
+      .map(function (r) { return r.destino; })
+      .sort();
+    poblarSelectSinEvento(document.getElementById('hasta'), filtrados);
   }
-
-  // Solo destinos donde existe una ruta con ese origen exacto
-  var destinosFiltrados = rutasDisponibles
-    .filter(function (r) { return r.origen === origenVal; })
-    .map(function (r) { return r.destino; })
-    .sort();
-
-  poblarSelect(selectHasta, destinosFiltrados);
   actualizarCategoriasSegunRuta();
 }
 
-// Al elegir DESTINO → mostrar solo origenes que tienen ruta hacia ese destino
+// Al elegir DESTINO → filtrar origenes
 function filtrarOrigenes() {
   var destinoVal = document.getElementById('hasta').value;
-  var selectDesde = document.getElementById('desde');
+  var todosOrigenes = Array.from(new Set(rutasDisponibles.map(function (r) { return r.origen; }))).sort();
 
   if (!destinoVal) {
-    // Sin destino: restaurar todos los origenes posibles
-    var todosOrigenes = Array.from(new Set(rutasDisponibles.map(function (r) { return r.origen; }))).sort();
-    poblarSelect(selectDesde, todosOrigenes);
-    actualizarCategoriasSegunRuta();
-    return;
+    poblarSelectSinEvento(document.getElementById('desde'), todosOrigenes);
+  } else {
+    var filtrados = rutasDisponibles
+      .filter(function (r) { return r.destino === destinoVal; })
+      .map(function (r) { return r.origen; })
+      .sort();
+    poblarSelectSinEvento(document.getElementById('desde'), filtrados);
   }
-
-  // Solo origenes donde existe una ruta con ese destino exacto
-  var origenesFiltrados = rutasDisponibles
-    .filter(function (r) { return r.destino === destinoVal; })
-    .map(function (r) { return r.origen; })
-    .sort();
-
-  poblarSelect(selectDesde, origenesFiltrados);
   actualizarCategoriasSegunRuta();
 }
 
