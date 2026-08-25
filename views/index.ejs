@@ -477,7 +477,6 @@ function cargarRutas() {
         filtradosO.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
         poblarSelect(document.getElementById('desde'), filtradosO);
       }
-      document.getElementById('hasta').value = paramHasta;
     }
 
     // Si llega origen preseleccionado, filtrar destinos
@@ -493,8 +492,11 @@ function cargarRutas() {
         filtradosD.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
         poblarSelect(document.getElementById('hasta'), filtradosD);
       }
-      document.getElementById('desde').value = paramDesde;
     }
+
+    // Asignar los dos valores al final para que no se pisen entre sí
+    if (paramDesde) document.getElementById('desde').value = paramDesde;
+    if (paramHasta) document.getElementById('hasta').value = paramHasta;
 
     if (paramDesde || paramHasta) actualizarCategoriasSegunRuta();
     if (rutas.length === 0) {
