@@ -2655,7 +2655,7 @@ app.get('/api/rutas', asyncHandler(async (req, res) => {
            array_agg(rp.categoria_id) AS categorias_con_precio
     FROM rutas r
     JOIN rutas_precios rp ON rp.ruta_id = r.id
-    WHERE r.activa = TRUE
+    WHERE r.activa = TRUE AND rp.precio > 0
     GROUP BY r.id, r.origen, r.destino
     ORDER BY r.origen, r.destino
   `);
