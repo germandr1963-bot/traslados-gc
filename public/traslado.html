@@ -369,7 +369,7 @@
           html += '<th>' + esc(tx.tabla_columna_equipaje   || '') + '</th>';
           html += '<th>' + esc(tx.tabla_columna_precio     || '') + '</th>';
           html += '</tr></thead><tbody>';
-          d.precios.forEach(function(p) {
+          d.precios.filter(function(p) { return p.precio > 0; }).forEach(function(p) {
             html += '<tr>';
             html += '<td><strong>' + esc(p.nombre) + '</strong></td>';
             html += '<td>' + esc(p.capacidad_pasajeros) + ' ' + esc(tx.sufijo_pax || '') + '</td>';
