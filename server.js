@@ -2683,6 +2683,22 @@ app.get('/api/rutas', asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
+// Devuelve los orígenes que tienen ruta activa con precio hacia un destino concreto
+app.get('/api/origenes-para-destino', asyncHandler(async (req, res) => {
+  const { nombre } = req.query;
+  if (!nombre) return res.status(400).json({ error: 'Falta nombre' });
+  const result = await pool.query(`
+    SELECT DISTINCT
+      CASE WHEN r.destino = $1 THEN r.origen ELSE r.destino END AS origen
+    FROM rutas r
+    JOIN rutas_precios rp ON rp.ruta_id = r.id
+    WHERE r.activa = TRUE
+      AND (r.destino = $1 OR r.origen = $1)
+    ORDER BY 1
+  `, [nombre]);
+  res.json(result.rows.map(r => r.origen));
+}));
+
 app.get('/api/precio', asyncHandler(async (req, res) => {
   const { ruta_id, categoria_id } = req.query;
   if (!ruta_id || !categoria_id) {
