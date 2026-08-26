@@ -9483,7 +9483,7 @@ function renderizarAltTextosFotoRuta(rutaId, fotoId, d, panel) {
   }).join('');
   panel.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-    '<strong style="font-size:12px;">Alt texts por idioma — ' + (etiqueta || 'foto #' + fotoId) + '</strong>' +
+    '<strong style="font-size:12px;">Alt texts por idioma — foto #' + fotoId + '</strong>' +
     '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" data-panelid="panel-alt-foto-ruta-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">✕ Cerrar</button>' +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
@@ -9944,7 +9944,7 @@ function renderizarAltTextosFotoCat(catId, fotoId, d, panel) {
   }).join('');
   panel.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-    '<strong style="font-size:12px;">Alt texts por idioma — ' + (etiqueta || 'foto #' + fotoId) + '</strong>' +
+    '<strong style="font-size:12px;">Alt texts por idioma — foto #' + fotoId + '</strong>' +
     '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" data-panelid="panel-alt-foto-cat-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">&#10005; Cerrar</button>' +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
