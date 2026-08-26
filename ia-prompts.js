@@ -65,6 +65,7 @@ REQUISITOS OBLIGATORIOS:
 4. Sin Muletillas: PROHIBIDO usar palabras como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción visual.${nombreIdioma === 'Ruso' ? '\n5. Regla Rusa: Traduce los términos comunes al ruso y translitera los nombres propios al alfabeto cirílico (Maspalomas -> Маспаломас, Gran Canaria -> Гран-Канария). Cero caracteres latinos en el texto.' : ''}
 INSTRUCCIÓN DE CONTROL DE CONTEO:
 Antes de responder, cuenta mentalmente cada carácter (letras, espacios y puntuación). Si tu borrador tiene menos de 100 o más de 125 caracteres, ajústalo hasta estar exactamente en el rango [100-125].
+REGLA DE MEJORA: El objetivo es siempre acercarse a 125 caracteres, nunca alejarse. Si ya tienes un texto en el rango, mejora la riqueza descriptiva añadiendo detalles visuales concretos hasta acercarte al máximo. PROHIBIDO reducir caracteres respecto al texto anterior.
 FORMATO DE RESPUESTA:
 Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea ni explicaciones:
 {"alt_texto": "..."}`;
