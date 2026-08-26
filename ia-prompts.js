@@ -62,7 +62,7 @@ REQUISITOS OBLIGATORIOS:
 3. LÍMITE INVIOLABLE DE CARACTERES: El texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (incluyendo espacios y puntuación).
    - Menos de 100 caracteres = ERROR.
    - Más de 125 caracteres = ERROR.
-4. Sin Muletillas: PROHIBIDO usar palabras como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción visual.${esBase ? '' : '\n5. Regla Rusa: Traduce los términos comunes al ruso y translitera los nombres propios al alfabeto cirílico (Maspalomas -> Маспаломас, Gran Canaria -> Гран-Канария). Cero caracteres latinos en el texto.'}
+4. Sin Muletillas: PROHIBIDO usar palabras como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción visual.${nombreIdioma === 'Ruso' ? '\n5. Regla Rusa: Traduce los términos comunes al ruso y translitera los nombres propios al alfabeto cirílico (Maspalomas -> Маспаломас, Gran Canaria -> Гран-Канария). Cero caracteres latinos en el texto.' : ''}
 INSTRUCCIÓN DE CONTROL DE CONTEO:
 Antes de responder, cuenta mentalmente cada carácter (letras, espacios y puntuación). Si tu borrador tiene menos de 100 o más de 125 caracteres, ajústalo hasta estar exactamente en el rango [100-125].
 FORMATO DE RESPUESTA:
