@@ -226,47 +226,31 @@ function GENERADOR_NOMBRES_DESTINOS(nombreIdioma, pendientes) {
 }
 
 
-// ─── GENERADOR 9 ─────────────────────────────────────────────────────────────
-// Alt text foto nueva de ruta — 1 idioma
+// ─── GENERADOR 9 ────────────────────────────────────────────────────────
+// Alt text foto nueva — 1 idioma (Rutas)
 // Endpoint: POST /admin/seo/rutas/:id/fotos/sugerir-ia
 // Botón admin: ✨ Sugerir en ES con IA
 function GENERADOR_ALT_FOTO_RUTA(origen, destino, lang, nombreIdioma) {
-  return `Eres un experto en SEO de imágenes para webs de turismo y transporte.\nAnaliza esta imagen relacionada con la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y devuelve dos cosas:\n\n1. nombre_archivo: Un nombre de archivo SEO optimizado en ${lang === 'es' ? 'español' : nombreIdioma}, en minúsculas, con guiones en lugar de espacios, sin tildes ni caracteres especiales, con extensión .webp. Debe describir lo que se ve en la imagen e incluir origen y destino. Ejemplo: "las-palmas-gran-canaria-maspalomas-traslado-privado.webp"\n\n2. alt_texto: Un texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe con detalle lo que se ve en la imagen — paisaje, luz, elementos visuales — y vincúlalo al traslado privado de "${origen}" a "${destino}". Debe tener entre 110 y 125 caracteres como máximo absoluto.\n\nResponde ÚNICAMENTE con JSON válido, sin markdown, con esta forma exacta:\n{"nombre_archivo": "...", "alt_texto": "..."}`;
+  return `Eres un experto en SEO técnico de imágenes para transportes y turismo.\nAnaliza la imagen de la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y genera sus metadatos SEO.\nREGLAS DE SALIDA:\n1. nombre_archivo: Nombre de archivo web único, descriptivo y optimizado para SEO en ${lang === 'es' ? 'español' : nombreIdioma}. En minúsculas, palabras separadas SOLO por guiones (-), sin tildes, comas ni caracteres especiales. Extensión .webp obligatoria. Debe incluir origen, destino y el elemento visual clave. Ejemplo: "las-palmas-maspalomas-traslado-privado-gran-canaria.webp".\n2. alt_texto: Texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe la escena visual concreta (luz, paisaje, elementos) vinculando de forma natural al traslado privado de "${origen}" a "${destino}".\n- RESTRICCIÓN RÍGIDA DE LONGITUD: Debe tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125.\n- PROHIBIDO: Usar muletillas como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción.\nFORMATO DE RESPUESTA:\nResponde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo adicional:\n{"nombre_archivo": "...", "alt_texto": "..."}`;
 }
 
 
-// ─── GENERADOR 10 ────────────────────────────────────────────────────────────
+// ─── GENERADOR 10 ────────────────────────────────────────────────────────────────
 // Alt text foto nueva de ruta — todos los idiomas a la vez
 // Endpoint: POST /admin/seo/rutas/:id/fotos/nueva/alt/generar-todos
 // Botón admin: ✨ Generar todos los idiomas con IA
 function GENERADOR_ALT_FOTO_RUTA_TODOS(origen, destino, listaIdiomas, codigos) {
-  return 'Eres un experto en SEO de imagenes para webs de turismo y transporte. Trabajas para multiples mercados europeos.\n' +
-    'Analiza esta imagen relacionada con la ruta de traslado privado de "' + origen + '" a "' + destino + '" en Gran Canaria y escribe un alt text para cada uno de estos idiomas: ' + listaIdiomas + '.\n\n' +
-    'Para cada idioma:\n' +
-    '- Escribe de forma completamente nativa — como lo escribiria un SEO local de ese mercado, NO como una traduccion del espanol\n' +
-    '- Describe lo que se ve en la imagen de forma natural y vinculalo al traslado de "' + origen + '" a "' + destino + '"\n' +
-    '- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye la ruta y Gran Canaria. Debe tener entre 110 y 125 caracteres como maximo absoluto\n' +
-    '- Maximo 125 caracteres\n\n' +
-    'Responde UNICAMENTE con JSON valido, sin markdown:\n' +
-    '{' + codigos + '}';
+  return `Eres un experto en SEO de imágenes multilenguaje para turismo y transporte privado.\nAnaliza la imagen de la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y genera el texto alternativo (alt text) optimizado para cada uno de estos idiomas: ${listaIdiomas}.\nREGLAS OBLIGATORIAS POR IDIOMA:\n1. Redacción Nativa: Escribe como un especialista SEO nativo de cada mercado, no uses traducciones literales del español.\n2. Descripción Visual y SEO: Describe elementos visuales concretos (luz, paisaje, detalles) vinculando de forma natural la imagen al traslado de "${origen}" a "${destino}" en Gran Canaria.\n3. RESTRICCIÓN RÍGIDA DE LONGITUD: Cada texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125 caracteres por idioma.\n4. Sin Muletillas: PROHIBIDO usar fórmulas como "fotografía de", "imagen de", "vista de" en cualquier idioma. Empieza directamente con la descripción visual.\n5. Normas para Ruso (ru): Traduce las palabras comunes (carretera, paisaje, montaña, etc.) al ruso. Translitera los nombres propios al alfabeto cirílico (ej. Las Palmas -> Лас-Пальмас, Gran Canaria -> Гран-Канария). Cero caracteres latinos en la clave de ruso.\nFORMATO DE RESPUESTA:\nResponde EXCLUSIVAMENTE con un objeto JSON válido conteniendo las claves solicitadas, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo:\n{${codigos}}`;
 }
 
 
-// ─── GENERADOR 11 ────────────────────────────────────────────────────────────
+// ─── GENERADOR 11 ────────────────────────────────────────────────────────────────
 // Alt text foto existente de ruta — por idioma
 // Endpoint: POST /admin/seo/rutas/:id/fotos/:fotoId/alt/:lang/sugerir-ia
 // Botón admin: ✨ Sugerir con IA
 // Línea original server.js: ~4261
 function GENERADOR_ALT_EXISTENTE_RUTA(origen, destino, esBase, nombreIdioma) {
-  return 'Eres un experto en SEO de imagenes para webs de turismo y transporte. Trabajas en el mercado de habla ' + (esBase ? 'español' : nombreIdioma) + '.\n' +
-    'Analiza esta imagen de la ruta de traslado privado de "' + origen + '" a "' + destino + '" en Gran Canaria y escribe un alt text.\n\n' +
-    'El alt text debe:\n' +
-    '- Estar escrito en ' + (esBase ? 'español' : nombreIdioma) + ' de forma completamente nativa — como lo escribiría un SEO local de ese mercado, no como una traducción\n' +
-    '- Describir lo que se ve en la imagen de forma natural y vincularlo al traslado de "' + origen + '" a "' + destino + '"\n' +
-    '- Describir con detalle lo que se ve — paisaje, luz, elementos visuales — e incluir la ruta y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto\n' +
-    '- Máximo 125 caracteres\n\n' +
-    'Responde ÚNICAMENTE con JSON válido, sin markdown:\n' +
-    '{"alt_texto": "..."}';
+  return `Eres un experto en SEO técnico de imágenes para turismo y transporte. Redactas contenido optimizado para el mercado de habla ${esBase ? 'español' : nombreIdioma}.\nAnaliza la imagen de la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y genera un texto alternativo (alt text) impecable.\nREQUISITOS OBLIGATORIOS:\n1. Idioma y Naturalidad: Escribe en ${esBase ? 'español' : nombreIdioma} de forma 100% nativa (estilo SEO local, jamás traducción literal).\n2. Descripción Visual: Describe los elementos concretos de la escena (luz, paisaje, colores, entorno) vinculando de forma natural la imagen al traslado de "${origen}" a "${destino}".\n3. LÍMITE INVIOLABLE DE CARACTERES: El texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (incluyendo espacios y puntuación).\n   - Menos de 100 caracteres = ERROR.\n   - Más de 125 caracteres = ERROR.\n4. Sin Muletillas: PROHIBIDO usar palabras como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción visual.${nombreIdioma === 'Ruso' ? '\\n5. Regla Rusa: Traduce los términos comunes al ruso y translitera los nombres propios al alfabeto cirílico (Las Palmas -> Лас-Пальмас, Gran Canaria -> Гран-Канария). Cero caracteres latinos en el texto.' : ''}\nINSTRUCCIÓN DE CONTROL DE CONTEO:\nAntes de responder, cuenta mentalmente cada carácter (letras, espacios y puntuación). Si tu borrador tiene menos de 100 o más de 125 caracteres, ajústalo hasta estar exactamente en el rango [100-125].\nREGLA DE MEJORA: El objetivo es siempre acercarse a 125 caracteres, nunca alejarse. Si ya tienes un texto en el rango, mejora la riqueza descriptiva añadiendo detalles visuales concretos hasta acercarte al máximo. PROHIBIDO reducir caracteres respecto al texto anterior.\nFORMATO DE RESPUESTA:\nResponde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea ni explicaciones:\n{"alt_texto": "..."}`;
 }
 
 
