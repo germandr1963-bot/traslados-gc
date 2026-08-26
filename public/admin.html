@@ -3375,7 +3375,7 @@ function medirPx(texto, fuente) {
 }
 
 function contarChars(input, idContador, max) {
-  var n = input.value.length;
+  var n = [...input.value].length;
   var el = document.getElementById(idContador);
   if (!el) return;
   el.textContent = n + ' / ' + max;
@@ -8706,7 +8706,7 @@ var _fotoDestinoData = {};
 var _fotoAltPanelData = {};
 
 function contarAltFoto(input, idCont) {
-  var n = input.value.length;
+  var n = [...input.value].length;
   var el = document.getElementById(idCont);
   if (!el) return;
   el.textContent = n + ' / 125';
@@ -8714,7 +8714,7 @@ function contarAltFoto(input, idCont) {
 }
 
 function actualizarContadorAltFoto(input, fotoId) {
-  var n = input.value.length;
+  var n = [...input.value].length;
   var el = document.getElementById('cnt-alt-foto-' + fotoId);
   if (!el) return;
   el.textContent = n + ' / 125';
@@ -8733,7 +8733,7 @@ function generarTodosAltFotoNueva(destinoId) {
     if (d.ok) {
       var altEs = d.alts && d.alts['es'];
       var altInput = document.getElementById('nueva-foto-alt-' + destinoId);
-      if (altInput && altEs) { altInput.value = altEs; contarAltFoto(altInput, 'cnt-alt-' + destinoId); }
+      if (altInput && altEs && !altInput.value.trim()) { altInput.value = altEs; contarAltFoto(altInput, 'cnt-alt-' + destinoId); }
       _fotoAltPanelData[destinoId] = d.alts || {};
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Alt texts generados en ' + Object.keys(d.alts || {}).length + ' idiomas. Revisa y guarda la foto.'; }
     } else {
