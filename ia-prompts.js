@@ -9,33 +9,65 @@
 // =============================================================================
 
 
-// ─── GENERADOR 1 ─────────────────────────────────────────────────────────────
-// Alt text foto nueva — 1 idioma
+// ─── GENERADOR 1 ─────────────────────────────────────────────────────────────────
+// Alt text foto nueva — 1 idioma (Destinos)
 // Endpoint: POST /admin/seo/destinos/:id/fotos/sugerir-ia
 // Botón admin: ✨ Sugerir en ES con IA
 // Línea original server.js: ~3785
 function GENERADOR_ALT_NUEVO_ES(nombre, isla, lang, nombreIdioma) {
-  return `Eres un experto en SEO de imágenes para webs de turismo y transporte.\nAnaliza esta imagen del destino "${nombre}" en ${isla} y devuelve dos cosas:\n\n1. nombre_archivo: Un nombre de archivo SEO optimizado en ${lang === 'es' ? 'español' : nombreIdioma}, en minúsculas, con guiones en lugar de espacios, sin tildes ni caracteres especiales, con extensión .webp. Debe describir lo que se ve en la imagen e incluir el nombre del destino. Ejemplo: "maspalomas-dunas-atardecer-gran-canaria.webp"\n\n2. alt_texto: Un texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe con detalle lo que se ve en la imagen — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto.\n\nResponde ÚNICAMENTE con JSON válido, sin markdown, con esta forma exacta:\n{"nombre_archivo": "...", "alt_texto": "..."}`;
+  return `Eres un experto en SEO técnico de imágenes para transportes y turismo.
+Analiza la imagen del destino "${nombre}" en ${isla} y genera sus metadatos SEO.
+REGLAS DE SALIDA:
+1. nombre_archivo: Nombre de archivo web único, descriptivo y optimizado para SEO en ${lang === 'es' ? 'español' : nombreIdioma}. En minúsculas, palabras separadas SOLO por guiones (-), sin tildes, comas ni caracteres especiales. Extensión .webp obligatoria. Debe incluir el nombre del destino y el elemento visual clave. Ejemplo: "dunas-maspalomas-atardecer-gran-canaria.webp".
+2. alt_texto: Texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe la escena visual concreta (luz, paisaje, elementos) integrando de forma natural el destino y la ubicación (${isla}).
+- RESTRICCIÓN RÍGIDA DE LONGITUD: Debe tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125.
+- PROHIBIDO: Usar muletillas como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción.
+FORMATO DE RESPUESTA:
+Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo adicional:
+{"nombre_archivo": "...", "alt_texto": "..."}`;
 }
 
 
-// ─── GENERADOR 2 ─────────────────────────────────────────────────────────────
-// Alt text foto nueva — todos los idiomas a la vez
+// ─── GENERADOR 2 ─────────────────────────────────────────────────────────────────
+// Alt text foto nueva — todos los idiomas a la vez (Destinos)
 // Endpoint: POST /admin/seo/destinos/:id/fotos/nueva/alt/generar-todos
 // Botón admin: ✨ Generar todos los idiomas con IA
 // Línea original server.js: ~3932
 function GENERADOR_ALT_NUEVO_TODOS(nombre, isla, listaIdiomas, codigos) {
-  return `Eres un experto en SEO de imagenes para webs de turismo y transporte. Trabajas para multiples mercados europeos.\nAnaliza esta imagen del destino "${nombre}" en ${isla} y escribe un alt text para cada uno de estos idiomas: ${listaIdiomas}.\n\nPara cada idioma:\n- Escribe de forma completamente nativa — como lo escribiria un SEO local de ese mercado, NO como una traduccion del espanol\n- Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino\n- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto\n- Maximo 125 caracteres\n\nResponde UNICAMENTE con JSON valido, sin markdown:\n{${codigos}}`;
+  return `Eres un experto en SEO de imágenes multilenguaje para turismo y transporte privado.
+Analiza la imagen del destino "${nombre}" en ${isla} y genera el texto alternativo (alt text) optimizado para cada uno de estos idiomas: ${listaIdiomas}.
+REGLAS OBLIGATORIAS POR IDIOMA:
+1. Redacción Nativa: Escribe como un especialista SEO nativo de cada mercado, no uses traducciones literales del español.
+2. Descripción Visual y SEO: Describe elementos visuales concretos (luz, paisaje, detalles) e integra de forma natural el destino ("${nombre}") y la ubicación (${isla}).
+3. RESTRICCIÓN RÍGIDA DE LONGITUD: Cada texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125 caracteres por idioma.
+4. Sin Muletillas: PROHIBIDO usar fórmulas como "fotografía de", "imagen de", "vista de" en cualquier idioma. Empieza directamente con la descripción visual.
+5. Normas para Ruso (ru): Traduce las palabras comunes (playa, faro, puerto, etc.) al ruso. Translitera los nombres propios al alfabeto cirílico (ej. Maspalomas -> Маспаломас, Gran Canaria -> Гран-Канария). Cero caracteres latinos en la clave de ruso.
+FORMATO DE RESPUESTA:
+Responde EXCLUSIVAMENTE con un objeto JSON válido conteniendo las claves solicitadas, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo:
+{${codigos}}`;
 }
 
 
-// ─── GENERADOR 3 ─────────────────────────────────────────────────────────────
-// Alt text foto existente — por idioma
+// ─── GENERADOR 3 ─────────────────────────────────────────────────────────────────
+// Alt text foto existente — por idioma (Destinos)
 // Endpoint: POST /admin/seo/destinos/:id/fotos/:fotoId/alt/:lang/sugerir-ia
 // Botón admin: ✨ Sugerir con IA
 // Línea original server.js: ~3999
 function GENERADOR_ALT_EXISTENTE_LANG(nombre, isla, esBase, nombreIdioma) {
-  return `Eres un experto en SEO de imágenes para webs de turismo y transporte. Trabajas en el mercado de habla ${esBase ? 'español' : nombreIdioma}.\nAnaliza esta imagen del destino "${nombre}" en ${isla} y escribe un alt text.\n\nEl alt text debe:\n- Estar escrito en ${esBase ? 'español' : nombreIdioma} de forma completamente nativa — como lo escribiría un SEO local de ese mercado, no como una traducción\n- Describir lo que se ve en la imagen de forma natural e incluir el nombre del destino\n- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto\n- Máximo 125 caracteres\n\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"alt_texto": "..."}`;
+  return `Eres un experto en SEO técnico de imágenes para turismo y transporte. Redactas contenido optimizado para el mercado de habla ${esBase ? 'español' : nombreIdioma}.
+Analiza la imagen del destino "${nombre}" en ${isla} y genera un texto alternativo (alt text) impecable.
+REQUISITOS OBLIGATORIOS:
+1. Idioma y Naturalidad: Escribe en ${esBase ? 'español' : nombreIdioma} de forma 100% nativa (estilo SEO local, jamás traducción literal).
+2. Descripción Visual: Describe los elementos concretos de la escena (luz, paisaje, colores, entorno) integrando de forma natural el destino ("${nombre}") y la ubicación (${isla}).
+3. LÍMITE INVIOLABLE DE CARACTERES: El texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (incluyendo espacios y puntuación).
+   - Menos de 100 caracteres = ERROR.
+   - Más de 125 caracteres = ERROR.
+4. Sin Muletillas: PROHIBIDO usar palabras como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción visual.${esBase ? '' : '\n5. Regla Rusa: Traduce los términos comunes al ruso y translitera los nombres propios al alfabeto cirílico (Maspalomas -> Маспаломас, Gran Canaria -> Гран-Канария). Cero caracteres latinos en el texto.'}
+INSTRUCCIÓN DE CONTROL DE CONTEO:
+Antes de responder, cuenta mentalmente cada carácter (letras, espacios y puntuación). Si tu borrador tiene menos de 100 o más de 125 caracteres, ajústalo hasta estar exactamente en el rango [100-125].
+FORMATO DE RESPUESTA:
+Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea ni explicaciones:
+{"alt_texto": "..."}`;
 }
 
 
