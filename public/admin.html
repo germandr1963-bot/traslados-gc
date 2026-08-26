@@ -8693,7 +8693,7 @@ function cargarFotosDestino(destinoId) {
               '<span id="msg-orden-' + f.id + '" style="font-size:10px;"></span>')
           ) +
           '</div>' +
-          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;margin-bottom:4px;" onclick="abrirAltTextosFoto(' + destinoId + ',' + f.id + ')">&#9998; Alt texts por idioma</button>' +
+          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;margin-bottom:4px;" onclick="abrirAltTextosFoto(' + destinoId + ',' + f.id + ',\'' + (esPrincipal ? 'Cabecera' : 'Foto ' + f.orden) + '\')">&#9998; Alt texts por idioma</button>' +
           '<button style="width:100%;font-size:10px;padding:3px 6px;border:1px solid ' + (esPrincipal ? 'var(--terracota)' : 'var(--gris-borde)') + ';border-radius:6px;cursor:pointer;background:' + (esPrincipal ? '#fff5f2' : 'var(--gris-fondo)') + ';color:' + (esPrincipal ? 'var(--terracota)' : 'var(--texto-muted)') + ';" ' +
           'onclick="marcarCabeceraFoto(' + destinoId + ',' + f.id + ')">' + (esPrincipal ? '&#11088; Cabecera actual' : 'Marcar como cabecera') + '</button>' +
           '</div>' +
@@ -8744,7 +8744,7 @@ function generarTodosAltFotoNueva(destinoId) {
   });
 }
 
-function abrirAltTextosFoto(destinoId, fotoId) {
+function abrirAltTextosFoto(destinoId, fotoId, etiqueta) {
   var cont = document.getElementById('fotos-destino-' + destinoId);
   var panelId = 'panel-alt-foto-' + fotoId;
   var existing = document.getElementById(panelId);
@@ -8756,10 +8756,10 @@ function abrirAltTextosFoto(destinoId, fotoId) {
   cont.parentNode.insertBefore(panel, cont.nextSibling);
   fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/alt')
     .then(function(r) { return r.json(); })
-    .then(function(d) { renderizarAltTextosFoto(destinoId, fotoId, d, panel); });
+    .then(function(d) { renderizarAltTextosFoto(destinoId, fotoId, d, panel, etiqueta); });
 }
 
-function renderizarAltTextosFoto(destinoId, fotoId, d, panel) {
+function renderizarAltTextosFoto(destinoId, fotoId, d, panel, etiqueta) {
   var idiomas = d.idiomas || [];
   var alts = d.alts || {};
   var tabs = idiomas.map(function(i, idx) {
@@ -8777,7 +8777,7 @@ function renderizarAltTextosFoto(destinoId, fotoId, d, panel) {
   }).join('');
   panel.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-    '<strong style="font-size:12px;">Alt texts por idioma — foto #' + fotoId + '</strong>' +
+    '<strong style="font-size:12px;">Alt texts por idioma — ' + (etiqueta || 'foto #' + fotoId) + '</strong>' +
     '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" data-panelid="panel-alt-foto-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">&#10005; Cerrar</button>' +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
@@ -9483,7 +9483,7 @@ function renderizarAltTextosFotoRuta(rutaId, fotoId, d, panel) {
   }).join('');
   panel.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-    '<strong style="font-size:12px;">Alt texts por idioma — foto #' + fotoId + '</strong>' +
+    '<strong style="font-size:12px;">Alt texts por idioma — ' + (etiqueta || 'foto #' + fotoId) + '</strong>' +
     '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" data-panelid="panel-alt-foto-ruta-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">✕ Cerrar</button>' +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
@@ -9944,7 +9944,7 @@ function renderizarAltTextosFotoCat(catId, fotoId, d, panel) {
   }).join('');
   panel.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-    '<strong style="font-size:12px;">Alt texts por idioma — foto #' + fotoId + '</strong>' +
+    '<strong style="font-size:12px;">Alt texts por idioma — ' + (etiqueta || 'foto #' + fotoId) + '</strong>' +
     '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" data-panelid="panel-alt-foto-cat-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">&#10005; Cerrar</button>' +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
