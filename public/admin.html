@@ -9306,11 +9306,12 @@ function confirmarSubidaFotoRuta(rutaId) {
   var nombre = (document.getElementById('nueva-foto-ruta-nombre-' + rutaId) || {}).value || '';
   var alt = (document.getElementById('nueva-foto-ruta-alt-' + rutaId) || {}).value || '';
   var msg = document.getElementById('msg-foto-ruta-' + rutaId);
-  var alts = _fotoRutaAltData[rutaId] || {};
   if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Subiendo...'; }
+  var altsEnviar = Object.assign({}, _fotoRutaAltData[rutaId] || {});
+  delete altsEnviar['es'];
   fetch('/admin/seo/rutas/' + rutaId + '/fotos', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imagen: imagen, alt_texto: alt, nombre_archivo: nombre, alts_idiomas: alts })
+    body: JSON.stringify({ imagen: imagen, alt_texto: alt, nombre_archivo: nombre, alts_idiomas: altsEnviar })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.ok) { cancelarNuevaFotoRuta(rutaId); cargarFotosRuta(rutaId); }
     else { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; } }
@@ -9358,7 +9359,7 @@ function generarTodosAltFotoRuta(rutaId) {
     if (d.ok) {
       var altEs = d.alts && d.alts['es'];
       var altInput = document.getElementById('nueva-foto-ruta-alt-' + rutaId);
-      if (altInput && altEs) { altInput.value = altEs; contarChars(altInput, 'nueva-foto-ruta-alt-cnt-' + rutaId, 125); }
+      if (altInput && altEs && !altInput.value.trim()) { altInput.value = altEs; contarChars(altInput, 'nueva-foto-ruta-alt-cnt-' + rutaId, 125); }
       _fotoRutaAltData[rutaId] = d.alts || {};
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Alt texts generados en ' + Object.keys(d.alts || {}).length + ' idiomas. Revisa y guarda la foto.'; }
     } else {
