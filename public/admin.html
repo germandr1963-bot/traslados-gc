@@ -8949,7 +8949,7 @@ function confirmarSubidaFoto(destinoId) {
   if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Subiendo...'; }
   fetch('/admin/seo/destinos/' + destinoId + '/fotos', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imagen: imagen, alt_texto: alt, nombre_archivo: nombre })
+    body: JSON.stringify({ imagen: imagen, alt_texto: alt, nombre_archivo: nombre, alts_idiomas: _fotoAltPanelData[destinoId] || {} })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.ok) { cancelarNuevaFoto(destinoId); cargarFotosDestino(destinoId); }
     else { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; } }
