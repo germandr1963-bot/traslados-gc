@@ -8947,9 +8947,11 @@ function confirmarSubidaFoto(destinoId) {
   var alt = (document.getElementById('nueva-foto-alt-' + destinoId) || {}).value || '';
   var msg = document.getElementById('msg-foto-' + destinoId);
   if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Subiendo...'; }
+  var altsEnviar = Object.assign({}, _fotoAltPanelData[destinoId] || {});
+  delete altsEnviar['es'];
   fetch('/admin/seo/destinos/' + destinoId + '/fotos', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imagen: imagen, alt_texto: alt, nombre_archivo: nombre, alts_idiomas: _fotoAltPanelData[destinoId] || {} })
+    body: JSON.stringify({ imagen: imagen, alt_texto: alt, nombre_archivo: nombre, alts_idiomas: altsEnviar })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.ok) { cancelarNuevaFoto(destinoId); cargarFotosDestino(destinoId); }
     else { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; } }
