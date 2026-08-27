@@ -3100,10 +3100,14 @@ function renderizarTablaSEO(datos) {
     var celdas = IDIOMAS_SEO.map(function (lang) {
       return '<td style="text-align:center" data-ruta-id="' + ruta.id + '" data-lang="' + lang + '">' + badgeSEO(seoRuta[lang]) + '</td>';
     }).join('');
+    var visibleBadge = ruta.visible_en_listado
+      ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#e8f5e9;color:#2e7d32;">✓ Visible</span>'
+      : '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#f5f5f5;color:#aaa;">Oculto</span>';
     return '<tr>' +
       '<td><strong>' + escapar(ruta.origen) + ' → ' + escapar(ruta.destino) + '</strong></td>' +
       celdas +
       '<td style="text-align:center;font-weight:600;">' + (ruta.num_fotos || 0) + '</td>' +
+      '<td style="text-align:center;">' + visibleBadge + '</td>' +
       '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorSEO(' + ruta.id + ')">✏️ Editar</button></td>' +
     '</tr>';
   }).join('');
