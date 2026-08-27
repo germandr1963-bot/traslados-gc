@@ -5328,6 +5328,12 @@ app.get('/ruta-foto/:fotoId', asyncHandler(async (req, res) => {
 }));
 
 // Elimina una foto del carrusel de una ruta
+// Elimina todas las fotos de una ruta
+app.post('/admin/seo/rutas/:id/fotos/eliminar-todas', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM rutas_fotos WHERE ruta_id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
 app.post('/admin/seo/rutas/:id/fotos/:fotoId/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM rutas_fotos WHERE id = $1 AND ruta_id = $2', [req.params.fotoId, req.params.id]);
   res.json({ ok: true });
