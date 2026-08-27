@@ -8594,6 +8594,9 @@ function abrirEditorDestino(destinoId) {
         '<div style="display:flex;gap:8px;align-items:center;">' +
         '<label class="boton-secundario" style="cursor:pointer;padding:5px 12px;font-size:0.78rem;">' +
         '+ A&#241;adir foto <input type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style="display:none;" onchange="previsualizarFotoDestino(' + destinoId + ', this)"></label>' +
+        '<label class="boton-secundario" style="cursor:pointer;padding:5px 12px;font-size:0.78rem;">' +
+        '📁 Subir en lote <input type="file" accept="image/jpeg,image/png,image/webp,image/jpg" multiple style="display:none;" onchange="subirLoteDestino(' + destinoId + ', this)"></label>' +
+        '<span id="msg-lote-destino-' + destinoId + '" style="font-size:11px;color:var(--texto-muted);"></span>' +
         '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 12px;color:var(--rojo-error);border-color:var(--rojo-error);" onclick="eliminarTodasFotosDestino(' + destinoId + ')">🗑 Eliminar todas</button>' +
         '</div>' +
         '</div>' +
@@ -8904,6 +8907,41 @@ function guardarAltFoto(destinoId, fotoId, lang) {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
     }
   });
+}
+
+function subirLoteDestino(destinoId, input) {
+  var files = Array.from(input.files);
+  if (!files.length) return;
+  var msg = document.getElementById('msg-lote-destino-' + destinoId);
+  var total = files.length;
+  var actual = 0;
+  var errores = 0;
+
+  function subirSiguiente() {
+    if (actual >= total) {
+      if (msg) msg.textContent = errores === 0
+        ? 'Subidas ' + total + ' foto' + (total > 1 ? 's' : '') + ' correctamente.'
+        : (total - errores) + ' de ' + total + ' subidas. ' + errores + ' con error.';
+      cargarFotosDestino(destinoId);
+      input.value = '';
+      return;
+    }
+    var file = files[actual];
+    actual++;
+    if (msg) msg.textContent = 'Subiendo ' + actual + ' de ' + total + '...';
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      fetch('/admin/seo/destinos/' + destinoId + '/fotos', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imagen: e.target.result, alt_texto: '', nombre_archivo: '', alts_idiomas: {} })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (!d.ok) errores++;
+        subirSiguiente();
+      }).catch(function() { errores++; subirSiguiente(); });
+    };
+    reader.readAsDataURL(file);
+  }
+  subirSiguiente();
 }
 
 function previsualizarFotoDestino(destinoId, input) {
