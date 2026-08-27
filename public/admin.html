@@ -9410,7 +9410,7 @@ function cargarFotosRuta(rutaId) {
               '<span id="msg-orden-ruta-' + f.id + '" style="font-size:10px;"></span>')
           ) +
           '</div>' +
-          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;margin-bottom:4px;" onclick="abrirAltTextosFotoRuta(' + rutaId + ',' + f.id + ')">✎ Alt texts por idioma</button>' +
+          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;margin-bottom:4px;" onclick="abrirAltTextosFotoRuta(' + rutaId + ',' + f.id + ',\'' + (esPrincipal ? 'Cabecera' : 'Foto ' + f.orden) + '\')">✎ Alt texts por idioma</button>' +
           '<button style="width:100%;font-size:10px;padding:3px 6px;border:1px solid ' + (esPrincipal ? 'var(--terracota)' : 'var(--gris-borde)') + ';border-radius:6px;cursor:pointer;background:' + (esPrincipal ? '#fff5f2' : 'var(--gris-fondo)') + ';color:' + (esPrincipal ? 'var(--terracota)' : 'var(--texto-muted)') + ';" ' +
           'onclick="marcarCabeceraFotoRuta(' + rutaId + ',' + f.id + ')">' + (esPrincipal ? '⭐ Cabecera actual' : 'Marcar como cabecera') + '</button>' +
           '</div>' +
@@ -9453,7 +9453,7 @@ function eliminarFotoRuta(rutaId, fotoId) {
     .then(function() { cargarFotosRuta(rutaId); });
 }
 
-function abrirAltTextosFotoRuta(rutaId, fotoId) {
+function abrirAltTextosFotoRuta(rutaId, fotoId, etiqueta) {
   var cont = document.getElementById('fotos-ruta-' + rutaId);
   var panelId = 'panel-alt-foto-ruta-' + fotoId;
   var existing = document.getElementById(panelId);
@@ -9465,10 +9465,10 @@ function abrirAltTextosFotoRuta(rutaId, fotoId) {
   cont.parentNode.insertBefore(panel, cont.nextSibling);
   fetch('/admin/seo/rutas/' + rutaId + '/fotos/' + fotoId + '/alt')
     .then(function(r) { return r.json(); })
-    .then(function(d) { renderizarAltTextosFotoRuta(rutaId, fotoId, d, panel); });
+    .then(function(d) { renderizarAltTextosFotoRuta(rutaId, fotoId, d, panel, etiqueta); });
 }
 
-function renderizarAltTextosFotoRuta(rutaId, fotoId, d, panel) {
+function renderizarAltTextosFotoRuta(rutaId, fotoId, d, panel, etiqueta) {
   var idiomas = d.idiomas || [];
   var alts = d.alts || {};
   var tabs = idiomas.map(function(i, idx) {
@@ -9486,7 +9486,7 @@ function renderizarAltTextosFotoRuta(rutaId, fotoId, d, panel) {
   }).join('');
   panel.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-    '<strong style="font-size:12px;">Alt texts por idioma — foto #' + fotoId + '</strong>' +
+    '<strong style="font-size:12px;">Alt texts por idioma — ' + (etiqueta || 'foto #' + fotoId) + '</strong>' +
     '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" data-panelid="panel-alt-foto-ruta-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">✕ Cerrar</button>' +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
