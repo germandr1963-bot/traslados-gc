@@ -3206,8 +3206,11 @@ function abrirEditorSEO(rutaId) {
         '<div style="background:var(--gris-fondo);padding:12px 14px;border-radius:8px;margin-bottom:18px;">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
         '<label class="etiqueta" style="font-size:11px;">Fotos de la ruta — la primera es la portada</label>' +
+        '<div style="display:flex;gap:8px;align-items:center;">' +
         '<label class="boton-secundario" style="cursor:pointer;padding:5px 12px;font-size:0.78rem;">' +
         '+ A&#241;adir foto <input type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style="display:none;" onchange="previsualizarFotoRuta(' + rutaId + ', this)"></label>' +
+        '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 12px;color:var(--rojo-error);border-color:var(--rojo-error);" onclick="eliminarTodasFotosRuta(' + rutaId + ')">🗑 Eliminar todas</button>' +
+        '</div>' +
         '</div>' +
         '<div id="panel-nueva-foto-ruta-' + rutaId + '" style="display:none;background:#fff;border:1px solid var(--gris-borde);border-radius:8px;padding:12px;margin-bottom:10px;">' +
         '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">' +
@@ -9445,6 +9448,16 @@ function guardarOrdenFotoRuta(rutaId, fotoId) {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error'; }
     }
   });
+}
+
+function eliminarTodasFotosRuta(rutaId) {
+  if (!confirm('¿Estás seguro de que quieres eliminar todas las fotos?')) return;
+  fetch('/admin/seo/rutas/' + rutaId + '/fotos/eliminar-todas', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) { cargarFotosRuta(rutaId); }
+      else { alert(d.error || 'Error al eliminar las fotos.'); }
+    }).catch(function() { alert('Error de conexión.'); });
 }
 
 function eliminarFotoRuta(rutaId, fotoId) {
