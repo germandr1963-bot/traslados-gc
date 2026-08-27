@@ -4699,8 +4699,7 @@ app.post('/admin/seo/destinos/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(
   if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
   const data = await response.json();
   const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-  let resultado;
-  try { resultado = JSON.parse(texto); } catch(e) { return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' }); }
+  const resultado = JSON.parse(texto);
   res.json({ ok: true, nombre_archivo: resultado.nombre_archivo || '', alt_texto: resultado.alt_texto || '' });
 }));
 
@@ -4845,8 +4844,7 @@ app.post('/admin/seo/destinos/:id/fotos/nueva/alt/generar-todos', requireAdmin, 
   if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
   const data = await response.json();
   const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-  let resultado;
-  try { resultado = JSON.parse(texto); } catch(e) { return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' }); }
+  const resultado = JSON.parse(texto);
   res.json({ ok: true, alts: resultado });
 }));
 
@@ -4903,8 +4901,7 @@ app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt/:lang/sugerir-ia', requireAd
   if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
   const data = await response.json();
   const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-  let resultado;
-  try { resultado = JSON.parse(texto); } catch(e) { return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' }); }
+  const resultado = JSON.parse(texto);
   await pool.query(
     `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
      ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
@@ -4955,8 +4952,7 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
   if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
   const data = await response.json();
   const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-  let resultado;
-  try { resultado = JSON.parse(texto); } catch(e) { return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' }); }
+  const resultado = JSON.parse(texto);
   for (const [langCode, altTexto] of Object.entries(resultado)) {
     if (altTexto) {
       await pool.query(
@@ -5029,8 +5025,7 @@ Responde ÚNICAMENTE con JSON válido, sin markdown: {"nombre_archivo": "...", "
   if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
   const data = await response.json();
   const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-  let resultado;
-  try { resultado = JSON.parse(texto); } catch(e) { return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' }); }
+  const resultado = JSON.parse(texto);
   res.json({ ok: true, nombre_archivo: resultado.nombre_archivo || '', alt_texto: resultado.alt_texto || '' });
 }));
 
@@ -5178,8 +5173,7 @@ app.post('/admin/seo/rutas/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(asy
   if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
   const data = await response.json();
   const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-  let resultado;
-  try { resultado = JSON.parse(texto); } catch(e) { return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' }); }
+  const resultado = JSON.parse(texto);
   res.json({ ok: true, nombre_archivo: resultado.nombre_archivo || '', alt_texto: resultado.alt_texto || '' });
 }));
 
@@ -5212,8 +5206,7 @@ app.post('/admin/seo/rutas/:id/fotos/nueva/alt/generar-todos', requireAdmin, asy
   if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
   const data = await response.json();
   const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-  let resultado;
-  try { resultado = JSON.parse(texto); } catch(e) { return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' }); }
+  const resultado = JSON.parse(texto);
   res.json({ ok: true, alts: resultado });
 }));
 
@@ -5264,8 +5257,7 @@ app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt/:lang/sugerir-ia', requireAdmin
   if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
   const data = await response.json();
   const texto = data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-  let resultado;
-  try { resultado = JSON.parse(texto); } catch(e) { return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' }); }
+  const resultado = JSON.parse(texto);
   await pool.query(
     `INSERT INTO rutas_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
      ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
