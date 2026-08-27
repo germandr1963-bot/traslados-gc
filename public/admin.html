@@ -9473,10 +9473,11 @@ function renderizarAltTextosFotoRuta(rutaId, fotoId, d, panel, etiqueta) {
   var alts = d.alts || {};
   var tabs = idiomas.map(function(i, idx) {
     var tieneTexto = !!(alts[i.codigo] && alts[i.codigo].trim());
-    var estiloTab = tieneTexto
+    var longitud = tieneTexto ? alts[i.codigo].length : 0;
+    var estiloTab = (tieneTexto && longitud <= 145)
       ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
       : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
-    var icono = tieneTexto ? ' ✓' : ' ⚠️';
+    var icono = (tieneTexto && longitud <= 145) ? ' ✓' : (tieneTexto && longitud > 145) ? ' 🔴' : ' ⚠️';
     return '<button class="tab-idioma' + (idx === 0 ? ' activo' : '') + '" ' +
       'id="tab-alt-foto-ruta-' + fotoId + '-' + i.codigo + '" ' +
       'style="' + estiloTab + '" ' +
@@ -9593,9 +9594,12 @@ function guardarAltFotoRutaBtn(boton) {
       if (panel && panel._altData) panel._altData.alts[lang] = altTexto;
       var tab = document.getElementById('tab-alt-foto-ruta-' + fotoId + '-' + lang);
       if (tab) {
-        if (altTexto) {
+        if (altTexto && altTexto.length <= 145) {
           tab.textContent = lang.toUpperCase() + ' ✓';
           tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
+        } else if (altTexto && altTexto.length > 145) {
+          tab.textContent = lang.toUpperCase() + ' 🔴';
+          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
         } else {
           tab.textContent = lang.toUpperCase() + ' ⚠️';
           tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
