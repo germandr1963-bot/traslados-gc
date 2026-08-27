@@ -236,7 +236,7 @@ function GENERADOR_ALT_FOTO_RUTA(origen, destino, lang, nombreIdioma) {
 Analiza la imagen de la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y genera sus metadatos SEO.
 REGLAS DE SALIDA:
 1. nombre_archivo: Nombre de archivo web único, descriptivo y optimizado para SEO en ${lang === 'es' ? 'español' : nombreIdioma}. En minúsculas, palabras separadas SOLO por guiones (-), sin tildes, comas ni caracteres especiales. Extensión .webp obligatoria. Debe incluir origen, destino y el elemento visual clave. Ejemplo: "las-palmas-maspalomas-traslado-privado-gran-canaria.webp".
-2. alt_texto: Texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe la escena visual concreta (luz, paisaje, elementos) vinculando de forma natural al traslado privado de "${origen}" a "${destino}".
+2. alt_texto: Texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe la escena visual concreta (luz, paisaje, elementos) y termina SIEMPRE con la frase fija ", traslado privado a ${destino}". Ejemplo: "Acantilados rojizos sobre el mar azul de Gran Canaria al atardecer, traslado privado a ${destino}".
 - RESTRICCIÓN RÍGIDA DE LONGITUD: Debe tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125.
 - PROHIBIDO: Usar muletillas como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción.
 FORMATO DE RESPUESTA:
