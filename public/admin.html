@@ -3222,10 +3222,10 @@ function abrirEditorSEO(rutaId) {
         '<div style="flex:1;min-width:200px;">' +
         '<label class="etiqueta" style="font-size:11px;">Nombre de archivo (.webp)</label>' +
         '<input class="campo" id="nueva-foto-ruta-nombre-' + rutaId + '" type="text" placeholder="ej: las-palmas-maspalomas-gran-canaria.webp" style="margin-bottom:8px;font-family:monospace;font-size:12px;">' +
-        '<label class="etiqueta" style="font-size:11px;">Alt text (español) — máx. 145 caracteres</label>' +
+        '<label class="etiqueta" style="font-size:11px;">Alt text (español)</label>' +
         '<input class="campo" id="nueva-foto-ruta-alt-' + rutaId + '" type="text" placeholder="Descripción de la imagen para Google" ' +
-        'oninput="contarChars(this,\'nueva-foto-ruta-alt-cnt-' + rutaId + '\',145)">' +
-        '<div id="nueva-foto-ruta-alt-cnt-' + rutaId + '" style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:4px;">0 / 145</div>' +
+        'oninput="soloContarChars(this,\'nueva-foto-ruta-alt-cnt-' + rutaId + '\')">' +
+        '<div id="nueva-foto-ruta-alt-cnt-' + rutaId + '" style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:4px;">0</div>' +
         '</div>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
@@ -8607,10 +8607,10 @@ function abrirEditorDestino(destinoId) {
         '<div style="flex:1;min-width:200px;">' +
         '<label class="etiqueta" style="font-size:11px;">Nombre de archivo (.webp)</label>' +
         '<input class="campo" id="nueva-foto-nombre-' + destinoId + '" type="text" placeholder="ej: maspalomas-dunas-gran-canaria.webp" style="margin-bottom:8px;font-family:monospace;font-size:12px;">' +
-        '<label class="etiqueta" style="font-size:11px;">Alt text (español) — máx. 125 caracteres</label>' +
+        '<label class="etiqueta" style="font-size:11px;">Alt text (español)</label>' +
         '<input class="campo" id="nueva-foto-alt-' + destinoId + '" type="text" placeholder="Descripción de la imagen para Google" ' +
-        'oninput="contarChars(this,\'nueva-foto-alt-cnt\',125)">' +
-        '<div id="nueva-foto-alt-cnt" style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:4px;">0 / 125</div>' +
+        'oninput="soloContarChars(this,\'nueva-foto-alt-cnt\')">' +
+        '<div id="nueva-foto-alt-cnt" style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:4px;">0</div>' +
         '</div>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
@@ -8812,6 +8812,14 @@ function abrirFotoDeCola(destinoId, idx) {
   });
 }
 
+function soloContarChars(input, idContador) {
+  var n = [...input.value].length;
+  var el = document.getElementById(idContador);
+  if (!el) return;
+  el.textContent = n;
+  el.style.color = 'var(--texto-muted)';
+}
+
 function contarAltFoto(input, idCont) {
   var n = [...input.value].length;
   var el = document.getElementById(idCont);
@@ -8824,8 +8832,8 @@ function actualizarContadorAltFoto(input, fotoId) {
   var n = [...input.value].length;
   var el = document.getElementById('cnt-alt-foto-' + fotoId);
   if (!el) return;
-  el.textContent = n + ' / 125';
-  el.style.color = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+  el.textContent = n;
+  el.style.color = 'var(--texto-muted)';
 }
 
 function generarTodosAltFotoNueva(destinoId) {
@@ -8840,7 +8848,7 @@ function generarTodosAltFotoNueva(destinoId) {
     if (d.ok) {
       var altEs = d.alts && d.alts['es'];
       var altInput = document.getElementById('nueva-foto-alt-' + destinoId);
-      if (altInput && altEs && !altInput.value.trim()) { altInput.value = altEs; contarAltFoto(altInput, 'cnt-alt-' + destinoId); }
+      if (altInput && altEs && !altInput.value.trim()) { altInput.value = altEs; soloContarChars(altInput, 'nueva-foto-alt-cnt'); }
       _fotoAltPanelData[destinoId] = d.alts || {};
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Alt texts generados en ' + Object.keys(d.alts || {}).length + ' idiomas. Revisa y guarda la foto.'; }
     } else {
@@ -8930,11 +8938,11 @@ function cambiarTabAltFoto(fotoId, lang, boton, dataOverride) {
   if (!campos) return;
   var cntId = 'cnt-alt-foto-' + fotoId;
   campos.innerHTML =
-    '<label class="etiqueta" style="font-size:11px;">Alt text en ' + lang.toUpperCase() + ' — máx. 125 caracteres</label>' +
+    '<label class="etiqueta" style="font-size:11px;">Alt text en ' + lang.toUpperCase() + '</label>' +
     '<input class="campo" id="alt-foto-input-' + fotoId + '" type="text" value="' + escapar(altActual) + '" ' +
     'oninput="actualizarContadorAltFoto(this,' + fotoId + ')" ' +
     'style="margin-bottom:4px;">' +
-    '<div id="cnt-alt-foto-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:' + colorCont + ';">' + n + ' / 125</div>' +
+    '<div id="cnt-alt-foto-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:var(--texto-muted);">' + n + '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
     '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="sugerirAltFotoIABtn(this)">&#10024; Sugerir con IA</button>' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoBtn(this)">&#128190; Guardar</button>' +
@@ -9036,7 +9044,7 @@ function sugerirFotoIA(destinoId) {
       if (nombre) nombre.value = d.nombre_archivo || '';
       if (alt) {
         alt.value = d.alt_texto || '';
-        contarChars(alt, 'nueva-foto-alt-cnt', 125);
+        soloContarChars(alt, 'nueva-foto-alt-cnt');
       }
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = 'Revisa y ajusta si hace falta'; }
     } else {
@@ -9461,7 +9469,7 @@ function sugerirFotoRutaIA(rutaId) {
       if (nombre) nombre.value = d.nombre_archivo || '';
       if (alt) {
         alt.value = d.alt_texto || '';
-        contarChars(alt, 'nueva-foto-ruta-alt-cnt-' + rutaId, 145);
+        soloContarChars(alt, 'nueva-foto-ruta-alt-cnt-' + rutaId);
       }
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = 'Revisa y ajusta si hace falta'; }
     } else {
@@ -9485,7 +9493,7 @@ function generarTodosAltFotoRuta(rutaId) {
     if (d.ok) {
       var altEs = d.alts && d.alts['es'];
       var altInput = document.getElementById('nueva-foto-ruta-alt-' + rutaId);
-      if (altInput && altEs && !altInput.value.trim()) { altInput.value = altEs; contarChars(altInput, 'nueva-foto-ruta-alt-cnt-' + rutaId, 145); }
+      if (altInput && altEs && !altInput.value.trim()) { altInput.value = altEs; soloContarChars(altInput, 'nueva-foto-ruta-alt-cnt-' + rutaId); }
       _fotoRutaAltData[rutaId] = d.alts || {};
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Alt texts generados en ' + Object.keys(d.alts || {}).length + ' idiomas. Revisa y guarda la foto.'; }
     } else {
@@ -9653,11 +9661,11 @@ function cambiarTabAltFotoRuta(fotoId, lang, boton, dataOverride) {
   var campos = document.getElementById('alt-foto-ruta-campos-' + fotoId);
   if (!campos) return;
   campos.innerHTML =
-    '<label class="etiqueta" style="font-size:11px;">Alt text en ' + lang.toUpperCase() + ' — máx. 145 caracteres</label>' +
+    '<label class="etiqueta" style="font-size:11px;">Alt text en ' + lang.toUpperCase() + '</label>' +
     '<input class="campo" id="alt-foto-ruta-input-' + fotoId + '" type="text" value="' + escapar(altActual) + '" ' +
     'oninput="actualizarContadorAltFotoRuta(this,' + fotoId + ')" ' +
     'style="margin-bottom:4px;">' +
-    '<div id="cnt-alt-foto-ruta-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:' + colorCont + ';">' + n + ' / 145</div>' +
+    '<div id="cnt-alt-foto-ruta-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:var(--texto-muted);">' + n + '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
     '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" data-rutaid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="sugerirAltFotoRutaIABtn(this)">&#10024; Sugerir con IA</button>' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-rutaid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoRutaBtn(this)">&#128190; Guardar</button>' +
@@ -9668,8 +9676,8 @@ function actualizarContadorAltFotoRuta(input, fotoId) {
   var n = input.value.length;
   var el = document.getElementById('cnt-alt-foto-ruta-' + fotoId);
   if (!el) return;
-  el.textContent = n + ' / 145';
-  el.style.color = n > 145 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+  el.textContent = n;
+  el.style.color = 'var(--texto-muted)';
 }
 
 function sugerirAltFotoRutaIABtn(boton) {
