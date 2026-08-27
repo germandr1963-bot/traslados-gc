@@ -3899,7 +3899,7 @@ app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(asyn
 // Lista todas las rutas con el estado SEO de cada idioma.
 // Si alguna ruta todavía no tiene fichas SEO, las crea automáticamente.
 app.get('/admin/seo/rutas', requireAdmin, asyncHandler(async (req, res) => {
-  const rutas = await pool.query('SELECT r.id, r.origen, r.destino, (SELECT COUNT(*) FROM rutas_fotos rf WHERE rf.ruta_id = r.id) AS num_fotos FROM rutas r ORDER BY r.origen, r.destino');
+  const rutas = await pool.query('SELECT r.id, r.origen, r.destino, r.visible_en_listado, (SELECT COUNT(*) FROM rutas_fotos rf WHERE rf.ruta_id = r.id) AS num_fotos FROM rutas r ORDER BY r.origen, r.destino');
 
   for (const ruta of rutas.rows) {
     await crearFichasSEOSiFaltan(ruta.id, ruta.origen, ruta.destino);
