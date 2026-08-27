@@ -8587,8 +8587,11 @@ function abrirEditorDestino(destinoId) {
         '<div style="background:var(--gris-fondo);padding:12px 14px;border-radius:8px;margin-bottom:18px;">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
         '<label class="etiqueta" style="font-size:11px;">Fotos del destino — la primera es la portada</label>' +
+        '<div style="display:flex;gap:8px;align-items:center;">' +
         '<label class="boton-secundario" style="cursor:pointer;padding:5px 12px;font-size:0.78rem;">' +
         '+ A&#241;adir foto <input type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style="display:none;" onchange="previsualizarFotoDestino(' + destinoId + ', this)"></label>' +
+        '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 12px;color:var(--rojo-error);border-color:var(--rojo-error);" onclick="eliminarTodasFotosDestino(' + destinoId + ')">🗑 Eliminar todas</button>' +
+        '</div>' +
         '</div>' +
         '<div id="panel-nueva-foto-' + destinoId + '" style="display:none;background:#fff;border:1px solid var(--gris-borde);border-radius:8px;padding:12px;margin-bottom:10px;">' +
         '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">' +
@@ -8967,6 +8970,16 @@ function cancelarNuevaFoto(destinoId) {
   delete _fotoDestinoData[destinoId];
   var panel = document.getElementById('panel-nueva-foto-' + destinoId);
   if (panel) panel.style.display = 'none';
+}
+
+function eliminarTodasFotosDestino(destinoId) {
+  if (!confirm('¿Estás seguro de que quieres eliminar todas las fotos?')) return;
+  fetch('/admin/seo/destinos/' + destinoId + '/fotos/eliminar-todas', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) { cargarFotosDestino(destinoId); }
+      else { alert(d.error || 'Error al eliminar las fotos.'); }
+    }).catch(function() { alert('Error de conexión.'); });
 }
 
 function eliminarFotoDestino(destinoId, fotoId) {
