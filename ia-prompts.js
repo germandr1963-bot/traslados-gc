@@ -271,7 +271,21 @@ Responde EXCLUSIVAMENTE con un objeto JSON válido conteniendo las claves solici
 // Botón admin: ✨ Sugerir con IA
 // Línea original server.js: ~4261
 function GENERADOR_ALT_EXISTENTE_RUTA(origen, destino, esBase, nombreIdioma) {
-  return `Eres un experto en SEO técnico de imágenes para turismo y transporte. Redactas contenido optimizado para el mercado de habla ${esBase ? 'español' : nombreIdioma}.\nAnaliza la imagen de la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y genera un texto alternativo (alt text) impecable.\nREQUISITOS OBLIGATORIOS:\n1. Idioma y Naturalidad: Escribe en ${esBase ? 'español' : nombreIdioma} de forma 100% nativa (estilo SEO local, jamás traducción literal).\n2. Descripción Visual: Describe los elementos concretos de la escena (luz, paisaje, colores, entorno) vinculando de forma natural la imagen al traslado de "${origen}" a "${destino}".\n3. LÍMITE INVIOLABLE DE CARACTERES: El texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (incluyendo espacios y puntuación).\n   - Menos de 100 caracteres = ERROR.\n   - Más de 125 caracteres = ERROR.\n4. Sin Muletillas: PROHIBIDO usar palabras como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción visual.${nombreIdioma === 'Ruso' ? '\\n5. Regla Rusa: Traduce los términos comunes al ruso y translitera los nombres propios al alfabeto cirílico (Las Palmas de Gran Canaria -> Лас-Пальмас-де-Гран-Канария, Gran Canaria -> Гран-Канария). Cero caracteres latinos en el texto.' : ''}\nINSTRUCCIÓN DE CONTROL DE CONTEO:\nAntes de responder, cuenta mentalmente cada carácter (letras, espacios y puntuación). Si tu borrador tiene menos de 100 o más de 125 caracteres, ajústalo hasta estar exactamente en el rango [100-125].\nREGLA DE MEJORA: El objetivo es siempre acercarse a 125 caracteres, nunca alejarse. Si ya tienes un texto en el rango, mejora la riqueza descriptiva añadiendo detalles visuales concretos hasta acercarte al máximo. PROHIBIDO reducir caracteres respecto al texto anterior.\nFORMATO DE RESPUESTA:\nResponde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea ni explicaciones:\n{"alt_texto": "..."}`;
+  return `Eres un experto en SEO técnico de imágenes para turismo y transporte. Redactas contenido optimizado para el mercado de habla ${esBase ? 'español' : nombreIdioma}.
+Analiza la imagen de la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y genera un texto alternativo (alt text) impecable.
+REQUISITOS OBLIGATORIOS:
+1. Idioma y Naturalidad: Escribe en ${esBase ? 'español' : nombreIdioma} de forma 100% nativa (estilo SEO local, jamás traducción literal).
+2. Descripción Visual: Describe los elementos concretos de la escena (luz, paisaje, colores, entorno) y termina SIEMPRE con la frase fija ", traslado privado a ${destino}" adaptada al idioma correspondiente.
+3. LÍMITE INVIOLABLE DE CARACTERES: El texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (incluyendo espacios y puntuación).
+   - Menos de 100 caracteres = ERROR.
+   - Más de 125 caracteres = ERROR.
+4. Sin Muletillas: PROHIBIDO usar palabras como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción visual.${nombreIdioma === 'Ruso' ? '\\n5. Regla Rusa: Traduce los términos comunes al ruso y translitera los nombres propios al alfabeto cirílico (Las Palmas de Gran Canaria -> Лас-Пальмас-де-Гран-Канария, Gran Canaria -> Гран-Канария). Cero caracteres latinos en el texto.' : ''}
+INSTRUCCIÓN DE CONTROL DE CONTEO:
+Antes de responder, cuenta mentalmente cada carácter (letras, espacios y puntuación). Si tu borrador tiene menos de 100 o más de 125 caracteres, ajústalo hasta estar exactamente en el rango [100-125].
+REGLA DE MEJORA: El objetivo es siempre acercarse a 125 caracteres, nunca alejarse. Si ya tienes un texto en el rango, mejora la riqueza descriptiva añadiendo detalles visuales concretos hasta acercarte al máximo. PROHIBIDO reducir caracteres respecto al texto anterior.
+FORMATO DE RESPUESTA:
+Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea ni explicaciones:
+{"alt_texto": "..."}`;
 }
 
 
