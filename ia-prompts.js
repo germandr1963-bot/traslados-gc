@@ -234,13 +234,17 @@ function GENERADOR_NOMBRES_DESTINOS(nombreIdioma, pendientes) {
 function GENERADOR_ALT_FOTO_RUTA(origen, destino, lang, nombreIdioma) {
   return `Eres un experto en SEO técnico de imágenes para transportes y turismo.
 Analiza la imagen de la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y genera sus metadatos SEO.
+
 REGLAS DE SALIDA:
-1. nombre_archivo: Nombre de archivo web único, descriptivo y optimizado para SEO en ${lang === 'es' ? 'español' : nombreIdioma}. En minúsculas, palabras separadas SOLO por guiones (-), sin tildes, comas ni caracteres especiales. Extensión .webp obligatoria. Debe incluir origen, destino y el elemento visual clave. Ejemplo: "las-palmas-maspalomas-traslado-privado-gran-canaria.webp".
-2. alt_texto: Texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe la escena visual concreta (luz, paisaje, elementos) y termina SIEMPRE con la frase fija ", traslado privado a ${destino}". Ejemplo: "Acantilados rojizos sobre el mar azul de Gran Canaria al atardecer, traslado privado a ${destino}".
-- RESTRICCIÓN RÍGIDA DE LONGITUD: Debe tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125.
-- PROHIBIDO: Usar muletillas como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción.
+1. nombre_archivo: Nombre de archivo web único, descriptivo y optimizado para SEO en ${lang === 'es' ? 'español' : nombreIdioma}. En minúsculas, palabras separadas SOLO por guiones (-), sin tildes, comas ni caracteres especiales. Extensión .webp obligatoria. Debe incluir origen, destino y elemento visual. Ejemplo: "las-palmas-maspalomas-traslado-privado-gran-canaria.webp".
+
+2. alt_texto: Texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe la escena visual concreta (luz, paisaje, elementos) y termina SIEMPRE con la frase fija ", traslado privado a ${destino}".
+
+- RANGO DE CARACTERES PERMITIDO: Debe tener OBLIGATORIAMENTE entre 110 y 145 caracteres (contando espacios y puntuación). Jamás menos de 110 ni más de 145.
+- PROHIBIDO: Usar muletillas como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción visual.
+
 FORMATO DE RESPUESTA:
-Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo adicional:
+Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown (\`\`\`json), sin saltos de línea innecesarios ni texto explicativo adicional:
 {"nombre_archivo": "...", "alt_texto": "..."}`;
 }
 
@@ -253,14 +257,16 @@ Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markd
 function GENERADOR_ALT_FOTO_RUTA_TODOS(origen, destino, listaIdiomas, codigos) {
   return `Eres un experto en SEO de imágenes multilenguaje para turismo y transporte privado.
 Analiza la imagen de la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y genera el texto alternativo (alt text) optimizado para cada uno de estos idiomas: ${listaIdiomas}.
+
 REGLAS OBLIGATORIAS POR IDIOMA:
 1. Redacción Nativa: Escribe como un especialista SEO nativo de cada mercado, no uses traducciones literales del español.
-2. Descripción Visual y SEO: Describe elementos visuales concretos (luz, paisaje, detalles) y termina SIEMPRE con la frase fija ", traslado privado a ${destino}" adaptada al idioma correspondiente.
-3. RESTRICCIÓN RÍGIDA DE LONGITUD: Cada texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125 caracteres por idioma.
-4. Sin Muletillas: PROHIBIDO usar fórmulas como "fotografía de", "imagen de", "vista de" en cualquier idioma. Empieza directamente con la descripción visual.
-5. Normas para Ruso (ru): Traduce las palabras comunes (carretera, paisaje, montaña, etc.) al ruso. Translitera los nombres propios al alfabeto cirílico (ej. Las Palmas de Gran Canaria -> Лас-Пальмас-де-Гран-Канария, Gran Canaria -> Гран-Канария). Cero caracteres latinos en la clave de ruso.
+2. Descripción Visual y SEO: Describe elementos visuales concretos (luz, paisaje, detalles) y termina SIEMPRE con la frase fija indicando el traslado privado a "${destino}" adaptada de forma natural a cada idioma.
+3. RANGO DE CARACTERES PERMITIDO: Cada texto DEBE tener OBLIGATORIAMENTE entre 110 y 145 caracteres (contando espacios y puntuación). Jamás menos de 110 ni más de 145 por idioma.
+4. Sin Muletillas: PROHIBIDO usar fórmulas como "fotografía de", "imagen de", "vista de" en cualquier idioma. Empieza directo con la descripción.
+5. Normas para Ruso (ru): Traduce las palabras comunes al ruso. Translitera los nombres propios al alfabeto cirílico (ej. Las Palmas de Gran Canaria -> Лас-Пальмас-де-Гран-Канария, Gran Canaria -> Гран-Канария). Cero caracteres latinos en la clave de ruso.
+
 FORMATO DE RESPUESTA:
-Responde EXCLUSIVAMENTE con un objeto JSON válido conteniendo las claves solicitadas, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo:
+Responde EXCLUSIVAMENTE con un objeto JSON válido conteniendo las claves solicitadas, sin bloques de código markdown (\`\`\`json), sin saltos de línea innecesarios ni texto explicativo:
 {${codigos}}`;
 }
 
@@ -271,21 +277,24 @@ Responde EXCLUSIVAMENTE con un objeto JSON válido conteniendo las claves solici
 // Botón admin: ✨ Sugerir con IA
 // Línea original server.js: ~4261
 function GENERADOR_ALT_EXISTENTE_RUTA(origen, destino, esBase, nombreIdioma) {
-  return `Eres un experto en SEO técnico de imágenes para turismo y transporte. Redactas contenido optimizado para el mercado de habla ${esBase ? 'español' : nombreIdioma}.
-Analiza la imagen de la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y genera un texto alternativo (alt text) impecable.
+  return `Eres un experto en SEO técnico de imágenes para turismo y transporte privado. Redactas contenido optimizado para el mercado de habla ${esBase ? 'español' : nombreIdioma}.
+
+Analiza la imagen de la ruta de traslado de "${origen}" a "${destino}" en Gran Canaria y genera un texto alternativo (alt text) impecable.
+
 REQUISITOS OBLIGATORIOS:
 1. Idioma y Naturalidad: Escribe en ${esBase ? 'español' : nombreIdioma} de forma 100% nativa (estilo SEO local, jamás traducción literal).
-2. Descripción Visual: Describe los elementos concretos de la escena (luz, paisaje, colores, entorno) y termina SIEMPRE con la frase fija ", traslado privado a ${destino}" adaptada al idioma correspondiente.
-3. LÍMITE INVIOLABLE DE CARACTERES: El texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (incluyendo espacios y puntuación).
-   - Menos de 100 caracteres = ERROR.
-   - Más de 125 caracteres = ERROR.
-4. Sin Muletillas: PROHIBIDO usar palabras como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción visual.${nombreIdioma === 'Ruso' ? '\\n5. Regla Rusa: Traduce los términos comunes al ruso y translitera los nombres propios al alfabeto cirílico (Las Palmas de Gran Canaria -> Лас-Пальмас-де-Гран-Канария, Gran Canaria -> Гран-Канария). Cero caracteres latinos en el texto.' : ''}
+2. Descripción Visual + Coletilla: Describe elementos concretos de la escena (luz, carretera, entorno visual) y remata la frase de forma natural indicando que es un traslado privado a "${destino}" (adaptado al idioma).
+3. RANGO DE CARACTERES PERMITIDO: El texto DEBE tener OBLIGATORIAMENTE entre 110 y 145 caracteres (contando espacios y puntuación).
+   - Menos de 110 caracteres = ERROR.
+   - Más de 145 caracteres = ERROR.
+4. Sin Muletillas: PROHIBIDO usar fórmulas como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción visual.${nombreIdioma === 'Ruso' || (!esBase && nombreIdioma.toLowerCase().includes('ruso')) ? '\n5. Regla Rusa: Traduce términos comunes al ruso y translitera los nombres propios al alfabeto cirílico. Cero caracteres latinos en el texto.' : ''}
+
 INSTRUCCIÓN DE CONTROL DE CONTEO:
-Antes de responder, cuenta mentalmente cada carácter (letras, espacios y puntuación). Si tu borrador tiene menos de 100 o más de 125 caracteres, ajústalo hasta estar exactamente en el rango [100-125].
-REGLA DE MEJORA: El objetivo es siempre acercarse a 125 caracteres, nunca alejarse. Si ya tienes un texto en el rango, mejora la riqueza descriptiva añadiendo detalles visuales concretos hasta acercarte al máximo. PROHIBIDO reducir caracteres respecto al texto anterior.
+Cuenta mentalmente cada carácter antes de emitir el resultado. El texto final debe encajar perfectamente dentro del rango [110-145]. Si te pasas de 145 caracteres, recorta adjetivos secundarios, no elimines la coletilla ni el destino.
+
 FORMATO DE RESPUESTA:
-Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea ni explicaciones:
-{"alt_texto": "..."}`;
+Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown (\`\`\`json), sin saltos de línea ni explicaciones:
+{"alt_texto": "...", "longitud": 128}`;
 }
 
 
