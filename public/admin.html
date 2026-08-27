@@ -8593,9 +8593,13 @@ function abrirEditorDestino(destinoId) {
         '<label class="etiqueta" style="font-size:11px;">Fotos del destino — la primera es la portada</label>' +
         '<div style="display:flex;gap:8px;align-items:center;">' +
         '<label class="boton-secundario" style="cursor:pointer;padding:5px 12px;font-size:0.78rem;">' +
-        '+ A&#241;adir foto <input type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style="display:none;" onchange="previsualizarFotoDestino(' + destinoId + ', this)"></label>' +
+        '+ A&#241;adir fotos <input type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style="display:none;" multiple onchange="cargarColaFotosDestino(' + destinoId + ', this)"></label>' +
         '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 12px;color:var(--rojo-error);border-color:var(--rojo-error);" onclick="eliminarTodasFotosDestino(' + destinoId + ')">🗑 Eliminar todas</button>' +
         '</div>' +
+        '</div>' +
+        '<div id="cola-fotos-destino-' + destinoId + '" style="display:none;margin-bottom:10px;">' +
+        '<div style="font-size:11px;color:var(--texto-muted);margin-bottom:6px;">📋 Fotos en cola — haz clic en una para procesarla:</div>' +
+        '<div id="cola-fotos-thumbs-' + destinoId + '" style="display:flex;flex-wrap:wrap;gap:8px;"></div>' +
         '</div>' +
         '<div id="panel-nueva-foto-' + destinoId + '" style="display:none;background:#fff;border:1px solid var(--gris-borde);border-radius:8px;padding:12px;margin-bottom:10px;">' +
         '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">' +
@@ -8714,6 +8718,99 @@ function cargarFotosDestino(destinoId) {
 
 var _fotoDestinoData = {};
 var _fotoAltPanelData = {};
+var _colaFotosDestino = {}; // cola de archivos pendientes por destinoId
+
+function cargarColaFotosDestino(destinoId, input) {
+  var files = Array.from(input.files);
+  if (!files.length) return;
+  if (!_colaFotosDestino[destinoId]) _colaFotosDestino[destinoId] = [];
+
+  var pending = 0;
+  files.forEach(function(file, idx) {
+    var reader = new FileReader();
+    pending++;
+    reader.onload = function(e) {
+      _colaFotosDestino[destinoId].push({ data: e.target.result, nombre: file.name });
+      pending--;
+      if (pending === 0) renderizarColaDestino(destinoId);
+    };
+    reader.readAsDataURL(file);
+  });
+  // Reset input para poder volver a seleccionar las mismas fotos si hace falta
+  input.value = '';
+}
+
+function renderizarColaDestino(destinoId) {
+  var cola = _colaFotosDestino[destinoId] || [];
+  var divCola = document.getElementById('cola-fotos-destino-' + destinoId);
+  var divThumbs = document.getElementById('cola-fotos-thumbs-' + destinoId);
+  if (!divCola || !divThumbs) return;
+
+  if (cola.length === 0) {
+    divCola.style.display = 'none';
+    return;
+  }
+  divCola.style.display = 'block';
+  divThumbs.innerHTML = '';
+  cola.forEach(function(item, idx) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative;cursor:pointer;border-radius:6px;overflow:hidden;width:80px;height:60px;border:2px solid var(--gris-borde);';
+    wrap.title = 'Clic para procesar esta foto';
+    wrap.onclick = function() { abrirFotoDeCola(destinoId, idx); };
+
+    var img = document.createElement('img');
+    img.src = item.data;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+    wrap.appendChild(img);
+
+    // Número de orden
+    var badge = document.createElement('div');
+    badge.style.cssText = 'position:absolute;top:2px;left:2px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;border-radius:3px;padding:1px 4px;';
+    badge.textContent = (idx + 1);
+    wrap.appendChild(badge);
+
+    // Botón X para descartar
+    var btn = document.createElement('div');
+    btn.style.cssText = 'position:absolute;top:2px;right:2px;background:rgba(200,0,0,0.8);color:#fff;font-size:10px;border-radius:3px;padding:1px 4px;cursor:pointer;';
+    btn.textContent = '✕';
+    btn.title = 'Descartar';
+    btn.onclick = function(ev) {
+      ev.stopPropagation();
+      _colaFotosDestino[destinoId].splice(idx, 1);
+      renderizarColaDestino(destinoId);
+    };
+    wrap.appendChild(btn);
+
+    divThumbs.appendChild(wrap);
+  });
+}
+
+function abrirFotoDeCola(destinoId, idx) {
+  var cola = _colaFotosDestino[destinoId] || [];
+  var item = cola[idx];
+  if (!item) return;
+
+  // Cargar en el panel igual que previsualizarFotoDestino
+  _fotoDestinoData[destinoId] = item.data;
+  _colaFotosDestino[destinoId]._indiceActivo = idx;
+
+  var preview = document.getElementById('preview-foto-' + destinoId);
+  if (preview) preview.src = item.data;
+  var panel = document.getElementById('panel-nueva-foto-' + destinoId);
+  if (panel) panel.style.display = 'block';
+  var nombre = document.getElementById('nueva-foto-nombre-' + destinoId);
+  var alt = document.getElementById('nueva-foto-alt-' + destinoId);
+  if (nombre) nombre.value = '';
+  if (alt) alt.value = '';
+  var msg = document.getElementById('msg-foto-' + destinoId);
+  if (msg) msg.textContent = '';
+
+  // Resaltar la miniatura activa en la cola
+  var thumbs = document.querySelectorAll('#cola-fotos-thumbs-' + destinoId + ' > div');
+  thumbs.forEach(function(t, i) {
+    t.style.borderColor = (i === idx) ? 'var(--azul-primario, #2563eb)' : 'var(--gris-borde)';
+  });
+}
 
 function contarAltFoto(input, idCont) {
   var n = [...input.value].length;
@@ -8963,7 +9060,16 @@ function confirmarSubidaFoto(destinoId) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ imagen: imagen, alt_texto: alt, nombre_archivo: nombre, alts_idiomas: altsEnviar })
   }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.ok) { cancelarNuevaFoto(destinoId); cargarFotosDestino(destinoId); }
+    if (d.ok) {
+      // Eliminar foto activa de la cola
+      if (_colaFotosDestino[destinoId] && typeof _colaFotosDestino[destinoId]._indiceActivo === 'number') {
+        _colaFotosDestino[destinoId].splice(_colaFotosDestino[destinoId]._indiceActivo, 1);
+        delete _colaFotosDestino[destinoId]._indiceActivo;
+        renderizarColaDestino(destinoId);
+      }
+      cancelarNuevaFoto(destinoId);
+      cargarFotosDestino(destinoId);
+    }
     else { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; } }
   }).catch(function() {
     if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexion.'; }
