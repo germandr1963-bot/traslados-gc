@@ -249,8 +249,19 @@ Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markd
 // Alt text foto nueva de ruta — todos los idiomas a la vez
 // Endpoint: POST /admin/seo/rutas/:id/fotos/nueva/alt/generar-todos
 // Botón admin: ✨ Generar todos los idiomas con IA
+// Línea original server.js: ~5188
 function GENERADOR_ALT_FOTO_RUTA_TODOS(origen, destino, listaIdiomas, codigos) {
-  return `Eres un experto en SEO de imágenes multilenguaje para turismo y transporte privado.\nAnaliza la imagen de la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y genera el texto alternativo (alt text) optimizado para cada uno de estos idiomas: ${listaIdiomas}.\nREGLAS OBLIGATORIAS POR IDIOMA:\n1. Redacción Nativa: Escribe como un especialista SEO nativo de cada mercado, no uses traducciones literales del español.\n2. Descripción Visual y SEO: Describe elementos visuales concretos (luz, paisaje, detalles) vinculando de forma natural la imagen al traslado de "${origen}" a "${destino}" en Gran Canaria.\n3. RESTRICCIÓN RÍGIDA DE LONGITUD: Cada texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125 caracteres por idioma.\n4. Sin Muletillas: PROHIBIDO usar fórmulas como "fotografía de", "imagen de", "vista de" en cualquier idioma. Empieza directamente con la descripción visual.\n5. Normas para Ruso (ru): Traduce las palabras comunes (carretera, paisaje, montaña, etc.) al ruso. Translitera los nombres propios al alfabeto cirílico (ej. Las Palmas de Gran Canaria -> Лас-Пальмас-де-Гран-Канария, Gran Canaria -> Гран-Канария). Cero caracteres latinos en la clave de ruso.\nINSTRUCCIÓN DE CONTROL DE CONTEO:\nAntes de entregar cada texto, cuenta mentalmente cada carácter (letras, espacios y puntuación). Si algún idioma tiene menos de 100 o más de 125 caracteres, ajústalo hasta estar exactamente en el rango [100-125].\nREGLA DE MEJORA: El objetivo es siempre acercarse a 125 caracteres, nunca alejarse. Genera textos ricos en detalles visuales concretos que se acerquen al máximo sin pasarlo.\nFORMATO DE RESPUESTA:\nResponde EXCLUSIVAMENTE con un objeto JSON válido conteniendo las claves solicitadas, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo:\n{${codigos}}`;
+  return `Eres un experto en SEO de imágenes multilenguaje para turismo y transporte privado.
+Analiza la imagen de la ruta de traslado privado de "${origen}" a "${destino}" en Gran Canaria y genera el texto alternativo (alt text) optimizado para cada uno de estos idiomas: ${listaIdiomas}.
+REGLAS OBLIGATORIAS POR IDIOMA:
+1. Redacción Nativa: Escribe como un especialista SEO nativo de cada mercado, no uses traducciones literales del español.
+2. Descripción Visual y SEO: Describe elementos visuales concretos (luz, paisaje, detalles) y termina SIEMPRE con la frase fija ", traslado privado a ${destino}" adaptada al idioma correspondiente.
+3. RESTRICCIÓN RÍGIDA DE LONGITUD: Cada texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125 caracteres por idioma.
+4. Sin Muletillas: PROHIBIDO usar fórmulas como "fotografía de", "imagen de", "vista de" en cualquier idioma. Empieza directamente con la descripción visual.
+5. Normas para Ruso (ru): Traduce las palabras comunes (carretera, paisaje, montaña, etc.) al ruso. Translitera los nombres propios al alfabeto cirílico (ej. Las Palmas de Gran Canaria -> Лас-Пальмас-де-Гран-Канария, Gran Canaria -> Гран-Канария). Cero caracteres latinos en la clave de ruso.
+FORMATO DE RESPUESTA:
+Responde EXCLUSIVAMENTE con un objeto JSON válido conteniendo las claves solicitadas, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo:
+{${codigos}}`;
 }
 
 
