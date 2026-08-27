@@ -3215,10 +3215,10 @@ function abrirEditorSEO(rutaId) {
         '<div style="flex:1;min-width:200px;">' +
         '<label class="etiqueta" style="font-size:11px;">Nombre de archivo (.webp)</label>' +
         '<input class="campo" id="nueva-foto-ruta-nombre-' + rutaId + '" type="text" placeholder="ej: las-palmas-maspalomas-gran-canaria.webp" style="margin-bottom:8px;font-family:monospace;font-size:12px;">' +
-        '<label class="etiqueta" style="font-size:11px;">Alt text (español) — máx. 125 caracteres</label>' +
+        '<label class="etiqueta" style="font-size:11px;">Alt text (español) — máx. 145 caracteres</label>' +
         '<input class="campo" id="nueva-foto-ruta-alt-' + rutaId + '" type="text" placeholder="Descripción de la imagen para Google" ' +
-        'oninput="contarChars(this,\'nueva-foto-ruta-alt-cnt-' + rutaId + '\',125)">' +
-        '<div id="nueva-foto-ruta-alt-cnt-' + rutaId + '" style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:4px;">0 / 125</div>' +
+        'oninput="contarChars(this,\'nueva-foto-ruta-alt-cnt-' + rutaId + '\',145)">' +
+        '<div id="nueva-foto-ruta-alt-cnt-' + rutaId + '" style="text-align:right;font-size:11px;color:var(--texto-muted);margin-bottom:4px;">0 / 145</div>' +
         '</div>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">' +
@@ -9335,7 +9335,7 @@ function sugerirFotoRutaIA(rutaId) {
       if (nombre) nombre.value = d.nombre_archivo || '';
       if (alt) {
         alt.value = d.alt_texto || '';
-        contarChars(alt, 'nueva-foto-ruta-alt-cnt-' + rutaId, 125);
+        contarChars(alt, 'nueva-foto-ruta-alt-cnt-' + rutaId, 145);
       }
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = 'Revisa y ajusta si hace falta'; }
     } else {
@@ -9359,7 +9359,7 @@ function generarTodosAltFotoRuta(rutaId) {
     if (d.ok) {
       var altEs = d.alts && d.alts['es'];
       var altInput = document.getElementById('nueva-foto-ruta-alt-' + rutaId);
-      if (altInput && altEs && !altInput.value.trim()) { altInput.value = altEs; contarChars(altInput, 'nueva-foto-ruta-alt-cnt-' + rutaId, 125); }
+      if (altInput && altEs && !altInput.value.trim()) { altInput.value = altEs; contarChars(altInput, 'nueva-foto-ruta-alt-cnt-' + rutaId, 145); }
       _fotoRutaAltData[rutaId] = d.alts || {};
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Alt texts generados en ' + Object.keys(d.alts || {}).length + ' idiomas. Revisa y guarda la foto.'; }
     } else {
@@ -9513,15 +9513,15 @@ function cambiarTabAltFotoRuta(fotoId, lang, boton, dataOverride) {
   var alts = d.alts || {};
   var altActual = alts[lang] || '';
   var n = altActual.length;
-  var colorCont = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+  var colorCont = n > 145 ? 'var(--rojo-error)' : 'var(--texto-muted)';
   var campos = document.getElementById('alt-foto-ruta-campos-' + fotoId);
   if (!campos) return;
   campos.innerHTML =
-    '<label class="etiqueta" style="font-size:11px;">Alt text en ' + lang.toUpperCase() + ' — máx. 125 caracteres</label>' +
+    '<label class="etiqueta" style="font-size:11px;">Alt text en ' + lang.toUpperCase() + ' — máx. 145 caracteres</label>' +
     '<input class="campo" id="alt-foto-ruta-input-' + fotoId + '" type="text" value="' + escapar(altActual) + '" ' +
     'oninput="actualizarContadorAltFotoRuta(this,' + fotoId + ')" ' +
     'style="margin-bottom:4px;">' +
-    '<div id="cnt-alt-foto-ruta-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:' + colorCont + ';">' + n + ' / 125</div>' +
+    '<div id="cnt-alt-foto-ruta-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:' + colorCont + ';">' + n + ' / 145</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
     '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" data-rutaid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="sugerirAltFotoRutaIABtn(this)">&#10024; Sugerir con IA</button>' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-rutaid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoRutaBtn(this)">&#128190; Guardar</button>' +
@@ -9532,8 +9532,8 @@ function actualizarContadorAltFotoRuta(input, fotoId) {
   var n = input.value.length;
   var el = document.getElementById('cnt-alt-foto-ruta-' + fotoId);
   if (!el) return;
-  el.textContent = n + ' / 125';
-  el.style.color = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)';
+  el.textContent = n + ' / 145';
+  el.style.color = n > 145 ? 'var(--rojo-error)' : 'var(--texto-muted)';
 }
 
 function sugerirAltFotoRutaIABtn(boton) {
@@ -9564,7 +9564,7 @@ function sugerirAltFotoRutaIA(rutaId, fotoId, lang) {
           input.value = d.alt_texto || '';
           var n = input.value.length;
           var cnt = document.getElementById('cnt-alt-foto-ruta-' + fotoId);
-          if (cnt) { cnt.textContent = n + ' / 125'; cnt.style.color = n > 125 ? 'var(--rojo-error)' : 'var(--texto-muted)'; }
+          if (cnt) { cnt.textContent = n + ' / 145'; cnt.style.color = n > 145 ? 'var(--rojo-error)' : 'var(--texto-muted)'; }
         }
         var panel = document.getElementById('panel-alt-foto-ruta-' + fotoId);
         if (panel && panel._altData) panel._altData.alts[lang] = d.alt_texto || '';
