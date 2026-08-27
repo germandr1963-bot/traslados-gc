@@ -4731,6 +4731,12 @@ app.get('/destino-foto/:fotoId', asyncHandler(async (req, res) => {
 }));
 
 // Elimina una foto del carrusel
+// Elimina todas las fotos de un destino
+app.post('/admin/seo/destinos/:id/fotos/eliminar-todas', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM destinos_fotos WHERE destino_id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
 app.post('/admin/seo/destinos/:id/fotos/:fotoId/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM destinos_fotos WHERE id = $1 AND destino_id = $2', [req.params.fotoId, req.params.id]);
   res.json({ ok: true });
