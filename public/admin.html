@@ -3212,9 +3212,13 @@ function abrirEditorSEO(rutaId) {
         '<label class="etiqueta" style="font-size:11px;">Fotos de la ruta — la primera es la portada</label>' +
         '<div style="display:flex;gap:8px;align-items:center;">' +
         '<label class="boton-secundario" style="cursor:pointer;padding:5px 12px;font-size:0.78rem;">' +
-        '+ A&#241;adir foto <input type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style="display:none;" onchange="previsualizarFotoRuta(' + rutaId + ', this)"></label>' +
+        '+ A&#241;adir fotos <input type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style="display:none;" multiple onchange="cargarColaFotosRuta(' + rutaId + ', this)"></label>' +
         '<button class="boton-secundario" style="font-size:0.78rem;padding:5px 12px;color:var(--rojo-error);border-color:var(--rojo-error);" onclick="eliminarTodasFotosRuta(' + rutaId + ')">🗑 Eliminar todas</button>' +
         '</div>' +
+        '</div>' +
+        '<div id="cola-fotos-ruta-' + rutaId + '" style="display:none;margin-bottom:10px;">' +
+        '<div style="font-size:11px;color:var(--texto-muted);margin-bottom:6px;">📋 Fotos en cola — haz clic en una para procesarla:</div>' +
+        '<div id="cola-fotos-ruta-thumbs-' + rutaId + '" style="display:flex;flex-wrap:wrap;gap:8px;"></div>' +
         '</div>' +
         '<div id="panel-nueva-foto-ruta-' + rutaId + '" style="display:none;background:#fff;border:1px solid var(--gris-borde);border-radius:8px;padding:12px;margin-bottom:10px;">' +
         '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">' +
@@ -9414,6 +9418,95 @@ function copiarEnlaceDestino(boton) {
 
 // ─── FUNCIONES DE FOTOS DE RUTAS ─────────────────────────────────────────────
 
+var _colaFotosRuta = {}; // cola de archivos pendientes por rutaId
+
+function cargarColaFotosRuta(rutaId, input) {
+  var files = Array.from(input.files);
+  if (!files.length) return;
+  if (!_colaFotosRuta[rutaId]) _colaFotosRuta[rutaId] = [];
+
+  var pending = 0;
+  files.forEach(function(file) {
+    var reader = new FileReader();
+    pending++;
+    reader.onload = function(e) {
+      _colaFotosRuta[rutaId].push({ data: e.target.result, nombre: file.name });
+      pending--;
+      if (pending === 0) renderizarColaRuta(rutaId);
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
+}
+
+function renderizarColaRuta(rutaId) {
+  var cola = _colaFotosRuta[rutaId] || [];
+  var divCola = document.getElementById('cola-fotos-ruta-' + rutaId);
+  var divThumbs = document.getElementById('cola-fotos-ruta-thumbs-' + rutaId);
+  if (!divCola || !divThumbs) return;
+
+  if (cola.length === 0) {
+    divCola.style.display = 'none';
+    return;
+  }
+  divCola.style.display = 'block';
+  divThumbs.innerHTML = '';
+  cola.forEach(function(item, idx) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative;cursor:pointer;border-radius:6px;overflow:hidden;width:80px;height:60px;border:2px solid var(--gris-borde);';
+    wrap.title = 'Clic para procesar esta foto';
+    wrap.onclick = function() { abrirFotoDeColaRuta(rutaId, idx); };
+
+    var img = document.createElement('img');
+    img.src = item.data;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+    wrap.appendChild(img);
+
+    var badge = document.createElement('div');
+    badge.style.cssText = 'position:absolute;top:2px;left:2px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;border-radius:3px;padding:1px 4px;';
+    badge.textContent = (idx + 1);
+    wrap.appendChild(badge);
+
+    var btn = document.createElement('div');
+    btn.style.cssText = 'position:absolute;top:2px;right:2px;background:rgba(200,0,0,0.8);color:#fff;font-size:10px;border-radius:3px;padding:1px 4px;cursor:pointer;';
+    btn.textContent = '✕';
+    btn.title = 'Descartar';
+    btn.onclick = function(ev) {
+      ev.stopPropagation();
+      _colaFotosRuta[rutaId].splice(idx, 1);
+      renderizarColaRuta(rutaId);
+    };
+    wrap.appendChild(btn);
+
+    divThumbs.appendChild(wrap);
+  });
+}
+
+function abrirFotoDeColaRuta(rutaId, idx) {
+  var cola = _colaFotosRuta[rutaId] || [];
+  var item = cola[idx];
+  if (!item) return;
+
+  _fotoRutaData[rutaId] = item.data;
+  _colaFotosRuta[rutaId]._indiceActivo = idx;
+
+  var preview = document.getElementById('preview-foto-ruta-' + rutaId);
+  if (preview) preview.src = item.data;
+  var panel = document.getElementById('panel-nueva-foto-ruta-' + rutaId);
+  if (panel) panel.style.display = 'block';
+  var nombre = document.getElementById('nueva-foto-ruta-nombre-' + rutaId);
+  var alt = document.getElementById('nueva-foto-ruta-alt-' + rutaId);
+  if (nombre) nombre.value = '';
+  if (alt) alt.value = '';
+  var msg = document.getElementById('msg-foto-ruta-' + rutaId);
+  if (msg) msg.textContent = '';
+
+  var thumbs = document.querySelectorAll('#cola-fotos-ruta-thumbs-' + rutaId + ' > div');
+  thumbs.forEach(function(t, i) {
+    t.style.borderColor = (i === idx) ? 'var(--azul-primario, #2563eb)' : 'var(--gris-borde)';
+  });
+}
+
 var _fotoRutaData = {};
 
 function previsualizarFotoRuta(rutaId, input) {
@@ -9447,7 +9540,15 @@ function confirmarSubidaFotoRuta(rutaId) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ imagen: imagen, alt_texto: alt, nombre_archivo: nombre, alts_idiomas: altsEnviar })
   }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.ok) { cancelarNuevaFotoRuta(rutaId); cargarFotosRuta(rutaId); }
+    if (d.ok) {
+      if (_colaFotosRuta[rutaId] && typeof _colaFotosRuta[rutaId]._indiceActivo === 'number') {
+        _colaFotosRuta[rutaId].splice(_colaFotosRuta[rutaId]._indiceActivo, 1);
+        delete _colaFotosRuta[rutaId]._indiceActivo;
+        renderizarColaRuta(rutaId);
+      }
+      cancelarNuevaFotoRuta(rutaId);
+      cargarFotosRuta(rutaId);
+    }
     else { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; } }
   }).catch(function() {
     if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexión.'; }
