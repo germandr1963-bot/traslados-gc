@@ -238,11 +238,7 @@ REGLAS DE SALIDA:
 1. nombre_archivo: Nombre de archivo web único, descriptivo y optimizado para SEO en ${lang === 'es' ? 'español' : nombreIdioma}. En minúsculas, palabras separadas SOLO por guiones (-), sin tildes, comas ni caracteres especiales. Extensión .webp obligatoria. Debe incluir origen, destino y el elemento visual clave. Ejemplo: "las-palmas-maspalomas-traslado-privado-gran-canaria.webp".
 2. alt_texto: Texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe la escena visual concreta (luz, paisaje, elementos) vinculando de forma natural al traslado privado de "${origen}" a "${destino}".
 - RESTRICCIÓN RÍGIDA DE LONGITUD: Debe tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125.
-- Menos de 100 caracteres = ERROR.
-- Más de 125 caracteres = ERROR.
 - PROHIBIDO: Usar muletillas como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción.
-INSTRUCCIÓN DE CONTROL DE CONTEO:
-Antes de responder, cuenta mentalmente cada carácter (letras, espacios y puntuación). Si tu borrador tiene menos de 100 o más de 125 caracteres, ajústalo hasta estar exactamente en el rango [100-125].
 FORMATO DE RESPUESTA:
 Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo adicional:
 {"nombre_archivo": "...", "alt_texto": "..."}`;
