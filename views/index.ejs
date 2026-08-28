@@ -86,6 +86,27 @@
   max-width: 420px;
   margin-bottom: 26px;
 }
+.subtitulo-hero-lista {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 26px 0;
+  max-width: 420px;
+}
+.subtitulo-hero-lista li {
+  font-size: 15px;
+  opacity: 0.85;
+  line-height: 1.5;
+  padding: 3px 0 3px 22px;
+  position: relative;
+}
+.subtitulo-hero-lista li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #C1502E;
+  font-weight: 700;
+  font-size: 14px;
+}
 .panel-busqueda {
   background: var(--piedra);
   border-radius: 12px;
@@ -301,7 +322,15 @@ footer {
 
   <div class="hero-overlay">
     <div class="titulo-hero titular"><%= t('home_titulo_hero') %></div>
+    <% if (lang === 'es') { %>
+    <ul class="subtitulo-hero-lista">
+      <li>Traslados de larga distancia en Gran Canaria.</li>
+      <li>Precio fijo por ruta.</li>
+      <li>Chofer confirmado antes de salir.</li>
+    </ul>
+    <% } else { %>
     <p class="subtitulo-hero"><%= t('home_subtitulo_hero') %></p>
+    <% } %>
 
     <div class="panel-busqueda">
       <div class="fila-busqueda">
