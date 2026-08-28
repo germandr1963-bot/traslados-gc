@@ -4035,10 +4035,12 @@ app.post('/admin/seo/rutas/:id/generar-ia', requireAdmin, asyncHandler(async (re
   const ALFABETO_LATINO = ['es','en','de','fr','it','nl','sv','no','fi','pt','pl','cs','ro','hu','sk','hr','sl','da'];
   const ALFABETO_CIRILI = ['ru','bg','uk','sr','mk'];
   let reglasSlug = '';
-  if (ALFABETO_LATINO.includes(lang)) {
-    reglasSlug = `El slug debe estar en ${nombreIdioma}, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). Debe describir el trayecto de origen a destino. Ejemplo en inglés para "Aeropuerto de Gran Canaria → Las Palmas": "gran-canaria-airport-to-las-palmas".`;
+  if (lang === 'fr') {
+    reglasSlug = `El slug debe estar en francés, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales. El nombre de la isla "Gran Canaria" en el slug es siempre "grande-canarie". Ejemplo para "Aeropuerto de Gran Canaria → Las Palmas": "aeroport-de-grande-canarie-a-las-palmas".`;
   } else if (ALFABETO_CIRILI.includes(lang)) {
-    reglasSlug = `El slug debe ser una transliteración al latín del trayecto en ${nombreIdioma}, usando solo a-z y guiones. Ejemplo en ruso para "Aeropuerto → Las Palmas": "aeroport-gran-kanaria-v-las-palmas".`;
+    reglasSlug = `El slug debe ser una transliteración al latín del trayecto en ${nombreIdioma}, usando solo a-z y guiones. El nombre de la isla "Gran Canaria" se transliterada siempre como "gran-kanariya". Ejemplo en ruso para "Aeropuerto de Gran Canaria → Las Palmas": "aeroport-gran-kanariya-v-las-palmas".`;
+  } else if (ALFABETO_LATINO.includes(lang)) {
+    reglasSlug = `El slug debe estar en ${nombreIdioma}, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). El nombre de la isla "Gran Canaria" en el slug es siempre "gran-canaria". Debe describir el trayecto de origen a destino. Ejemplo en inglés para "Aeropuerto de Gran Canaria → Las Palmas": "gran-canaria-airport-to-las-palmas".`;
   } else {
     reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones. Describe el trayecto de origen a destino en inglés.`;
   }

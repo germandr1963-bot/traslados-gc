@@ -143,6 +143,9 @@ Límites de caracteres por idioma:
 2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
    "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".
 
+### REGLA PARA IDIOMA RUSO — NOMBRES PROPIOS:
+Cuando generes contenido en ruso, las palabras comunes (aeropuerto, carretera, norte, sur, trayecto, puerto, zona...) deben traducirse al ruso (ejemplo: "Aeropuerto" → "Аэропорт", "Puerto" → "Порт"). Los nombres propios (Maspalomas, Las Palmas, Mogán, Canaria...) deben transliterarse completamente al cirílico (ejemplo: "Maspalomas" → "Маспаломас", "Gran Canaria" → "Гран-Канария"). Nunca dejes ninguna palabra en caracteres latinos dentro de un texto en ruso.
+
 ---
 
 ## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
