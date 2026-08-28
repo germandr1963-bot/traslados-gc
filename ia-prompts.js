@@ -157,7 +157,7 @@ URL amigable para esta ruta (ejemplo tipico: origen-a-destino). ${items[0].regla
 La palabra o expresión para "ruta" o "trayecto" (ejemplo: traslado, transferencia, taxi o ruta según aplique mejor al contexto) traducida a ${nombreIdioma}, en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico. Solo la palabra o expresión clave.
 
 3. NOMBRE_ISLA:
-El nombre de la isla "Gran Canaria" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente.
+El nombre de la isla "Gran Canaria" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente. Usa este nombre traducido en todo el contenido generado (meta_title, meta_description, resena_breve y texto_descripcion).
 
 4. META_TITLE (campo: meta_title):
 - Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
