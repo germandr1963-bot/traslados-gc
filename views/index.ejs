@@ -322,15 +322,11 @@ footer {
 
   <div class="hero-overlay">
     <div class="titulo-hero titular"><%= t('home_titulo_hero') %></div>
-    <% if (lang === 'es') { %>
     <ul class="subtitulo-hero-lista">
-      <li>Traslados de larga distancia en Gran Canaria.</li>
-      <li>Precio fijo por ruta.</li>
-      <li>Chofer confirmado antes de salir.</li>
+      <li><%= t('home_subtitulo_1') %></li>
+      <li><%= t('home_subtitulo_2') %></li>
+      <li><%= t('home_subtitulo_3') %></li>
     </ul>
-    <% } else { %>
-    <p class="subtitulo-hero"><%= t('home_subtitulo_hero') %></p>
-    <% } %>
 
     <div class="panel-busqueda">
       <div class="fila-busqueda">
