@@ -139,9 +139,14 @@ Límites de caracteres por idioma:
 
 ### REGLAS OBLIGATORIAS SOBRE PRECIOS Y TARIFAS:
 1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):
-   Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
-2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
-   "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".
+   Está ESTRICTAMENTE PROHIBIDO usar: "precio fijo", "tarifa fija", "precio cerrado", "precio exacto", "importe exacto", "conoces el precio antes de subir", "sin suplementos", "sin costes adicionales", "sin sorpresas en el precio", "sin costes ocultos", o cualquier frase que sugiera que el precio final del viaje es conocido o no varía. NUNCA mencionar el taxímetro, tarifa por kilómetro ni mecanismos internos de tarificación.
+2. LO QUE SÍ SE PUEDE COMUNICAR (con estas ideas, no necesariamente con estas palabras exactas):
+   - El precio orientativo del trayecto está visible desde el primer momento de la reserva.
+   - Los extras contratados al reservar tienen precio confirmado que no varía.
+   - El cliente sabe exactamente qué extras contrata y a qué coste antes de subir al vehículo.
+   - El cliente recibe un voucher con el precio orientativo del trayecto y la relación completa de extras contratados con sus costes.
+   - El conductor recibe ese mismo documento, garantizando que todo lo acordado queda confirmado por escrito antes del viaje.
+   - El pago del viaje se realiza directamente al conductor al finalizar el trayecto.
 
 ### REGLA PARA IDIOMA RUSO — NOMBRES PROPIOS:
 Cuando generes contenido en ruso, las palabras comunes (aeropuerto, carretera, norte, sur, trayecto, puerto, zona...) deben traducirse al ruso (ejemplo: "Aeropuerto" → "Аэропорт", "Puerto" → "Порт"). Los nombres propios (Maspalomas, Las Palmas, Mogán, Canaria...) deben transliterarse completamente al cirílico (ejemplo: "Maspalomas" → "Маспаломас", "Gran Canaria" → "Гран-Канария"). Nunca dejes ninguna palabra en caracteres latinos dentro de un texto en ruso.
