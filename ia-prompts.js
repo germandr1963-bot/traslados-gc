@@ -586,8 +586,26 @@ Actúa como un Experto en SEO Local, Logística Portuaria y Redactor Creativo Na
 REGLA FUNDAMENTAL — EL PROTAGONISTA ES EL MUELLE/TERMINAL:
 El destino "${nombre}" incluye el nombre completo con su muelle o terminal específica. ESE MUELLE CONCRETO es el protagonista absoluto de todo el contenido. El nombre completo "${nombre}" (incluyendo el muelle) debe aparecer en el meta_title, en el primer párrafo del texto principal, y en el texto_tarjeta. NUNCA uses solo la parte genérica (ej. "Puerto de La Luz") sin mencionar el muelle específico. El modelo NO debe simplificar el nombre ni omitir el muelle bajo ninguna circunstancia.
 
-REGLA DE NATIVIDAD (NO TRADUCIR):
-No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo busca, piensa y reserva un usuario real de ese idioma cuando planifica su viaje o desembarque en "${nombre}".
+---
+
+### ⚠️ REGLAS OBLIGATORIAS Y EXCLUSIVAS SI EL IDIOMA ES RUSO (${nombreIdioma}):
+1. CERO CARACTERES LATINOS EN TEXTOS: Está 100% PROHIBIDO incluir letras en alfabeto latino (A-Z, a-z) dentro del texto en ruso. TODO debe estar escrito en alfabeto cirílico.
+2. VOCABULARIO PORTUARIO EXACTO (ÚNICO TÉRMINO PERMITIDO):
+   - Muelle / Atracadero / Embarcadero → Причал (Única palabra permitida. PROHIBIDO usar "Мол" o "Пирс").
+   - Puerto → Порт
+   - Terminal → Терминал
+   - Ferri / Ferry → Паром
+   - Crucero → Круиз / Круизное судно
+3. DISTINCIÓN ENTRE LUGAR PORTUARIO Y NOMBRES PROPIOS COMERCIALES:
+   - Cuando "Muelle" se refiere a la zona de embarque u operativa, usa SIEMPRE Причал: Ej. Muelle Santa Catalina → Причал Санта-Каталина.
+   - Cuando "Muelle" forma parte de un nombre propio comercial o de un edificio (ej. "Centro Comercial El Muelle"), se translitera íntegramente como nombre propio sin traducir su significado: Торговый центр Эль-Муэлье (igual que si fuera un restaurante llamado "La Casona" → "Ла-Касона").
+4. REGLA DE TRANSLITERACIÓN Y NOMBRES PROPIOS EN CIRÍLICO:
+   Translitera todos los nombres propios al cirílico con guiones en nombres compuestos:
+   - Puerto de La Luz → Порт-де-ла-Лус
+   - Muelle Santa Catalina → Причал-Санта-Каталина
+   - Muelle Nelson Mandela → Причал-Нельсон-Мандела
+   - Las Palmas → Лас-Пальмас
+5. PROHIBICIÓN TURÍSTICA: Queda estrictamente PROHIBIDO crear secciones sobre atracciones turísticas, qué ver, qué hacer o plazas cercanas. EL CONTENIDO DEBE SER 100% SOBRE LOGÍSTICA DE TRASLADO Y TRANSPORTE.
 
 ---
 
@@ -600,10 +618,10 @@ Esta página es una landing de captación logística y de transporte. Su objetiv
 ## REGLAS DE ORO Y ESTILO (HUMAN-LIKE)
 
 1. ENFOQUE HIPERLOCAL EN EL MUELLE/TERMINAL ESPECÍFICA:
-Todo el contenido (Título, Descripción, Tarjeta y Texto Principal) debe enfocar la logística de transporte, comodidad con el equipaje y la ubicación exacta del muelle/terminal concreto dentro de "${nombre}". Concéntrate 100% en las características, operativa, navieras o cruceros que operan en ESA terminal concreta — no en el puerto general, no en la historia de la ciudad. Si se menciona Puerto de La Luz como contexto geográfico, siempre debe ir acompañado del muelle específico.
+Todo el contenido (Título, Descripción, Tarjeta y Texto Principal) debe enfocar la logística de transporte, comodidad con el equipaje y la ubicación exacta del muelle/terminal concreto dentro de "${nombre}". Concéntrate 100% en las características, operativa, navieras o cruceros que operan en ESA terminal concreta — no en el puerto general, no en la historia de la ciudad.
 
 2. LÍMITES ESTRICTOS DE CARACTERES (INFRANQUEABLES):
-Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido para aprovechar el espacio SEO, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO en ${nombreIdioma}. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter.
+Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). NUNCA sobrepases el LÍMITE MÁXIMO en ${nombreIdioma}.
 
 Límites de caracteres por idioma:
 - Español (ES): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)
@@ -619,64 +637,50 @@ Límites de caracteres por idioma:
 
 3. ESTILO NATURAL Y PROHIBICIONES DE IA:
 - Prohibido usar palabras y clichés típicos de IA como: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido".
-- Usa un tono cercano, seguro, experto en logística local y conversacional (de experto portuario a viajero).
-- Alterna la longitud de las frases (cortas y directas con explicativas) para dar un ritmo de lectura 100% humano.
+- Usa un tono cercano, seguro, experto en logística local y conversacional.
 
 ### REGLAS OBLIGATORIAS SOBRE PRECIOS Y TARIFAS:
-1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):
-   Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
-2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
-   "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".
-3. PROHIBICIÓN ABSOLUTA — PRECIOS (¡CRÍTICO, NO IGNORAR!):
-   NUNCA uses frases que sugieran que el precio se conoce de antemano, que es fijo, cerrado o visible antes de reservar. Esto incluye: "precio fijo", "tarifa fija", "precio cerrado", "conoce el precio antes de reservar", "ves la cantidad al reservar", "pagas exactamente esa cantidad" o cualquier variante similar.
-
-### REGLA PARA IDIOMA RUSO — NOMBRES PROPIOS:
-Cuando generes contenido en ruso, las palabras comunes (puerto, muelle, terminal, ferri, crucero, aeropuerto, pasarela...) deben traducirse al ruso (ejemplo: "Puerto" → "Порт", "Terminal" → "Терминал", "Muelle" → "Причал", "Ferri" → "Паром"). Los nombres propios (Santa Catalina, Nelson Mandela, Las Palmas, Cambulloneros...) deben transliterarse completamente al cirílico (ejemplo: "Santa Catalina" → "Санта-Каталина", "Nelson Mandela" → "Нельсон-Мандела"). Cuando "Muelle" forma parte de un nombre propio de lugar (ej. "Paseo del Muelle"), se transliteran todas las palabras. Nunca dejes ninguna palabra en caracteres latinos dentro de un texto en ruso.
+1. PROHIBICIÓN ABSOLUTA: Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
+2. ALTERNATIVAS PERMITIDAS: "Precios ajustados", "tarifas competitivas", "precios económicos", "tarifas transparentes", "sin costes ocultos", "precio oficial".
 
 ---
 
 ## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
 
 1. SLUG:
-URL amigable para este destino. ${reglasSlug} El slug debe reflejar el nombre completo incluyendo el muelle específico — nunca solo la parte genérica del puerto. Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
+URL amigable para este destino. ${reglasSlug} El slug debe reflejar el nombre completo incluyendo el muelle específico. Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio. ⚠️ REGLA PARA RUSO: Está PROHIBIDO usar la palabra "mol" en el slug; si transliteras "muelle" en la URL debe ser "prichal" (ejemplo: puerto-de-la-luz-prichal-santa-catalina).
 
 2. PALABRA_DESTINO:
-La palabra que indica "lugar portuario" o "muelle" (según el contexto) traducida a ${nombreIdioma}, en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico. Solo la palabra.
+La palabra que indica "lugar portuario" o "muelle" traducida a ${nombreIdioma}, en caracteres latinos a-z y guiones únicamente.
 
 3. NOMBRE_ISLA:
 El nombre de la isla "${isla}" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente.
 
 4. META_TITLE (campo: meta_title):
-- Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
-- El nombre completo "${nombre}" (con el muelle específico) debe aparecer en el primer bloque.
-- Formato habitual: [Traslado a/desde ${nombre}] | [Naviera/Crucero que opera ahí] | [Tarifas Competitivas]
+- Separador "|" para 2 o 3 bloques. El nombre completo "${nombre}" debe aparecer en el primer bloque.
 
 5. META_DESCRIPTION (campo: meta_description):
-- Redactada como una solución logística directa para el viajero en esa terminal concreta.
-- El muelle específico debe nombrarse explícitamente.
-- Formato habitual: [Solución de traslado directo a/desde ${nombre}] + [Ventajas: recogida a pie de pasarela/terminal, comodidad con equipaje, sin esperas] + [CTA corto].
+- Solución logística directa nombrando explícitamente el muelle.
 
 6. TEXTO INTRODUCTORIO PARA TARJETA DE DESTINO (campo: texto_tarjeta):
-- EXTENSIÓN: Entre 150 y 200 caracteres (MÁXIMO ABSOLUTO: 200 caracteres, incluidos espacios).
+- EXTENSIÓN: Entre 150 y 200 caracteres (MÁXIMO ABSOLUTO: 200 caracteres).
 - El nombre completo del muelle/terminal debe aparecer en la primera frase.
-- OBJETIVO: Pincelada logística corta y atractiva para la ficha previa del destino con botón hacia la página completa.
-- ESTRUCTURA (2 frases): [Frase 1: Utilidad y localización exacta del muelle/terminal dentro de "${nombre}"] + [Frase 2: Ventaja del traslado privado a pie de muelle + CTA de clic].
 
 7. TEXTO PRINCIPAL DEL DESTINO (campo: texto_descripcion):
-EXTENSIÓN TOTAL OBLIGATORIA: Entre 400 y 550 palabras (LÍMITE MÁXIMO ABSOLUTO: 600 palabras).
-FORMATO: HTML válido. Usa <h2>, <h3>, <p>, <ul>, <li>, <strong>. NUNCA <h1>. NUNCA Markdown.
-ESTRUCTURA:
-- <h2> Encabezado Principal: 1 frase potente centrada en la llegada/salida desde el muelle/terminal específico de "${nombre}". Debe incluir el nombre completo del muelle.
-- <h2> Qué es ${nombre} + <p>: Máximo 1 párrafo (aprox. 60-80 palabras). Ubicación exacta dentro del puerto, navieras o líneas de cruceros que operan específicamente en ese muelle y su función principal.
-- <h2> Operativa y servicios en ${nombre} + <p> o <ul><li>: Máximo 2-3 bloques breves (aprox. 120-150 palabras). Conectividad, accesos para personas con movilidad reducida, zonas de embarque/desembarque específicas y gestión fluida de equipajes en ese muelle concreto.
-- <h2> Te llevamos directamente a/desde ${nombre} + <p>: Máximo 2 párrafos (aprox. 100-120 palabras). TONO OBLIGATORIO: habla en primera persona del plural como si fuera el propio servicio quien escribe — "nuestro conductor te espera a pie de pasarela", "nosotros monitorizamos la llegada de tu barco o ferri", "te dejamos en la puerta exacta que necesitas sin dar rodeos". Explica que el conductor conoce los accesos al muelle específico, los horarios de mayor tráfico y los puntos de encuentro exactos dentro del recinto. Deja claro que el cliente elige el origen: te recogemos desde el punto que necesite — su hotel, su alojamiento o cualquier otro lugar de la isla. Nunca fijes un origen concreto como si fuera el único disponible. Transmite seguridad y control: el viajero no tiene que preocuparse de nada, nosotros nos ocupamos de todo.
-- <h2> Consejos para tu traslado en ${nombre} + <ul><li>: 2-3 tips breves (aprox. 60-80 palabras). TONO OBLIGATORIO: consejos prácticos escritos desde la experiencia del conductor — como si un local que conoce ese muelle de memoria te diera un aviso útil antes de llegar. Incluir: aviso sobre días de alta ocupación (varios barcos a la vez), gestión de equipaje grande en muelle, y que el conductor monitoriza retrasos en la llegada del ferri o crucero sin coste adicional.
-- <h2> Reserva tu traslado a ${nombre} + <p>: 1 párrafo final con CTA (aprox. 40-50 palabras). TONO OBLIGATORIO: cálido y directo, en primera persona — "deja que nosotros nos ocupemos del resto", "llega a ${nombre} como mereces: tranquilo, sin carreras y con todo controlado". Invita a reservar en pocos minutos y transmite que el viajero está en buenas manos.
+EXTENSIÓN TOTAL OBLIGATORIA: Entre 400 y 550 palabras (MÁXIMO: 600 palabras).
+FORMATO: HTML válido (<h2>, <h3>, <p>, <ul>, <li>, <strong>). NUNCA <h1>. NUNCA Markdown.
+ESTRUCTURA RIGUROSA DE ENCABEZADOS (Adaptar el texto de los <h2> al idioma ${nombreIdioma}):
+- <h2> Encabezado Principal: 1 frase potente centrada en la llegada/salida desde el muelle/terminal específico de "${nombre}".
+- <h2> Operativa y características de ${nombre} + <p>: Ubicación exacta dentro del puerto, navieras o cruceros que operan ahí. (PROHIBIDO HABLAR DE TURISMO O ATRACTIVOS DE LA CIUDAD).
+- <h2> Servicios para el viajero en ${nombre} + <p> o <ul><li>: Conectividad, accesibilidad, punto de embarque y gestión de equipaje.
+- <h2> Te llevamos directamente a/desde ${nombre} + <p>: Habla en primera persona del plural ("nuestro conductor te espera...", "monitorizamos tu barco"). Explica recogida flexible desde cualquier punto u hotel.
+- <h2> Consejos prácticos para tu traslado en ${nombre} + <ul><li>: Consejos logísticos locales (días de alta ocupación, equipaje pesado, monitorización de demoras).
+- <h2> Reserva tu traslado a ${nombre} + <p>: Párrafo final con CTA directo a la reserva.
 
 ---
 
 ## AUTOCONTROL DE CARACTERES
-Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) del meta_title, meta_description y texto_tarjeta. Si superan por 1 solo carácter el límite máximo, reescríbelos.
+Antes de entregar la respuesta, cuenta los caracteres exactos de meta_title, meta_description y texto_tarjeta. Si superan por 1 solo carácter el límite máximo, reescríbelos.
 
 ---
 
@@ -684,7 +688,6 @@ Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacio
 Responde ÚNICAMENTE con JSON válido, sin markdown:
 {"slug": "...", "palabra_destino": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "texto_tarjeta": "...", "texto_descripcion": "..."}`;
 }
-
 // =============================================================================
 module.exports = {
   GENERADOR_ALT_NUEVO_ES,
