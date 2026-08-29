@@ -4624,12 +4624,12 @@ app.post('/admin/destinos/:id/visible', requireAdmin, asyncHandler(async (req, r
 
 // Guarda configuración del destino: zona, orden, isla, visible_rutas, sitemap
 app.post('/admin/seo/destinos/:id/config', requireAdmin, asyncHandler(async (req, res) => {
-  const { zona, orden, isla, visible_rutas, sitemap_prioridad, sitemap_frecuencia } = req.body;
+  const { zona, orden, isla, visible_rutas, es_puerto, sitemap_prioridad, sitemap_frecuencia } = req.body;
   await pool.query(
     `UPDATE destinos SET zona = $1, orden = $2, isla = $3, visible_rutas = $4,
-     sitemap_prioridad = $5, sitemap_frecuencia = $6 WHERE id = $7`,
+     es_puerto = $5, sitemap_prioridad = $6, sitemap_frecuencia = $7 WHERE id = $8`,
     [zona || '', parseInt(orden) || 99, isla || 'Gran Canaria',
-     !!visible_rutas, parseFloat(sitemap_prioridad) || 0.8,
+     !!visible_rutas, !!es_puerto, parseFloat(sitemap_prioridad) || 0.8,
      sitemap_frecuencia || 'monthly', req.params.id]
   );
   res.json({ ok: true });
@@ -5531,7 +5531,7 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
   if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
   const { lang } = req.body;
   if (!IDIOMAS_PERMITIDOS.includes(lang)) return res.status(400).json({ error: 'Idioma no válido.' });
-  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  const destino = await pool.query('SELECT nombre, isla, zona, es_puerto FROM destinos WHERE id = $1', [req.params.id]);
   if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado.' });
   const d = destino.rows[0];
   const nombreIdioma = await getNombreIdioma(lang);
@@ -5556,7 +5556,9 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
   const maxCharsDesc   = MAX_CHARS_DESC[lang]   || 148;
 
 
-  const prompt = iaPrompts.GENERADOR_DESTINO_TODO(d.nombre, d.isla, nombreIdioma, reglasSlug);
+  const prompt = d.es_puerto
+    ? iaPrompts.GENERADOR_TERMINAL_PORTUARIA(d.nombre, d.isla, nombreIdioma, reglasSlug)
+    : iaPrompts.GENERADOR_DESTINO_TODO(d.nombre, d.isla, nombreIdioma, reglasSlug);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',

@@ -573,6 +573,118 @@ SOLO esto:
 {"es":{"nombre":"...","slug":"..."},"en":{"nombre":"...","slug":"..."},"de":{"nombre":"...","slug":"..."},"fr":{"nombre":"...","slug":"..."},"it":{"nombre":"...","slug":"..."},"nl":{"nombre":"...","slug":"..."},"sv":{"nombre":"...","slug":"..."},"no":{"nombre":"...","slug":"..."},"fi":{"nombre":"...","slug":"..."},"ru":{"nombre":"...","slug":"..."}}`;
 }
 
+// ─── GENERADOR 15 ────────────────────────────────────────────────────────────
+// Contenido completo de terminal portuaria específica — todo de una vez
+// Endpoint: POST /admin/seo/destinos/:id/generar-todo (mismo endpoint, bifurcado por es_puerto)
+// Botón admin: 🤖 Generar todo con IA
+// Línea original server.js: ~5559
+function GENERADOR_TERMINAL_PORTUARIA(nombre, isla, nombreIdioma, reglasSlug) {
+  return `# INSTRUCCIONES GENERALES DE REDACCIÓN SEO LOCAL Y METADATOS MULTIIDIOMA
+
+Actúa como un Experto en SEO Local, Logística Portuaria y Redactor Creativo Nativo. Tu trabajo consiste en redactar metadatos y contenidos altamente persuasivos, escritos de "humano a humano", para una página de captación del punto de transporte específico "${nombre}" (${isla}, Islas Canarias) de una empresa de traslados y transportes privados intermunicipales.
+
+REGLA FUNDAMENTAL — EL PROTAGONISTA ES EL MUELLE/TERMINAL:
+El destino "${nombre}" incluye el nombre completo con su muelle o terminal específica. ESE MUELLE CONCRETO es el protagonista absoluto de todo el contenido. El nombre completo "${nombre}" (incluyendo el muelle) debe aparecer en el meta_title, en el primer párrafo del texto principal, y en el texto_tarjeta. NUNCA uses solo la parte genérica (ej. "Puerto de La Luz") sin mencionar el muelle específico. El modelo NO debe simplificar el nombre ni omitir el muelle bajo ninguna circunstancia.
+
+REGLA DE NATIVIDAD (NO TRADUCIR):
+No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo busca, piensa y reserva un usuario real de ese idioma cuando planifica su viaje o desembarque en "${nombre}".
+
+---
+
+## CONCEPTO Y OBJETIVO DE LA PÁGINA
+
+Esta página es una landing de captación logística y de transporte. Su objetivo es transmitir máxima seguridad al viajero y presentar el servicio de traslado/transporte privado como la opción más rápida, cómoda y directa para llegar o salir desde "${nombre}" (conectando directamente con el aeropuerto, hoteles, zonas turísticas u otros puntos de la isla).
+
+---
+
+## REGLAS DE ORO Y ESTILO (HUMAN-LIKE)
+
+1. ENFOQUE HIPERLOCAL EN EL MUELLE/TERMINAL ESPECÍFICA:
+Todo el contenido (Título, Descripción, Tarjeta y Texto Principal) debe enfocar la logística de transporte, comodidad con el equipaje y la ubicación exacta del muelle/terminal concreto dentro de "${nombre}". Concéntrate 100% en las características, operativa, navieras o cruceros que operan en ESA terminal concreta — no en el puerto general, no en la historia de la ciudad. Si se menciona Puerto de La Luz como contexto geográfico, siempre debe ir acompañado del muelle específico.
+
+2. LÍMITES ESTRICTOS DE CARACTERES (INFRANQUEABLES):
+Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido para aprovechar el espacio SEO, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO en ${nombreIdioma}. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter.
+
+Límites de caracteres por idioma:
+- Español (ES): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)
+- Inglés (EN): Título (54-60 chars | MÁX 62) | Descripción (150-157 chars | MÁX 160)
+- Alemán (DE): Título (48-53 chars | MÁX 55) | Descripción (130-137 chars | MÁX 140)
+- Francés (FR): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)
+- Italiano (IT): Título (52-58 chars | MÁX 60) | Descripción (148-155 chars | MÁX 158)
+- Neerlandés (NL): Título (50-55 chars | MÁX 57) | Descripción (138-145 chars | MÁX 148)
+- Sueco (SV): Título (50-55 chars | MÁX 57) | Descripción (140-147 chars | MÁX 150)
+- Noruego (NO): Título (50-55 chars | MÁX 57) | Descripción (142-149 chars | MÁX 152)
+- Finlandés (FI): Título (46-52 chars | MÁX 54) | Descripción (128-135 chars | MÁX 138)
+- Ruso (RU): Título (42-48 chars | MÁX 50) | Descripción (118-125 chars | MÁX 128)
+
+3. ESTILO NATURAL Y PROHIBICIONES DE IA:
+- Prohibido usar palabras y clichés típicos de IA como: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido".
+- Usa un tono cercano, seguro, experto en logística local y conversacional (de experto portuario a viajero).
+- Alterna la longitud de las frases (cortas y directas con explicativas) para dar un ritmo de lectura 100% humano.
+
+### REGLAS OBLIGATORIAS SOBRE PRECIOS Y TARIFAS:
+1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):
+   Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
+2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
+   "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".
+3. PROHIBICIÓN ABSOLUTA — PRECIOS (¡CRÍTICO, NO IGNORAR!):
+   NUNCA uses frases que sugieran que el precio se conoce de antemano, que es fijo, cerrado o visible antes de reservar. Esto incluye: "precio fijo", "tarifa fija", "precio cerrado", "conoce el precio antes de reservar", "ves la cantidad al reservar", "pagas exactamente esa cantidad" o cualquier variante similar.
+
+### REGLA PARA IDIOMA RUSO — NOMBRES PROPIOS:
+Cuando generes contenido en ruso, las palabras comunes (puerto, muelle, terminal, ferri, crucero, aeropuerto, playa...) deben traducirse al ruso (ejemplo: "Terminal" → "Терминал", "Muelle" → "Пирс/Причал"). Los nombres propios (Santa Catalina, Nelson Mandela, Las Palmas, Maspalomas...) deben transliterarse completamente al cirílico (ejemplo: "Santa Catalina" → "Санта-Каталина"). Nunca dejes ninguna palabra en caracteres latinos dentro de un texto en ruso.
+
+---
+
+## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
+
+1. SLUG:
+URL amigable para este destino. ${reglasSlug} El slug debe reflejar el nombre completo incluyendo el muelle específico — nunca solo la parte genérica del puerto. Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.
+
+2. PALABRA_DESTINO:
+La palabra que indica "lugar portuario" o "muelle" (según el contexto) traducida a ${nombreIdioma}, en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico. Solo la palabra.
+
+3. NOMBRE_ISLA:
+El nombre de la isla "${isla}" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente.
+
+4. META_TITLE (campo: meta_title):
+- Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
+- El nombre completo "${nombre}" (con el muelle específico) debe aparecer en el primer bloque.
+- Formato habitual: [Traslado a/desde ${nombre}] | [Naviera/Crucero que opera ahí] | [Tarifas Competitivas]
+
+5. META_DESCRIPTION (campo: meta_description):
+- Redactada como una solución logística directa para el viajero en esa terminal concreta.
+- El muelle específico debe nombrarse explícitamente.
+- Formato habitual: [Solución de traslado directo a/desde ${nombre}] + [Ventajas: recogida a pie de pasarela/terminal, comodidad con equipaje, sin esperas] + [CTA corto].
+
+6. TEXTO INTRODUCTORIO PARA TARJETA DE DESTINO (campo: texto_tarjeta):
+- EXTENSIÓN: Entre 150 y 200 caracteres (MÁXIMO ABSOLUTO: 200 caracteres, incluidos espacios).
+- El nombre completo del muelle/terminal debe aparecer en la primera frase.
+- OBJETIVO: Pincelada logística corta y atractiva para la ficha previa del destino con botón hacia la página completa.
+- ESTRUCTURA (2 frases): [Frase 1: Utilidad y localización exacta del muelle/terminal dentro de "${nombre}"] + [Frase 2: Ventaja del traslado privado a pie de muelle + CTA de clic].
+
+7. TEXTO PRINCIPAL DEL DESTINO (campo: texto_descripcion):
+EXTENSIÓN TOTAL OBLIGATORIA: Entre 400 y 550 palabras (LÍMITE MÁXIMO ABSOLUTO: 600 palabras).
+FORMATO: HTML válido. Usa <h2>, <h3>, <p>, <ul>, <li>, <strong>. NUNCA <h1>. NUNCA Markdown.
+ESTRUCTURA:
+- <h2> Encabezado Principal: 1 frase potente centrada en la llegada/salida desde el muelle/terminal específico de "${nombre}". Debe incluir el nombre completo del muelle.
+- <h2> Qué es ${nombre} + <p>: Máximo 1 párrafo (aprox. 60-80 palabras). Ubicación exacta dentro del puerto, navieras o líneas de cruceros que operan específicamente en ese muelle y su función principal.
+- <h2> Operativa y servicios en ${nombre} + <p> o <ul><li>: Máximo 2-3 bloques breves (aprox. 120-150 palabras). Conectividad, accesos para personas con movilidad reducida, zonas de embarque/desembarque específicas y gestión fluida de equipajes en ese muelle concreto.
+- <h2> La mejor forma de desplazarte a/desde ${nombre} + <p>: Máximo 2 párrafos (aprox. 100-120 palabras). Ventajas del transporte privado vs. colas de taxis públicos o transporte masivo, recogida a pie de pasarela y conexión directa con el Aeropuerto de Gran Canaria y zonas turísticas.
+- <h2> Consejos para tu traslado en ${nombre} + <ul><li>: 2-3 tips breves (aprox. 60-80 palabras) sobre horarios de desembarque en ese muelle específico, punto de encuentro exacto con el chófer y previsión de tiempos.
+- <h2> Reserva tu traslado a ${nombre} + <p>: 1 párrafo final con CTA directo a la reserva (aprox. 40-50 palabras).
+
+---
+
+## AUTOCONTROL DE CARACTERES
+Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) del meta_title, meta_description y texto_tarjeta. Si superan por 1 solo carácter el límite máximo, reescríbelos.
+
+---
+
+## FORMATO DE SALIDA (OBLIGATORIO)
+Responde ÚNICAMENTE con JSON válido, sin markdown:
+{"slug": "...", "palabra_destino": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "texto_tarjeta": "...", "texto_descripcion": "..."}`;
+}
+
 // =============================================================================
 module.exports = {
   GENERADOR_ALT_NUEVO_ES,
@@ -588,5 +700,6 @@ module.exports = {
   GENERADOR_ALT_EXISTENTE_RUTA,
   GENERADOR_CATEGORIAS_FLOTA,
   GENERADOR_CATEGORIAS_SEO,
-  GENERADOR_ISLAS
+  GENERADOR_ISLAS,
+  GENERADOR_TERMINAL_PORTUARIA
 };
