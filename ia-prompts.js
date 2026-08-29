@@ -630,8 +630,26 @@ Límites de caracteres por idioma:
 3. PROHIBICIÓN ABSOLUTA — PRECIOS (¡CRÍTICO, NO IGNORAR!):
    NUNCA uses frases que sugieran que el precio se conoce de antemano, que es fijo, cerrado o visible antes de reservar. Esto incluye: "precio fijo", "tarifa fija", "precio cerrado", "conoce el precio antes de reservar", "ves la cantidad al reservar", "pagas exactamente esa cantidad" o cualquier variante similar.
 
-### REGLA PARA IDIOMA RUSO — NOMBRES PROPIOS:
-Cuando generes contenido en ruso, las palabras comunes (puerto, muelle, terminal, ferri, crucero, aeropuerto, playa...) deben traducirse al ruso (ejemplo: "Terminal" → "Терминал", "Muelle" → "Пирс/Причал"). Los nombres propios (Santa Catalina, Nelson Mandela, Las Palmas, Maspalomas...) deben transliterarse completamente al cirílico (ejemplo: "Santa Catalina" → "Санта-Каталина"). Nunca dejes ninguna palabra en caracteres latinos dentro de un texto en ruso.
+### REGLA PARA IDIOMA RUSO — NOMBRES PROPIOS Y PALABRAS COMUNES:
+Cuando generes contenido en ruso, aplica estas reglas sin excepción:
+
+1. PALABRAS COMUNES DE INFRAESTRUCTURA: Se traducen al ruso.
+   - "Terminal" → "Терминал"
+   - "Puerto" → "Порт"
+   - "Ferri" → "Паром"
+   - "Crucero" → "Круиз"
+   - "Muelle" como tipo de infraestructura (el muelle donde atracan los barcos) → siempre "Причал". NUNCA "Мол", NUNCA "Муэль", NUNCA en latino.
+   - Ejemplo correcto: "Muelle Santa Catalina" → "Причал Санта-Каталина" (Причал = infraestructura, Santa Catalina = nombre propio transliterado)
+
+2. NOMBRES PROPIOS: Se transliteran completos al cirílico.
+   - Nombres de lugares, barrios, personas: "Santa Catalina" → "Санта-Каталина", "Nelson Mandela" → "Нельсон-Мандела"
+   - Cuando "Muelle" forma parte de un nombre propio de lugar (ej. "Paseo del Muelle"), se transliteran todas las palabras: "Пасео-дель-Муэлье"
+
+3. PROHIBICIÓN ABSOLUTA — MEZCLA DE IDIOMAS (¡CRÍTICO, NO IGNORAR!):
+   Un texto en ruso es 100% cirílico. Sin excepciones. Sin excusas.
+   Si no sabes traducir una palabra, TRANSLITERALA al cirílico. Nunca la dejes en latino.
+   Está TERMINANTEMENTE PROHIBIDO mezclar palabras en español, inglés u otro idioma latino dentro de un texto en ruso. Ejemplos de lo que NUNCA debe aparecer: "Эль-Muelle", "centro comercial", "Paseo", "Terminal" en latino, o cualquier otra palabra no cirílica.
+   REGLA DE ORO: Si al terminar el texto ves cualquier carácter latino que no sea un número o símbolo universal (€, %, etc.), es un error — corrígelo antes de entregar.
 
 ---
 
