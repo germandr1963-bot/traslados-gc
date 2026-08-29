@@ -4465,7 +4465,7 @@ app.get('/admin/seo/destinos', requireAdmin, asyncHandler(async (req, res) => {
 app.get('/admin/seo/destinos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
   if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) return res.status(400).json({ error: 'Idioma no válido' });
   const result = await pool.query(
-    `SELECT dss.*, d.nombre, d.isla, d.zona, d.orden, d.visible_rutas,
+    `SELECT dss.*, d.nombre, d.isla, d.zona, d.orden, d.visible_rutas, d.es_puerto,
             (SELECT COUNT(*) FROM destinos_fotos df WHERE df.destino_id = d.id) AS num_fotos
      FROM destinos_seo_settings dss
      JOIN destinos d ON d.id = dss.destino_id
@@ -4511,7 +4511,7 @@ app.get('/admin/seo/destinos/:id/completo', requireAdmin, asyncHandler(async (re
     `SELECT dss.destino_id, dss.lang_code, dss.slug_url, dss.meta_title, dss.meta_description,
             dss.og_title, dss.og_description, dss.robots_status, dss.canonical_url,
             dss.texto_descripcion, dss.resena_breve, dss.activo, dss.updated_at,
-            d.nombre, d.zona, d.isla, d.orden, d.visible_rutas,
+            d.nombre, d.zona, d.isla, d.orden, d.visible_rutas, d.es_puerto,
             d.sitemap_prioridad, d.sitemap_frecuencia
      FROM destinos_seo_settings dss
      JOIN destinos d ON d.id = dss.destino_id
