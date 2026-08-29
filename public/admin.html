@@ -9133,7 +9133,7 @@ function guardarConfigDestino(destinoId) {
       msg.innerHTML = d.ok ? '<div class="aviso-ok">✅ Configuración guardada</div>' : '<div class="aviso-error">Error: ' + escapar(d.error || '') + '</div>';
       setTimeout(function() { msg.innerHTML = ''; }, 3000);
     }
-    if (d.ok) cargarPaginaRutas();
+    if (d.ok) { cargarPaginaRutas(); abrirEditorDestino(destinoId); }
   });
 }
 
