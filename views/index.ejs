@@ -208,6 +208,7 @@
   font-size: 14px;
   color: var(--texto-muted);
   min-height: 26px;
+  margin-top: 12px;
 }
 .resultado-vacio {
   display: flex;
@@ -420,7 +421,7 @@ footer {
           <div class="custom-select-box placeholder-activo" id="hasta-box"><%= t('home_label_selecciona') %></div>
           <div class="custom-select-dropdown" id="hasta-dropdown"></div>
         </div>
-        <div class="custom-select-wrapper">
+        <div class="custom-select-wrapper" style="justify-self:center;width:60%;">
           <label class="etiqueta"><%= t('home_label_categoria') %></label>
           <select id="categoria" class="campo" style="display:none"><option value=""><%= t('home_label_selecciona') %></option></select>
           <div class="custom-select-box placeholder-activo" id="categoria-box"><%= t('home_label_selecciona') %></div>
