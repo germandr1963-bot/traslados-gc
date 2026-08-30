@@ -700,7 +700,7 @@ function cargarRutas() {
         filtrados.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
         poblarSelect(selectHasta, filtrados);
       }
-      if (hastaVal) selectHasta.value = hastaVal;
+      if (hastaVal) { selectHasta.value = hastaVal; sincronizarDropdown('hasta'); }
       actualizarCategoriasSegunRuta();
     });
 
@@ -721,7 +721,7 @@ function cargarRutas() {
         filtrados.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
         poblarSelect(selectDesde, filtrados);
       }
-      if (desdeVal) selectDesde.value = desdeVal;
+      if (desdeVal) { selectDesde.value = desdeVal; sincronizarDropdown('desde'); }
       actualizarCategoriasSegunRuta();
     });
   });
