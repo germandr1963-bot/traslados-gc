@@ -126,73 +126,6 @@
   word-break: break-word;
   padding: 8px 10px;
 }
-.dropdown-custom {
-  position: relative;
-  width: 100%;
-}
-.dropdown-custom-btn {
-  width: 100%;
-  min-height: 40px;
-  padding: 8px 32px 8px 10px;
-  background: #fff;
-  border: 1px solid var(--piedra-borde);
-  border-radius: 6px;
-  color: var(--texto-oscuro);
-  font-size: 14px;
-  text-align: left;
-  cursor: pointer;
-  white-space: normal;
-  word-break: break-word;
-  line-height: 1.4;
-  position: relative;
-  box-sizing: border-box;
-}
-.dropdown-custom-btn::after {
-  content: '▾';
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  opacity: 0.6;
-}
-.dropdown-custom-lista {
-  display: none;
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: #fff;
-  border: 1px solid var(--piedra-borde);
-  border-radius: 6px;
-  z-index: 999;
-  max-height: 260px;
-  overflow-y: auto;
-  margin-top: 2px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-}
-.dropdown-custom-lista.abierta {
-  display: block;
-}
-.dropdown-custom-item {
-  padding: 9px 12px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--texto-oscuro);
-  white-space: normal;
-  word-break: break-word;
-  line-height: 1.4;
-}
-.dropdown-custom-item:hover {
-  background: var(--gris-fondo, #f5f2ed);
-}
-.dropdown-custom-item.seleccionado {
-  background: #FBEAE7;
-  font-weight: 600;
-}
-.dropdown-custom-item.placeholder {
-  color: var(--texto-muted);
-}
 #resultado-precio {
   font-size: 14px;
   color: var(--texto-muted);
@@ -399,19 +332,11 @@ footer {
       <div class="fila-busqueda">
         <div>
           <label class="etiqueta"><%= t('home_label_desde') %></label>
-          <div class="dropdown-custom" id="dropdown-desde">
-            <button type="button" class="dropdown-custom-btn" id="desde-btn"><%= t('home_label_selecciona') %></button>
-            <div class="dropdown-custom-lista" id="desde-lista"></div>
-          </div>
-          <input type="hidden" id="desde" value="">
+          <select id="desde" class="campo" size="1"><option value=""><%= t('home_label_selecciona') %></option></select>
         </div>
         <div>
           <label class="etiqueta"><%= t('home_label_hasta') %></label>
-          <div class="dropdown-custom" id="dropdown-hasta">
-            <button type="button" class="dropdown-custom-btn" id="hasta-btn"><%= t('home_label_selecciona') %></button>
-            <div class="dropdown-custom-lista" id="hasta-lista"></div>
-          </div>
-          <input type="hidden" id="hasta" value="">
+          <select id="hasta" class="campo" size="1"><option value=""><%= t('home_label_selecciona') %></option></select>
         </div>
         <div>
           <label class="etiqueta"><%= t('home_label_categoria') %></label>
@@ -536,78 +461,10 @@ function cargarFondo() {
   img.src = '/fondo-activo';
 }
 
-var _labelSelecciona = TXT.selecciona || '<%= t("home_label_selecciona") %>';
-
-function poblarDropdown(inputId, valores) {
-  var input = document.getElementById(inputId);
-  var btn = document.getElementById(inputId + '-btn');
-  var lista = document.getElementById(inputId + '-lista');
-  if (!input || !btn || !lista) return;
-
-  lista.innerHTML = '';
-
-  // Opción vacía
-  var itemVacio = document.createElement('div');
-  itemVacio.className = 'dropdown-custom-item placeholder';
-  itemVacio.textContent = _labelSelecciona;
-  itemVacio.addEventListener('click', function() {
-    input.value = '';
-    btn.innerHTML = _labelSelecciona;
-    lista.classList.remove('abierta');
-    // Disparar evento change
-    input.dispatchEvent(new Event('change'));
-  });
-  lista.appendChild(itemVacio);
-
-  valores.forEach(function(v) {
-    var item = document.createElement('div');
-    item.className = 'dropdown-custom-item';
-    if (String(v.valor) === String(input.value)) item.classList.add('seleccionado');
-    item.textContent = v.etiqueta;
-    item.addEventListener('click', function() {
-      input.value = v.valor;
-      btn.textContent = v.etiqueta;
-      // Marcar seleccionado
-      lista.querySelectorAll('.dropdown-custom-item').forEach(function(i) { i.classList.remove('seleccionado'); });
-      item.classList.add('seleccionado');
-      lista.classList.remove('abierta');
-      input.dispatchEvent(new Event('change'));
-    });
-    lista.appendChild(item);
-  });
-}
-
-function abrirDropdown(inputId) {
-  var lista = document.getElementById(inputId + '-lista');
-  var otraLista = inputId === 'desde' ? document.getElementById('hasta-lista') : document.getElementById('desde-lista');
-  if (otraLista) otraLista.classList.remove('abierta');
-  if (lista) lista.classList.toggle('abierta');
-}
-
-// Cerrar dropdowns al hacer clic fuera
-document.addEventListener('click', function(e) {
-  ['desde', 'hasta'].forEach(function(id) {
-    var dropdown = document.getElementById('dropdown-' + id);
-    if (dropdown && !dropdown.contains(e.target)) {
-      var lista = document.getElementById(id + '-lista');
-      if (lista) lista.classList.remove('abierta');
-    }
-  });
-});
-
-document.getElementById('desde-btn').addEventListener('click', function(e) { e.stopPropagation(); abrirDropdown('desde'); });
-document.getElementById('hasta-btn').addEventListener('click', function(e) { e.stopPropagation(); abrirDropdown('hasta'); });
-
-// Compatibilidad: poblarSelect redirige a poblarDropdown para desde/hasta
-function poblarSelect(selectOrId, valores) {
-  var id = typeof selectOrId === 'string' ? selectOrId : (selectOrId && selectOrId.id);
-  if (id === 'desde' || id === 'hasta') {
-    poblarDropdown(id, valores);
-    return;
-  }
-  // Para el select de categoría (nativo), funciona igual que antes
-  var select = typeof selectOrId === 'string' ? document.getElementById(selectOrId) : selectOrId;
-  if (!select) return;
+function poblarSelect(select, valores) {
+  // valores: lista de objetos { valor, etiqueta }
+  // valor = nombre en español (interno, para buscar ruta y precio)
+  // etiqueta = nombre traducido (lo que ve el visitante)
   var primera = select.options[0] ? select.options[0].textContent : '';
   select.innerHTML = '<option value="">' + primera + '</option>';
   valores.forEach(function (v) {
@@ -663,16 +520,8 @@ function cargarRutas() {
     }
 
     // Asignar los dos valores al final para que no se pisen entre sí
-    if (paramDesde) {
-      document.getElementById('desde').value = paramDesde;
-      var etqDesde = origenes.find(function(o){ return o.valor === paramDesde; });
-      if (etqDesde) document.getElementById('desde-btn').textContent = etqDesde.etiqueta;
-    }
-    if (paramHasta) {
-      document.getElementById('hasta').value = paramHasta;
-      var etqHasta = destinos.find(function(o){ return o.valor === paramHasta; });
-      if (etqHasta) document.getElementById('hasta-btn').textContent = etqHasta.etiqueta;
-    }
+    if (paramDesde) document.getElementById('desde').value = paramDesde;
+    if (paramHasta) document.getElementById('hasta').value = paramHasta;
 
     if (paramDesde || paramHasta) actualizarCategoriasSegunRuta();
     if (rutas.length === 0) {
@@ -682,9 +531,10 @@ function cargarRutas() {
     // Filtrado bidireccional: origen filtra destino, destino filtra origen
     document.getElementById('desde').addEventListener('change', function () {
       var origenVal = this.value;
-      var hastaVal = document.getElementById('hasta').value;
+      var selectHasta = document.getElementById('hasta');
+      var hastaVal = selectHasta.value;
       if (!origenVal) {
-        poblarDropdown('hasta', destinos);
+        poblarSelect(selectHasta, destinos);
       } else {
         var vistos = {}, filtrados = [];
         rutasDisponibles.forEach(function (r) {
@@ -694,21 +544,18 @@ function cargarRutas() {
           }
         });
         filtrados.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
-        poblarDropdown('hasta', filtrados);
+        poblarSelect(selectHasta, filtrados);
       }
-      if (hastaVal) {
-        document.getElementById('hasta').value = hastaVal;
-        var etq = destinos.find(function(o){ return o.valor === hastaVal; });
-        if (etq) document.getElementById('hasta-btn').textContent = etq.etiqueta;
-      }
+      if (hastaVal) selectHasta.value = hastaVal;
       actualizarCategoriasSegunRuta();
     });
 
     document.getElementById('hasta').addEventListener('change', function () {
       var destinoVal = this.value;
-      var desdeVal = document.getElementById('desde').value;
+      var selectDesde = document.getElementById('desde');
+      var desdeVal = selectDesde.value;
       if (!destinoVal) {
-        poblarDropdown('desde', origenes);
+        poblarSelect(selectDesde, origenes);
       } else {
         var vistos = {}, filtrados = [];
         rutasDisponibles.forEach(function (r) {
@@ -718,13 +565,9 @@ function cargarRutas() {
           }
         });
         filtrados.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
-        poblarDropdown('desde', filtrados);
+        poblarSelect(selectDesde, filtrados);
       }
-      if (desdeVal) {
-        document.getElementById('desde').value = desdeVal;
-        var etq = origenes.find(function(o){ return o.valor === desdeVal; });
-        if (etq) document.getElementById('desde-btn').textContent = etq.etiqueta;
-      }
+      if (desdeVal) selectDesde.value = desdeVal;
       actualizarCategoriasSegunRuta();
     });
   });
