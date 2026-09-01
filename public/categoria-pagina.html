@@ -483,15 +483,15 @@
         html += '</div>';
 
         // 4. Ficha técnica — nombre categoría + modelos + capacidad + características
-        html += '<h2 class="nombre-categoria-ficha">Categoría ' + esc(cat.nombre) + '</h2>';
+        html += '<h2 class="nombre-categoria-ficha">' + esc(tx.cat_ficha_categoria || 'Categoría') + ' ' + esc(cat.nombre) + '</h2>';
         if (cat.subtitulo) {
-          html += '<p class="subtitulo-categoria-ficha"><strong>Modelos de referencia:</strong> ' + esc(cat.subtitulo.replace(/^Modelos de referencia:\s*/i, '')) + '</p>';
+          html += '<p class="subtitulo-categoria-ficha"><strong>' + esc(tx.cat_modelos_referencia || 'Modelos de referencia') + ':</strong> ' + esc(cat.subtitulo.replace(/^Modelos de referencia:\s*/i, '')) + '</p>';
         }
         html += '<div class="capacidad-bloque">';
         html += '<div class="capacidad-item"><div class="cap-valor">' + esc(String(cat.capacidad_pasajeros)) + '</div><div class="cap-etiqueta">' + esc(tx.tabla_columna_pasajeros || 'Pasajeros') + '</div></div>';
         html += '<div class="capacidad-item"><div class="cap-valor">' + esc(String(cat.capacidad_maletas)) + '</div><div class="cap-etiqueta">' + esc(tx.tabla_columna_equipaje || 'Maletas') + '</div></div>';
         if (cat.limite_sillas && cat.limite_sillas > 0) {
-          html += '<div class="capacidad-item"><div class="cap-valor">' + esc(String(cat.limite_sillas)) + '</div><div class="cap-etiqueta">Sillas bebé</div></div>';
+          html += '<div class="capacidad-item"><div class="cap-valor">' + esc(String(cat.limite_sillas)) + '</div><div class="cap-etiqueta">' + esc(tx.cat_sillas_bebe || 'Sillas bebé') + '</div></div>';
         }
         html += '</div>';
         if (cat.caracteristicas) {
