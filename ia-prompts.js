@@ -583,6 +583,9 @@ function GENERADOR_TERMINAL_PORTUARIA(nombre, isla, nombreIdioma, reglasSlug) {
 
 Actúa como un Experto en SEO Local, Logística Portuaria y Redactor Creativo Nativo. Tu trabajo consiste en redactar metadatos y contenidos altamente persuasivos, escritos de "humano a humano", para una página de captación del punto de transporte específico "${nombre}" (${isla}, Islas Canarias) de una empresa de traslados y transportes privados intermunicipales.
 
+REGLA DE NATIVIDAD (NO TRADUCIR):
+No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo busca, piensa y planifica su llegada o salida un viajero real de ese idioma cuando necesita un traslado privado desde o hacia un puerto o terminal marítima.
+
 REGLA FUNDAMENTAL — EL PROTAGONISTA ES EL MUELLE/TERMINAL:
 El destino "${nombre}" incluye el nombre completo con su muelle o terminal específica. ESE MUELLE CONCRETO es el protagonista absoluto de todo el contenido. El nombre completo "${nombre}" (incluyendo el muelle) debe aparecer en el meta_title, en el primer párrafo del texto principal, y en el texto_tarjeta. NUNCA uses solo la parte genérica (ej. "Puerto de La Luz") sin mencionar el muelle específico. El modelo NO debe simplificar el nombre ni omitir el muelle bajo ninguna circunstancia.
 
