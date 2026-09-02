@@ -4038,6 +4038,23 @@ app.post('/admin/seo/rutas/:id/generar-ia', requireAdmin, asyncHandler(async (re
   const { origen, destino } = rutaResult.rows[0];
   const nombreIdioma = await getNombreIdioma(lang);
 
+  // Buscar nombres traducidos en destinos_traducciones (igual que Generador 15)
+  let origenParaGenerador = origen;
+  let destinoParaGenerador = destino;
+  if (lang !== 'es') {
+    const tradOrigen = await pool.query(
+      'SELECT dt.nombre FROM destinos_traducciones dt JOIN destinos d ON d.id = dt.destino_id WHERE d.nombre = $1 AND dt.lang_code = $2 LIMIT 1',
+      [origen, lang]
+    );
+    if (tradOrigen.rows[0] && tradOrigen.rows[0].nombre) origenParaGenerador = tradOrigen.rows[0].nombre;
+
+    const tradDestino = await pool.query(
+      'SELECT dt.nombre FROM destinos_traducciones dt JOIN destinos d ON d.id = dt.destino_id WHERE d.nombre = $1 AND dt.lang_code = $2 LIMIT 1',
+      [destino, lang]
+    );
+    if (tradDestino.rows[0] && tradDestino.rows[0].nombre) destinoParaGenerador = tradDestino.rows[0].nombre;
+  }
+
   const ALFABETO_LATINO = ['es','en','de','fr','it','nl','sv','no','fi','pt','pl','cs','ro','hu','sk','hr','sl','da'];
   const ALFABETO_CIRILI = ['ru','bg','uk','sr','mk'];
   let reglasSlug = '';
@@ -4051,7 +4068,7 @@ app.post('/admin/seo/rutas/:id/generar-ia', requireAdmin, asyncHandler(async (re
     reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones. Describe el trayecto de origen a destino en inglés.`;
   }
 
-  const items = [{ route_id: parseInt(req.params.id), origen, destino, reglasSlug }];
+  const items = [{ route_id: parseInt(req.params.id), origen: origenParaGenerador, destino: destinoParaGenerador, reglasSlug }];
   const prompt = iaPrompts.GENERADOR_RUTAS_SEO(nombreIdioma, items);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
