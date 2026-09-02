@@ -5578,9 +5578,9 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
   const maxCharsDesc   = MAX_CHARS_DESC[lang]   || 148;
 
 
-  // Para el Generador 15 (puertos): buscar el nombre traducido en destinos_traducciones
+  // Buscar el nombre traducido en destinos_traducciones para todos los destinos (puertos y normales)
   let nombreParaGenerador = d.nombre;
-  if (d.es_puerto && lang !== 'es') {
+  if (lang !== 'es') {
     const tradNombre = await pool.query(
       'SELECT nombre FROM destinos_traducciones WHERE destino_id = $1 AND lang_code = $2 LIMIT 1',
       [req.params.id, lang]
@@ -5592,7 +5592,7 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
 
   const prompt = d.es_puerto
     ? iaPrompts.GENERADOR_TERMINAL_PORTUARIA(nombreParaGenerador, d.isla, nombreIdioma, reglasSlug)
-    : iaPrompts.GENERADOR_DESTINO_TODO(d.nombre, d.isla, nombreIdioma, reglasSlug);
+    : iaPrompts.GENERADOR_DESTINO_TODO(nombreParaGenerador, d.isla, nombreIdioma, reglasSlug);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
