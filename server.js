@@ -4519,8 +4519,9 @@ app.get('/admin/seo/destinos/:id/completo', requireAdmin, asyncHandler(async (re
             d.sitemap_prioridad, d.sitemap_frecuencia
      FROM destinos_seo_settings dss
      JOIN destinos d ON d.id = dss.destino_id
+     JOIN idiomas_web iw ON iw.codigo = dss.lang_code
      WHERE dss.destino_id = $1
-     ORDER BY dss.lang_code`,
+     ORDER BY iw.orden`,
     [req.params.id]
   );
   const porIdioma = {};
