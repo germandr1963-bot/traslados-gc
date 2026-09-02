@@ -151,9 +151,6 @@ Límites de caracteres por idioma:
 ### REGLA PARA IDIOMA RUSO — NOMBRES PROPIOS:
 Cuando generes contenido en ruso, las palabras comunes (aeropuerto, carretera, norte, sur, trayecto, puerto, zona...) deben traducirse al ruso (ejemplo: "Aeropuerto" → "Аэропорт", "Puerto" → "Порт"). Los nombres propios (Maspalomas, Las Palmas, Mogán, Canaria...) deben transliterarse completamente al cirílico (ejemplo: "Maspalomas" → "Маспаломас", "Gran Canaria" → "Гран-Канария"). Nunca dejes ninguna palabra en caracteres latinos dentro de un texto en ruso.
 
-### REGLA PARA IDIOMA FRANCÉS — NOMBRE DE LA CIUDAD:
-Cuando generes contenido en francés, sustituye SIEMPRE "Las Palmas de Gran Canaria" por "Las Palmas de Grande Canarie" (o solo "Las Palmas" si el contexto es informal o fluido). Nunca dejes "Gran Canaria" dentro del nombre de la ciudad en un texto en francés.
-
 ---
 
 ## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
