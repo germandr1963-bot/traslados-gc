@@ -1916,7 +1916,7 @@ function renderizarEditorIsla(isla) {
 
   // Si es isla existente, añadir bloque de traducciones por idioma (sin ES — ya está arriba)
   if (!esNueva) {
-    var idiomasTrad = ['en','de','fr','it','nl','sv','no','fi','ru'];
+    var idiomasTrad = ['en','de','sv','no','nl','it','fr','fi','ru'];
 
     // Estructura HTML provisional con pestañas en rojo — los colores reales se cargan en el fetch de abajo
     var tabsHtml = idiomasTrad.map(function(lang, i) {
@@ -8544,9 +8544,8 @@ function abrirEditorDestino(destinoId) {
   fetch('/admin/seo/destinos/' + destinoId + '/completo')
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      // ES siempre primero, luego el resto en el orden que vengan
-      var todosIdiomas = Object.keys(d.idiomas);
-      var idiomas = ['es'].concat(todosIdiomas.filter(function(l) { return l !== 'es'; }));
+      // Orden fijo desde IDIOMAS_SEO (cargado desde BD con ORDER BY orden)
+      var idiomas = IDIOMAS_SEO.filter(function(l) { return d.idiomas[l]; });
       var primerIdioma = d.idiomas['es'] || d.idiomas[idiomas[0]] || {};
       var nombre = primerIdioma.nombre || 'Destino';
       var tabs = idiomas.map(function(lang) {
