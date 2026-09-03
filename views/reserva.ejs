@@ -358,6 +358,9 @@
 .lang-pill:hover { border-color:var(--texto-muted); color:var(--texto-oscuro); }
 .lang-pill.activo { background:#C1502E; border-color:#C1502E; color:#fff; }
 footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13px; }
+.breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; padding: 0 0 0 4px; }
+.breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+.breadcrumbs a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -382,6 +385,7 @@ footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13
     <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#C1502E;font-weight:700;margin-bottom:2px;"><%= t('reserva_banner_portal') %></div>
     <div id="banner-nombre-cliente" style="font-size:18px;font-weight:700;color:#1C1815;"></div>
   </div>
+  <nav class="breadcrumbs"><a href="<%= urlHome %>"><%= t('nav_inicio') %></a><span> › </span><span><%= t('reserva_titulo') %></span></nav>
   <h1 class="titular" style="font-size:26px;margin-bottom:6px;"><%= t('reserva_titulo') %></h1>
   <p style="font-size:14px;color:var(--texto-muted);margin-bottom:22px;"><%= t('reserva_subtitulo') %></p>
 
