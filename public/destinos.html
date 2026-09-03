@@ -207,8 +207,6 @@
     // Admin → Gestionar idiomas → Palabras de URL por página.
     // La API nos la devuelve junto con los destinos.
     // Actualizar enlaces del footer y cabecera al idioma detectado
-    var palabraIsla = 'Isla'; // fallback hasta que llegue la traducción de la API
-
     fetch('/api/palabras-paginas-publico?lang=' + lang)
       .then(function(r) { return r.json(); })
       .then(function(pp) {
@@ -241,7 +239,6 @@
         if (pp.nav_inicio)        { var bc = document.getElementById('breadcrumb-inicio');   if (bc) bc.textContent = pp.nav_inicio; }
         if (pp.footer_destinos)   { var bd = document.getElementById('breadcrumb-destinos'); if (bd) bd.textContent = pp.footer_destinos; }
         if (pp.nav_contacto)           document.getElementById('link-contacto-header').textContent   = pp.nav_contacto;
-        if (pp.destinos_palabra_isla)   palabraIsla = pp.destinos_palabra_isla;
       }).catch(function() {});
 
     fetch('/api/destinos-pagina?lang=' + lang)
@@ -249,24 +246,22 @@
       .then(function(d) {
         var islas = d.islas || {};
         var palabraDestino = d.palabra_destino || 'destino'; // palabra en el idioma actual
-        var claves = Object.keys(islas);
-        if (claves.length === 0) {
+        var nombres = Object.keys(islas);
+        if (nombres.length === 0) {
           document.getElementById('contenido-destinos').innerHTML =
             '<p style="text-align:center;color:var(--texto-muted);font-size:14px;padding:40px 0;">Próximamente los destinos disponibles.</p>';
           return;
         }
         var html = '';
-        claves.forEach(function(clave) {
-          var bloqueIsla = islas[clave];
-          var nombreIsla = bloqueIsla.nombre || clave;
-          var destinos = bloqueIsla.destinos || [];
+        nombres.forEach(function(isla) {
+          var destinos = islas[isla];
           html += '<div class="isla-bloque">';
-          html += '<div class="isla-titulo">' + nombreIsla + ' <span class="isla-label">' + palabraIsla + '</span></div>';
+          html += '<div class="isla-titulo">' + isla + ' <span class="isla-label">Isla</span></div>';
           html += '<div class="grid-destinos">';
           destinos.forEach(function(dest) {
             var slug = dest.slug || dest.nombre.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-            var islaSlug = clave.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-            var url = '/' + lang + '/' + palabraDestino + '/' + islaSlug + '/' + slug;
+            var isla = (dest.isla || 'Gran Canaria').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            var url = '/' + lang + '/' + palabraDestino + '/' + isla + '/' + slug;
             html += '<a href="' + url + '" class="tarjeta-destino">';
             html += '<div class="td-foto">';
             if (dest.foto_cabecera_id) html += '<img src="/destino-foto/' + dest.foto_cabecera_id + '" alt="' + dest.nombre + '">';
