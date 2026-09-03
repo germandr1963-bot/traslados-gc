@@ -115,9 +115,10 @@
     }
     .oculto { display: none; }
     footer { text-align: center; padding: 30px; color: var(--texto-muted); font-size: 13px; }
-    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; align-self: flex-start; width: 100%; max-width: 520px; text-align: left; }
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; }
     .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
     .breadcrumbs a:hover { text-decoration: underline; }
+    .contenido-bc { max-width: 860px; margin: 0 auto; padding: 24px 24px 0; }
   </style>
 </head>
 <body>
@@ -127,7 +128,7 @@
     <a id="link-contacto-header" href="/contacto" class="nav derecha">Contacto</a>
   </header>
   <main>
-  <nav class="breadcrumbs"><a id="breadcrumb-inicio" href="/">Inicio</a><span> › </span><span id="breadcrumb-mi-reserva">Mi reserva</span></nav>
+  <div class="contenido-bc"><nav class="breadcrumbs"><a id="breadcrumb-inicio" href="/">Inicio</a><span> › </span><span id="breadcrumb-mi-reserva">Mi reserva</span></nav></div>
   <h1 id="acceso-titulo">Acceso clientes</h1>
   <p class="subtitulo" id="acceso-subtitulo">Consulta y gestiona todas tus reservas</p>
   <div class="card">

@@ -96,9 +96,10 @@
       border-width: 2px;
     }
     footer { text-align: center; padding: 30px; color: var(--texto-muted); font-size: 13px; }
-    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; text-align: left; }
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; }
     .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
     .breadcrumbs a:hover { text-decoration: underline; }
+    .contenido-bc { max-width: 860px; margin: 0 auto; padding: 24px 24px 0; }
   </style>
 </head>
 <body>
@@ -110,7 +111,7 @@
   </header>
 
   <main>
-    <nav class="breadcrumbs" id="breadcrumb-nav"></nav>
+    <div class="contenido-bc"><nav class="breadcrumbs" id="breadcrumb-nav"></nav></div>
     <h1 id="titulo-pagina">Acceso a choferes</h1>
     <p class="sub" id="texto-intro">Regístrate y forma parte de nuestro equipo</p>
 
