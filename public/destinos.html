@@ -170,7 +170,7 @@
   </header>
 
   <div class="contenido">
-    <nav class="breadcrumbs"><a id="breadcrumb-inicio" href="/">Inicio</a></nav>
+    <nav class="breadcrumbs"><a id="breadcrumb-inicio" href="/">Inicio</a><span> › </span><span id="breadcrumb-destinos">Destinos</span></nav>
     <h1 id="titulo-destinos">Destinos</h1>
     <p class="subtitulo" id="subtitulo-destinos">Descubre los destinos más solicitados de Gran Canaria</p>
 
@@ -214,6 +214,7 @@
           var base = '/' + lang + '/';
           document.getElementById('link-inicio-header').href   = '/' + lang + '/';
           document.getElementById('link-logo-header').href     = '/' + lang + '/';
+          document.getElementById('breadcrumb-inicio').href    = '/' + lang + '/';
           document.getElementById('link-contacto-header').href = base + (pp.contacto || 'contacto');
           document.getElementById('footer-rutas').href     = base + (pp.rutas    || 'rutas');
           document.getElementById('footer-destinos').href  = base + (pp.destinos || 'destinos');
@@ -235,7 +236,8 @@
         if (pp.footer_acceso_choferes) document.getElementById('footer-acceso-choferes').textContent = pp.footer_acceso_choferes;
         if (pp.footer_acceso_clientes) document.getElementById('footer-acceso-clientes').textContent = pp.footer_acceso_clientes;
         if (pp.nav_inicio_flecha)      document.getElementById('link-inicio-header').textContent     = pp.nav_inicio_flecha;
-        if (pp.nav_inicio)             { var bc = document.getElementById('breadcrumb-inicio'); if (bc) bc.textContent = pp.nav_inicio; }
+        if (pp.nav_inicio)        { var bc = document.getElementById('breadcrumb-inicio');   if (bc) bc.textContent = pp.nav_inicio; }
+        if (pp.footer_destinos)   { var bd = document.getElementById('breadcrumb-destinos'); if (bd) bd.textContent = pp.footer_destinos; }
         if (pp.nav_contacto)           document.getElementById('link-contacto-header').textContent   = pp.nav_contacto;
       }).catch(function() {});
 

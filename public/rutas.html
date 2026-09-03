@@ -170,7 +170,7 @@
   </header>
 
   <div class="contenido">
-    <nav class="breadcrumbs"><a id="breadcrumb-inicio" href="/">Inicio</a></nav>
+    <nav class="breadcrumbs"><a id="breadcrumb-inicio" href="/">Inicio</a><span> › </span><span id="breadcrumb-rutas">Rutas</span></nav>
     <h1 id="titulo-rutas">Rutas</h1>
     <p class="subtitulo" id="subtitulo-rutas">Todos los trayectos intermunicipales de Gran Canaria, a tu medida</p>
 
@@ -241,6 +241,7 @@
             var base = '/' + lang + '/';
             document.getElementById('link-inicio-header').href   = '/' + lang + '/';
             document.getElementById('link-logo-header').href     = '/' + lang + '/';
+            document.getElementById('breadcrumb-inicio').href    = '/' + lang + '/';
             document.getElementById('link-contacto-header').href = base + (pp.contacto || 'contacto');
             document.getElementById('footer-rutas').href          = base + (pp.rutas    || 'rutas');
             document.getElementById('footer-destinos').href       = base + (pp.destinos || 'destinos');
@@ -258,7 +259,8 @@
           if (pp.footer_acceso_choferes) document.getElementById('footer-acceso-choferes').textContent = pp.footer_acceso_choferes;
           if (pp.footer_acceso_clientes) document.getElementById('footer-acceso-clientes').textContent = pp.footer_acceso_clientes;
           if (pp.nav_inicio)   document.getElementById('link-inicio-header').textContent   = pp.nav_inicio;
-          if (pp.nav_inicio)   { var bc = document.getElementById('breadcrumb-inicio'); if (bc) bc.textContent = pp.nav_inicio; }
+          if (pp.nav_inicio)  { var bc = document.getElementById('breadcrumb-inicio'); if (bc) bc.textContent = pp.nav_inicio; }
+          if (pp.footer_rutas) { var br = document.getElementById('breadcrumb-rutas');  if (br) br.textContent = pp.footer_rutas; }
           if (pp.nav_contacto) document.getElementById('link-contacto-header').textContent = pp.nav_contacto;
           if (pp.rutas_titulo)           document.getElementById('titulo-rutas').textContent            = pp.rutas_titulo;
           if (pp.rutas_subtitulo)        document.getElementById('subtitulo-rutas').textContent         = pp.rutas_subtitulo;
