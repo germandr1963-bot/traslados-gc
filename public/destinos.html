@@ -202,7 +202,6 @@
     // Si estamos en /destinos (sin idioma), usamos 'es' por defecto.
     var partes = window.location.pathname.split('/');
     var lang = (partes[1] && partes[1].length === 2) ? partes[1] : 'es';
-    var pp = {};
 
     // La palabra "destino" en la URL varía por idioma y se gestiona desde
     // Admin → Gestionar idiomas → Palabras de URL por página.
@@ -210,8 +209,7 @@
     // Actualizar enlaces del footer y cabecera al idioma detectado
     fetch('/api/palabras-paginas-publico?lang=' + lang)
       .then(function(r) { return r.json(); })
-      .then(function(datos) {
-        pp = datos;
+      .then(function(pp) {
         if (lang !== 'es') {
           var base = '/' + lang + '/';
           document.getElementById('link-inicio-header').href   = '/' + lang + '/';
@@ -258,7 +256,7 @@
         nombres.forEach(function(isla) {
           var destinos = islas[isla];
           html += '<div class="isla-bloque">';
-          html += '<div class="isla-titulo">' + isla + ' <span class="isla-label">' + (pp.destinos_isla_label || 'Isla') + '</span></div>';
+          html += '<div class="isla-titulo">' + isla + ' <span class="isla-label">Isla</span></div>';
           html += '<div class="grid-destinos">';
           destinos.forEach(function(dest) {
             var slug = dest.slug || dest.nombre.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
