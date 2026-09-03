@@ -3654,12 +3654,19 @@ app.post('/admin/precios-grid', requireAdmin, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Formato incorrecto' });
   }
   for (const c of cambios) {
-    await pool.query(
-      `INSERT INTO rutas_precios (ruta_id, categoria_id, precio)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (ruta_id, categoria_id) DO UPDATE SET precio = $3`,
-      [c.ruta_id, c.categoria_id, c.precio]
-    );
+    if (c.precio === null) {
+      await pool.query(
+        `DELETE FROM rutas_precios WHERE ruta_id = $1 AND categoria_id = $2`,
+        [c.ruta_id, c.categoria_id]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO rutas_precios (ruta_id, categoria_id, precio)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (ruta_id, categoria_id) DO UPDATE SET precio = $3`,
+        [c.ruta_id, c.categoria_id, c.precio]
+      );
+    }
   }
   res.json({ ok: true });
 }));
