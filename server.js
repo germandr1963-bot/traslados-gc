@@ -1068,8 +1068,10 @@ async function initSchema() {
 
   // ─── Textos de la página de Destinos ─────────────────────────────────────
   const TEXTOS_DESTINOS_PAGINA = [
-    { clave: 'destinos_titulo',    contexto: 'Título principal de la página de Destinos', es: 'Destinos' },
-    { clave: 'destinos_subtitulo', contexto: 'Frase bajo el título de la página de Destinos', es: 'Descubre los destinos más solicitados de Gran Canaria' },
+    { clave: 'destinos_titulo',       contexto: 'Título principal de la página de Destinos', es: 'Destinos' },
+    { clave: 'destinos_subtitulo',    contexto: 'Frase bajo el título de la página de Destinos', es: 'Descubre los destinos más solicitados de Gran Canaria' },
+    { clave: 'destinos_palabra_isla', contexto: 'Etiqueta "Isla" que aparece junto al nombre de la isla en la página de Destinos', es: 'Isla' },
+    { clave: 'destinos_nombre_isla',  contexto: 'Nombre de la isla en la página de Destinos (ej: "Gran Canaria")', es: 'Gran Canaria' },
   ];
   for (const tx of TEXTOS_DESTINOS_PAGINA) {
     await pool.query(
