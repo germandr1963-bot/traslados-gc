@@ -1070,7 +1070,6 @@ async function initSchema() {
   const TEXTOS_DESTINOS_PAGINA = [
     { clave: 'destinos_titulo',    contexto: 'Título principal de la página de Destinos', es: 'Destinos' },
     { clave: 'destinos_subtitulo', contexto: 'Frase bajo el título de la página de Destinos', es: 'Descubre los destinos más solicitados de Gran Canaria' },
-    { clave: 'destinos_isla_label', contexto: 'Etiqueta que aparece junto al nombre de la isla en la página de Destinos (ej: "Gran Canaria · Isla")', es: 'Isla' },
   ];
   for (const tx of TEXTOS_DESTINOS_PAGINA) {
     await pool.query(
