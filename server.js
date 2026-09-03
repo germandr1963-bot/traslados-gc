@@ -6316,6 +6316,8 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
     rutas_subtitulo:           obtenerTexto('rutas_subtitulo',                 lang),
     destinos_titulo:           obtenerTexto('destinos_titulo',                 lang),
     destinos_subtitulo:        obtenerTexto('destinos_subtitulo',              lang),
+    destinos_palabra_isla:     obtenerTexto('destinos_palabra_isla',           lang),
+    destinos_nombre_isla:      obtenerTexto('destinos_nombre_isla',            lang),
     footer_rutas:              obtenerTexto('home_footer_rutas',               lang),
     footer_destinos:           obtenerTexto('home_footer_destinos',            lang),
     footer_flota:              obtenerTexto('home_footer_flota',               lang),
