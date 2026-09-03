@@ -11,6 +11,7 @@
       background: #1C1815;
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: 20px;
@@ -77,9 +78,13 @@
       display: none;
     }
     @media (max-width: 420px) { .card { padding: 28px 20px; } }
+    .breadcrumbs { font-size: 13px; color: #aaa; margin-bottom: 16px; text-align: left; width: 100%; max-width: 400px; }
+    .breadcrumbs a { color: #aaa; text-decoration: none; }
+    .breadcrumbs a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
+  <nav class="breadcrumbs"><a href="/">Inicio</a><span> › </span><span>Acceso choferes</span></nav>
   <div class="card">
     <div class="logo">
       <h1>TRASLADOS GC</h1>

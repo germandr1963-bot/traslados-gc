@@ -96,6 +96,9 @@
       border-width: 2px;
     }
     footer { text-align: center; padding: 30px; color: var(--texto-muted); font-size: 13px; }
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; }
+    .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+    .breadcrumbs a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -107,6 +110,7 @@
   </header>
 
   <main>
+    <nav class="breadcrumbs" id="breadcrumb-nav"></nav>
     <h1 id="titulo-pagina">Acceso a choferes</h1>
     <p class="sub" id="texto-intro">Regístrate y forma parte de nuestro equipo</p>
 
@@ -244,6 +248,16 @@
   </footer>
 
   <script>
+    // Breadcrumb según URL
+    (function() {
+      var esAlta = window.location.pathname.indexOf('/alta') !== -1;
+      var texto = esAlta ? 'Alta choferes' : 'Acceso choferes';
+      var nav = document.getElementById('breadcrumb-nav');
+      if (nav) {
+        nav.innerHTML = '<a href="/">Inicio</a><span> › </span><span>' + texto + '</span>';
+      }
+    })();
+
     var catalogoMarcas = [];
     var categoriaSeleccionada = null;
     var fotoRegistro = null;
