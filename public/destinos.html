@@ -239,11 +239,10 @@
         if (pp.nav_inicio)        { var bc = document.getElementById('breadcrumb-inicio');   if (bc) bc.textContent = pp.nav_inicio; }
         if (pp.footer_destinos)   { var bd = document.getElementById('breadcrumb-destinos'); if (bd) bd.textContent = pp.footer_destinos; }
         if (pp.nav_contacto)           document.getElementById('link-contacto-header').textContent   = pp.nav_contacto;
-      }).catch(function() {});
 
-    fetch('/api/destinos-pagina?lang=' + lang)
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
+        fetch('/api/destinos-pagina?lang=' + lang)
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
         var islas = d.islas || {};
         var palabraDestino = d.palabra_destino || 'destino'; // palabra en el idioma actual
         var nombres = Object.keys(islas);
@@ -256,7 +255,7 @@
         nombres.forEach(function(isla) {
           var destinos = islas[isla];
           html += '<div class="isla-bloque">';
-          html += '<div class="isla-titulo">' + isla + ' <span class="isla-label">Isla</span></div>';
+          html += '<div class="isla-titulo">' + (pp.destinos_nombre_isla || isla) + ' <span class="isla-label">' + (pp.destinos_palabra_isla || 'Isla') + '</span></div>';
           html += '<div class="grid-destinos">';
           destinos.forEach(function(dest) {
             var slug = dest.slug || dest.nombre.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -278,11 +277,12 @@
           html += '</div></div>';
         });
         document.getElementById('contenido-destinos').innerHTML = html;
-      })
-      .catch(function() {
-        document.getElementById('contenido-destinos').innerHTML =
-          '<p style="text-align:center;color:var(--texto-muted);font-size:14px;padding:40px 0;">No se pudieron cargar los destinos.</p>';
-      });
+          })
+          .catch(function() {
+            document.getElementById('contenido-destinos').innerHTML =
+              '<p style="text-align:center;color:var(--texto-muted);font-size:14px;padding:40px 0;">No se pudieron cargar los destinos.</p>';
+          });
+      }).catch(function() {});
   </script>
 </body>
 </html>
