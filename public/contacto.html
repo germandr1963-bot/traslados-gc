@@ -35,6 +35,9 @@
       header.app .marca { font-size: 19px; letter-spacing: 1px; }
       header.app a.nav { font-size: 12px; }
     }
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; text-align: left; }
+    .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+    .breadcrumbs a:hover { text-decoration: underline; }
     .contenido { max-width: 700px; margin: 0 auto; padding: 40px 24px 80px; text-align: center; }
     h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: clamp(32px, 6vw, 52px); margin-bottom: 12px; }
     h1 span { color: var(--terracota); }
@@ -64,6 +67,7 @@
     <a id="link-contacto-header" href="/contacto" class="nav derecha">Contacto</a>
   </header>
   <div class="contenido">
+    <nav class="breadcrumbs"><a id="breadcrumb-inicio" href="/">Inicio</a><span> › </span><span id="breadcrumb-contacto">Contacto</span></nav>
     <h1 id="contacto-titulo">Contacto</h1>
     <p class="subtitulo" id="contacto-subtitulo">Estamos aquí para ayudarte en lo que necesites</p>
     <div class="tarjetas" id="tarjetas-contacto">
@@ -94,6 +98,7 @@
             var base = '/' + lang + '/';
             document.getElementById('link-inicio-header').href    = '/' + lang + '/';
             document.getElementById('link-logo-header').href      = '/' + lang + '/';
+            document.getElementById('breadcrumb-inicio').href     = '/' + lang + '/';
             document.getElementById('link-contacto-header').href  = base + (pp.contacto || 'contacto');
             document.getElementById('footer-rutas').href          = base + (pp.rutas    || 'rutas');
             document.getElementById('footer-destinos').href       = base + (pp.destinos || 'destinos');
@@ -110,8 +115,10 @@
           if (pp.footer_alta_choferes)   document.getElementById('footer-alta-choferes').textContent   = pp.footer_alta_choferes;
           if (pp.footer_acceso_choferes) document.getElementById('footer-acceso-choferes').textContent = pp.footer_acceso_choferes;
           if (pp.footer_acceso_clientes) document.getElementById('footer-acceso-clientes').textContent = pp.footer_acceso_clientes;
-          if (pp.nav_inicio)   document.getElementById('link-inicio-header').textContent   = pp.nav_inicio;
-          if (pp.nav_contacto) document.getElementById('link-contacto-header').textContent = pp.nav_contacto;
+          if (pp.nav_inicio)     document.getElementById('link-inicio-header').textContent   = pp.nav_inicio;
+          if (pp.nav_contacto)   document.getElementById('link-contacto-header').textContent = pp.nav_contacto;
+          if (pp.nav_inicio)     { var bc = document.getElementById('breadcrumb-inicio');   if (bc) bc.textContent = pp.nav_inicio; }
+          if (pp.footer_contacto){ var bct = document.getElementById('breadcrumb-contacto'); if (bct) bct.textContent = pp.footer_contacto; }
           if (pp.contacto_titulo)        document.getElementById('contacto-titulo').textContent        = pp.contacto_titulo;
           if (pp.contacto_subtitulo)     document.getElementById('contacto-subtitulo').textContent     = pp.contacto_subtitulo;
           if (pp.contacto_cargando)      document.getElementById('contacto-cargando') && (document.getElementById('contacto-cargando').textContent = pp.contacto_cargando);
