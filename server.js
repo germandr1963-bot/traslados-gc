@@ -5222,7 +5222,7 @@ app.post('/admin/seo/rutas/:id/fotos/nueva/alt/generar-todos', requireAdmin, asy
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6', max_tokens: 600,
+      model: 'claude-sonnet-4-6', max_tokens: 800,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
         { type: 'text', text: prompt }
