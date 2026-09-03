@@ -2987,20 +2987,20 @@ document.getElementById('boton-guardar-precios').addEventListener('click', funct
   var inputs = document.querySelectorAll('#tabla-precios-contenedor input');
   var cambios = [];
   inputs.forEach(function (input) {
-    if (input.value !== '') {
-      cambios.push({
-        ruta_id: Number(input.dataset.ruta),
-        categoria_id: Number(input.dataset.categoria),
-        precio: Number(input.value)
-      });
-    }
+    cambios.push({
+      ruta_id: Number(input.dataset.ruta),
+      categoria_id: Number(input.dataset.categoria),
+      precio: input.value !== '' ? Number(input.value) : null
+    });
   });
   fetch('/admin/precios-grid', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cambios: cambios })
   }).then(function () {
-    document.getElementById('mensaje-precios').innerHTML = '<div class="aviso-ok">Precios guardados</div>';
+    var msg = document.getElementById('mensaje-precios');
+    msg.innerHTML = '<div class="aviso-ok">Precios guardados</div>';
+    setTimeout(function () { msg.innerHTML = ''; }, 3000);
   });
 });
 
