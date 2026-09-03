@@ -1068,8 +1068,9 @@ async function initSchema() {
 
   // ─── Textos de la página de Destinos ─────────────────────────────────────
   const TEXTOS_DESTINOS_PAGINA = [
-    { clave: 'destinos_titulo',    contexto: 'Título principal de la página de Destinos', es: 'Destinos' },
-    { clave: 'destinos_subtitulo', contexto: 'Frase bajo el título de la página de Destinos', es: 'Descubre los destinos más solicitados de Gran Canaria' },
+    { clave: 'destinos_titulo',       contexto: 'Título principal de la página de Destinos', es: 'Destinos' },
+    { clave: 'destinos_subtitulo',    contexto: 'Frase bajo el título de la página de Destinos', es: 'Descubre los destinos más solicitados de Gran Canaria' },
+    { clave: 'destinos_palabra_isla', contexto: 'Etiqueta "Isla" que aparece junto al nombre de la isla en la página de Destinos', es: 'Isla' },
   ];
   for (const tx of TEXTOS_DESTINOS_PAGINA) {
     await pool.query(
@@ -6314,6 +6315,7 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
     rutas_subtitulo:           obtenerTexto('rutas_subtitulo',                 lang),
     destinos_titulo:           obtenerTexto('destinos_titulo',                 lang),
     destinos_subtitulo:        obtenerTexto('destinos_subtitulo',              lang),
+    destinos_palabra_isla:     obtenerTexto('destinos_palabra_isla',           lang),
     footer_rutas:              obtenerTexto('home_footer_rutas',               lang),
     footer_destinos:           obtenerTexto('home_footer_destinos',            lang),
     footer_flota:              obtenerTexto('home_footer_flota',               lang),
@@ -6875,19 +6877,23 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
            COALESCE(dss_lang.slug_url, dss_es.slug_url) AS slug_url,
            COALESCE(dss_lang.resena_breve, dss_es.resena_breve) AS resena_breve,
            (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id,
-           COALESCE(dt.nombre, d.nombre) AS nombre_mostrar
+           COALESCE(dt.nombre, d.nombre) AS nombre_mostrar,
+           COALESCE(it.nombre, i.nombre, d.isla) AS isla_nombre_traducido
     FROM destinos d
     JOIN destinos_seo_settings dss_es ON dss_es.destino_id = d.id AND dss_es.lang_code = 'es'
     LEFT JOIN destinos_seo_settings dss_lang ON dss_lang.destino_id = d.id AND dss_lang.lang_code = $1 AND dss_lang.activo = TRUE
     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1
+    LEFT JOIN islas i ON i.id = d.isla_id
+    LEFT JOIN islas_traducciones it ON it.isla_id = d.isla_id AND it.lang_code = $1
     WHERE d.activo = TRUE AND d.visible_rutas = TRUE AND dss_es.activo = TRUE
     ORDER BY d.isla, d.orden, d.nombre
   `, [lang]);
   const porIsla = {};
   for (const d of result.rows) {
     const isla = d.isla || 'Gran Canaria';
-    if (!porIsla[isla]) porIsla[isla] = [];
-    porIsla[isla].push({
+    const islaNombreTraducido = d.isla_nombre_traducido || isla;
+    if (!porIsla[isla]) porIsla[isla] = { nombre: islaNombreTraducido, destinos: [] };
+    porIsla[isla].destinos.push({
       id: d.id,
       nombre: d.nombre_mostrar,
       zona: d.zona,
