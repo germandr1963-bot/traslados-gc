@@ -6131,7 +6131,7 @@ app.post('/admin/categorias/generar-ia/:lang', requireAdmin, asyncHandler(async 
 
   // Cargar todas las categorías activas con sus datos
   const cats = await pool.query(
-    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas
+    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas, descripcion
      FROM categorias_vehiculos
      WHERE activa = TRUE
      ORDER BY orden, nombre`
@@ -6141,9 +6141,22 @@ app.post('/admin/categorias/generar-ia/:lang', requireAdmin, asyncHandler(async 
     return res.json({ ok: true, propuestas: [] });
   }
 
-  // Genera siempre todas las categorías activas — sin filtrar por contenido existente.
-  // El panel de revisión permite al admin decidir qué guardar antes de sobreescribir.
-  const pendientes = cats.rows;
+  // Solo generar las categorías que no tienen texto en este idioma todavía.
+  // Las que ya tienen contenido (revisado o escrito a mano) se respetan.
+  let pendientes;
+  if (lang === 'es') {
+    pendientes = cats.rows.filter(function (c) {
+      return !c.descripcion || c.descripcion.trim() === '';
+    });
+  } else {
+    const traducidas = await pool.query(
+      `SELECT categoria_id FROM categorias_vehiculos_traducciones
+       WHERE lang_code = $1 AND descripcion IS NOT NULL AND descripcion <> ''`,
+      [lang]
+    );
+    const idsConTexto = new Set(traducidas.rows.map(function (r) { return r.categoria_id; }));
+    pendientes = cats.rows.filter(function (c) { return !idsConTexto.has(c.id); });
+  }
 
   const nombreIdioma = await getNombreIdioma(lang);
   let generado;
