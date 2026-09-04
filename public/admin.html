@@ -2320,18 +2320,14 @@ function elegirFotoCategoria(id) {
       var imagen = new Image();
       imagen.onload = function () {
         var continuar = function () {
+          var escala = Math.min(1, 600 / imagen.width);
           var lienzo = document.createElement('canvas');
-          lienzo.width = 600;
-          lienzo.height = 400;
+          lienzo.width = Math.round(imagen.width * escala);
+          lienzo.height = Math.round(imagen.height * escala);
           var contexto = lienzo.getContext('2d');
           contexto.fillStyle = '#ffffff';
-          contexto.fillRect(0, 0, 600, 400);
-          var escala = Math.min(600 / imagen.width, 400 / imagen.height);
-          var w = Math.round(imagen.width * escala);
-          var h = Math.round(imagen.height * escala);
-          var x = Math.round((600 - w) / 2);
-          var y = Math.round((400 - h) / 2);
-          contexto.drawImage(imagen, x, y, w, h);
+          contexto.fillRect(0, 0, lienzo.width, lienzo.height);
+          contexto.drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
           fetch('/admin/categorias/' + id + '/foto', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
