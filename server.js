@@ -10547,7 +10547,7 @@ app.get('/api/ruta-publica/:lang/:slug', asyncHandler(async (req, res) => {
     twitterActivo:      !!globales.twitter_activo,
     schemaTaxiService,
     schemaBreadcrumb,
-    palabrasPaginas: PALABRAS_PAGINAS[lang] || {},
+    palabrasPaginas: Object.assign({}, PALABRAS_PAGINAS[lang] || {}, { nav_inicio: t('nav_inicio') }),
     seccionTraslado: SECCIONES_TRASLADO[lang] || 'traslado',
     textos: {
       titulo_tarifas:            t('titulo_tarifas'),
@@ -10569,6 +10569,7 @@ app.get('/api/ruta-publica/:lang/:slug', asyncHandler(async (req, res) => {
       paso3_titulo:              t('paso3_titulo'),
       paso3_texto:               t('paso3_texto'),
       titulo_rutas_relacionadas: t('titulo_rutas_relacionadas'),
+      nav_inicio:                t('nav_inicio'),
       nav_volver_rutas:          t('nav_volver_rutas'),
       nav_contacto:              t('nav_contacto'),
       home_footer_rutas:         t('home_footer_rutas'),
