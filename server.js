@@ -10407,6 +10407,7 @@ app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
       paso2_texto:                 t('paso2_texto'),
       paso3_titulo:                t('paso3_titulo'),
       paso3_texto:                 t('paso3_texto'),
+      nav_inicio:                  t('nav_inicio'),
       nav_volver_flota:            t('home_footer_flota'),
       nav_contacto:                t('nav_contacto'),
       home_footer_rutas:           t('home_footer_rutas'),
