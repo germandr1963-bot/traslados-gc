@@ -6784,9 +6784,19 @@ app.post('/admin/tarifario/calcular', requireAdmin, asyncHandler(async (req, res
 
 // ─── Contacto público ─────────────────────────────────────────────────────────
 
-app.get('/contacto', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'contacto.html'));
-});
+async function renderContacto(req, res, lang) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
+  const contacto = await pool.query('SELECT * FROM configuracion_contacto WHERE id = 1');
+  res.render('contacto', { lang, t, palabrasPaginas, BASE_URL, contacto: contacto.rows[0] || {} });
+}
+
+app.get('/contacto', asyncHandler(async (req, res) => {
+  await renderContacto(req, res, 'es');
+}));
 
 app.get('/api/contacto', asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT * FROM configuracion_contacto WHERE id = 1');
@@ -7206,7 +7216,7 @@ app.get('/:lang([a-z]{2})/:seccion', asyncHandler(async (req, res) => {
   // ── Contacto ─────────────────────────────────────────────────────────────
   const palabraContacto = pp.contacto || 'contacto';
   if (seccion === palabraContacto) {
-    return res.sendFile(path.join(__dirname, 'public', 'contacto.html'));
+    return renderContacto(req, res, lang);
   }
 
   // ── Acceso clientes (mi reserva) ─────────────────────────────────────────
