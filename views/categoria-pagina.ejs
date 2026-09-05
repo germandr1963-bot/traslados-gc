@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= cat.meta_title || (cat.nombre + ' — ' + nombreMarca) %></title>
+  <% if (cat.meta_description) { %>
+  <meta name="description" content="<%= cat.meta_description %>">
+  <% } %>
+  <meta name="robots" content="index,follow">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="<%= nombreMarca %>">
+  <meta property="og:title" content="<%= cat.meta_title || cat.nombre %>">
+  <% if (cat.meta_description) { %>
+  <meta property="og:description" content="<%= cat.meta_description %>">
+  <% } %>
+  <% if (cat.canonical_url) { %>
+  <meta property="og:url" content="<%= BASE_URL %><%= cat.canonical_url %>">
+  <link rel="canonical" href="<%= BASE_URL %><%= cat.canonical_url %>">
+  <% } %>
+  <% if (cat.tiene_foto) { %>
+  <meta property="og:image" content="<%= BASE_URL %>/admin/categorias/<%= cat.id %>/foto">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <% } else if (tieneImagenDefecto) { %>
+  <meta property="og:image" content="<%= BASE_URL %>/imagen-og-defecto">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <% } %>
+
+  <% if (twitterActivo) { %>
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="<%= cat.meta_title || cat.nombre %>">
+  <% if (cat.meta_description) { %>
+  <meta name="twitter:description" content="<%= cat.meta_description %>">
+  <% } %>
+  <% if (cat.tiene_foto) { %>
+  <meta name="twitter:image" content="<%= BASE_URL %>/admin/categorias/<%= cat.id %>/foto">
+  <% } else if (tieneImagenDefecto) { %>
+  <meta name="twitter:image" content="<%= BASE_URL %>/imagen-og-defecto">
+  <% } %>
+  <% } %>
+
+  <!-- Hreflang -->
+  <% alternates.forEach(function(alt) { %>
+  <link rel="alternate" hreflang="<%= alt.lang_code %>"
+    href="<%= BASE_URL %><%= alt.lang_code !== 'es' ? '/' + alt.lang_code : '' %>/<%= (alt.lang_code !== 'es' && palabrasPaginas.flota) ? palabrasPaginas.flota : 'flota' %>/<%= cat.isla_slug %>/<%= alt.slug_url %>">
+  <% }); %>
+  <link rel="alternate" hreflang="x-default" href="<%= BASE_URL %>/flota/<%= cat.isla_slug %>/<%= cat.slug_url %>">
+
+  <!-- Schema.org -->
+  <script type="application/ld+json"><%- JSON.stringify(schemaVehicle).replace(/<\/script>/gi, '<\\/script>') %></script>
+  <script type="application/ld+json"><%- JSON.stringify(schemaBreadcrumb).replace(/<\/script>/gi, '<\\/script>') %></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/estilos.css">
+  <style>
+    body { background: var(--gris-fondo); color: var(--texto-oscuro); min-height: 100vh; }
+    header.app {
+      background: var(--charcoal);
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      border-bottom: 3px solid var(--terracota);
+    }
+    header.app .marca {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--texto-claro);
+      letter-spacing: 2px;
+      text-decoration: none;
+      text-align: center;
+      justify-self: center;
+    }
+    header.app a.nav { color: rgba(255,255,255,0.65); text-decoration: none; font-size: 14px; }
+    header.app a.nav:hover { color: #fff; }
+    header.app a.nav.izquierda { justify-self: start; }
+    header.app .derecha-header { justify-self: end; }
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; }
+    .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+    .breadcrumbs a:hover { text-decoration: underline; }
+    .contenido { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+    .foto-cabecera {
+      width: 100%; height: 400px; background: #fff;
+      border-radius: 12px; overflow: hidden; margin-bottom: 32px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .foto-cabecera img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    h1.titulo-categoria {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: clamp(32px, 6vw, 52px);
+      margin-bottom: 10px; line-height: 1.1; text-align: center;
+    }
+    .subtitulo-categoria { font-size: 15px; color: var(--texto-muted); text-align: center; margin-bottom: 10px; }
+    .botones-accion { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 36px; }
+    .boton-reservar {
+      display: inline-block; background: var(--terracota); color: white;
+      font-family: 'Big Shoulders Display', sans-serif; font-size: 20px;
+      letter-spacing: 1px; padding: 16px 40px; border-radius: 8px;
+      text-decoration: none; transition: opacity 0.2s;
+    }
+    .boton-reservar:hover { opacity: 0.88; }
+    .caracteristicas-lista { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 36px; }
+    .caracteristica-item { background: var(--gris-borde); border-radius: 20px; padding: 6px 16px; font-size: 13px; color: var(--texto-oscuro); }
+    .caracteristica-item::before { content: '✓ '; color: var(--terracota); font-weight: 600; }
+    .capacidad-bloque { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
+    .capacidad-item { background: white; border: 1px solid var(--gris-borde); border-radius: 10px; padding: 12px 24px; text-align: center; min-width: 110px; }
+    .capacidad-item .cap-valor { font-family: 'Big Shoulders Display', sans-serif; font-size: 28px; color: var(--terracota); line-height: 1; }
+    .capacidad-item .cap-etiqueta { font-size: 12px; color: var(--texto-muted); margin-top: 4px; }
+    .descripcion-larga { font-size: 15px; line-height: 1.75; color: var(--texto-oscuro); margin-bottom: 40px; white-space: pre-line; }
+    .seccion { margin: 40px 0; }
+    .seccion h2 { margin-bottom: 16px; }
+    .tabla-tarifas { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .tabla-tarifas th { background: var(--charcoal); color: var(--texto-claro); padding: 10px 14px; text-align: left; font-weight: 500; font-family: 'Big Shoulders Display', sans-serif; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .tabla-tarifas td { padding: 10px 14px; border-bottom: 1px solid var(--gris-borde); color: var(--texto-oscuro); }
+    .tabla-tarifas th:last-child, .tabla-tarifas td:last-child { text-align: right; }
+    .precio-valor { font-weight: 500; font-size: 16px; }
+    .badge-fijo { background: var(--oro); color: var(--oro-texto); font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 10px; margin-left: 8px; }
+    .consultar { color: var(--texto-muted); font-style: italic; }
+    .nombre-categoria-ficha { font-size: 26px; margin-bottom: 8px; margin-top: 20px; text-align: center; }
+    .subtitulo-categoria-ficha { font-size: 16px; color: var(--texto-oscuro); margin-bottom: 16px; text-align: center; }
+    .texto-seo-corto p { font-size: 16px; line-height: 1.7; color: var(--texto-oscuro); }
+    .texto-seo-largo { font-size: 15px; line-height: 1.75; color: var(--texto-oscuro); }
+    .texto-seo-largo h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 24px; margin: 28px 0 10px; }
+    .texto-seo-largo h3 { font-family: 'Big Shoulders Display', sans-serif; font-size: 20px; margin: 22px 0 8px; }
+    .texto-seo-largo p { margin: 0 0 14px; }
+    .texto-seo-largo ul { padding-left: 20px; margin: 0 0 14px; }
+    .texto-seo-largo li { margin-bottom: 6px; }
+    .galeria-fotos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 0; }
+    .galeria-foto { border-radius: 10px; overflow: hidden; background: #fff; border: 1px solid var(--gris-borde); aspect-ratio: 4/3; }
+    .galeria-foto img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s ease; }
+    .galeria-foto img:hover { transform: scale(1.03); }
+    .tres-columnas { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+    footer { text-align: center; padding: 30px; color: var(--texto-muted); font-size: 13px; }
+    footer a { color: var(--texto-muted); text-decoration: none; margin: 0 12px; font-size: 13px; }
+    footer a:hover { color: var(--texto-oscuro); }
+    .footer-links { margin-bottom: 12px; }
+    @media (max-width: 560px) {
+      header.app { padding: 12px 14px; }
+      header.app .marca { font-size: 19px; letter-spacing: 1px; }
+      header.app a.nav { font-size: 12px; }
+      .contenido { padding: 24px 16px 60px; }
+      .foto-cabecera { height: 220px; border-radius: 8px; }
+      h1.titulo-categoria { font-size: clamp(24px, 7vw, 36px); }
+      .boton-reservar { display: block; text-align: center; padding: 14px 20px; font-size: 17px; }
+      .seccion { margin: 28px 0; }
+      .tabla-tarifas { font-size: 13px; }
+      .tabla-tarifas th, .tabla-tarifas td { padding: 8px 8px; }
+      .tres-columnas { grid-template-columns: 1fr; gap: 12px; }
+      .capacidad-bloque { gap: 10px; }
+      .galeria-fotos { grid-template-columns: 1fr; gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="app">
+  <a href="<%= lang === 'es' ? '/flota' : '/' + lang + '/' + (palabrasPaginas.flota || 'flota') %>" class="nav izquierda">← <%= t('home_footer_flota') || 'Flota' %></a>
+  <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="marca"><%= nombreMarca %></a>
+  <div class="derecha-header">
+    <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/' + (palabrasPaginas.contacto || 'contacto') %>" class="nav"><%= t('nav_contacto') || 'Contacto' %></a>
+  </div>
+</header>
+
+<div class="contenido">
+  <!-- Breadcrumbs -->
+  <nav class="breadcrumbs">
+    <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>"><%= t('nav_inicio') || 'Inicio' %></a>
+    <span> › </span>
+    <a href="<%= lang === 'es' ? '/flota' : '/' + lang + '/' + (palabrasPaginas.flota || 'flota') %>"><%= t('home_footer_flota') || 'Flota' %></a>
+    <span> › </span>
+    <span><%= cat.isla_nombre %></span>
+    <span> › </span>
+    <span><%= cat.nombre %></span>
+  </nav>
+
+  <!-- H1 -->
+  <h1 class="titulo-categoria"><%= cat.h1_seo || cat.nombre %></h1>
+  <% if (cat.subtitulo_seo || cat.subtitulo) { %>
+  <p class="subtitulo-categoria"><%= cat.subtitulo_seo || cat.subtitulo %></p>
+  <% } %>
+
+  <!-- Foto cabecera -->
+  <div class="foto-cabecera">
+    <% if (cat.tiene_foto) { %>
+    <img src="/admin/categorias/<%= cat.id %>/foto" alt="<%= cat.nombre %>">
+    <% } %>
+  </div>
+
+  <!-- Ficha técnica -->
+  <h2 class="nombre-categoria-ficha"><%= t('cat_ficha_categoria') || 'Categoría' %> <%= cat.nombre %></h2>
+  <% if (cat.subtitulo) { %>
+  <p class="subtitulo-categoria-ficha">
+    <strong><%= t('cat_modelos_referencia') || 'Modelos de referencia' %>:</strong>
+    <%= cat.subtitulo.replace(/^Modelos de referencia:\s*/i, '') %>
+  </p>
+  <% } %>
+
+  <div class="capacidad-bloque">
+    <div class="capacidad-item">
+      <div class="cap-valor"><%= cat.capacidad_pasajeros %></div>
+      <div class="cap-etiqueta"><%= t('tabla_columna_pasajeros') || 'Pasajeros' %></div>
+    </div>
+    <div class="capacidad-item">
+      <div class="cap-valor"><%= cat.capacidad_maletas %></div>
+      <div class="cap-etiqueta"><%= t('tabla_columna_equipaje') || 'Maletas' %></div>
+    </div>
+    <% if (cat.limite_sillas && cat.limite_sillas > 0) { %>
+    <div class="capacidad-item">
+      <div class="cap-valor"><%= cat.limite_sillas %></div>
+      <div class="cap-etiqueta"><%= t('cat_sillas_bebe') || 'Sillas bebé' %></div>
+    </div>
+    <% } %>
+  </div>
+
+  <% if (cat.caracteristicas) { %>
+  <div class="caracteristicas-lista">
+    <% cat.caracteristicas.split('\n').filter(function(l) { return l.trim(); }).forEach(function(item) { %>
+    <span class="caracteristica-item"><%= item.trim() %></span>
+    <% }); %>
+  </div>
+  <% } %>
+
+  <!-- Texto SEO corto -->
+  <% if (cat.resena_breve) { %>
+  <div class="seccion texto-seo-corto"><p><%= cat.resena_breve %></p></div>
+  <% } %>
+
+  <!-- Galería de fotos -->
+  <% if (fotosGaleria && fotosGaleria.length > 0) { %>
+  <div class="seccion galeria-fotos">
+    <% fotosGaleria.forEach(function(f) { %>
+    <div class="galeria-foto">
+      <img src="/categoria-foto/<%= f.id %>" alt="<%= f.alt_texto %>" loading="lazy">
+    </div>
+    <% }); %>
+  </div>
+  <% } %>
+
+  <!-- Tabla de tarifas -->
+  <% if (precios && precios.length > 0) { %>
+  <div class="seccion">
+    <h2><%= t('titulo_tarifas') || 'Tarifas' %></h2>
+    <table class="tabla-tarifas">
+      <thead>
+        <tr>
+          <th><%= t('tabla_columna_categoria') || 'Ruta' %></th>
+          <th style="text-align:right;"><%= t('tabla_columna_precio') || 'Precio' %></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% precios.forEach(function(p) { %>
+        <tr>
+          <td><%= p.origen %> → <%= p.destino %></td>
+          <td style="text-align:right;">
+            <% if (p.precio) { %>
+              <span class="precio-valor"><%= Number(p.precio).toFixed(0) %> €</span>
+              <span class="badge-fijo"><%= t('badge_precio_fijo') || '' %></span>
+            <% } else { %>
+              <span class="consultar"><%= t('texto_a_consultar') || 'A consultar' %></span>
+            <% } %>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <p style="margin-top:20px;">
+      <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>?categoria=<%= cat.id %>" class="boton-reservar">
+        <%= t('boton_solicitar_traslado') || 'Solicitar traslado' %>
+      </a>
+    </p>
+  </div>
+  <% } %>
+
+  <!-- Cómo funciona -->
+  <div class="seccion">
+    <h2><%= t('titulo_como_funciona') || '' %></h2>
+    <div class="tres-columnas">
+      <div class="tarjeta">
+        <strong><%= t('paso1_titulo') || '' %></strong>
+        <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);"><%= t('paso1_texto') || '' %></p>
+      </div>
+      <div class="tarjeta">
+        <strong><%= t('paso2_titulo') || '' %></strong>
+        <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);"><%= t('paso2_texto') || '' %></p>
+      </div>
+      <div class="tarjeta">
+        <strong><%= t('paso3_titulo') || '' %></strong>
+        <p style="margin-top:8px;font-size:14px;color:var(--texto-muted);"><%= t('paso3_texto') || '' %></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Texto SEO largo -->
+  <% if (cat.texto_descripcion) { %>
+  <div class="seccion">
+    <div class="texto-seo-largo"><%- cat.texto_descripcion %></div>
+  </div>
+  <% } %>
+
+</div>
+
+<footer>
+  <div class="footer-links">
+    <a href="<%= lang === 'es' ? '/rutas' : '/' + lang + '/' + (palabrasPaginas.rutas || 'rutas') %>"><%= t('home_footer_rutas') || 'Rutas' %></a>
+    <a href="<%= lang === 'es' ? '/destinos' : '/' + lang + '/' + (palabrasPaginas.destinos || 'destinos') %>"><%= t('home_footer_destinos') || 'Destinos' %></a>
+    <a href="<%= lang === 'es' ? '/flota' : '/' + lang + '/' + (palabrasPaginas.flota || 'flota') %>"><%= t('home_footer_flota') || 'Flota' %></a>
+    <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/' + (palabrasPaginas.contacto || 'contacto') %>"><%= t('home_footer_contacto') || 'Contacto' %></a>
+    <% if (lang === 'es') { %>
+    <a href="/chofer/acceso/alta"><%= t('home_footer_alta_choferes') || 'Alta choferes' %></a>
+    <a href="/chofer/acceso"><%= t('home_footer_acceso_choferes') || 'Acceso a choferes' %></a>
+    <% } %>
+    <a href="<%= lang === 'es' ? '/mi-reserva' : '/' + lang + '/' + (palabrasPaginas['mi-reserva'] || 'mi-reserva') %>"><%= t('home_footer_acceso_clientes') || 'Acceso clientes' %></a>
+  </div>
+  <%= nombreMarca %> — Gran Canaria
+</footer>
+
+</body>
+</html>
