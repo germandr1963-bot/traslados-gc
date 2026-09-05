@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= t('contacto_titulo') || 'Contacto' %> — Traslados GC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/estilos.css">
+  <style>
+    body { background: var(--gris-fondo); color: var(--texto-oscuro); min-height: 100vh; }
+    header.app {
+      background: var(--charcoal);
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      border-bottom: 3px solid var(--terracota);
+    }
+    header.app .marca {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--texto-claro);
+      letter-spacing: 2px;
+      text-decoration: none;
+      text-align: center;
+      justify-self: center;
+    }
+    header.app a.nav { color: rgba(255,255,255,0.65); text-decoration: none; font-size: 14px; }
+    header.app a.nav:hover { color: #fff; }
+    header.app a.nav.izquierda { justify-self: start; }
+    header.app a.nav.derecha { justify-self: end; }
+    @media (max-width: 560px) {
+      header.app { padding: 12px 14px; }
+      header.app .marca { font-size: 19px; letter-spacing: 1px; }
+      header.app a.nav { font-size: 12px; }
+    }
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; text-align: left; }
+    .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+    .breadcrumbs a:hover { text-decoration: underline; }
+    .contenido { max-width: 700px; margin: 0 auto; padding: 40px 24px 80px; text-align: center; }
+    h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: clamp(32px, 6vw, 52px); margin-bottom: 12px; }
+    h1 span { color: var(--terracota); }
+    .subtitulo { color: var(--texto-muted); font-size: 19px; font-style: italic; letter-spacing: 0.3px; margin-bottom: 48px; line-height: 1.6; }
+    .tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; text-align: center; }
+    .tarjeta-contacto { background: #fff; border: 1px solid var(--gris-borde); border-radius: 14px; padding: 24px 20px; text-align: center; }
+    .icono { font-size: 28px; margin-bottom: 12px; }
+    .etiqueta { font-size: 11px; color: var(--texto-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+    .valor { font-size: 15px; font-weight: 500; color: var(--texto-oscuro); }
+    .valor a { color: var(--terracota); text-decoration: none; }
+    .valor a:hover { text-decoration: underline; }
+    .vacio { color: var(--texto-muted); font-size: 13px; }
+    @media (max-width: 600px) { .contenido { padding: 24px 16px 60px; } }
+    footer { text-align: center; padding: 30px; color: var(--texto-muted); font-size: 13px; }
+    footer a { color: var(--texto-muted); text-decoration: none; margin: 0 12px; font-size: 13px; }
+    footer a:hover { color: var(--texto-oscuro); }
+    .footer-links { margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <header class="app">
+    <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="nav izquierda"><%= t('nav_inicio') || 'Inicio' %></a>
+    <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="marca">TRASLADOS · GC</a>
+    <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/' + (palabrasPaginas.contacto || 'contacto') %>" class="nav derecha"><%= t('nav_contacto') || 'Contacto' %></a>
+  </header>
+
+  <div class="contenido">
+    <nav class="breadcrumbs">
+      <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>"><%= t('nav_inicio') || 'Inicio' %></a>
+      <span> › </span>
+      <span><%= t('home_footer_contacto') || 'Contacto' %></span>
+    </nav>
+
+    <h1><%= t('contacto_titulo') || 'Contacto' %></h1>
+    <p class="subtitulo"><%= t('contacto_subtitulo') || 'Estamos aquí para ayudarte en lo que necesites' %></p>
+
+    <div class="tarjetas">
+      <% if (contacto.nombre_empresa) { %>
+      <div class="tarjeta-contacto">
+        <div class="icono">🏢</div>
+        <div class="etiqueta"><%= t('contacto_etiqueta_empresa') || 'Empresa' %></div>
+        <div class="valor"><%= contacto.nombre_empresa %></div>
+      </div>
+      <% } %>
+      <% if (contacto.telefono) { %>
+      <div class="tarjeta-contacto">
+        <div class="icono">📞</div>
+        <div class="etiqueta"><%= t('contacto_etiqueta_telefono') || 'Teléfono' %></div>
+        <div class="valor"><a href="tel:<%= contacto.telefono %>"><%= contacto.telefono %></a></div>
+      </div>
+      <% } %>
+      <% if (contacto.whatsapp) { %>
+      <div class="tarjeta-contacto">
+        <div class="icono">💬</div>
+        <div class="etiqueta"><%= t('contacto_etiqueta_whatsapp') || 'WhatsApp' %></div>
+        <div class="valor"><a href="https://wa.me/<%= contacto.whatsapp.replace(/\s|\+/g, '') %>" target="_blank"><%= contacto.whatsapp %></a></div>
+      </div>
+      <% } %>
+      <% if (contacto.email) { %>
+      <div class="tarjeta-contacto">
+        <div class="icono">✉️</div>
+        <div class="etiqueta"><%= t('contacto_etiqueta_email') || 'Email' %></div>
+        <div class="valor"><a href="mailto:<%= contacto.email %>"><%= contacto.email %></a></div>
+      </div>
+      <% } %>
+      <% if (t('contacto_horario')) { %>
+      <div class="tarjeta-contacto">
+        <div class="icono">🕐</div>
+        <div class="etiqueta"><%= t('contacto_etiqueta_horario') || 'Horario' %></div>
+        <div class="valor"><%= t('contacto_horario') %></div>
+      </div>
+      <% } %>
+      <% if (contacto.direccion) { %>
+      <div class="tarjeta-contacto">
+        <div class="icono">📍</div>
+        <div class="etiqueta"><%= t('contacto_etiqueta_direccion') || 'Dirección' %></div>
+        <div class="valor"><%= contacto.direccion %></div>
+      </div>
+      <% } %>
+      <% if (!contacto.nombre_empresa && !contacto.telefono && !contacto.whatsapp && !contacto.email && !contacto.direccion) { %>
+      <div class="tarjeta-contacto">
+        <div class="vacio"><%= t('contacto_vacio') || 'Información de contacto no disponible.' %></div>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-links">
+      <a href="<%= lang === 'es' ? '/rutas' : '/' + lang + '/' + (palabrasPaginas.rutas || 'rutas') %>"><%= t('home_footer_rutas') || 'Rutas' %></a>
+      <a href="<%= lang === 'es' ? '/destinos' : '/' + lang + '/' + (palabrasPaginas.destinos || 'destinos') %>"><%= t('home_footer_destinos') || 'Destinos' %></a>
+      <a href="<%= lang === 'es' ? '/flota' : '/' + lang + '/' + (palabrasPaginas.flota || 'flota') %>"><%= t('home_footer_flota') || 'Flota' %></a>
+      <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/' + (palabrasPaginas.contacto || 'contacto') %>"><%= t('home_footer_contacto') || 'Contacto' %></a>
+      <% if (lang === 'es') { %>
+      <a href="/chofer/acceso/alta"><%= t('home_footer_alta_choferes') || 'Alta choferes' %></a>
+      <a href="/chofer/acceso"><%= t('home_footer_acceso_choferes') || 'Acceso a choferes' %></a>
+      <% } %>
+      <a href="<%= lang === 'es' ? '/mi-reserva' : '/' + lang + '/' + (palabrasPaginas['mi-reserva'] || 'mi-reserva') %>"><%= t('home_footer_acceso_clientes') || 'Acceso clientes' %></a>
+    </div>
+    Traslados · GC — Gran Canaria
+  </footer>
+</body>
+</html>
