@@ -152,15 +152,15 @@
       <span><%= dest.nombre %></span>
     </nav>
 
+    <!-- Título -->
+    <h1><%= dest.nombre %></h1>
+
     <!-- Foto cabecera -->
     <div class="foto-cabecera">
       <% if (dest.foto_cabecera_id) { %>
         <img src="/destino-foto/<%= dest.foto_cabecera_id %>" alt="<%= dest.nombre %>">
       <% } %>
     </div>
-
-    <!-- Título -->
-    <h1><%= dest.nombre %></h1>
 
     <!-- Texto descriptivo -->
     <% if (dest.texto_descripcion) { %>

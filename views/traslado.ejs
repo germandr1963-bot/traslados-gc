@@ -293,16 +293,16 @@ footer a:hover { color: var(--texto-oscuro); }
     <span><%= seo.origen %> → <%= seo.destino %></span>
   </nav>
 
+  <h1 class="titulo-ruta">
+    <%= seo.origen %> <span class="acento">→</span> <%= seo.destino %>
+  </h1>
+  <p class="subtitulo-ruta"><%= t('subtitulo_hero') %></p>
+
   <div class="foto-cabecera">
     <% if (fotoCabeceraId) { %>
     <img src="/ruta-foto/<%= fotoCabeceraId %>" alt="<%= seo.origen %> → <%= seo.destino %>">
     <% } %>
   </div>
-
-  <h1 class="titulo-ruta">
-    <%= seo.origen %> <span class="acento">→</span> <%= seo.destino %>
-  </h1>
-  <p class="subtitulo-ruta"><%= t('subtitulo_hero') %></p>
 
 <div class="seccion">
   <h2><%= t('titulo_tarifas') %></h2>
