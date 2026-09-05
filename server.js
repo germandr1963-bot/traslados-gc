@@ -10604,6 +10604,136 @@ app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
   });
 }));
 
+// ─── Página de traslado individual — renderizada en servidor con EJS ────────
+async function renderTraslado(req, res, lang, slug) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+
+  const seoResult = await pool.query(
+    `SELECT rss.*, r.origen, r.destino, r.id AS ruta_id, (r.imagen_og IS NOT NULL) AS tiene_imagen
+     FROM route_seo_settings rss
+     JOIN rutas r ON r.id = rss.route_id
+     WHERE rss.lang_code = $1 AND rss.slug_url = $2 AND rss.activo = TRUE AND r.activa = TRUE`,
+    [lang, slug]
+  );
+  if (seoResult.rows.length === 0) {
+    const redirect = await pool.query(
+      'SELECT ruta_nueva FROM redirecciones_301 WHERE ruta_antigua = $1',
+      [req.path]
+    );
+    if (redirect.rows.length) return res.redirect(301, redirect.rows[0].ruta_nueva);
+    return res.status(404).send('Página no encontrada');
+  }
+
+  const seo = seoResult.rows[0];
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
+
+  const precios = await pool.query(
+    `SELECT cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, rp.precio
+     FROM rutas_precios rp
+     JOIN categorias_vehiculos cv ON cv.id = rp.categoria_id
+     WHERE rp.ruta_id = $1 AND cv.disponible = TRUE
+     ORDER BY cv.orden, cv.nombre`,
+    [seo.ruta_id]
+  );
+
+  const alternates = await pool.query(
+    `SELECT lang_code, slug_url FROM route_seo_settings
+     WHERE route_id = $1 AND activo = TRUE`,
+    [seo.ruta_id]
+  );
+
+  const ajustesGlobales = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
+  const globales = ajustesGlobales.rows[0] || { nombre_marca: 'Traslados · GC', imagen_og_defecto: null, twitter_activo: false };
+  const nombreMarca = globales.nombre_marca || 'Traslados · GC';
+
+  const relacionadas = await pool.query(
+    `SELECT r.destino, rss.slug_url
+     FROM rutas r
+     JOIN route_seo_settings rss ON rss.route_id = r.id
+     WHERE r.origen = $1 AND r.id != $2 AND r.activa = TRUE
+       AND rss.lang_code = $3 AND rss.activo = TRUE
+     ORDER BY RANDOM()
+     LIMIT 4`,
+    [seo.origen, seo.ruta_id, lang]
+  );
+
+  const destinosTrad = await pool.query(
+    `SELECT d.nombre AS nombre_es, dt.nombre AS nombre_traducido
+     FROM destinos d
+     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1`,
+    [lang]
+  );
+  const mapaDestinos = {};
+  for (const d of destinosTrad.rows) {
+    mapaDestinos[d.nombre_es] = (d.nombre_traducido && d.nombre_traducido.trim()) ? d.nombre_traducido : d.nombre_es;
+  }
+
+  const catsTrad = await pool.query(
+    `SELECT ti.texto_es, COALESCE(tit.texto, ti.texto_es) AS nombre_traducido
+     FROM textos_interfaz ti
+     LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+     WHERE ti.modulo = 'Categorías de vehículo'`,
+    [lang]
+  );
+  const mapaCategorias = {};
+  for (const c of catsTrad.rows) {
+    mapaCategorias[c.texto_es] = c.nombre_traducido;
+  }
+
+  const origenTraducido  = mapaDestinos[seo.origen]  || seo.origen;
+  const destinoTraducido = mapaDestinos[seo.destino] || seo.destino;
+
+  const fotosRuta = await pool.query(
+    `SELECT rf.id, COALESCE(rfa.alt_texto, rf.alt_texto, '') AS alt_texto
+     FROM rutas_fotos rf
+     LEFT JOIN rutas_fotos_alt rfa ON rfa.foto_id = rf.id AND rfa.lang_code = $2
+     WHERE rf.ruta_id = $1 AND rf.es_principal = FALSE
+     ORDER BY rf.orden, rf.id`,
+    [seo.ruta_id, lang]
+  );
+
+  const fotoCabecera = await pool.query(
+    'SELECT id FROM rutas_fotos WHERE ruta_id = $1 AND es_principal = TRUE LIMIT 1',
+    [seo.ruta_id]
+  );
+  const fotoCabeceraId = fotoCabecera.rows.length > 0 ? fotoCabecera.rows[0].id : null;
+
+  const urlActual = BASE_URL + '/' + lang + '/' + (SECCIONES_TRASLADO[lang] || 'traslado') + '/' + slug;
+  const seoConTrad = Object.assign({}, seo, { origen: origenTraducido, destino: destinoTraducido });
+  const { schemaTaxiService, schemaBreadcrumb } = construirSchemaRuta(
+    seoConTrad, precios.rows, nombreMarca, globales, BASE_URL, urlActual
+  );
+
+  res.render('traslado', {
+    lang,
+    t,
+    palabrasPaginas,
+    SECCIONES_TRASLADO,
+    seo: seoConTrad,
+    precios: precios.rows.map(function(p) {
+      return Object.assign({}, p, {
+        nombre:            mapaCategorias[p.nombre]            || p.nombre,
+        capacidad_maletas: mapaCategorias[p.capacidad_maletas] || p.capacidad_maletas
+      });
+    }),
+    alternates:         alternates.rows,
+    relacionadas:       relacionadas.rows.map(function(r) {
+      return { destino: mapaDestinos[r.destino] || r.destino, slug_url: r.slug_url };
+    }),
+    fotosRuta:          fotosRuta.rows,
+    fotoCabeceraId,
+    nombreMarca,
+    BASE_URL,
+    tieneImagenDefecto: !!globales.imagen_og_defecto,
+    twitterActivo:      !!globales.twitter_activo,
+    schemaTaxiService,
+    schemaBreadcrumb
+  });
+}
+
 // ─── API pública: datos de una ruta para traslado.html ───────────────────────
 // Devuelve en JSON todo lo necesario para pintar la página de ruta.
 // La llama traslado.html desde el navegador, igual que destino-pagina.html
@@ -10814,7 +10944,7 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
       [lang, slug]
     );
     if (seoResult.rows.length > 0) {
-      return res.sendFile(path.join(__dirname, 'public', 'traslado.html'));
+      return renderTraslado(req, res, lang, slug);
     }
     // No encontrado: buscar redirección 301
     const redirect = await pool.query(
