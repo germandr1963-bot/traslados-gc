@@ -248,6 +248,11 @@ footer a:hover { color: var(--texto-oscuro); }
   display: block;
 }
 
+/* ── Migas de pan ── */
+.breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; }
+.breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+.breadcrumbs a:hover { text-decoration: underline; }
+
 /* ── Responsive móvil ── */
 @media (max-width: 560px) {
   header.app { padding: 12px 14px; }
@@ -272,14 +277,22 @@ footer a:hover { color: var(--texto-oscuro); }
 <body>
 
 <header class="app">
-  <a href="/<%= lang %>/<%= palabrasPaginas.rutas || 'rutas' %>" class="nav izquierda"><%= t('nav_volver_rutas') %></a>
+  <a href="<%= lang === 'es' ? '/rutas' : '/' + lang + '/' + (palabrasPaginas.rutas || 'rutas') %>" class="nav izquierda"><%= t('nav_volver_rutas') %></a>
   <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="marca"><%= nombreMarca %></a>
   <div class="derecha-header">
-    <a href="/<%= lang %>/<%= palabrasPaginas.contacto || 'contacto' %>" class="nav"><%= t('nav_contacto') %></a>
+    <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/' + (palabrasPaginas.contacto || 'contacto') %>" class="nav"><%= t('nav_contacto') %></a>
   </div>
 </header>
 
 <div class="contenido">
+  <nav class="breadcrumbs">
+    <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>"><%= t('nav_inicio') || 'Inicio' %></a>
+    <span> › </span>
+    <a href="<%= lang === 'es' ? '/rutas' : '/' + lang + '/' + (palabrasPaginas.rutas || 'rutas') %>"><%= t('home_footer_rutas') || 'Rutas' %></a>
+    <span> › </span>
+    <span><%= seo.origen %> → <%= seo.destino %></span>
+  </nav>
+
   <div class="foto-cabecera">
     <% if (fotoCabeceraId) { %>
     <img src="/ruta-foto/<%= fotoCabeceraId %>" alt="<%= seo.origen %> → <%= seo.destino %>">
