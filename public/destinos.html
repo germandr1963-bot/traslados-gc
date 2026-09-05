@@ -27,6 +27,7 @@
       justify-self: center;
     }
     header.app a.nav { color: rgba(255,255,255,0.65); text-decoration: none; font-size: 14px; }
+    header.app a.nav, header.app .marca, .breadcrumbs { opacity: 0; transition: opacity 0.15s; }
     header.app a.nav:hover { color: #fff; }
     header.app a.nav.izquierda { justify-self: start; }
     header.app a.nav.derecha { justify-self: end; }
@@ -164,13 +165,13 @@
 </head>
 <body>
   <header class="app">
-    <a id="link-inicio-header" href="/" class="nav izquierda">← Inicio</a>
+    <a id="link-inicio-header" href="/" class="nav izquierda"></a>
     <a id="link-logo-header" href="/" class="marca">TRASLADOS · GC</a>
-    <a id="link-contacto-header" href="/contacto" class="nav derecha">Contacto</a>
+    <a id="link-contacto-header" href="/contacto" class="nav derecha"></a>
   </header>
 
   <div class="contenido">
-    <nav class="breadcrumbs"><a id="breadcrumb-inicio" href="/">Inicio</a><span> › </span><span id="breadcrumb-destinos">Destinos</span></nav>
+    <nav class="breadcrumbs"><a id="breadcrumb-inicio" href="/"></a><span> › </span><span id="breadcrumb-destinos"></span></nav>
     <h1 id="titulo-destinos">Destinos</h1>
     <p class="subtitulo" id="subtitulo-destinos">Descubre los destinos más solicitados de Gran Canaria</p>
 
@@ -244,6 +245,9 @@
       if (pp.footer_destinos)   { var bd = document.getElementById('breadcrumb-destinos'); if (bd) bd.textContent = pp.footer_destinos; }
       if (pp.nav_contacto)           document.getElementById('link-contacto-header').textContent   = pp.nav_contacto;
 
+      // Mostrar header y breadcrumbs una vez traducidos
+      document.querySelectorAll('header.app a.nav, header.app .marca, .breadcrumbs').forEach(function(el) { el.style.opacity = '1'; });
+
       var islas = d.islas || {};
       var palabraDestino = d.palabra_destino || 'destino';
       var nombres = Object.keys(islas);
@@ -264,7 +268,7 @@
           var url = '/' + lang + '/' + palabraDestino + '/' + isla + '/' + slug;
           html += '<a href="' + url + '" class="tarjeta-destino">';
           html += '<div class="td-foto">';
-          if (dest.foto_cabecera_id) html += '<img src="/destino-foto/' + dest.foto_cabecera_id + '" alt="' + dest.nombre + '">';
+          if (dest.foto_cabecera_id) html += '<img src="/destino-foto/' + dest.foto_cabecera_id + '" alt="' + dest.nombre + '" loading="lazy">';
           if (dest.zona) html += '<span class="td-zona">' + dest.zona + '</span>';
           html += '</div>';
           html += '<div class="td-body">';
