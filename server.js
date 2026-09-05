@@ -7297,7 +7297,7 @@ app.get('/:lang([a-z]{2})/:palabra/:isla/:slug', asyncHandler(async (req, res) =
       [lang, slug]
     );
     if (catResult.rows.length > 0) {
-      return res.sendFile(path.join(__dirname, 'public', 'categoria-pagina.html'));
+      return renderCategoriaPagina(req, res, lang, slug);
     }
     return res.status(404).send('Página no encontrada');
   }
@@ -10614,6 +10614,156 @@ app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
   });
 }));
 
+// ─── Página de categoría individual — renderizada en servidor con EJS ──────
+async function renderCategoriaPagina(req, res, lang, slug) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+
+  const catResult = await pool.query(
+    `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas,
+            cv.limite_sillas, cv.foto,
+            COALESCE(cvt.descripcion,       cv.descripcion)       AS descripcion,
+            COALESCE(cvt.subtitulo,         cv.subtitulo)         AS subtitulo,
+            COALESCE(cvt.descripcion_larga, cv.descripcion_larga) AS descripcion_larga,
+            COALESCE(cvt.caracteristicas,   cv.caracteristicas)   AS caracteristicas,
+            cvt.slug_url, cvt.meta_title, cvt.meta_description, cvt.activo,
+            cvt.resena_breve, cvt.texto_descripcion, cvt.h1_seo, cvt.subtitulo_seo,
+            i.slug AS isla_slug,
+            COALESCE(it.nombre, i.nombre) AS isla_nombre,
+            COALESCE(it.slug,   i.slug)   AS isla_slug_traducido
+     FROM categorias_vehiculos cv
+     JOIN categorias_vehiculos_traducciones cvt
+          ON cvt.categoria_id = cv.id AND cvt.lang_code = $1
+     LEFT JOIN islas i ON i.id = cv.isla_id
+     LEFT JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = $1
+     WHERE cvt.slug_url = $2 AND cvt.activo = TRUE
+       AND cv.activa = TRUE AND cv.en_flota = TRUE`,
+    [lang, slug]
+  );
+  if (catResult.rows.length === 0) {
+    return res.status(404).send('Categoría no encontrada');
+  }
+
+  const cat = catResult.rows[0];
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
+
+  const alternates = await pool.query(
+    `SELECT lang_code, slug_url
+     FROM categorias_vehiculos_traducciones
+     WHERE categoria_id = $1 AND activo = TRUE AND slug_url IS NOT NULL`,
+    [cat.id]
+  );
+
+  const ajustesGlobales = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
+  const globales = ajustesGlobales.rows[0] || { nombre_marca: 'Traslados · GC', imagen_og_defecto: null, twitter_activo: false };
+  const nombreMarca = globales.nombre_marca || 'Traslados · GC';
+
+  const precios = await pool.query(
+    `SELECT r.id AS ruta_id, r.origen, r.destino, rp.precio
+     FROM rutas_precios rp
+     JOIN rutas r ON r.id = rp.ruta_id
+     WHERE rp.categoria_id = $1 AND r.activa = TRUE
+     ORDER BY r.origen, r.destino`,
+    [cat.id]
+  );
+
+  const destinosTrad = await pool.query(
+    `SELECT d.nombre AS nombre_es, COALESCE(dt.nombre, d.nombre) AS nombre_traducido
+     FROM destinos d
+     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1`,
+    [lang]
+  );
+  const mapaDestinos = {};
+  for (const d of destinosTrad.rows) {
+    mapaDestinos[d.nombre_es] = (d.nombre_traducido && d.nombre_traducido.trim()) ? d.nombre_traducido : d.nombre_es;
+  }
+
+  const nombreTrad = obtenerTexto('categoria_nombre_' + cat.id, lang);
+  const palabraFlota = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
+  const slugIsla = cat.isla_slug || 'gran-canaria';
+  const urlActual = BASE_URL + (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota + '/' + slugIsla + '/' + slug;
+  const canonical_url = (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota + '/' + slugIsla + '/' + slug;
+
+  const schemaVehicle = {
+    '@context': 'https://schema.org',
+    '@type': 'Vehicle',
+    name: (nombreTrad || cat.nombre) + ' — ' + nombreMarca,
+    description: cat.meta_description || cat.descripcion || undefined,
+    url: urlActual,
+    vehicleSeatingCapacity: cat.capacidad_pasajeros,
+    provider: { '@type': 'Organization', name: nombreMarca, url: BASE_URL },
+    areaServed: { '@type': 'Place', name: 'Gran Canaria' }
+  };
+  if (cat.foto) schemaVehicle.image = BASE_URL + '/admin/categorias/' + cat.id + '/foto';
+  else if (globales.imagen_og_defecto) schemaVehicle.image = BASE_URL + '/imagen-og-defecto';
+
+  const schemaBreadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Inicio', item: BASE_URL + (lang !== 'es' ? '/' + lang + '/' : '/') },
+      { '@type': 'ListItem', position: 2, name: obtenerTexto('home_footer_flota', lang) || 'Flota', item: BASE_URL + (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota },
+      { '@type': 'ListItem', position: 3, name: nombreTrad || cat.nombre, item: urlActual }
+    ]
+  };
+
+  const fotosResult = await pool.query(
+    `SELECT cf.id, cf.nombre_archivo, cf.orden,
+            COALESCE(cfa.alt_texto, cf.alt_texto, '') AS alt_texto
+     FROM categorias_fotos cf
+     LEFT JOIN categorias_fotos_alt cfa ON cfa.foto_id = cf.id AND cfa.lang_code = $2
+     WHERE cf.categoria_id = $1
+     ORDER BY cf.orden`,
+    [cat.id, lang]
+  );
+
+  res.render('categoria-pagina', {
+    lang,
+    t,
+    palabrasPaginas,
+    palabraFlota,
+    BASE_URL,
+    nombreMarca,
+    tieneImagenDefecto: !!globales.imagen_og_defecto,
+    twitterActivo:      !!globales.twitter_activo,
+    schemaVehicle,
+    schemaBreadcrumb,
+    alternates:   alternates.rows,
+    fotosGaleria: fotosResult.rows,
+    precios: precios.rows.map(function(p) {
+      return {
+        origen:  mapaDestinos[p.origen]  || p.origen,
+        destino: mapaDestinos[p.destino] || p.destino,
+        precio:  p.precio
+      };
+    }),
+    cat: {
+      id:                  cat.id,
+      nombre:              nombreTrad || cat.nombre,
+      capacidad_pasajeros: cat.capacidad_pasajeros,
+      capacidad_maletas:   obtenerTexto('categoria_maletas_' + cat.id, lang) || cat.capacidad_maletas,
+      limite_sillas:       cat.limite_sillas,
+      tiene_foto:          !!cat.foto,
+      descripcion:         cat.descripcion,
+      subtitulo:           cat.subtitulo,
+      descripcion_larga:   cat.descripcion_larga,
+      caracteristicas:     cat.caracteristicas,
+      slug_url:            cat.slug_url,
+      meta_title:          cat.meta_title,
+      meta_description:    cat.meta_description,
+      canonical_url,
+      isla_slug:           slugIsla,
+      isla_nombre:         cat.isla_nombre || 'Gran Canaria',
+      resena_breve:        cat.resena_breve || '',
+      texto_descripcion:   cat.texto_descripcion || '',
+      h1_seo:              cat.h1_seo || '',
+      subtitulo_seo:       cat.subtitulo_seo || ''
+    }
+  });
+}
+
 // ─── Página de traslado individual — renderizada en servidor con EJS ────────
 async function renderTraslado(req, res, lang, slug) {
   if (!IDIOMAS_PERMITIDOS.includes(lang)) {
@@ -10930,7 +11080,7 @@ app.get('/:lang([a-z]{2})/:seccion/:isla/:slug', asyncHandler(async (req, res) =
       [lang, slug]
     );
     if (catResult.rows.length > 0) {
-      return res.sendFile(path.join(__dirname, 'public', 'categoria-pagina.html'));
+      return renderCategoriaPagina(req, res, lang, slugCat);
     }
   }
 
@@ -10984,7 +11134,7 @@ app.get('/:lang([a-z]{2})/:seccion/:slug', asyncHandler(async (req, res) => {
         [lang, slugCat]
       );
       if (catResult.rows.length > 0) {
-        return res.sendFile(path.join(__dirname, 'public', 'categoria-pagina.html'));
+        return renderCategoriaPagina(req, res, lang, slugCat);
       }
     }
     return res.status(404).send('Página no encontrada');
@@ -11006,7 +11156,7 @@ app.get('/flota/:isla/:slug', asyncHandler(async (req, res) => {
   if (catResult.rows.length === 0) {
     return res.status(404).send('Página no encontrada');
   }
-  res.sendFile(path.join(__dirname, 'public', 'categoria-pagina.html'));
+  await renderCategoriaPagina(req, res, 'es', slug);
 }));
 
 // ─── Admin: listado de clientes ──────────────────────────────────────────────
