@@ -6917,6 +6917,16 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
   res.json({ islas: porIsla, palabra_destino: palabraDestino });
 }));
 
+// ─── Página de flota — renderizada en servidor con EJS ───────────────────
+async function renderFlota(req, res, lang) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
+  res.render('flota', { lang, t, palabrasPaginas, BASE_URL });
+}
+
 // ─── Página de rutas — renderizada en servidor con EJS ──────────────────
 async function renderRutas(req, res, lang) {
   if (!IDIOMAS_PERMITIDOS.includes(lang)) {
@@ -7190,7 +7200,7 @@ app.get('/:lang([a-z]{2})/:seccion', asyncHandler(async (req, res) => {
   // ── Flota ────────────────────────────────────────────────────────────────
   const palabraFlota = pp.flota || 'flota';
   if (seccion === palabraFlota) {
-    return res.sendFile(path.join(__dirname, 'public', 'flota.html'));
+    return renderFlota(req, res, lang);
   }
 
   // ── Contacto ─────────────────────────────────────────────────────────────
@@ -7311,9 +7321,9 @@ app.get('/:lang([a-z]{2})/:palabra/:isla/:slug', asyncHandler(async (req, res) =
   await renderDestinoPagina(req, res, lang, isla, slug);
 }));
 
-app.get('/flota', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'flota.html'));
-});
+app.get('/flota', asyncHandler(async (req, res) => {
+  await renderFlota(req, res, 'es');
+}));
 
 app.get('/chofer/acceso', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'chofer-registro.html'));
