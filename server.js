@@ -6917,6 +6917,62 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
   res.json({ islas: porIsla, palabra_destino: palabraDestino });
 }));
 
+// ─── Página de destino individual — renderizada en servidor con EJS ────────
+async function renderDestinoPagina(req, res, lang, isla, slug) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
+
+  // Datos del destino — misma consulta que /api/destino-publico
+  const result = await pool.query(
+    `SELECT d.id, COALESCE(dt.nombre, d.nombre) AS nombre, d.nombre AS nombre_es, d.isla, d.zona,
+            dss.texto_descripcion, dss.meta_title, dss.meta_description,
+            (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
+     FROM destinos d
+     JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = $2
+     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $2
+     WHERE dss.slug_url = $1 AND dss.activo = TRUE
+     LIMIT 1`,
+    [slug, lang]
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).send('Destino no encontrado');
+  }
+  const dest = result.rows[0];
+
+  // Fotos adicionales (máximo 3, excluyendo la cabecera)
+  const fotosResult = await pool.query(
+    `SELECT df.id, COALESCE(dfa.alt_texto, df.alt_texto) AS alt_texto
+     FROM destinos_fotos df
+     LEFT JOIN destinos_fotos_alt dfa ON dfa.foto_id = df.id AND dfa.lang_code = $2
+     WHERE df.destino_id = $1 AND (df.es_principal = FALSE OR df.es_principal IS NULL)
+     ORDER BY df.orden ASC NULLS LAST LIMIT 3`,
+    [dest.id, lang]
+  );
+
+  // URL de vuelta al listado de destinos
+  const urlDestinos = lang === 'es'
+    ? '/destinos'
+    : '/' + lang + '/' + (palabrasPaginas.destinos || 'destinos');
+
+  // URL del CTA (buscador en portada con destino preseleccionado)
+  const urlBase = lang === 'es' ? '/' : '/' + lang + '/';
+  const urlCta = urlBase + '?hasta=' + encodeURIComponent(dest.nombre_es).replace(/%20/g, '+');
+
+  res.render('destino-pagina', {
+    lang,
+    t,
+    palabrasPaginas,
+    dest,
+    fotos: fotosResult.rows,
+    urlDestinos,
+    urlCta,
+    BASE_URL
+  });
+}
+
 // ─── Página de destinos — renderizada en servidor con EJS ───────────────
 async function renderDestinos(req, res, lang) {
   if (!IDIOMAS_PERMITIDOS.includes(lang)) {
@@ -7128,9 +7184,9 @@ app.get('/api/destino-publico/:isla/:slug', asyncHandler(async (req, res) => {
 }));
 
 // Página pública de destino individual — español (ruta fija legacy)
-app.get('/es/destino/:isla/:slug', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'destino-pagina.html'));
-});
+app.get('/es/destino/:isla/:slug', asyncHandler(async (req, res) => {
+  await renderDestinoPagina(req, res, 'es', req.params.isla, req.params.slug);
+}));
 
 // Página pública de destino individual — todos los idiomas
 //
@@ -7187,7 +7243,7 @@ app.get('/:lang([a-z]{2})/:palabra/:isla/:slug', asyncHandler(async (req, res) =
     return res.status(404).send('Destino no encontrado');
   }
 
-  res.sendFile(path.join(__dirname, 'public', 'destino-pagina.html'));
+  await renderDestinoPagina(req, res, lang, isla, slug);
 }));
 
 app.get('/flota', (req, res) => {
