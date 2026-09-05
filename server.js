@@ -6917,6 +6917,71 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
   res.json({ islas: porIsla, palabra_destino: palabraDestino });
 }));
 
+// ─── Página de rutas — renderizada en servidor con EJS ──────────────────
+async function renderRutas(req, res, lang) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
+  const palabraTraslado = SECCIONES_TRASLADO[lang] || 'traslado';
+
+  // Misma consulta que /api/rutas-publicas
+  const result = await pool.query(
+    `SELECT r.id, r.origen, r.destino,
+            COALESCE(rss_lang.slug_url, rss_es.slug_url) AS slug_url,
+            COALESCE(rss_lang.resena_breve, rss_es.resena_breve) AS resena_breve,
+            (SELECT id FROM rutas_fotos WHERE ruta_id = r.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
+     FROM rutas r
+     LEFT JOIN route_seo_settings rss_lang
+           ON rss_lang.route_id = r.id AND rss_lang.lang_code = $1
+     LEFT JOIN route_seo_settings rss_es
+           ON rss_es.route_id   = r.id AND rss_es.lang_code  = 'es'
+     WHERE r.activa = TRUE AND r.visible_en_listado = TRUE
+     AND rss_es.activo = TRUE
+     AND EXISTS (SELECT 1 FROM destinos WHERE nombre = r.origen AND activo = TRUE)
+     AND EXISTS (SELECT 1 FROM destinos WHERE nombre = r.destino AND activo = TRUE)
+     AND EXISTS (SELECT 1 FROM destinos d JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = 'es' WHERE d.nombre = r.origen AND dss.activo = TRUE)
+     AND EXISTS (SELECT 1 FROM destinos d JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = 'es' WHERE d.nombre = r.destino AND dss.activo = TRUE)
+     ORDER BY r.origen, r.destino`,
+    [lang]
+  );
+
+  // Nombres traducidos de destinos si no es español
+  let mapaDestinos = {};
+  if (lang !== 'es') {
+    const trad = await pool.query(
+      `SELECT d.nombre AS nombre_es, dt.nombre AS nombre_traducido
+       FROM destinos d
+       LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1`,
+      [lang]
+    );
+    for (const d of trad.rows) {
+      mapaDestinos[d.nombre_es] = (d.nombre_traducido && d.nombre_traducido.trim()) ? d.nombre_traducido : d.nombre_es;
+    }
+  }
+
+  const rutas = result.rows
+    .filter(r => r.slug_url)
+    .map(r => ({
+      id:               r.id,
+      origen:           mapaDestinos[r.origen]  || r.origen,
+      destino:          mapaDestinos[r.destino] || r.destino,
+      slug_url:         r.slug_url,
+      url:              '/' + lang + '/' + palabraTraslado + '/' + r.slug_url,
+      foto_cabecera_id: r.foto_cabecera_id || null,
+      resena_breve:     r.resena_breve || ''
+    }));
+
+  res.render('rutas', {
+    lang,
+    t,
+    palabrasPaginas,
+    rutas,
+    BASE_URL
+  });
+}
+
 // ─── Página de destino individual — renderizada en servidor con EJS ────────
 async function renderDestinoPagina(req, res, lang, isla, slug) {
   if (!IDIOMAS_PERMITIDOS.includes(lang)) {
@@ -7119,7 +7184,7 @@ app.get('/:lang([a-z]{2})/:seccion', asyncHandler(async (req, res) => {
   // ── Rutas ────────────────────────────────────────────────────────────────
   const palabraRutas = pp.rutas || 'rutas';
   if (seccion === palabraRutas) {
-    return res.sendFile(path.join(__dirname, 'public', 'rutas.html'));
+    return renderRutas(req, res, lang);
   }
 
   // ── Flota ────────────────────────────────────────────────────────────────
@@ -7144,9 +7209,9 @@ app.get('/:lang([a-z]{2})/:seccion', asyncHandler(async (req, res) => {
   return res.status(404).send('Página no encontrada');
 }));
 
-app.get('/rutas', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'rutas.html'));
-});
+app.get('/rutas', asyncHandler(async (req, res) => {
+  await renderRutas(req, res, 'es');
+}));
 
 app.get('/destinos', asyncHandler(async (req, res) => {
   await renderDestinos(req, res, 'es');
