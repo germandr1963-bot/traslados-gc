@@ -6917,6 +6917,68 @@ app.get('/api/destinos-pagina', asyncHandler(async (req, res) => {
   res.json({ islas: porIsla, palabra_destino: palabraDestino });
 }));
 
+// ─── Página de destinos — renderizada en servidor con EJS ───────────────
+async function renderDestinos(req, res, lang) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
+
+  // Misma consulta que /api/destinos-pagina
+  const result = await pool.query(`
+    SELECT DISTINCT d.id, d.nombre, d.isla, d.zona, d.orden,
+           COALESCE(dss_lang.slug_url, dss_es.slug_url) AS slug_url,
+           COALESCE(dss_lang.resena_breve, dss_es.resena_breve) AS resena_breve,
+           (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id,
+           COALESCE(dt.nombre, d.nombre) AS nombre_mostrar
+    FROM destinos d
+    JOIN destinos_seo_settings dss_es ON dss_es.destino_id = d.id AND dss_es.lang_code = 'es'
+    LEFT JOIN destinos_seo_settings dss_lang ON dss_lang.destino_id = d.id AND dss_lang.lang_code = $1 AND dss_lang.activo = TRUE
+    LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1
+    WHERE d.activo = TRUE AND d.visible_rutas = TRUE AND dss_es.activo = TRUE
+    ORDER BY d.isla, d.orden, d.nombre
+  `, [lang]);
+
+  // Obtener slugs de isla desde islas_traducciones (nunca slugify directo)
+  const islaRows = await pool.query(
+    `SELECT i.nombre, COALESCE(it.slug, i.slug, 'gran-canaria') AS isla_slug
+     FROM islas i
+     LEFT JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = $1
+     WHERE i.activa = TRUE`,
+    [lang]
+  );
+  const mapaIslaSlug = {};
+  for (const r of islaRows.rows) {
+    mapaIslaSlug[r.nombre] = r.isla_slug;
+  }
+
+  const palabraDestino = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].destino) ? PALABRAS_PAGINAS[lang].destino : 'destino';
+  const porIsla = {};
+  for (const d of result.rows) {
+    const isla = d.isla || 'Gran Canaria';
+    if (!porIsla[isla]) porIsla[isla] = [];
+    porIsla[isla].push({
+      id: d.id,
+      nombre: d.nombre_mostrar,
+      zona: d.zona,
+      slug: d.slug_url || slugify(d.nombre),
+      isla_slug: mapaIslaSlug[isla] || slugify(isla),
+      foto_cabecera_id: d.foto_cabecera_id || null,
+      resena_breve: d.resena_breve || ''
+    });
+  }
+
+  res.render('destinos', {
+    lang,
+    t,
+    palabrasPaginas,
+    porIsla,
+    palabraDestino,
+    BASE_URL
+  });
+}
+
 // ─── Página de inicio — renderizada en servidor con EJS ──────────────────
 async function renderHome(req, res, lang) {
   if (!IDIOMAS_PERMITIDOS.includes(lang)) {
@@ -6995,7 +7057,7 @@ app.get('/:lang([a-z]{2})/:seccion', asyncHandler(async (req, res) => {
   // ── Destinos (listado) ───────────────────────────────────────────────────
   const palabraDestinos = pp.destinos || 'destinos';
   if (seccion === palabraDestinos) {
-    return res.sendFile(path.join(__dirname, 'public', 'destinos.html'));
+    return renderDestinos(req, res, lang);
   }
 
   // ── Rutas ────────────────────────────────────────────────────────────────
@@ -7030,9 +7092,9 @@ app.get('/rutas', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'rutas.html'));
 });
 
-app.get('/destinos', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'destinos.html'));
-});
+app.get('/destinos', asyncHandler(async (req, res) => {
+  await renderDestinos(req, res, 'es');
+}));
 
 // API pública de un destino por isla y slug
 // API pública de un destino por isla, slug e idioma.
