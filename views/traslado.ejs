@@ -299,8 +299,8 @@ footer a:hover { color: var(--texto-oscuro); }
   <p class="subtitulo-ruta"><%= t('subtitulo_hero') %></p>
 
   <div class="foto-cabecera">
-    <% if (fotoCabeceraId) { %>
-    <img src="/ruta-foto/<%= fotoCabeceraId %>" alt="<%= seo.origen %> → <%= seo.destino %>">
+    <% if (fotoCabeceraUrl) { %>
+    <img src="<%= fotoCabeceraUrl %>" alt="<%= seo.origen %> → <%= seo.destino %>">
     <% } %>
   </div>
 
@@ -384,7 +384,7 @@ footer a:hover { color: var(--texto-oscuro); }
   <div class="fotos-grid">
     <% fotosRuta.forEach(function(f) { %>
     <div class="foto-item">
-      <img src="/ruta-foto/<%= f.id %>" alt="<%= f.alt_texto %>">
+      <img src="<%= f.url_foto %>" alt="<%= f.alt_texto %>">
     </div>
     <% }); %>
   </div>

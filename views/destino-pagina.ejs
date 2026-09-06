@@ -157,8 +157,8 @@
 
     <!-- Foto cabecera -->
     <div class="foto-cabecera">
-      <% if (dest.foto_cabecera_id) { %>
-        <img src="/destino-foto/<%= dest.foto_cabecera_id %>" alt="<%= dest.nombre %>">
+      <% if (dest.url_foto) { %>
+        <img src="<%= dest.url_foto %>" alt="<%= dest.nombre %>">
       <% } %>
     </div>
 
@@ -179,7 +179,7 @@
       <div class="fotos-grid">
         <% fotos.forEach(function(f) { %>
           <div class="foto-item">
-            <img src="/destino-foto/<%= f.id %>" alt="<%= f.alt_texto || dest.nombre %>">
+            <img src="<%= f.url_foto %>" alt="<%= f.alt_texto || dest.nombre %>">
           </div>
         <% }); %>
       </div>
