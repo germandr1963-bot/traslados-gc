@@ -5122,9 +5122,33 @@ app.get('/categoria-foto/:fotoId', asyncHandler(async (req, res) => {
 
 // Migra todas las fotos de categorías existentes en Neon a Cloudinary
 app.post('/admin/categorias/migrar-cloudinary', requireAdmin, asyncHandler(async (req, res) => {
-  const fotos = await pool.query('SELECT id, imagen, nombre_archivo FROM categorias_fotos WHERE cloudinary_url IS NULL');
   let ok = 0, errores = 0;
-  for (const foto of fotos.rows) {
+
+  // 1. Fotos principales de categorias_vehiculos
+  const principales = await pool.query('SELECT id, nombre, foto FROM categorias_vehiculos WHERE foto IS NOT NULL AND foto != \'\' AND cloudinary_url IS NULL');
+  for (const cat of principales.rows) {
+    try {
+      const match = cat.foto.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+      if (!match) { errores++; continue; }
+      const imgBuffer = Buffer.from(match[2], 'base64');
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: 'traslados-gc/categorias', public_id: `categoria-principal-${cat.id}`, overwrite: true },
+          (error, result) => { if (error) reject(error); else resolve(result); }
+        );
+        stream.end(imgBuffer);
+      });
+      await pool.query('UPDATE categorias_vehiculos SET cloudinary_url = $1 WHERE id = $2', [uploadResult.secure_url, cat.id]);
+      ok++;
+    } catch (e) {
+      console.error(`Error migrando foto principal categoría ${cat.id}:`, e.message);
+      errores++;
+    }
+  }
+
+  // 2. Fotos de galería de categorias_fotos
+  const galeria = await pool.query('SELECT id, imagen, nombre_archivo FROM categorias_fotos WHERE cloudinary_url IS NULL');
+  for (const foto of galeria.rows) {
     try {
       let imgBuffer;
       const raw = foto.imagen;
@@ -5133,7 +5157,7 @@ app.post('/admin/categorias/migrar-cloudinary', requireAdmin, asyncHandler(async
       else { imgBuffer = Buffer.from(raw); }
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: 'traslados-gc/categorias', public_id: foto.nombre_archivo || `categoria-foto-${foto.id}`, overwrite: true },
+          { folder: 'traslados-gc/categorias', public_id: foto.nombre_archivo || `categoria-galeria-${foto.id}`, overwrite: true },
           (error, result) => { if (error) reject(error); else resolve(result); }
         );
         stream.end(imgBuffer);
@@ -5141,11 +5165,12 @@ app.post('/admin/categorias/migrar-cloudinary', requireAdmin, asyncHandler(async
       await pool.query('UPDATE categorias_fotos SET cloudinary_url = $1 WHERE id = $2', [uploadResult.secure_url, foto.id]);
       ok++;
     } catch (e) {
-      console.error(`Error migrando foto ${foto.id}:`, e.message);
+      console.error(`Error migrando foto galería ${foto.id}:`, e.message);
       errores++;
     }
   }
-  res.json({ ok, errores, total: fotos.rows.length });
+
+  res.json({ ok, errores, total: principales.rows.length + galeria.rows.length });
 }));
 
 // Elimina una foto de la galería de categoría
