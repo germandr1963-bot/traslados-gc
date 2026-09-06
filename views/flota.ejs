@@ -156,7 +156,49 @@
     <!-- CATÁLOGO -->
     <h2 style="font-family:'Big Shoulders Display',sans-serif;font-size:28px;color:var(--texto-oscuro);margin-bottom:20px;text-align:center;"><%= t('flota_catalogo_titulo') || 'Nuestras Categorías de Vehículos' %></h2>
     <div class="grid-flota" id="grid-flota">
-      <div class="cargando"><%= t('flota_catalogo_cargando') || 'Cargando vehículos...' %></div>
+      <% if (!categorias || categorias.length === 0) { %>
+        <p style="text-align:center;color:var(--texto-muted);padding:40px 0;">Próximamente más vehículos disponibles.</p>
+      <% } else { %>
+        <% categorias.forEach(function(c) { %>
+          <%
+            var cap = (t('flota_catalogo_hasta') || 'Hasta') + ' ' + c.capacidad_pasajeros + ' ' + (t('flota_catalogo_pasajeros') || 'pasajeros');
+            var desc = c.descripcion || '';
+            var subtitulo = c.subtitulo || '';
+            var descLarga = c.descripcion_larga ? c.descripcion_larga.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>') : '';
+          %>
+          <div class="tarjeta-cat" data-pasajeros="<%= c.capacidad_pasajeros %>" data-id="<%= c.id %>">
+            <div class="tarjeta-cat-top">
+              <div>
+                <div class="tarjeta-cat-nombre"><%= c.nombre %></div>
+                <div class="tarjeta-cat-cap"><%= cap %></div>
+              </div>
+              <a href="<%= c.url_reserva %>?categoria=<%= c.id %>" class="btn-reservar-cat"><%= t('flota_catalogo_btn_reservar') || 'Reservar' %></a>
+              <% if (c.url_conoce_mas) { %>
+                <a href="<%= c.url_conoce_mas %>" class="btn-reservar-cat" style="background:var(--charcoal);"><%= t('flota_catalogo_btn_conoce_mas') || 'Conoce más' %></a>
+              <% } %>
+            </div>
+            <div class="tarjeta-cat-body">
+              <div class="tarjeta-cat-desc">
+                <% if (desc) { %><p style="font-style:italic;font-weight:700;color:var(--texto-muted);font-size:15px;margin-bottom:8px;"><%= desc %></p><% } %>
+                <% if (subtitulo) { %><p style="font-weight:700;font-size:13px;color:var(--texto-oscuro);margin-bottom:6px;"><%= subtitulo %></p><% } %>
+                <% if (descLarga) { %><p style="font-size:13px;color:var(--texto-oscuro);line-height:1.6;margin:0;"><%- descLarga %></p><% } %>
+              </div>
+              <div class="tarjeta-cat-foto">
+                <img src="<%= c.url_foto %>" alt="<%= c.nombre %>">
+              </div>
+            </div>
+            <% if (c.caracteristicas) { %>
+              <div class="tarjeta-cat-caract">
+                <p style="font-size:12px;color:var(--texto-oscuro);margin:0;line-height:1.8;">
+                  <% c.caracteristicas.split('\n').filter(function(l) { return l.trim(); }).forEach(function(item) { %>
+                    <span style="margin-right:14px;white-space:nowrap;"><span style="color:#2e7d32;font-weight:700;">✓</span> <%= item.trim() %></span>
+                  <% }); %>
+                </p>
+              </div>
+            <% } %>
+          </div>
+        <% }); %>
+      <% } %>
     </div>
 
     <!-- BLOQUE ECO -->
@@ -240,7 +282,8 @@
     contacto:   '<%= palabrasPaginas.contacto || "contacto" %>'
   };
 
-  var categoriasFlota = [];
+  // Categorías — vienen del servidor, sin fetch
+  var categoriasFlota = <%- JSON.stringify(categorias) %>;
   var extrasFlota = [];
 
   // Textos para el catálogo — vienen del servidor, no de fetch
@@ -260,7 +303,25 @@
     <% } %>
   };
 
-  // Cargar extras aprobados por conductores
+  // Poblar select de pasajeros con los datos ya disponibles
+  (function() {
+    var maxPax = 0;
+    categoriasFlota.forEach(function(c) {
+      var p = parseInt(c.capacidad_pasajeros) || 0;
+      if (p > maxPax) maxPax = p;
+    });
+    var selPax = document.getElementById('sel-pasajeros');
+    selPax.innerHTML = '';
+    for (var p = 1; p <= maxPax; p++) {
+      var opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = txtsPax[String(p)] || (p === 1 ? '1 ' + txtPasajero : p + ' ' + txtPasajeros);
+      if (p === 1) opt.selected = true;
+      selPax.appendChild(opt);
+    }
+  })();
+
+  // Cargar extras aprobados por conductores (sigue con fetch — es dinámico)
   fetch('/api/extras-flota?lang=' + langFlota)
     .then(function(r) { return r.json(); })
     .then(function(extras) {
@@ -279,76 +340,6 @@
       }
     })
     .catch(function() {});
-
-  // Cargar categorías desde /api/flota
-  fetch('/api/flota?lang=' + langFlota)
-    .then(function(r) { return r.json(); })
-    .then(function(cats) {
-      categoriasFlota = cats;
-
-      // Poblar select de pasajeros hasta el máximo disponible
-      var maxPax = 0;
-      cats.forEach(function(c) {
-        var p = parseInt(c.capacidad_pasajeros) || 0;
-        if (p > maxPax) maxPax = p;
-      });
-      var selPax = document.getElementById('sel-pasajeros');
-      selPax.innerHTML = '';
-      for (var p = 1; p <= maxPax; p++) {
-        var opt = document.createElement('option');
-        opt.value = p;
-        opt.textContent = txtsPax[String(p)] || (p === 1 ? '1 ' + txtPasajero : p + ' ' + txtPasajeros);
-        if (p === 1) opt.selected = true;
-        selPax.appendChild(opt);
-      }
-
-      var grid = document.getElementById('grid-flota');
-      if (!cats || cats.length === 0) {
-        grid.innerHTML = '<p style="text-align:center;color:var(--texto-muted);padding:40px 0;">Próximamente más vehículos disponibles.</p>';
-        return;
-      }
-      grid.innerHTML = cats.map(function(c) {
-        var fotoHtml = c.foto
-          ? '<img src="' + c.foto + '" alt="' + c.nombre + '">'
-          : '<span>Sin foto</span>';
-        var clsFoto = c.foto ? 'tarjeta-cat-foto' : 'tarjeta-cat-foto sin-foto';
-        var desc = c.descripcion ? '<p style="font-style:italic;font-weight:700;color:var(--texto-muted);font-size:15px;margin-bottom:8px;">' + c.descripcion + '</p>' : '';
-        var subtitulo = c.subtitulo ? '<p style="font-weight:700;font-size:13px;color:var(--texto-oscuro);margin-bottom:6px;">' + c.subtitulo + '</p>' : '';
-        var descLarga = c.descripcion_larga ? '<p style="font-size:13px;color:var(--texto-oscuro);line-height:1.6;margin:0;">' + c.descripcion_larga.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>') + '</p>' : '';
-        var caract = '';
-        if (c.caracteristicas) {
-          var lineas = c.caracteristicas.split('\n').filter(function(l) { return l.trim(); });
-          caract = '<p style="font-size:12px;color:var(--texto-oscuro);margin:0;line-height:1.8;">' +
-            lineas.map(function(l) {
-              return '<span style="margin-right:14px;white-space:nowrap;"><span style="color:#2e7d32;font-weight:700;">✓</span> ' + l.trim() + '</span>';
-            }).join('') +
-          '</p>';
-        }
-        var cap = txtHasta + ' ' + c.capacidad_pasajeros + ' ' + txtPasajeros;
-        var urlReserva = langFlota !== 'es' ? '/' + langFlota + '/' : '/';
-        var urlConoceMas = langFlota !== 'es'
-          ? '/' + langFlota + '/' + palabrasFlota.flota + '/' + (c.isla_slug || 'gran-canaria') + '/' + c.slug_url
-          : '/flota/' + (c.isla_slug || 'gran-canaria') + '/' + c.slug_url;
-        return '<div class="tarjeta-cat" data-pasajeros="' + c.capacidad_pasajeros + '" data-id="' + c.id + '">'
-          + '<div class="tarjeta-cat-top">'
-          +   '<div>'
-          +     '<div class="tarjeta-cat-nombre">' + c.nombre + '</div>'
-          +     '<div class="tarjeta-cat-cap">' + cap + '</div>'
-          +   '</div>'
-          +   '<a href="' + urlReserva + '?categoria=' + c.id + '" class="btn-reservar-cat">' + txtReservar + '</a>'
-          +   (c.slug_url ? '<a href="' + urlConoceMas + '" class="btn-reservar-cat" style="background:var(--charcoal);">' + txtConoceMas + '</a>' : '')
-          + '</div>'
-          + '<div class="tarjeta-cat-body">'
-          +   '<div class="tarjeta-cat-desc">' + desc + subtitulo + descLarga + '</div>'
-          +   '<div class="' + clsFoto + '">' + fotoHtml + '</div>'
-          + '</div>'
-          + (caract ? '<div class="tarjeta-cat-caract">' + caract + '</div>' : '')
-          + '</div>';
-      }).join('');
-    })
-    .catch(function() {
-      document.getElementById('grid-flota').innerHTML = '<p style="text-align:center;color:var(--texto-muted);padding:40px 0;">No se pudieron cargar los vehículos.</p>';
-    });
 
   // Selector de vehículo
   function recomendar() {
