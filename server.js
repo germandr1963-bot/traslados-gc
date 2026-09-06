@@ -7294,12 +7294,20 @@ async function renderDestinoPagina(req, res, lang, isla, slug) {
   const urlBase = lang === 'es' ? '/' : '/' + lang + '/';
   const urlCta = urlBase + '?hasta=' + encodeURIComponent(dest.nombre_es).replace(/%20/g, '+');
 
+  // URL de foto cabecera: directo a Cloudinary si existe, si no por el servidor (fallback)
+  dest.url_foto = dest.foto_cabecera_cloudinary || (dest.foto_cabecera_id ? '/destino-foto/' + dest.foto_cabecera_id : null);
+
+  // URLs de fotos adicionales: directo a Cloudinary si existe, si no por el servidor (fallback)
+  const fotos = fotosResult.rows.map(function(f) {
+    return Object.assign({}, f, { url_foto: f.cloudinary_url || '/destino-foto/' + f.id });
+  });
+
   res.render('destino-pagina', {
     lang,
     t,
     palabrasPaginas,
     dest,
-    fotos: fotosResult.rows,
+    fotos,
     urlDestinos,
     urlCta,
     BASE_URL
@@ -11105,7 +11113,7 @@ async function renderTraslado(req, res, lang, slug) {
   const destinoTraducido = mapaDestinos[seo.destino] || seo.destino;
 
   const fotosRuta = await pool.query(
-    `SELECT rf.id, COALESCE(rfa.alt_texto, rf.alt_texto, '') AS alt_texto
+    `SELECT rf.id, rf.cloudinary_url, COALESCE(rfa.alt_texto, rf.alt_texto, '') AS alt_texto
      FROM rutas_fotos rf
      LEFT JOIN rutas_fotos_alt rfa ON rfa.foto_id = rf.id AND rfa.lang_code = $2
      WHERE rf.ruta_id = $1 AND rf.es_principal = FALSE
@@ -11114,10 +11122,19 @@ async function renderTraslado(req, res, lang, slug) {
   );
 
   const fotoCabecera = await pool.query(
-    'SELECT id FROM rutas_fotos WHERE ruta_id = $1 AND es_principal = TRUE LIMIT 1',
+    'SELECT id, cloudinary_url FROM rutas_fotos WHERE ruta_id = $1 AND es_principal = TRUE LIMIT 1',
     [seo.ruta_id]
   );
   const fotoCabeceraId = fotoCabecera.rows.length > 0 ? fotoCabecera.rows[0].id : null;
+  // URL directa a Cloudinary si existe, si no por el servidor (fallback)
+  const fotoCabeceraUrl = fotoCabecera.rows.length > 0
+    ? (fotoCabecera.rows[0].cloudinary_url || '/ruta-foto/' + fotoCabecera.rows[0].id)
+    : null;
+
+  // URLs de fotos adicionales: directo a Cloudinary si existe, si no por el servidor (fallback)
+  const fotosRutaMapeadas = fotosRuta.rows.map(function(f) {
+    return Object.assign({}, f, { url_foto: f.cloudinary_url || '/ruta-foto/' + f.id });
+  });
 
   const urlActual = BASE_URL + '/' + lang + '/' + (SECCIONES_TRASLADO[lang] || 'traslado') + '/' + slug;
   const seoConTrad = Object.assign({}, seo, { origen: origenTraducido, destino: destinoTraducido });
@@ -11141,8 +11158,9 @@ async function renderTraslado(req, res, lang, slug) {
     relacionadas:       relacionadas.rows.map(function(r) {
       return { destino: mapaDestinos[r.destino] || r.destino, slug_url: r.slug_url };
     }),
-    fotosRuta:          fotosRuta.rows,
+    fotosRuta:          fotosRutaMapeadas,
     fotoCabeceraId,
+    fotoCabeceraUrl,
     nombreMarca,
     BASE_URL,
     tieneImagenDefecto: !!globales.imagen_og_defecto,
