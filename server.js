@@ -3270,7 +3270,7 @@ app.post('/admin/categorias/:id/eliminar', requireAdmin, asyncHandler(async (req
 
 app.post('/admin/categorias/:id/foto', requireAdmin, asyncHandler(async (req, res) => {
   const { foto } = req.body;
-  if (!foto || !foto.startsWith('data:image/') || foto.length > 1500000) {
+  if (!foto || !foto.startsWith('data:image/') || foto.length > 700000) {
     return res.status(400).json({ error: 'La imagen no es válida o pesa demasiado.' });
   }
   await pool.query('UPDATE categorias_vehiculos SET foto = $1 WHERE id = $2', [foto, req.params.id]);
