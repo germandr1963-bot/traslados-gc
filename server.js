@@ -3270,10 +3270,15 @@ app.post('/admin/categorias/:id/eliminar', requireAdmin, asyncHandler(async (req
 
 app.post('/admin/categorias/:id/foto', requireAdmin, asyncHandler(async (req, res) => {
   const { foto } = req.body;
-  if (!foto || !foto.startsWith('data:image/') || foto.length > 700000) {
-    return res.status(400).json({ error: 'La imagen no es válida o pesa demasiado.' });
+  if (!foto || !foto.startsWith('data:image/') || foto.length > 10000000) {
+    return res.status(400).json({ error: 'La imagen no es válida o pesa demasiado (máx. ~7MB).' });
   }
-  await pool.query('UPDATE categorias_vehiculos SET foto = $1 WHERE id = $2', [foto, req.params.id]);
+  const matches = foto.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato de imagen no válido.' });
+  const buffer = Buffer.from(matches[2], 'base64');
+  const webpBuffer = await sharp(buffer).webp({ quality: 92, smartSubsample: false }).toBuffer();
+  const webpDataUrl = 'data:image/webp;base64,' + webpBuffer.toString('base64');
+  await pool.query('UPDATE categorias_vehiculos SET foto = $1 WHERE id = $2', [webpDataUrl, req.params.id]);
   res.json({ ok: true });
 }));
 
