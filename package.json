@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.11.0",
     "connect-pg-simple": "^9.0.1",
     "docx": "^9.0.0",
     "ejs": "^3.1.10",
@@ -20,7 +21,7 @@
     "multer": "^2.0.0",
     "pdfkit": "^0.19.1",
     "pg": "^8.12.0",
-    "stripe": "^14.0.0",
-    "sharp": "^0.33.0"
+    "sharp": "^0.33.0",
+    "stripe": "^14.0.0"
   }
 }

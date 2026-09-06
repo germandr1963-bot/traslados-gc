@@ -15,6 +15,12 @@ const { medirPxTitulo, medirPxDescripcion } = require('./medidor-pixeles');
 const fs = require('fs');
 const os = require('os');
 const PDFDocument = require('pdfkit');
+const cloudinary = require('cloudinary').v2;
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 const app = express();
 
@@ -5031,6 +5037,21 @@ app.post('/admin/categorias/:id/fotos', requireAdmin, asyncHandler(async (req, r
       [inserted.rows[0].id, alt_texto]
     );
   }
+  // Subir a Cloudinary y guardar la URL
+  if (inserted.rows[0]) {
+    try {
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: 'traslados-gc/categorias', public_id: nombre_archivo || `categoria-${req.params.id}-${inserted.rows[0].id}`, overwrite: true },
+          (error, result) => { if (error) reject(error); else resolve(result); }
+        );
+        stream.end(webpBuffer);
+      });
+      await pool.query('UPDATE categorias_fotos SET cloudinary_url = $1 WHERE id = $2', [uploadResult.secure_url, inserted.rows[0].id]);
+    } catch (e) {
+      console.error('Cloudinary upload error (categorias):', e.message);
+    }
+  }
   res.json({ ok: true });
 }));
 
@@ -5080,8 +5101,11 @@ app.get('/admin/categorias/:id/fotos', requireAdmin, asyncHandler(async (req, re
 
 // Sirve una foto pública de categoría por su id
 app.get('/categoria-foto/:fotoId', asyncHandler(async (req, res) => {
-  const result = await pool.query('SELECT imagen, mime_type FROM categorias_fotos WHERE id = $1', [req.params.fotoId]);
+  const result = await pool.query('SELECT imagen, mime_type, cloudinary_url FROM categorias_fotos WHERE id = $1', [req.params.fotoId]);
   if (result.rows.length === 0) return res.status(404).send('No encontrado');
+  if (result.rows[0].cloudinary_url) {
+    return res.redirect(301, result.rows[0].cloudinary_url);
+  }
   let imgBuffer;
   const raw = result.rows[0].imagen;
   if (Buffer.isBuffer(raw)) {
@@ -5094,6 +5118,34 @@ app.get('/categoria-foto/:fotoId', asyncHandler(async (req, res) => {
   res.setHeader('Content-Type', result.rows[0].mime_type || 'image/webp');
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.send(imgBuffer);
+}));
+
+// Migra todas las fotos de categorías existentes en Neon a Cloudinary
+app.post('/admin/categorias/migrar-cloudinary', requireAdmin, asyncHandler(async (req, res) => {
+  const fotos = await pool.query('SELECT id, imagen, nombre_archivo FROM categorias_fotos WHERE cloudinary_url IS NULL');
+  let ok = 0, errores = 0;
+  for (const foto of fotos.rows) {
+    try {
+      let imgBuffer;
+      const raw = foto.imagen;
+      if (Buffer.isBuffer(raw)) { imgBuffer = raw; }
+      else if (typeof raw === 'string' && raw.startsWith('\\x')) { imgBuffer = Buffer.from(raw.slice(2), 'hex'); }
+      else { imgBuffer = Buffer.from(raw); }
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: 'traslados-gc/categorias', public_id: foto.nombre_archivo || `categoria-foto-${foto.id}`, overwrite: true },
+          (error, result) => { if (error) reject(error); else resolve(result); }
+        );
+        stream.end(imgBuffer);
+      });
+      await pool.query('UPDATE categorias_fotos SET cloudinary_url = $1 WHERE id = $2', [uploadResult.secure_url, foto.id]);
+      ok++;
+    } catch (e) {
+      console.error(`Error migrando foto ${foto.id}:`, e.message);
+      errores++;
+    }
+  }
+  res.json({ ok, errores, total: fotos.rows.length });
 }));
 
 // Elimina una foto de la galería de categoría
