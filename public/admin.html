@@ -1672,6 +1672,11 @@ table.tabla-precios input {
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
         <button class="boton-costa" onclick="cargarPaginaRutas()" style="font-size:0.85rem;">🔄 Actualizar</button>
       </div>
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:#fff8e1;padding:10px 14px;border-radius:8px;border:1px solid #ffe082;">
+        <span style="font-size:13px;">☁️ Migrar fotos de destinos a Cloudinary:</span>
+        <button class="boton-costa" onclick="migrarFotosDestinos()" id="btn-migrar-cloudinary-destinos">Migrar fotos ahora</button>
+        <span id="msg-migrar-cloudinary-destinos" style="font-size:13px;color:var(--texto-muted);"></span>
+      </div>
       <p class="subtitulo">Gestiona los destinos que aparecen en la página pública /rutas. Cada destino tiene su propia página con fotos, texto descriptivo y datos SEO por idioma. Los slugs, rutas y demás datos vienen de las secciones Destinos y Rutas y precios — aquí solo se enriquece y activa.</p>
 
 
@@ -4399,6 +4404,35 @@ function migrarFotosCloudinary() {
   msg.style.color = 'var(--texto-muted)';
   msg.textContent = 'Subiendo fotos a Cloudinary, espera...';
   fetch('/admin/categorias/migrar-cloudinary', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false;
+      btn.textContent = 'Migrar fotos ahora';
+      if (d.errores === 0) {
+        msg.style.color = 'green';
+        msg.textContent = '✅ ' + d.ok + ' fotos migradas correctamente.';
+      } else {
+        msg.style.color = 'orange';
+        msg.textContent = '⚠️ ' + d.ok + ' migradas, ' + d.errores + ' con error.';
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Migrar fotos ahora';
+      msg.style.color = 'red';
+      msg.textContent = '❌ Error de conexión. Inténtalo de nuevo.';
+    });
+}
+
+function migrarFotosDestinos() {
+  var btn = document.getElementById('btn-migrar-cloudinary-destinos');
+  var msg = document.getElementById('msg-migrar-cloudinary-destinos');
+  if (!btn || !msg) return;
+  btn.disabled = true;
+  btn.textContent = 'Migrando...';
+  msg.style.color = 'var(--texto-muted)';
+  msg.textContent = 'Subiendo fotos a Cloudinary, espera...';
+  fetch('/admin/destinos/migrar-cloudinary', { method: 'POST' })
     .then(function(r) { return r.json(); })
     .then(function(d) {
       btn.disabled = false;
