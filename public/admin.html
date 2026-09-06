@@ -448,6 +448,12 @@ table.tabla-precios input {
         <div id="bloque2-flota-contenido" style="display:none;margin-top:16px;">
           <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Genera con IA la descripción, subtítulo, texto largo y características de cada categoría de vehículo. El contenido en español se guarda en la ficha de la categoría. El de otros idiomas se guarda en la tabla de traducciones.</p>
 
+          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:#fff8e1;padding:10px 14px;border-radius:8px;border:1px solid #ffe082;">
+            <span style="font-size:13px;">☁️ Migrar fotos de flota a Cloudinary:</span>
+            <button class="boton-costa" onclick="migrarFotosCloudinary()" id="btn-migrar-cloudinary">Migrar fotos ahora</button>
+            <span id="msg-migrar-cloudinary" style="font-size:13px;color:var(--texto-muted);"></span>
+          </div>
+
           <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
             <span style="font-size:13px;">🤖 Generar contenido de categorías con IA:</span>
             <select id="select-idioma-categorias" class="campo" style="height:34px;width:auto;"></select>
@@ -4385,6 +4391,35 @@ function toggleSeccionTextos(seccionId, cabeceraEl) {
   var visible = filas.length > 0 && filas[0].style.display !== 'none';
   filas.forEach(function(f) { f.style.display = visible ? 'none' : ''; });
   if (icono) icono.textContent = visible ? '▶' : '▼';
+}
+
+function migrarFotosCloudinary() {
+  var btn = document.getElementById('btn-migrar-cloudinary');
+  var msg = document.getElementById('msg-migrar-cloudinary');
+  if (!btn || !msg) return;
+  btn.disabled = true;
+  btn.textContent = 'Migrando...';
+  msg.style.color = 'var(--texto-muted)';
+  msg.textContent = 'Subiendo fotos a Cloudinary, espera...';
+  fetch('/admin/categorias/migrar-cloudinary', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false;
+      btn.textContent = 'Migrar fotos ahora';
+      if (d.errores === 0) {
+        msg.style.color = 'green';
+        msg.textContent = '✅ ' + d.ok + ' fotos migradas correctamente.';
+      } else {
+        msg.style.color = 'orange';
+        msg.textContent = '⚠️ ' + d.ok + ' migradas, ' + d.errores + ' con error.';
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Migrar fotos ahora';
+      msg.style.color = 'red';
+      msg.textContent = '❌ Error de conexión. Inténtalo de nuevo.';
+    });
 }
 
 function toggleBloque2Flota() {
