@@ -3284,15 +3284,32 @@ app.post('/admin/categorias/:id/foto', requireAdmin, asyncHandler(async (req, re
   const buffer = Buffer.from(matches[2], 'base64');
   const webpBuffer = await sharp(buffer).webp({ quality: 92, smartSubsample: false }).toBuffer();
   const webpDataUrl = 'data:image/webp;base64,' + webpBuffer.toString('base64');
-  await pool.query('UPDATE categorias_vehiculos SET foto = $1 WHERE id = $2', [webpDataUrl, req.params.id]);
+  // Subir a Cloudinary
+  let cloudinaryUrl = null;
+  try {
+    const uploadResult = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: 'traslados-gc/categorias', public_id: `categoria-principal-${req.params.id}`, overwrite: true },
+        (error, result) => { if (error) reject(error); else resolve(result); }
+      );
+      stream.end(webpBuffer);
+    });
+    cloudinaryUrl = uploadResult.secure_url;
+  } catch (e) {
+    console.error(`Error subiendo foto categoría ${req.params.id} a Cloudinary:`, e.message);
+  }
+  await pool.query('UPDATE categorias_vehiculos SET foto = $1, cloudinary_url = $2 WHERE id = $3', [webpDataUrl, cloudinaryUrl, req.params.id]);
   res.json({ ok: true });
 }));
 
 // Sirve la foto de una categoría — accesible públicamente para categoria-pagina.html
 app.get('/admin/categorias/:id/foto', asyncHandler(async (req, res) => {
-  const result = await pool.query('SELECT foto FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
+  const result = await pool.query('SELECT foto, cloudinary_url FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
   if (!result.rows.length || !result.rows[0].foto) {
     return res.status(404).end();
+  }
+  if (result.rows[0].cloudinary_url) {
+    return res.redirect(302, result.rows[0].cloudinary_url);
   }
   const dataUrl = result.rows[0].foto;
   const match = dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
