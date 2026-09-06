@@ -6939,7 +6939,44 @@ async function renderFlota(req, res, lang) {
   }
   const t = function(clave) { return obtenerTexto(clave, lang); };
   const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
-  res.render('flota', { lang, t, palabrasPaginas, BASE_URL });
+  const palabraFlota = palabrasPaginas.flota || 'flota';
+
+  // Misma consulta que /api/flota
+  const result = await pool.query(
+    `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.limite_sillas,
+            COALESCE(cvt.descripcion,       cv.descripcion)       AS descripcion,
+            COALESCE(cvt.subtitulo,         cv.subtitulo)         AS subtitulo,
+            COALESCE(cvt.descripcion_larga, cv.descripcion_larga) AS descripcion_larga,
+            COALESCE(cvt.caracteristicas,   cv.caracteristicas)   AS caracteristicas,
+            CASE WHEN cvt.activo = TRUE THEN cvt.slug_url ELSE NULL END AS slug_url,
+            COALESCE(it.slug, i.slug, 'gran-canaria') AS isla_slug
+     FROM categorias_vehiculos cv
+     LEFT JOIN categorias_vehiculos_traducciones cvt
+           ON cvt.categoria_id = cv.id AND cvt.lang_code = $1
+     LEFT JOIN islas i ON i.id = cv.isla_id
+     LEFT JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = $1
+     WHERE cv.activa = TRUE AND cv.en_flota = TRUE
+     ORDER BY cv.orden, cv.nombre`,
+    [lang]
+  );
+
+  const categorias = result.rows.map(function(cat) {
+    const nombreTrad  = obtenerTexto('categoria_nombre_'  + cat.id, lang);
+    const maletasTrad = obtenerTexto('categoria_maletas_' + cat.id, lang);
+    return Object.assign({}, cat, {
+      nombre:            nombreTrad  || cat.nombre,
+      capacidad_maletas: maletasTrad || cat.capacidad_maletas,
+      url_foto:          '/admin/categorias/' + cat.id + '/foto',
+      url_reserva:       lang !== 'es' ? '/' + lang + '/' : '/',
+      url_conoce_mas:    cat.slug_url
+        ? (lang !== 'es'
+            ? '/' + lang + '/' + palabraFlota + '/' + (cat.isla_slug || 'gran-canaria') + '/' + cat.slug_url
+            : '/flota/' + (cat.isla_slug || 'gran-canaria') + '/' + cat.slug_url)
+        : null
+    });
+  });
+
+  res.render('flota', { lang, t, palabrasPaginas, BASE_URL, categorias });
 }
 
 // ─── Página de rutas — renderizada en servidor con EJS ──────────────────
