@@ -4705,11 +4705,28 @@ app.post('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req,
   const buffer = Buffer.from(matches[2], 'base64');
   const webpBuffer = await sharp(buffer).webp({ quality: 85 }).toBuffer();
   const webpHex = '\\x' + webpBuffer.toString('hex');
+  // Subir a Cloudinary en subcarpeta con el nombre del destino
+  let cloudinaryUrl = null;
+  try {
+    const destinoRes = await pool.query('SELECT nombre FROM destinos WHERE id = $1', [req.params.id]);
+    const destinoNombre = destinoRes.rows[0] ? destinoRes.rows[0].nombre : `destino-${req.params.id}`;
+    const subcarpeta = destinoNombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const uploadResult = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: `traslados-gc/destinos/${subcarpeta}`, public_id: nombre_archivo || `destino-foto-${req.params.id}-${Date.now()}`, overwrite: true },
+        (error, result) => { if (error) reject(error); else resolve(result); }
+      );
+      stream.end(webpBuffer);
+    });
+    cloudinaryUrl = uploadResult.secure_url;
+  } catch (e) {
+    console.error(`Error subiendo foto destino ${req.params.id} a Cloudinary:`, e.message);
+  }
   const maxOrden = await pool.query('SELECT COALESCE(MAX(orden), 0) AS m FROM destinos_fotos WHERE destino_id = $1', [req.params.id]);
   const inserted = await pool.query(
-    `INSERT INTO destinos_fotos (destino_id, imagen, mime_type, nombre_archivo, alt_texto, orden)
-     VALUES ($1, $2::bytea, 'image/webp', $3, $4, $5) RETURNING id`,
-    [req.params.id, webpHex, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1]
+    `INSERT INTO destinos_fotos (destino_id, imagen, mime_type, nombre_archivo, alt_texto, orden, cloudinary_url)
+     VALUES ($1, $2::bytea, 'image/webp', $3, $4, $5, $6) RETURNING id`,
+    [req.params.id, webpHex, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1, cloudinaryUrl]
   );
   const fotoId = inserted.rows[0] && inserted.rows[0].id;
   if (fotoId) {
@@ -4777,8 +4794,11 @@ app.get('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req, 
 
 // Sirve una foto pública por su id
 app.get('/destino-foto/:fotoId', asyncHandler(async (req, res) => {
-  const result = await pool.query('SELECT imagen, mime_type FROM destinos_fotos WHERE id = $1', [req.params.fotoId]);
+  const result = await pool.query('SELECT imagen, mime_type, cloudinary_url FROM destinos_fotos WHERE id = $1', [req.params.fotoId]);
   if (result.rows.length === 0) return res.status(404).send('No encontrado');
+  if (result.rows[0].cloudinary_url) {
+    return res.redirect(302, result.rows[0].cloudinary_url);
+  }
   let imgBuffer;
   const raw = result.rows[0].imagen;
   if (Buffer.isBuffer(raw)) {
@@ -4791,6 +4811,41 @@ app.get('/destino-foto/:fotoId', asyncHandler(async (req, res) => {
   res.setHeader('Content-Type', result.rows[0].mime_type || 'image/webp');
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.send(imgBuffer);
+}));
+
+// Migra fotos de destinos a Cloudinary organizadas por subcarpeta de destino
+app.post('/admin/destinos/migrar-cloudinary', requireAdmin, asyncHandler(async (req, res) => {
+  let ok = 0, errores = 0;
+  const fotos = await pool.query(`
+    SELECT df.id, df.imagen, df.nombre_archivo, df.destino_id, d.nombre AS destino_nombre
+    FROM destinos_fotos df
+    JOIN destinos d ON d.id = df.destino_id
+    WHERE df.cloudinary_url IS NULL
+  `);
+  for (const foto of fotos.rows) {
+    try {
+      let imgBuffer;
+      const raw = foto.imagen;
+      if (Buffer.isBuffer(raw)) { imgBuffer = raw; }
+      else if (typeof raw === 'string' && raw.startsWith('\\x')) { imgBuffer = Buffer.from(raw.slice(2), 'hex'); }
+      else { imgBuffer = Buffer.from(raw); }
+      // Subcarpeta con el nombre del destino (slugificado)
+      const subcarpeta = foto.destino_nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: `traslados-gc/destinos/${subcarpeta}`, public_id: foto.nombre_archivo || `destino-foto-${foto.id}`, overwrite: true },
+          (error, result) => { if (error) reject(error); else resolve(result); }
+        );
+        stream.end(imgBuffer);
+      });
+      await pool.query('UPDATE destinos_fotos SET cloudinary_url = $1 WHERE id = $2', [uploadResult.secure_url, foto.id]);
+      ok++;
+    } catch (e) {
+      console.error(`Error migrando foto destino ${foto.id}:`, e.message);
+      errores++;
+    }
+  }
+  res.json({ ok, errores, total: fotos.rows.length });
 }));
 
 // Elimina una foto del carrusel
