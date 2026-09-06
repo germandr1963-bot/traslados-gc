@@ -2320,18 +2320,10 @@ function elegirFotoCategoria(id) {
       var imagen = new Image();
       imagen.onload = function () {
         var continuar = function () {
-          var escala = Math.min(1, 600 / imagen.width);
-          var lienzo = document.createElement('canvas');
-          lienzo.width = Math.round(imagen.width * escala);
-          lienzo.height = Math.round(imagen.height * escala);
-          var contexto = lienzo.getContext('2d');
-          contexto.fillStyle = '#ffffff';
-          contexto.fillRect(0, 0, lienzo.width, lienzo.height);
-          contexto.drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
           fetch('/admin/categorias/' + id + '/foto', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ foto: lienzo.toDataURL('image/jpeg', 0.8) })
+            body: JSON.stringify({ foto: evento.target.result })
           }).then(function (r) { return r.json(); }).then(function (respuesta) {
             if (respuesta.ok) {
               alert('Foto de la categoría guardada. 📷');
