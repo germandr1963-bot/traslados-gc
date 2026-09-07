@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= t('acceso_titulo') || 'Mi Reserva' %> — Traslados GC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/estilos.css">
+  <style>
+    body {
+      font-family: 'Public Sans', 'Segoe UI', Arial, sans-serif;
+      background: var(--gris-fondo);
+      min-height: 100vh;
+    }
+    header.app {
+      background: var(--charcoal);
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      border-bottom: 3px solid var(--terracota);
+    }
+    header.app .marca {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--texto-claro);
+      letter-spacing: 2px;
+      text-decoration: none;
+      text-align: center;
+      justify-self: center;
+    }
+    header.app a.nav { color: rgba(255,255,255,0.65); text-decoration: none; font-size: 14px; }
+    header.app a.nav:hover { color: #fff; }
+    header.app a.nav.izquierda { justify-self: start; }
+    header.app a.nav.derecha { justify-self: end; }
+    @media (max-width: 560px) {
+      header.app { padding: 12px 14px; }
+      header.app .marca { font-size: 19px; letter-spacing: 1px; }
+      header.app a.nav { font-size: 12px; }
+    }
+
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; text-align: left; }
+    .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+    .breadcrumbs a:hover { text-decoration: underline; }
+
+    .contenido { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; text-align: center; }
+
+    @media (max-width: 600px) { .contenido { padding: 24px 16px 60px; } }
+
+    h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: clamp(32px, 6vw, 52px); color: var(--texto-oscuro); margin-bottom: 12px; }
+    .subtitulo { color: var(--texto-muted); font-size: 19px; font-style: italic; letter-spacing: 0.3px; margin-bottom: 28px; line-height: 1.6; }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--gris-borde);
+      border-radius: 12px;
+      padding: 20px;
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      text-align: left;
+    }
+    label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 5px; }
+    input {
+      width: 100%;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 15px;
+      color: #2c2c2c;
+      margin-bottom: 18px;
+      transition: border-color 0.2s;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+    input:focus { outline: none; border-color: var(--terracota); }
+    .boton {
+      width: 100%;
+      background: var(--terracota);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: inherit;
+    }
+    .boton:hover { background: var(--terracota-oscuro); }
+    .boton:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error {
+      background: #fdf0ee;
+      border: 1px solid #e8b4a8;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #842029;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .ok {
+      background: #e8f5e9;
+      border: 1px solid #a5d6a7;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #1b5e20;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .enlace {
+      display: block;
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--terracota);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    footer { text-align: center; padding: 30px; color: var(--texto-muted); font-size: 13px; }
+    footer a { color: var(--texto-muted); text-decoration: none; margin: 0 12px; font-size: 13px; }
+    footer a:hover { color: var(--texto-oscuro); }
+    .footer-links { margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <header class="app">
+    <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="nav izquierda"><%= t('nav_inicio') || 'Inicio' %></a>
+    <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="marca">TRASLADOS · GC</a>
+    <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/' + (palabrasPaginas.contacto || 'contacto') %>" class="nav derecha"><%= t('nav_contacto') || 'Contacto' %></a>
+  </header>
+
+  <div class="contenido">
+    <nav class="breadcrumbs">
+      <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>"><%= t('nav_inicio') || 'Inicio' %></a>
+      <span> › </span>
+      <span><%= t('acceso_titulo') || 'Mi reserva' %></span>
+    </nav>
+
+    <h1><%= t('acceso_titulo') || 'Acceso clientes' %></h1>
+    <p class="subtitulo"><%= t('acceso_subtitulo') || 'Consulta y gestiona todas tus reservas' %></p>
+
+    <div class="card">
+
+      <!-- PANTALLA LOGIN -->
+      <div id="pantalla-login">
+        <div id="error-login" class="error"></div>
+        <label for="login-email"><%= t('acceso_label_email') || 'Tu email' %></label>
+        <input type="email" id="login-email" placeholder="<%= t('acceso_ph_email') || 'tucorreo@email.com' %>">
+        <label for="login-pwd"><%= t('acceso_label_password') || 'Contraseña' %></label>
+        <input type="password" id="login-pwd" placeholder="<%= t('acceso_ph_password') || 'Tu contraseña' %>">
+        <button class="boton" id="btn-login" onclick="hacerLogin()"><%= t('acceso_btn_entrar') || 'Entrar' %></button>
+        <span class="enlace" id="link-primera-vez" onclick="mostrarSolicitar()"><%= t('acceso_link_primera_vez') || '¿Primera vez? Accede con tu número de reserva' %></span><br>
+        <span class="enlace" id="link-olvide-pwd" onclick="mostrarRecuperar()"><%= t('acceso_link_olvide_password') || '¿Olvidaste tu contraseña?' %></span>
+      </div>
+
+      <!-- PANTALLA RECUPERAR CONTRASEÑA -->
+      <div id="pantalla-recuperar" class="oculto">
+        <p style="font-size:13px;color:#666;margin-bottom:20px;"><%= t('acceso_rec_info') || 'Te enviaremos un enlace a tu email para crear una nueva contraseña.' %></p>
+        <div id="error-recuperar" class="error"></div>
+        <div id="ok-recuperar" class="ok"></div>
+        <label for="rec-email"><%= t('acceso_rec_label_email') || 'Tu email' %></label>
+        <input type="email" id="rec-email" placeholder="<%= t('acceso_rec_ph_email') || 'El email con el que reservaste' %>">
+        <button class="boton" id="btn-recuperar" onclick="recuperarPassword()"><%= t('acceso_rec_btn_enviar') || 'Enviar enlace de recuperación' %></button>
+        <span class="enlace" onclick="mostrarLogin()"><%= t('acceso_link_volver') || '← Volver al acceso' %></span>
+      </div>
+
+      <!-- PANTALLA SOLICITAR CONTRASEÑA -->
+      <div id="pantalla-solicitar" class="oculto">
+        <div id="error-solicitar" class="error"></div>
+        <div id="ok-solicitar" class="ok"></div>
+        <label for="sol-pnr"><%= t('acceso_sol_label_pnr') || 'Número de reserva' %></label>
+        <input type="text" id="sol-pnr" placeholder="<%= t('acceso_sol_ph_pnr') || 'Ej: GCA123' %>" style="text-transform:uppercase;letter-spacing:2px;font-weight:700">
+        <label for="sol-email"><%= t('acceso_sol_label_email') || 'Tu email' %></label>
+        <input type="email" id="sol-email" placeholder="<%= t('acceso_sol_ph_email') || 'El email con el que reservaste' %>">
+        <button class="boton" id="btn-solicitar" onclick="solicitarAcceso()"><%= t('acceso_sol_btn_enviar') || 'Enviar contraseña provisional' %></button>
+        <span class="enlace" onclick="mostrarLogin()"><%= t('acceso_link_volver') || '← Volver al acceso' %></span>
+      </div>
+
+      <!-- PANTALLA CAMBIAR CONTRASEÑA -->
+      <div id="pantalla-cambiar" class="oculto">
+        <p style="font-size:13px;color:#666;margin-bottom:20px;"><%= t('acceso_cambiar_info') || 'Es tu primera vez. Elige una contraseña propia para acceder en el futuro.' %></p>
+        <div id="error-cambiar" class="error"></div>
+        <label for="nueva-pwd"><%= t('acceso_cambiar_label_pwd') || 'Nueva contraseña' %></label>
+        <input type="password" id="nueva-pwd" placeholder="<%= t('acceso_cambiar_ph_pwd') || 'Mínimo 6 caracteres' %>">
+        <label for="nueva-pwd2"><%= t('acceso_cambiar_label_pwd2') || 'Repite la contraseña' %></label>
+        <input type="password" id="nueva-pwd2" placeholder="<%= t('acceso_cambiar_ph_pwd2') || 'Repite la contraseña' %>">
+        <button class="boton" id="btn-cambiar" onclick="cambiarPassword()"><%= t('acceso_cambiar_btn') || 'Guardar y entrar' %></button>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-links">
+      <a href="<%= lang === 'es' ? '/rutas' : '/' + lang + '/' + (palabrasPaginas.rutas || 'rutas') %>"><%= t('home_footer_rutas') || 'Rutas' %></a>
+      <a href="<%= lang === 'es' ? '/destinos' : '/' + lang + '/' + (palabrasPaginas.destinos || 'destinos') %>"><%= t('home_footer_destinos') || 'Destinos' %></a>
+      <a href="<%= lang === 'es' ? '/flota' : '/' + lang + '/' + (palabrasPaginas.flota || 'flota') %>"><%= t('home_footer_flota') || 'Flota' %></a>
+      <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/' + (palabrasPaginas.contacto || 'contacto') %>"><%= t('home_footer_contacto') || 'Contacto' %></a>
+      <% if (lang === 'es') { %>
+      <a href="/chofer/acceso/alta"><%= t('home_footer_alta_choferes') || 'Alta choferes' %></a>
+      <a href="/chofer/acceso"><%= t('home_footer_acceso_choferes') || 'Acceso a choferes' %></a>
+      <% } %>
+      <a href="<%= lang === 'es' ? '/mi-reserva' : '/' + lang + '/' + (palabrasPaginas['mi-reserva'] || 'mi-reserva') %>"><%= t('home_footer_acceso_clientes') || 'Acceso clientes' %></a>
+    </div>
+    Traslados · GC — Gran Canaria
+  </footer>
+
+  <script>
+    // Textos para uso dinámico en JS (mensajes de error, estados de botones)
+    window._tx = {
+      acceso_btn_entrar:           '<%= t("acceso_btn_entrar")           || "Entrar" %>',
+      acceso_btn_entrando:         '<%= t("acceso_btn_entrando")         || "Entrando..." %>',
+      acceso_rec_btn_enviar:       '<%= t("acceso_rec_btn_enviar")       || "Enviar enlace de recuperación" %>',
+      acceso_rec_btn_enviando:     '<%= t("acceso_rec_btn_enviando")     || "Enviando..." %>',
+      acceso_rec_ok:               '<%= t("acceso_rec_ok")               || "Te hemos enviado a tu email registrado el acceso de recuperación." %>',
+      acceso_rec_err_email:        '<%= t("acceso_rec_err_email")        || "Indica tu email." %>',
+      acceso_sol_btn_enviar:       '<%= t("acceso_sol_btn_enviar")       || "Enviar contraseña provisional" %>',
+      acceso_sol_btn_enviando:     '<%= t("acceso_sol_btn_enviando")     || "Enviando..." %>',
+      acceso_sol_ok:               '<%= t("acceso_sol_ok")               || "Te hemos enviado la contraseña provisional. Revisa tu email." %>',
+      acceso_cambiar_btn:          '<%= t("acceso_cambiar_btn")          || "Guardar y entrar" %>',
+      acceso_cambiar_btn_guardando:'<%= t("acceso_cambiar_btn_guardando")|| "Guardando..." %>',
+      acceso_err_campos:           '<%= t("acceso_err_campos")           || "Rellena todos los campos." %>',
+      acceso_err_pwd_corta:        '<%= t("acceso_err_pwd_corta")        || "Mínimo 6 caracteres." %>',
+      acceso_err_pwd_no_coincide:  '<%= t("acceso_err_pwd_no_coincide")  || "Las contraseñas no coinciden." %>',
+      acceso_err_conexion:         '<%= t("acceso_err_conexion")         || "Error de conexión. Inténtalo de nuevo." %>'
+    };
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        if (!document.getElementById('pantalla-login').classList.contains('oculto')) hacerLogin();
+        else if (!document.getElementById('pantalla-solicitar').classList.contains('oculto')) solicitarAcceso();
+        else if (!document.getElementById('pantalla-cambiar').classList.contains('oculto')) cambiarPassword();
+        else if (!document.getElementById('pantalla-recuperar').classList.contains('oculto')) recuperarPassword();
+      }
+    });
+
+    function mostrarLogin() {
+      document.getElementById('pantalla-login').classList.remove('oculto');
+      document.getElementById('pantalla-solicitar').classList.add('oculto');
+      document.getElementById('pantalla-cambiar').classList.add('oculto');
+      document.getElementById('pantalla-recuperar').classList.add('oculto');
+    }
+
+    function mostrarSolicitar() {
+      document.getElementById('pantalla-login').classList.add('oculto');
+      document.getElementById('pantalla-solicitar').classList.remove('oculto');
+      document.getElementById('pantalla-cambiar').classList.add('oculto');
+      document.getElementById('pantalla-recuperar').classList.add('oculto');
+    }
+
+    function mostrarCambiar() {
+      document.getElementById('pantalla-login').classList.add('oculto');
+      document.getElementById('pantalla-solicitar').classList.add('oculto');
+      document.getElementById('pantalla-cambiar').classList.remove('oculto');
+      document.getElementById('pantalla-recuperar').classList.add('oculto');
+    }
+
+    function mostrarRecuperar() {
+      document.getElementById('pantalla-login').classList.add('oculto');
+      document.getElementById('pantalla-solicitar').classList.add('oculto');
+      document.getElementById('pantalla-cambiar').classList.add('oculto');
+      document.getElementById('pantalla-recuperar').classList.remove('oculto');
+    }
+
+    function mostrarError(id, texto) {
+      var el = document.getElementById(id);
+      el.textContent = texto;
+      el.style.display = 'block';
+    }
+
+    function ocultarError(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    function hacerLogin() {
+      var email = document.getElementById('login-email').value.trim();
+      var pwd = document.getElementById('login-pwd').value;
+      var btn = document.getElementById('btn-login');
+      ocultarError('error-login');
+      if (!email || !pwd) { mostrarError('error-login', window._tx.acceso_err_campos); return; }
+      btn.disabled = true; btn.textContent = window._tx.acceso_btn_entrando;
+      fetch('/api/cliente/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, password: pwd })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) {
+          mostrarError('error-login', d.error);
+          btn.disabled = false; btn.textContent = window._tx.acceso_btn_entrar;
+          return;
+        }
+        if (d.primer_acceso) {
+          mostrarCambiar();
+          btn.disabled = false; btn.textContent = window._tx.acceso_btn_entrar;
+        } else {
+          window.location.href = '/cliente/portal';
+        }
+      })
+      .catch(function() {
+        mostrarError('error-login', window._tx.acceso_err_conexion);
+        btn.disabled = false; btn.textContent = window._tx.acceso_btn_entrar;
+      });
+    }
+
+    function recuperarPassword() {
+      var email = document.getElementById('rec-email').value.trim();
+      var btn = document.getElementById('btn-recuperar');
+      ocultarError('error-recuperar');
+      document.getElementById('ok-recuperar').style.display = 'none';
+      if (!email) { mostrarError('error-recuperar', window._tx.acceso_rec_err_email); return; }
+      btn.disabled = true; btn.textContent = window._tx.acceso_rec_btn_enviando;
+      fetch('/api/cliente/recuperar-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        btn.disabled = false; btn.textContent = window._tx.acceso_rec_btn_enviar;
+        if (d.error) { mostrarError('error-recuperar', d.error); return; }
+        var ok = document.getElementById('ok-recuperar');
+        ok.textContent = window._tx.acceso_rec_ok;
+        ok.style.display = 'block';
+        setTimeout(function() {
+          document.getElementById('login-email').value = email;
+          mostrarLogin();
+        }, 3000);
+      })
+      .catch(function() {
+        mostrarError('error-recuperar', window._tx.acceso_err_conexion);
+        btn.disabled = false; btn.textContent = window._tx.acceso_rec_btn_enviar;
+      });
+    }
+
+    function solicitarAcceso() {
+      var pnr = document.getElementById('sol-pnr').value.trim();
+      var email = document.getElementById('sol-email').value.trim();
+      var btn = document.getElementById('btn-solicitar');
+      ocultarError('error-solicitar');
+      document.getElementById('ok-solicitar').style.display = 'none';
+      if (!pnr || !email) { mostrarError('error-solicitar', window._tx.acceso_err_campos); return; }
+      btn.disabled = true; btn.textContent = window._tx.acceso_sol_btn_enviando;
+      fetch('/api/cliente/solicitar-acceso', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pnr: pnr, email: email })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        btn.disabled = false; btn.textContent = window._tx.acceso_sol_btn_enviar;
+        if (d.error) { mostrarError('error-solicitar', d.error); return; }
+        var ok = document.getElementById('ok-solicitar');
+        ok.textContent = window._tx.acceso_sol_ok;
+        ok.style.display = 'block';
+        setTimeout(function() {
+          mostrarLogin();
+        }, 3000);
+      })
+      .catch(function() {
+        mostrarError('error-solicitar', window._tx.acceso_err_conexion);
+        btn.disabled = false; btn.textContent = window._tx.acceso_sol_btn_enviar;
+      });
+    }
+
+    function cambiarPassword() {
+      var p1 = document.getElementById('nueva-pwd').value;
+      var p2 = document.getElementById('nueva-pwd2').value;
+      var btn = document.getElementById('btn-cambiar');
+      ocultarError('error-cambiar');
+      if (!p1 || p1.length < 6) { mostrarError('error-cambiar', window._tx.acceso_err_pwd_corta); return; }
+      if (p1 !== p2) { mostrarError('error-cambiar', window._tx.acceso_err_pwd_no_coincide); return; }
+      btn.disabled = true; btn.textContent = window._tx.acceso_cambiar_btn_guardando;
+      fetch('/api/cliente/cambiar-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password_nueva: p1 })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) {
+          mostrarError('error-cambiar', d.error);
+          btn.disabled = false; btn.textContent = window._tx.acceso_cambiar_btn;
+          return;
+        }
+        window.location.href = '/cliente/portal';
+      })
+      .catch(function() {
+        mostrarError('error-cambiar', window._tx.acceso_err_conexion);
+        btn.disabled = false; btn.textContent = window._tx.acceso_cambiar_btn;
+      });
+    }
+  </script>
+</body>
+</html>
