@@ -7595,13 +7595,19 @@ app.get('/flota', asyncHandler(async (req, res) => {
   await renderFlota(req, res, 'es');
 }));
 
-app.get('/chofer/acceso', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'chofer-registro.html'));
-});
+app.get('/chofer/acceso', asyncHandler(async (req, res) => {
+  if (req.session && req.session.choferId) return res.redirect('/chofer/portal');
+  const t = function(clave) { return obtenerTexto(clave, 'es'); };
+  const palabrasPaginas = PALABRAS_PAGINAS['es'] || {};
+  res.render('chofer-registro', { lang: 'es', t, palabrasPaginas, BASE_URL });
+}));
 
-app.get('/chofer/acceso/alta', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'chofer-registro.html'));
-});
+app.get('/chofer/acceso/alta', asyncHandler(async (req, res) => {
+  if (req.session && req.session.choferId) return res.redirect('/chofer/portal');
+  const t = function(clave) { return obtenerTexto(clave, 'es'); };
+  const palabrasPaginas = PALABRAS_PAGINAS['es'] || {};
+  res.render('chofer-registro', { lang: 'es', t, palabrasPaginas, BASE_URL });
+}));
 
 app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
   const {
