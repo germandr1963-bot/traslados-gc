@@ -4833,7 +4833,7 @@ app.post('/admin/destinos/migrar-cloudinary', requireAdmin, asyncHandler(async (
       const subcarpeta = foto.destino_nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: `traslados-gc/destinos/${subcarpeta}`, public_id: foto.nombre_archivo || `destino-foto-${foto.id}`, overwrite: true },
+          { folder: `traslados-gc/destinos/${subcarpeta}`, public_id: (foto.nombre_archivo || `destino-foto-${foto.id}`).replace(/\.[^.]+$/, ''), overwrite: true },
           (error, result) => { if (error) reject(error); else resolve(result); }
         );
         stream.end(imgBuffer);
@@ -5562,7 +5562,7 @@ app.post('/admin/rutas/migrar-cloudinary', requireAdmin, asyncHandler(async (req
       const subcarpeta = rutaNombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: `traslados-gc/rutas/${subcarpeta}`, public_id: foto.nombre_archivo || `ruta-foto-${foto.id}`, overwrite: true },
+          { folder: `traslados-gc/rutas/${subcarpeta}`, public_id: (foto.nombre_archivo || `ruta-foto-${foto.id}`).replace(/\.[^.]+$/, ''), overwrite: true },
           (error, result) => { if (error) reject(error); else resolve(result); }
         );
         stream.end(imgBuffer);
