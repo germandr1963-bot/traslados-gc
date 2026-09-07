@@ -389,6 +389,10 @@ table.tabla-precios input {
           <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
         </div>
         <div id="seo-rutas-contenido" style="display:none;padding:18px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <button id="btn-migrar-cloudinary-rutas" class="boton-costa" onclick="migrarFotosRutas()" style="font-size:0.85rem;background:#e67e22;color:#fff;">&#x2601;&#xFE0F; Migrar fotos a Cloudinary</button>
+            <span id="msg-migrar-cloudinary-rutas" style="font-size:0.85rem;color:#666;align-self:center;"></span>
+          </div>
           <table class="tabla-admin">
             <thead id="thead-seo">
               <tr>
@@ -1673,6 +1677,8 @@ table.tabla-precios input {
       <h1>🌍 Páginas Destino — SEO Destinos</h1>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
         <button class="boton-costa" onclick="cargarPaginaRutas()" style="font-size:0.85rem;">🔄 Actualizar</button>
+        <button id="btn-migrar-cloudinary-destinos" class="boton-costa" onclick="migrarFotosDestinos()" style="font-size:0.85rem;background:#e67e22;color:#fff;">☁️ Migrar fotos a Cloudinary</button>
+        <span id="msg-migrar-cloudinary-destinos" style="font-size:0.85rem;color:#666;align-self:center;"></span>
       </div>
 
       <p class="subtitulo">Gestiona los destinos que aparecen en la página pública /rutas. Cada destino tiene su propia página con fotos, texto descriptivo y datos SEO por idioma. Los slugs, rutas y demás datos vienen de las secciones Destinos y Rutas y precios — aquí solo se enriquece y activa.</p>
