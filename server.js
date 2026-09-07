@@ -4703,7 +4703,7 @@ app.post('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req,
   const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return res.status(400).json({ error: 'Formato de imagen no válido.' });
   const buffer = Buffer.from(matches[2], 'base64');
-  const webpBuffer = await sharp(buffer).webp({ quality: 85 }).toBuffer();
+  const webpBuffer = await sharp(buffer).webp({ quality: 92 }).toBuffer();
   const webpHex = '\\x' + webpBuffer.toString('hex');
   // Subir a Cloudinary en subcarpeta con el nombre del destino
   let cloudinaryUrl = null;
@@ -5094,7 +5094,7 @@ app.post('/admin/categorias/:id/fotos', requireAdmin, asyncHandler(async (req, r
   const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return res.status(400).json({ error: 'Formato de imagen no válido.' });
   const buffer = Buffer.from(matches[2], 'base64');
-  const webpBuffer = await sharp(buffer).webp({ quality: 85 }).toBuffer();
+  const webpBuffer = await sharp(buffer).webp({ quality: 92 }).toBuffer();
   const webpHex = '\\x' + webpBuffer.toString('hex');
   const maxOrden = await pool.query('SELECT COALESCE(MAX(orden), 0) AS m FROM categorias_fotos WHERE categoria_id = $1', [req.params.id]);
   const inserted = await pool.query(
@@ -5464,7 +5464,7 @@ app.post('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, re
   const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return res.status(400).json({ error: 'Formato de imagen no válido.' });
   const buffer = Buffer.from(matches[2], 'base64');
-  const webpBuffer = await sharp(buffer).webp({ quality: 85 }).toBuffer();
+  const webpBuffer = await sharp(buffer).webp({ quality: 92 }).toBuffer();
   const webpHex = '\\x' + webpBuffer.toString('hex');
   // Subir a Cloudinary en subcarpeta con el nombre de la ruta
   let cloudinaryUrl = null;
