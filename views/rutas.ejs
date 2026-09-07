@@ -77,7 +77,7 @@
 
     .td-foto {
       height: 110px;
-      background: var(--charcoal);
+      background: var(--gris-fondo);
       position: relative;
     }
     .td-foto img {
@@ -159,8 +159,8 @@
         <% rutas.forEach(function(ruta) { %>
           <a href="<%= ruta.url %>" class="tarjeta-destino">
             <div class="td-foto">
-              <% if (ruta.foto_cabecera_id) { %>
-                <img src="/ruta-foto/<%= ruta.foto_cabecera_id %>" alt="<%= ruta.origen %> - <%= ruta.destino %>">
+              <% if (ruta.url_foto) { %>
+                <img src="<%= ruta.url_foto %>" alt="<%= ruta.origen %> - <%= ruta.destino %>">
               <% } %>
             </div>
             <div class="td-body">
