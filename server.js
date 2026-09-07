@@ -4713,7 +4713,7 @@ app.post('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req,
     const subcarpeta = destinoNombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const uploadResult = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        { folder: `traslados-gc/destinos/${subcarpeta}`, public_id: (nombre_archivo || `destino-foto-${req.params.id}-${Date.now()}`).replace(/\.[^.]+$/, ''), overwrite: true },
+        { folder: `traslados-gc/destinos/${subcarpeta}`, public_id: nombre_archivo || `destino-foto-${req.params.id}-${Date.now()}`, overwrite: true },
         (error, result) => { if (error) reject(error); else resolve(result); }
       );
       stream.end(webpBuffer);
@@ -4833,7 +4833,7 @@ app.post('/admin/destinos/migrar-cloudinary', requireAdmin, asyncHandler(async (
       const subcarpeta = foto.destino_nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: `traslados-gc/destinos/${subcarpeta}`, public_id: (foto.nombre_archivo || `destino-foto-${foto.id}`).replace(/\.[^.]+$/, ''), overwrite: true },
+          { folder: `traslados-gc/destinos/${subcarpeta}`, public_id: foto.nombre_archivo || `destino-foto-${foto.id}`, overwrite: true },
           (error, result) => { if (error) reject(error); else resolve(result); }
         );
         stream.end(imgBuffer);
@@ -5114,7 +5114,7 @@ app.post('/admin/categorias/:id/fotos', requireAdmin, asyncHandler(async (req, r
     try {
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: 'traslados-gc/categorias', public_id: (nombre_archivo || `categoria-${req.params.id}-${inserted.rows[0].id}`).replace(/\.[^.]+$/, ''), overwrite: true },
+          { folder: 'traslados-gc/categorias', public_id: nombre_archivo || `categoria-${req.params.id}-${inserted.rows[0].id}`, overwrite: true },
           (error, result) => { if (error) reject(error); else resolve(result); }
         );
         stream.end(webpBuffer);
@@ -5229,7 +5229,7 @@ app.post('/admin/categorias/migrar-cloudinary', requireAdmin, asyncHandler(async
       else { imgBuffer = Buffer.from(raw); }
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: 'traslados-gc/categorias', public_id: (foto.nombre_archivo || `categoria-galeria-${foto.id}`).replace(/\.[^.]+$/, ''), overwrite: true },
+          { folder: 'traslados-gc/categorias', public_id: foto.nombre_archivo || `categoria-galeria-${foto.id}`, overwrite: true },
           (error, result) => { if (error) reject(error); else resolve(result); }
         );
         stream.end(imgBuffer);
@@ -5474,7 +5474,7 @@ app.post('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, re
     const subcarpeta = rutaNombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const uploadResult = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        { folder: `traslados-gc/rutas/${subcarpeta}`, public_id: (nombre_archivo || `ruta-foto-${req.params.id}-${Date.now()}`).replace(/\.[^.]+$/, ''), overwrite: true },
+        { folder: `traslados-gc/rutas/${subcarpeta}`, public_id: nombre_archivo || `ruta-foto-${req.params.id}-${Date.now()}`, overwrite: true },
         (error, result) => { if (error) reject(error); else resolve(result); }
       );
       stream.end(webpBuffer);
@@ -5562,7 +5562,7 @@ app.post('/admin/rutas/migrar-cloudinary', requireAdmin, asyncHandler(async (req
       const subcarpeta = rutaNombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: `traslados-gc/rutas/${subcarpeta}`, public_id: (foto.nombre_archivo || `ruta-foto-${foto.id}`).replace(/\.[^.]+$/, ''), overwrite: true },
+          { folder: `traslados-gc/rutas/${subcarpeta}`, public_id: foto.nombre_archivo || `ruta-foto-${foto.id}`, overwrite: true },
           (error, result) => { if (error) reject(error); else resolve(result); }
         );
         stream.end(imgBuffer);
@@ -7198,8 +7198,7 @@ async function renderRutas(req, res, lang) {
     `SELECT r.id, r.origen, r.destino,
             COALESCE(rss_lang.slug_url, rss_es.slug_url) AS slug_url,
             COALESCE(rss_lang.resena_breve, rss_es.resena_breve) AS resena_breve,
-            (SELECT id FROM rutas_fotos WHERE ruta_id = r.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id,
-            (SELECT cloudinary_url FROM rutas_fotos WHERE ruta_id = r.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_cloudinary
+            (SELECT id FROM rutas_fotos WHERE ruta_id = r.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
      FROM rutas r
      LEFT JOIN route_seo_settings rss_lang
            ON rss_lang.route_id = r.id AND rss_lang.lang_code = $1
@@ -7238,7 +7237,6 @@ async function renderRutas(req, res, lang) {
       slug_url:         r.slug_url,
       url:              '/' + lang + '/' + palabraTraslado + '/' + r.slug_url,
       foto_cabecera_id: r.foto_cabecera_id || null,
-      url_foto:         r.foto_cabecera_cloudinary || (r.foto_cabecera_id ? '/ruta-foto/' + r.foto_cabecera_id : null),
       resena_breve:     r.resena_breve || ''
     }));
 
@@ -7330,7 +7328,6 @@ async function renderDestinos(req, res, lang) {
            COALESCE(dss_lang.slug_url, dss_es.slug_url) AS slug_url,
            COALESCE(dss_lang.resena_breve, dss_es.resena_breve) AS resena_breve,
            (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id,
-           (SELECT cloudinary_url FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_cloudinary,
            COALESCE(dt.nombre, d.nombre) AS nombre_mostrar
     FROM destinos d
     JOIN destinos_seo_settings dss_es ON dss_es.destino_id = d.id AND dss_es.lang_code = 'es'
@@ -7365,7 +7362,6 @@ async function renderDestinos(req, res, lang) {
       slug: d.slug_url || slugify(d.nombre),
       isla_slug: mapaIslaSlug[isla] || slugify(isla),
       foto_cabecera_id: d.foto_cabecera_id || null,
-      url_foto: d.foto_cabecera_cloudinary || (d.foto_cabecera_id ? '/destino-foto/' + d.foto_cabecera_id : null),
       resena_breve: d.resena_breve || ''
     });
   }
