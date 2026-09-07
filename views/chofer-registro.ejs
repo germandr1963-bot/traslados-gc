@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alta de Chofer — Traslados GC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/estilos.css">
+  <style>
+    header.app {
+      background: var(--charcoal);
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      border-bottom: 3px solid var(--terracota);
+    }
+    header.app .marca {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--texto-claro);
+      letter-spacing: 2px;
+      text-decoration: none;
+      text-align: center;
+      justify-self: center;
+    }
+    header.app a.nav { color: rgba(255,255,255,0.65); text-decoration: none; font-size: 14px; }
+    header.app a.nav:hover { color: #fff; }
+    header.app a.nav.izquierda { justify-self: start; }
+    header.app a.nav.derecha { justify-self: end; }
+
+    @media (max-width: 560px) {
+      header.app { padding: 12px 14px; }
+      header.app .marca { font-size: 19px; letter-spacing: 1px; }
+      header.app a.nav { font-size: 12px; }
+    }
+
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; text-align: left; }
+    .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+    .breadcrumbs a:hover { text-decoration: underline; }
+
+    .contenido { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; text-align: center; }
+    .contenido .tarjeta { text-align: left; margin: 0 auto; }
+
+    @media (max-width: 600px) { .contenido { padding: 24px 16px 60px; } }
+
+    h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: clamp(32px, 6vw, 52px); color: var(--texto-oscuro); margin-bottom: 12px; }
+    h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 15px; color: var(--terracota); margin: 20px 0 6px; letter-spacing: 0.5px; }
+    p.sub { color: var(--texto-muted); margin-bottom: 20px; font-size: 19px; font-style: italic; letter-spacing: 0.3px; line-height: 1.6; }
+
+    .pestanas { display: flex; gap: 8px; margin-bottom: 18px; }
+    .pestanas button {
+      flex: 1; margin-top: 0; background: #fff;
+      border: 1px solid var(--gris-borde); border-radius: 8px;
+      color: var(--texto-muted); font-family: 'Public Sans', sans-serif;
+      font-size: 14px; font-weight: 600; padding: 10px; cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .pestanas button.activa { background: var(--charcoal); color: #fff; border-color: var(--charcoal); }
+
+    label { display: block; font-size: 13px; font-weight: 600; color: var(--texto-oscuro); margin: 14px 0 4px; }
+    input[type=text], input[type=email], input[type=tel], input[type=password], select {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--gris-borde);
+      border-radius: 8px; font-size: 14px; font-family: 'Public Sans', sans-serif;
+      color: var(--texto-oscuro); background: #fff;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--terracota); box-shadow: 0 0 0 3px rgba(193,80,46,0.1); }
+    input::placeholder { color: #c0b5aa; }
+
+    .categorias-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-top: 6px; }
+    .cat-opcion { border: 1px solid var(--gris-borde); border-radius: 8px; padding: 12px 10px; cursor: pointer; text-align: center; background: #fff; transition: border-color 0.15s, background 0.15s; }
+    .cat-opcion:hover { border-color: #b5a99a; }
+    .cat-opcion.sel { border-color: var(--terracota); background: rgba(193,80,46,0.05); }
+    .cat-opcion .cn { font-size: 13px; font-weight: 700; color: var(--texto-oscuro); }
+    .cat-opcion .cd { font-size: 11px; color: var(--texto-muted); margin-top: 2px; }
+    .cat-otra { border: 1px dashed var(--gris-borde); border-radius: 8px; padding: 12px 10px; cursor: pointer; text-align: center; background: #fff; transition: border-color 0.15s; }
+    .cat-otra:hover { border-color: #b5a99a; }
+    .cat-otra.sel { border-color: var(--oro); background: rgba(217,164,65,0.06); }
+    .cat-otra .cn { font-size: 13px; font-weight: 700; color: var(--texto-muted); }
+    .aviso-otra { display: none; margin-top: 8px; background: #fdf8ec; border: 1px solid rgba(217,164,65,0.5); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #5a4010; line-height: 1.5; }
+
+    .check-wrap { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; }
+    .check-wrap input[type=checkbox] { width: 16px; min-width: 16px; height: 16px; margin-top: 2px; accent-color: var(--terracota); cursor: pointer; }
+    .check-wrap label { font-size: 13px; font-weight: 400; color: var(--texto-muted); margin: 0; cursor: pointer; line-height: 1.55; }
+    .check-wrap label a { color: var(--terracota); text-decoration: underline; }
+
+    button.principal { display: block; width: 100%; margin-top: 20px; padding: 13px; border: none; border-radius: 8px; background: var(--terracota); color: #fff; font-weight: 700; font-size: 15px; font-family: 'Public Sans', sans-serif; cursor: pointer; transition: background 0.2s; }
+    button.principal:hover { background: var(--terracota-oscuro); }
+    button.principal:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .mensaje { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13px; display: none; line-height: 1.5; }
+    .mensaje.error { display: block; background: var(--rojo-error-fondo); color: var(--rojo-error); border: 1px solid #e8b4a8; }
+    .mensaje.ok { display: block; background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; padding: 10px 14px; margin-top: 0; margin-bottom: 16px; text-align: left; }
+
+    .nota-final { font-size: 12px; color: var(--texto-muted); text-align: center; margin-top: 10px; line-height: 1.6; }
+
+    .enlace { display: block; text-align: center; font-size: 13px; color: var(--terracota); text-decoration: underline; cursor: pointer; margin-top: 12px; }
+
+    .cat-opcion.campo-obligatorio-vacio, .cat-otra.campo-obligatorio-vacio {
+      border-width: 2px;
+    }
+    footer { text-align: center; padding: 30px; color: var(--texto-muted); font-size: 13px; }
+    footer a { color: var(--texto-muted); text-decoration: none; margin: 0 12px; font-size: 13px; }
+    footer a:hover { color: var(--texto-oscuro); }
+    .footer-links { margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+  <header class="app">
+    <a href="/" class="nav izquierda">Inicio</a>
+    <a href="/" class="marca">TRASLADOS · GC</a>
+    <a href="/contacto" class="nav derecha">Contacto</a>
+  </header>
+
+  <div class="contenido">
+    <nav class="breadcrumbs" id="breadcrumb-nav">
+      <a href="/">Inicio</a>
+      <span> › </span>
+      <span id="breadcrumb-texto">Acceso choferes</span>
+    </nav>
+
+    <h1 id="titulo-pagina">Acceso a choferes</h1>
+    <p class="sub" id="texto-intro">Regístrate y forma parte de nuestro equipo</p>
+
+    <div class="tarjeta" style="max-width:520px">
+      <div class="pestanas" id="selector-pestanas">
+        <button id="pestana-login" class="activa" onclick="mostrarPestana('login')">Iniciar sesión</button>
+        <button id="pestana-registro" onclick="mostrarPestana('registro')">Registrarme</button>
+      </div>
+
+      <!-- LOGIN -->
+      <div id="formulario-login">
+        <label for="login-email">Email</label>
+        <input id="login-email" type="email" autocomplete="email" placeholder="tu@email.com">
+        <label for="login-password">Contraseña</label>
+        <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••">
+        <button class="principal" onclick="iniciarSesion()">Entrar</button>
+        <div id="mensaje-login" class="mensaje"></div>
+        <span class="enlace" onclick="mostrarRecuperar()">¿Olvidaste tu contraseña?</span>
+      </div>
+
+      <!-- RECUPERAR CONTRASEÑA -->
+      <div id="formulario-recuperar" class="oculto">
+        <p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px">Te enviaremos un enlace a tu email para crear una nueva contraseña.</p>
+        <div id="mensaje-recuperar" class="mensaje"></div>
+        <label for="rec-email">Email</label>
+        <input id="rec-email" type="email" placeholder="tu@email.com">
+        <button class="principal" onclick="recuperarPassword()">Enviar enlace de recuperación</button>
+        <span class="enlace" onclick="mostrarSoloLogin()">← Volver al acceso</span>
+      </div>
+
+      <!-- REGISTRO -->
+      <div id="formulario-registro" class="oculto">
+
+        <h2>Datos personales</h2>
+        <label for="r-nombre">Nombre completo *</label>
+        <input id="r-nombre" type="text" autocomplete="name" placeholder="Tu nombre y apellidos">
+        <label for="r-documento">Documento de identidad (DNI/NIE) *</label>
+        <input id="r-documento" type="text" placeholder="00000000A">
+        <label for="r-direccion">Dirección *</label>
+        <input id="r-direccion" type="text" placeholder="Calle, número">
+        <label for="r-cp">Código postal *</label>
+        <input id="r-cp" type="text" placeholder="35001">
+        <label for="r-municipio">Municipio *</label>
+        <input id="r-municipio" type="text" placeholder="Las Palmas de Gran Canaria">
+        <label for="r-email">Email *</label>
+        <input id="r-email" type="email" autocomplete="email" placeholder="tu@email.com">
+        <label for="r-telefono">Teléfono móvil *</label>
+        <input id="r-telefono" type="tel" autocomplete="tel" placeholder="+34 600 000 000">
+        <label for="r-password">Contraseña (mínimo 6 caracteres) *</label>
+        <input id="r-password" type="password" autocomplete="new-password">
+        <label for="r-password2">Repetir contraseña *</label>
+        <input id="r-password2" type="password" autocomplete="new-password">
+
+        <h2>Licencia de taxi</h2>
+        <label for="r-municipio-licencia">Municipio de la licencia municipal *</label>
+        <input id="r-municipio-licencia" type="text" placeholder="Las Palmas de Gran Canaria">
+        <label for="r-numero-licencia">Número de la licencia municipal *</label>
+        <input id="r-numero-licencia" type="text" placeholder="LPA-0001">
+
+        <h2>Categoría de vehículo</h2>
+        <div id="categorias-grid" class="categorias-grid">
+          <div style="font-size:13px;color:var(--texto-muted)">Cargando...</div>
+        </div>
+        <div id="aviso-otra" class="aviso-otra">
+          Si tu vehículo no encaja en ninguna de estas categorías, indícalo en las observaciones. Lo estudiaremos y te contactaremos.
+        </div>
+
+        <h2>Vehículo</h2>
+        <label for="r-marca">Marca *</label>
+        <select id="r-marca" onchange="cambioMarca()"><option value="">Cargando...</option></select>
+        <input id="r-marca-nueva" type="text" class="oculto" placeholder="Escribe la marca" style="margin-top:8px">
+        <label for="r-modelo">Modelo *</label>
+        <select id="r-modelo" onchange="cambioModelo()"><option value="">— Selecciona primero la marca —</option></select>
+        <input id="r-modelo-nuevo" type="text" class="oculto" placeholder="Escribe el modelo" style="margin-top:8px">
+        <label for="r-matricula">Matrícula *</label>
+        <input id="r-matricula" type="text" placeholder="1234 ABC">
+        <label for="r-numero-taxi">Número de taxi *</label>
+        <input id="r-numero-taxi" type="text" placeholder="Ej.: 154">
+        <label for="r-plazas">Plazas para pasajeros</label>
+        <select id="r-plazas">
+          <option value="4" selected>4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+        </select>
+        <label for="r-isla">Isla</label>
+        <select id="r-isla">
+          <option value="Gran Canaria" selected>Gran Canaria</option>
+          <option value="Tenerife">Tenerife</option>
+          <option value="Lanzarote">Lanzarote</option>
+          <option value="Fuerteventura">Fuerteventura</option>
+          <option value="La Palma">La Palma</option>
+          <option value="La Gomera">La Gomera</option>
+          <option value="El Hierro">El Hierro</option>
+        </select>
+        <label for="r-central-flota">Central de flota (opcional)</label>
+        <input id="r-central-flota" type="text" placeholder="Nombre de la central, si perteneces a una">
+
+        <h2>Foto de carné de conducir</h2>
+        <label>Sube una foto tuya (obligatoria; nuestro equipo la revisará y aprobará antes de que aparezca en los vouchers)</label>
+        <input id="r-foto-input" type="file" accept="image/*" onchange="previsualizarFotoRegistro()" style="margin-top:6px">
+        <img id="r-foto-preview" style="max-width:120px;border-radius:8px;margin-top:8px;display:none">
+
+        <h2>Observaciones</h2>
+        <label for="r-observaciones">¿Algo que quieras añadir? (opcional)</label>
+        <input id="r-observaciones" type="text" placeholder="Tipo de vehículo especial, preguntas, etc.">
+
+        <h2>Aceptaciones</h2>
+        <div class="check-wrap">
+          <input type="checkbox" id="acepta-privacidad">
+          <label for="acepta-privacidad">He leído y acepto la <a href="/privacidad" target="_blank">Política de Privacidad</a>.</label>
+        </div>
+
+        <div id="mensaje-registro" class="mensaje"></div>
+
+        <button class="principal" onclick="registrarse()">Enviar solicitud de alta</button>
+        <p class="nota-final">Tu solicitud será revisada por nuestro equipo antes de activar tu acceso al portal.</p>
+
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-links">
+      <a href="/rutas"><%= t('home_footer_rutas') || 'Rutas' %></a>
+      <a href="/destinos"><%= t('home_footer_destinos') || 'Destinos' %></a>
+      <a href="/flota"><%= t('home_footer_flota') || 'Flota' %></a>
+      <a href="/contacto"><%= t('home_footer_contacto') || 'Contacto' %></a>
+      <a href="/chofer/acceso/alta"><%= t('home_footer_alta_choferes') || 'Alta choferes' %></a>
+      <a href="/chofer/acceso"><%= t('home_footer_acceso_choferes') || 'Acceso a choferes' %></a>
+      <a href="/mi-reserva"><%= t('home_footer_acceso_clientes') || 'Acceso clientes' %></a>
+    </div>
+    Traslados · GC — Gran Canaria
+  </footer>
+
+  <script>
+    // Breadcrumb y título según URL
+    (function() {
+      var esAlta = window.location.pathname.indexOf('/alta') !== -1;
+      if (esAlta) {
+        document.getElementById('breadcrumb-texto').textContent = 'Alta choferes';
+        document.getElementById('titulo-pagina').textContent    = 'Alta choferes';
+      } else {
+        document.getElementById('texto-intro').textContent = 'Accede a tu portal para gestionar tus servicios';
+      }
+      document.getElementById('selector-pestanas').style.display = 'none';
+      if (esAlta) mostrarPestana('registro');
+    })();
+
+    var catalogoMarcas = [];
+    var categoriaSeleccionada = null;
+    var fotoRegistro = null;
+
+    function previsualizarFotoRegistro() {
+      var archivo = document.getElementById('r-foto-input').files[0];
+      if (!archivo) return;
+      var lector = new FileReader();
+      lector.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+          var escala = Math.min(1, 500 / img.width);
+          var lienzo = document.createElement('canvas');
+          lienzo.width = Math.round(img.width * escala);
+          lienzo.height = Math.round(img.height * escala);
+          var ctx = lienzo.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+          ctx.drawImage(img, 0, 0, lienzo.width, lienzo.height);
+          fotoRegistro = lienzo.toDataURL('image/jpeg', 0.82);
+          var preview = document.getElementById('r-foto-preview');
+          preview.src = fotoRegistro;
+          preview.style.display = 'block';
+        };
+        img.src = e.target.result;
+      };
+      lector.readAsDataURL(archivo);
+    }
+
+    function mostrarPestana(cual) {
+      document.getElementById('formulario-login').classList.toggle('oculto', cual !== 'login');
+      document.getElementById('formulario-registro').classList.toggle('oculto', cual !== 'registro');
+      document.getElementById('pestana-login').classList.toggle('activa', cual === 'login');
+      document.getElementById('pestana-registro').classList.toggle('activa', cual === 'registro');
+    }
+
+    function iniciarSesion() {
+      var email = document.getElementById('login-email').value.trim();
+      var password = document.getElementById('login-password').value;
+      var msg = document.getElementById('mensaje-login');
+      msg.className = 'mensaje'; msg.style.display = 'none';
+      if (!email || !password) { msg.textContent = 'Introduce tu email y contraseña.'; msg.className = 'mensaje error'; return; }
+      fetch('/chofer/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: password }) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.error) { msg.textContent = d.error; msg.className = 'mensaje error'; return; }
+          window.location.href = '/chofer/portal';
+        })
+        .catch(function() { msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error'; });
+    }
+
+    function mostrarRecuperar() {
+      document.getElementById('formulario-login').classList.add('oculto');
+      document.getElementById('formulario-recuperar').classList.remove('oculto');
+    }
+
+    function mostrarSoloLogin() {
+      document.getElementById('formulario-recuperar').classList.add('oculto');
+      document.getElementById('formulario-login').classList.remove('oculto');
+    }
+
+    function recuperarPassword() {
+      var email = document.getElementById('rec-email').value.trim();
+      var msg = document.getElementById('mensaje-recuperar');
+      msg.className = 'mensaje'; msg.style.display = 'none';
+      if (!email) { msg.textContent = 'Indica tu email.'; msg.className = 'mensaje error'; msg.style.display = 'block'; return; }
+      var btn = document.querySelector('#formulario-recuperar button.principal');
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      fetch('/chofer/recuperar-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          btn.disabled = false; btn.textContent = 'Enviar enlace de recuperación';
+          if (d.error) { msg.textContent = d.error; msg.className = 'mensaje error'; msg.style.display = 'block'; return; }
+          msg.textContent = 'Te hemos enviado a tu email registrado el acceso de recuperación.';
+          msg.className = 'mensaje ok';
+          msg.style.display = 'block';
+          setTimeout(function() {
+            document.getElementById('login-email').value = email;
+            mostrarSoloLogin();
+          }, 3000);
+        })
+        .catch(function() {
+          btn.disabled = false; btn.textContent = 'Enviar enlace de recuperación';
+          msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error'; msg.style.display = 'block';
+        });
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Enter') return;
+      if (!document.getElementById('formulario-login').classList.contains('oculto')) iniciarSesion();
+      else if (!document.getElementById('formulario-recuperar').classList.contains('oculto')) recuperarPassword();
+    });
+
+    fetch('/api/categorias')
+      .then(function(r) { return r.json(); })
+      .then(function(cats) {
+        var html = cats.map(function(c) {
+          return '<div class="cat-opcion" data-id="' + c.id + '" data-nombre="' + c.nombre + '" onclick="selCat(this)">'
+            + '<div class="cn">' + c.nombre + '</div>'
+            + '<div class="cd">' + c.capacidad_pasajeros + ' pas. · ' + c.capacidad_maletas + ' mal.</div></div>';
+        }).join('') + '<div class="cat-otra" data-id="otra" onclick="selCat(this)"><div class="cn">Otro vehículo</div></div>';
+        document.getElementById('categorias-grid').innerHTML = html;
+      })
+      .catch(function() { document.getElementById('categorias-grid').innerHTML = '<p style="font-size:13px;color:var(--texto-muted)">No se pudieron cargar las categorías.</p>'; });
+
+    function selCat(el) {
+      document.querySelectorAll('.cat-opcion,.cat-otra').forEach(function(x) { x.classList.remove('sel'); });
+      el.classList.add('sel');
+      categoriaSeleccionada = el.dataset.id;
+      document.getElementById('aviso-otra').style.display = categoriaSeleccionada === 'otra' ? 'block' : 'none';
+    }
+
+    fetch('/api/marcas-vehiculos')
+      .then(function(r) { return r.json(); })
+      .then(function(marcas) {
+        catalogoMarcas = marcas;
+        var sel = document.getElementById('r-marca');
+        sel.innerHTML = '<option value="">— Selecciona la marca —</option>'
+          + marcas.map(function(m) { return '<option value="' + m.id + '">' + m.nombre + '</option>'; }).join('')
+          + '<option value="nueva">➕ Otra marca</option>';
+      })
+      .catch(function() { document.getElementById('r-marca').innerHTML = '<option value="nueva">Escribir la marca</option>'; cambioMarca(); });
+
+    function cambioMarca() {
+      var val = document.getElementById('r-marca').value;
+      var esNueva = val === 'nueva';
+      document.getElementById('r-marca-nueva').classList.toggle('oculto', !esNueva);
+      var selMod = document.getElementById('r-modelo');
+      if (esNueva || val === '') {
+        selMod.innerHTML = '<option value="nuevo">Escribir el modelo</option>';
+        document.getElementById('r-modelo-nuevo').classList.remove('oculto');
+      } else {
+        var marca = catalogoMarcas.find(function(m) { return String(m.id) === val; });
+        var opts = marca && marca.modelos.length ? marca.modelos.map(function(mo) { return '<option value="' + mo.id + '">' + mo.nombre + '</option>'; }).join('') : '';
+        selMod.innerHTML = '<option value="">— Selecciona el modelo —</option>' + opts + '<option value="nuevo">➕ Otro modelo</option>';
+        document.getElementById('r-modelo-nuevo').classList.add('oculto');
+      }
+      cambioModelo();
+    }
+
+    function cambioModelo() {
+      document.getElementById('r-modelo-nuevo').classList.toggle('oculto', document.getElementById('r-modelo').value !== 'nuevo');
+    }
+
+    function mostrarError(msg, texto) {
+      msg.textContent = texto;
+      msg.style.cssText = 'display:block;margin-top:12px;padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.5;background:var(--rojo-error-fondo);color:var(--rojo-error);border:1px solid #e8b4a8;';
+      msg.scrollIntoView({ behavior:'smooth', block:'center' });
+    }
+
+    function limpiarErroresCampos() {
+      document.querySelectorAll('.campo-obligatorio-vacio').forEach(function(el) {
+        el.classList.remove('campo-obligatorio-vacio');
+      });
+    }
+
+    function registrarse() {
+      var msg = document.getElementById('mensaje-registro');
+      msg.style.display = 'none';
+      limpiarErroresCampos();
+
+      var faltan = false;
+      var primerFaltante = null;
+      function marcar(el) {
+        if (!el) return;
+        el.classList.add('campo-obligatorio-vacio');
+        faltan = true;
+        if (!primerFaltante) primerFaltante = el;
+      }
+      function chequearTexto(id) {
+        var el = document.getElementById(id);
+        var val = el.value.trim();
+        if (!val) marcar(el);
+        return val;
+      }
+
+      var nombre            = chequearTexto('r-nombre');
+      var documento         = chequearTexto('r-documento');
+      var direccion         = chequearTexto('r-direccion');
+      var cp                = chequearTexto('r-cp');
+      var municipio         = chequearTexto('r-municipio');
+      var email             = chequearTexto('r-email');
+      var telefono          = chequearTexto('r-telefono');
+      var password          = chequearTexto('r-password');
+      var password2         = chequearTexto('r-password2');
+      var municipioLicencia = chequearTexto('r-municipio-licencia');
+      var numeroLicencia    = chequearTexto('r-numero-licencia');
+      var matricula         = chequearTexto('r-matricula');
+      var numeroTaxi        = chequearTexto('r-numero-taxi');
+
+      var gridCategorias = document.getElementById('categorias-grid');
+      gridCategorias.classList.remove('campo-obligatorio-vacio');
+      if (!categoriaSeleccionada) { gridCategorias.classList.add('campo-obligatorio-vacio'); faltan = true; if (!primerFaltante) primerFaltante = gridCategorias; }
+
+      var marcaEl = document.getElementById('r-marca');
+      var marcaVal = marcaEl.value;
+      var marcaTexto = '';
+      if (!marcaVal) {
+        marcar(marcaEl);
+      } else if (marcaVal === 'nueva') {
+        marcaTexto = chequearTexto('r-marca-nueva');
+      } else {
+        marcaTexto = (marcaEl.selectedOptions[0] || {}).text || '';
+      }
+
+      var modeloEl = document.getElementById('r-modelo');
+      var modeloVal = modeloEl.value;
+      var modeloTexto = '';
+      if (!modeloVal) {
+        marcar(modeloEl);
+      } else if (modeloVal === 'nuevo') {
+        modeloTexto = chequearTexto('r-modelo-nuevo');
+      } else {
+        modeloTexto = (modeloEl.selectedOptions[0] || {}).text || '';
+      }
+
+      if (!fotoRegistro) marcar(document.getElementById('r-foto-input'));
+
+      if (faltan) {
+        mostrarError(msg, 'Completa los campos marcados en rosa.');
+        primerFaltante.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      if (password.length < 6) { marcar(document.getElementById('r-password')); mostrarError(msg, 'La contraseña debe tener al menos 6 caracteres.'); return; }
+      if (password !== password2) { marcar(document.getElementById('r-password2')); mostrarError(msg, 'Las contraseñas no coinciden.'); return; }
+      var privacidad = document.getElementById('acepta-privacidad').checked;
+      if (!privacidad) { mostrarError(msg, 'Debes aceptar la Política de Privacidad.'); return; }
+
+      var obs = document.getElementById('r-observaciones').value.trim();
+      if (categoriaSeleccionada === 'otra') obs = obs ? '[Otro vehículo] ' + obs : '[Otro vehículo]';
+
+      var btn = document.querySelector('#formulario-registro button.principal');
+      btn.disabled = true; btn.textContent = 'Enviando...';
+
+      fetch('/api/chofer/registro', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: nombre, email: email, telefono: telefono, password: password,
+          documento: documento, direccion: direccion, cp: cp, municipio: municipio,
+          municipio_licencia: municipioLicencia, numero_licencia: numeroLicencia,
+          central_flota: document.getElementById('r-central-flota').value.trim(),
+          categoria_id: categoriaSeleccionada !== 'otra' ? categoriaSeleccionada : null,
+          vehiculo_marca: marcaTexto, vehiculo_modelo: modeloTexto,
+          matricula: matricula,
+          numero_taxi: numeroTaxi,
+          plazas: document.getElementById('r-plazas').value,
+          isla: document.getElementById('r-isla').value,
+          foto: fotoRegistro,
+          observaciones: obs
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) {
+          mostrarError(msg, d.error);
+          btn.disabled = false; btn.textContent = 'Enviar solicitud de alta'; return;
+        }
+        document.getElementById('formulario-registro').innerHTML =
+          '<div style="margin-top:0;padding:20px;border-radius:8px;background:var(--verde-ok-fondo);color:var(--verde-ok);border:1px solid #a8dece;text-align:center;">'
+          + '<strong style="font-size:17px;display:block;margin-bottom:8px">✅ Solicitud enviada</strong>'
+          + 'Hemos recibido tu solicitud y te hemos enviado un email de confirmación. Revisaremos tu información y nos pondremos en contacto contigo en breve.'
+          + '</div>';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      })
+      .catch(function() {
+        mostrarError(msg, 'Error de conexión. Inténtalo de nuevo.');
+        btn.disabled = false; btn.textContent = 'Enviar solicitud de alta';
+      });
+    }
+  </script>
+</body>
+</html>
