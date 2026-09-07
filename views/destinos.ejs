@@ -206,8 +206,8 @@
               %>
               <a href="<%= urlDestino %>" class="tarjeta-destino">
                 <div class="td-foto">
-                  <% if (dest.url_foto) { %>
-                    <img src="<%= dest.url_foto %>" alt="<%= dest.nombre %>">
+                  <% if (dest.foto_cabecera_id) { %>
+                    <img src="/destino-foto/<%= dest.foto_cabecera_id %>" alt="<%= dest.nombre %>">
                   <% } %>
                   <% if (dest.zona) { %>
                     <span class="td-zona"><%= dest.zona %></span>
