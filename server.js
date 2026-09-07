@@ -7198,7 +7198,8 @@ async function renderRutas(req, res, lang) {
     `SELECT r.id, r.origen, r.destino,
             COALESCE(rss_lang.slug_url, rss_es.slug_url) AS slug_url,
             COALESCE(rss_lang.resena_breve, rss_es.resena_breve) AS resena_breve,
-            (SELECT id FROM rutas_fotos WHERE ruta_id = r.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id
+            (SELECT id FROM rutas_fotos WHERE ruta_id = r.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id,
+            (SELECT cloudinary_url FROM rutas_fotos WHERE ruta_id = r.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_cloudinary
      FROM rutas r
      LEFT JOIN route_seo_settings rss_lang
            ON rss_lang.route_id = r.id AND rss_lang.lang_code = $1
@@ -7237,6 +7238,7 @@ async function renderRutas(req, res, lang) {
       slug_url:         r.slug_url,
       url:              '/' + lang + '/' + palabraTraslado + '/' + r.slug_url,
       foto_cabecera_id: r.foto_cabecera_id || null,
+      url_foto: r.foto_cabecera_cloudinary || (r.foto_cabecera_id ? `/ruta-foto/${r.foto_cabecera_id}` : null),
       resena_breve:     r.resena_breve || ''
     }));
 
@@ -7328,6 +7330,7 @@ async function renderDestinos(req, res, lang) {
            COALESCE(dss_lang.slug_url, dss_es.slug_url) AS slug_url,
            COALESCE(dss_lang.resena_breve, dss_es.resena_breve) AS resena_breve,
            (SELECT id FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_id,
+           (SELECT cloudinary_url FROM destinos_fotos WHERE destino_id = d.id AND es_principal = TRUE LIMIT 1) AS foto_cabecera_cloudinary,
            COALESCE(dt.nombre, d.nombre) AS nombre_mostrar
     FROM destinos d
     JOIN destinos_seo_settings dss_es ON dss_es.destino_id = d.id AND dss_es.lang_code = 'es'
@@ -7362,6 +7365,7 @@ async function renderDestinos(req, res, lang) {
       slug: d.slug_url || slugify(d.nombre),
       isla_slug: mapaIslaSlug[isla] || slugify(isla),
       foto_cabecera_id: d.foto_cabecera_id || null,
+      url_foto: d.foto_cabecera_cloudinary || (d.foto_cabecera_id ? `/destino-foto/${d.foto_cabecera_id}` : null),
       resena_breve: d.resena_breve || ''
     });
   }
