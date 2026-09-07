@@ -6991,6 +6991,18 @@ app.post('/admin/tarifario/calcular', requireAdmin, asyncHandler(async (req, res
   res.json({ precio: Math.max(precio, parseFloat(t.bajada_bandera)).toFixed(2) });
 }));
 
+// ─── Acceso clientes (mi reserva) ────────────────────────────────────────────
+
+async function renderMiReserva(req, res, lang) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
+    return res.status(404).send('Página no encontrada');
+  }
+  if (req.session && req.session.clienteReservaId) return res.redirect('/cliente/portal');
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
+  res.render('mi-reserva', { lang, t, palabrasPaginas, BASE_URL });
+}
+
 // ─── Contacto público ─────────────────────────────────────────────────────────
 
 async function renderContacto(req, res, lang) {
@@ -7482,8 +7494,7 @@ app.get('/:lang([a-z]{2})/:seccion', asyncHandler(async (req, res) => {
   // ── Acceso clientes (mi reserva) ─────────────────────────────────────────
   const palabraMiReserva = pp['mi-reserva'] || 'mi-reserva';
   if (seccion === palabraMiReserva) {
-    if (req.session && req.session.clienteReservaId) return res.redirect('/cliente/portal');
-    return res.sendFile(path.join(__dirname, 'public', 'mi-reserva.html'));
+    return renderMiReserva(req, res, lang);
   }
 
   return res.status(404).send('Página no encontrada');
@@ -11562,10 +11573,9 @@ app.post('/admin/notificaciones', requireAdmin, asyncHandler(async (req, res) =>
 // ─── PORTAL DEL CLIENTE (/mi-reserva) ─────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
 
-app.get('/mi-reserva', (req, res) => {
-  if (req.session && req.session.clienteReservaId) return res.redirect('/cliente/portal');
-  res.sendFile(path.join(__dirname, 'public', 'mi-reserva.html'));
-});
+app.get('/mi-reserva', asyncHandler(async (req, res) => {
+  await renderMiReserva(req, res, 'es');
+}));
 
 // Ruta de acceso clientes en todos los idiomas (/en/my-booking, /de/meine-buchung, etc.)
 app.get('/:lang([a-z]{2})/:palabra', asyncHandler(async (req, res, next) => {
@@ -11573,8 +11583,7 @@ app.get('/:lang([a-z]{2})/:palabra', asyncHandler(async (req, res, next) => {
   if (!IDIOMAS_PERMITIDOS.includes(lang)) return next();
   const palabraMiReserva = PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang]['mi-reserva'];
   if (!palabraMiReserva || palabra !== palabraMiReserva) return next();
-  if (req.session && req.session.clienteReservaId) return res.redirect('/cliente/portal');
-  res.sendFile(path.join(__dirname, 'public', 'mi-reserva.html'));
+  return renderMiReserva(req, res, lang);
 }));
 
 app.get('/restablecer-password', (req, res) => {
