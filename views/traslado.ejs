@@ -338,7 +338,7 @@ footer a:hover { color: var(--texto-oscuro); }
   <p style="color:var(--texto-muted);font-size:14px;"><%= t('texto_consulta_disponibilidad') %></p>
   <% } %>
   <p style="margin-top:20px;">
-    <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>" class="boton-reservar"><%= t('boton_solicitar_traslado') %></a>
+    <a href="<%= lang === 'es' ? '/' : '/' + lang + '/' %>?desde=<%= encodeURIComponent(seo.origen) %>&hasta=<%= encodeURIComponent(seo.destino) %>" class="boton-reservar"><%= t('boton_solicitar_traslado') %></a>
   </p>
 </div>
 
