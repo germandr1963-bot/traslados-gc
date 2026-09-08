@@ -11187,7 +11187,9 @@ async function renderTraslado(req, res, lang, slug) {
     tieneImagenDefecto: !!globales.imagen_og_defecto,
     twitterActivo:      !!globales.twitter_activo,
     schemaTaxiService,
-    schemaBreadcrumb
+    schemaBreadcrumb,
+    origen_es:          seo.origen,
+    destino_es:         seo.destino
   });
 }
 
