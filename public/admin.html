@@ -9986,6 +9986,7 @@ var seoCatCache = null;
 var seoCatLangActual = 'es';
 var destiLangActual = 'es';
 var seoCatIdActual = null;
+var seoCatIslaSlug = 'gran-canaria'; // isla de la categoría activa en el editor
 
 function toggleBloqueSEORutas() {
   var contenido = document.getElementById('seo-rutas-contenido');
@@ -10055,6 +10056,7 @@ function abrirEditorSEOCat(catId) {
   seoCatIdActual = catId;
   var cat = seoCatCache && seoCatCache.categorias.find(function(c) { return c.id === catId; });
   if (!cat) return;
+  seoCatIslaSlug = cat.isla_slug || 'gran-canaria';
   var editor = document.getElementById('editor-seo-cat');
   editor.classList.remove('oculto');
   editor.innerHTML = '<p style="color:var(--texto-muted)">Cargando idiomas...</p>';
@@ -10437,8 +10439,10 @@ function renderizarCamposSEOCat(catId, lang, datos) {
   };
   limitesSEOCat = LIMITES_SEO_CAT[lang] || LIMITES_SEO_CAT['es'];
 
-  // Usar canonical_url guardada en BD — igual que Destinos
-  var urlPublica = datos.canonical_url || '';
+  // Construir URL pública en tiempo real a partir del slug — igual que Destinos
+  var _palabraFlota = (window._palabrasPaginas && window._palabrasPaginas[lang] && window._palabrasPaginas[lang].flota) || 'flota';
+  var _prefijoCat = lang === 'es' ? '/flota' : ('/' + lang + '/' + _palabraFlota);
+  var urlPublica = _prefijoCat + '/' + seoCatIslaSlug + '/' + (datos.slug_url || '');
 
   campos.innerHTML =
     '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--gris-fondo);border-radius:8px;margin-bottom:16px;flex-wrap:wrap;">' +
@@ -10519,11 +10523,9 @@ function actualizarURLCat(lang) {
   var slugInput = document.getElementById('seo-cat-slug');
   var urlInput = document.getElementById('seo-cat-url-publica');
   if (!slugInput || !urlInput) return;
-  var slugActual = urlInput.value;
-  // Reemplazar solo el último segmento (el slug) manteniendo el resto de la URL intacta
-  var partes = slugActual.split('/');
-  partes[partes.length - 1] = slugInput.value.trim();
-  urlInput.value = partes.join('/');
+  var _palabraFlota = (window._palabrasPaginas && window._palabrasPaginas[lang] && window._palabrasPaginas[lang].flota) || 'flota';
+  var _prefijoCat = lang === 'es' ? '/flota' : ('/' + lang + '/' + _palabraFlota);
+  urlInput.value = _prefijoCat + '/' + seoCatIslaSlug + '/' + slugInput.value.trim();
 }
 
 // Variable global para los límites del idioma activo en el editor SEO de categorías
