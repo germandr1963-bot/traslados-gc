@@ -3511,7 +3511,7 @@ app.get('/admin/conductores/:id/ficha', requireAdmin, asyncHandler(async (req, r
             c.vehiculo_marca, c.vehiculo_modelo, c.matricula, c.numero_taxi, c.plazas, c.isla,
             c.tipo, c.estado, c.foto, c.foto_estado, c.foto_motivo, c.creado_en, c.permitir_edicion_ficha,
             c.cambios_pendientes,
-            cat.nombre AS categoria
+            cat.nombre AS categoria, c.categoria_id
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
      WHERE c.id = $1`,
@@ -3543,6 +3543,11 @@ app.post('/admin/conductores/:id/editar', requireAdmin, asyncHandler(async (req,
   if (req.body.permitir_edicion_ficha !== undefined) {
     valores.push(!!req.body.permitir_edicion_ficha);
     cambios.push(`permitir_edicion_ficha = $${valores.length}`);
+  }
+  if (req.body.categoria_id !== undefined) {
+    const catId = parseInt(req.body.categoria_id, 10);
+    valores.push(isNaN(catId) ? null : catId);
+    cambios.push(`categoria_id = $${valores.length}`);
   }
   if (!cambios.length) return res.status(400).json({ error: 'No hay cambios que guardar.' });
   valores.push(req.params.id);
