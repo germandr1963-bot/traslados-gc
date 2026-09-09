@@ -2756,15 +2756,17 @@ app.get('/api/extras-publicos', asyncHandler(async (req, res) => {
 }));
 
 app.get('/api/extras-flota', asyncHandler(async (req, res) => {
-  // Devuelve extras aprobados (gratis o pago) por al menos un conductor aprobado.
-  // Si se pasa categoria_id, solo muestra extras ofrecidos por conductores de esa categoría.
-  // Incluye las categoria_id de los conductores que aprueban cada extra (para el Asistente de Flota).
+  // Devuelve extras aprobados por al menos un conductor aprobado.
+  // Si se pasa categoria_id, filtra por esa categoría.
+  // Cuando un mismo extra tiene conductores gratis Y conductores pago en la misma categoría,
+  // devuelve dos filas (una por modalidad) para que el cliente elija.
+  // Cada fila lleva: extra_id (id real), id_ui (clave única front), modalidad, precio.
   const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
   const categoriaId = req.query.categoria_id ? parseInt(req.query.categoria_id, 10) : null;
   const params = categoriaId ? [categoriaId] : [];
   const filtroCategoria = categoriaId ? 'AND c.categoria_id = $1' : '';
   const result = await pool.query(`
-    SELECT e.id, e.nombre, e.precio, e.bloque, e.orden,
+    SELECT e.id, e.nombre, e.precio, e.bloque, e.orden, ce.estado AS modalidad,
       array_agg(DISTINCT c.categoria_id) FILTER (WHERE c.categoria_id IS NOT NULL) AS categorias
     FROM extras e
     JOIN conductor_extras ce ON ce.extra_id = e.id
@@ -2774,8 +2776,8 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
       AND ce.estado IN ('gratis', 'pago')
       AND c.estado = 'aprobado'
       ${filtroCategoria}
-    GROUP BY e.id, e.nombre, e.precio, e.bloque, e.orden
-    ORDER BY e.bloque, e.orden, e.id
+    GROUP BY e.id, e.nombre, e.precio, e.bloque, e.orden, ce.estado
+    ORDER BY e.bloque, e.orden, e.id, ce.estado
   `, params);
   const extrasTrad = await pool.query(
     `SELECT ti.texto_es, COALESCE(tit.texto, ti.texto_es) AS nombre_traducido
@@ -2789,7 +2791,18 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
     mapaExtras[e.texto_es] = e.nombre_traducido;
   }
   const rows = result.rows.map(function(ex) {
-    return Object.assign({}, ex, { nombre: mapaExtras[ex.nombre] || ex.nombre });
+    const nombre = mapaExtras[ex.nombre] || ex.nombre;
+    const precioFinal = ex.modalidad === 'gratis' ? 0 : ex.precio;
+    return {
+      extra_id: ex.id,
+      id_ui: ex.id + '_' + ex.modalidad,
+      nombre: nombre,
+      precio: precioFinal,
+      bloque: ex.bloque,
+      orden: ex.orden,
+      modalidad: ex.modalidad,
+      categorias: ex.categorias
+    };
   });
   res.json(rows);
 }));
