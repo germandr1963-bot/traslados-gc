@@ -2596,8 +2596,16 @@ app.get('/admin/sesion', (req, res) => {
 
 // ─── API pública ──────────────────────────────────────────────────────────────
 app.get('/api/categorias', asyncHandler(async (req, res) => {
+  // Solo muestra categorías que tienen al menos un conductor aprobado y disponible_hoy = TRUE.
+  // Si no hay ningún conductor operativo en una categoría, no aparece en el buscador público.
   const result = await pool.query(
-    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, descripcion, limite_sillas, foto FROM categorias_vehiculos WHERE disponible = TRUE ORDER BY orden, nombre'
+    `SELECT DISTINCT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.descripcion, cv.limite_sillas, cv.foto
+     FROM categorias_vehiculos cv
+     JOIN conductores c ON c.categoria_id = cv.id
+                       AND c.estado = 'aprobado'
+                       AND c.disponible_hoy = TRUE
+     WHERE cv.disponible = TRUE
+     ORDER BY cv.orden, cv.nombre`
   );
 
   // Si se pide un idioma distinto del español, añadimos el nombre traducido
