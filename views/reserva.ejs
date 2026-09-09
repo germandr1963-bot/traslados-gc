@@ -934,8 +934,8 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
     }
   }
 
-  // Cargar extras
-  fetch('/api/extras-publicos?lang=' + LANG).then(function(r){ return r.json(); }).then(function(extras){
+  // Cargar extras — solo los que ofrece al menos un conductor aprobado de esta categoría
+  fetch('/api/extras-flota?lang=' + LANG + (paramCategoriaId ? '&categoria_id=' + paramCategoriaId : '')).then(function(r){ return r.json(); }).then(function(extras){
     extrasData = extras;
     var lista = document.getElementById('lista-extras');
     if (!extras.length) {
