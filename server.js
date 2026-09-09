@@ -2599,7 +2599,7 @@ app.get('/api/categorias', asyncHandler(async (req, res) => {
   // Solo muestra categorías que tienen al menos un conductor aprobado y disponible_hoy = TRUE.
   // Si no hay ningún conductor operativo en una categoría, no aparece en el buscador público.
   const result = await pool.query(
-    `SELECT DISTINCT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.descripcion, cv.limite_sillas, cv.foto
+    `SELECT DISTINCT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.descripcion, cv.limite_sillas, cv.foto, cv.orden
      FROM categorias_vehiculos cv
      JOIN conductores c ON c.categoria_id = cv.id
                        AND c.estado = 'aprobado'
