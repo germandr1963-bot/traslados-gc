@@ -2748,9 +2748,13 @@ app.get('/api/extras-publicos', asyncHandler(async (req, res) => {
 }));
 
 app.get('/api/extras-flota', asyncHandler(async (req, res) => {
-  // Devuelve extras aprobados (gratis o pago) por al menos un conductor aprobado
-  // Incluye las categoria_id de los conductores que aprueban cada extra
+  // Devuelve extras aprobados (gratis o pago) por al menos un conductor aprobado.
+  // Si se pasa categoria_id, solo muestra extras ofrecidos por conductores de esa categoría.
+  // Incluye las categoria_id de los conductores que aprueban cada extra (para el Asistente de Flota).
   const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
+  const categoriaId = req.query.categoria_id ? parseInt(req.query.categoria_id, 10) : null;
+  const params = categoriaId ? [categoriaId] : [];
+  const filtroCategoria = categoriaId ? 'AND c.categoria_id = $1' : '';
   const result = await pool.query(`
     SELECT e.id, e.nombre, e.bloque, e.orden,
       array_agg(DISTINCT c.categoria_id) FILTER (WHERE c.categoria_id IS NOT NULL) AS categorias
@@ -2761,9 +2765,10 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
       AND e.depende_chofer = TRUE
       AND ce.estado IN ('gratis', 'pago')
       AND c.estado = 'aprobado'
+      ${filtroCategoria}
     GROUP BY e.id, e.nombre, e.bloque, e.orden
     ORDER BY e.bloque, e.orden, e.id
-  `);
+  `, params);
   const extrasTrad = await pool.query(
     `SELECT ti.texto_es, COALESCE(tit.texto, ti.texto_es) AS nombre_traducido
      FROM textos_interfaz ti
