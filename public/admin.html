@@ -2584,8 +2584,15 @@ function verFichaConductor(id) {
             '<input class="campo" id="f-vehiculo_modelo-nuevo" type="text" placeholder="Escribir aquí" value="' + escapar(modeloInfo.esOtra ? c.vehiculo_modelo : '') + '">' +
           '</div>' +
         '</div>' +
+        '<div style="display:grid;grid-template-columns:max-content 1fr;gap:8px 12px;margin-top:10px;align-items:center">' +
+          '<label class="etiqueta" style="margin:0;white-space:nowrap">Categoría del vehículo</label>' +
+          '<select class="campo" id="f-categoria_id">' +
+            catalogoConductorCache.categorias.map(function(cat) {
+              return '<option value="' + cat.id + '"' + (c.categoria_id === cat.id ? ' selected' : '') + '>' + escapar(cat.nombre) + '</option>';
+            }).join('') +
+          '</select>' +
+        '</div>' +
         '<p style="margin-top:10px;font-size:13px">' +
-          '<strong>Categoría:</strong> ' + escapar(c.categoria || '—') + ' · ' +
           '<strong>Foto de carné:</strong> ' + ETIQUETAS_FOTO_CONDUCTOR[c.foto_estado || 'sin_foto'] +
           (c.foto_motivo ? '<br><em>Motivo del rechazo: ' + escapar(c.foto_motivo) + '</em>' : '') +
         '</p>' +
@@ -2655,6 +2662,8 @@ function guardarFichaConductor(id) {
 
   datos.central_flota = document.getElementById('f-central_flota').value.trim();
   datos.permitir_edicion_ficha = document.getElementById('f-permitir_edicion_ficha').checked;
+  var catEl = document.getElementById('f-categoria_id');
+  if (catEl) datos.categoria_id = parseInt(catEl.value, 10);
 
   var islaEl = document.getElementById('f-isla');
   datos.isla = islaEl.value;
