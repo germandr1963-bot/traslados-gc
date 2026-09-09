@@ -802,7 +802,8 @@ var TXT = {
   resLlegadaVuelo:'<%- t("reserva_res_llegada_vuelo").replace(/'/g, "\\'") %>',
   resAtraque:     '<%- t("reserva_res_atraque").replace(/'/g, "\\'") %>',
   resVuelo:       '<%- t("reserva_res_vuelo").replace(/'/g, "\\'") %>',
-  resBarco:       '<%- t("reserva_res_barco").replace(/'/g, "\\'") %>'
+  resBarco:       '<%- t("reserva_res_barco").replace(/'/g, "\\'") %>',
+  extrasGratis:   '<%- t("extras_gratis").replace(/'/g, "\\'") %>'
 };
 // Las píldoras de idioma conservan la ruta y categoría elegidas
 document.addEventListener('DOMContentLoaded', function() {
@@ -946,7 +947,7 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
       return '<div class="extra-item" id="extra-' + ex.id + '" onclick="toggleExtra(' + ex.id + ')">' +
         '<div class="extra-check" id="check-' + ex.id + '"></div>' +
         '<span class="extra-nombre">' + (ex.nombre_traducido || ex.nombre) + '</span>' +
-        '<span class="extra-precio">' + Number(ex.precio).toFixed(2) + ' €</span>' +
+        '<span class="extra-precio">' + (Number(ex.precio) === 0 ? TXT.extrasGratis : Number(ex.precio).toFixed(2) + ' €') + '</span>' +
       '</div>';
     }).join('');
   });
