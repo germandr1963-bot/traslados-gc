@@ -2764,7 +2764,7 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
   const params = categoriaId ? [categoriaId] : [];
   const filtroCategoria = categoriaId ? 'AND c.categoria_id = $1' : '';
   const result = await pool.query(`
-    SELECT e.id, e.nombre, e.bloque, e.orden,
+    SELECT e.id, e.nombre, e.precio, e.bloque, e.orden,
       array_agg(DISTINCT c.categoria_id) FILTER (WHERE c.categoria_id IS NOT NULL) AS categorias
     FROM extras e
     JOIN conductor_extras ce ON ce.extra_id = e.id
@@ -2774,7 +2774,7 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
       AND ce.estado IN ('gratis', 'pago')
       AND c.estado = 'aprobado'
       ${filtroCategoria}
-    GROUP BY e.id, e.nombre, e.bloque, e.orden
+    GROUP BY e.id, e.nombre, e.precio, e.bloque, e.orden
     ORDER BY e.bloque, e.orden, e.id
   `, params);
   const extrasTrad = await pool.query(
