@@ -2812,6 +2812,43 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
   res.json(rows);
 }));
 
+// Extras informativos para el asistente de selección de vehículo (sin filtro de conductores disponibles)
+app.get('/api/extras-info', asyncHandler(async (req, res) => {
+  const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
+  const result = await pool.query(`
+    SELECT e.id, e.nombre, e.bloque, e.orden,
+      array_agg(DISTINCT ce.categoria_id) FILTER (WHERE ce.categoria_id IS NOT NULL) AS categorias
+    FROM extras e
+    JOIN conductor_extras ce ON ce.extra_id = e.id
+    WHERE e.activo = TRUE
+      AND e.depende_chofer = TRUE
+      AND e.bloque IN ('C','D','E')
+    GROUP BY e.id, e.nombre, e.bloque, e.orden
+    ORDER BY e.bloque, e.orden, e.id
+  `);
+  const extrasTrad = await pool.query(
+    `SELECT ti.texto_es, COALESCE(tit.texto, ti.texto_es) AS nombre_traducido
+     FROM textos_interfaz ti
+     LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+     WHERE ti.modulo = 'Extras'`,
+    [lang]
+  );
+  const mapaExtras = {};
+  for (const e of extrasTrad.rows) {
+    mapaExtras[e.texto_es] = e.nombre_traducido;
+  }
+  const rows = result.rows.map(function(ex) {
+    return {
+      id: ex.id,
+      nombre: mapaExtras[ex.nombre] || ex.nombre,
+      bloque: ex.bloque,
+      orden: ex.orden,
+      categorias: ex.categorias
+    };
+  });
+  res.json(rows);
+}));
+
 app.get('/api/marcas-vehiculos', asyncHandler(async (req, res) => {
   const marcas = await pool.query('SELECT id, nombre FROM marcas_vehiculos ORDER BY nombre');
   const modelos = await pool.query('SELECT id, marca_id, nombre FROM modelos_vehiculos ORDER BY nombre');
@@ -7449,13 +7486,10 @@ async function renderHome(req, res, lang) {
   const rutaReserva = lang === 'es' ? '/reserva' : '/' + lang + '/' + (SECCIONES_RESERVA[lang] || 'reserva');
   const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
   const catResult = await pool.query(
-    `SELECT DISTINCT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas
-     FROM categorias_vehiculos cv
-     JOIN conductores c ON c.categoria_id = cv.id
-                       AND c.estado = 'aprobado'
-                       AND c.disponible_hoy = TRUE
-     WHERE cv.disponible = TRUE
-     ORDER BY cv.nombre`
+    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas
+     FROM categorias_vehiculos
+     WHERE activa = TRUE
+     ORDER BY orden, nombre`
   );
   const categoriasHome = catResult.rows.map(function(cat) {
     const nombreTrad = obtenerTexto('categoria_nombre_' + cat.id, lang);
