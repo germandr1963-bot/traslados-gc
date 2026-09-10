@@ -7447,9 +7447,22 @@ async function renderHome(req, res, lang) {
   const t = function(clave) { return obtenerTexto(clave, lang); };
   const idiomas = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
   const rutaReserva = lang === 'es' ? '/reserva' : '/' + lang + '/' + (SECCIONES_RESERVA[lang] || 'reserva');
-  // Palabras de URL de páginas para construir los enlaces del footer en el idioma correcto
   const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
-  res.render('index', { lang, t, idiomas: idiomas.rows, BASE_URL, rutaReserva, palabrasPaginas });
+  const catResult = await pool.query(
+    `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas
+     FROM categorias_vehiculos cv
+     WHERE cv.activa = TRUE AND cv.en_flota = TRUE
+     ORDER BY cv.orden, cv.nombre`
+  );
+  const categoriasHome = catResult.rows.map(function(cat) {
+    const nombreTrad = obtenerTexto('categoria_nombre_' + cat.id, lang);
+    const maletasTrad = obtenerTexto('categoria_maletas_' + cat.id, lang);
+    return Object.assign({}, cat, {
+      nombre: nombreTrad || cat.nombre,
+      capacidad_maletas: maletasTrad || cat.capacidad_maletas
+    });
+  });
+  res.render('index', { lang, t, idiomas: idiomas.rows, BASE_URL, rutaReserva, palabrasPaginas, categoriasHome });
 }
 
 app.get('/', asyncHandler(async (req, res) => {
