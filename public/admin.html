@@ -231,7 +231,7 @@ table.tabla-precios input {
 
           <table class="tabla-admin">
             <thead>
-              <tr><th>Categoría</th><th>Isla</th><th>Pasajeros</th><th>Maletas</th><th>Sillas bebé (máx.)</th><th>Bajada (diurna / nocturna)</th><th>Foto</th><th>Activa</th><th>Disponible</th><th>Acción</th></tr>
+              <tr><th>Orden</th><th>Categoría</th><th>Isla</th><th>Pasajeros</th><th>Maletas</th><th>Sillas bebé (máx.)</th><th>Bajada (diurna / nocturna)</th><th>Foto</th><th>Activa</th><th>Disponible</th><th>Acción</th></tr>
             </thead>
             <tbody id="tabla-categorias"></tbody>
           </table>
@@ -2170,6 +2170,7 @@ function cargarCategorias() {
     categoriasCache = categorias;
     document.getElementById('tabla-categorias').innerHTML = categorias.map(function (cat) {
       return '<tr>' +
+        '<td style="text-align:center;font-weight:700;color:var(--texto-muted);">' + (cat.orden || 0) + '</td>' +
         '<td><strong>' + escapar(cat.nombre) + '</strong></td>' +
         '<td>' + escapar(cat.isla_nombre || '—') + '</td>' +
         '<td>' + cat.capacidad_pasajeros + '</td>' +
@@ -2199,6 +2200,8 @@ function cargarCategorias() {
 
 function formularioCategoria(cat) {
   return '' +
+    '<label class="etiqueta">Orden de aparición en la web (número, menor = primero)</label>' +
+    '<input class="campo" id="cat-orden" type="number" min="0" max="99" value="' + (cat.orden || 0) + '" style="margin-bottom:10px;width:100px">' +
     '<label class="etiqueta">Nombre</label>' +
     '<input class="campo" id="cat-nombre" type="text" value="' + escapar(cat.nombre || '') + '" style="margin-bottom:10px">' +
     '<label class="etiqueta">Isla / Localidad</label>' +
@@ -2256,6 +2259,7 @@ document.getElementById('boton-nueva-categoria').addEventListener('click', nueva
 
 function guardarCategoria(id) {
   var datos = {
+    orden: document.getElementById('cat-orden').value,
     nombre: document.getElementById('cat-nombre').value,
     capacidad_pasajeros: document.getElementById('cat-pasajeros').value,
     capacidad_maletas: document.getElementById('cat-maletas').value,
