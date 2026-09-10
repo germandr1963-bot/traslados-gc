@@ -335,6 +335,7 @@
   .hero { padding: 20px 16px 24px; }
   .caja-busqueda { padding: 14px 12px; }
   .fila-busqueda { grid-template-columns: 1fr; }
+  .asistente-home-grid { grid-template-columns: 1fr !important; }
   .tarjeta-resultado {
     flex-direction: column;
     gap: 12px;
@@ -407,6 +408,45 @@ footer {
       <li><%= t('home_subtitulo_2') %></li>
       <li><%= t('home_subtitulo_3') %></li>
     </ul>
+
+    <!-- Bloque asistente de selección de vehículo -->
+    <div style="margin-bottom:20px;">
+      <p style="font-size:14px;color:rgba(255,255,255,0.82);line-height:1.6;margin:0 0 10px 0;max-width:520px;"><%= t('home_asistente_texto') %></p>
+      <a href="javascript:void(0)" onclick="abrirAsistenteHome()" style="font-size:13px;font-weight:600;color:#ffb347;font-family:'Public Sans',sans-serif;text-decoration:underline;cursor:pointer;"><%= t('home_asistente_cta') %></a>
+    </div>
+
+    <!-- Panel del asistente — oculto por defecto -->
+    <div id="panel-asistente-home" style="display:none;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:12px;padding:20px;margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <strong style="font-family:'Public Sans',sans-serif;font-size:15px;color:#fff;"><%= t('flota_selector_titulo') || 'Asistente de Selección de Vehículo' %></strong>
+        <button onclick="cerrarAsistenteHome()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer;line-height:1;padding:0 4px;" title="<%= t('home_asistente_cerrar') || 'Cerrar' %>">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;" class="asistente-home-grid">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px;"><%= t('flota_selector_label_pax') || 'Pasajeros' %></label>
+          <select id="ah-pasajeros" style="width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-size:14px;background:rgba(255,255,255,0.12);color:#fff;font-family:'Public Sans',sans-serif;"></select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px;"><%= t('flota_selector_label_mal') || 'Maletas grandes' %></label>
+          <select id="ah-maletas" style="width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-size:14px;background:rgba(255,255,255,0.12);color:#fff;font-family:'Public Sans',sans-serif;">
+            <option value="0"><%= t('flota_selector_mal_0') || 'Sin maletas' %></option>
+            <option value="1"><%= t('flota_selector_mal_1') || '1 maleta' %></option>
+            <option value="2" selected><%= t('flota_selector_mal_2') || '2 maletas' %></option>
+            <option value="3"><%= t('flota_selector_mal_3') || '3 maletas' %></option>
+            <option value="4"><%= t('flota_selector_mal_4') || '4 maletas' %></option>
+            <option value="5"><%= t('flota_selector_mal_5') || '5 o más maletas' %></option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px;"><%= t('flota_selector_label_esp') || 'Equipaje especial' %></label>
+          <select id="ah-especial" style="width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-size:14px;background:rgba(255,255,255,0.12);color:#fff;font-family:'Public Sans',sans-serif;">
+            <option value="ninguno"><%= t('flota_selector_esp_ninguno') || 'Ninguno' %></option>
+          </select>
+        </div>
+      </div>
+      <button onclick="recomendarHome()" style="width:100%;background:var(--terracota);color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Public Sans',sans-serif;"><%= t('flota_selector_btn') || 'Ver vehículo recomendado' %></button>
+      <div id="ah-resultado" style="display:none;margin-top:12px;padding:12px 16px;background:rgba(255,255,255,0.1);border-radius:8px;font-size:14px;font-family:'Public Sans',sans-serif;color:#fff;"></div>
+    </div>
 
     <div class="panel-busqueda">
       <div class="fila-busqueda">
@@ -945,6 +985,123 @@ function enviarCotizacion() {
 document.getElementById('modal-cotizacion').addEventListener('click', function(e) {
   if (e.target === this) cerrarFormCotizacion();
 });
+
+// ─── Asistente de selección de vehículo — portada ────────────────────────
+var _ahCategorias = [];
+var _ahExtras = [];
+var _ahTimerCierre = null;
+var _ahLang = '<%= lang %>';
+
+// Textos para el resultado
+var _ahTxtHasta      = '<%= t("flota_catalogo_hasta") || "Hasta" %>';
+var _ahTxtPasajeros  = '<%= t("flota_catalogo_pasajeros") || "pasajeros" %>';
+var _ahTxtPasajero   = '<%= t("flota_catalogo_pasajero") || "pasajero" %>';
+var _ahTxtMaletas    = '<%= t("flota_catalogo_maletas") || "maletas" %>';
+var _ahTxtIntro      = '<%= t("flota_selector_intro") || "Según tus parámetros, los vehículos recomendados pueden ser estos:" %>';
+var _ahTxtSinRes     = '<%= t("flota_selector_sin_resultado") || "No encontramos ningún vehículo que se ajuste a tu selección." %>';
+var _ahTxtsPax = {
+  <% for (var i = 1; i <= 8; i++) { %>
+  '<%= i %>': '<%= t("flota_pax_" + i) || "" %>',
+  <% } %>
+};
+
+function abrirAsistenteHome() {
+  var panel = document.getElementById('panel-asistente-home');
+  if (panel.style.display !== 'none') return;
+  panel.style.display = 'block';
+  // Cargar categorías y extras si aún no están cargados
+  if (_ahCategorias.length === 0) {
+    fetch('/api/categorias?lang=' + _ahLang)
+      .then(function(r) { return r.json(); })
+      .then(function(cats) {
+        _ahCategorias = cats;
+        // Poblar selector de pasajeros
+        var maxPax = 0;
+        cats.forEach(function(c) { var p = parseInt(c.capacidad_pasajeros) || 0; if (p > maxPax) maxPax = p; });
+        var sel = document.getElementById('ah-pasajeros');
+        sel.innerHTML = '';
+        for (var p = 1; p <= maxPax; p++) {
+          var opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = _ahTxtsPax[String(p)] || (p === 1 ? '1 ' + _ahTxtPasajero : p + ' ' + _ahTxtPasajeros);
+          if (p === 1) opt.selected = true;
+          sel.appendChild(opt);
+        }
+      }).catch(function() {});
+    fetch('/api/extras-flota?lang=' + _ahLang)
+      .then(function(r) { return r.json(); })
+      .then(function(extras) {
+        _ahExtras = extras;
+        var sel = document.getElementById('ah-especial');
+        var aptos = extras.filter(function(e) { return ['C','D','E'].indexOf(e.bloque) !== -1; });
+        aptos.forEach(function(e) {
+          var opt = document.createElement('option');
+          opt.value = e.id;
+          opt.textContent = e.nombre;
+          sel.appendChild(opt);
+        });
+      }).catch(function() {});
+  }
+}
+
+function cerrarAsistenteHome() {
+  if (_ahTimerCierre) { clearTimeout(_ahTimerCierre); _ahTimerCierre = null; }
+  var panel = document.getElementById('panel-asistente-home');
+  panel.style.display = 'none';
+  document.getElementById('ah-resultado').style.display = 'none';
+}
+
+function recomendarHome() {
+  var pasajeros = parseInt(document.getElementById('ah-pasajeros').value) || 1;
+  var maletas   = parseInt(document.getElementById('ah-maletas').value) || 0;
+  var especial  = document.getElementById('ah-especial').value;
+  var resultado = document.getElementById('ah-resultado');
+
+  if (_ahCategorias.length === 0) {
+    resultado.innerHTML = 'Cargando vehículos... Por favor espera un momento y vuelve a intentarlo.';
+    resultado.style.display = 'block';
+    return;
+  }
+
+  var ordenadas = _ahCategorias.slice().sort(function(a, b) { return a.capacidad_pasajeros - b.capacidad_pasajeros; });
+  var aptas = ordenadas.filter(function(c) {
+    var capMaletas = parseInt(c.capacidad_maletas) || 0;
+    return c.capacidad_pasajeros >= pasajeros && (maletas === 0 || capMaletas >= maletas);
+  });
+  if (aptas.length === 0) aptas = ordenadas;
+
+  if (especial !== 'ninguno') {
+    var extraId = parseInt(especial);
+    var extra = _ahExtras.filter(function(e) { return e.id === extraId; })[0];
+    if (extra && extra.categorias && extra.categorias.length > 0) {
+      var catIds = extra.categorias.map(function(id) { return parseInt(id); });
+      var aptasConExtra = aptas.filter(function(c) { return catIds.indexOf(c.id) !== -1; });
+      if (aptasConExtra.length > 0) aptas = aptasConExtra;
+    }
+  }
+
+  if (aptas.length === 0) {
+    resultado.innerHTML = '<span style="color:#ffb347;font-weight:600;">' + _ahTxtSinRes + '</span>';
+    resultado.style.display = 'block';
+  } else {
+    var html = '<p style="margin:0 0 8px 0;font-size:13px;opacity:0.8;">' + _ahTxtIntro + '</p><ul style="list-style:none;padding:0;margin:0;">';
+    aptas.forEach(function(cat) {
+      var cap = _ahTxtHasta + ' ' + cat.capacidad_pasajeros + ' ' + _ahTxtPasajeros;
+      if (cat.capacidad_maletas && cat.capacidad_maletas !== '—') cap += ' · ' + cat.capacidad_maletas + ' ' + _ahTxtMaletas;
+      html += '<li style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.15);">'
+            + '<strong style="font-size:14px;">' + cat.nombre + '</strong>'
+            + '<span style="font-size:12px;margin-left:8px;opacity:0.7;">' + cap + '</span>'
+            + '</li>';
+    });
+    html += '</ul>';
+    resultado.innerHTML = html;
+    resultado.style.display = 'block';
+  }
+
+  // Cierre automático 15 segundos después de mostrar el resultado
+  if (_ahTimerCierre) clearTimeout(_ahTimerCierre);
+  _ahTimerCierre = setTimeout(function() { cerrarAsistenteHome(); }, 15000);
+}
 </script>
 
 </body>
