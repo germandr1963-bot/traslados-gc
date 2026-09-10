@@ -2227,7 +2227,11 @@ function formularioCategoria(cat) {
     '<label class="etiqueta">Descripción larga (texto para la página de flota)</label>' +
     '<textarea class="campo" id="cat-descripcion-larga" rows="4" style="margin-bottom:10px;resize:vertical">' + escapar(cat.descripcion_larga || '') + '</textarea>' +
     '<label class="etiqueta">Características (una por línea, se muestran con ✓)</label>' +
-    '<textarea class="campo" id="cat-caracteristicas" rows="4" style="margin-bottom:10px;resize:vertical">' + escapar(cat.caracteristicas || '') + '</textarea>';
+    '<textarea class="campo" id="cat-caracteristicas" rows="4" style="margin-bottom:10px;resize:vertical">' + escapar(cat.caracteristicas || '') + '</textarea>' +
+    '<label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;">' +
+      '<input type="checkbox" id="cat-en-promo"' + (cat.en_promo ? ' checked' : '') + ' style="width:18px;height:18px;accent-color:var(--terracota);cursor:pointer;">' +
+      '<span style="font-size:13px;font-weight:600;color:var(--texto-oscuro);">🎁 Tiene promoción activa (muestra badge en la página de flota)</span>' +
+    '</label>';
 }
 
 function editarCategoria(id) {
@@ -2270,7 +2274,8 @@ function guardarCategoria(id) {
     subtitulo: document.getElementById('cat-subtitulo').value,
     descripcion_larga: document.getElementById('cat-descripcion-larga').value,
     caracteristicas: document.getElementById('cat-caracteristicas').value,
-    isla_id: document.getElementById('cat-isla-id') ? parseInt(document.getElementById('cat-isla-id').value) : null
+    isla_id: document.getElementById('cat-isla-id') ? parseInt(document.getElementById('cat-isla-id').value) : null,
+    en_promo: document.getElementById('cat-en-promo') ? document.getElementById('cat-en-promo').checked : false
   };
   var url = id ? '/admin/categorias/' + id + '/editar' : '/admin/categorias';
   fetch(url, {
