@@ -453,7 +453,8 @@ async function initSchema() {
       ADD COLUMN IF NOT EXISTS en_flota BOOLEAN DEFAULT TRUE,
       ADD COLUMN IF NOT EXISTS descripcion_larga TEXT,
       ADD COLUMN IF NOT EXISTS caracteristicas TEXT,
-      ADD COLUMN IF NOT EXISTS isla_id INT REFERENCES islas(id) ON DELETE SET NULL
+      ADD COLUMN IF NOT EXISTS isla_id INT REFERENCES islas(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS en_promo BOOLEAN DEFAULT FALSE
   `);
 
   // Asignar Gran Canaria por defecto a todas las categorías sin isla
@@ -816,6 +817,7 @@ async function initSchema() {
     { clave: 'flota_badge_eco',             contexto: 'Badge 2 de los 4 que aparecen bajo el subtítulo', es: 'Opción Eco / Híbridos' },
     { clave: 'flota_badge_pmr',             contexto: 'Badge 3 de los 4 que aparecen bajo el subtítulo', es: 'EuroTaxi Adaptado (PMR)' },
     { clave: 'flota_badge_deportivo',       contexto: 'Badge 4 de los 4 que aparecen bajo el subtítulo', es: 'Espacio Surf, Bici & Golf' },
+    { clave: 'flota_badge_promo',           contexto: 'Badge de promoción activa que aparece en la tarjeta de la categoría cuando tiene promoción activada', es: '🎁 Promoción activa' },
     { clave: 'flota_selector_titulo',       contexto: 'Título del bloque asistente de selección de vehículo', es: 'Asistente de Selección de Vehículo' },
     { clave: 'flota_selector_bajada',       contexto: 'Frase en negrita bajo el título del selector', es: '¿Qué vehículo necesitas?' },
     { clave: 'flota_selector_descripcion',  contexto: 'Texto descriptivo del selector, bajo la frase en negrita', es: 'Selecciona tu equipaje y pasajeros y te recomendamos la categoría ideal' },
@@ -3233,7 +3235,7 @@ app.post('/admin/islas/:id/traducciones/guardar', requireAdmin, asyncHandler(asy
 app.get('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.limite_sillas, cv.descripcion,
-            cv.activa, cv.disponible, cv.bajada_diurna, cv.bajada_nocturna, cv.orden,
+            cv.activa, cv.disponible, cv.bajada_diurna, cv.bajada_nocturna, cv.orden, cv.en_promo,
             cv.descripcion_larga, cv.caracteristicas, cv.subtitulo,
             (cv.foto IS NOT NULL) AS tiene_foto,
             cv.isla_id, COALESCE(i.nombre, 'Gran Canaria') AS isla_nombre
@@ -3290,14 +3292,14 @@ app.post('/admin/categorias/:id/editar', requireAdmin, asyncHandler(async (req, 
       `UPDATE categorias_vehiculos
        SET nombre = $1, capacidad_pasajeros = $2, capacidad_maletas = $3, limite_sillas = $4, descripcion = $5,
            bajada_diurna = $6, bajada_nocturna = $7, descripcion_larga = $8, caracteristicas = $9, subtitulo = $10,
-           isla_id = $11, orden = $12
-       WHERE id = $13`,
+           isla_id = $11, orden = $12, en_promo = $13
+       WHERE id = $14`,
       [nombre, parseInt(d.capacidad_pasajeros, 10) || 4, (d.capacidad_maletas || '').trim() || '—',
        parseInt(d.limite_sillas, 10) || 0, (d.descripcion || '').trim(),
        parseFloat(d.bajada_diurna) || 0, parseFloat(d.bajada_nocturna) || 0,
        (d.descripcion_larga || '').trim(), (d.caracteristicas || '').trim(),
        (d.subtitulo || '').trim(), d.isla_id ? parseInt(d.isla_id) : null,
-       parseInt(d.orden, 10) || 0, req.params.id]
+       parseInt(d.orden, 10) || 0, !!d.en_promo, req.params.id]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -7202,7 +7204,7 @@ async function renderFlota(req, res, lang) {
   // Misma consulta que /api/flota
   const result = await pool.query(
     `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.limite_sillas,
-            cv.cloudinary_url,
+            cv.cloudinary_url, cv.en_promo,
             COALESCE(cvt.descripcion,       cv.descripcion)       AS descripcion,
             COALESCE(cvt.subtitulo,         cv.subtitulo)         AS subtitulo,
             COALESCE(cvt.descripcion_larga, cv.descripcion_larga) AS descripcion_larga,
