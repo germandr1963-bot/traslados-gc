@@ -992,27 +992,27 @@ document.getElementById('modal-cotizacion').addEventListener('click', function(e
 });
 
 // ─── Asistente de selección de vehículo — portada ────────────────────────
-var _ahCategorias = <%- JSON.stringify(categoriasHome) %>;
-var _ahExtras = [];
-var _ahTimerCierre = null;
-var _ahLang = '<%= lang %>';
+var categoriasHome = <%- JSON.stringify(categoriasHome) %>;
+var extrasHome = [];
+var langHome = '<%= lang %>';
 
-var _ahTxtHasta     = '<%= t("flota_catalogo_hasta") || "Hasta" %>';
-var _ahTxtPasajeros = '<%= t("flota_catalogo_pasajeros") || "pasajeros" %>';
-var _ahTxtPasajero  = '<%= t("flota_catalogo_pasajero") || "pasajero" %>';
-var _ahTxtMaletas   = '<%= t("flota_catalogo_maletas") || "maletas" %>';
-var _ahTxtIntro     = '<%= t("flota_selector_intro") || "Según tus parámetros de búsqueda, los vehículos recomendados pueden ser estos:" %>';
-var _ahTxtSinRes    = '<%= t("flota_selector_sin_resultado") || "No encontramos ningún vehículo que se ajuste a tu selección." %>';
-var _ahTxtsPax = {
+var txtHastaHome     = '<%= t("flota_catalogo_hasta") || "Hasta" %>';
+var txtPasajerosHome = '<%= t("flota_catalogo_pasajeros") || "pasajeros" %>';
+var txtPasajeroHome  = '<%= t("flota_catalogo_pasajero") || "pasajero" %>';
+var txtMaletasHome   = '<%= t("flota_catalogo_maletas") || "maletas" %>';
+var txtIntroHome     = '<%= t("flota_selector_intro") || "Según tus parámetros de búsqueda, los vehículos recomendados pueden ser estos:" %>';
+var txtSinResHome    = '<%= t("flota_selector_sin_resultado") || "No encontramos ningún vehículo que se ajuste a tu selección." %>';
+
+var txtsPaxHome = {
   <% for (var i = 1; i <= 8; i++) { %>
   '<%= i %>': '<%= t("flota_pax_" + i) || "" %>',
   <% } %>
 };
 
-// Poblar select de pasajeros con los datos del servidor — igual que en flota
+// Poblar select de pasajeros con los datos ya disponibles
 (function() {
   var maxPax = 0;
-  _ahCategorias.forEach(function(c) {
+  categoriasHome.forEach(function(c) {
     var p = parseInt(c.capacidad_pasajeros) || 0;
     if (p > maxPax) maxPax = p;
   });
@@ -1021,23 +1021,22 @@ var _ahTxtsPax = {
   for (var p = 1; p <= maxPax; p++) {
     var opt = document.createElement('option');
     opt.value = p;
-    opt.textContent = _ahTxtsPax[String(p)] || (p === 1 ? '1 ' + _ahTxtPasajero : p + ' ' + _ahTxtPasajeros);
+    opt.textContent = txtsPaxHome[String(p)] || (p === 1 ? '1 ' + txtPasajeroHome : p + ' ' + txtPasajerosHome);
     if (p === 1) opt.selected = true;
     selPax.appendChild(opt);
   }
 })();
 
-// Cargar extras aprobados por conductores (igual que en flota)
-fetch('/api/extras-info?lang=' + _ahLang)
+// Cargar extras — bloques C, D, E — sin filtro de conductores
+fetch('/api/extras-info?lang=' + langHome)
   .then(function(r) { return r.json(); })
   .then(function(extras) {
-    _ahExtras = extras;
+    extrasHome = extras;
     var sel = document.getElementById('ah-especial');
-    var aptos = extras;
-    if (aptos.length > 0) {
-      aptos.forEach(function(e) {
+    if (extras.length > 0) {
+      extras.forEach(function(e) {
         var opt = document.createElement('option');
-        opt.value = e.extra_id;
+        opt.value = e.id;
         opt.textContent = e.nombre;
         sel.appendChild(opt);
       });
@@ -1052,7 +1051,6 @@ function abrirAsistenteHome() {
 }
 
 function cerrarAsistenteHome() {
-  if (_ahTimerCierre) { clearTimeout(_ahTimerCierre); _ahTimerCierre = null; }
   var panel = document.getElementById('panel-asistente-home');
   panel.style.display = 'none';
   var res = document.getElementById('ah-resultado');
@@ -1066,13 +1064,13 @@ function recomendarHome() {
   var especial  = document.getElementById('ah-especial').value;
   var resultado = document.getElementById('ah-resultado');
 
-  if (_ahCategorias.length === 0) {
+  if (categoriasHome.length === 0) {
     resultado.innerHTML = 'Cargando vehículos... Por favor espera un momento y vuelve a intentarlo.';
     resultado.className = 'selector-resultado visible';
     return;
   }
 
-  var ordenadas = _ahCategorias.slice().sort(function(a, b) {
+  var ordenadas = categoriasHome.slice().sort(function(a, b) {
     return a.capacidad_pasajeros - b.capacidad_pasajeros;
   });
 
@@ -1086,7 +1084,7 @@ function recomendarHome() {
 
   if (especial !== 'ninguno') {
     var extraId = parseInt(especial);
-    var extra = _ahExtras.filter(function(e) { return e.extra_id === extraId; })[0];
+    var extra = extrasHome.filter(function(e) { return e.id === extraId; })[0];
     if (extra && extra.categorias && extra.categorias.length > 0) {
       var catIds = extra.categorias.map(function(id) { return parseInt(id); });
       var aptasConExtra = aptas.filter(function(c) {
@@ -1097,17 +1095,17 @@ function recomendarHome() {
   }
 
   if (aptas.length === 0) {
-    resultado.innerHTML = '<p style="font-size:13px;color:#ffb347;font-weight:600;">' + _ahTxtSinRes + '</p>';
+    resultado.innerHTML = '<p style="font-size:13px;color:#ffb347;font-weight:600;">' + txtSinResHome + '</p>';
     resultado.className = 'selector-resultado visible';
     return;
   }
 
-  var html = '<p style="margin-bottom:10px;font-size:13px;color:rgba(255,255,255,0.7);">' + _ahTxtIntro + '</p>';
+  var html = '<p style="margin-bottom:10px;font-size:13px;color:rgba(255,255,255,0.7);">' + txtIntroHome + '</p>';
   html += '<ul style="list-style:none;padding:0;margin:0;text-align:left;">';
   for (var j = 0; j < aptas.length; j++) {
     var cat = aptas[j];
-    var cap = _ahTxtHasta + ' ' + cat.capacidad_pasajeros + ' ' + _ahTxtPasajeros;
-    if (cat.capacidad_maletas && cat.capacidad_maletas !== '—') cap += ' · ' + cat.capacidad_maletas + ' ' + _ahTxtMaletas;
+    var cap = txtHastaHome + ' ' + cat.capacidad_pasajeros + ' ' + txtPasajerosHome;
+    if (cat.capacidad_maletas && cat.capacidad_maletas !== '—') cap += ' · ' + cat.capacidad_maletas + ' ' + txtMaletasHome;
     html += '<li style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.15);">'
           + '<strong style="color:#fff;font-size:14px;">' + cat.nombre + '</strong>'
           + '<span style="color:rgba(255,255,255,0.7);font-size:12px;margin-left:8px;">' + cap + '</span>'
@@ -1116,9 +1114,6 @@ function recomendarHome() {
   html += '</ul>';
   resultado.innerHTML = html;
   resultado.className = 'selector-resultado visible';
-
-  if (_ahTimerCierre) clearTimeout(_ahTimerCierre);
-  _ahTimerCierre = setTimeout(function() { cerrarAsistenteHome(); }, 15000);
 }
 </script>
 
