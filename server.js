@@ -3275,18 +3275,29 @@ app.post('/admin/categorias/:id/editar', requireAdmin, asyncHandler(async (req, 
   if (!nombre) {
     return res.status(400).json({ error: 'La categoría necesita un nombre.' });
   }
+  const ordenNuevo = parseInt(d.orden, 10) || 0;
+  if (ordenNuevo > 0) {
+    const duplicado = await pool.query(
+      'SELECT id FROM categorias_vehiculos WHERE orden = $1 AND id != $2',
+      [ordenNuevo, req.params.id]
+    );
+    if (duplicado.rows.length > 0) {
+      return res.status(400).json({ error: 'El número de orden ' + ordenNuevo + ' ya está asignado a otra categoría. Usa un número diferente.' });
+    }
+  }
   try {
     await pool.query(
       `UPDATE categorias_vehiculos
        SET nombre = $1, capacidad_pasajeros = $2, capacidad_maletas = $3, limite_sillas = $4, descripcion = $5,
            bajada_diurna = $6, bajada_nocturna = $7, descripcion_larga = $8, caracteristicas = $9, subtitulo = $10,
-           isla_id = $11
-       WHERE id = $12`,
+           isla_id = $11, orden = $12
+       WHERE id = $13`,
       [nombre, parseInt(d.capacidad_pasajeros, 10) || 4, (d.capacidad_maletas || '').trim() || '—',
        parseInt(d.limite_sillas, 10) || 0, (d.descripcion || '').trim(),
        parseFloat(d.bajada_diurna) || 0, parseFloat(d.bajada_nocturna) || 0,
        (d.descripcion_larga || '').trim(), (d.caracteristicas || '').trim(),
-       (d.subtitulo || '').trim(), d.isla_id ? parseInt(d.isla_id) : null, req.params.id]
+       (d.subtitulo || '').trim(), d.isla_id ? parseInt(d.isla_id) : null,
+       parseInt(d.orden, 10) || 0, req.params.id]
     );
     res.json({ ok: true });
   } catch (err) {
