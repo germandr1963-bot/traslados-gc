@@ -382,6 +382,8 @@ footer {
   color: var(--texto-muted);
   font-size: 13px;
 }
+.selector-resultado { margin-top: 12px; padding: 12px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; font-size: 13px; color: #fff; display: none; }
+.selector-resultado.visible { display: block; }
 </style>
 </head>
 <body>
@@ -448,7 +450,7 @@ footer {
         </div>
       </div>
       <button onclick="recomendarHome()" style="width:100%;background:var(--terracota);color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Public Sans',sans-serif;"><%= t('flota_selector_btn') || 'Ver vehículo recomendado' %></button>
-      <div id="ah-resultado" style="display:none;margin-top:12px;padding:12px 16px;background:rgba(255,255,255,0.1);border-radius:8px;font-size:14px;font-family:'Public Sans',sans-serif;color:#fff;"></div>
+      <div id="ah-resultado" class="selector-resultado"></div>
     </div>
 
     <div class="panel-busqueda">
@@ -999,7 +1001,7 @@ var _ahTxtHasta     = '<%= t("flota_catalogo_hasta") || "Hasta" %>';
 var _ahTxtPasajeros = '<%= t("flota_catalogo_pasajeros") || "pasajeros" %>';
 var _ahTxtPasajero  = '<%= t("flota_catalogo_pasajero") || "pasajero" %>';
 var _ahTxtMaletas   = '<%= t("flota_catalogo_maletas") || "maletas" %>';
-var _ahTxtIntro     = '<%= t("flota_selector_intro") || "Según tus parámetros, los vehículos recomendados pueden ser estos:" %>';
+var _ahTxtIntro     = '<%= t("flota_selector_intro") || "Según tus parámetros de búsqueda, los vehículos recomendados pueden ser estos:" %>';
 var _ahTxtSinRes    = '<%= t("flota_selector_sin_resultado") || "No encontramos ningún vehículo que se ajuste a tu selección." %>';
 var _ahTxtsPax = {
   <% for (var i = 1; i <= 8; i++) { %>
@@ -1007,40 +1009,43 @@ var _ahTxtsPax = {
   <% } %>
 };
 
-// Poblar pasajeros desde datos del servidor — igual que en flota
+// Poblar select de pasajeros con los datos del servidor — igual que en flota
 (function() {
   var maxPax = 0;
   _ahCategorias.forEach(function(c) {
     var p = parseInt(c.capacidad_pasajeros) || 0;
     if (p > maxPax) maxPax = p;
   });
-  var sel = document.getElementById('ah-pasajeros');
-  sel.innerHTML = '';
+  var selPax = document.getElementById('ah-pasajeros');
+  selPax.innerHTML = '';
   for (var p = 1; p <= maxPax; p++) {
     var opt = document.createElement('option');
     opt.value = p;
     opt.textContent = _ahTxtsPax[String(p)] || (p === 1 ? '1 ' + _ahTxtPasajero : p + ' ' + _ahTxtPasajeros);
     if (p === 1) opt.selected = true;
-    sel.appendChild(opt);
+    selPax.appendChild(opt);
   }
 })();
 
-// Cargar extras al cargar la página — igual que en flota
+// Cargar extras aprobados por conductores (igual que en flota)
 fetch('/api/extras-flota?lang=' + _ahLang)
   .then(function(r) { return r.json(); })
   .then(function(extras) {
     _ahExtras = extras;
     var sel = document.getElementById('ah-especial');
-    var aptos = extras.filter(function(e) { return ['C','D','E'].indexOf(e.bloque) !== -1; });
+    var aptos = extras.filter(function(e) {
+      return ['C','D','E'].indexOf(e.bloque) !== -1;
+    });
     if (aptos.length > 0) {
       aptos.forEach(function(e) {
         var opt = document.createElement('option');
-        opt.value = e.id;
+        opt.value = e.extra_id;
         opt.textContent = e.nombre;
         sel.appendChild(opt);
       });
     }
-  }).catch(function() {});
+  })
+  .catch(function() {});
 
 function abrirAsistenteHome() {
   var panel = document.getElementById('panel-asistente-home');
@@ -1052,7 +1057,9 @@ function cerrarAsistenteHome() {
   if (_ahTimerCierre) { clearTimeout(_ahTimerCierre); _ahTimerCierre = null; }
   var panel = document.getElementById('panel-asistente-home');
   panel.style.display = 'none';
-  document.getElementById('ah-resultado').style.display = 'none';
+  var res = document.getElementById('ah-resultado');
+  res.innerHTML = '';
+  res.className = 'selector-resultado';
 }
 
 function recomendarHome() {
@@ -1060,6 +1067,12 @@ function recomendarHome() {
   var maletas   = parseInt(document.getElementById('ah-maletas').value);
   var especial  = document.getElementById('ah-especial').value;
   var resultado = document.getElementById('ah-resultado');
+
+  if (_ahCategorias.length === 0) {
+    resultado.innerHTML = 'Cargando vehículos... Por favor espera un momento y vuelve a intentarlo.';
+    resultado.className = 'selector-resultado visible';
+    return;
+  }
 
   var ordenadas = _ahCategorias.slice().sort(function(a, b) {
     return a.capacidad_pasajeros - b.capacidad_pasajeros;
@@ -1075,31 +1088,36 @@ function recomendarHome() {
 
   if (especial !== 'ninguno') {
     var extraId = parseInt(especial);
-    var extra = _ahExtras.filter(function(e) { return e.id === extraId; })[0];
+    var extra = _ahExtras.filter(function(e) { return e.extra_id === extraId; })[0];
     if (extra && extra.categorias && extra.categorias.length > 0) {
       var catIds = extra.categorias.map(function(id) { return parseInt(id); });
-      var aptasConExtra = aptas.filter(function(c) { return catIds.indexOf(c.id) !== -1; });
-      if (aptasConExtra.length > 0) aptas = aptasConExtra;
+      var aptasConExtra = aptas.filter(function(c) {
+        return catIds.indexOf(c.id) !== -1;
+      });
+      aptas = aptasConExtra;
     }
   }
 
   if (aptas.length === 0) {
-    resultado.innerHTML = '<span style="color:#ffb347;font-weight:600;">' + _ahTxtSinRes + '</span>';
-    resultado.style.display = 'block';
-  } else {
-    var html = '<p style="margin:0 0 8px 0;font-size:13px;opacity:0.8;">' + _ahTxtIntro + '</p><ul style="list-style:none;padding:0;margin:0;">';
-    aptas.forEach(function(cat) {
-      var cap = _ahTxtHasta + ' ' + cat.capacidad_pasajeros + ' ' + _ahTxtPasajeros;
-      if (cat.capacidad_maletas && cat.capacidad_maletas !== '—') cap += ' · ' + cat.capacidad_maletas + ' ' + _ahTxtMaletas;
-      html += '<li style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.15);">'
-            + '<strong style="font-size:14px;">' + cat.nombre + '</strong>'
-            + '<span style="font-size:12px;margin-left:8px;opacity:0.7;">' + cap + '</span>'
-            + '</li>';
-    });
-    html += '</ul>';
-    resultado.innerHTML = html;
-    resultado.style.display = 'block';
+    resultado.innerHTML = '<p style="font-size:13px;color:#ffb347;font-weight:600;">' + _ahTxtSinRes + '</p>';
+    resultado.className = 'selector-resultado visible';
+    return;
   }
+
+  var html = '<p style="margin-bottom:10px;font-size:13px;color:rgba(255,255,255,0.7);">' + _ahTxtIntro + '</p>';
+  html += '<ul style="list-style:none;padding:0;margin:0;text-align:left;">';
+  for (var j = 0; j < aptas.length; j++) {
+    var cat = aptas[j];
+    var cap = _ahTxtHasta + ' ' + cat.capacidad_pasajeros + ' ' + _ahTxtPasajeros;
+    if (cat.capacidad_maletas && cat.capacidad_maletas !== '—') cap += ' · ' + cat.capacidad_maletas + ' ' + _ahTxtMaletas;
+    html += '<li style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.15);">'
+          + '<strong style="color:#fff;font-size:14px;">' + cat.nombre + '</strong>'
+          + '<span style="color:rgba(255,255,255,0.7);font-size:12px;margin-left:8px;">' + cap + '</span>'
+          + '</li>';
+  }
+  html += '</ul>';
+  resultado.innerHTML = html;
+  resultado.className = 'selector-resultado visible';
 
   if (_ahTimerCierre) clearTimeout(_ahTimerCierre);
   _ahTimerCierre = setTimeout(function() { cerrarAsistenteHome(); }, 15000);
