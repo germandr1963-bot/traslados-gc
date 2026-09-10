@@ -7449,10 +7449,13 @@ async function renderHome(req, res, lang) {
   const rutaReserva = lang === 'es' ? '/reserva' : '/' + lang + '/' + (SECCIONES_RESERVA[lang] || 'reserva');
   const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
   const catResult = await pool.query(
-    `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas
+    `SELECT DISTINCT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas
      FROM categorias_vehiculos cv
-     WHERE cv.activa = TRUE AND cv.en_flota = TRUE
-     ORDER BY cv.orden, cv.nombre`
+     JOIN conductores c ON c.categoria_id = cv.id
+                       AND c.estado = 'aprobado'
+                       AND c.disponible_hoy = TRUE
+     WHERE cv.disponible = TRUE
+     ORDER BY cv.nombre`
   );
   const categoriasHome = catResult.rows.map(function(cat) {
     const nombreTrad = obtenerTexto('categoria_nombre_' + cat.id, lang);
