@@ -994,7 +994,6 @@ var _ahCategorias = <%- JSON.stringify(categoriasHome) %>;
 var _ahExtras = [];
 var _ahTimerCierre = null;
 var _ahLang = '<%= lang %>';
-var _ahCargado = false;
 
 var _ahTxtHasta     = '<%= t("flota_catalogo_hasta") || "Hasta" %>';
 var _ahTxtPasajeros = '<%= t("flota_catalogo_pasajeros") || "pasajeros" %>';
@@ -1026,29 +1025,27 @@ var _ahTxtsPax = {
   }
 })();
 
+// Cargar extras al cargar la página — igual que en flota
+fetch('/api/extras-flota?lang=' + _ahLang)
+  .then(function(r) { return r.json(); })
+  .then(function(extras) {
+    _ahExtras = extras;
+    var sel = document.getElementById('ah-especial');
+    var aptos = extras.filter(function(e) { return ['C','D','E'].indexOf(e.bloque) !== -1; });
+    if (aptos.length > 0) {
+      aptos.forEach(function(e) {
+        var opt = document.createElement('option');
+        opt.value = e.id;
+        opt.textContent = e.nombre;
+        sel.appendChild(opt);
+      });
+    }
+  }).catch(function() {});
+
 function abrirAsistenteHome() {
   var panel = document.getElementById('panel-asistente-home');
   if (panel.style.display !== 'none') return;
   panel.style.display = 'block';
-  // Cargar extras solo una vez — igual que en flota
-  if (!_ahCargado) {
-    _ahCargado = true;
-    fetch('/api/extras-flota?lang=' + _ahLang)
-      .then(function(r) { return r.json(); })
-      .then(function(extras) {
-        _ahExtras = extras;
-        var sel = document.getElementById('ah-especial');
-        var aptos = extras.filter(function(e) { return ['C','D','E'].indexOf(e.bloque) !== -1; });
-        if (aptos.length > 0) {
-          aptos.forEach(function(e) {
-            var opt = document.createElement('option');
-            opt.value = e.id;
-            opt.textContent = e.nombre;
-            sel.appendChild(opt);
-          });
-        }
-      }).catch(function() {});
-  }
 }
 
 function cerrarAsistenteHome() {
