@@ -1027,27 +1027,36 @@ var txtsPaxHome = {
   }
 })();
 
-// Cargar extras — bloques C, D, E — sin filtro de conductores
-fetch('/api/extras-info?lang=' + langHome)
-  .then(function(r) { return r.json(); })
-  .then(function(extras) {
-    extrasHome = extras;
-    var sel = document.getElementById('ah-especial');
-    if (extras.length > 0) {
-      extras.forEach(function(e) {
-        var opt = document.createElement('option');
-        opt.value = e.id;
-        opt.textContent = e.nombre;
-        sel.appendChild(opt);
+var extrasHomeCargados = false;
+
+function cargarExtrasHome() {
+  if (extrasHomeCargados) return;
+  fetch('/api/extras-flota?lang=' + langHome)
+    .then(function(r) { return r.json(); })
+    .then(function(extras) {
+      extrasHomeCargados = true;
+      extrasHome = extras;
+      var sel = document.getElementById('ah-especial');
+      var aptos = extras.filter(function(e) {
+        return ['C','D','E'].indexOf(e.bloque) !== -1;
       });
-    }
-  })
-  .catch(function() {});
+      if (aptos.length > 0) {
+        aptos.forEach(function(e) {
+          var opt = document.createElement('option');
+          opt.value = e.extra_id;
+          opt.textContent = e.nombre;
+          sel.appendChild(opt);
+        });
+      }
+    })
+    .catch(function() {});
+}
 
 function abrirAsistenteHome() {
   var panel = document.getElementById('panel-asistente-home');
   if (panel.style.display !== 'none') return;
   panel.style.display = 'block';
+  cargarExtrasHome();
 }
 
 function cerrarAsistenteHome() {
@@ -1084,7 +1093,7 @@ function recomendarHome() {
 
   if (especial !== 'ninguno') {
     var extraId = parseInt(especial);
-    var extra = extrasHome.filter(function(e) { return e.id === extraId; })[0];
+    var extra = extrasHome.filter(function(e) { return e.extra_id === extraId; })[0];
     if (extra && extra.categorias && extra.categorias.length > 0) {
       var catIds = extra.categorias.map(function(id) { return parseInt(id); });
       var aptasConExtra = aptas.filter(function(c) {
