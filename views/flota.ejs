@@ -328,7 +328,7 @@
   })();
 
   // Cargar extras aprobados por conductores (sigue con fetch — es dinámico)
-  fetch('/api/extras-flota?lang=' + langFlota)
+  fetch('/api/extras-info?lang=' + langFlota)
     .then(function(r) { return r.json(); })
     .then(function(extras) {
       extrasFlota = extras;
