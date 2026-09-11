@@ -335,7 +335,6 @@
   .hero { padding: 20px 16px 24px; }
   .caja-busqueda { padding: 14px 12px; }
   .fila-busqueda { grid-template-columns: 1fr; }
-  .asistente-home-grid { grid-template-columns: 1fr !important; }
   .tarjeta-resultado {
     flex-direction: column;
     gap: 12px;
@@ -411,47 +410,6 @@ footer {
       <li><%= t('home_subtitulo_3') %></li>
     </ul>
 
-    <!-- Bloque asistente de selección de vehículo -->
-    <div style="margin-bottom:20px;margin-top:-10px;">
-      <p style="font-size:14px;color:rgba(255,255,255,0.82);line-height:1.6;margin:0 0 10px 0;max-width:520px;"><%= t('home_asistente_texto') %></p>
-      <a href="javascript:void(0)" onclick="abrirAsistenteHome()" style="font-size:13px;font-weight:600;color:#ffb347;font-family:'Public Sans',sans-serif;text-decoration:underline;cursor:pointer;"><%= t('home_asistente_cta') %></a>
-    </div>
-
-    <!-- Panel del asistente — oculto por defecto -->
-    <div id="panel-asistente-home" style="display:none;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:12px;padding:20px;margin-bottom:20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <strong style="font-family:'Public Sans',sans-serif;font-size:15px;color:#fff;"><%= t('flota_selector_titulo') || 'Asistente de Selección de Vehículo' %></strong>
-        <button onclick="cerrarAsistenteHome()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer;line-height:1;padding:0 4px;" title="<%= t('home_asistente_cerrar') || 'Cerrar' %>">✕</button>
-      </div>
-      <p style="font-size:13px;color:rgba(255,255,255,0.7);margin:0 0 14px 0;font-weight:600;"><%= t('flota_selector_bajada') || '¿Qué vehículo necesitas?' %></p>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;" class="asistente-home-grid">
-        <div>
-          <label style="display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px;"><%= t('flota_selector_label_pax') || 'Pasajeros' %></label>
-          <select id="ah-pasajeros" style="width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-size:14px;background:rgba(255,255,255,0.12);color:#fff;font-family:'Public Sans',sans-serif;">
-            <option value="1">1 pasajero</option>
-          </select>
-        </div>
-        <div>
-          <label style="display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px;"><%= t('flota_selector_label_mal') || 'Maletas grandes' %></label>
-          <select id="ah-maletas" style="width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-size:14px;background:rgba(255,255,255,0.12);color:#fff;font-family:'Public Sans',sans-serif;">
-            <option value="0"><%= t('flota_selector_mal_0') || 'Sin maletas' %></option>
-            <option value="1"><%= t('flota_selector_mal_1') || '1 maleta' %></option>
-            <option value="2" selected><%= t('flota_selector_mal_2') || '2 maletas' %></option>
-            <option value="3"><%= t('flota_selector_mal_3') || '3 maletas' %></option>
-            <option value="4"><%= t('flota_selector_mal_4') || '4 maletas' %></option>
-            <option value="5"><%= t('flota_selector_mal_5') || '5 o más maletas' %></option>
-          </select>
-        </div>
-        <div>
-          <label style="display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px;"><%= t('flota_selector_label_esp') || 'Equipaje especial' %></label>
-          <select id="ah-especial" style="width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-size:14px;background:rgba(255,255,255,0.12);color:#fff;font-family:'Public Sans',sans-serif;">
-            <option value="ninguno"><%= t('flota_selector_esp_ninguno') || 'Ninguno' %></option>
-          </select>
-        </div>
-      </div>
-      <button onclick="recomendarHome()" style="width:100%;background:var(--terracota);color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Public Sans',sans-serif;"><%= t('flota_selector_btn') || 'Ver vehículo recomendado' %></button>
-      <div id="ah-resultado" class="selector-resultado"></div>
-    </div>
 
     <div class="panel-busqueda">
       <div class="fila-busqueda">
@@ -991,139 +949,7 @@ document.getElementById('modal-cotizacion').addEventListener('click', function(e
   if (e.target === this) cerrarFormCotizacion();
 });
 
-// ─── Asistente de selección de vehículo — portada ────────────────────────
-var categoriasHome = <%- JSON.stringify(categoriasHome) %>;
-var extrasHome = [];
-var langHome = '<%= lang %>';
 
-var txtHastaHome     = '<%= t("flota_catalogo_hasta") || "Hasta" %>';
-var txtPasajerosHome = '<%= t("flota_catalogo_pasajeros") || "pasajeros" %>';
-var txtPasajeroHome  = '<%= t("flota_catalogo_pasajero") || "pasajero" %>';
-var txtMaletasHome   = '<%= t("flota_catalogo_maletas") || "maletas" %>';
-var txtIntroHome     = '<%= t("flota_selector_intro") || "Según tus parámetros de búsqueda, los vehículos recomendados pueden ser estos:" %>';
-var txtSinResHome    = '<%= t("flota_selector_sin_resultado") || "No encontramos ningún vehículo que se ajuste a tu selección." %>';
-
-var txtsPaxHome = {
-  <% for (var i = 1; i <= 8; i++) { %>
-  '<%= i %>': '<%= t("flota_pax_" + i) || "" %>',
-  <% } %>
-};
-
-// Poblar select de pasajeros con los datos ya disponibles
-(function() {
-  var maxPax = 0;
-  categoriasHome.forEach(function(c) {
-    var p = parseInt(c.capacidad_pasajeros) || 0;
-    if (p > maxPax) maxPax = p;
-  });
-  var selPax = document.getElementById('ah-pasajeros');
-  selPax.innerHTML = '';
-  for (var p = 1; p <= maxPax; p++) {
-    var opt = document.createElement('option');
-    opt.value = p;
-    opt.textContent = txtsPaxHome[String(p)] || (p === 1 ? '1 ' + txtPasajeroHome : p + ' ' + txtPasajerosHome);
-    if (p === 1) opt.selected = true;
-    selPax.appendChild(opt);
-  }
-})();
-
-var extrasHomeCargados = false;
-
-function cargarExtrasHome() {
-  if (extrasHomeCargados) return;
-  fetch('/api/extras-flota?lang=' + langHome)
-    .then(function(r) { return r.json(); })
-    .then(function(extras) {
-      extrasHomeCargados = true;
-      extrasHome = extras;
-      var sel = document.getElementById('ah-especial');
-      var aptos = extras.filter(function(e) {
-        return ['C','D','E'].indexOf(e.bloque) !== -1;
-      });
-      if (aptos.length > 0) {
-        aptos.forEach(function(e) {
-          var opt = document.createElement('option');
-          opt.value = e.extra_id;
-          opt.textContent = e.nombre;
-          sel.appendChild(opt);
-        });
-      }
-    })
-    .catch(function() {});
-}
-
-function abrirAsistenteHome() {
-  var panel = document.getElementById('panel-asistente-home');
-  if (panel.style.display !== 'none') return;
-  panel.style.display = 'block';
-  cargarExtrasHome();
-}
-
-function cerrarAsistenteHome() {
-  var panel = document.getElementById('panel-asistente-home');
-  panel.style.display = 'none';
-  var res = document.getElementById('ah-resultado');
-  res.innerHTML = '';
-  res.className = 'selector-resultado';
-}
-
-function recomendarHome() {
-  var pasajeros = parseInt(document.getElementById('ah-pasajeros').value);
-  var maletas   = parseInt(document.getElementById('ah-maletas').value);
-  var especial  = document.getElementById('ah-especial').value;
-  var resultado = document.getElementById('ah-resultado');
-
-  if (categoriasHome.length === 0) {
-    resultado.innerHTML = 'Cargando vehículos... Por favor espera un momento y vuelve a intentarlo.';
-    resultado.className = 'selector-resultado visible';
-    return;
-  }
-
-  var ordenadas = categoriasHome.slice().sort(function(a, b) {
-    return a.capacidad_pasajeros - b.capacidad_pasajeros;
-  });
-
-  var aptas = ordenadas.filter(function(c) {
-    var capMaletas = parseInt(c.capacidad_maletas) || 0;
-    var okPax = c.capacidad_pasajeros >= pasajeros;
-    var okMal = maletas === 0 || capMaletas >= maletas;
-    return okPax && okMal;
-  });
-  if (aptas.length === 0) aptas = ordenadas;
-
-  if (especial !== 'ninguno') {
-    var extraId = parseInt(especial);
-    var extra = extrasHome.filter(function(e) { return e.extra_id === extraId; })[0];
-    if (extra && extra.categorias && extra.categorias.length > 0) {
-      var catIds = extra.categorias.map(function(id) { return parseInt(id); });
-      var aptasConExtra = aptas.filter(function(c) {
-        return catIds.indexOf(c.id) !== -1;
-      });
-      aptas = aptasConExtra;
-    }
-  }
-
-  if (aptas.length === 0) {
-    resultado.innerHTML = '<p style="font-size:13px;color:#ffb347;font-weight:600;">' + txtSinResHome + '</p>';
-    resultado.className = 'selector-resultado visible';
-    return;
-  }
-
-  var html = '<p style="margin-bottom:10px;font-size:13px;color:rgba(255,255,255,0.7);">' + txtIntroHome + '</p>';
-  html += '<ul style="list-style:none;padding:0;margin:0;text-align:left;">';
-  for (var j = 0; j < aptas.length; j++) {
-    var cat = aptas[j];
-    var cap = txtHastaHome + ' ' + cat.capacidad_pasajeros + ' ' + txtPasajerosHome;
-    if (cat.capacidad_maletas && cat.capacidad_maletas !== '—') cap += ' · ' + cat.capacidad_maletas + ' ' + txtMaletasHome;
-    html += '<li style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.15);">'
-          + '<strong style="color:#fff;font-size:14px;">' + cat.nombre + '</strong>'
-          + '<span style="color:rgba(255,255,255,0.7);font-size:12px;margin-left:8px;">' + cap + '</span>'
-          + '</li>';
-  }
-  html += '</ul>';
-  resultado.innerHTML = html;
-  resultado.className = 'selector-resultado visible';
-}
 </script>
 
 </body>
