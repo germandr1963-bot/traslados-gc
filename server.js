@@ -7245,7 +7245,7 @@ async function renderFlota(req, res, lang) {
   // Misma consulta que /api/flota
   const result = await pool.query(
     `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.limite_sillas,
-            cv.cloudinary_url, cv.en_promo,
+            cv.cloudinary_url, cv.en_promo, cv.disponible,
             COALESCE(cvt.descripcion,       cv.descripcion)       AS descripcion,
             COALESCE(cvt.subtitulo,         cv.subtitulo)         AS subtitulo,
             COALESCE(cvt.descripcion_larga, cv.descripcion_larga) AS descripcion_larga,
