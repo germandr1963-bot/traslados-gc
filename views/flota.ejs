@@ -320,7 +320,7 @@
     for (var p = 1; p <= maxPax; p++) {
       var opt = document.createElement('option');
       opt.value = p;
-      opt.textContent = txtsPax[String(p)] || (p === 1 ? '1 ' + txtPasajero : p + ' ' + txtPasajeros);
+      opt.textContent = p === 1 ? '1 ' + txtPasajero : p + ' ' + txtPasajeros;
       if (p === 1) opt.selected = true;
       selPax.appendChild(opt);
     }
