@@ -7486,21 +7486,7 @@ async function renderHome(req, res, lang) {
   const idiomas = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
   const rutaReserva = lang === 'es' ? '/reserva' : '/' + lang + '/' + (SECCIONES_RESERVA[lang] || 'reserva');
   const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
-  const catResult = await pool.query(
-    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas
-     FROM categorias_vehiculos
-     WHERE activa = TRUE
-     ORDER BY orden, nombre`
-  );
-  const categoriasHome = catResult.rows.map(function(cat) {
-    const nombreTrad = obtenerTexto('categoria_nombre_' + cat.id, lang);
-    const maletasTrad = obtenerTexto('categoria_maletas_' + cat.id, lang);
-    return Object.assign({}, cat, {
-      nombre: nombreTrad || cat.nombre,
-      capacidad_maletas: maletasTrad || cat.capacidad_maletas
-    });
-  });
-  res.render('index', { lang, t, idiomas: idiomas.rows, BASE_URL, rutaReserva, palabrasPaginas, categoriasHome });
+  res.render('index', { lang, t, idiomas: idiomas.rows, BASE_URL, rutaReserva, palabrasPaginas });
 }
 
 app.get('/', asyncHandler(async (req, res) => {
