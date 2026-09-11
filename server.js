@@ -10515,6 +10515,11 @@ app.post('/admin/extras/:id/activo', requireAdmin, asyncHandler(async (req, res)
   res.json({ ok: true });
 }));
 
+app.post('/admin/extras/:id/asistente', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE extras SET en_asistente = $1 WHERE id = $2', [!!req.body.en_asistente, req.params.id]);
+  res.json({ ok: true });
+}));
+
 app.post('/admin/extras/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   const enUso = await pool.query('SELECT 1 FROM reservas_extras WHERE extra_id = $1 LIMIT 1', [req.params.id]);
   if (enUso.rows.length) {
