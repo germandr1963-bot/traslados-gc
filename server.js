@@ -2823,7 +2823,7 @@ app.get('/api/extras-info', asyncHandler(async (req, res) => {
     JOIN conductores c ON c.id = ce.conductor_id
     WHERE e.activo = TRUE
       AND e.depende_chofer = TRUE
-      AND e.bloque IN ('C','D','E')
+      AND e.en_asistente = TRUE
     GROUP BY e.id, e.nombre, e.bloque, e.orden
     ORDER BY e.bloque, e.orden, e.id
   `);
@@ -10470,26 +10470,26 @@ app.get('/factura-descarga/:id/:firma/:nombre?', asyncHandler(async (req, res) =
 // ─── Admin: extras ────────────────────────────────────────────────────────────
 app.get('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, nombre, precio, activo, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer FROM extras ORDER BY depende_chofer DESC, bloque, orden, id'
+    'SELECT id, nombre, precio, activo, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer, en_asistente FROM extras ORDER BY depende_chofer DESC, bloque, orden, id'
   );
   res.json({ extras: result.rows });
 }));
 
 app.post('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
-  const { nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer } = req.body;
+  const { nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer, en_asistente } = req.body;
   if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
   const p = parseFloat(precio);
   if (isNaN(p) || p < 0) return res.status(400).json({ error: 'El precio no es válido.' });
   await pool.query(
-    'INSERT INTO extras (nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer, activo) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE)',
+    'INSERT INTO extras (nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer, activo, en_asistente) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8)',
     [nombre.trim(), p, (bloque || 'F').trim(), parseInt(orden, 10) || 0,
-     (tipo_seleccion || 'checkbox').trim(), notas_chofer ? notas_chofer.trim() : null, depende_chofer !== false]
+     (tipo_seleccion || 'checkbox').trim(), notas_chofer ? notas_chofer.trim() : null, depende_chofer !== false, !!en_asistente]
   );
   res.json({ ok: true });
 }));
 
 app.post('/admin/extras/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
-  const { nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer } = req.body;
+  const { nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer, en_asistente } = req.body;
   if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
   const p = parseFloat(precio);
   if (isNaN(p) || p < 0) return res.status(400).json({ error: 'El precio no es válido.' });
@@ -10499,12 +10499,13 @@ app.post('/admin/extras/:id/editar', requireAdmin, asyncHandler(async (req, res)
        orden = COALESCE($4, orden),
        tipo_seleccion = COALESCE(NULLIF($5, ''), tipo_seleccion),
        notas_chofer = COALESCE($6, notas_chofer),
-       depende_chofer = $7
-     WHERE id = $8`,
+       depende_chofer = $7,
+       en_asistente = $8
+     WHERE id = $9`,
     [nombre.trim(), p, (bloque || '').trim(),
      (orden !== undefined && orden !== null && orden !== '') ? parseInt(orden, 10) : null,
      (tipo_seleccion || '').trim(), notas_chofer !== undefined ? (notas_chofer ? notas_chofer.trim() : '') : null,
-     depende_chofer !== false, req.params.id]
+     depende_chofer !== false, !!en_asistente, req.params.id]
   );
   res.json({ ok: true });
 }));
