@@ -365,12 +365,12 @@
     });
 
     var aptas = ordenadas.filter(function(c) {
+      if (c.disponible === false) return false;
       var capMaletas = parseInt(c.capacidad_maletas) || 0;
       var okPax = c.capacidad_pasajeros >= pasajeros;
       var okMal = maletas === 0 || capMaletas >= maletas;
       return okPax && okMal;
     });
-    if (aptas.length === 0) aptas = ordenadas;
 
     if (especial !== 'ninguno') {
       var extraId = parseInt(especial);
