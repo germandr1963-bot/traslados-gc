@@ -312,6 +312,7 @@
   (function() {
     var maxPax = 0;
     categoriasFlota.forEach(function(c) {
+      if (c.disponible === false) return;
       var p = parseInt(c.capacidad_pasajeros) || 0;
       if (p > maxPax) maxPax = p;
     });
