@@ -1448,9 +1448,13 @@ table.tabla-precios input {
             <label class="etiqueta">Precio (€) — 0 = gratis</label>
             <input type="number" id="extra-precio" class="campo" step="0.01" min="0" placeholder="0.00" style="width:140px;">
           </div>
-          <div style="margin-bottom:20px;">
+          <div style="margin-bottom:12px;">
             <label class="etiqueta">Nota para el chofer (opcional)</label>
             <input type="text" id="extra-notas" class="campo" placeholder="Ej: Grupo 0 homologado">
+          </div>
+          <div style="margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+            <input type="checkbox" id="extra-en-asistente" style="width:18px;height:18px;cursor:pointer;">
+            <label for="extra-en-asistente" style="font-size:14px;font-weight:600;cursor:pointer;">Asistente — mostrar en el selector de vehículo</label>
           </div>
           <div style="display:flex;gap:10px;">
             <button class="boton-primario" onclick="guardarExtra()">💾 Guardar (queda en borrador)</button>
@@ -7615,6 +7619,7 @@ function abrirFormularioExtra(id) {
     document.getElementById('extra-tipo').value = 'checkbox';
     document.getElementById('extra-precio').value = '';
     document.getElementById('extra-notas').value = '';
+    document.getElementById('extra-en-asistente').checked = false;
   } else {
     var ex = extrasCache.find(function (e) { return e.id === id; });
     document.getElementById('modal-extra-titulo').textContent = 'Editar extra';
@@ -7624,6 +7629,7 @@ function abrirFormularioExtra(id) {
     document.getElementById('extra-tipo').value = ex.tipo_seleccion || 'checkbox';
     document.getElementById('extra-precio').value = ex.precio;
     document.getElementById('extra-notas').value = ex.notas_chofer || '';
+    document.getElementById('extra-en-asistente').checked = !!ex.en_asistente;
   }
   document.getElementById('modal-extra').classList.remove('oculto');
 }
@@ -7640,6 +7646,7 @@ function guardarExtra() {
   var tipo_seleccion = document.getElementById('extra-tipo').value;
   var precio = parseFloat(document.getElementById('extra-precio').value);
   var notas_chofer = document.getElementById('extra-notas').value.trim();
+  var en_asistente = document.getElementById('extra-en-asistente').checked;
   var msg = document.getElementById('extra-msg');
   if (!nombre) { msg.textContent = 'El nombre es obligatorio.'; return; }
   if (isNaN(precio) || precio < 0) { msg.textContent = 'El precio debe ser un número positivo.'; return; }
@@ -7647,7 +7654,7 @@ function guardarExtra() {
   fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nombre: nombre, precio: precio, bloque: bloque, tipo_seleccion: tipo_seleccion, notas_chofer: notas_chofer, depende_chofer: dependeChofer })
+    body: JSON.stringify({ nombre: nombre, precio: precio, bloque: bloque, tipo_seleccion: tipo_seleccion, notas_chofer: notas_chofer, depende_chofer: dependeChofer, en_asistente: en_asistente })
   }).then(function (r) { return r.json(); }).then(function (d) {
     if (d.ok) {
       cerrarModalExtra();
