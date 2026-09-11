@@ -7500,7 +7500,6 @@ async function renderHome(req, res, lang) {
       capacidad_maletas: maletasTrad || cat.capacidad_maletas
     });
   });
-  console.log('[renderHome] categoriasHome:', JSON.stringify(categoriasHome));
   res.render('index', { lang, t, idiomas: idiomas.rows, BASE_URL, rutaReserva, palabrasPaginas, categoriasHome });
 }
 
