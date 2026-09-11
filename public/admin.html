@@ -7341,6 +7341,7 @@ function pintarBloquesExtras(lista, contenedorId) {
         '<td>' + (ex.tipo_seleccion === 'contador' ? 'Contador' : 'Casilla') + '</td>' +
         '<td>' + Number(ex.precio).toFixed(2) + ' €</td>' +
         '<td><span class="' + (ex.activo ? 'insignia-ok' : 'insignia-suspendido') + '">' + (ex.activo ? 'Publicado' : 'Borrador') + '</span></td>' +
+        '<td style="text-align:center;"><input type="checkbox" ' + (ex.en_asistente ? 'checked' : '') + ' style="width:18px;height:18px;cursor:pointer;" onchange="toggleAsistenteExtra(' + ex.id + ',this.checked)"></td>' +
         '<td>' +
           '<button class="boton-costa" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="abrirFormularioExtra(' + ex.id + ')">✏️ Editar</button>' +
           '<button class="boton-secundario" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="toggleActivoExtra(' + ex.id + ',' + ex.activo + ')">' + (ex.activo ? '⏸ Pasar a borrador' : '▶ Publicar') + '</button>' +
@@ -7350,7 +7351,7 @@ function pintarBloquesExtras(lista, contenedorId) {
     }).join('');
     return '<div class="tarjeta" style="margin-bottom:16px;">' +
       '<h3 style="margin-top:0;">' + (NOMBRES_BLOQUE_EXTRA[b] || b) + '</h3>' +
-      '<table class="tabla-admin"><thead><tr><th>Nombre</th><th>Tipo</th><th>Precio</th><th>Estado</th><th>Acciones</th></tr></thead>' +
+      '<table class="tabla-admin"><thead><tr><th>Nombre</th><th>Tipo</th><th>Precio</th><th>Estado</th><th>Asistente</th><th>Acciones</th></tr></thead>' +
       '<tbody>' + filas + '</tbody></table>' +
     '</div>';
   }).join('');
@@ -7671,6 +7672,14 @@ function toggleActivoExtra(id, activo) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ activo: !activo })
   }).then(function () { cargarExtras(); });
+}
+
+function toggleAsistenteExtra(id, valor) {
+  fetch('/admin/extras/' + id + '/asistente', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ en_asistente: valor })
+  });
 }
 
 function eliminarExtra(id) {
