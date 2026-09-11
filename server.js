@@ -2817,9 +2817,10 @@ app.get('/api/extras-info', asyncHandler(async (req, res) => {
   const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
   const result = await pool.query(`
     SELECT e.id, e.nombre, e.bloque, e.orden,
-      array_agg(DISTINCT ce.categoria_id) FILTER (WHERE ce.categoria_id IS NOT NULL) AS categorias
+      array_agg(DISTINCT c.categoria_id) FILTER (WHERE c.categoria_id IS NOT NULL) AS categorias
     FROM extras e
     JOIN conductor_extras ce ON ce.extra_id = e.id
+    JOIN conductores c ON c.id = ce.conductor_id
     WHERE e.activo = TRUE
       AND e.depende_chofer = TRUE
       AND e.bloque IN ('C','D','E')
