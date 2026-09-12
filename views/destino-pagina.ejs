@@ -179,7 +179,7 @@
       <div class="fotos-grid">
         <% fotos.forEach(function(f) { %>
           <div class="foto-item">
-            <img src="<%= f.url_foto %>" alt="<%= f.alt_texto || dest.nombre %>">
+            <img src="<%= f.url_foto && f.url_foto.includes('cloudinary') ? f.url_foto.replace('/upload/', '/upload/w_261,h_220,c_fill/') : f.url_foto %>" alt="<%= f.alt_texto || dest.nombre %>">
           </div>
         <% }); %>
       </div>
