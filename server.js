@@ -1047,6 +1047,18 @@ async function initSchema() {
        ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
       [claveExtra, 'Nombre del extra "' + ex.nombre + '" tal como aparece en la página de reserva', ex.nombre]
     );
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Extras', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      ['extra_chofer_' + ex.id, 'Texto del extra "' + ex.nombre + '" redactado para el chofer', ex.nombre]
+    );
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Extras', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      ['extra_cliente_' + ex.id, 'Texto del extra "' + ex.nombre + '" redactado para el cliente', ex.nombre]
+    );
   }
 
   // Textos del bloque "Próximamente" en la página de listado de destinos
@@ -10480,10 +10492,27 @@ app.post('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
   if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
   const p = parseFloat(precio);
   if (isNaN(p) || p < 0) return res.status(400).json({ error: 'El precio no es válido.' });
-  await pool.query(
-    'INSERT INTO extras (nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer, activo, en_asistente) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8)',
+  const ins = await pool.query(
+    'INSERT INTO extras (nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer, activo, en_asistente) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8) RETURNING id',
     [nombre.trim(), p, (bloque || 'F').trim(), parseInt(orden, 10) || 0,
      (tipo_seleccion || 'checkbox').trim(), notas_chofer ? notas_chofer.trim() : null, depende_chofer !== false, !!en_asistente]
+  );
+  const nuevoId = ins.rows[0].id;
+  const nombreLimpio = nombre.trim();
+  await pool.query(
+    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+     VALUES ($1, 'Extras', $2, $3) ON CONFLICT (clave) DO NOTHING`,
+    ['extra_nombre_' + nuevoId, 'Nombre del extra "' + nombreLimpio + '" tal como aparece en la página de reserva', nombreLimpio]
+  );
+  await pool.query(
+    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+     VALUES ($1, 'Extras', $2, $3) ON CONFLICT (clave) DO NOTHING`,
+    ['extra_chofer_' + nuevoId, 'Texto del extra "' + nombreLimpio + '" redactado para el chofer', nombreLimpio]
+  );
+  await pool.query(
+    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+     VALUES ($1, 'Extras', $2, $3) ON CONFLICT (clave) DO NOTHING`,
+    ['extra_cliente_' + nuevoId, 'Texto del extra "' + nombreLimpio + '" redactado para el cliente', nombreLimpio]
   );
   res.json({ ok: true });
 }));
@@ -10493,6 +10522,8 @@ app.post('/admin/extras/:id/editar', requireAdmin, asyncHandler(async (req, res)
   if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
   const p = parseFloat(precio);
   if (isNaN(p) || p < 0) return res.status(400).json({ error: 'El precio no es válido.' });
+  const nombreLimpio = nombre.trim();
+  const extraId = req.params.id;
   await pool.query(
     `UPDATE extras SET nombre = $1, precio = $2,
        bloque = COALESCE(NULLIF($3, ''), bloque),
@@ -10502,10 +10533,35 @@ app.post('/admin/extras/:id/editar', requireAdmin, asyncHandler(async (req, res)
        depende_chofer = $7,
        en_asistente = $8
      WHERE id = $9`,
-    [nombre.trim(), p, (bloque || '').trim(),
+    [nombreLimpio, p, (bloque || '').trim(),
      (orden !== undefined && orden !== null && orden !== '') ? parseInt(orden, 10) : null,
      (tipo_seleccion || '').trim(), notas_chofer !== undefined ? (notas_chofer ? notas_chofer.trim() : '') : null,
-     depende_chofer !== false, !!en_asistente, req.params.id]
+     depende_chofer !== false, !!en_asistente, extraId]
+  );
+  // Actualizar el contexto en textos_interfaz si cambia el nombre interno
+  // (el texto_es de chofer y cliente no se sobreescribe — lo edita el admin a mano)
+  await pool.query(
+    `UPDATE textos_interfaz SET contexto = $1 WHERE clave = $2`,
+    ['Nombre del extra "' + nombreLimpio + '" tal como aparece en la página de reserva', 'extra_nombre_' + extraId]
+  );
+  await pool.query(
+    `UPDATE textos_interfaz SET contexto = $1 WHERE clave = $2`,
+    ['Texto del extra "' + nombreLimpio + '" redactado para el chofer', 'extra_chofer_' + extraId]
+  );
+  await pool.query(
+    `UPDATE textos_interfaz SET contexto = $1 WHERE clave = $2`,
+    ['Texto del extra "' + nombreLimpio + '" redactado para el cliente', 'extra_cliente_' + extraId]
+  );
+  // Si las filas no existen aún (extras creados antes de este despliegue), crearlas
+  await pool.query(
+    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+     VALUES ($1, 'Extras', $2, $3) ON CONFLICT (clave) DO NOTHING`,
+    ['extra_chofer_' + extraId, 'Texto del extra "' + nombreLimpio + '" redactado para el chofer', nombreLimpio]
+  );
+  await pool.query(
+    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+     VALUES ($1, 'Extras', $2, $3) ON CONFLICT (clave) DO NOTHING`,
+    ['extra_cliente_' + extraId, 'Texto del extra "' + nombreLimpio + '" redactado para el cliente', nombreLimpio]
   );
   res.json({ ok: true });
 }));
