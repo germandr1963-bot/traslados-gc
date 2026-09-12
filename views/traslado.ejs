@@ -384,7 +384,7 @@ footer a:hover { color: var(--texto-oscuro); }
   <div class="fotos-grid">
     <% fotosRuta.forEach(function(f) { %>
     <div class="foto-item">
-      <img src="<%= f.url_foto && f.url_foto.includes('cloudinary') ? f.url_foto.replace('/upload/', '/upload/w_1200,h_1008,c_fill/') : f.url_foto %>" alt="<%= f.alt_texto %>">
+      <img src="<%= f.url_foto && f.url_foto.includes('cloudinary') ? f.url_foto.replace('/upload/', '/upload/w_1044,h_880,c_fill/') : f.url_foto %>" alt="<%= f.alt_texto %>">
     </div>
     <% }); %>
   </div>
