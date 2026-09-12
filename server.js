@@ -1037,16 +1037,26 @@ async function initSchema() {
     }
   }
 
-  // Sincronizar nombres de extras activos como textos traducibles
-  const extrasActivos = await pool.query('SELECT id, nombre FROM extras WHERE activo = TRUE ORDER BY bloque, orden, id');
-  for (const ex of extrasActivos.rows) {
-    const claveExtra = 'extra_nombre_' + ex.id;
-    await pool.query(
-      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
-       VALUES ($1, 'Extras', $2, $3)
-       ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
-      [claveExtra, 'Nombre del extra "' + ex.nombre + '" tal como aparece en la página de reserva', ex.nombre]
-    );
+  // Sincronizar todos los extras (activos y borradores) como textos traducibles
+  const todosExtras = await pool.query('SELECT id, nombre, activo FROM extras ORDER BY bloque, orden, id');
+  for (const ex of todosExtras.rows) {
+    // extra_nombre: DO UPDATE para activos (el nombre puede cambiar), DO NOTHING para borradores
+    if (ex.activo) {
+      await pool.query(
+        `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+         VALUES ($1, 'Extras', $2, $3)
+         ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+        ['extra_nombre_' + ex.id, 'Nombre del extra "' + ex.nombre + '" tal como aparece en la página de reserva', ex.nombre]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+         VALUES ($1, 'Extras', $2, $3)
+         ON CONFLICT (clave) DO NOTHING`,
+        ['extra_nombre_' + ex.id, 'Nombre del extra "' + ex.nombre + '" tal como aparece en la página de reserva', ex.nombre]
+      );
+    }
+    // extra_chofer y extra_cliente: siempre DO NOTHING para no sobreescribir lo que el admin haya editado
     await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, 'Extras', $2, $3)
