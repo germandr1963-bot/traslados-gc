@@ -4396,18 +4396,91 @@ function renderizarTablaTextos(datos) {
     '</tr>';
 
     // Filas de textos (ocultas por defecto)
-    textos.forEach(function(t) {
-      var celdas = IDIOMAS_TEXTOS.map(function(lang) {
-        var ok = t.estado[lang];
-        return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
-      }).join('');
-      html += '<tr class="' + seccionId + '" style="display:none;">' +
-        '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
-        '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(t.modulo) + '</td>' +
-        celdas +
-        '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
-      '</tr>';
-    });
+    if (modulo === 'Extras') {
+      // Agrupar por número de extra: extra_nombre_X, extra_cliente_X, extra_chofer_X
+      var extrasMap = {};
+      var extrasOrden = [];
+      textos.forEach(function(t) {
+        var m = t.clave.match(/^extra_(nombre|cliente|chofer)_(\d+)$/);
+        if (!m) {
+          // extras_gratis u otras claves sueltas — fila normal
+          var celdas = IDIOMAS_TEXTOS.map(function(lang) {
+            var ok = t.estado[lang];
+            return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+          }).join('');
+          html += '<tr class="' + seccionId + '" style="display:none;">' +
+            '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
+            '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(t.modulo) + '</td>' +
+            celdas +
+            '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
+          '</tr>';
+          return;
+        }
+        var tipo = m[1]; // nombre | cliente | chofer
+        var num  = m[2];
+        if (!extrasMap[num]) { extrasMap[num] = {}; extrasOrden.push(num); }
+        extrasMap[num][tipo] = t;
+      });
+
+      extrasOrden.forEach(function(num) {
+        var grupo = extrasMap[num];
+        var tNombre  = grupo.nombre;
+        var tCliente = grupo.cliente;
+        var tChofer  = grupo.chofer;
+        var extraSecId = seccionId + '-extra-' + num;
+
+        // Fila cabecera del extra — muestra el nombre interno, colapsable
+        html += '<tr class="' + seccionId + '" style="display:none;background:var(--gris-fondo);cursor:pointer;" onclick="toggleSeccionTextos(\'' + extraSecId + '\', this)">' +
+          '<td colspan="' + totalCols + '" style="padding:8px 20px;font-size:13px;user-select:none;">' +
+            '<span id="' + extraSecId + '-icono">▶</span> ' +
+            '<strong>' + escapar(tNombre ? tNombre.texto_es : 'Extra ' + num) + '</strong>' +
+            ' <span style="font-size:11px;font-weight:400;color:var(--texto-muted);">(' + escapar('extra_nombre_' + num) + ')</span>' +
+          '</td>' +
+        '</tr>';
+
+        // Fila cliente
+        if (tCliente) {
+          var celdasC = IDIOMAS_TEXTOS.map(function(lang) {
+            var ok = tCliente.estado[lang];
+            return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+          }).join('');
+          html += '<tr class="' + seccionId + ' ' + extraSecId + '" style="display:none;">' +
+            '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;padding-left:32px;"><strong>' + escapar(tCliente.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(tCliente.clave) + '</span></td>' +
+            '<td style="font-size:12px;color:var(--texto-muted);">Cliente</td>' +
+            celdasC +
+            '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + tCliente.id + ')">✏️ Editar</button></td>' +
+          '</tr>';
+        }
+
+        // Fila chofer
+        if (tChofer) {
+          var celdasCh = IDIOMAS_TEXTOS.map(function(lang) {
+            var ok = tChofer.estado[lang];
+            return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+          }).join('');
+          html += '<tr class="' + seccionId + ' ' + extraSecId + '" style="display:none;">' +
+            '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;padding-left:32px;"><strong>' + escapar(tChofer.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(tChofer.clave) + '</span></td>' +
+            '<td style="font-size:12px;color:var(--texto-muted);">Chofer</td>' +
+            celdasCh +
+            '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + tChofer.id + ')">✏️ Editar</button></td>' +
+          '</tr>';
+        }
+      });
+
+    } else {
+      textos.forEach(function(t) {
+        var celdas = IDIOMAS_TEXTOS.map(function(lang) {
+          var ok = t.estado[lang];
+          return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+        }).join('');
+        html += '<tr class="' + seccionId + '" style="display:none;">' +
+          '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
+          '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(t.modulo) + '</td>' +
+          celdas +
+          '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
+        '</tr>';
+      });
+    }
   });
 
   cuerpo.innerHTML = html;
