@@ -6811,7 +6811,7 @@ app.post('/admin/idiomas/:codigo/activo', requireAdmin, asyncHandler(async (req,
 
 app.get('/admin/textos', requireAdmin, asyncHandler(async (req, res) => {
   const textos = await pool.query(
-    `SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY modulo, id`
+    `SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY modulo, clave`
   );
   const traducciones = await pool.query(
     `SELECT texto_id, lang_code, texto FROM textos_interfaz_traducciones`
@@ -6847,7 +6847,7 @@ app.delete('/admin/textos/:id/traducciones', requireAdmin, asyncHandler(async (r
 
 
 app.get('/admin/textos/exportar', requireAdmin, asyncHandler(async (req, res) => {
-  const textos = await pool.query(`SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY modulo, id`);
+  const textos = await pool.query(`SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY modulo, clave`);
   const traducciones = await pool.query(`SELECT texto_id, lang_code, texto FROM textos_interfaz_traducciones`);
 
   const traduccionesPorTexto = {};
@@ -6977,7 +6977,7 @@ app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (re
     return res.status(400).json({ error: 'Idioma no válido' });
   }
 
-  const textos = await pool.query('SELECT id, clave, contexto, texto_es FROM textos_interfaz ORDER BY id');
+  const textos = await pool.query('SELECT id, clave, contexto, texto_es FROM textos_interfaz ORDER BY modulo, clave');
   const traducciones = await pool.query(
     'SELECT texto_id, texto FROM textos_interfaz_traducciones WHERE lang_code = $1',
     [lang]
