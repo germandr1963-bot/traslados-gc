@@ -4492,6 +4492,15 @@ function toggleSeccionTextos(seccionId, cabeceraEl) {
   var visible = filas.length > 0 && filas[0].style.display !== 'none';
   filas.forEach(function(f) { f.style.display = visible ? 'none' : ''; });
   if (icono) icono.textContent = visible ? '▶' : '▼';
+  // Si se está cerrando, cerrar también cualquier extra desplegado dentro
+  if (visible) {
+    document.querySelectorAll('[id^="' + seccionId + '-extra-"][id$="-icono"]').forEach(function(ic) {
+      ic.textContent = '▶';
+    });
+    document.querySelectorAll('[class*="' + seccionId + '-extra-"]').forEach(function(f) {
+      f.style.display = 'none';
+    });
+  }
 }
 
 function migrarFotosCloudinary() {
