@@ -4407,36 +4407,21 @@ function renderizarTablaTextos(datos) {
         { bloque: 'F', ids: [23, 15, 16, 29, 25, 30, 4, 21, 35],   titulo: 'Comodidades y servicios premium' }
       ];
 
-      // Agrupar textos por id de extra
+      // Agrupar textos por id de extra (nombre + web)
       var extrasMap = {};
-      var extrasSueltos = [];
       textos.forEach(function(t) {
-        var m = t.clave.match(/^extra_(nombre|cliente|chofer)_(\d+)$/);
-        if (!m) { extrasSueltos.push(t); return; }
+        var m = t.clave.match(/^extra_(nombre|web)_(\d+)$/);
+        if (!m) return;
         var tipo = m[1];
         var num  = m[2];
         if (!extrasMap[num]) { extrasMap[num] = {}; }
         extrasMap[num][tipo] = t;
       });
 
-      // Pintar extras sueltos (extras_gratis, etc.)
-      extrasSueltos.forEach(function(t) {
-        var celdas = IDIOMAS_TEXTOS.map(function(lang) {
-          var ok = t.estado[lang];
-          return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
-        }).join('');
-        html += '<tr class="' + seccionId + '" style="display:none;">' +
-          '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;padding-left:40px;"><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
-          '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(t.modulo) + '</td>' +
-          celdas +
-          '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
-        '</tr>';
-      });
-
       // Pintar departamentos con cabecera colapsable y extras dentro
       DEPARTAMENTOS.forEach(function(dep) {
         var depSecId = seccionId + '-dep-' + dep.bloque;
-        // Cabecera de departamento
+        // Cabecera de departamento — colapsable
         html += '<tr class="' + seccionId + '" style="display:none;background:#e8f0fe;cursor:pointer;" onclick="toggleSeccionTextos(\'' + depSecId + '\', this)">' +
           '<td colspan="' + totalCols + '" style="padding:10px 20px 10px 32px;font-size:13px;font-weight:700;user-select:none;color:#1a3a6b;letter-spacing:0.01em;">' +
             '<span id="' + depSecId + '-icono">▶</span> ' +
@@ -4444,52 +4429,24 @@ function renderizarTablaTextos(datos) {
             ' <span style="font-size:11px;font-weight:400;color:#5a7ab0;margin-left:6px;">Bloque ' + dep.bloque + ' · ' + dep.ids.length + ' extras</span>' +
           '</td>' +
         '</tr>';
-        // Extras del departamento
+        // Una fila directa por extra (extra_web_X)
         dep.ids.forEach(function(id) {
           var numStr = String(id);
           var grupo = extrasMap[numStr];
           if (!grupo) return;
-          var tNombre  = grupo.nombre;
-          var tCliente = grupo.cliente;
-          var tChofer  = grupo.chofer;
-          var extraSecId = seccionId + '-extra-' + numStr;
-
-          // Fila cabecera del extra — colapsable
-          html += '<tr class="' + depSecId + '" style="display:none;background:var(--gris-fondo);cursor:pointer;" onclick="toggleSeccionTextos(\'' + extraSecId + '\', this)">' +
-            '<td colspan="' + totalCols + '" style="padding:8px 20px 8px 56px;font-size:13px;user-select:none;">' +
-              '<span id="' + extraSecId + '-icono">▶</span> ' +
-              '<strong>' + escapar(tNombre ? tNombre.texto_es : 'Extra ' + numStr) + '</strong>' +
-              ' <span style="font-size:11px;font-weight:400;color:var(--texto-muted);">(' + escapar('extra_nombre_' + numStr) + ')</span>' +
-            '</td>' +
+          var tNombre = grupo.nombre;
+          var tWeb    = grupo.web;
+          if (!tWeb) return;
+          var celdas = IDIOMAS_TEXTOS.map(function(lang) {
+            var ok = tWeb.estado[lang];
+            return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+          }).join('');
+          html += '<tr class="' + depSecId + '" style="display:none;">' +
+            '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;padding-left:56px;"><strong>' + escapar(tNombre ? tNombre.texto_es : 'Extra ' + numStr) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(tWeb.clave) + '</span></td>' +
+            '<td style="font-size:12px;color:var(--texto-muted);">Web</td>' +
+            celdas +
+            '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + tWeb.id + ')">✏️ Editar</button></td>' +
           '</tr>';
-
-          // Fila cliente
-          if (tCliente) {
-            var celdasC = IDIOMAS_TEXTOS.map(function(lang) {
-              var ok = tCliente.estado[lang];
-              return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
-            }).join('');
-            html += '<tr class="' + extraSecId + '" style="display:none;">' +
-              '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;padding-left:72px;"><strong>' + escapar(tCliente.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(tCliente.clave) + '</span></td>' +
-              '<td style="font-size:12px;color:var(--texto-muted);">Cliente</td>' +
-              celdasC +
-              '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + tCliente.id + ')">✏️ Editar</button></td>' +
-            '</tr>';
-          }
-
-          // Fila chofer
-          if (tChofer) {
-            var celdasCh = IDIOMAS_TEXTOS.map(function(lang) {
-              var ok = tChofer.estado[lang];
-              return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
-            }).join('');
-            html += '<tr class="' + extraSecId + '" style="display:none;">' +
-              '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;padding-left:72px;"><strong>' + escapar(tChofer.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(tChofer.clave) + '</span></td>' +
-              '<td style="font-size:12px;color:var(--texto-muted);">Chofer</td>' +
-              celdasCh +
-              '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + tChofer.id + ')">✏️ Editar</button></td>' +
-            '</tr>';
-          }
         });
       });
 
