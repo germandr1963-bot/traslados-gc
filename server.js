@@ -1451,7 +1451,14 @@ async function initSchema() {
       ('Conductor con letrero en llegadas', 'F', 6, 'checkbox', 'Para recogidas en aeropuerto o puerto', TRUE),
       ('Seguimiento de vuelo — espero si hay retraso', 'F', 7, 'checkbox', 'Sin coste adicional por retraso', TRUE),
       ('Recogida en puerto / muelle (cruceros)', 'F', 8, 'checkbox', 'Muy relevante en Las Palmas y Arrecife', TRUE),
-      ('Nevera/refrigeración a bordo', 'F', 9, 'checkbox', 'Para alimentos o medicinas que requieren frío', TRUE)
+      ('Nevera/refrigeración a bordo', 'F', 9, 'checkbox', 'Para alimentos o medicinas que requieren frío', TRUE),
+      ('🪧 Recogida personalizada con letrero en llegadas.', 'G', 1, 'informativo', NULL, FALSE),
+      ('✈️ Seguimiento de vuelo en tiempo real sin recargo por retrasos.', 'G', 2, 'informativo', NULL, FALSE),
+      ('⏱️ 60 minutos de espera gratuita en el aeropuerto.', 'G', 3, 'informativo', NULL, FALSE),
+      ('⚓ Recogida directa en muelle de cruceros y terminales de puerto.', 'G', 4, 'informativo', NULL, FALSE),
+      ('🧳 Ayuda profesional con el equipaje.', 'G', 5, 'informativo', NULL, FALSE),
+      ('🏷️ Tarifa fija garantizada (peajes e impuestos incluidos).', 'G', 6, 'informativo', NULL, FALSE),
+      ('📱 Contacto directo por teléfono o WhatsApp con tu conductor asignado.', 'G', 7, 'informativo', NULL, FALSE)
     ) AS v(nombre, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer)
     WHERE NOT EXISTS (SELECT 1 FROM extras e WHERE e.nombre = v.nombre);
   `);
