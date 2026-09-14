@@ -1064,7 +1064,7 @@ async function initSchema() {
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, 'Servicios incluidos', $2, $3)
        ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
-      [claveServicio, sv.icono + ' ' + sv.texto + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', sv.icono + ' ' + sv.texto]
+      [claveServicio, sv.icono + ' ' + sv.texto + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', sv.texto]
     );
   }
 
@@ -10706,7 +10706,7 @@ app.post('/admin/servicios-incluidos', requireAdmin, asyncHandler(async (req, re
     `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
      VALUES ($1, 'Servicios incluidos', $2, $3)
      ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
-    [clave, (icono || '').trim() + ' ' + texto.trim() + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', (icono || '').trim() + ' ' + texto.trim()]
+    [clave, (icono || '').trim() + ' ' + texto.trim() + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', texto.trim()]
   );
   res.json({ ok: true, id: nuevoId });
 }));
@@ -10723,7 +10723,7 @@ app.post('/admin/servicios-incluidos/:id/editar', requireAdmin, asyncHandler(asy
     `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
      VALUES ($1, 'Servicios incluidos', $2, $3)
      ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
-    [clave, (icono || '').trim() + ' ' + texto.trim() + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', (icono || '').trim() + ' ' + texto.trim()]
+    [clave, (icono || '').trim() + ' ' + texto.trim() + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', texto.trim()]
   );
   res.json({ ok: true });
 }));
