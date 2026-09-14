@@ -1367,9 +1367,36 @@ table.tabla-precios input {
       </div>
       <div id="lista-preferencias"></div>
 
-      <h2 style="margin-bottom:4px;margin-top:32px;">Extras fijos incluidos</h2>
-      <p class="subtitulo" style="margin-top:0;">Se muestran siempre al cliente en el paso de extras, como información — sin checkbox ni precio. Puedes activar, desactivar y editar cada uno.</p>
-      <div id="bloques-extras-fijos"></div>
+      <h2 style="margin-bottom:4px;margin-top:32px;">Servicios incluidos</h2>
+      <p class="subtitulo" style="margin-top:0;">Se muestran al cliente al final del paso de extras como "⭐ Servicios que siempre te incluimos". Sin checkbox ni precio — solo información.</p>
+      <div class="tarjeta" style="margin-bottom:12px;">
+        <button class="boton-primario" onclick="abrirFormularioServicio(null)">+ Añadir servicio</button>
+      </div>
+      <div id="lista-servicios-incluidos"></div>
+
+      <!-- Modal formulario servicio incluido -->
+      <div id="modal-servicio" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
+        <div class="tarjeta" style="width:100%;max-width:440px;position:relative;">
+          <h3 style="margin-top:0;" id="modal-servicio-titulo">Nuevo servicio incluido</h3>
+          <div style="margin-bottom:12px;">
+            <label class="etiqueta">Icono (emoji)</label>
+            <input type="text" id="servicio-icono" class="campo" placeholder="Ej: ✈️" style="max-width:80px;">
+          </div>
+          <div style="margin-bottom:12px;">
+            <label class="etiqueta">Texto visible al cliente</label>
+            <input type="text" id="servicio-texto" class="campo" placeholder="Ej: Seguimiento de vuelo en tiempo real">
+          </div>
+          <div style="margin-bottom:20px;">
+            <label class="etiqueta">Orden</label>
+            <input type="number" id="servicio-orden" class="campo" value="0" min="0" style="max-width:80px;">
+          </div>
+          <p id="servicio-msg" style="color:var(--rojo-error);font-size:13px;margin-bottom:8px;"></p>
+          <div style="display:flex;gap:10px;">
+            <button class="boton-primario" onclick="guardarServicio()">Guardar</button>
+            <button class="boton-secundario" onclick="cerrarModalServicio()">Cancelar</button>
+          </div>
+        </div>
+      </div>
 
       <h2 style="margin-bottom:4px;margin-top:32px;">Sugerencias de preferencias</h2>
       <p class="subtitulo" style="margin-top:0;">Propuestas enviadas por los clientes desde su panel. Para convertir una en preferencia real, usa "+ Añadir preferencia".</p>
@@ -1781,7 +1808,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
     if (boton.dataset.seccion === 'cotizaciones') cargarCotizaciones();
     if (boton.dataset.seccion === 'reservas') cargarReservas();
-    if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); cargarPreferencias(); cargarSugerenciasPreferencias(); }
+    if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); cargarPreferencias(); cargarSugerenciasPreferencias(); cargarServiciosIncluidos(); }
     if (boton.dataset.seccion === 'clientes') cargarClientes();
     if (boton.dataset.seccion === 'equipo') cargarEquipo();
     if (boton.dataset.seccion === 'pagina-rutas') cargarPaginaRutas();
@@ -7384,10 +7411,9 @@ var extraEditandoId = null;
 
 var NOMBRES_BLOQUE_EXTRA = {
   A: 'Retención infantil', B: 'Mascotas', C: 'Material deportivo',
-  D: 'Equipaje especial', E: 'Accesibilidad y movilidad reducida', F: 'Comodidades y servicios premium',
-  G: 'Incluidos en todos los traslados'
+  D: 'Equipaje especial', E: 'Accesibilidad y movilidad reducida', F: 'Comodidades y servicios premium'
 };
-var ORDEN_BLOQUES_EXTRA = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+var ORDEN_BLOQUES_EXTRA = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 function pintarBloquesExtras(lista, contenedorId) {
   var cont = document.getElementById(contenedorId);
@@ -7435,8 +7461,7 @@ function cargarExtras() {
     .then(function (data) {
       extrasCache = data.extras;
       pintarBloquesExtras(extrasCache.filter(function (e) { return e.depende_chofer; }), 'bloques-extras-chofer');
-      pintarBloquesExtras(extrasCache.filter(function (e) { return !e.depende_chofer && e.bloque !== 'G'; }), 'bloques-extras-cliente');
-      pintarBloquesExtras(extrasCache.filter(function (e) { return e.bloque === 'G'; }), 'bloques-extras-fijos');
+      pintarBloquesExtras(extrasCache.filter(function (e) { return !e.depende_chofer; }), 'bloques-extras-cliente');
     });
 }
 
@@ -7630,6 +7655,111 @@ function eliminarPreferencia(id) {
       } else {
         alert(d.error || 'No se pudo eliminar.');
       }
+    });
+}
+
+function eliminarPreferencia(id) {
+  if (!confirm('¿Eliminar esta preferencia? Esta acción no se puede deshacer.')) return;
+  fetch('/admin/preferencias/' + id + '/eliminar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.ok) {
+        cargarPreferencias();
+      } else {
+        alert(d.error || 'No se pudo eliminar.');
+      }
+    });
+}
+
+// ── Servicios incluidos ──────────────────────────────────────────────────────
+var servicioEditandoId = null;
+
+function pintarServiciosIncluidos(lista) {
+  var cont = document.getElementById('lista-servicios-incluidos');
+  if (!lista.length) {
+    cont.innerHTML = '<p style="color:var(--texto-muted);padding:12px 0;">Nada aquí todavía.</p>';
+    return;
+  }
+  var filas = lista.map(function (sv) {
+    return '<tr>' +
+      '<td style="font-size:20px;text-align:center;width:40px;">' + (sv.icono || '') + '</td>' +
+      '<td>' + sv.texto + '</td>' +
+      '<td style="text-align:center;">' + sv.orden + '</td>' +
+      '<td><span class="' + (sv.activo ? 'insignia-ok' : 'insignia-suspendido') + '">' + (sv.activo ? 'Publicado' : 'Borrador') + '</span></td>' +
+      '<td>' +
+        '<button class="boton-costa" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="abrirFormularioServicio(' + sv.id + ')">✏️ Editar</button>' +
+        '<button class="boton-secundario" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="toggleActivoServicio(' + sv.id + ',' + sv.activo + ')">' + (sv.activo ? '⏸ Borrador' : '▶ Publicar') + '</button>' +
+        '<button class="boton-peligro" style="font-size:12px;padding:4px 10px;" onclick="eliminarServicio(' + sv.id + ')">🗑️</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+  cont.innerHTML = '<div class="tarjeta"><table class="tabla-admin"><thead><tr><th>Icono</th><th>Texto</th><th>Orden</th><th>Estado</th><th>Acciones</th></tr></thead>' +
+    '<tbody>' + filas + '</tbody></table></div>';
+}
+
+function cargarServiciosIncluidos() {
+  fetch('/admin/servicios-incluidos')
+    .then(function (r) { return r.json(); })
+    .then(function (data) { window._serviciosCache = data.servicios; pintarServiciosIncluidos(data.servicios); });
+}
+
+function abrirFormularioServicio(id) {
+  servicioEditandoId = id;
+  document.getElementById('servicio-msg').textContent = '';
+  if (id === null) {
+    document.getElementById('modal-servicio-titulo').textContent = 'Nuevo servicio incluido';
+    document.getElementById('servicio-icono').value = '';
+    document.getElementById('servicio-texto').value = '';
+    document.getElementById('servicio-orden').value = '0';
+  } else {
+    var sv = (window._serviciosCache || []).find(function (s) { return s.id === id; });
+    if (!sv) return;
+    document.getElementById('modal-servicio-titulo').textContent = 'Editar servicio incluido';
+    document.getElementById('servicio-icono').value = sv.icono || '';
+    document.getElementById('servicio-texto').value = sv.texto || '';
+    document.getElementById('servicio-orden').value = sv.orden || 0;
+  }
+  document.getElementById('modal-servicio').classList.remove('oculto');
+}
+
+function cerrarModalServicio() {
+  document.getElementById('modal-servicio').classList.add('oculto');
+}
+
+function guardarServicio() {
+  var icono  = document.getElementById('servicio-icono').value.trim();
+  var texto  = document.getElementById('servicio-texto').value.trim();
+  var orden  = document.getElementById('servicio-orden').value;
+  var msg    = document.getElementById('servicio-msg');
+  if (!texto) { msg.textContent = 'El texto es obligatorio.'; return; }
+  var url    = servicioEditandoId === null ? '/admin/servicios-incluidos' : '/admin/servicios-incluidos/' + servicioEditandoId + '/editar';
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ icono: icono, texto: texto, orden: parseInt(orden, 10) || 0 })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.ok) { cerrarModalServicio(); cargarServiciosIncluidos(); }
+      else { msg.textContent = d.error || 'No se pudo guardar.'; }
+    });
+}
+
+function toggleActivoServicio(id, activo) {
+  fetch('/admin/servicios-incluidos/' + id + '/activo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activo: !activo })
+  }).then(function () { cargarServiciosIncluidos(); });
+}
+
+function eliminarServicio(id) {
+  if (!confirm('¿Eliminar este servicio? Esta acción no se puede deshacer.')) return;
+  fetch('/admin/servicios-incluidos/' + id + '/eliminar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.ok) { cargarServiciosIncluidos(); }
+      else { alert(d.error || 'No se pudo eliminar.'); }
     });
 }
 
