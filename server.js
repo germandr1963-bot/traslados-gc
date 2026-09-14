@@ -4236,18 +4236,21 @@ app.post('/admin/seo/rutas/:id/generar-ia', requireAdmin, asyncHandler(async (re
     if (tradDestino.rows[0] && tradDestino.rows[0].nombre) destinoParaGenerador = tradDestino.rows[0].nombre;
   }
 
-  const ALFABETO_LATINO = ['es','en','de','fr','it','nl','sv','no','fi','pt','pl','cs','ro','hu','sk','hr','sl','da'];
-  const ALFABETO_CIRILI = ['ru','bg','uk','sr','mk'];
-  let reglasSlug = '';
-  if (lang === 'fr') {
-    reglasSlug = `El slug debe estar en francés, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales. El nombre de la isla "Gran Canaria" en el slug es siempre "grande-canarie". Ejemplo para "Aeropuerto de Gran Canaria → Las Palmas": "aeroport-de-grande-canarie-a-las-palmas".`;
-  } else if (ALFABETO_CIRILI.includes(lang)) {
-    reglasSlug = `El slug debe ser una transliteración al latín del trayecto en ${nombreIdioma}, usando solo a-z y guiones. El nombre de la isla "Gran Canaria" se transliterada siempre como "gran-kanariya". Ejemplo en ruso para "Aeropuerto de Gran Canaria → Las Palmas": "aeroport-gran-kanariya-v-las-palmas".`;
-  } else if (ALFABETO_LATINO.includes(lang)) {
-    reglasSlug = `El slug debe estar en ${nombreIdioma}, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). El nombre de la isla "Gran Canaria" en el slug es siempre "gran-canaria". Debe describir el trayecto de origen a destino. Ejemplo en inglés para "Aeropuerto de Gran Canaria → Las Palmas": "gran-canaria-airport-to-las-palmas".`;
-  } else {
-    reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones. Describe el trayecto de origen a destino en inglés.`;
-  }
+  const SLUG_RUTA = {
+    es: (o, d) => `${o}-a-${d}-en-taxi-traslado`,
+    en: (o, d) => `${o}-to-${d}-by-taxi-transfer`,
+    de: (o, d) => `${o}-nach-${d}-per-taxi-transfer`,
+    sv: (o, d) => `${o}-till-${d}-med-taxi-transfer`,
+    no: (o, d) => `${o}-til-${d}-med-taxi-transfer`,
+    nl: (o, d) => `${o}-naar-${d}-per-taxi-transfer`,
+    it: (o, d) => `${o}-a-${d}-in-taxi-transfer`,
+    fr: (o, d) => `${o}-a-${d}-en-taxi-transfert`,
+    fi: (o, d) => `${o}-${d}-taksilla-transfer`,
+    ru: (o, d) => `${o}-v-${d}-na-taksi-transfer`,
+  };
+  const slugRutaFn = SLUG_RUTA[lang] || SLUG_RUTA['en'];
+  const slugRutaEjemplo = slugRutaFn('aeropuerto-gran-canaria', 'las-palmas-de-gran-canaria');
+  const reglasSlug = `El slug debe seguir EXACTAMENTE este patrón para ${nombreIdioma}: ${slugRutaFn('[origen]', '[destino]')}. Solo letras minúsculas a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). Sin cirílico. Usa los nombres completos de origen y destino, nunca abreviados. Ejemplo de resultado esperado: "${slugRutaEjemplo}".`;
 
   const items = [{ route_id: parseInt(req.params.id), origen: origenParaGenerador, destino: destinoParaGenerador, reglasSlug }];
   const prompt = iaPrompts.GENERADOR_RUTAS_SEO(nombreIdioma, items);
@@ -5921,18 +5924,21 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
   const nombreIdioma = await getNombreIdioma(lang);
 
   // Regla de slug según alfabeto del idioma
-  const ALFABETO_LATINO = ['es','en','de','fr','it','nl','sv','no','fi','pt','pl','cs','ro','hu','sk','hr','sl','da'];
-  const ALFABETO_CIRILI = ['ru','bg','uk','sr','mk'];
-  let reglasSlug = '';
-  if (lang === 'fr') {
-    reglasSlug = `El slug debe estar en francés, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales. El nombre de la isla "Gran Canaria" en el slug es siempre "grande-canarie". Ejemplo para "Aeropuerto de Gran Canaria" en francés: "aeroport-de-grande-canarie".`;
-  } else if (ALFABETO_CIRILI.includes(lang)) {
-    reglasSlug = `El slug debe ser una transliteración al latín del nombre en ${nombreIdioma}, usando solo a-z y guiones. En ruso "Aeropuerto de Gran Canaria" se transliteraría como "aeroport-gran-kanariya" — sigue ese mismo criterio para ${nombreIdioma}.`;
-  } else if (ALFABETO_LATINO.includes(lang)) {
-    reglasSlug = `El slug debe estar en ${nombreIdioma}, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). El nombre de la isla "Gran Canaria" en el slug es siempre "gran-canaria". Ejemplo para "Aeropuerto de Gran Canaria": "aeropuerto-gran-canaria".`;
-  } else {
-    reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones. El nombre del destino en inglés. Ejemplo: "gran-canaria-airport".`;
-  }
+  const SLUG_DESTINO = {
+    es: (d) => `traslado-${d}-taxi-transfer`,
+    en: (d) => `${d}-taxi-transfer`,
+    de: (d) => `${d}-taxi-transfer`,
+    sv: (d) => `${d}-taxi-transfer`,
+    no: (d) => `${d}-taxi-transfer`,
+    nl: (d) => `${d}-taxi-transfer`,
+    it: (d) => `${d}-taxi-trasferimento`,
+    fr: (d) => `${d}-taxi-transfert`,
+    fi: (d) => `${d}-taxi-transfer-kuljetus`,
+    ru: (d) => `${d}-taksi-transfer`,
+  };
+  const slugFn = SLUG_DESTINO[lang] || SLUG_DESTINO['en'];
+  const slugEjemplo = slugFn('aeropuerto-gran-canaria');
+  const reglasSlug = `El slug debe seguir EXACTAMENTE este patrón para ${nombreIdioma}: ${slugFn('[nombre-del-destino]')}. Solo letras minúsculas a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). Sin cirílico. Ejemplo de resultado esperado: "${slugEjemplo}".`;
 
   const MAX_CHARS_TITULO = {es:60,en:62,de:55,fr:60,it:60,nl:57,sv:57,no:57,fi:54,ru:50};
   const MAX_CHARS_DESC   = {es:155,en:160,de:140,fr:155,it:158,nl:148,sv:150,no:152,fi:138,ru:128};
