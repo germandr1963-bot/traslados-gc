@@ -1047,6 +1047,13 @@ async function initSchema() {
        ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
       [claveExtra, 'Nombre del extra "' + ex.nombre + '" tal como aparece en la página de reserva', ex.nombre]
     );
+    const claveWeb = 'extra_web_' + ex.id;
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Extras', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+      [claveWeb, 'Descripción del extra "' + ex.nombre + '" para el cliente y el chofer', ex.nombre]
+    );
   }
 
   // Textos del bloque "Próximamente" en la página de listado de destinos
