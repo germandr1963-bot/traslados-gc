@@ -1056,6 +1056,18 @@ async function initSchema() {
     );
   }
 
+  // Sincronizar textos de servicios incluidos como textos traducibles
+  const serviciosIncluidos = await pool.query('SELECT id, icono, texto FROM servicios_incluidos ORDER BY orden, id');
+  for (const sv of serviciosIncluidos.rows) {
+    const claveServicio = 'servicio_incluido_' + sv.id;
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Servicios incluidos', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+      [claveServicio, sv.icono + ' ' + sv.texto + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', sv.icono + ' ' + sv.texto]
+    );
+  }
+
   // Textos del bloque "Próximamente" en la página de listado de destinos
   const TEXTOS_PROXIMAMENTE = [
     { clave: 'destinos_proximamente_titulo',    contexto: 'Título del bloque "Próximamente" al final de la página de listado de destinos', es: 'Próximamente · Otras islas' },
@@ -1451,16 +1463,23 @@ async function initSchema() {
       ('Conductor con letrero en llegadas', 'F', 6, 'checkbox', 'Para recogidas en aeropuerto o puerto', TRUE),
       ('Seguimiento de vuelo — espero si hay retraso', 'F', 7, 'checkbox', 'Sin coste adicional por retraso', TRUE),
       ('Recogida en puerto / muelle (cruceros)', 'F', 8, 'checkbox', 'Muy relevante en Las Palmas y Arrecife', TRUE),
-      ('Nevera/refrigeración a bordo', 'F', 9, 'checkbox', 'Para alimentos o medicinas que requieren frío', TRUE),
-      ('🪧 Recogida personalizada con letrero en llegadas.', 'G', 1, 'informativo', NULL, FALSE),
-      ('✈️ Seguimiento de vuelo en tiempo real sin recargo por retrasos.', 'G', 2, 'informativo', NULL, FALSE),
-      ('⏱️ 60 minutos de espera gratuita en el aeropuerto.', 'G', 3, 'informativo', NULL, FALSE),
-      ('⚓ Recogida directa en muelle de cruceros y terminales de puerto.', 'G', 4, 'informativo', NULL, FALSE),
-      ('🧳 Ayuda profesional con el equipaje.', 'G', 5, 'informativo', NULL, FALSE),
-      ('🏷️ Tarifa fija garantizada (peajes e impuestos incluidos).', 'G', 6, 'informativo', NULL, FALSE),
-      ('📱 Contacto directo por teléfono o WhatsApp con tu conductor asignado.', 'G', 7, 'informativo', NULL, FALSE)
+      ('Nevera/refrigeración a bordo', 'F', 9, 'checkbox', 'Para alimentos o medicinas que requieren frío', TRUE)
     ) AS v(nombre, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer)
     WHERE NOT EXISTS (SELECT 1 FROM extras e WHERE e.nombre = v.nombre);
+  `);
+
+  // ─── Servicios incluidos — bloque informativo para el cliente ───────────────
+  // Tabla independiente, sin relación con choferes ni extras seleccionables.
+  // Se muestra al final del paso 3 de reserva como "⭐ Servicios que siempre te incluimos".
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS servicios_incluidos (
+      id SERIAL PRIMARY KEY,
+      icono TEXT NOT NULL DEFAULT '',
+      texto TEXT NOT NULL,
+      orden INT DEFAULT 0,
+      activo BOOLEAN DEFAULT FALSE,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
   `);
 
   // ─── Avisos de reserva (Grupo B: información pura, sin precio, el chofer ──
@@ -2862,6 +2881,32 @@ app.get('/api/extras-info', asyncHandler(async (req, res) => {
     };
   });
   res.json(rows);
+}));
+
+// Servicios incluidos — bloque informativo al final del paso 3 de reserva
+app.get('/api/servicios-incluidos', asyncHandler(async (req, res) => {
+  const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
+  const result = await pool.query(
+    'SELECT id, icono, texto, orden FROM servicios_incluidos WHERE activo = TRUE ORDER BY orden, id'
+  );
+  if (lang !== 'es') {
+    const traducciones = await pool.query(
+      `SELECT ti.clave, COALESCE(tit.texto, ti.texto_es) AS texto_traducido
+       FROM textos_interfaz ti
+       LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+       WHERE ti.modulo = 'Servicios incluidos'`,
+      [lang]
+    );
+    const mapa = {};
+    for (const t of traducciones.rows) {
+      mapa[t.clave] = t.texto_traducido;
+    }
+    for (const sv of result.rows) {
+      const clave = 'servicio_incluido_' + sv.id;
+      if (mapa[clave]) sv.texto = mapa[clave];
+    }
+  }
+  res.json(result.rows);
 }));
 
 app.get('/api/marcas-vehiculos', asyncHandler(async (req, res) => {
@@ -10639,6 +10684,58 @@ app.post('/admin/preferencias-sugerencias/:id/estado', requireAdmin, asyncHandle
 
 app.post('/admin/preferencias-sugerencias/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM preferencias_sugerencias WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// ─── Admin: servicios incluidos ───────────────────────────────────────────────
+app.get('/admin/servicios-incluidos', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT id, icono, texto, orden, activo FROM servicios_incluidos ORDER BY orden, id');
+  res.json({ servicios: result.rows });
+}));
+
+app.post('/admin/servicios-incluidos', requireAdmin, asyncHandler(async (req, res) => {
+  const { icono, texto, orden } = req.body;
+  if (!texto || !texto.trim()) return res.status(400).json({ error: 'El texto es obligatorio.' });
+  const result = await pool.query(
+    'INSERT INTO servicios_incluidos (icono, texto, orden, activo) VALUES ($1, $2, $3, FALSE) RETURNING id',
+    [(icono || '').trim(), texto.trim(), parseInt(orden, 10) || 0]
+  );
+  const nuevoId = result.rows[0].id;
+  const clave = 'servicio_incluido_' + nuevoId;
+  await pool.query(
+    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+     VALUES ($1, 'Servicios incluidos', $2, $3)
+     ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+    [clave, (icono || '').trim() + ' ' + texto.trim() + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', (icono || '').trim() + ' ' + texto.trim()]
+  );
+  res.json({ ok: true, id: nuevoId });
+}));
+
+app.post('/admin/servicios-incluidos/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
+  const { icono, texto, orden } = req.body;
+  if (!texto || !texto.trim()) return res.status(400).json({ error: 'El texto es obligatorio.' });
+  await pool.query(
+    'UPDATE servicios_incluidos SET icono = $1, texto = $2, orden = $3 WHERE id = $4',
+    [(icono || '').trim(), texto.trim(), parseInt(orden, 10) || 0, req.params.id]
+  );
+  const clave = 'servicio_incluido_' + req.params.id;
+  await pool.query(
+    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+     VALUES ($1, 'Servicios incluidos', $2, $3)
+     ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+    [clave, (icono || '').trim() + ' ' + texto.trim() + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', (icono || '').trim() + ' ' + texto.trim()]
+  );
+  res.json({ ok: true });
+}));
+
+app.post('/admin/servicios-incluidos/:id/activo', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE servicios_incluidos SET activo = $1 WHERE id = $2', [!!req.body.activo, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/servicios-incluidos/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM servicios_incluidos WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM textos_interfaz WHERE clave = $1', ['servicio_incluido_' + req.params.id]);
   res.json({ ok: true });
 }));
 
