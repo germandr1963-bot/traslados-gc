@@ -1367,6 +1367,10 @@ table.tabla-precios input {
       </div>
       <div id="lista-preferencias"></div>
 
+      <h2 style="margin-bottom:4px;margin-top:32px;">Extras fijos incluidos</h2>
+      <p class="subtitulo" style="margin-top:0;">Se muestran siempre al cliente en el paso de extras, como información — sin checkbox ni precio. Puedes activar, desactivar y editar cada uno.</p>
+      <div id="bloques-extras-fijos"></div>
+
       <h2 style="margin-bottom:4px;margin-top:32px;">Sugerencias de preferencias</h2>
       <p class="subtitulo" style="margin-top:0;">Propuestas enviadas por los clientes desde su panel. Para convertir una en preferencia real, usa "+ Añadir preferencia".</p>
       <div id="lista-sugerencias-preferencias"></div>
@@ -7431,7 +7435,8 @@ function cargarExtras() {
     .then(function (data) {
       extrasCache = data.extras;
       pintarBloquesExtras(extrasCache.filter(function (e) { return e.depende_chofer; }), 'bloques-extras-chofer');
-      pintarBloquesExtras(extrasCache.filter(function (e) { return !e.depende_chofer; }), 'bloques-extras-cliente');
+      pintarBloquesExtras(extrasCache.filter(function (e) { return !e.depende_chofer && e.bloque !== 'G'; }), 'bloques-extras-cliente');
+      pintarBloquesExtras(extrasCache.filter(function (e) { return e.bloque === 'G'; }), 'bloques-extras-fijos');
     });
 }
 
