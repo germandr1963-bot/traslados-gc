@@ -712,7 +712,7 @@ footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13
       <!-- Servicios siempre incluidos -->
       <div id="bloque-servicios-incluidos" style="display:none;margin-top:24px;border:1px solid var(--gris-borde);border-radius:12px;overflow:hidden;">
         <div style="background:var(--gris-fondo);padding:12px 16px;border-bottom:1px solid var(--gris-borde);">
-          <span style="font-size:15px;font-weight:700;color:var(--texto-oscuro);">⭐ Servicios que siempre te incluimos</span>
+          <span style="font-size:15px;font-weight:700;color:var(--texto-oscuro);">⭐ <span id="servicios-incluidos-titulo"></span></span>
         </div>
         <ul id="lista-servicios-incluidos" style="list-style:none;margin:0;padding:0;"></ul>
       </div>
@@ -811,7 +811,8 @@ var TXT = {
   resAtraque:     '<%- t("reserva_res_atraque").replace(/'/g, "\\'") %>',
   resVuelo:       '<%- t("reserva_res_vuelo").replace(/'/g, "\\'") %>',
   resBarco:       '<%- t("reserva_res_barco").replace(/'/g, "\\'") %>',
-  extrasGratis:   '<%- t("extras_gratis").replace(/'/g, "\\'") %>'
+  extrasGratis:         '<%- t("extras_gratis").replace(/'/g, "\\'") %>',
+  serviciosInclTitulo:  '<%- t("servicios_incluidos_titulo").replace(/'/g, "\\'") %>'
 };
 // Las píldoras de idioma conservan la ruta y categoría elegidas
 document.addEventListener('DOMContentLoaded', function() {
@@ -974,6 +975,7 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
     // Quitar borde inferior del último elemento
     var items = lista.querySelectorAll('li');
     if (items.length) items[items.length - 1].style.borderBottom = 'none';
+    document.getElementById('servicios-incluidos-titulo').textContent = TXT.serviciosInclTitulo;
     bloque.style.display = 'block';
   });
 
