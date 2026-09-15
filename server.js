@@ -13841,32 +13841,50 @@ app.get('/admin/plantillas-comunicacion/:clave/traducciones', requireAdmin, asyn
 }));
 
 // GET — obtener traducciones de todas las plantillas cliente para un idioma (para el panel resumen)
-app.get('/admin/plantillas-comunicacion-traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
-  const { lang } = req.params;
+app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandler(async (req, res) => {
+  // Devuelve todas las plantillas cliente con estado por idioma — igual que /admin/textos
   const plantillas = await pool.query(
-    `SELECT clave, nombre FROM plantillas_comunicacion WHERE categoria = 'cliente' ORDER BY nombre`
+    `SELECT clave, nombre, asunto_email, cuerpo_email, cuerpo_whatsapp
+     FROM plantillas_comunicacion WHERE categoria = 'cliente' ORDER BY nombre`
   );
   const traducciones = await pool.query(
-    `SELECT plantilla_clave, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en
-     FROM plantillas_comunicacion_traducciones
-     WHERE lang_code = $1`,
-    [lang]
+    `SELECT plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp
+     FROM plantillas_comunicacion_traducciones`
   );
+
+  // Mapa: plantilla_clave -> { lang_code -> { email: bool, wa: bool } }
   const mapaTrads = {};
-  traducciones.rows.forEach(function(t) { mapaTrads[t.plantilla_clave] = t; });
-  const resultado = plantillas.rows.map(function(p) {
-    const trad = mapaTrads[p.clave] || null;
+  for (const t of traducciones.rows) {
+    if (!mapaTrads[t.plantilla_clave]) mapaTrads[t.plantilla_clave] = {};
+    mapaTrads[t.plantilla_clave][t.lang_code] = {
+      email: !!(t.cuerpo_email && t.cuerpo_email.trim()),
+      wa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()),
+      asunto: !!(t.asunto_email && t.asunto_email.trim())
+    };
+  }
+
+  const idiomas = IDIOMAS_TRADUCIBLES; // excluye español — es el original
+
+  const lista = plantillas.rows.map(function(p) {
+    const estadoEmail = { es: !!(p.cuerpo_email && p.cuerpo_email.trim()) };
+    const estadoWa    = { es: !!(p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim()) };
+    for (const lang of idiomas) {
+      const t = mapaTrads[p.clave] && mapaTrads[p.clave][lang];
+      estadoEmail[lang] = !!(t && t.email);
+      estadoWa[lang]    = !!(t && t.wa);
+    }
     return {
       clave: p.clave,
       nombre: p.nombre,
-      tiene_email: !!(trad && trad.cuerpo_email && trad.cuerpo_email.trim()),
-      tiene_whatsapp: !!(trad && trad.cuerpo_whatsapp && trad.cuerpo_whatsapp.trim()),
-      tiene_asunto: !!(trad && trad.asunto_email && trad.asunto_email.trim()),
-      generado_por_ia: trad ? trad.generado_por_ia : false,
-      actualizado_en: trad ? trad.actualizado_en : null
+      texto_es_email: p.cuerpo_email || '',
+      texto_es_wa: p.cuerpo_whatsapp || '',
+      asunto_es: p.asunto_email || '',
+      estado_email: estadoEmail,
+      estado_wa: estadoWa
     };
   });
-  res.json({ lang, plantillas: resultado });
+
+  res.json({ plantillas: lista, idiomas });
 }));
 
 // PUT — guardar o actualizar una traducción
