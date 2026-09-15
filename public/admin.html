@@ -493,12 +493,32 @@ table.tabla-precios input {
             <span id="com-cliente-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
           </div>
 
-          <!-- Tabla comunicaciones -->
-          <div class="tabla-envoltura">
-            <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
-              <thead id="thead-com-cliente"></thead>
-              <tbody id="tbody-com-cliente"></tbody>
-            </table>
+          <!-- Tabla EMAIL -->
+          <div style="margin-bottom:24px;">
+            <h3 style="font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px;">
+              📧 Cliente — Email
+              <span id="com-email-pct" style="font-size:12px;font-weight:400;color:var(--texto-muted);"></span>
+            </h3>
+            <div class="tabla-envoltura">
+              <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
+                <thead id="thead-com-email"></thead>
+                <tbody id="tbody-com-email"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tabla WHATSAPP -->
+          <div>
+            <h3 style="font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px;">
+              📱 Cliente — WhatsApp
+              <span id="com-wa-pct" style="font-size:12px;font-weight:400;color:var(--texto-muted);"></span>
+            </h3>
+            <div class="tabla-envoltura">
+              <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
+                <thead id="thead-com-wa"></thead>
+                <tbody id="tbody-com-wa"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -1265,7 +1285,11 @@ table.tabla-precios input {
         <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="filtrarPlantillas('chofer')" id="filtro-chofer">&#128663; Chofer</button>
         <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="filtrarPlantillas('interno')" id="filtro-interno">&#128274; Interno</button>
         <span style="font-size:13px;color:var(--texto-muted);margin-left:8px;" id="com-total-info"></span>
-
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+          <span style="font-size:13px;color:var(--texto-muted);">🌍 Idioma:</span>
+          <select id="select-idioma-com-trad" class="campo" style="height:34px;width:auto;" onchange="cambiarIdiomasCom()"></select>
+          <span id="trad-com-resumen" style="font-size:12px;color:var(--texto-muted);"></span>
+        </div>
       </div>
 
       <!-- Lista de plantillas -->
@@ -4723,7 +4747,7 @@ function cargarComunicacionesCliente() {
       }
     })
     .catch(function() {
-      document.getElementById('tbody-com-cliente').innerHTML = '<tr><td colspan="12" style="color:red;">Error cargando datos.</td></tr>';
+      document.getElementById('tbody-com-email').innerHTML = '<tr><td colspan="12" style="color:red;">Error cargando datos.</td></tr>';
     });
 }
 
@@ -4732,12 +4756,14 @@ function renderizarComunicacionesCliente(data) {
   var idiomas = data.idiomas || [];
   var totalCols = 1 + 1 + idiomas.length + 1; // nombre + ES + idiomas + acción
 
-  // Cabecera de tabla
+  // Cabeceras
   var cabecera = '<tr><th style="text-align:left;">Plantilla</th>' +
     '<th style="text-align:center;">ES</th>' +
     idiomas.map(function(l) { return '<th style="text-align:center;">' + l.toUpperCase() + '</th>'; }).join('') +
-    '<th>Acción</th></tr>';
-  document.getElementById('thead-com-cliente').innerHTML = cabecera;
+    '<th style="text-align:center;">Acción</th></tr>';
+
+  document.getElementById('thead-com-email').innerHTML = cabecera;
+  document.getElementById('thead-com-wa').innerHTML = cabecera;
 
   // Calcular % Email
   var tradEmail = plantillas.reduce(function(sum, p) {
@@ -4746,6 +4772,8 @@ function renderizarComunicacionesCliente(data) {
   var totalEmail = plantillas.length * idiomas.length;
   var pctEmail = totalEmail > 0 ? Math.round(tradEmail / totalEmail * 100) : 0;
   var colorEmail = pctEmail === 100 ? '#2e7d32' : pctEmail > 50 ? '#b45309' : 'var(--rojo-error)';
+  var elEmail = document.getElementById('com-email-pct');
+  if (elEmail) elEmail.innerHTML = '<span style="color:' + colorEmail + ';">' + pctEmail + '% traducido</span>';
 
   // Calcular % WhatsApp
   var tradWa = plantillas.reduce(function(sum, p) {
@@ -4754,66 +4782,51 @@ function renderizarComunicacionesCliente(data) {
   var totalWa = plantillas.length * idiomas.length;
   var pctWa = totalWa > 0 ? Math.round(tradWa / totalWa * 100) : 0;
   var colorWa = pctWa === 100 ? '#2e7d32' : pctWa > 50 ? '#b45309' : 'var(--rojo-error)';
+  var elWa = document.getElementById('com-wa-pct');
+  if (elWa) elWa.innerHTML = '<span style="color:' + colorWa + ';">' + pctWa + '% traducido</span>';
 
-  var html = '';
+  // Filas Email
+  var htmlEmail = '';
+  var htmlWa = '';
 
-  // Cabecera colapsable EMAIL — igual que toggleSeccionTextos
-  html += '<tr style="background:var(--gris-fondo);cursor:pointer;" onclick="toggleSeccionTextos('com-sec-email', this)">' +
-    '<td colspan="' + totalCols + '" style="padding:10px 14px;font-weight:600;font-size:13px;user-select:none;">' +
-      '<span id="com-sec-email-icono">▶</span> 📧 Cliente — Email' +
-      ' <span style="font-size:11px;font-weight:400;color:var(--texto-muted);">(' + plantillas.length + ' plantillas)</span>' +
-      ' <span style="float:right;font-size:12px;color:' + colorEmail + ';">' + pctEmail + '% traducido</span>' +
-    '</td>' +
-  '</tr>';
-
-  // Filas Email (ocultas por defecto)
   plantillas.forEach(function(p) {
-    var celdas = '<td style="text-align:center;">' +
+    // Celdas Email
+    var celdasEmail = '<td style="text-align:center;">' +
       (p.estado_email['es'] ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') +
       '</td>' +
       idiomas.map(function(l) {
-        return '<td style="text-align:center;">' +
-          (p.estado_email[l] ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') +
-          '</td>';
+        var ok = p.estado_email[l];
+        return '<td style="text-align:center;">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
       }).join('');
-    html += '<tr class="com-sec-email" style="display:none;">' +
+
+    htmlEmail += '<tr>' +
       '<td><strong style="font-size:12px;">' + p.nombre + '</strong><br>' +
       '<span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + p.clave + '</span></td>' +
-      celdas +
-      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;" ' +
+      celdasEmail +
+      '<td style="text-align:center;"><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;" ' +
       'data-clave="' + p.clave + '" data-tipo="email" onclick="abrirModalComTradBtn(this)">✏️ Editar</button></td>' +
       '</tr>';
-  });
 
-  // Cabecera colapsable WHATSAPP
-  html += '<tr style="background:var(--gris-fondo);cursor:pointer;" onclick="toggleSeccionTextos('com-sec-wa', this)">' +
-    '<td colspan="' + totalCols + '" style="padding:10px 14px;font-weight:600;font-size:13px;user-select:none;">' +
-      '<span id="com-sec-wa-icono">▶</span> 📱 Cliente — WhatsApp' +
-      ' <span style="font-size:11px;font-weight:400;color:var(--texto-muted);">(' + plantillas.length + ' plantillas)</span>' +
-      ' <span style="float:right;font-size:12px;color:' + colorWa + ';">' + pctWa + '% traducido</span>' +
-    '</td>' +
-  '</tr>';
-
-  // Filas WhatsApp (ocultas por defecto)
-  plantillas.forEach(function(p) {
-    var celdas = '<td style="text-align:center;">' +
+    // Celdas WhatsApp
+    var celdasWa = '<td style="text-align:center;">' +
       (p.estado_wa['es'] ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') +
       '</td>' +
       idiomas.map(function(l) {
-        return '<td style="text-align:center;">' +
-          (p.estado_wa[l] ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') +
-          '</td>';
+        var ok = p.estado_wa[l];
+        return '<td style="text-align:center;">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
       }).join('');
-    html += '<tr class="com-sec-wa" style="display:none;">' +
+
+    htmlWa += '<tr>' +
       '<td><strong style="font-size:12px;">' + p.nombre + '</strong><br>' +
       '<span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + p.clave + '</span></td>' +
-      celdas +
-      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;" ' +
+      celdasWa +
+      '<td style="text-align:center;"><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;" ' +
       'data-clave="' + p.clave + '" data-tipo="wa" onclick="abrirModalComTradBtn(this)">✏️ Editar</button></td>' +
       '</tr>';
   });
 
-  document.getElementById('tbody-com-cliente').innerHTML = html;
+  document.getElementById('tbody-com-email').innerHTML = htmlEmail;
+  document.getElementById('tbody-com-wa').innerHTML = htmlWa;
 }
 
 function abrirModalComTradBtn(btn) {
