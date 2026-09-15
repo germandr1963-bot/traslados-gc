@@ -3073,6 +3073,20 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
   try {
     const fechaTexto = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
     const horaTexto = hora ? hora.slice(0, 5) : '—';
+
+    // Extras seleccionados por el cliente
+    const extrasEmail1 = await pool.query(
+      `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
+       JOIN extras e ON e.id = re.extra_id
+       WHERE re.reserva_id = $1 ORDER BY e.bloque, e.orden`,
+      [reservaId]
+    );
+    const extrasLineaEmail1 = extrasEmail1.rows.length
+      ? '<br>Extras: ' + extrasEmail1.rows.map(e =>
+          e.nombre + (parseFloat(e.precio_en_reserva) > 0 ? ' (' + parseFloat(e.precio_en_reserva).toFixed(2) + ' € — a pagar al conductor)' : ' (incluido)')
+        ).join(', ')
+      : '';
+
     const _par = await obtenerPlantilla('cliente_acuse_recibo', {
       nombre_cliente: nombre_cliente.trim(),
       numero_reserva: numeroReserva,
@@ -3092,7 +3106,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
          Origen: ${origen}<br>
          Destino: ${destino}<br>
          Fecha: ${fechaTexto}<br>
-         Pasajeros: ${num_pasajeros || '—'}
+         Pasajeros: ${num_pasajeros || '—'}${extrasLineaEmail1}
        </div>
        <p style="font-size:13px;color:#888;">Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.</p>
        <p style="font-size:13px;color:#888;">El plazo máximo para confirmarte un chofer es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.</p>`);
@@ -9363,6 +9377,19 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
            </div>`
         : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
 
+      // Extras de la reserva para el email de confirmación
+      const extrasEmail2 = await pool.query(
+        `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
+         JOIN extras e ON e.id = re.extra_id
+         WHERE re.reserva_id = $1 ORDER BY e.bloque, e.orden`,
+        [reservaIdParam]
+      );
+      const extrasLineaEmail2 = extrasEmail2.rows.length
+        ? '<br>Extras: ' + extrasEmail2.rows.map(e =>
+            e.nombre + (parseFloat(e.precio_en_reserva) > 0 ? ' (' + parseFloat(e.precio_en_reserva).toFixed(2) + ' € — a pagar al conductor)' : ' (incluido)')
+          ).join(', ')
+        : '';
+
       const _pc1 = await obtenerPlantilla('cliente_confirmacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -9389,7 +9416,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
            Fecha: ${fechaViaje}<br>
            Hora: ${r.hora ? r.hora.slice(0,5) : '—'}<br>
            Categoría: ${r.categoria_nombre || '—'}<br>
-           ${r.conductor_nombre ? 'Conductor: ' + r.conductor_nombre : ''}
+           ${r.conductor_nombre ? 'Conductor: ' + r.conductor_nombre : ''}${extrasLineaEmail2}
          </div>
          <div class="caja-verde">
            <p style="margin:0 0 8px 0;font-weight:600;">💳 Depósito de garantía — ${importe} €</p>
