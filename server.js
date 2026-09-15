@@ -1691,6 +1691,7 @@ async function initSchema() {
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_devolucion_pendiente BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_retenido_noshow BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS lang_cliente VARCHAR(10) DEFAULT 'es'`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS whatsapp_mensajes_pendientes (
       id SERIAL PRIMARY KEY,
@@ -2928,7 +2929,8 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     es_para_otra_persona, nombre_pasajero_otro, telefono_pasajero_otro,
     email_pasajero_otro,
     pasaporte_dni,
-    extras
+    extras,
+    lang_cliente
   } = req.body;
 
   if (!origen || !destino || !categoria_id || !fecha || !nombre_cliente || !telefono_cliente || !email_cliente) {
@@ -2993,11 +2995,12 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       num_pasajeros, notas_cliente, estado_aviso_whatsapp,
       es_para_otra_persona, nombre_pasajero_otro, telefono_pasajero_otro,
       email_pasajero_otro,
-      pasaporte_dni
+      pasaporte_dni,
+      lang_cliente
     )
      VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, 'pendiente',
              $10, $11, $12, $13, $14, $15, $16, $17, $18, 'pendiente',
-             $19, $20, $21, $22, $23)
+             $19, $20, $21, $22, $23, $24)
      RETURNING id`,
     [
       numeroReserva, categoria_id, fecha, horaGuardar,
@@ -3011,7 +3014,8 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       es_para_otra_persona ? nombre_pasajero_otro.trim() : null,
       (es_para_otra_persona && telefono_pasajero_otro && telefono_pasajero_otro.trim()) ? telefono_pasajero_otro.trim() : null,
       (es_para_otra_persona && email_pasajero_otro && email_pasajero_otro.trim()) ? email_pasajero_otro.trim() : null,
-      pasaporte_dni ? pasaporte_dni.trim() : null
+      pasaporte_dni ? pasaporte_dni.trim() : null,
+      (lang_cliente && ['es','en','de','sv','no','nl','it','fr','fi','ru'].includes(lang_cliente)) ? lang_cliente : 'es'
     ]
   );
 
@@ -3071,7 +3075,9 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
 
   // Email de pre-reserva al cliente
   try {
-    const fechaTexto = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+    const _langCliente = (lang_cliente && ['es','en','de','sv','no','nl','it','fr','fi','ru'].includes(lang_cliente)) ? lang_cliente : 'es';
+    const _localeCliente = _langCliente === 'es' ? 'es-ES' : _langCliente === 'en' ? 'en-GB' : _langCliente === 'de' ? 'de-DE' : _langCliente === 'sv' ? 'sv-SE' : _langCliente === 'no' ? 'nb-NO' : _langCliente === 'nl' ? 'nl-NL' : _langCliente === 'it' ? 'it-IT' : _langCliente === 'fr' ? 'fr-FR' : _langCliente === 'fi' ? 'fi-FI' : _langCliente === 'ru' ? 'ru-RU' : 'es-ES';
+    const fechaTexto = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString(_localeCliente, {day:'numeric', month:'long', year:'numeric'}) : '';
     const horaTexto = hora ? hora.slice(0, 5) : '—';
     const _par = await obtenerPlantilla('cliente_acuse_recibo', {
       nombre_cliente: nombre_cliente.trim(),
