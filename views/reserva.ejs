@@ -1302,6 +1302,10 @@ function toggleExtra(idUi) {
   var box = document.getElementById('total-extras');
   box.style.display = extrasSeleccionados.length ? 'flex' : 'none';
   document.getElementById('total-extras-precio').textContent = total.toFixed(2) + ' €';
+
+  // Si el resumen ya está visible, actualizarlo automáticamente
+  var resumen = document.getElementById('resumen-final');
+  if (resumen && resumen.style.display !== 'none') mostrarResumen();
 }
 
 // ── Navegación ──────────────────────────────────────────────────────────────
