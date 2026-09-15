@@ -2390,6 +2390,17 @@ Pulsa el botón para crear una nueva contraseña:
       [p.clave, p.nombre, p.categoria, p.asunto_email, p.cuerpo_email, p.cuerpo_whatsapp]
     );
   }
+  // Forzar actualización de las dos plantillas que incluyen {extras}
+  for (const p of plantillasBase.filter(p => ['cliente_acuse_recibo', 'cliente_confirmacion'].includes(p.clave))) {
+    await pool.query(
+      `INSERT INTO plantillas_comunicacion (clave, nombre, categoria, asunto_email, cuerpo_email, cuerpo_whatsapp)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (clave) DO UPDATE SET
+         cuerpo_email = EXCLUDED.cuerpo_email,
+         cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp`,
+      [p.clave, p.nombre, p.categoria, p.asunto_email, p.cuerpo_email, p.cuerpo_whatsapp]
+    );
+  }
   console.log('Plantillas de comunicaci\u00f3n cargadas.');
 
   // ─── Destinos: columnas para página pública de rutas ─────────────────────
