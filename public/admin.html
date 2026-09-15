@@ -480,6 +480,7 @@ table.tabla-precios input {
           <span id="bloque-com-cliente-icono" style="font-size:14px;">▶</span>
           <h2 style="font-size:18px;margin:0;">Comunicaciones — Cliente</h2>
           <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
+          <span id="bloque-com-cliente-pct" style="font-size:12px;margin-left:auto;"></span>
         </div>
 
         <div id="bloque-com-cliente-contenido" style="display:none;margin-top:20px;">
@@ -1285,11 +1286,7 @@ table.tabla-precios input {
         <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="filtrarPlantillas('chofer')" id="filtro-chofer">&#128663; Chofer</button>
         <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="filtrarPlantillas('interno')" id="filtro-interno">&#128274; Interno</button>
         <span style="font-size:13px;color:var(--texto-muted);margin-left:8px;" id="com-total-info"></span>
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
-          <span style="font-size:13px;color:var(--texto-muted);">🌍 Idioma:</span>
-          <select id="select-idioma-com-trad" class="campo" style="height:34px;width:auto;" onchange="cambiarIdiomasCom()"></select>
-          <span id="trad-com-resumen" style="font-size:12px;color:var(--texto-muted);"></span>
-        </div>
+
       </div>
 
       <!-- Lista de plantillas -->
@@ -4745,9 +4742,21 @@ function cargarComunicacionesCliente() {
           return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
         }).join('');
       }
+      // Calcular % global y mostrarlo en la cabecera del bloque
+      var plantillas = data.plantillas || [];
+      var idiomas = data.idiomas || [];
+      var traducidos = plantillas.reduce(function(sum, p) {
+        return sum + idiomas.filter(function(l) { return p.estado_email[l] && p.estado_wa[l]; }).length;
+      }, 0);
+      var total = plantillas.length * idiomas.length;
+      var pct = total > 0 ? Math.round(traducidos / total * 100) : 0;
+      var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
+      var el = document.getElementById('bloque-com-cliente-pct');
+      if (el) el.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
     })
     .catch(function() {
-      document.getElementById('tbody-com-email').innerHTML = '<tr><td colspan="12" style="color:red;">Error cargando datos.</td></tr>';
+      var el = document.getElementById('bloque-com-cliente-pct');
+      if (el) el.textContent = 'Error cargando';
     });
 }
 
