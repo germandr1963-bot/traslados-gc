@@ -1540,7 +1540,8 @@ function confirmarEnvio() {
       ? document.getElementById('otra-persona-prefijo').value + ' ' + document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'')
       : '',
     email_pasajero_otro: document.getElementById('otra-persona-email').value.trim(),
-    extras: extrasSeleccionados.map(function(e){ return { id: e.extra_id, precio: e.precio }; })
+    extras: extrasSeleccionados.map(function(e){ return { id: e.extra_id, precio: e.precio }; }),
+    lang_cliente: LANG
   };
 
   fetch('/api/reservas', {
