@@ -10494,6 +10494,54 @@ app.get('/factura-comision-descarga/:numero/:firma/:nombre?', asyncHandler(async
   res.send(row.rows[0].pdf);
 }));
 
+// Devuelve el bloque HTML de extras de una reserva, con nombres en el idioma del cliente.
+// Retorna cadena vacía si la reserva no tiene extras.
+async function formatearExtrasEmail(reservaId, lang) {
+  try {
+    const result = await pool.query(
+      `SELECT re.extra_id, re.precio_en_reserva
+       FROM reservas_extras re
+       JOIN extras e ON e.id = re.extra_id
+       WHERE re.reserva_id = $1
+       ORDER BY e.bloque, e.orden`,
+      [reservaId]
+    );
+    if (!result.rows.length) return '';
+
+    const _lang = (lang && ['es','en','de','sv','no','nl','it','fr','fi','ru'].includes(lang)) ? lang : 'es';
+
+    const incluidos = [];
+    const aCobrar  = [];
+
+    for (const row of result.rows) {
+      const nombre = obtenerTexto('extra_web_' + row.extra_id, _lang);
+      const precio = parseFloat(row.precio_en_reserva);
+      if (!precio || precio === 0) {
+        incluidos.push(nombre);
+      } else {
+        aCobrar.push({ nombre, precio });
+      }
+    }
+
+    let html = '<br><strong style="font-size:14px;">Extras seleccionados:</strong><br>';
+    for (const n of incluidos) {
+      html += '&nbsp;&nbsp;· ' + n + ' <span style="color:#2e7d32;font-size:12px;">(incluido)</span><br>';
+    }
+    for (const ex of aCobrar) {
+      html += '&nbsp;&nbsp;· ' + ex.nombre + ' <span style="color:#856404;font-size:12px;">(' + ex.precio.toFixed(2) + ' € — a pagar al conductor)</span><br>';
+    }
+    if (aCobrar.length) {
+      const total = aCobrar.reduce((s, e) => s + e.precio, 0);
+      html += '<div style="background:#fff8e1;border:1px solid #D9A441;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:13px;">'
+            + '<strong>💰 Total extras a pagar al conductor: ' + total.toFixed(2) + ' €</strong></div>';
+    }
+    return html;
+  } catch(e) {
+    console.warn('formatearExtrasEmail error:', e.message);
+    return '';
+  }
+}
+
 async function obtenerPlantilla(clave, vars) {
   try {
     const r = await pool.query(
