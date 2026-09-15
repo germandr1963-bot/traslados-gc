@@ -3079,13 +3079,15 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     const _localeCliente = _langCliente === 'es' ? 'es-ES' : _langCliente === 'en' ? 'en-GB' : _langCliente === 'de' ? 'de-DE' : _langCliente === 'sv' ? 'sv-SE' : _langCliente === 'no' ? 'nb-NO' : _langCliente === 'nl' ? 'nl-NL' : _langCliente === 'it' ? 'it-IT' : _langCliente === 'fr' ? 'fr-FR' : _langCliente === 'fi' ? 'fi-FI' : _langCliente === 'ru' ? 'ru-RU' : 'es-ES';
     const fechaTexto = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString(_localeCliente, {day:'numeric', month:'long', year:'numeric'}) : '';
     const horaTexto = hora ? hora.slice(0, 5) : '—';
+    const _extrasAcuse = await formatearExtrasEmail(reservaId, _langCliente);
     const _par = await obtenerPlantilla('cliente_acuse_recibo', {
       nombre_cliente: nombre_cliente.trim(),
       numero_reserva: numeroReserva,
       origen: origen || '—',
       destino: destino || '—',
       fecha: fechaTexto,
-      hora: horaTexto
+      hora: horaTexto,
+      extras: _extrasAcuse
     });
     const htmlEmail = plantillaEmail(
       (_par && _par.email) ||
@@ -9369,6 +9371,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
            </div>`
         : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
 
+      const _extrasConf1 = await formatearExtrasEmail(r.id, r.lang_cliente || 'es');
       const _pc1 = await obtenerPlantilla('cliente_confirmacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -9381,7 +9384,8 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         importe_deposito: importe,
         horas_cancelacion: horas,
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
-        boton_pago: botonPago
+        boton_pago: botonPago,
+        extras: _extrasConf1
       });
       const html = plantillaEmail(
         (_pc1 && _pc1.email) ||
@@ -10121,6 +10125,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
        </div>`
     : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
 
+  const _extrasConf2 = await formatearExtrasEmail(r.id, r.lang_cliente || 'es');
   const _pc2 = await obtenerPlantilla('cliente_confirmacion', {
     nombre_cliente: r.nombre_cliente,
     numero_reserva: r.numero_reserva,
@@ -10133,7 +10138,8 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
     importe_deposito: importe,
     horas_cancelacion: horas,
     fecha_limite_cancelacion: _textoLimiteCancelEmail,
-    boton_pago: botonPago
+    boton_pago: botonPago,
+    extras: _extrasConf2
   });
   const html = plantillaEmail(
     (_pc2 && _pc2.email) ||
