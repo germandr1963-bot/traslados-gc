@@ -953,8 +953,8 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
       return;
     }
     lista.innerHTML = extras.map(function(ex){
-      return '<div class="extra-item" id="extra-' + ex.id + '" onclick="toggleExtra(' + ex.id + ')">' +
-        '<div class="extra-check" id="check-' + ex.id + '"></div>' +
+      return '<div class="extra-item" id="extra-' + ex.extra_id + '" onclick="toggleExtra(' + ex.extra_id + ')">' +
+        '<div class="extra-check" id="check-' + ex.extra_id + '"></div>' +
         '<span class="extra-nombre">' + (ex.nombre_traducido || ex.nombre) + '</span>' +
         '<span class="extra-precio">' + (Number(ex.precio) === 0 ? TXT.extrasGratis : Number(ex.precio).toFixed(2) + ' €') + '</span>' +
       '</div>';
@@ -1272,8 +1272,8 @@ document.getElementById('modal-cotizacion').addEventListener('click', function(e
 
 // ── Extras ──────────────────────────────────────────────────────────────────
 function toggleExtra(id) {
-  var ex = extrasData.find(function(e){ return e.id === id; });
-  var idx = extrasSeleccionados.findIndex(function(e){ return e.id === id; });
+  var ex = extrasData.find(function(e){ return e.extra_id === id; });
+  var idx = extrasSeleccionados.findIndex(function(e){ return e.extra_id === id; });
   var item = document.getElementById('extra-' + id);
   var check = document.getElementById('check-' + id);
   if (idx === -1) { extrasSeleccionados.push(ex); item.classList.add('seleccionado'); check.textContent = '✓'; }
@@ -1516,7 +1516,7 @@ function confirmarEnvio() {
       ? document.getElementById('otra-persona-prefijo').value + ' ' + document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'')
       : '',
     email_pasajero_otro: document.getElementById('otra-persona-email').value.trim(),
-    extras: extrasSeleccionados.map(function(e){ return { id: e.id, precio: e.precio }; })
+    extras: extrasSeleccionados.map(function(e){ return { id: e.extra_id, precio: e.precio }; })
   };
 
   fetch('/api/reservas', {
