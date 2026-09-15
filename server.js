@@ -1883,6 +1883,7 @@ Hola, <strong>{nombre_cliente}</strong> 👋
   🏁 Destino: {destino}
   📅 Fecha: {fecha} · {hora}
 </div>
+{extras}
 <span style="font-size:13px;color:#888;">💾 Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.</span>
 
 <span style="font-size:13px;color:#888;">⏱️ El plazo máximo para confirmarte un conductor es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.</span>
@@ -1890,7 +1891,7 @@ Hola, <strong>{nombre_cliente}</strong> 👋
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n📨 Hemos recibido tu solicitud de traslado. Estamos trabajando en ella y en breve recibirás confirmación.\n\n🔖 *Tu número de reserva es:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\n💾 Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.\n\n⏱️ El plazo máximo para confirmarte un conductor es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n📨 Hemos recibido tu solicitud de traslado. Estamos trabajando en ella y en breve recibirás confirmación.\n\n🔖 *Tu número de reserva es:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n{extras}\n💾 Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.\n\n⏱️ El plazo máximo para confirmarte un conductor es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_confirmacion', nombre: 'Traslado confirmado (al cliente)', categoria: 'cliente',
       asunto_email: 'Traslado confirmado \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -1908,6 +1909,7 @@ Hola, <strong>{nombre_cliente}</strong> 👋
   🚗 Categoría: {categoria}
   🧭 Conductor: {conductor}
 </div>
+{extras}
 <div class="caja-verde">
   <span style="font-weight:600;">💳 Depósito de garantía — {importe_deposito} €</span><br>
   <span style="font-size:13px;">Para garantizar tu plaza, realiza el pago del depósito de <strong>{importe_deposito} €</strong>. El voucher de tu traslado te llegará automáticamente al confirmar el pago.</span><br>
@@ -1921,7 +1923,7 @@ Hola, <strong>{nombre_cliente}</strong> 👋
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n✅ *¡Tu traslado está confirmado! Hemos asignado un conductor para tu servicio.*\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n\n💳 *Depósito de garantía — {importe_deposito} €*\nPara garantizar tu plaza, realiza el pago del depósito de {importe_deposito} €. El voucher de tu traslado te llegará automáticamente al confirmar el pago.\n\n⚠️ *Importante:* Si no recibimos el pago {horas_cancelacion} horas antes de tu traslado, la reserva será cancelada.\n\n✔️ El depósito te será devuelto íntegramente una vez completado el servicio.\n\n🗓️ *Cancelación gratuita hasta el {fecha_limite_cancelacion}.* Después de esa fecha, el depósito de {importe_deposito} € no será reembolsable.\n\n👉 {url_pago}\n\n📲 Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n✅ *¡Tu traslado está confirmado! Hemos asignado un conductor para tu servicio.*\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n{extras}\n💳 *Depósito de garantía — {importe_deposito} €*\nPara garantizar tu plaza, realiza el pago del depósito de {importe_deposito} €. El voucher de tu traslado te llegará automáticamente al confirmar el pago.\n\n⚠️ *Importante:* Si no recibimos el pago {horas_cancelacion} horas antes de tu traslado, la reserva será cancelada.\n\n✔️ El depósito te será devuelto íntegramente una vez completado el servicio.\n\n🗓️ *Cancelación gratuita hasta el {fecha_limite_cancelacion}.* Después de esa fecha, el depósito de {importe_deposito} € no será reembolsable.\n\n👉 {url_pago}\n\n📲 Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_enlace_pago', nombre: 'Enlace de pago (dep\u00f3sito)', categoria: 'cliente',
       asunto_email: 'Enlace de pago \u2014 Reserva {numero_reserva}',
       cuerpo_email: `
@@ -9437,6 +9439,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         const codigoPago = await generarCodigoCorto('pago', r.id, null, urlPago);
         urlPagoCorta = BASE_URL + '/v/' + codigoPago;
       }
+      const _extrasWa1 = await formatearExtrasWhatsapp(r.id, r.lang_cliente || 'es');
       const _pc1wa = await obtenerPlantilla('cliente_confirmacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -9448,7 +9451,8 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         importe_deposito: importe,
         horas_cancelacion: horas,
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
-        url_pago: urlPagoCorta
+        url_pago: urlPagoCorta,
+        extras: _extrasWa1
       });
       const textoWa = (_pc1wa && _pc1wa.whatsapp) ||
         ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Hemos asignado un conductor para tu servicio. Revisa tu email para todos los detalles y el enlace de pago del depósito.');
@@ -10184,6 +10188,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
   try {
     if (r.telefono_cliente) {
       const urlCortaConf = urlPago ? `${BASE_URL}/v/${await generarCodigoCorto('pago', r.id, null, urlPago)}` : '';
+  const _extrasWa2 = await formatearExtrasWhatsapp(r.id, r.lang_cliente || 'es');
       const _pc2wa = await obtenerPlantilla('cliente_confirmacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -10196,7 +10201,8 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
         horas_cancelacion: horas,
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
         url_pago: urlCortaConf,
-        url_corta: urlCortaConf
+        url_corta: urlCortaConf,
+        extras: _extrasWa2
       });
       const textoWa = (_pc2wa && _pc2wa.whatsapp) ||
         ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Revisa tu email para ver los detalles y el enlace de pago del depósito.');
@@ -10502,6 +10508,8 @@ app.get('/factura-comision-descarga/:numero/:firma/:nombre?', asyncHandler(async
 
 // Devuelve el bloque HTML de extras de una reserva, con nombres en el idioma del cliente.
 // Retorna cadena vacía si la reserva no tiene extras.
+// Devuelve el bloque HTML de extras de una reserva, con nombres en el idioma del cliente.
+// Retorna cadena vacía si la reserva no tiene extras.
 async function formatearExtrasEmail(reservaId, lang) {
   try {
     const result = await pool.query(
@@ -10529,21 +10537,77 @@ async function formatearExtrasEmail(reservaId, lang) {
       }
     }
 
-    let html = '<br><strong style="font-size:14px;">Extras seleccionados:</strong><br>';
+    let lineas = '';
     for (const n of incluidos) {
-      html += '&nbsp;&nbsp;· ' + n + ' <span style="color:#2e7d32;font-size:12px;">(incluido)</span><br>';
+      lineas += '&nbsp;&nbsp;&#183; ' + n + ' <span style="color:#2e7d32;font-size:12px;">(incluido)</span><br>';
     }
     for (const ex of aCobrar) {
-      html += '&nbsp;&nbsp;· ' + ex.nombre + ' <span style="color:#856404;font-size:12px;">(' + ex.precio.toFixed(2) + ' € — a pagar al conductor)</span><br>';
+      lineas += '&nbsp;&nbsp;&#183; ' + ex.nombre + ' <span style="color:#856404;font-size:12px;">' + ex.precio.toFixed(2) + ' &euro; &mdash; a pagar al conductor</span><br>';
+    }
+
+    let totalHtml = '';
+    if (aCobrar.length) {
+      const total = aCobrar.reduce((s, e) => s + e.precio, 0);
+      totalHtml = '<div class="caja-amarilla" style="margin-top:10px;margin-bottom:0;">'
+                + '<strong>&#128176; Total extras a pagar al conductor: ' + total.toFixed(2) + ' &euro;</strong><br>'
+                + '<span style="font-size:11px;">Este importe se abona directamente al conductor al finalizar el servicio.</span>'
+                + '</div>';
+    }
+
+    return '<div class="info-box">'
+         + '<strong>&#129524; Extras seleccionados:</strong><br>'
+         + lineas
+         + totalHtml
+         + '</div>';
+  } catch(e) {
+    console.warn('formatearExtrasEmail error:', e.message);
+    return '';
+  }
+}
+
+// Devuelve el bloque de extras en texto plano para WhatsApp.
+// Retorna cadena vacía si la reserva no tiene extras.
+async function formatearExtrasWhatsapp(reservaId, lang) {
+  try {
+    const result = await pool.query(
+      `SELECT re.extra_id, re.precio_en_reserva
+       FROM reservas_extras re
+       JOIN extras e ON e.id = re.extra_id
+       WHERE re.reserva_id = $1
+       ORDER BY e.bloque, e.orden`,
+      [reservaId]
+    );
+    if (!result.rows.length) return '';
+
+    const _lang = (lang && ['es','en','de','sv','no','nl','it','fr','fi','ru'].includes(lang)) ? lang : 'es';
+
+    const incluidos = [];
+    const aCobrar  = [];
+
+    for (const row of result.rows) {
+      const nombre = obtenerTexto('extra_web_' + row.extra_id, _lang);
+      const precio = parseFloat(row.precio_en_reserva);
+      if (!precio || precio === 0) {
+        incluidos.push(nombre);
+      } else {
+        aCobrar.push({ nombre, precio });
+      }
+    }
+
+    let texto = '\n🧳 *Extras seleccionados:*\n';
+    for (const n of incluidos) {
+      texto += '· ' + n + ' _(incluido)_\n';
+    }
+    for (const ex of aCobrar) {
+      texto += '· ' + ex.nombre + ' _(' + ex.precio.toFixed(2) + ' € — a pagar al conductor)_\n';
     }
     if (aCobrar.length) {
       const total = aCobrar.reduce((s, e) => s + e.precio, 0);
-      html += '<div style="background:#fff8e1;border:1px solid #D9A441;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:13px;">'
-            + '<strong>💰 Total extras a pagar al conductor: ' + total.toFixed(2) + ' €</strong></div>';
+      texto += '💰 *Total extras a pagar al conductor: ' + total.toFixed(2) + ' €*\n';
     }
-    return html;
+    return texto;
   } catch(e) {
-    console.warn('formatearExtrasEmail error:', e.message);
+    console.warn('formatearExtrasWhatsapp error:', e.message);
     return '';
   }
 }
