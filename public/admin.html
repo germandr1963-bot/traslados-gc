@@ -474,6 +474,91 @@ table.tabla-precios input {
         </div>
       </div>
 
+      <!-- ─── BLOQUE 3 — Comunicaciones Cliente ────────────────────────────── -->
+      <div style="margin-top:32px;border-top:2px solid var(--gris-borde);padding-top:24px;">
+        <div style="cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none;" onclick="toggleBloqueComunicacionesCliente()">
+          <span id="bloque-com-cliente-icono" style="font-size:14px;">▶</span>
+          <h2 style="font-size:18px;margin:0;">Comunicaciones — Cliente</h2>
+          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
+        </div>
+
+        <div id="bloque-com-cliente-contenido" style="display:none;margin-top:16px;">
+          <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Traducciones de los emails y WhatsApp que recibe el cliente. El texto en español es solo referencia — se edita desde Admin → Comunicaciones. Selecciona un idioma y edita o genera las traducciones que faltan.</p>
+
+          <!-- Selector idioma + generador -->
+          <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
+            <span style="font-size:13px;">🌍 Idioma:</span>
+            <select id="select-idioma-com-cliente" class="campo" style="height:34px;width:auto;" onchange="cargarComunicacionesCliente()"></select>
+            <button class="boton-costa" onclick="generarComunicacionesClienteIA()" id="btn-generar-com-cliente">🤖 Generar lo que falta</button>
+            <span id="com-cliente-msg-ia" style="font-size:13px;color:var(--acento);display:none;">🤖 Generando...</span>
+            <span id="com-cliente-resumen" style="font-size:12px;color:var(--texto-muted);margin-left:8px;"></span>
+          </div>
+
+          <!-- Sub-colapsable EMAIL -->
+          <div style="border:1px solid var(--gris-borde);border-radius:8px;margin-bottom:12px;overflow:hidden;">
+            <div style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gris-fondo);user-select:none;" onclick="toggleSubBloqueCom('email')">
+              <span id="sub-com-email-icono" style="font-size:13px;">▶</span>
+              <span style="font-weight:600;font-size:0.95rem;">📧 Cliente — Email</span>
+              <span id="sub-com-email-resumen" style="font-size:12px;color:var(--texto-muted);margin-left:auto;"></span>
+            </div>
+            <div id="sub-com-email-contenido" style="display:none;">
+              <div id="tabla-com-email"></div>
+            </div>
+          </div>
+
+          <!-- Sub-colapsable WHATSAPP -->
+          <div style="border:1px solid var(--gris-borde);border-radius:8px;overflow:hidden;">
+            <div style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gris-fondo);user-select:none;" onclick="toggleSubBloqueCom('wa')">
+              <span id="sub-com-wa-icono" style="font-size:13px;">▶</span>
+              <span style="font-weight:600;font-size:0.95rem;">📱 Cliente — WhatsApp</span>
+              <span id="sub-com-wa-resumen" style="font-size:12px;color:var(--texto-muted);margin-left:auto;"></span>
+            </div>
+            <div id="sub-com-wa-contenido" style="display:none;">
+              <div id="tabla-com-wa"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Modal edición comunicación traducida -->
+      <div id="modal-com-trad" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;">
+        <div class="tarjeta" style="width:100%;max-width:820px;margin:auto;position:relative;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+              <h3 style="margin:0;" id="modal-com-trad-titulo">Editar traducción</h3>
+              <span id="modal-com-trad-subtitulo" style="font-size:12px;color:var(--texto-muted);font-family:monospace;"></span>
+            </div>
+            <button onclick="cerrarModalComTrad()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--texto-muted);">×</button>
+          </div>
+
+          <!-- Texto original en español (solo lectura) -->
+          <div style="background:var(--fondo-tarjeta);border:1px solid var(--borde);border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+            <p style="font-size:12px;color:var(--texto-muted);margin:0 0 8px;font-weight:600;">📋 Original en español (referencia — no editable aquí):</p>
+            <div id="modal-com-trad-ref-asunto" style="font-size:12px;margin-bottom:6px;"></div>
+            <div id="modal-com-trad-ref-texto" style="font-size:12px;color:var(--texto-muted);white-space:pre-wrap;max-height:100px;overflow-y:auto;line-height:1.5;"></div>
+          </div>
+
+          <!-- Campo traducción -->
+          <div id="modal-com-trad-campo-asunto" style="margin-bottom:12px;">
+            <label class="etiqueta">Asunto del email (<span id="modal-com-trad-lang-label"></span>)</label>
+            <input type="text" id="modal-com-trad-asunto" class="campo" placeholder="Asunto traducido">
+          </div>
+          <div style="margin-bottom:4px;">
+            <label class="etiqueta" id="modal-com-trad-campo-label">Traducción</label>
+            <p style="font-size:12px;color:var(--texto-muted);margin:0 0 6px;">Las variables <code>{entre_llaves}</code> no se traducen — déjalas exactamente igual.</p>
+            <textarea id="modal-com-trad-texto" class="campo" rows="12" style="font-family:monospace;font-size:13px;resize:vertical;"></textarea>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:20px;align-items:center;flex-wrap:wrap;">
+            <button class="boton-primario" onclick="guardarComTrad()">💾 Guardar</button>
+            <button class="boton-secundario" onclick="cerrarModalComTrad()">Cancelar</button>
+            <span id="modal-com-trad-msg-ok" style="font-size:13px;color:green;display:none;">✓ Guardado</span>
+            <span id="modal-com-trad-msg-err" style="font-size:13px;color:red;display:none;">Error al guardar</span>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- ─── CALCULADOR DE TARIFAS ─────────────────────────────────────────── -->
@@ -1280,62 +1365,7 @@ table.tabla-precios input {
         </div>
       </div>
 
-      <!-- Modal edición traducción -->
-      <div id="modal-trad-com" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;">
-        <div class="tarjeta" style="width:100%;max-width:820px;margin:auto;position:relative;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <div>
-              <h3 style="margin:0;" id="modal-trad-com-titulo">Editar traducción</h3>
-              <span id="modal-trad-com-subtitulo" style="font-size:12px;color:var(--texto-muted);font-family:monospace;"></span>
-            </div>
-            <button onclick="cerrarModalTradCom()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--texto-muted);">×</button>
-          </div>
 
-          <!-- Referencia en español -->
-          <div style="background:var(--fondo-tarjeta);border:1px solid var(--borde);border-radius:8px;padding:12px 16px;margin-bottom:16px;">
-            <p style="font-size:12px;color:var(--texto-muted);margin:0 0 6px;font-weight:600;">📋 Texto original en español (referencia):</p>
-            <div id="modal-trad-ref-asunto" style="font-size:12px;margin-bottom:4px;"></div>
-            <div id="modal-trad-ref-email" style="font-size:12px;color:var(--texto-muted);white-space:pre-wrap;max-height:80px;overflow-y:auto;"></div>
-          </div>
-
-          <!-- Tabs Email / WhatsApp -->
-          <div style="display:flex;gap:0;margin-bottom:0;border-bottom:2px solid var(--borde);">
-            <button id="trad-tab-email-btn" onclick="switchTabTradCom('email')" style="padding:8px 20px;border:none;background:var(--fondo-tarjeta);border-bottom:3px solid var(--acento);cursor:pointer;font-weight:600;color:var(--texto);">📧 Email</button>
-            <button id="trad-tab-wa-btn" onclick="switchTabTradCom('wa')" style="padding:8px 20px;border:none;background:none;border-bottom:3px solid transparent;cursor:pointer;color:var(--texto-muted);">📱 WhatsApp</button>
-          </div>
-
-          <!-- Panel Email -->
-          <div id="trad-panel-email" style="padding-top:16px;">
-            <div style="margin-bottom:12px;">
-              <label class="etiqueta">Asunto del email</label>
-              <input type="text" id="trad-com-asunto" class="campo" placeholder="Asunto traducido">
-            </div>
-            <div style="margin-bottom:4px;">
-              <label class="etiqueta">Cuerpo del email</label>
-              <p style="font-size:12px;color:var(--texto-muted);margin:0 0 6px;">Las variables <code>{entre_llaves}</code> no se traducen — déjalas exactamente igual.</p>
-              <textarea id="trad-com-email" class="campo" rows="12" style="font-family:monospace;font-size:13px;resize:vertical;"></textarea>
-            </div>
-          </div>
-
-          <!-- Panel WhatsApp -->
-          <div id="trad-panel-wa" style="display:none;padding-top:16px;">
-            <div style="margin-bottom:4px;">
-              <label class="etiqueta">Texto de WhatsApp</label>
-              <p style="font-size:12px;color:var(--texto-muted);margin:0 0 6px;">Las variables <code>{entre_llaves}</code> no se traducen — déjalas exactamente igual.</p>
-              <textarea id="trad-com-wa" class="campo" rows="12" style="font-family:monospace;font-size:13px;resize:vertical;"></textarea>
-            </div>
-          </div>
-
-          <div style="display:flex;gap:10px;margin-top:20px;align-items:center;flex-wrap:wrap;">
-            <button class="boton-primario" onclick="guardarTradCom()">💾 Guardar</button>
-            <button class="boton-costa" onclick="generarTradComIA()">🤖 Generar con IA</button>
-            <button class="boton-secundario" onclick="cerrarModalTradCom()">Cancelar</button>
-            <span id="trad-com-msg-ok" style="font-size:13px;color:green;display:none;">✓ Guardado</span>
-            <span id="trad-com-msg-err" style="font-size:13px;color:red;display:none;">Error al guardar</span>
-            <span id="trad-com-msg-ia" style="font-size:13px;color:var(--acento);display:none;">🤖 Generando...</span>
-          </div>
-        </div>
-      </div>
 
     <!-- Plantilla base de marca -->
       <div style="margin-top:40px;border-top:2px solid var(--borde);padding-top:28px;">
@@ -1880,7 +1910,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'equipo') cargarEquipo();
     if (boton.dataset.seccion === 'pagina-rutas') cargarPaginaRutas();
     if (boton.dataset.seccion === 'valoraciones') cargarValoraciones();
-    if (boton.dataset.seccion === 'comunicaciones') { cargarPlantillasCom(); iniciarEditorMarca(); iniciarSelectorIdiomasTradCom(); }
+    if (boton.dataset.seccion === 'comunicaciones') { cargarPlantillasCom(); iniciarEditorMarca(); }
   });
 });
 
@@ -4680,6 +4710,226 @@ function toggleBloque2Flota() {
   var visible = contenido.style.display !== 'none';
   contenido.style.display = visible ? 'none' : 'block';
   if (icono) icono.textContent = visible ? '▶' : '▼';
+}
+
+// ─── Bloque 3 — Comunicaciones Cliente ───────────────────────────────────────
+var _comClienteLang = '';
+var _comClienteDatos = [];
+var _comClienteClaveTrad = null;
+var _comClienteTipoTrad = null; // 'email' o 'wa'
+
+function toggleBloqueComunicacionesCliente() {
+  var contenido = document.getElementById('bloque-com-cliente-contenido');
+  var icono = document.getElementById('bloque-com-cliente-icono');
+  if (!contenido) return;
+  var visible = contenido.style.display !== 'none';
+  contenido.style.display = visible ? 'none' : 'block';
+  if (icono) icono.textContent = visible ? '▶' : '▼';
+  if (!visible) iniciarSelectorComCliente();
+}
+
+function toggleSubBloqueCom(tipo) {
+  var contenido = document.getElementById('sub-com-' + tipo + '-contenido');
+  var icono = document.getElementById('sub-com-' + tipo + '-icono');
+  if (!contenido) return;
+  var visible = contenido.style.display !== 'none';
+  contenido.style.display = visible ? 'none' : 'block';
+  if (icono) icono.textContent = visible ? '▶' : '▼';
+}
+
+function iniciarSelectorComCliente() {
+  var sel = document.getElementById('select-idioma-com-cliente');
+  if (!sel || sel.options.length > 0) {
+    if (sel && sel.options.length > 0) cargarComunicacionesCliente();
+    return;
+  }
+  fetch('/api/idiomas-activos')
+    .then(function(r) { return r.json(); })
+    .then(function(idiomas) {
+      sel.innerHTML = '';
+      idiomas.forEach(function(id) {
+        if (id.codigo === 'es') return;
+        var opt = document.createElement('option');
+        opt.value = id.codigo;
+        opt.textContent = id.nombre;
+        sel.appendChild(opt);
+      });
+      if (sel.options.length) {
+        _comClienteLang = sel.value;
+        cargarComunicacionesCliente();
+      }
+    });
+}
+
+function cargarComunicacionesCliente() {
+  var sel = document.getElementById('select-idioma-com-cliente');
+  if (!sel) return;
+  _comClienteLang = sel.value;
+  document.getElementById('tabla-com-email').innerHTML = '<p style="padding:12px 16px;color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+  document.getElementById('tabla-com-wa').innerHTML = '<p style="padding:12px 16px;color:var(--texto-muted);font-size:13px;">Cargando...</p>';
+
+  fetch('/admin/plantillas-comunicacion-traducciones/' + _comClienteLang)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _comClienteDatos = data.plantillas || [];
+
+      // Resumen general
+      var conEmail = _comClienteDatos.filter(function(p) { return p.tiene_email; }).length;
+      var conWa = _comClienteDatos.filter(function(p) { return p.tiene_whatsapp; }).length;
+      var total = _comClienteDatos.length;
+      var resumen = document.getElementById('com-cliente-resumen');
+      if (resumen) resumen.textContent = conEmail + '/' + total + ' emails · ' + conWa + '/' + total + ' WhatsApp traducidos';
+
+      // Resumen sub-bloques
+      var resEmail = document.getElementById('sub-com-email-resumen');
+      var resWa = document.getElementById('sub-com-wa-resumen');
+      if (resEmail) resEmail.textContent = conEmail + ' de ' + total + ' traducidos';
+      if (resWa) resWa.textContent = conWa + ' de ' + total + ' traducidos';
+
+      renderTablaComCliente('email');
+      renderTablaComCliente('wa');
+    })
+    .catch(function() {
+      document.getElementById('tabla-com-email').innerHTML = '<p style="padding:12px;color:red;">Error cargando datos.</p>';
+      document.getElementById('tabla-com-wa').innerHTML = '<p style="padding:12px;color:red;">Error cargando datos.</p>';
+    });
+}
+
+function renderTablaComCliente(tipo) {
+  var contenedor = document.getElementById('tabla-com-' + tipo);
+  if (!contenedor) return;
+
+  var html = '<table class="tabla-admin" style="font-size:0.85rem;width:100%;">';
+  html += '<thead><tr>';
+  html += '<th style="text-align:left;width:45%;">Original en español</th>';
+  html += '<th style="text-align:left;width:45%;">Traducción (' + _comClienteLang.toUpperCase() + ')</th>';
+  html += '<th style="text-align:center;width:10%;"></th>';
+  html += '</tr></thead><tbody>';
+
+  _comClienteDatos.forEach(function(p) {
+    var traducido = tipo === 'email' ? p.tiene_email : p.tiene_whatsapp;
+    var estadoBadge = traducido
+      ? '<span style="color:green;font-size:11px;">✓ Traducido</span>'
+      : '<span style="color:#ccc;font-size:11px;">— Pendiente</span>';
+    var iaLabel = p.generado_por_ia ? ' 🤖' : '';
+
+    html += '<tr>';
+    html += '<td style="vertical-align:top;">';
+    html += '<strong style="font-size:12px;">' + p.nombre + '</strong><br>';
+    html += '<span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + p.clave + '</span>';
+    html += '</td>';
+    html += '<td style="vertical-align:top;">' + estadoBadge + iaLabel + '</td>';
+    html += '<td style="text-align:center;vertical-align:middle;">';
+    html += '<button class="boton-primario" style="font-size:0.75rem;padding:5px 10px;" ';
+    html += 'onclick="abrirModalComTrad('' + p.clave + '','' + p.nombre.replace(/'/g, '') + '','' + tipo + '')">✏️</button>';
+    html += '</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  contenedor.innerHTML = html;
+}
+
+function abrirModalComTrad(clave, nombre, tipo) {
+  _comClienteClaveTrad = clave;
+  _comClienteTipoTrad = tipo;
+
+  document.getElementById('modal-com-trad-titulo').textContent = nombre;
+  document.getElementById('modal-com-trad-subtitulo').textContent = clave + ' · ' + _comClienteLang.toUpperCase() + ' · ' + (tipo === 'email' ? 'Email' : 'WhatsApp');
+  document.getElementById('modal-com-trad-lang-label').textContent = _comClienteLang.toUpperCase();
+  document.getElementById('modal-com-trad-asunto').value = '';
+  document.getElementById('modal-com-trad-texto').value = '';
+  document.getElementById('modal-com-trad-ref-asunto').innerHTML = '';
+  document.getElementById('modal-com-trad-ref-texto').textContent = '';
+  document.getElementById('modal-com-trad-msg-ok').style.display = 'none';
+  document.getElementById('modal-com-trad-msg-err').style.display = 'none';
+
+  // Mostrar u ocultar campo asunto según tipo
+  var campoAsunto = document.getElementById('modal-com-trad-campo-asunto');
+  campoAsunto.style.display = tipo === 'email' ? 'block' : 'none';
+  document.getElementById('modal-com-trad-campo-label').textContent = tipo === 'email' ? 'Cuerpo del email (' + _comClienteLang.toUpperCase() + ')' : 'Texto WhatsApp (' + _comClienteLang.toUpperCase() + ')';
+
+  // Cargar texto original en español
+  fetch('/admin/plantillas-comunicacion/' + clave)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var refAsunto = document.getElementById('modal-com-trad-ref-asunto');
+      var refTexto = document.getElementById('modal-com-trad-ref-texto');
+      if (tipo === 'email') {
+        if (refAsunto) refAsunto.innerHTML = '<strong>Asunto:</strong> ' + (d.asunto_email || '—');
+        if (refTexto) refTexto.textContent = d.cuerpo_email ? d.cuerpo_email.replace(/<[^>]+>/g, '').substring(0, 400) + (d.cuerpo_email.length > 400 ? '...' : '') : '—';
+      } else {
+        if (refAsunto) refAsunto.innerHTML = '';
+        if (refTexto) refTexto.textContent = d.cuerpo_whatsapp ? d.cuerpo_whatsapp.substring(0, 400) + (d.cuerpo_whatsapp.length > 400 ? '...' : '') : '—';
+      }
+    });
+
+  // Cargar traducción existente si la hay
+  fetch('/admin/plantillas-comunicacion/' + clave + '/traducciones')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var trad = (d.traducciones || []).find(function(t) { return t.lang_code === _comClienteLang; });
+      if (trad) {
+        if (tipo === 'email') {
+          document.getElementById('modal-com-trad-asunto').value = trad.asunto_email || '';
+          document.getElementById('modal-com-trad-texto').value = trad.cuerpo_email || '';
+        } else {
+          document.getElementById('modal-com-trad-texto').value = trad.cuerpo_whatsapp || '';
+        }
+      }
+    });
+
+  document.getElementById('modal-com-trad').classList.remove('oculto');
+}
+
+function cerrarModalComTrad() {
+  document.getElementById('modal-com-trad').classList.add('oculto');
+  _comClienteClaveTrad = null;
+  _comClienteTipoTrad = null;
+}
+
+function guardarComTrad() {
+  if (!_comClienteClaveTrad || !_comClienteTipoTrad) return;
+  var texto = document.getElementById('modal-com-trad-texto').value.trim();
+  var asunto = document.getElementById('modal-com-trad-asunto').value.trim();
+  document.getElementById('modal-com-trad-msg-ok').style.display = 'none';
+  document.getElementById('modal-com-trad-msg-err').style.display = 'none';
+
+  // Primero cargamos la traducción existente para no borrar el otro campo
+  fetch('/admin/plantillas-comunicacion/' + _comClienteClaveTrad + '/traducciones')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var trad = (d.traducciones || []).find(function(t) { return t.lang_code === _comClienteLang; }) || {};
+      var body = {
+        asunto_email: _comClienteTipoTrad === 'email' ? asunto : (trad.asunto_email || ''),
+        cuerpo_email: _comClienteTipoTrad === 'email' ? texto : (trad.cuerpo_email || ''),
+        cuerpo_whatsapp: _comClienteTipoTrad === 'wa' ? texto : (trad.cuerpo_whatsapp || ''),
+        generado_por_ia: false
+      };
+      return fetch('/admin/plantillas-comunicacion/' + _comClienteClaveTrad + '/traducciones/' + _comClienteLang, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        document.getElementById('modal-com-trad-msg-ok').style.display = 'inline';
+        cargarComunicacionesCliente();
+      } else {
+        document.getElementById('modal-com-trad-msg-err').style.display = 'inline';
+      }
+    })
+    .catch(function() { document.getElementById('modal-com-trad-msg-err').style.display = 'inline'; });
+}
+
+function generarComunicacionesClienteIA() {
+  // Placeholder — se conectará al Generador dedicado en la siguiente fase
+  var msg = document.getElementById('com-cliente-msg-ia');
+  msg.textContent = '🤖 El generador dedicado se añadirá en la siguiente fase.';
+  msg.style.display = 'inline';
+  setTimeout(function() { msg.style.display = 'none'; }, 3000);
 }
 
 function abrirEditorTexto(textoId) {
@@ -8093,170 +8343,6 @@ var _plantillasCom = [];
 var _plantillaComActual = null;
 var _filtroCom = 'todas';
 
-// ─── Traducciones de comunicaciones ──────────────────────────────────────────
-var _tradComLang = '';
-var _tradComPlantillaActual = null;
-var _plantillaComEsActual = null;
-
-function iniciarSelectorIdiomasTradCom() {
-  var sel = document.getElementById('select-idioma-com-trad');
-  if (!sel) return;
-  fetch('/api/idiomas-activos')
-    .then(function(r) { return r.json(); })
-    .then(function(idiomas) {
-      // Opción española primero
-      sel.innerHTML = '<option value="es">🇪🇸 Español (original)</option>';
-      idiomas.forEach(function(id) {
-        if (id.codigo === 'es') return;
-        var opt = document.createElement('option');
-        opt.value = id.codigo;
-        opt.textContent = id.nombre;
-        sel.appendChild(opt);
-      });
-      _tradComLang = 'es';
-      actualizarVistaCom();
-    });
-}
-
-function cambiarIdiomasCom() {
-  var sel = document.getElementById('select-idioma-com-trad');
-  _tradComLang = sel ? sel.value : 'es';
-  actualizarVistaCom();
-}
-
-function actualizarVistaCom() {
-  var resumen = document.getElementById('trad-com-resumen');
-  if (_tradComLang === 'es') {
-    if (resumen) resumen.textContent = '';
-    renderPlantillasCom();
-  } else {
-    cargarTradCom();
-  }
-}
-
-function cargarTradCom() {
-  var sel = document.getElementById('select-idioma-com-trad');
-  if (!sel) return;
-  _tradComLang = sel.value;
-  var contenedor = document.getElementById('tabla-trad-com');
-  contenedor.innerHTML = '<p style="color:var(--texto-muted);">Cargando...</p>';
-  fetch('/admin/plantillas-comunicacion-traducciones/' + _tradComLang)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      var plantillas = data.plantillas || [];
-      var completas = plantillas.filter(function(p) { return p.tiene_email || p.tiene_whatsapp; }).length;
-      var resumen = document.getElementById('trad-com-resumen');
-      if (resumen) resumen.textContent = completas + ' de ' + plantillas.length + ' plantillas con traducción';
-
-      var html = '<div class="tabla-envoltura"><table class="tabla-admin" style="font-size:0.85rem;width:100%;">';
-      html += '<thead><tr>';
-      html += '<th style="text-align:left;">Plantilla</th>';
-      html += '<th style="text-align:center;width:80px;">Email</th>';
-      html += '<th style="text-align:center;width:80px;">WhatsApp</th>';
-      html += '<th style="text-align:right;width:120px;"></th>';
-      html += '</tr></thead><tbody>';
-      plantillas.forEach(function(p) {
-        var iconoEmail = p.tiene_email ? '<span style="color:green;">✓</span>' : '<span style="color:#ccc;">—</span>';
-        var iconoWa = p.tiene_whatsapp ? '<span style="color:green;">✓</span>' : '<span style="color:#ccc;">—</span>';
-        var iaLabel = p.generado_por_ia ? ' <span style="font-size:10px;color:var(--texto-muted);">🤖</span>' : '';
-        html += '<tr>';
-        html += '<td><strong>' + p.nombre + '</strong>' + iaLabel + '<br><span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + p.clave + '</span></td>';
-        html += '<td style="text-align:center;">' + iconoEmail + '</td>';
-        html += '<td style="text-align:center;">' + iconoWa + '</td>';
-        html += '<td style="text-align:right;"><button class="boton-primario" style="font-size:0.8rem;padding:6px 12px;" onclick="abrirModalTradCom(\'' + p.clave + '\',\'' + p.nombre.replace(/'/g,'') + '\')">✏️ Editar</button></td>';
-        html += '</tr>';
-      });
-      html += '</tbody></table></div>';
-      contenedor.innerHTML = html;
-    })
-    .catch(function() {
-      document.getElementById('tabla-trad-com').innerHTML = '<p style="color:red;">Error cargando traducciones.</p>';
-    });
-}
-
-function abrirModalTradCom(clave, nombre) {
-  _tradComPlantillaActual = clave;
-  document.getElementById('modal-trad-com-titulo').textContent = nombre;
-  document.getElementById('modal-trad-com-subtitulo').textContent = clave + ' · ' + _tradComLang.toUpperCase();
-  document.getElementById('trad-com-asunto').value = '';
-  document.getElementById('trad-com-email').value = '';
-  document.getElementById('trad-com-wa').value = '';
-  document.getElementById('trad-com-msg-ok').style.display = 'none';
-  document.getElementById('trad-com-msg-err').style.display = 'none';
-  document.getElementById('trad-com-msg-ia').style.display = 'none';
-  switchTabTradCom('email');
-
-  _plantillaComEsActual = null;
-  fetch('/admin/plantillas-comunicacion/' + clave)
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      _plantillaComEsActual = d;
-      var refAsunto = document.getElementById('modal-trad-ref-asunto');
-      var refEmail = document.getElementById('modal-trad-ref-email');
-      if (refAsunto) refAsunto.innerHTML = '<strong>Asunto:</strong> ' + (d.asunto_email || '—');
-      if (refEmail) refEmail.textContent = d.cuerpo_email ? d.cuerpo_email.replace(/<[^>]+>/g,'').substring(0,300) + '...' : '—';
-    });
-
-  fetch('/admin/plantillas-comunicacion/' + clave + '/traducciones')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      var trad = (d.traducciones || []).find(function(t) { return t.lang_code === _tradComLang; });
-      if (trad) {
-        document.getElementById('trad-com-asunto').value = trad.asunto_email || '';
-        document.getElementById('trad-com-email').value = trad.cuerpo_email || '';
-        document.getElementById('trad-com-wa').value = trad.cuerpo_whatsapp || '';
-      }
-    });
-
-  document.getElementById('modal-trad-com').classList.remove('oculto');
-}
-
-function cerrarModalTradCom() {
-  document.getElementById('modal-trad-com').classList.add('oculto');
-  _tradComPlantillaActual = null;
-}
-
-function switchTabTradCom(tab) {
-  document.getElementById('trad-panel-email').style.display = tab === 'email' ? 'block' : 'none';
-  document.getElementById('trad-panel-wa').style.display = tab === 'wa' ? 'block' : 'none';
-  document.getElementById('trad-tab-email-btn').style.borderBottomColor = tab === 'email' ? 'var(--acento)' : 'transparent';
-  document.getElementById('trad-tab-email-btn').style.fontWeight = tab === 'email' ? '600' : 'normal';
-  document.getElementById('trad-tab-email-btn').style.color = tab === 'email' ? 'var(--texto)' : 'var(--texto-muted)';
-  document.getElementById('trad-tab-wa-btn').style.borderBottomColor = tab === 'wa' ? 'var(--acento)' : 'transparent';
-  document.getElementById('trad-tab-wa-btn').style.fontWeight = tab === 'wa' ? '600' : 'normal';
-  document.getElementById('trad-tab-wa-btn').style.color = tab === 'wa' ? 'var(--texto)' : 'var(--texto-muted)';
-}
-
-function guardarTradCom() {
-  if (!_tradComPlantillaActual) return;
-  var asunto = document.getElementById('trad-com-asunto').value.trim();
-  var email = document.getElementById('trad-com-email').value.trim();
-  var wa = document.getElementById('trad-com-wa').value.trim();
-  document.getElementById('trad-com-msg-ok').style.display = 'none';
-  document.getElementById('trad-com-msg-err').style.display = 'none';
-  fetch('/admin/plantillas-comunicacion/' + _tradComPlantillaActual + '/traducciones/' + _tradComLang, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ asunto_email: asunto, cuerpo_email: email, cuerpo_whatsapp: wa, generado_por_ia: false })
-  })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d.ok) {
-        document.getElementById('trad-com-msg-ok').style.display = 'inline';
-        cargarTradCom();
-      } else {
-        document.getElementById('trad-com-msg-err').style.display = 'inline';
-      }
-    })
-    .catch(function() { document.getElementById('trad-com-msg-err').style.display = 'inline'; });
-}
-
-function generarTradComIA() {
-  var msgIA = document.getElementById('trad-com-msg-ia');
-  msgIA.textContent = '🤖 El generador se añadirá en la siguiente fase.';
-  msgIA.style.display = 'inline';
-  setTimeout(function() { msgIA.style.display = 'none'; }, 3000);
-}
 
 function cargarPlantillasCom() {
   fetch('/admin/plantillas-comunicacion')
