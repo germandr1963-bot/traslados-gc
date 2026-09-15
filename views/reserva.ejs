@@ -953,8 +953,8 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
       return;
     }
     lista.innerHTML = extras.map(function(ex){
-      return '<div class="extra-item" id="extra-' + ex.extra_id + '" onclick="toggleExtra(' + ex.extra_id + ')">' +
-        '<div class="extra-check" id="check-' + ex.extra_id + '"></div>' +
+      return '<div class="extra-item" id="extra-' + ex.id_ui + '" onclick="toggleExtra(\'' + ex.id_ui + '\')">' +
+        '<div class="extra-check" id="check-' + ex.id_ui + '"></div>' +
         '<span class="extra-nombre">' + (ex.nombre_traducido || ex.nombre) + '</span>' +
         '<span class="extra-precio">' + (Number(ex.precio) === 0 ? TXT.extrasGratis : Number(ex.precio).toFixed(2) + ' €') + '</span>' +
       '</div>';
@@ -1271,13 +1271,33 @@ document.getElementById('modal-cotizacion').addEventListener('click', function(e
 });
 
 // ── Extras ──────────────────────────────────────────────────────────────────
-function toggleExtra(id) {
-  var ex = extrasData.find(function(e){ return e.extra_id === id; });
-  var idx = extrasSeleccionados.findIndex(function(e){ return e.extra_id === id; });
-  var item = document.getElementById('extra-' + id);
-  var check = document.getElementById('check-' + id);
-  if (idx === -1) { extrasSeleccionados.push(ex); item.classList.add('seleccionado'); check.textContent = '✓'; }
-  else { extrasSeleccionados.splice(idx,1); item.classList.remove('seleccionado'); check.textContent = ''; }
+function toggleExtra(idUi) {
+  var ex = extrasData.find(function(e){ return e.id_ui === idUi; });
+  if (!ex) return;
+  var idx = extrasSeleccionados.findIndex(function(e){ return e.id_ui === idUi; });
+  var item = document.getElementById('extra-' + idUi);
+  var check = document.getElementById('check-' + idUi);
+
+  if (idx === -1) {
+    // Si ya hay seleccionada otra modalidad del mismo extra, desmarcamos la anterior
+    var otraIdx = extrasSeleccionados.findIndex(function(e){ return e.extra_id === ex.extra_id; });
+    if (otraIdx !== -1) {
+      var otraUi = extrasSeleccionados[otraIdx].id_ui;
+      extrasSeleccionados.splice(otraIdx, 1);
+      var otraItem = document.getElementById('extra-' + otraUi);
+      var otraCheck = document.getElementById('check-' + otraUi);
+      if (otraItem) otraItem.classList.remove('seleccionado');
+      if (otraCheck) otraCheck.textContent = '';
+    }
+    extrasSeleccionados.push(ex);
+    item.classList.add('seleccionado');
+    check.textContent = '✓';
+  } else {
+    extrasSeleccionados.splice(idx, 1);
+    item.classList.remove('seleccionado');
+    check.textContent = '';
+  }
+
   var total = extrasSeleccionados.reduce(function(s,e){ return s + Number(e.precio); }, 0);
   var box = document.getElementById('total-extras');
   box.style.display = extrasSeleccionados.length ? 'flex' : 'none';
