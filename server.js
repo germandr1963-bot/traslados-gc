@@ -13826,6 +13826,69 @@ app.put('/admin/plantillas-comunicacion/:clave', requireAdmin, asyncHandler(asyn
   res.json({ ok: true, plantilla: result.rows[0] });
 }));
 
+// ─── Traducciones de plantillas de comunicación ──────────────────────────────
+
+// GET — obtener todas las traducciones de una plantilla
+app.get('/admin/plantillas-comunicacion/:clave/traducciones', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en
+     FROM plantillas_comunicacion_traducciones
+     WHERE plantilla_clave = $1
+     ORDER BY lang_code`,
+    [req.params.clave]
+  );
+  res.json({ traducciones: result.rows });
+}));
+
+// GET — obtener traducciones de todas las plantillas cliente para un idioma (para el panel resumen)
+app.get('/admin/plantillas-comunicacion-traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang } = req.params;
+  const plantillas = await pool.query(
+    `SELECT clave, nombre FROM plantillas_comunicacion WHERE categoria = 'cliente' ORDER BY nombre`
+  );
+  const traducciones = await pool.query(
+    `SELECT plantilla_clave, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en
+     FROM plantillas_comunicacion_traducciones
+     WHERE lang_code = $1`,
+    [lang]
+  );
+  const mapaTrads = {};
+  traducciones.rows.forEach(function(t) { mapaTrads[t.plantilla_clave] = t; });
+  const resultado = plantillas.rows.map(function(p) {
+    const trad = mapaTrads[p.clave] || null;
+    return {
+      clave: p.clave,
+      nombre: p.nombre,
+      tiene_email: !!(trad && trad.cuerpo_email && trad.cuerpo_email.trim()),
+      tiene_whatsapp: !!(trad && trad.cuerpo_whatsapp && trad.cuerpo_whatsapp.trim()),
+      tiene_asunto: !!(trad && trad.asunto_email && trad.asunto_email.trim()),
+      generado_por_ia: trad ? trad.generado_por_ia : false,
+      actualizado_en: trad ? trad.actualizado_en : null
+    };
+  });
+  res.json({ lang, plantillas: resultado });
+}));
+
+// PUT — guardar o actualizar una traducción
+app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const { clave, lang } = req.params;
+  const { asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia } = req.body;
+  await pool.query(
+    `INSERT INTO plantillas_comunicacion_traducciones
+       (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW())
+     ON CONFLICT (plantilla_clave, lang_code)
+     DO UPDATE SET
+       asunto_email = EXCLUDED.asunto_email,
+       cuerpo_email = EXCLUDED.cuerpo_email,
+       cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp,
+       generado_por_ia = EXCLUDED.generado_por_ia,
+       actualizado_en = NOW()`,
+    [clave, lang, asunto_email || null, cuerpo_email || null, cuerpo_whatsapp || null, !!generado_por_ia]
+  );
+  res.json({ ok: true });
+}));
+
 // ─── Tarea automática: cancelar reservas confirmadas sin pago de depósito ────
 // Corre cada hora. Busca reservas confirmadas cuyo plazo de pago ya venció
 // y el depósito no fue pagado. Las cancela y notifica al cliente y al chofer.
