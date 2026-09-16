@@ -554,7 +554,7 @@ table.tabla-precios input {
               <div style="background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
                 <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;" id="modal-com-trad-ref-trad-label">🌐 Preview</p>
                 <div id="modal-com-trad-ref-asunto-trad" style="font-size:12px;font-weight:600;margin-bottom:8px;display:none;"></div>
-                <div id="modal-com-trad-ref-trad" style="font-size:12px;color:var(--texto-oscuro);line-height:1.6;max-height:200px;overflow-y:auto;"></div>
+                <div id="modal-com-trad-ref-trad" style="font-size:12px;color:var(--texto-oscuro);white-space:pre-wrap;line-height:1.6;max-height:200px;overflow-y:auto;"></div>
               </div>
 
             </div>
@@ -4910,16 +4910,10 @@ function abrirModalComTrad(clave, tipo, lang) {
     var refTexto = document.getElementById('modal-com-trad-ref-texto');
     if (tipo === 'email') {
       if (refAsunto) refAsunto.innerHTML = '<strong>Asunto:</strong> ' + (plantilla.asunto_es || '—');
-      if (refTexto) refTexto.innerHTML = plantilla.texto_es_email || '';
+      if (refTexto) refTexto.textContent = (plantilla.texto_es_email || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
     } else {
       if (refAsunto) refAsunto.innerHTML = '';
-      if (refTexto) {
-        var waEs = (plantilla.texto_es_wa || '');
-        refTexto.innerHTML = waEs
-          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-          .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
-          .replace(/\n/g, '<br>');
-      }
+      if (refTexto) refTexto.textContent = plantilla.texto_es_wa || '';
     }
   }
 
@@ -4937,13 +4931,9 @@ function abrirModalComTrad(clave, tipo, lang) {
   textarea._previewHandler = function() {
     if (refTrad) {
       if (_comClienteTipoTrad === 'email') {
-        refTrad.innerHTML = textarea.value;
+        refTrad.textContent = textarea.value.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
       } else {
-        // WhatsApp: convertir \n a saltos de línea visibles, *negrita*, sin HTML
-        refTrad.innerHTML = textarea.value
-          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-          .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
-          .replace(/\n/g, '<br>');
+        refTrad.textContent = textarea.value;
       }
     }
   };
@@ -4963,18 +4953,12 @@ function abrirModalComTrad(clave, tipo, lang) {
             refAsuntoTrad.innerHTML = '<strong>Asunto:</strong> ' + trad.asunto_email;
             refAsuntoTrad.style.display = 'block';
           }
-          // Preview cuerpo
-          if (refTrad) refTrad.innerHTML = trad.cuerpo_email || '<span style="color:var(--texto-muted);">— sin traducción aún —</span>';
+          // Preview cuerpo en texto plano
+          if (refTrad) refTrad.textContent = (trad.cuerpo_email || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim() || '— sin traducción aún —';
         } else {
           textarea.value = trad.cuerpo_whatsapp || '';
-          // Preview WhatsApp
-          if (refTrad) {
-            var waTexto = (trad.cuerpo_whatsapp || '');
-            refTrad.innerHTML = waTexto
-              .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-              .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
-              .replace(/\n/g, '<br>') || '<span style="color:var(--texto-muted);">— sin traducción aún —</span>';
-          }
+          // Preview WhatsApp en texto plano
+          if (refTrad) refTrad.textContent = trad.cuerpo_whatsapp || '— sin traducción aún —';
         }
       } else {
         if (refTrad) refTrad.innerHTML = '<span style="color:var(--texto-muted);">— sin traducción aún —</span>';
