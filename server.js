@@ -13844,35 +13844,60 @@ app.get('/admin/plantillas-comunicacion/:clave/traducciones', requireAdmin, asyn
 app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandler(async (req, res) => {
   // Devuelve todas las plantillas cliente con estado por idioma — igual que /admin/textos
   const plantillas = await pool.query(
-    `SELECT clave, nombre, asunto_email, cuerpo_email, cuerpo_whatsapp
+    `SELECT clave, nombre, asunto_email, cuerpo_email, cuerpo_whatsapp, actualizado_en
      FROM plantillas_comunicacion WHERE categoria = 'cliente' ORDER BY nombre`
   );
   const traducciones = await pool.query(
-    `SELECT plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp
+    `SELECT plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp,
+            generado_por_ia, actualizado_en
      FROM plantillas_comunicacion_traducciones`
   );
 
-  // Mapa: plantilla_clave -> { lang_code -> { email: bool, wa: bool } }
+  // Mapa: plantilla_clave -> { lang_code -> { email, wa, generado_por_ia, actualizado_en } }
   const mapaTrads = {};
   for (const t of traducciones.rows) {
     if (!mapaTrads[t.plantilla_clave]) mapaTrads[t.plantilla_clave] = {};
     mapaTrads[t.plantilla_clave][t.lang_code] = {
-      email: !!(t.cuerpo_email && t.cuerpo_email.trim()),
-      wa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()),
-      asunto: !!(t.asunto_email && t.asunto_email.trim())
+      email:          !!(t.cuerpo_email && t.cuerpo_email.trim()),
+      wa:             !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()),
+      asunto:         !!(t.asunto_email && t.asunto_email.trim()),
+      generado_por_ia: !!t.generado_por_ia,
+      actualizado_en:  t.actualizado_en
     };
   }
 
   const idiomas = IDIOMAS_TRADUCIBLES; // excluye español — es el original
 
   const lista = plantillas.rows.map(function(p) {
+    // estado: null = sin traducción, 'ia' = generado por IA pendiente revisión,
+    //         'desactualizado' = español más reciente que la traducción, 'ok' = revisado y al día
     const estadoEmail = { es: !!(p.cuerpo_email && p.cuerpo_email.trim()) };
     const estadoWa    = { es: !!(p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim()) };
+
     for (const lang of idiomas) {
       const t = mapaTrads[p.clave] && mapaTrads[p.clave][lang];
-      estadoEmail[lang] = !!(t && t.email);
-      estadoWa[lang]    = !!(t && t.wa);
+
+      if (!t || !t.email) {
+        estadoEmail[lang] = null;
+      } else if (t.generado_por_ia) {
+        estadoEmail[lang] = 'ia';
+      } else if (p.actualizado_en && t.actualizado_en && new Date(p.actualizado_en) > new Date(t.actualizado_en)) {
+        estadoEmail[lang] = 'desactualizado';
+      } else {
+        estadoEmail[lang] = 'ok';
+      }
+
+      if (!t || !t.wa) {
+        estadoWa[lang] = null;
+      } else if (t.generado_por_ia) {
+        estadoWa[lang] = 'ia';
+      } else if (p.actualizado_en && t.actualizado_en && new Date(p.actualizado_en) > new Date(t.actualizado_en)) {
+        estadoWa[lang] = 'desactualizado';
+      } else {
+        estadoWa[lang] = 'ok';
+      }
     }
+
     return {
       clave: p.clave,
       nombre: p.nombre,
