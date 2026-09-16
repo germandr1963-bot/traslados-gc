@@ -4946,11 +4946,45 @@ function guardarComTrad() {
 }
 
 function generarComunicacionesClienteIA() {
-  // Placeholder — generador dedicado en siguiente fase
+  var lang = document.getElementById('select-com-cliente-ia').value;
   var msg = document.getElementById('com-cliente-msg-ia');
-  msg.textContent = '🤖 El generador dedicado se añadirá en la siguiente fase.';
+  if (!lang) {
+    msg.textContent = 'Selecciona un idioma.';
+    msg.style.color = 'var(--rojo-error)';
+    msg.style.display = 'inline';
+    setTimeout(function() { msg.style.display = 'none'; }, 3000);
+    return;
+  }
+  msg.textContent = '🤖 Generando con IA, puede tardar unos segundos...';
+  msg.style.color = 'var(--acento)';
   msg.style.display = 'inline';
-  setTimeout(function() { msg.style.display = 'none'; }, 3000);
+
+  fetch('/admin/plantillas-comunicacion/generar-ia/' + lang, { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(respuesta) {
+      if (!respuesta.ok) {
+        msg.textContent = '❌ Error: ' + (respuesta.error || 'Error al generar');
+        msg.style.color = 'var(--rojo-error)';
+        return;
+      }
+      if (respuesta.generadas === 0) {
+        msg.textContent = '✅ Ya estaba todo generado en ' + lang.toUpperCase() + '.';
+        msg.style.color = '#2e7d32';
+      } else {
+        msg.textContent = '✅ ' + respuesta.generadas + ' plantilla(s) generadas en ' + lang.toUpperCase() + '.';
+        msg.style.color = '#2e7d32';
+        _comClienteDatos = null; // forzar recarga de la tabla
+        cargarComunicacionesCliente();
+      }
+      if (respuesta.errores && respuesta.errores.length > 0) {
+        console.warn('[GEN15/16] Errores parciales:', respuesta.errores);
+        msg.textContent += ' (' + respuesta.errores.length + ' con error — ver consola)';
+      }
+    })
+    .catch(function() {
+      msg.textContent = '❌ No se pudo conectar con la IA. Inténtalo de nuevo.';
+      msg.style.color = 'var(--rojo-error)';
+    });
 }
 
 
