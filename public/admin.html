@@ -4910,10 +4910,16 @@ function abrirModalComTrad(clave, tipo, lang) {
     var refTexto = document.getElementById('modal-com-trad-ref-texto');
     if (tipo === 'email') {
       if (refAsunto) refAsunto.innerHTML = '<strong>Asunto:</strong> ' + (plantilla.asunto_es || '—');
-      if (refTexto) refTexto.textContent = (plantilla.texto_es_email || '').replace(/<[^>]+>/g, '');
+      if (refTexto) refTexto.innerHTML = plantilla.texto_es_email || '';
     } else {
       if (refAsunto) refAsunto.innerHTML = '';
-      if (refTexto) refTexto.textContent = plantilla.texto_es_wa || '';
+      if (refTexto) {
+        var waEs = (plantilla.texto_es_wa || '');
+        refTexto.innerHTML = waEs
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
+          .replace(/\n/g, '<br>');
+      }
     }
   }
 
