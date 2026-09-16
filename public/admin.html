@@ -4910,7 +4910,7 @@ function abrirModalComTrad(clave, tipo, lang) {
     if (!iframe) return;
     var doc = iframe.contentDocument || iframe.contentWindow.document;
     doc.open();
-    doc.write(html || '');
+    doc.write((html || '').replace(/\n/g, '<br>'));
     doc.close();
     setTimeout(function() {
       try { iframe.style.height = (doc.body.scrollHeight + 20) + 'px'; } catch(e) {}
@@ -4939,9 +4939,8 @@ function abrirModalComTrad(clave, tipo, lang) {
     if (!iframe) return;
     var doc = iframe.contentDocument || iframe.contentWindow.document;
     doc.open();
-    doc.write(html || '<p style="color:#999;font-size:12px;">— sin traducción aún —</p>');
+    doc.write((html || '<p style="color:#999;font-size:12px;">— sin traducción aún —</p>').replace(/\n/g, '<br>'));
     doc.close();
-    // Ajustar altura al contenido
     setTimeout(function() {
       try { iframe.style.height = (doc.body.scrollHeight + 20) + 'px'; } catch(e) {}
     }, 50);
