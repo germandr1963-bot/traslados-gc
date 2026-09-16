@@ -13938,8 +13938,13 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
 // Guarda directamente en BD sin revisión previa (igual que otros generadores masivos).
 app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const lang = req.params.lang;
+  const tipo = req.body && req.body.tipo; // 'email' | 'wa'
+
   if (!IDIOMAS_TRADUCIBLES.includes(lang)) {
     return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  if (!['email', 'wa'].includes(tipo)) {
+    return res.status(400).json({ error: 'Parámetro tipo inválido. Usa email o wa.' });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -13947,15 +13952,13 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
     return res.status(500).json({ error: 'Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.' });
   }
 
-  // Cargar todas las plantillas de cliente con su contenido en español
   const plantillas = await pool.query(
     `SELECT clave, nombre, asunto_email, cuerpo_email, cuerpo_whatsapp
      FROM plantillas_comunicacion WHERE categoria = 'cliente' ORDER BY nombre`
   );
 
-  // Cargar las traducciones ya existentes para este idioma
   const tradExistentes = await pool.query(
-    `SELECT plantilla_clave, cuerpo_email, cuerpo_whatsapp
+    `SELECT plantilla_clave, asunto_email, cuerpo_email, cuerpo_whatsapp
      FROM plantillas_comunicacion_traducciones WHERE lang_code = $1`,
     [lang]
   );
@@ -13973,12 +13976,12 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
 
   for (const p of plantillas.rows) {
     const existente = mapaExistentes[p.clave] || { tieneEmail: false, tieneWa: false };
-    let nuevoEmail = null;
+    const filaActual = tradExistentes.rows.find(function (t) { return t.plantilla_clave === p.clave; }) || {};
     let nuevoAsunto = null;
-    let nuevoWa = null;
+    let nuevoEmail  = null;
+    let nuevoWa     = null;
 
-    // ── Email: generar si falta y hay original en español ──
-    if (!existente.tieneEmail && p.cuerpo_email && p.cuerpo_email.trim()) {
+    if (tipo === 'email' && !existente.tieneEmail && p.cuerpo_email && p.cuerpo_email.trim()) {
       try {
         const promptEmail = iaPrompts.GENERADOR_EMAIL_COMUNICACIONES(
           nombreIdioma,
@@ -13992,8 +13995,7 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
         });
         if (!respEmail.ok) throw new Error('API error ' + respEmail.status);
         const dataEmail = await respEmail.json();
-        const textoEmail = dataEmail.content.map(function (b) { return b.text || ''; }).join('');
-        const limpiEmail = textoEmail.replace(/```json|```/g, '').trim();
+        const limpiEmail = dataEmail.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
         console.log('[GEN15] Email', p.clave, lang, '—', limpiEmail.slice(0, 150));
         const parsedEmail = JSON.parse(limpiEmail);
         nuevoAsunto = parsedEmail.asunto_email || null;
@@ -14004,8 +14006,7 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
       }
     }
 
-    // ── WhatsApp: generar si falta y hay original en español ──
-    if (!existente.tieneWa && p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim()) {
+    if (tipo === 'wa' && !existente.tieneWa && p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim()) {
       try {
         const promptWa = iaPrompts.GENERADOR_WA_COMUNICACIONES(
           nombreIdioma,
@@ -14018,8 +14019,7 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
         });
         if (!respWa.ok) throw new Error('API error ' + respWa.status);
         const dataWa = await respWa.json();
-        const textoWa = dataWa.content.map(function (b) { return b.text || ''; }).join('');
-        const limpiWa = textoWa.replace(/```json|```/g, '').trim();
+        const limpiWa = dataWa.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
         console.log('[GEN16] WA', p.clave, lang, '—', limpiWa.slice(0, 150));
         const parsedWa = JSON.parse(limpiWa);
         nuevoWa = (parsedWa.cuerpo_whatsapp && parsedWa.cuerpo_whatsapp !== 'null')
@@ -14031,10 +14031,7 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
       }
     }
 
-    // ── Guardar si hay algo nuevo ──
     if (nuevoEmail !== null || nuevoWa !== null) {
-      // Leer la fila existente para no machacar lo que ya hay
-      const filaActual = tradExistentes.rows.find(function (t) { return t.plantilla_clave === p.clave; }) || {};
       await pool.query(
         `INSERT INTO plantillas_comunicacion_traducciones
            (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en)
