@@ -486,20 +486,17 @@ table.tabla-precios input {
         <div id="bloque-com-cliente-contenido" style="display:none;margin-top:20px;">
           <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Traducciones de los emails y WhatsApp que recibe el cliente. El español es el original — se edita desde Admin → Comunicaciones. Aquí se gestionan los demás idiomas.</p>
 
-          <!-- Generador IA -->
-          <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
-            <span style="font-size:13px;">🤖 Generar comunicaciones con IA:</span>
-            <select id="select-com-cliente-ia" class="campo" style="height:34px;width:auto;"></select>
-            <button class="boton-costa" onclick="generarComunicacionesClienteIA()">Generar lo que falta</button>
-            <span id="com-cliente-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
-          </div>
-
           <!-- Tabla EMAIL -->
           <div style="margin-bottom:24px;">
             <h3 style="font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px;">
               📧 Cliente — Email
               <span id="com-email-pct" style="font-size:12px;font-weight:400;color:var(--texto-muted);"></span>
             </h3>
+            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+              <select id="select-com-email-ia" class="campo" style="height:34px;width:auto;"></select>
+              <button class="boton-costa" onclick="generarComunicacionesClienteIA('email', 'select-com-email-ia', 'com-email-msg-ia')">🤖 Generar Emails</button>
+              <span id="com-email-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
+            </div>
             <div class="tabla-envoltura">
               <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
                 <thead id="thead-com-email"></thead>
@@ -514,6 +511,11 @@ table.tabla-precios input {
               📱 Cliente — WhatsApp
               <span id="com-wa-pct" style="font-size:12px;font-weight:400;color:var(--texto-muted);"></span>
             </h3>
+            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+              <select id="select-com-wa-ia" class="campo" style="height:34px;width:auto;"></select>
+              <button class="boton-costa" onclick="generarComunicacionesClienteIA('wa', 'select-com-wa-ia', 'com-wa-msg-ia')">🤖 Generar WhatsApp</button>
+              <span id="com-wa-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
+            </div>
             <div class="tabla-envoltura">
               <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
                 <thead id="thead-com-wa"></thead>
@@ -4757,13 +4759,14 @@ function cargarComunicacionesCliente() {
     .then(function(data) {
       _comClienteDatos = data;
       renderizarComunicacionesCliente(data);
-      // Poblar selector IA
-      var sel = document.getElementById('select-com-cliente-ia');
-      if (sel) {
-        sel.innerHTML = data.idiomas.map(function(l) {
-          return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
-        }).join('');
-      }
+      // Poblar selectores IA
+      var opcionesIdioma = data.idiomas.map(function(l) {
+        return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
+      }).join('');
+      var selEmail = document.getElementById('select-com-email-ia');
+      if (selEmail) selEmail.innerHTML = opcionesIdioma;
+      var selWa = document.getElementById('select-com-wa-ia');
+      if (selWa) selWa.innerHTML = opcionesIdioma;
       // Calcular % global y mostrarlo en la cabecera del bloque
       var plantillas = data.plantillas || [];
       var idiomas = data.idiomas || [];
@@ -4875,10 +4878,10 @@ function renderizarComunicacionesCliente(data) {
 function abrirModalComTradBtn(btn) {
   var clave = btn.dataset.clave;
   var tipo = btn.dataset.tipo;
-  // Pedir al usuario que seleccione el idioma antes de editar
-  var sel = document.getElementById('select-com-cliente-ia');
+  var selId = (tipo === 'wa') ? 'select-com-wa-ia' : 'select-com-email-ia';
+  var sel = document.getElementById(selId);
   var lang = sel ? sel.value : '';
-  if (!lang) { alert('Selecciona primero un idioma en el selector de arriba.'); return; }
+  if (!lang) { alert('Selecciona primero un idioma en el selector correspondiente.'); return; }
   abrirModalComTrad(clave, tipo, lang);
 }
 
@@ -5044,9 +5047,9 @@ function guardarComTrad() {
     .catch(function() { document.getElementById('modal-com-trad-msg-err').style.display = 'inline'; });
 }
 
-function generarComunicacionesClienteIA() {
-  var lang = document.getElementById('select-com-cliente-ia').value;
-  var msg = document.getElementById('com-cliente-msg-ia');
+function generarComunicacionesClienteIA(tipo, selId, msgId) {
+  var lang = document.getElementById(selId).value;
+  var msg = document.getElementById(msgId);
   if (!lang) {
     msg.textContent = 'Selecciona un idioma.';
     msg.style.color = 'var(--rojo-error)';
@@ -5058,7 +5061,11 @@ function generarComunicacionesClienteIA() {
   msg.style.color = 'var(--acento)';
   msg.style.display = 'inline';
 
-  fetch('/admin/plantillas-comunicacion/generar-ia/' + lang, { method: 'POST' })
+  fetch('/admin/plantillas-comunicacion/generar-ia/' + lang, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tipo: tipo })
+  })
     .then(function(r) { return r.json(); })
     .then(function(respuesta) {
       if (!respuesta.ok) {
@@ -5072,7 +5079,7 @@ function generarComunicacionesClienteIA() {
       } else {
         msg.textContent = '✅ ' + respuesta.generadas + ' plantilla(s) generadas en ' + lang.toUpperCase() + '.';
         msg.style.color = '#2e7d32';
-        _comClienteDatos = null; // forzar recarga de la tabla
+        _comClienteDatos = null;
         cargarComunicacionesCliente();
       }
       if (respuesta.errores && respuesta.errores.length > 0) {
