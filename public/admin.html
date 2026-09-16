@@ -540,11 +540,23 @@ table.tabla-precios input {
           <!-- Dos columnas -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
 
-            <!-- Columna izquierda — Original en español (solo lectura) -->
-            <div style="background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
-              <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;">📋 Original en español</p>
-              <div id="modal-com-trad-ref-asunto" style="font-size:12px;font-weight:600;margin-bottom:8px;"></div>
-              <div id="modal-com-trad-ref-texto" style="font-size:12px;color:var(--texto-oscuro);white-space:pre-wrap;line-height:1.6;max-height:420px;overflow-y:auto;"></div>
+            <!-- Columna izquierda — Original en español + traducción limpia (solo lectura) -->
+            <div style="display:flex;flex-direction:column;gap:14px;">
+
+              <!-- Español -->
+              <div style="background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
+                <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;">📋 Original en español</p>
+                <div id="modal-com-trad-ref-asunto" style="font-size:12px;font-weight:600;margin-bottom:8px;"></div>
+                <div id="modal-com-trad-ref-texto" style="font-size:12px;color:var(--texto-oscuro);white-space:pre-wrap;line-height:1.6;max-height:200px;overflow-y:auto;"></div>
+              </div>
+
+              <!-- Preview renderizada del idioma destino — se actualiza en tiempo real -->
+              <div style="background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
+                <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;" id="modal-com-trad-ref-trad-label">🌐 Preview</p>
+                <div id="modal-com-trad-ref-asunto-trad" style="font-size:12px;font-weight:600;margin-bottom:8px;display:none;"></div>
+                <div id="modal-com-trad-ref-trad" style="font-size:12px;color:var(--texto-oscuro);line-height:1.6;max-height:200px;overflow-y:auto;"></div>
+              </div>
+
             </div>
 
             <!-- Columna derecha — Editable en el idioma destino -->
@@ -4892,20 +4904,46 @@ function abrirModalComTrad(clave, tipo, lang) {
     ? 'Cuerpo del email (' + lang.toUpperCase() + ')'
     : 'Texto WhatsApp (' + lang.toUpperCase() + ')';
 
-  // Referencia en español
+  // Referencia en español — texto completo sin recorte
   if (plantilla) {
     var refAsunto = document.getElementById('modal-com-trad-ref-asunto');
     var refTexto = document.getElementById('modal-com-trad-ref-texto');
     if (tipo === 'email') {
       if (refAsunto) refAsunto.innerHTML = '<strong>Asunto:</strong> ' + (plantilla.asunto_es || '—');
-      if (refTexto) refTexto.textContent = (plantilla.texto_es_email || '').replace(/<[^>]+>/g, '').substring(0, 400);
+      if (refTexto) refTexto.textContent = (plantilla.texto_es_email || '').replace(/<[^>]+>/g, '');
     } else {
       if (refAsunto) refAsunto.innerHTML = '';
-      if (refTexto) refTexto.textContent = (plantilla.texto_es_wa || '').substring(0, 400);
+      if (refTexto) refTexto.textContent = plantilla.texto_es_wa || '';
     }
   }
 
-  // Cargar traducción existente
+  // Limpiar preview mientras carga
+  var refTrad = document.getElementById('modal-com-trad-ref-trad');
+  var refAsuntoTrad = document.getElementById('modal-com-trad-ref-asunto-trad');
+  var refTradLabel = document.getElementById('modal-com-trad-ref-trad-label');
+  if (refTrad) refTrad.innerHTML = '<span style="color:var(--texto-muted);">…</span>';
+  if (refAsuntoTrad) { refAsuntoTrad.textContent = ''; refAsuntoTrad.style.display = 'none'; }
+  if (refTradLabel) refTradLabel.textContent = '🌐 Preview ' + lang.toUpperCase();
+
+  // Conectar preview en tiempo real al textarea
+  var textarea = document.getElementById('modal-com-trad-texto');
+  if (textarea._previewHandler) textarea.removeEventListener('input', textarea._previewHandler);
+  textarea._previewHandler = function() {
+    if (refTrad) {
+      if (_comClienteTipoTrad === 'email') {
+        refTrad.innerHTML = textarea.value;
+      } else {
+        // WhatsApp: convertir \n a saltos de línea visibles, *negrita*, sin HTML
+        refTrad.innerHTML = textarea.value
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
+          .replace(/\n/g, '<br>');
+      }
+    }
+  };
+  textarea.addEventListener('input', textarea._previewHandler);
+
+  // Cargar traducción existente — rellena el textarea editable Y la preview
   fetch('/admin/plantillas-comunicacion/' + clave + '/traducciones')
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -4913,10 +4951,27 @@ function abrirModalComTrad(clave, tipo, lang) {
       if (trad) {
         if (tipo === 'email') {
           document.getElementById('modal-com-trad-asunto').value = trad.asunto_email || '';
-          document.getElementById('modal-com-trad-texto').value = trad.cuerpo_email || '';
+          textarea.value = trad.cuerpo_email || '';
+          // Asunto en preview
+          if (refAsuntoTrad && trad.asunto_email) {
+            refAsuntoTrad.innerHTML = '<strong>Asunto:</strong> ' + trad.asunto_email;
+            refAsuntoTrad.style.display = 'block';
+          }
+          // Preview cuerpo
+          if (refTrad) refTrad.innerHTML = trad.cuerpo_email || '<span style="color:var(--texto-muted);">— sin traducción aún —</span>';
         } else {
-          document.getElementById('modal-com-trad-texto').value = trad.cuerpo_whatsapp || '';
+          textarea.value = trad.cuerpo_whatsapp || '';
+          // Preview WhatsApp
+          if (refTrad) {
+            var waTexto = (trad.cuerpo_whatsapp || '');
+            refTrad.innerHTML = waTexto
+              .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+              .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
+              .replace(/\n/g, '<br>') || '<span style="color:var(--texto-muted);">— sin traducción aún —</span>';
+          }
         }
+      } else {
+        if (refTrad) refTrad.innerHTML = '<span style="color:var(--texto-muted);">— sin traducción aún —</span>';
       }
     });
 
