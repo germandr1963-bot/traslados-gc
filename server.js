@@ -13907,6 +13907,135 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
   res.json({ ok: true });
 }));
 
+// POST — generar traducciones de comunicaciones cliente con IA para un idioma
+// Detecta qué plantillas de cliente faltan en ese idioma y las genera una a una.
+// Email y WhatsApp se procesan por separado con sus generadores dedicados (15 y 16).
+// Guarda directamente en BD sin revisión previa (igual que otros generadores masivos).
+app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.' });
+  }
+
+  // Cargar todas las plantillas de cliente con su contenido en español
+  const plantillas = await pool.query(
+    `SELECT clave, nombre, asunto_email, cuerpo_email, cuerpo_whatsapp
+     FROM plantillas_comunicacion WHERE categoria = 'cliente' ORDER BY nombre`
+  );
+
+  // Cargar las traducciones ya existentes para este idioma
+  const tradExistentes = await pool.query(
+    `SELECT plantilla_clave, cuerpo_email, cuerpo_whatsapp
+     FROM plantillas_comunicacion_traducciones WHERE lang_code = $1`,
+    [lang]
+  );
+  const mapaExistentes = {};
+  for (const t of tradExistentes.rows) {
+    mapaExistentes[t.plantilla_clave] = {
+      tieneEmail: !!(t.cuerpo_email && t.cuerpo_email.trim()),
+      tieneWa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim())
+    };
+  }
+
+  const nombreIdioma = await getNombreIdioma(lang);
+  let generadas = 0;
+  const errores = [];
+
+  for (const p of plantillas.rows) {
+    const existente = mapaExistentes[p.clave] || { tieneEmail: false, tieneWa: false };
+    let nuevoEmail = null;
+    let nuevoAsunto = null;
+    let nuevoWa = null;
+
+    // ── Email: generar si falta y hay original en español ──
+    if (!existente.tieneEmail && p.cuerpo_email && p.cuerpo_email.trim()) {
+      try {
+        const promptEmail = iaPrompts.GENERADOR_EMAIL_COMUNICACIONES(
+          nombreIdioma,
+          p.asunto_email || '',
+          p.cuerpo_email
+        );
+        const respEmail = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: promptEmail }] })
+        });
+        if (!respEmail.ok) throw new Error('API error ' + respEmail.status);
+        const dataEmail = await respEmail.json();
+        const textoEmail = dataEmail.content.map(function (b) { return b.text || ''; }).join('');
+        const limpiEmail = textoEmail.replace(/```json|```/g, '').trim();
+        console.log('[GEN15] Email', p.clave, lang, '—', limpiEmail.slice(0, 150));
+        const parsedEmail = JSON.parse(limpiEmail);
+        nuevoAsunto = parsedEmail.asunto_email || null;
+        nuevoEmail  = parsedEmail.cuerpo_email  || null;
+      } catch (err) {
+        console.error('[GEN15] Error email', p.clave, lang, err.message);
+        errores.push(p.clave + ' (email): ' + err.message.slice(0, 80));
+      }
+    }
+
+    // ── WhatsApp: generar si falta y hay original en español ──
+    if (!existente.tieneWa && p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim()) {
+      try {
+        const promptWa = iaPrompts.GENERADOR_WA_COMUNICACIONES(
+          nombreIdioma,
+          p.cuerpo_whatsapp
+        );
+        const respWa = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: promptWa }] })
+        });
+        if (!respWa.ok) throw new Error('API error ' + respWa.status);
+        const dataWa = await respWa.json();
+        const textoWa = dataWa.content.map(function (b) { return b.text || ''; }).join('');
+        const limpiWa = textoWa.replace(/```json|```/g, '').trim();
+        console.log('[GEN16] WA', p.clave, lang, '—', limpiWa.slice(0, 150));
+        const parsedWa = JSON.parse(limpiWa);
+        nuevoWa = (parsedWa.cuerpo_whatsapp && parsedWa.cuerpo_whatsapp !== 'null')
+          ? parsedWa.cuerpo_whatsapp
+          : null;
+      } catch (err) {
+        console.error('[GEN16] Error WA', p.clave, lang, err.message);
+        errores.push(p.clave + ' (wa): ' + err.message.slice(0, 80));
+      }
+    }
+
+    // ── Guardar si hay algo nuevo ──
+    if (nuevoEmail !== null || nuevoWa !== null) {
+      // Leer la fila existente para no machacar lo que ya hay
+      const filaActual = tradExistentes.rows.find(function (t) { return t.plantilla_clave === p.clave; }) || {};
+      await pool.query(
+        `INSERT INTO plantillas_comunicacion_traducciones
+           (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en)
+         VALUES ($1, $2, $3, $4, $5, TRUE, NOW())
+         ON CONFLICT (plantilla_clave, lang_code)
+         DO UPDATE SET
+           asunto_email    = COALESCE(EXCLUDED.asunto_email,    plantillas_comunicacion_traducciones.asunto_email),
+           cuerpo_email    = COALESCE(EXCLUDED.cuerpo_email,    plantillas_comunicacion_traducciones.cuerpo_email),
+           cuerpo_whatsapp = COALESCE(EXCLUDED.cuerpo_whatsapp, plantillas_comunicacion_traducciones.cuerpo_whatsapp),
+           generado_por_ia = TRUE,
+           actualizado_en  = NOW()`,
+        [
+          p.clave,
+          lang,
+          nuevoAsunto || filaActual.asunto_email || null,
+          nuevoEmail  || filaActual.cuerpo_email  || null,
+          nuevoWa     || filaActual.cuerpo_whatsapp || null
+        ]
+      );
+      generadas++;
+    }
+  }
+
+  res.json({ ok: true, generadas, errores });
+}));
+
 // ─── Tarea automática: cancelar reservas confirmadas sin pago de depósito ────
 // Corre cada hora. Busca reservas confirmadas cuyo plazo de pago ya venció
 // y el depósito no fue pagado. Las cancela y notifica al cliente y al chofer.
