@@ -1955,7 +1955,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
     if (boton.dataset.seccion === 'seo') cargarSEO();
-    if (boton.dataset.seccion === 'idiomas') cargarTextosInterfaz();
+    if (boton.dataset.seccion === 'idiomas') { cargarTextosInterfaz(); cargarComunicacionesCliente(); }
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
     if (boton.dataset.seccion === 'configuracion') cargarConfiguracionNoshow();
     if (boton.dataset.seccion === 'contacto') cargarContacto();
