@@ -492,53 +492,69 @@ table.tabla-precios input {
           </td>
         </tr>
         <tr id="bloque-com-cliente-fila" style="display:none;">
-          <td style="padding:20px 14px;">
+          <td style="padding:0;">
             <div id="bloque-com-cliente-contenido">
-          <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Traducciones de los emails y WhatsApp que recibe el cliente. El español es el original — se edita desde Admin → Comunicaciones. Aquí se gestionan los demás idiomas.</p>
+              <p style="font-size:13px;color:var(--texto-muted);margin:16px 14px 12px;">Traducciones de los emails y WhatsApp que recibe el cliente. El español es el original — se edita desde Admin → Comunicaciones. Aquí se gestionan los demás idiomas.</p>
 
-          <!-- Tabla EMAIL -->
-          <div style="margin-bottom:24px;">
-            <h3 style="font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px;">
-              📧 Cliente — Email
-              <span id="com-email-num" style="font-size:11px;font-weight:400;color:var(--texto-muted);"></span>
-              <span id="com-email-pct" style="font-size:12px;font-weight:400;color:var(--texto-muted);"></span>
-            </h3>
-            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-              <select id="select-com-email-ia" class="campo" style="height:34px;width:auto;"></select>
-              <button class="boton-costa" onclick="generarComunicacionesClienteIA('email', 'select-com-email-ia', 'com-email-msg-ia')">🤖 Generar Emails</button>
-              <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoComunicaciones('email')">✅ Aprobar todo</button>
-              <span id="com-email-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
-              <span id="com-email-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
-            </div>
-            <div class="tabla-envoltura">
-              <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
-                <thead id="thead-com-email"></thead>
-                <tbody id="tbody-com-email"></tbody>
-              </table>
-            </div>
-          </div>
+              <table style="width:100%;border-collapse:collapse;">
+                <tbody>
 
-          <!-- Tabla WHATSAPP -->
-          <div>
-            <h3 style="font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px;">
-              📱 Cliente — WhatsApp
-              <span id="com-wa-num" style="font-size:11px;font-weight:400;color:var(--texto-muted);"></span>
-              <span id="com-wa-pct" style="font-size:12px;font-weight:400;color:var(--texto-muted);"></span>
-            </h3>
-            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-              <select id="select-com-wa-ia" class="campo" style="height:34px;width:auto;"></select>
-              <button class="boton-costa" onclick="generarComunicacionesClienteIA('wa', 'select-com-wa-ia', 'com-wa-msg-ia')">🤖 Generar WhatsApp</button>
-              <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoComunicaciones('wa')">✅ Aprobar todo</button>
-              <span id="com-wa-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
-              <span id="com-wa-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
-            </div>
-            <div class="tabla-envoltura">
-              <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
-                <thead id="thead-com-wa"></thead>
-                <tbody id="tbody-com-wa"></tbody>
+                  <!-- Sub-fila EMAIL -->
+                  <tr style="background:#e8f0fe;cursor:pointer;" onclick="toggleComEmail()">
+                    <td style="padding:10px 20px 10px 32px;font-size:13px;font-weight:700;user-select:none;color:#1a3a6b;">
+                      <span id="com-email-icono">▶</span>
+                      📧 Cliente — Email
+                      <span id="com-email-num" style="font-size:11px;font-weight:400;color:#5a7ab0;margin-left:6px;"></span>
+                      <span id="com-email-pct" style="float:right;font-size:12px;font-weight:600;"></span>
+                    </td>
+                  </tr>
+                  <tr id="com-email-fila" style="display:none;">
+                    <td style="padding:16px 14px 16px 32px;">
+                      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+                        <select id="select-com-email-ia" class="campo" style="height:34px;width:auto;"></select>
+                        <button class="boton-costa" onclick="generarComunicacionesClienteIA('email', 'select-com-email-ia', 'com-email-msg-ia')">🤖 Generar Emails</button>
+                        <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoComunicaciones('email')">✅ Aprobar todo</button>
+                        <span id="com-email-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
+                        <span id="com-email-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
+                      </div>
+                      <div class="tabla-envoltura">
+                        <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
+                          <thead id="thead-com-email"></thead>
+                          <tbody id="tbody-com-email"></tbody>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- Sub-fila WHATSAPP -->
+                  <tr style="background:#e8f0fe;cursor:pointer;" onclick="toggleComWa()">
+                    <td style="padding:10px 20px 10px 32px;font-size:13px;font-weight:700;user-select:none;color:#1a3a6b;">
+                      <span id="com-wa-icono">▶</span>
+                      📱 Cliente — WhatsApp
+                      <span id="com-wa-num" style="font-size:11px;font-weight:400;color:#5a7ab0;margin-left:6px;"></span>
+                      <span id="com-wa-pct" style="float:right;font-size:12px;font-weight:600;"></span>
+                    </td>
+                  </tr>
+                  <tr id="com-wa-fila" style="display:none;">
+                    <td style="padding:16px 14px 16px 32px;">
+                      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+                        <select id="select-com-wa-ia" class="campo" style="height:34px;width:auto;"></select>
+                        <button class="boton-costa" onclick="generarComunicacionesClienteIA('wa', 'select-com-wa-ia', 'com-wa-msg-ia')">🤖 Generar WhatsApp</button>
+                        <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoComunicaciones('wa')">✅ Aprobar todo</button>
+                        <span id="com-wa-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
+                        <span id="com-wa-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
+                      </div>
+                      <div class="tabla-envoltura">
+                        <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
+                          <thead id="thead-com-wa"></thead>
+                          <tbody id="tbody-com-wa"></tbody>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+
+                </tbody>
               </table>
-            </div>
-          </div>
             </div>
           </td>
         </tr>
@@ -4785,6 +4801,24 @@ function toggleBloqueComunicacionesCliente() {
   fila.style.display = visible ? 'none' : '';
   if (icono) icono.textContent = visible ? '▶' : '▼';
   if (!visible && !_comClienteDatos) cargarComunicacionesCliente();
+}
+
+function toggleComEmail() {
+  var fila = document.getElementById('com-email-fila');
+  var icono = document.getElementById('com-email-icono');
+  if (!fila) return;
+  var visible = fila.style.display !== 'none';
+  fila.style.display = visible ? 'none' : '';
+  if (icono) icono.textContent = visible ? '▶' : '▼';
+}
+
+function toggleComWa() {
+  var fila = document.getElementById('com-wa-fila');
+  var icono = document.getElementById('com-wa-icono');
+  if (!fila) return;
+  var visible = fila.style.display !== 'none';
+  fila.style.display = visible ? 'none' : '';
+  if (icono) icono.textContent = visible ? '▶' : '▼';
 }
 
 function cargarComunicacionesCliente() {
