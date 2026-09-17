@@ -13915,7 +13915,19 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
 // PUT — guardar o actualizar una traducción
 app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const { clave, lang } = req.params;
-  const { asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia } = req.body;
+  const { asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, solo_aprobar } = req.body;
+
+  // Modo aprobación masiva: solo marca generado_por_ia=false sin tocar el contenido
+  if (solo_aprobar) {
+    await pool.query(
+      `UPDATE plantillas_comunicacion_traducciones
+       SET generado_por_ia = false, actualizado_en = NOW()
+       WHERE plantilla_clave = $1 AND lang_code = $2`,
+      [clave, lang]
+    );
+    return res.json({ ok: true });
+  }
+
   await pool.query(
     `INSERT INTO plantillas_comunicacion_traducciones
        (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en)
