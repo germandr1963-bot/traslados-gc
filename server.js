@@ -13849,7 +13849,7 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
   );
   const traducciones = await pool.query(
     `SELECT plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp,
-            generado_por_ia, actualizado_en
+            generado_por_ia, revisado_email, revisado_wa, actualizado_en
      FROM plantillas_comunicacion_traducciones`
   );
 
@@ -13858,10 +13858,12 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
   for (const t of traducciones.rows) {
     if (!mapaTrads[t.plantilla_clave]) mapaTrads[t.plantilla_clave] = {};
     mapaTrads[t.plantilla_clave][t.lang_code] = {
-      email:          !!(t.cuerpo_email && t.cuerpo_email.trim()),
-      wa:             !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()),
-      asunto:         !!(t.asunto_email && t.asunto_email.trim()),
+      email:           !!(t.cuerpo_email && t.cuerpo_email.trim()),
+      wa:              !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()),
+      asunto:          !!(t.asunto_email && t.asunto_email.trim()),
       generado_por_ia: !!t.generado_por_ia,
+      revisado_email:  !!t.revisado_email,
+      revisado_wa:     !!t.revisado_wa,
       actualizado_en:  t.actualizado_en
     };
   }
@@ -13877,8 +13879,11 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
     for (const lang of idiomas) {
       const t = mapaTrads[p.clave] && mapaTrads[p.clave][lang];
 
+      // Estado Email — canal independiente
       if (!t || !t.email) {
         estadoEmail[lang] = null;
+      } else if (t.revisado_email) {
+        estadoEmail[lang] = 'ok';
       } else if (t.generado_por_ia) {
         estadoEmail[lang] = 'ia';
       } else if (p.actualizado_en && t.actualizado_en && new Date(p.actualizado_en) > new Date(t.actualizado_en)) {
@@ -13887,8 +13892,11 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
         estadoEmail[lang] = 'ok';
       }
 
+      // Estado WhatsApp — canal independiente
       if (!t || !t.wa) {
         estadoWa[lang] = null;
+      } else if (t.revisado_wa) {
+        estadoWa[lang] = 'ok';
       } else if (t.generado_por_ia) {
         estadoWa[lang] = 'ia';
       } else if (p.actualizado_en && t.actualizado_en && new Date(p.actualizado_en) > new Date(t.actualizado_en)) {
@@ -13915,31 +13923,45 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
 // PUT — guardar o actualizar una traducción
 app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const { clave, lang } = req.params;
-  const { asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, solo_aprobar } = req.body;
+  const { asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, solo_aprobar, tipo } = req.body;
 
-  // Modo aprobación masiva: solo marca generado_por_ia=false sin tocar el contenido
+  // Modo aprobación: actualiza revisado_email o revisado_wa segun el tipo, sin tocar el otro canal
   if (solo_aprobar) {
-    await pool.query(
-      `UPDATE plantillas_comunicacion_traducciones
-       SET generado_por_ia = false, actualizado_en = NOW()
-       WHERE plantilla_clave = $1 AND lang_code = $2`,
-      [clave, lang]
-    );
+    if (tipo === 'email') {
+      await pool.query(
+        `UPDATE plantillas_comunicacion_traducciones
+         SET revisado_email = true, actualizado_en = NOW()
+         WHERE plantilla_clave = $1 AND lang_code = $2`,
+        [clave, lang]
+      );
+    } else if (tipo === 'wa') {
+      await pool.query(
+        `UPDATE plantillas_comunicacion_traducciones
+         SET revisado_wa = true, actualizado_en = NOW()
+         WHERE plantilla_clave = $1 AND lang_code = $2`,
+        [clave, lang]
+      );
+    }
     return res.json({ ok: true });
   }
 
+  // Al guardar manualmente se marca el canal correspondiente como revisado
+  const esEmail = !!(cuerpo_email && cuerpo_email.trim());
+  const esWa    = !!(cuerpo_whatsapp && cuerpo_whatsapp.trim());
   await pool.query(
     `INSERT INTO plantillas_comunicacion_traducciones
-       (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW())
+       (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, revisado_email, revisado_wa, actualizado_en)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
      ON CONFLICT (plantilla_clave, lang_code)
      DO UPDATE SET
-       asunto_email = EXCLUDED.asunto_email,
-       cuerpo_email = EXCLUDED.cuerpo_email,
+       asunto_email    = EXCLUDED.asunto_email,
+       cuerpo_email    = EXCLUDED.cuerpo_email,
        cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp,
        generado_por_ia = EXCLUDED.generado_por_ia,
-       actualizado_en = NOW()`,
-    [clave, lang, asunto_email || null, cuerpo_email || null, cuerpo_whatsapp || null, !!generado_por_ia]
+       revisado_email  = CASE WHEN EXCLUDED.revisado_email THEN true ELSE plantillas_comunicacion_traducciones.revisado_email END,
+       revisado_wa     = CASE WHEN EXCLUDED.revisado_wa     THEN true ELSE plantillas_comunicacion_traducciones.revisado_wa     END,
+       actualizado_en  = NOW()`,
+    [clave, lang, asunto_email || null, cuerpo_email || null, cuerpo_whatsapp || null, !!generado_por_ia, esEmail, esWa]
   );
   res.json({ ok: true });
 }));
