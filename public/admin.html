@@ -4408,7 +4408,7 @@ function cargarTablaCategoriasIA() {
       // Contador de categorías en la cabecera del colapsable
       var numCats = (datos.categorias || []).length;
       var elNum = document.getElementById('bloque2-flota-num');
-      if (elNum) elNum.textContent = '(' + numCats + ' categorías)';
+      if (elNum) elNum.textContent = '(' + numCats + ' textos)';
       var cats = datos.categorias || [];
       var idiomas = datos.idiomas || [];
       var total = cats.length * idiomas.length;
@@ -4788,12 +4788,11 @@ function cargarComunicacionesCliente() {
       var selWa = document.getElementById('select-com-wa-ia');
       var langWaActual = selWa ? selWa.value : '';
       if (selWa) { selWa.innerHTML = opcionesIdioma; if (langWaActual) selWa.value = langWaActual; }
-      // Contador de plantillas (email + WA) en la cabecera del colapsable
-      var numPlantillas = plantillas.length;
-      var elNum = document.getElementById('bloque-com-cliente-num');
-      if (elNum) elNum.textContent = '(' + (numPlantillas * 2) + ' plantillas)';
       var plantillas = data.plantillas || [];
       var idiomas = data.idiomas || [];
+      // Contador de textos en la cabecera del colapsable
+      var elNum = document.getElementById('bloque-com-cliente-num');
+      if (elNum) elNum.textContent = '(' + (plantillas.length * 2) + ' textos)';
       var aprobEmail = plantillas.reduce(function(sum, p) {
         return sum + idiomas.filter(function(l) { return p.estado_email[l] === 'ok'; }).length;
       }, 0);
