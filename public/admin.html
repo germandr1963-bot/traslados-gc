@@ -491,6 +491,7 @@ table.tabla-precios input {
           <div style="margin-bottom:24px;">
             <h3 style="font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px;">
               📧 Cliente — Email
+              <span id="com-email-num" style="font-size:11px;font-weight:400;color:var(--texto-muted);"></span>
               <span id="com-email-pct" style="font-size:12px;font-weight:400;color:var(--texto-muted);"></span>
             </h3>
             <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
@@ -512,6 +513,7 @@ table.tabla-precios input {
           <div>
             <h3 style="font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px;">
               📱 Cliente — WhatsApp
+              <span id="com-wa-num" style="font-size:11px;font-weight:400;color:var(--texto-muted);"></span>
               <span id="com-wa-pct" style="font-size:12px;font-weight:400;color:var(--texto-muted);"></span>
             </h3>
             <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
@@ -4824,6 +4826,12 @@ function renderizarComunicacionesCliente(data) {
 
   document.getElementById('thead-com-email').innerHTML = cabecera;
   document.getElementById('thead-com-wa').innerHTML = cabecera;
+
+  // Contadores de textos en los encabezados de cada sección
+  var elEmailNum = document.getElementById('com-email-num');
+  if (elEmailNum) elEmailNum.textContent = '(' + plantillas.length + ' textos)';
+  var elWaNum = document.getElementById('com-wa-num');
+  if (elWaNum) elWaNum.textContent = '(' + plantillas.length + ' textos)';
 
   // Calcular % Email — solo cuenta 'ok' (aprobado)
   var aprobadosEmail = plantillas.reduce(function(sum, p) {
