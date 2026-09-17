@@ -4775,14 +4775,16 @@ function cargarComunicacionesCliente() {
     .then(function(data) {
       _comClienteDatos = data;
       renderizarComunicacionesCliente(data);
-      // Poblar selectores IA
+      // Poblar selectores IA — conservando el idioma que estaba seleccionado
       var opcionesIdioma = data.idiomas.map(function(l) {
         return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
       }).join('');
       var selEmail = document.getElementById('select-com-email-ia');
-      if (selEmail) selEmail.innerHTML = opcionesIdioma;
+      var langEmailActual = selEmail ? selEmail.value : '';
+      if (selEmail) { selEmail.innerHTML = opcionesIdioma; if (langEmailActual) selEmail.value = langEmailActual; }
       var selWa = document.getElementById('select-com-wa-ia');
-      if (selWa) selWa.innerHTML = opcionesIdioma;
+      var langWaActual = selWa ? selWa.value : '';
+      if (selWa) { selWa.innerHTML = opcionesIdioma; if (langWaActual) selWa.value = langWaActual; }
       // Calcular % global (media de aprobados email + wa) y mostrarlo en la cabecera del bloque
       var plantillas = data.plantillas || [];
       var idiomas = data.idiomas || [];
