@@ -452,7 +452,7 @@ table.tabla-precios input {
           <span id="bloque2-flota-icono" style="font-size:14px;">▶</span>
           <h2 style="font-size:18px;margin:0;">Página de flota — categorías</h2>
           <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
-          <span id="bloque2-flota-pct" style="font-size:12px;margin-left:auto;"></span>
+          <span id="bloque2-flota-pct" style="font-size:12px;font-weight:400;margin-left:auto;color:var(--texto-muted);"></span>
         </div>
 
         <div id="bloque2-flota-contenido" style="display:none;margin-top:16px;">
@@ -481,7 +481,7 @@ table.tabla-precios input {
           <span id="bloque-com-cliente-icono" style="font-size:14px;">▶</span>
           <h2 style="font-size:18px;margin:0;">Comunicaciones — Cliente</h2>
           <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
-          <span id="bloque-com-cliente-pct" style="font-size:12px;margin-left:auto;"></span>
+          <span id="bloque-com-cliente-pct" style="font-size:12px;font-weight:400;margin-left:auto;color:var(--texto-muted);"></span>
         </div>
 
         <div id="bloque-com-cliente-contenido" style="display:none;margin-top:20px;">
@@ -496,17 +496,15 @@ table.tabla-precios input {
             <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
               <select id="select-com-email-ia" class="campo" style="height:34px;width:auto;"></select>
               <button class="boton-costa" onclick="generarComunicacionesClienteIA('email', 'select-com-email-ia', 'com-email-msg-ia')">🤖 Generar Emails</button>
+              <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoComunicaciones('email')">✅ Aprobar todo</button>
               <span id="com-email-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
+              <span id="com-email-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
             </div>
             <div class="tabla-envoltura">
               <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
                 <thead id="thead-com-email"></thead>
                 <tbody id="tbody-com-email"></tbody>
               </table>
-            </div>
-            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
-              <button class="boton-primario" style="padding:7px 16px;font-size:0.85rem;" onclick="aprobarTodoComunicaciones('email')">✅ Aprobar todo Email</button>
-              <span id="com-email-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
             </div>
           </div>
 
@@ -519,17 +517,15 @@ table.tabla-precios input {
             <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
               <select id="select-com-wa-ia" class="campo" style="height:34px;width:auto;"></select>
               <button class="boton-costa" onclick="generarComunicacionesClienteIA('wa', 'select-com-wa-ia', 'com-wa-msg-ia')">🤖 Generar WhatsApp</button>
+              <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoComunicaciones('wa')">✅ Aprobar todo</button>
               <span id="com-wa-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
+              <span id="com-wa-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
             </div>
             <div class="tabla-envoltura">
               <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
                 <thead id="thead-com-wa"></thead>
                 <tbody id="tbody-com-wa"></tbody>
               </table>
-            </div>
-            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
-              <button class="boton-primario" style="padding:7px 16px;font-size:0.85rem;" onclick="aprobarTodoComunicaciones('wa')">✅ Aprobar todo WhatsApp</button>
-              <span id="com-wa-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
             </div>
           </div>
         </div>
@@ -4898,57 +4894,51 @@ function renderizarComunicacionesCliente(data) {
   document.getElementById('tbody-com-wa').innerHTML = htmlWa;
 }
 
-// ── Aprobar todo — aprueba de una vez todos los ítems con traducción del idioma activo ──
+// ── Aprobar todo — aprueba TODOS los idiomas de TODAS las plantillas que tengan traducción ──
 function aprobarTodoComunicaciones(tipo) {
-  var selId = (tipo === 'wa') ? 'select-com-wa-ia' : 'select-com-email-ia';
   var msgId = (tipo === 'wa') ? 'com-wa-aprobar-msg' : 'com-email-aprobar-msg';
-  var sel = document.getElementById(selId);
   var msg = document.getElementById(msgId);
-  var lang = sel ? sel.value : '';
-  if (!lang) { alert('Selecciona primero un idioma en el selector correspondiente.'); return; }
 
   var plantillas = _comClienteDatos && _comClienteDatos.plantillas ? _comClienteDatos.plantillas : [];
+  var idiomas    = _comClienteDatos && _comClienteDatos.idiomas    ? _comClienteDatos.idiomas    : [];
   var campoEstado = (tipo === 'wa') ? 'estado_wa' : 'estado_email';
 
-  // Solo las que tienen traducción (no son null/false) y aún no están aprobadas
-  var pendientes = plantillas.filter(function(p) {
-    var e = p[campoEstado][lang];
-    return e && e !== 'ok';
+  // Construir lista de pares {clave, lang} que tienen traducción pero no están aprobados
+  var pendientes = [];
+  plantillas.forEach(function(p) {
+    idiomas.forEach(function(lang) {
+      var e = p[campoEstado][lang];
+      if (e && e !== 'ok') {
+        pendientes.push({ clave: p.clave, lang: lang });
+      }
+    });
   });
 
   if (pendientes.length === 0) {
-    if (msg) { msg.textContent = '✅ Todo ya está aprobado.'; msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 3000); }
+    if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ Todo ya estaba aprobado.'; msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 3000); }
     return;
   }
 
-  if (msg) { msg.textContent = 'Aprobando ' + pendientes.length + ' plantilla(s)…'; msg.style.display = 'inline'; }
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Aprobando ' + pendientes.length + ' traducción(es)…'; msg.style.display = 'inline'; }
 
-  // Llamadas en serie para no saturar
-  var promesas = pendientes.map(function(p) {
-    var body = { revisado: true };
-    // Incluimos el contenido existente para que el endpoint no lo borre
-    var claveCuerpo = (tipo === 'wa') ? 'cuerpo_whatsapp' : 'cuerpo_email';
-    var claveAsunto = 'asunto_email';
-    // El endpoint PUT espera asunto_email + cuerpo_email o cuerpo_whatsapp
-    // Obtenemos los valores actuales de la caché
-    var tradActual = p._trad && p._trad[lang] ? p._trad[lang] : {};
-    return fetch('/admin/plantillas-comunicacion/' + p.clave + '/traducciones/' + lang, {
+  var promesas = pendientes.map(function(item) {
+    return fetch('/admin/plantillas-comunicacion/' + item.clave + '/traducciones/' + item.lang, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ revisado: true, solo_aprobar: true })
+      body: JSON.stringify({ solo_aprobar: true })
     }).then(function(r) { return r.json(); });
   });
 
   Promise.all(promesas).then(function(resultados) {
-    var errores = resultados.filter(function(r) { return r && r.error; });
+    var errores = resultados.filter(function(r) { return !r || !r.ok; });
     if (errores.length > 0) {
-      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error en ' + errores.length + ' plantilla(s). Revisa la consola.'; msg.style.display = 'inline'; }
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error en ' + errores.length + ' traducción(es).'; msg.style.display = 'inline'; }
     } else {
-      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ ' + pendientes.length + ' plantilla(s) aprobada(s).'; msg.style.display = 'inline'; }
-      setTimeout(function() { if (msg) msg.style.display = 'none'; }, 4000);
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ ' + pendientes.length + ' traducción(es) aprobada(s).'; msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 4000); }
     }
+    _comClienteDatos = null;
     cargarComunicacionesCliente();
-  }).catch(function(err) {
+  }).catch(function() {
     if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de red. Inténtalo de nuevo.'; msg.style.display = 'inline'; }
   });
 }
