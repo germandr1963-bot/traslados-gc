@@ -10537,25 +10537,31 @@ async function formatearExtrasEmail(reservaId, lang) {
       }
     }
 
+    const txtTitulo    = obtenerTexto('email_extras_titulo',     _lang);
+    const txtIncluido  = obtenerTexto('email_extras_incluido',   _lang);
+    const txtConductor = obtenerTexto('email_extras_conductor',  _lang);
+    const txtNota      = obtenerTexto('email_extras_total_nota', _lang);
+    const txtTotal     = obtenerTexto('reserva_total_extras',    _lang);
+
     let lineas = '';
     for (const n of incluidos) {
-      lineas += '&nbsp;&nbsp;&#183; ' + n + ' <span style="color:#2e7d32;font-size:12px;">(incluido)</span><br>';
+      lineas += '&nbsp;&nbsp;&#183; ' + n + ' <span style="color:#2e7d32;font-size:12px;">(' + txtIncluido + ')</span><br>';
     }
     for (const ex of aCobrar) {
-      lineas += '&nbsp;&nbsp;&#183; ' + ex.nombre + ' <span style="color:#856404;font-size:12px;">' + ex.precio.toFixed(2) + ' &euro; &mdash; a pagar al conductor</span><br>';
+      lineas += '&nbsp;&nbsp;&#183; ' + ex.nombre + ' <span style="color:#856404;font-size:12px;">' + ex.precio.toFixed(2) + ' &euro; &mdash; ' + txtConductor + '</span><br>';
     }
 
     let totalHtml = '';
     if (aCobrar.length) {
       const total = aCobrar.reduce((s, e) => s + e.precio, 0);
       totalHtml = '<div class="caja-amarilla" style="margin-top:10px;margin-bottom:0;">'
-                + '<strong>&#128176; Total extras a pagar al conductor: ' + total.toFixed(2) + ' &euro;</strong><br>'
-                + '<span style="font-size:11px;">Este importe se abona directamente al conductor al finalizar el servicio.</span>'
+                + '<strong>&#128176; ' + txtTotal + ': ' + total.toFixed(2) + ' &euro;</strong><br>'
+                + '<span style="font-size:11px;">' + txtNota + '</span>'
                 + '</div>';
     }
 
     return '<div class="info-box">'
-         + '<strong>&#129524; Extras seleccionados:</strong><br>'
+         + '<strong>&#129524; ' + txtTitulo + '</strong><br>'
          + lineas
          + totalHtml
          + '</div>';
@@ -10594,16 +10600,21 @@ async function formatearExtrasWhatsapp(reservaId, lang) {
       }
     }
 
-    let texto = '\n🧳 *Extras seleccionados:*\n';
+    const txtTitulo    = obtenerTexto('email_extras_titulo',    _lang);
+    const txtIncluido  = obtenerTexto('email_extras_incluido',  _lang);
+    const txtConductor = obtenerTexto('email_extras_conductor', _lang);
+    const txtTotal     = obtenerTexto('reserva_total_extras',   _lang);
+
+    let texto = '\n🧳 *' + txtTitulo + '*\n';
     for (const n of incluidos) {
-      texto += '· ' + n + ' _(incluido)_\n';
+      texto += '· ' + n + ' _(' + txtIncluido + ')_\n';
     }
     for (const ex of aCobrar) {
-      texto += '· ' + ex.nombre + ' _(' + ex.precio.toFixed(2) + ' € — a pagar al conductor)_\n';
+      texto += '· ' + ex.nombre + ' _(' + ex.precio.toFixed(2) + ' € — ' + txtConductor + ')_\n';
     }
     if (aCobrar.length) {
       const total = aCobrar.reduce((s, e) => s + e.precio, 0);
-      texto += '💰 *Total extras a pagar al conductor: ' + total.toFixed(2) + ' €*\n';
+      texto += '💰 *' + txtTotal + ': ' + total.toFixed(2) + ' €*\n';
     }
     return texto;
   } catch(e) {
