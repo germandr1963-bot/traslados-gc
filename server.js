@@ -3090,7 +3090,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       fecha: fechaTexto,
       hora: horaTexto,
       extras: _extrasAcuse
-    });
+    }, _langCliente);
     const htmlEmail = plantillaEmail(
       (_par && _par.email) ||
       `<p>Hola <strong>${nombre_cliente.trim()}</strong>,</p>
@@ -8149,7 +8149,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   // Verificar que la reserva pertenece a este chofer y está confirmada
   const check = await pool.query(
     `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
-            r.origen, r.destino, r.fecha,
+            r.origen, r.destino, r.fecha, r.lang_cliente,
             c.nombre AS nombre_chofer, c.telefono AS telefono_chofer
      FROM reservas r
      LEFT JOIN conductores c ON c.id = $2
@@ -8227,7 +8227,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
     fecha: fechaTexto,
     url_valoracion: enlaceCorto,
     boton_valoracion: botonValoracion
-  });
+  }, r.lang_cliente || 'es');
   const html = plantillaEmail(
     (_pval && _pval.email) ||
     `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
@@ -8264,7 +8264,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
         numero_factura: numFacEmail
-      });
+      }, r.lang_cliente || 'es');
       await enviarEmailConAdjunto({
         to: r.email_cliente,
         subject: (_pfacemail && _pfacemail.asunto) || (`📄 Factura ${numFacEmail} — Reserva ${r.numero_reserva}`),
@@ -8298,7 +8298,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
           nombre_cliente: r.nombre_cliente,
           numero_reserva: r.numero_reserva,
           numero_factura: numFac
-        });
+        }, r.lang_cliente || 'es');
         const textoFacturaWa = (_pfacwa && _pfacwa.whatsapp) || `📄 Adjuntamos la factura de tu traslado *${r.numero_reserva}*.`;
         await pool.query(
           `INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento)
@@ -8335,7 +8335,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
 app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req, res) => {
   const check = await pool.query(
     `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
-            r.origen, r.destino, r.fecha, r.deposito_pagado
+            r.origen, r.destino, r.fecha, r.deposito_pagado, r.lang_cliente
      FROM reservas r
      WHERE r.id = $1 AND r.conductor_id = $2 AND r.estado = 'confirmada'`,
     [req.params.id, req.session.choferId]
@@ -8362,7 +8362,7 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
       destino: r.destino || '—',
       fecha: fechaTexto,
       importe: importe
-    });
+    }, r.lang_cliente || 'es');
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pns1 && _pns1.asunto) || ('🔒 Depósito retenido por no-show — ' + r.numero_reserva),
@@ -8393,7 +8393,7 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
         destino: r.destino || '—',
         fecha: fechaTexto,
         importe: importe
-      });
+      }, r.lang_cliente || 'es');
       const textoWa = (_pns1wa && _pns1wa.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) no pudo realizarse al no presentarse en el punto de recogida. El depósito de garantía ha sido retenido según nuestra política de reservas.\n\nSi crees que ha habido un error, contáctanos. Un saludo 🙏`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
@@ -9388,7 +9388,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
         boton_pago: botonPago,
         extras: _extrasConf1
-      });
+      }, r.lang_cliente || 'es');
       const html = plantillaEmail(
         (_pc1 && _pc1.email) ||
         `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
@@ -9453,7 +9453,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
         url_pago: urlPagoCorta,
         extras: _extrasWa1
-      });
+      }, r.lang_cliente || 'es');
       const textoWa = (_pc1wa && _pc1wa.whatsapp) ||
         ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Hemos asignado un conductor para tu servicio. Revisa tu email para todos los detalles y el enlace de pago del depósito.');
       await pool.query(
@@ -9931,7 +9931,7 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         const _pvA = await obtenerPlantilla('cliente_voucher', {
           nombre_cliente: r.nombre_cliente,
           numero_reserva: r.numero_reserva
-        });
+        }, r.lang_cliente || 'es');
         if (htmlVoucher) {
           await enviarEmail({
             to: r.email_cliente,
@@ -10144,7 +10144,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
     fecha_limite_cancelacion: _textoLimiteCancelEmail,
     boton_pago: botonPago,
     extras: _extrasConf2
-  });
+  }, r.lang_cliente || 'es');
   const html = plantillaEmail(
     (_pc2 && _pc2.email) ||
     `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
@@ -10203,7 +10203,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
         url_pago: urlCortaConf,
         url_corta: urlCortaConf,
         extras: _extrasWa2
-      });
+      }, r.lang_cliente || 'es');
       const textoWa = (_pc2wa && _pc2wa.whatsapp) ||
         ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Revisa tu email para ver los detalles y el enlace de pago del depósito.');
       await pool.query(
@@ -10279,7 +10279,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
     importe: importe,
     url_pago: urlCortaEmail,
     boton_pago: botonPagoReenvio
-  });
+  }, lang);
   const html = plantillaEmail(
     (_pep && _pep.email) ||
     `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
@@ -10310,7 +10310,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
         importe: importe,
         url_pago: urlCorta,
         url_corta: urlCorta
-      });
+      }, lang);
       const textoWa = (_pepwa && _pepwa.whatsapp) ||
         `Hola, *${r.nombre_cliente}* 👋\n\n💳 Te reenviamos el enlace de pago para confirmar tu reserva *${r.numero_reserva}*.\n\n👉 ${urlCorta}\n\n❓ Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
       await pool.query(
@@ -10336,7 +10336,7 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
     const _pvM = await obtenerPlantilla('cliente_voucher', {
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva
-    });
+    }, r.lang_cliente || 'es');
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pvM && _pvM.asunto) || ('Voucher de traslado — ' + r.numero_reserva),
@@ -10425,7 +10425,7 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva,
       numero_factura: resultado.numeroFactura
-    });
+    }, r.lang_cliente || 'es');
     await enviarEmailConAdjunto({
       to: r.email_cliente,
       subject: (_pf && _pf.asunto) || ('📄 Factura ' + resultado.numeroFactura + ' — Reserva ' + r.numero_reserva),
@@ -10612,14 +10612,32 @@ async function formatearExtrasWhatsapp(reservaId, lang) {
   }
 }
 
-async function obtenerPlantilla(clave, vars) {
+async function obtenerPlantilla(clave, vars, lang) {
   try {
-    const r = await pool.query(
-      'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion WHERE clave = $1',
-      [clave]
-    );
-    if (!r.rows.length) return null;
-    const p = r.rows[0];
+    // Si hay idioma y no es español, buscar primero en traducciones
+    const _lang = (lang && lang !== 'es' && ['en','de','sv','no','nl','it','fr','fi','ru'].includes(lang)) ? lang : null;
+    let p = null;
+
+    if (_lang) {
+      const rt = await pool.query(
+        'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion_traducciones WHERE plantilla_clave = $1 AND lang_code = $2',
+        [clave, _lang]
+      );
+      if (rt.rows.length && (rt.rows[0].cuerpo_email || rt.rows[0].cuerpo_whatsapp)) {
+        p = rt.rows[0];
+      }
+    }
+
+    // Si no hay traducción, usar la plantilla en español (siempre existe)
+    if (!p) {
+      const r = await pool.query(
+        'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion WHERE clave = $1',
+        [clave]
+      );
+      if (!r.rows.length) return null;
+      p = r.rows[0];
+    }
+
     const sustituir = (txt) => {
       if (!txt) return txt;
       return txt.replace(/\{([^}]+)\}/g, (_, k) => {
@@ -12696,7 +12714,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
       destino: r.destino || '—',
       fecha: fechaTextoCancel,
       aviso_deposito: avisoDeposito
-    });
+    }, r.lang_cliente || 'es');
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pcancelE && _pcancelE.asunto) || ('Tu reserva ' + r.numero_reserva + ' ha sido cancelada'),
@@ -12725,7 +12743,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
         destino: r.destino || '—',
         fecha: fechaTextoWa,
         aviso_deposito: fueraDePlazo ? '⚠️ La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido.' : '✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve.'
-      });
+      }, r.lang_cliente || 'es');
       const textoWa = (_pcancelWa && _pcancelWa.whatsapp) || (fueraDePlazo
         ? `Hola, ${r.nombre_cliente} 👋\n\nTu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTextoWa} ha sido cancelada.\n\n⚠️ La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido según nuestra política de cancelación.\n\nSi tienes alguna duda, contáctanos. Un saludo 🙏`
         : `Hola, ${r.nombre_cliente} 👋\n\nTu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTextoWa} ha sido cancelada correctamente.\n\n✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.\n\nUn saludo 🙏`);
@@ -12788,7 +12806,7 @@ app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(
     const _pma = await obtenerPlantilla('cliente_modificacion_aprobada', {
       nombre_cliente: ra.nombre_cliente,
       numero_reserva: ra.numero_reserva
-    });
+    }, ra.lang_cliente || 'es');
     await enviarEmail({
       to: ra.email_cliente,
       subject: (_pma && _pma.asunto) || ('✅ Tu modificación ha sido aprobada — ' + ra.numero_reserva),
@@ -13027,7 +13045,7 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
   // Notificar al cliente por email
   try {
     const reserva = await pool.query(
-      'SELECT nombre_cliente, email_cliente, numero_reserva FROM reservas WHERE id = $1',
+      'SELECT nombre_cliente, email_cliente, numero_reserva, lang_cliente FROM reservas WHERE id = $1',
       [req.params.id]
     );
     if (reserva.rows.length) {
@@ -13036,7 +13054,7 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
         mensaje: mensaje.trim().replace(/\n/g,'<br>')
-      });
+      }, r.lang_cliente || 'es');
       await enviarEmail({
         to: r.email_cliente,
         subject: (_pmsg && _pmsg.asunto) || ('💬 Tienes un mensaje sobre tu reserva ' + r.numero_reserva),
@@ -13116,7 +13134,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
       destino: r.destino || '—',
       fecha: fechaViaje,
       numero_factura: numeroFactura || ''
-    });
+    }, r.lang_cliente || 'es');
     await fnEmail({
       to: r.email_cliente,
       subject: (_pdl && _pdl.asunto) || ('✅ Servicio completado — ' + r.numero_reserva),
@@ -13185,7 +13203,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
         destino: r.destino || '—',
         fecha: fechaViajeDl,
         numero_factura: numeroFactura || ''
-      });
+      }, r.lang_cliente || 'es');
       const textoWa = (_pdlwa && _pdlwa.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nEl depósito de garantía de tu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) ha sido liberado. El importe quedará disponible en tu tarjeta en un plazo de 5 a 10 días hábiles según tu entidad bancaria.\n\nUn saludo, el equipo de Traslados GC 🙏`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
@@ -13218,7 +13236,7 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
       destino: r.destino || '—',
       fecha: fechaViaje,
       importe: importe
-    });
+    }, r.lang_cliente || 'es');
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pns2 && _pns2.asunto) || ('🔒 Depósito retenido por no-show — ' + r.numero_reserva),
@@ -13249,7 +13267,7 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
         destino: r.destino || '—',
         fecha: fechaViaje,
         importe: importe
-      });
+      }, r.lang_cliente || 'es');
       const textoWa = (_pns2wa && _pns2wa.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) no pudo realizarse al no presentarse en el punto de recogida. El depósito de garantía ha sido retenido según nuestra política de reservas.\n\nSi crees que ha habido un error, contáctanos. Un saludo 🙏`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
@@ -13587,7 +13605,7 @@ app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, re
     nombre_cliente: r.nombre_cliente,
     numero_reserva: r.numero_reserva,
     numero_factura: factura.numero_factura
-  });
+  }, r.lang_cliente || 'es');
   await enviarEmailConAdjunto({
     to: emailFinal,
     subject: (_pf && _pf.asunto) || ('📄 Factura ' + factura.numero_factura + ' — Reserva ' + r.numero_reserva),
@@ -14135,7 +14153,7 @@ async function cancelarReservasSinPago() {
             origen: r.origen || '—',
             destino: r.destino || '—',
             fecha: fechaTexto
-          });
+          }, r.lang_cliente || 'es');
           await enviarEmail({
             to: r.email_cliente,
             subject: (_pcliente && _pcliente.asunto) || ('❌ Tu reserva ' + r.numero_reserva + ' ha sido cancelada por falta de pago'),
@@ -14163,7 +14181,7 @@ async function cancelarReservasSinPago() {
               origen: r.origen || '—',
               destino: r.destino || '—',
               fecha: fechaTexto
-            });
+            }, r.lang_cliente || 'es');
             const textoWaCliente = (_pclientewa && _pclientewa.whatsapp) ||
               `Hola, ${r.nombre_cliente} 👋\n\n❌ Tu reserva ${r.numero_reserva} ha sido cancelada automáticamente.\n\nNo hemos recibido el pago del depósito de garantía en el plazo establecido.\n\n📍 Ruta: ${r.origen || '—'} → ${r.destino || '—'}\n📅 Fecha: ${fechaTexto}\n\nSi deseas realizar este traslado, puedes enviarnos una nueva solicitud. Un saludo 🙏`;
             await pool.query(
