@@ -451,7 +451,7 @@ table.tabla-precios input {
         <div style="cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none;" onclick="toggleBloque2Flota()">
           <span id="bloque2-flota-icono" style="font-size:14px;">▶</span>
           <h2 style="font-size:18px;margin:0;">Página de flota — categorías</h2>
-          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
+          <span id="bloque2-flota-num" style="font-size:11px;font-weight:400;color:var(--texto-muted);"></span>
           <span id="bloque2-flota-pct" style="font-size:12px;font-weight:400;margin-left:auto;color:var(--texto-muted);"></span>
         </div>
 
@@ -480,7 +480,7 @@ table.tabla-precios input {
         <div style="cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none;" onclick="toggleBloqueComunicacionesCliente()">
           <span id="bloque-com-cliente-icono" style="font-size:14px;">▶</span>
           <h2 style="font-size:18px;margin:0;">Comunicaciones — Cliente</h2>
-          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
+          <span id="bloque-com-cliente-num" style="font-size:11px;font-weight:400;color:var(--texto-muted);"></span>
           <span id="bloque-com-cliente-pct" style="font-size:12px;font-weight:400;margin-left:auto;color:var(--texto-muted);"></span>
         </div>
 
@@ -4405,7 +4405,10 @@ function cargarTablaCategoriasIA() {
       categoriasIACache = datos;
       renderizarCabeceraCategoriasIA(datos.idiomas);
       renderizarTablaCategoriasIA(datos);
-      // Calcular % traducido de categorías y mostrarlo en la cabecera del colapsable
+      // Contador de categorías en la cabecera del colapsable
+      var numCats = (datos.categorias || []).length;
+      var elNum = document.getElementById('bloque2-flota-num');
+      if (elNum) elNum.textContent = '(' + numCats + ' categorías)';
       var cats = datos.categorias || [];
       var idiomas = datos.idiomas || [];
       var total = cats.length * idiomas.length;
@@ -4785,7 +4788,10 @@ function cargarComunicacionesCliente() {
       var selWa = document.getElementById('select-com-wa-ia');
       var langWaActual = selWa ? selWa.value : '';
       if (selWa) { selWa.innerHTML = opcionesIdioma; if (langWaActual) selWa.value = langWaActual; }
-      // Calcular % global (media de aprobados email + wa) y mostrarlo en la cabecera del bloque
+      // Contador de plantillas (email + WA) en la cabecera del colapsable
+      var numPlantillas = plantillas.length;
+      var elNum = document.getElementById('bloque-com-cliente-num');
+      if (elNum) elNum.textContent = '(' + (numPlantillas * 2) + ' plantillas)';
       var plantillas = data.plantillas || [];
       var idiomas = data.idiomas || [];
       var aprobEmail = plantillas.reduce(function(sum, p) {
