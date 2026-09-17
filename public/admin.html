@@ -456,7 +456,7 @@ table.tabla-precios input {
             <span id="bloque2-flota-icono">▶</span>
             Página de flota — categorías
             <span id="bloque2-flota-num" style="font-size:11px;font-weight:400;color:var(--texto-muted);"></span>
-            <span id="bloque2-flota-pct" style="float:right;font-size:12px;font-weight:400;color:var(--texto-muted);"></span>
+            <span id="bloque2-flota-pct" style="float:right;font-size:12px;font-weight:600;"></span>
           </td>
         </tr>
         <tr id="bloque2-flota-fila" style="display:none;">
@@ -488,7 +488,7 @@ table.tabla-precios input {
             <span id="bloque-com-cliente-icono">▶</span>
             Comunicaciones — Cliente
             <span id="bloque-com-cliente-num" style="font-size:11px;font-weight:400;color:var(--texto-muted);"></span>
-            <span id="bloque-com-cliente-pct" style="float:right;font-size:12px;font-weight:400;color:var(--texto-muted);"></span>
+            <span id="bloque-com-cliente-pct" style="float:right;font-size:12px;font-weight:600;"></span>
           </td>
         </tr>
         <tr id="bloque-com-cliente-fila" style="display:none;">
@@ -4818,7 +4818,7 @@ function cargarComunicacionesCliente() {
       var pct = totalCeldas > 0 ? Math.round((aprobEmail + aprobWa) / (totalCeldas * 2) * 100) : 0;
       var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
       var el = document.getElementById('bloque-com-cliente-pct');
-      if (el) el.innerHTML = '<span style="color:' + color + ';">' + pct + '% aprobado</span>';
+      if (el) el.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
     })
     .catch(function() {
       var el = document.getElementById('bloque-com-cliente-pct');
@@ -4854,7 +4854,7 @@ function renderizarComunicacionesCliente(data) {
   var pctEmail = totalEmail > 0 ? Math.round(aprobadosEmail / totalEmail * 100) : 0;
   var colorEmail = pctEmail === 100 ? '#2e7d32' : pctEmail > 50 ? '#b45309' : 'var(--rojo-error)';
   var elEmail = document.getElementById('com-email-pct');
-  if (elEmail) elEmail.innerHTML = '<span style="color:' + colorEmail + ';">' + pctEmail + '% aprobado</span>';
+  if (elEmail) elEmail.innerHTML = '<span style="color:' + colorEmail + ';">' + pctEmail + '% traducido</span>';
 
   // Calcular % WhatsApp — solo cuenta 'ok' (aprobado)
   var aprobadosWa = plantillas.reduce(function(sum, p) {
@@ -4864,7 +4864,7 @@ function renderizarComunicacionesCliente(data) {
   var pctWa = totalWa > 0 ? Math.round(aprobadosWa / totalWa * 100) : 0;
   var colorWa = pctWa === 100 ? '#2e7d32' : pctWa > 50 ? '#b45309' : 'var(--rojo-error)';
   var elWa = document.getElementById('com-wa-pct');
-  if (elWa) elWa.innerHTML = '<span style="color:' + colorWa + ';">' + pctWa + '% aprobado</span>';
+  if (elWa) elWa.innerHTML = '<span style="color:' + colorWa + ';">' + pctWa + '% traducido</span>';
 
   // ── Helper: pinta la celda según el estado de la traducción ──
   // null        → punto rojo    (sin traducción)
