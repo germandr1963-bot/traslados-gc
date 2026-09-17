@@ -4925,7 +4925,7 @@ function aprobarTodoComunicaciones(tipo) {
     return fetch('/admin/plantillas-comunicacion/' + item.clave + '/traducciones/' + item.lang, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ solo_aprobar: true })
+      body: JSON.stringify({ solo_aprobar: true, tipo: tipo })
     }).then(function(r) { return r.json(); });
   });
 
