@@ -290,6 +290,11 @@ function obtenerTexto(clave, lang) {
   return entrada.texto_es;
 }
 
+function langALocale(lang) {
+  const mapa = { es:'es-ES', en:'en-GB', de:'de-DE', sv:'sv-SE', no:'nb-NO', nl:'nl-NL', it:'it-IT', fr:'fr-FR', fi:'fi-FI', ru:'ru-RU' };
+  return mapa[lang] || 'es-ES';
+}
+
 // ─── Helpers generales ───────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
   if (req.session && req.session.adminId) {
@@ -8213,7 +8218,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
 
   const enlace = `${BASE_URL}/valorar?token=${token}`;
   const enlaceCorto = `${BASE_URL}/v/${codigo}`;
-  const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+  const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
 
   // Email al cliente
   const botonValoracion = `<div style="text-align:center;margin:12px 0;">
@@ -8349,7 +8354,7 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
     [r.id]
   );
 
-  const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+  const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
   const _cfgNs1 = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
   const importe = ((_cfgNs1.rows[0] && _cfgNs1.rows[0].importe_deposito) || 10).toString();
 
@@ -9331,9 +9336,9 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
 
       importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
       horas = condiciones ? condiciones.horas_cancelacion : 12;
-      const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+      const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '';
       const _fechaLimiteCancelEmail = calcularFechaCancelacion(new Date(r.fecha), r.hora, horas);
-      _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+      _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString(langALocale(r.lang_cliente || 'es'), {hour:'2-digit', minute:'2-digit'});
 
       // Crear sesión de pago en Stripe si está configurado
       if (stripe) {
@@ -9367,9 +9372,10 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         }
       }
 
+      const _txtBotonPago1 = obtenerTexto('email_boton_pagar_deposito', r.lang_cliente || 'es').replace('{importe}', importe);
       const botonPago = urlPago
         ? `<div style="text-align:center;margin:12px 0;">
-            <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 Pagar depósito de ${importe} €</a>
+            <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 ${_txtBotonPago1}</a>
            </div>`
         : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
 
@@ -9381,7 +9387,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         destino: r.destino || '—',
         fecha: fechaViaje,
         hora: r.hora ? r.hora.slice(0,5) : '—',
-        categoria: r.categoria_nombre || '—',
+        categoria: obtenerTexto('categoria_nombre_' + r.categoria_id, r.lang_cliente || 'es') || r.categoria_nombre || '—',
         conductor: r.conductor_nombre || '',
         importe_deposito: importe,
         horas_cancelacion: horas,
@@ -9445,7 +9451,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         numero_reserva: r.numero_reserva,
         origen: r.origen || '—',
         destino: r.destino || '—',
-        fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—',
+        fecha: r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—',
         hora: r.hora ? r.hora.slice(0,5) : '—',
         categoria: r.categoria_nombre || '—',
         importe_deposito: importe,
@@ -9504,7 +9510,8 @@ async function generarHtmlVoucher(reservaId) {
   );
   if (!result.rows.length) return null;
   const r = result.rows[0];
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+  const _langVoucher = r.lang_cliente || 'es';
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(_langVoucher), {day:'numeric', month:'long', year:'numeric'}) : '';
 
   // Extras de la reserva
   const extrasResult = await pool.query(
@@ -9518,23 +9525,28 @@ async function generarHtmlVoucher(reservaId) {
   const extrasACobrar = extrasReserva.filter(e => parseFloat(e.precio_en_reserva) > 0);
   const totalExtras = extrasACobrar.reduce((sum, e) => sum + parseFloat(e.precio_en_reserva), 0);
 
+  const _txtIncVoucher  = obtenerTexto('email_extras_incluido',   _langVoucher);
+  const _txtCondVoucher = obtenerTexto('email_extras_conductor',  _langVoucher);
+  const _txtTotalVoucher= obtenerTexto('reserva_total_extras',    _langVoucher);
+  const _txtNotaVoucher = obtenerTexto('email_extras_total_nota', _langVoucher);
+
   const extrasHtml = extrasReserva.length ? `
     <br><strong>Extras:</strong>
-    ${extrasIncluidos.map(e => `<br>&nbsp;&nbsp;· ${e.nombre} <span style="color:#2e7d32;font-size:12px;">(incluido)</span>`).join('')}
-    ${extrasACobrar.map(e => `<br>&nbsp;&nbsp;· ${e.nombre} <span style="color:#856404;font-size:12px;">(${parseFloat(e.precio_en_reserva).toFixed(2)} € — a pagar al conductor al final del servicio)</span>`).join('')}
+    ${extrasIncluidos.map(e => `<br>&nbsp;&nbsp;· ${e.nombre} <span style="color:#2e7d32;font-size:12px;">(${_txtIncVoucher})</span>`).join('')}
+    ${extrasACobrar.map(e => `<br>&nbsp;&nbsp;· ${e.nombre} <span style="color:#856404;font-size:12px;">(${parseFloat(e.precio_en_reserva).toFixed(2)} € — ${_txtCondVoucher})</span>`).join('')}
   ` : '';
 
   const totalExtrasHtml = extrasACobrar.length ? `
     <div style="background:#fff8e1;border:1px solid #D9A441;border-radius:6px;padding:10px 14px;margin-top:12px;font-size:13px;color:#1C1815;">
-      <strong>💰 Total de extras a pagar al conductor: ${totalExtras.toFixed(2)} €</strong><br>
-      <span style="font-size:12px;color:#555;">Este importe se abona directamente al conductor al final del servicio, aparte del precio del traslado.</span>
+      <strong>💰 ${_txtTotalVoucher}: ${totalExtras.toFixed(2)} €</strong><br>
+      <span style="font-size:12px;color:#555;">${_txtNotaVoucher}</span>
     </div>` : '';
 
   // Fecha límite de cancelación gratuita para el voucher
   const _cfgNoshowVoucher = await obtenerConfigNoshow(r.fecha);
   const _fechaLimiteVoucher = calcularFechaCancelacion(new Date(r.fecha), r.hora, _cfgNoshowVoucher.horas_cancelacion);
   const _importeVoucher = parseFloat(_cfgNoshowVoucher.importe_deposito).toFixed(2);
-  const _textoLimiteVoucher = _fechaLimiteVoucher.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteVoucher.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+  const _textoLimiteVoucher = _fechaLimiteVoucher.toLocaleDateString(langALocale(_langVoucher), {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteVoucher.toLocaleTimeString(langALocale(_langVoucher), {hour:'2-digit', minute:'2-digit'});
 
   // Foto del chofer solo si está aprobada
   const slugChofer = r.conductor_nombre
@@ -9610,7 +9622,8 @@ async function generarVoucherPDF(reservaId) {
   if (!result.rows.length) return null;
   const r = result.rows[0];
 
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '\u2014';
+  const _langVoucherPdf = r.lang_cliente || 'es';
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(_langVoucherPdf), { day: 'numeric', month: 'long', year: 'numeric' }) : '\u2014';
 
   const extrasResult = await pool.query(
     `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
@@ -9626,8 +9639,8 @@ async function generarVoucherPDF(reservaId) {
   const _cfgNoshow = await obtenerConfigNoshow(r.fecha);
   const _fechaLimite = calcularFechaCancelacion(new Date(r.fecha), r.hora, _cfgNoshow.horas_cancelacion);
   const _importe = parseFloat(_cfgNoshow.importe_deposito).toFixed(2);
-  const _textoLimite = _fechaLimite.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) +
-    ' a las ' + _fechaLimite.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const _textoLimite = _fechaLimite.toLocaleDateString(langALocale(_langVoucherPdf), { day: 'numeric', month: 'long', year: 'numeric' }) +
+    ' a las ' + _fechaLimite.toLocaleTimeString(langALocale(_langVoucherPdf), { hour: '2-digit', minute: '2-digit' });
 
   let fotoChoferBuffer = null;
   if (r.conductor_foto && r.conductor_foto_estado === 'aprobada' && r.conductor_foto.startsWith('data:image/')) {
@@ -9961,7 +9974,7 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
             numero_reserva: r.numero_reserva,
             origen: r.origen || '—',
             destino: r.destino || '—',
-            fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—',
+            fecha: r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—',
             hora: r.hora ? r.hora.slice(0,5) : '—'
           });
           await enviarEmailConAdjunto({
@@ -10085,9 +10098,9 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
 
   const importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
   const horas = condiciones ? condiciones.horas_cancelacion : 12;
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '';
   const _fechaLimiteCancelEmail = calcularFechaCancelacion(new Date(r.fecha), r.hora, horas);
-  const _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+  const _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString(langALocale(r.lang_cliente || 'es'), {hour:'2-digit', minute:'2-digit'});
 
   // Crear sesión de pago en Stripe si está configurado
   let urlPago = null;
@@ -10123,9 +10136,10 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
     }
   }
 
+  const _txtBotonPago2 = obtenerTexto('email_boton_pagar_deposito', r.lang_cliente || 'es').replace('{importe}', importe);
   const botonPago = urlPago
     ? `<div style="text-align:center;margin:24px 0;">
-        <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 Pagar depósito de ${importe} €</a>
+        <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 ${_txtBotonPago2}</a>
        </div>`
     : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
 
@@ -10137,7 +10151,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
     destino: r.destino || '—',
     fecha: fechaViaje,
     hora: r.hora ? r.hora.slice(0,5) : '—',
-    categoria: r.categoria_nombre || '—',
+    categoria: obtenerTexto('categoria_nombre_' + r.categoria_id, r.lang_cliente || 'es') || r.categoria_nombre || '—',
     conductor: r.conductor_nombre || '',
     importe_deposito: importe,
     horas_cancelacion: horas,
@@ -10194,7 +10208,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
         numero_reserva: r.numero_reserva,
         origen: r.origen || '—',
         destino: r.destino || '—',
-        fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—',
+        fecha: r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—',
         hora: r.hora ? r.hora.slice(0,5) : '—',
         categoria: r.categoria_nombre || '—',
         importe_deposito: importe,
@@ -10242,7 +10256,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
   }
 
   const importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '';
   const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
   const lang = r.lang_cliente || 'es';
 
@@ -10270,7 +10284,8 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
   await pool.query('UPDATE reservas SET stripe_session_id = $1 WHERE id = $2', [session.id, r.id]);
 
   // Enviar email con nuevo enlace
-  const botonPagoReenvio = `<p style="text-align:center;margin:12px 0;"><a href="${session.url}" class="boton">💳 Pagar depósito de ${importe} €</a></p>`;
+  const _txtBotonReenvio = obtenerTexto('email_boton_pagar_deposito', r.lang_cliente || 'es').replace('{importe}', importe);
+  const botonPagoReenvio = `<p style="text-align:center;margin:12px 0;"><a href="${session.url}" class="boton">💳 ${_txtBotonReenvio}</a></p>`;
   const codigoPagoEmail = await generarCodigoCorto('pago', r.id, null, session.url);
   const urlCortaEmail = `${BASE_URL}/v/${codigoPagoEmail}`;
   const _pep = await obtenerPlantilla('cliente_enlace_pago', {
@@ -12712,7 +12727,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
 
   // Confirmar al cliente
   try {
-    const fechaTextoCancel = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+    const fechaTextoCancel = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
     const avisoDeposito = r.deposito_pagado
       ? (fueraDePlazo
           ? '<p style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:10px 14px;font-size:13px;color:#856404;">⚠️ La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía ha sido retenido según nuestra política de cancelación.</p>'
@@ -12746,7 +12761,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
   // WhatsApp al cliente
   if (r.telefono_cliente) {
     try {
-      const fechaTextoWa = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+      const fechaTextoWa = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
       const _pcancelWa = await obtenerPlantilla('cliente_cancelacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -12800,7 +12815,7 @@ app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(
       `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
        JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`, [r.id]
     );
-    const fechaViaje = ra.fecha ? new Date(ra.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+    const fechaViaje = ra.fecha ? new Date(ra.fecha).toLocaleDateString(langALocale(ra.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—';
     const lineas = [
       '<strong>Ruta:</strong> ' + (ra.origen || '—') + ' → ' + (ra.destino || '—'),
       '<strong>Fecha:</strong> ' + fechaViaje,
@@ -13008,7 +13023,7 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
 
     // Enviar email al cliente con resumen actualizado
     try {
-      const fechaViaje = ra.fecha ? new Date(ra.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+      const fechaViaje = ra.fecha ? new Date(ra.fecha).toLocaleDateString(langALocale(ra.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—';
       const lineas = [
         '<strong>Ruta:</strong> ' + (ra.origen || '—') + ' → ' + (ra.destino || '—'),
         '<strong>Fecha:</strong> ' + fechaViaje,
@@ -13137,7 +13152,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
   try {
     const adjunto = facturaBuffer ? { filename: 'factura-' + r.numero_reserva + '.pdf', content: facturaBuffer } : null;
     const fnEmail = adjunto ? enviarEmailConAdjunto : enviarEmail;
-    const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+    const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—';
     const _pdl = await obtenerPlantilla('cliente_deposito_liberado', {
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva,
@@ -13175,7 +13190,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
     );
     if (conductorQ.rows.length && conductorQ.rows[0].email) {
       const chofer = conductorQ.rows[0];
-      const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+      const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—';
       const _pgs = await obtenerPlantilla('chofer_gracias_servicio', {
         nombre_chofer: chofer.nombre,
         numero_reserva: r.numero_reserva,
@@ -13206,7 +13221,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
   // WhatsApp al cliente
   if (r.telefono_cliente) {
     try {
-      const fechaViajeDl = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+      const fechaViajeDl = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—';
       const _pdlwa = await obtenerPlantilla('cliente_deposito_liberado', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -13234,7 +13249,7 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
 
   await pool.query('UPDATE reservas SET deposito_retenido_noshow = TRUE WHERE id = $1', [req.params.id]);
 
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—';
   const _cfgNs2b = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
   const importe = ((_cfgNs2b.rows[0] && _cfgNs2b.rows[0].importe_deposito) || 10).toString();
 
@@ -14146,7 +14161,7 @@ async function cancelarReservasSinPago() {
         const fechaLimite = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
         if (ahora < fechaLimite) continue; // aún dentro del plazo
 
-        const fechaTexto = new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+        const fechaTexto = new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), { day: 'numeric', month: 'long', year: 'numeric' });
 
         // Cancelar la reserva
         await pool.query(
