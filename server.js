@@ -9956,13 +9956,13 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         // WhatsApp voucher al cliente
         if (r.telefono_cliente) {
           try {
-            const voucherPdfA = await generarVoucherPDF(reservaId);
+            const firma = firmarVoucher(reservaId);
             const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
+            const urlDoc = `${BASE_URL}/voucher-descarga/${reservaId}/${firma}/${nombreDoc}`;
             const textoWaVoucherA = (_pvA && _pvA.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`;
-            const base64VoucherA = voucherPdfA ? voucherPdfA.buffer.toString('base64') : null;
             await pool.query(
-              'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, nombre_documento, documento_base64) VALUES ($1, $2, $3, $4)',
-              [r.telefono_cliente, textoWaVoucherA, nombreDoc, base64VoucherA]
+              'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+              [r.telefono_cliente, textoWaVoucherA, urlDoc, nombreDoc]
             );
           } catch(e) { console.warn('Error encolando WhatsApp voucher:', e.message); }
         }
@@ -9989,13 +9989,14 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
               'SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]
             );
             if (telefonoChoferQ.rows.length && telefonoChoferQ.rows[0].telefono) {
+              const firmaCartelWa = firmarCartel(reservaId);
               const nombreDocCartel = `cartel-${r.numero_reserva}.pdf`;
+              const urlCartelDoc = `${BASE_URL}/cartel-descarga/${reservaId}/${firmaCartelWa}/${nombreDocCartel}`;
               const textoCartelWa = (_pccA && _pccA.whatsapp) ||
                 `Hola, *${cartelPdf.conductor_nombre || ''}* 👋\n\n📋 Adjuntamos el cartel de recogida para tu próximo servicio.\n\n🔖 *Reserva:* ${r.numero_reserva}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
-              const base64CartelA = cartelPdf.buffer.toString('base64');
               await pool.query(
-                'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, nombre_documento, documento_base64) VALUES ($1, $2, $3, $4)',
-                [telefonoChoferQ.rows[0].telefono, textoCartelWa, nombreDocCartel, base64CartelA]
+                'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+                [telefonoChoferQ.rows[0].telefono, textoCartelWa, urlCartelDoc, nombreDocCartel]
               );
             }
           } catch(waCartelErr) { console.warn('Error encolando WhatsApp cartel chofer:', waCartelErr.message); }
@@ -10360,13 +10361,13 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
     // WhatsApp voucher al cliente
     if (r.telefono_cliente) {
       try {
-        const voucherPdfM = await generarVoucherPDF(req.params.id);
+        const firma = firmarVoucher(req.params.id);
         const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
+        const urlDoc = `${BASE_URL}/voucher-descarga/${req.params.id}/${firma}/${nombreDoc}`;
         const textoWaVoucherM = (_pvM && _pvM.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`;
-        const base64VoucherM = voucherPdfM ? voucherPdfM.buffer.toString('base64') : null;
         await pool.query(
-          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, nombre_documento, documento_base64) VALUES ($1, $2, $3, $4)',
-          [r.telefono_cliente, textoWaVoucherM, nombreDoc, base64VoucherM]
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+          [r.telefono_cliente, textoWaVoucherM, urlDoc, nombreDoc]
         );
       } catch(e) { console.warn('Error encolando WhatsApp voucher:', e.message); }
     }
@@ -10405,12 +10406,13 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
     const choferQ = await pool.query('SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]);
     if (choferQ.rows.length && choferQ.rows[0].telefono) {
       try {
+        const firma = firmarCartel(req.params.id);
         const nombreDoc = `cartel-${r.numero_reserva}.pdf`;
+        const urlDoc = `${BASE_URL}/cartel-descarga/${req.params.id}/${firma}/${nombreDoc}`;
         const textoWaCartelM = (_pccM && _pccM.whatsapp) || `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe adjuntamos el cartel de recogida para la reserva ${r.numero_reserva}.\n\nTraslados GC`;
-        const base64CartelM = cartel.buffer.toString('base64');
         await pool.query(
-          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, nombre_documento, documento_base64) VALUES ($1, $2, $3, $4)',
-          [choferQ.rows[0].telefono, textoWaCartelM, nombreDoc, base64CartelM]
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+          [choferQ.rows[0].telefono, textoWaCartelM, urlDoc, nombreDoc]
         );
       } catch(e) { console.warn('Error encolando WhatsApp cartel:', e.message); }
     }
