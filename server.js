@@ -9941,13 +9941,9 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
       const r = reserva.rows[0];
       try {
         const htmlVoucher = await generarHtmlVoucher(reservaId);
-        const _firmaVoucherA = firmarVoucher(reservaId);
-        const _nombreDocVoucherA = `voucher-${r.numero_reserva}.pdf`;
-        const _urlDocVoucherA = `${BASE_URL}/voucher-descarga/${reservaId}/${_firmaVoucherA}/${_nombreDocVoucherA}`;
         const _pvA = await obtenerPlantilla('cliente_voucher', {
           nombre_cliente: r.nombre_cliente,
-          numero_reserva: r.numero_reserva,
-          url_voucher: _urlDocVoucherA
+          numero_reserva: r.numero_reserva
         }, r.lang_cliente || 'es');
         if (htmlVoucher) {
           await enviarEmail({
@@ -9960,8 +9956,9 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         // WhatsApp voucher al cliente
         if (r.telefono_cliente) {
           try {
-            const nombreDoc = _nombreDocVoucherA;
-            const urlDoc = _urlDocVoucherA;
+            const firma = firmarVoucher(reservaId);
+            const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
+            const urlDoc = `${BASE_URL}/voucher-descarga/${reservaId}/${firma}/${nombreDoc}`;
             const textoWaVoucherA = (_pvA && _pvA.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`;
             await pool.query(
               'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
@@ -9972,17 +9969,13 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         // Enviar cartel PDF al chofer
         const cartelPdf = await generarCartelPDF(reservaId);
         if (cartelPdf && cartelPdf.conductor_email) {
-          const _firmaCartelA = firmarCartel(reservaId);
-          const _nombreDocCartelA = `cartel-${r.numero_reserva}.pdf`;
-          const _urlCartelDocA = `${BASE_URL}/cartel-descarga/${reservaId}/${_firmaCartelA}/${_nombreDocCartelA}`;
           const _pccA = await obtenerPlantilla('chofer_cartel', {
             nombre_chofer: cartelPdf.conductor_nombre || '',
             numero_reserva: r.numero_reserva,
             origen: r.origen || '—',
             destino: r.destino || '—',
             fecha: r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—',
-            hora: r.hora ? r.hora.slice(0,5) : '—',
-            url_cartel: _urlCartelDocA
+            hora: r.hora ? r.hora.slice(0,5) : '—'
           });
           await enviarEmailConAdjunto({
             to: cartelPdf.conductor_email,
@@ -9996,8 +9989,9 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
               'SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]
             );
             if (telefonoChoferQ.rows.length && telefonoChoferQ.rows[0].telefono) {
-              const nombreDocCartel = _nombreDocCartelA;
-              const urlCartelDoc = _urlCartelDocA;
+              const firmaCartelWa = firmarCartel(reservaId);
+              const nombreDocCartel = `cartel-${r.numero_reserva}.pdf`;
+              const urlCartelDoc = `${BASE_URL}/cartel-descarga/${reservaId}/${firmaCartelWa}/${nombreDocCartel}`;
               const textoCartelWa = (_pccA && _pccA.whatsapp) ||
                 `Hola, *${cartelPdf.conductor_nombre || ''}* 👋\n\n📋 Adjuntamos el cartel de recogida para tu próximo servicio.\n\n🔖 *Reserva:* ${r.numero_reserva}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
               await pool.query(
@@ -10354,13 +10348,9 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
   try {
     const html = await generarHtmlVoucher(req.params.id);
     if (!html) return res.status(500).json({ error: 'No se pudo generar el voucher.' });
-    const _firmaVoucherM = firmarVoucher(req.params.id);
-    const _nombreDocVoucherM = `voucher-${r.numero_reserva}.pdf`;
-    const _urlDocVoucherM = `${BASE_URL}/voucher-descarga/${req.params.id}/${_firmaVoucherM}/${_nombreDocVoucherM}`;
     const _pvM = await obtenerPlantilla('cliente_voucher', {
       nombre_cliente: r.nombre_cliente,
-      numero_reserva: r.numero_reserva,
-      url_voucher: _urlDocVoucherM
+      numero_reserva: r.numero_reserva
     }, r.lang_cliente || 'es');
     await enviarEmail({
       to: r.email_cliente,
@@ -10371,8 +10361,9 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
     // WhatsApp voucher al cliente
     if (r.telefono_cliente) {
       try {
-        const nombreDoc = _nombreDocVoucherM;
-        const urlDoc = _urlDocVoucherM;
+        const firma = firmarVoucher(req.params.id);
+        const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
+        const urlDoc = `${BASE_URL}/voucher-descarga/${req.params.id}/${firma}/${nombreDoc}`;
         const textoWaVoucherM = (_pvM && _pvM.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
@@ -10397,17 +10388,13 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
     const cartel = await generarCartelPDF(req.params.id);
     if (!cartel || !cartel.conductor_email) return res.status(400).json({ error: 'El chofer no tiene email configurado.' });
     const fechaCartelM = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
-    const _firmaCartelM = firmarCartel(req.params.id);
-    const _nombreDocCartelM = `cartel-${r.numero_reserva}.pdf`;
-    const _urlCartelDocM = `${BASE_URL}/cartel-descarga/${req.params.id}/${_firmaCartelM}/${_nombreDocCartelM}`;
     const _pccM = await obtenerPlantilla('chofer_cartel', {
       nombre_chofer: cartel.conductor_nombre || '',
       numero_reserva: r.numero_reserva,
       origen: r.origen || '—',
       destino: r.destino || '—',
       fecha: fechaCartelM,
-      hora: r.hora ? r.hora.slice(0,5) : '—',
-      url_cartel: _urlCartelDocM
+      hora: r.hora ? r.hora.slice(0,5) : '—'
     });
     await enviarEmailConAdjunto({
       to: cartel.conductor_email,
@@ -10419,8 +10406,9 @@ app.post('/admin/reservas/:id/reenviar-cartel', requireAdmin, asyncHandler(async
     const choferQ = await pool.query('SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]);
     if (choferQ.rows.length && choferQ.rows[0].telefono) {
       try {
-        const nombreDoc = _nombreDocCartelM;
-        const urlDoc = _urlCartelDocM;
+        const firma = firmarCartel(req.params.id);
+        const nombreDoc = `cartel-${r.numero_reserva}.pdf`;
+        const urlDoc = `${BASE_URL}/cartel-descarga/${req.params.id}/${firma}/${nombreDoc}`;
         const textoWaCartelM = (_pccM && _pccM.whatsapp) || `Hola, ${cartel.conductor_nombre || ''} 👋\n\nTe adjuntamos el cartel de recogida para la reserva ${r.numero_reserva}.\n\nTraslados GC`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
