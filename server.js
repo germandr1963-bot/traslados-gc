@@ -13675,7 +13675,7 @@ app.get('/api/whatsapp/plantilla/:clave', requierePuenteWhatsapp, asyncHandler(a
 
 app.get('/api/whatsapp/mensajes-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, telefono, texto, url_documento, nombre_documento, documento_base64 FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
+    'SELECT id, telefono, texto, url_documento, nombre_documento FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
   );
   res.json(result.rows);
 }));
