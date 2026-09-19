@@ -290,11 +290,6 @@ function obtenerTexto(clave, lang) {
   return entrada.texto_es;
 }
 
-function langALocale(lang) {
-  const mapa = { es:'es-ES', en:'en-GB', de:'de-DE', sv:'sv-SE', no:'nb-NO', nl:'nl-NL', it:'it-IT', fr:'fr-FR', fi:'fi-FI', ru:'ru-RU' };
-  return mapa[lang] || 'es-ES';
-}
-
 // ─── Helpers generales ───────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
   if (req.session && req.session.adminId) {
@@ -3095,7 +3090,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       fecha: fechaTexto,
       hora: horaTexto,
       extras: _extrasAcuse
-    }, _langCliente);
+    });
     const htmlEmail = plantillaEmail(
       (_par && _par.email) ||
       `<p>Hola <strong>${nombre_cliente.trim()}</strong>,</p>
@@ -8154,7 +8149,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   // Verificar que la reserva pertenece a este chofer y está confirmada
   const check = await pool.query(
     `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
-            r.origen, r.destino, r.fecha, r.lang_cliente,
+            r.origen, r.destino, r.fecha,
             c.nombre AS nombre_chofer, c.telefono AS telefono_chofer
      FROM reservas r
      LEFT JOIN conductores c ON c.id = $2
@@ -8218,7 +8213,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
 
   const enlace = `${BASE_URL}/valorar?token=${token}`;
   const enlaceCorto = `${BASE_URL}/v/${codigo}`;
-  const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+  const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
 
   // Email al cliente
   const botonValoracion = `<div style="text-align:center;margin:12px 0;">
@@ -8232,7 +8227,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
     fecha: fechaTexto,
     url_valoracion: enlaceCorto,
     boton_valoracion: botonValoracion
-  }, r.lang_cliente || 'es');
+  });
   const html = plantillaEmail(
     (_pval && _pval.email) ||
     `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
@@ -8269,7 +8264,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
         numero_factura: numFacEmail
-      }, r.lang_cliente || 'es');
+      });
       await enviarEmailConAdjunto({
         to: r.email_cliente,
         subject: (_pfacemail && _pfacemail.asunto) || (`📄 Factura ${numFacEmail} — Reserva ${r.numero_reserva}`),
@@ -8303,7 +8298,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
           nombre_cliente: r.nombre_cliente,
           numero_reserva: r.numero_reserva,
           numero_factura: numFac
-        }, r.lang_cliente || 'es');
+        });
         const textoFacturaWa = (_pfacwa && _pfacwa.whatsapp) || `📄 Adjuntamos la factura de tu traslado *${r.numero_reserva}*.`;
         await pool.query(
           `INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento)
@@ -8340,7 +8335,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
 app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req, res) => {
   const check = await pool.query(
     `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
-            r.origen, r.destino, r.fecha, r.deposito_pagado, r.lang_cliente
+            r.origen, r.destino, r.fecha, r.deposito_pagado
      FROM reservas r
      WHERE r.id = $1 AND r.conductor_id = $2 AND r.estado = 'confirmada'`,
     [req.params.id, req.session.choferId]
@@ -8354,7 +8349,7 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
     [r.id]
   );
 
-  const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+  const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
   const _cfgNs1 = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
   const importe = ((_cfgNs1.rows[0] && _cfgNs1.rows[0].importe_deposito) || 10).toString();
 
@@ -8367,7 +8362,7 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
       destino: r.destino || '—',
       fecha: fechaTexto,
       importe: importe
-    }, r.lang_cliente || 'es');
+    });
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pns1 && _pns1.asunto) || ('🔒 Depósito retenido por no-show — ' + r.numero_reserva),
@@ -8398,7 +8393,7 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
         destino: r.destino || '—',
         fecha: fechaTexto,
         importe: importe
-      }, r.lang_cliente || 'es');
+      });
       const textoWa = (_pns1wa && _pns1wa.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) no pudo realizarse al no presentarse en el punto de recogida. El depósito de garantía ha sido retenido según nuestra política de reservas.\n\nSi crees que ha habido un error, contáctanos. Un saludo 🙏`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
@@ -9336,9 +9331,9 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
 
       importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
       horas = condiciones ? condiciones.horas_cancelacion : 12;
-      const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '';
+      const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
       const _fechaLimiteCancelEmail = calcularFechaCancelacion(new Date(r.fecha), r.hora, horas);
-      _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString(langALocale(r.lang_cliente || 'es'), {hour:'2-digit', minute:'2-digit'});
+      _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
 
       // Crear sesión de pago en Stripe si está configurado
       if (stripe) {
@@ -9372,10 +9367,9 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         }
       }
 
-      const _txtBotonPago1 = obtenerTexto('email_boton_pagar_deposito', r.lang_cliente || 'es').replace('{importe}', importe);
       const botonPago = urlPago
         ? `<div style="text-align:center;margin:12px 0;">
-            <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 ${_txtBotonPago1}</a>
+            <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 Pagar depósito de ${importe} €</a>
            </div>`
         : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
 
@@ -9387,14 +9381,14 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         destino: r.destino || '—',
         fecha: fechaViaje,
         hora: r.hora ? r.hora.slice(0,5) : '—',
-        categoria: obtenerTexto('categoria_nombre_' + r.categoria_id, r.lang_cliente || 'es') || r.categoria_nombre || '—',
+        categoria: r.categoria_nombre || '—',
         conductor: r.conductor_nombre || '',
         importe_deposito: importe,
         horas_cancelacion: horas,
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
         boton_pago: botonPago,
         extras: _extrasConf1
-      }, r.lang_cliente || 'es');
+      });
       const html = plantillaEmail(
         (_pc1 && _pc1.email) ||
         `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
@@ -9451,7 +9445,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         numero_reserva: r.numero_reserva,
         origen: r.origen || '—',
         destino: r.destino || '—',
-        fecha: r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—',
+        fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—',
         hora: r.hora ? r.hora.slice(0,5) : '—',
         categoria: r.categoria_nombre || '—',
         importe_deposito: importe,
@@ -9459,7 +9453,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
         url_pago: urlPagoCorta,
         extras: _extrasWa1
-      }, r.lang_cliente || 'es');
+      });
       const textoWa = (_pc1wa && _pc1wa.whatsapp) ||
         ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Hemos asignado un conductor para tu servicio. Revisa tu email para todos los detalles y el enlace de pago del depósito.');
       await pool.query(
@@ -9510,8 +9504,7 @@ async function generarHtmlVoucher(reservaId) {
   );
   if (!result.rows.length) return null;
   const r = result.rows[0];
-  const _langVoucher = r.lang_cliente || 'es';
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(_langVoucher), {day:'numeric', month:'long', year:'numeric'}) : '';
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
 
   // Extras de la reserva
   const extrasResult = await pool.query(
@@ -9525,28 +9518,23 @@ async function generarHtmlVoucher(reservaId) {
   const extrasACobrar = extrasReserva.filter(e => parseFloat(e.precio_en_reserva) > 0);
   const totalExtras = extrasACobrar.reduce((sum, e) => sum + parseFloat(e.precio_en_reserva), 0);
 
-  const _txtIncVoucher  = obtenerTexto('email_extras_incluido',   _langVoucher);
-  const _txtCondVoucher = obtenerTexto('email_extras_conductor',  _langVoucher);
-  const _txtTotalVoucher= obtenerTexto('reserva_total_extras',    _langVoucher);
-  const _txtNotaVoucher = obtenerTexto('email_extras_total_nota', _langVoucher);
-
   const extrasHtml = extrasReserva.length ? `
     <br><strong>Extras:</strong>
-    ${extrasIncluidos.map(e => `<br>&nbsp;&nbsp;· ${e.nombre} <span style="color:#2e7d32;font-size:12px;">(${_txtIncVoucher})</span>`).join('')}
-    ${extrasACobrar.map(e => `<br>&nbsp;&nbsp;· ${e.nombre} <span style="color:#856404;font-size:12px;">(${parseFloat(e.precio_en_reserva).toFixed(2)} € — ${_txtCondVoucher})</span>`).join('')}
+    ${extrasIncluidos.map(e => `<br>&nbsp;&nbsp;· ${e.nombre} <span style="color:#2e7d32;font-size:12px;">(incluido)</span>`).join('')}
+    ${extrasACobrar.map(e => `<br>&nbsp;&nbsp;· ${e.nombre} <span style="color:#856404;font-size:12px;">(${parseFloat(e.precio_en_reserva).toFixed(2)} € — a pagar al conductor al final del servicio)</span>`).join('')}
   ` : '';
 
   const totalExtrasHtml = extrasACobrar.length ? `
     <div style="background:#fff8e1;border:1px solid #D9A441;border-radius:6px;padding:10px 14px;margin-top:12px;font-size:13px;color:#1C1815;">
-      <strong>💰 ${_txtTotalVoucher}: ${totalExtras.toFixed(2)} €</strong><br>
-      <span style="font-size:12px;color:#555;">${_txtNotaVoucher}</span>
+      <strong>💰 Total de extras a pagar al conductor: ${totalExtras.toFixed(2)} €</strong><br>
+      <span style="font-size:12px;color:#555;">Este importe se abona directamente al conductor al final del servicio, aparte del precio del traslado.</span>
     </div>` : '';
 
   // Fecha límite de cancelación gratuita para el voucher
   const _cfgNoshowVoucher = await obtenerConfigNoshow(r.fecha);
   const _fechaLimiteVoucher = calcularFechaCancelacion(new Date(r.fecha), r.hora, _cfgNoshowVoucher.horas_cancelacion);
   const _importeVoucher = parseFloat(_cfgNoshowVoucher.importe_deposito).toFixed(2);
-  const _textoLimiteVoucher = _fechaLimiteVoucher.toLocaleDateString(langALocale(_langVoucher), {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteVoucher.toLocaleTimeString(langALocale(_langVoucher), {hour:'2-digit', minute:'2-digit'});
+  const _textoLimiteVoucher = _fechaLimiteVoucher.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteVoucher.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
 
   // Foto del chofer solo si está aprobada
   const slugChofer = r.conductor_nombre
@@ -9622,8 +9610,7 @@ async function generarVoucherPDF(reservaId) {
   if (!result.rows.length) return null;
   const r = result.rows[0];
 
-  const _langVoucherPdf = r.lang_cliente || 'es';
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(_langVoucherPdf), { day: 'numeric', month: 'long', year: 'numeric' }) : '\u2014';
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '\u2014';
 
   const extrasResult = await pool.query(
     `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
@@ -9639,8 +9626,8 @@ async function generarVoucherPDF(reservaId) {
   const _cfgNoshow = await obtenerConfigNoshow(r.fecha);
   const _fechaLimite = calcularFechaCancelacion(new Date(r.fecha), r.hora, _cfgNoshow.horas_cancelacion);
   const _importe = parseFloat(_cfgNoshow.importe_deposito).toFixed(2);
-  const _textoLimite = _fechaLimite.toLocaleDateString(langALocale(_langVoucherPdf), { day: 'numeric', month: 'long', year: 'numeric' }) +
-    ' a las ' + _fechaLimite.toLocaleTimeString(langALocale(_langVoucherPdf), { hour: '2-digit', minute: '2-digit' });
+  const _textoLimite = _fechaLimite.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) +
+    ' a las ' + _fechaLimite.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
   let fotoChoferBuffer = null;
   if (r.conductor_foto && r.conductor_foto_estado === 'aprobada' && r.conductor_foto.startsWith('data:image/')) {
@@ -9944,7 +9931,7 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         const _pvA = await obtenerPlantilla('cliente_voucher', {
           nombre_cliente: r.nombre_cliente,
           numero_reserva: r.numero_reserva
-        }, r.lang_cliente || 'es');
+        });
         if (htmlVoucher) {
           await enviarEmail({
             to: r.email_cliente,
@@ -9974,7 +9961,7 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
             numero_reserva: r.numero_reserva,
             origen: r.origen || '—',
             destino: r.destino || '—',
-            fecha: r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—',
+            fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—',
             hora: r.hora ? r.hora.slice(0,5) : '—'
           });
           await enviarEmailConAdjunto({
@@ -10098,9 +10085,9 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
 
   const importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
   const horas = condiciones ? condiciones.horas_cancelacion : 12;
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '';
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
   const _fechaLimiteCancelEmail = calcularFechaCancelacion(new Date(r.fecha), r.hora, horas);
-  const _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString(langALocale(r.lang_cliente || 'es'), {hour:'2-digit', minute:'2-digit'});
+  const _textoLimiteCancelEmail = _fechaLimiteCancelEmail.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteCancelEmail.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
 
   // Crear sesión de pago en Stripe si está configurado
   let urlPago = null;
@@ -10136,10 +10123,9 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
     }
   }
 
-  const _txtBotonPago2 = obtenerTexto('email_boton_pagar_deposito', r.lang_cliente || 'es').replace('{importe}', importe);
   const botonPago = urlPago
     ? `<div style="text-align:center;margin:24px 0;">
-        <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 ${_txtBotonPago2}</a>
+        <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 Pagar depósito de ${importe} €</a>
        </div>`
     : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
 
@@ -10151,14 +10137,14 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
     destino: r.destino || '—',
     fecha: fechaViaje,
     hora: r.hora ? r.hora.slice(0,5) : '—',
-    categoria: obtenerTexto('categoria_nombre_' + r.categoria_id, r.lang_cliente || 'es') || r.categoria_nombre || '—',
+    categoria: r.categoria_nombre || '—',
     conductor: r.conductor_nombre || '',
     importe_deposito: importe,
     horas_cancelacion: horas,
     fecha_limite_cancelacion: _textoLimiteCancelEmail,
     boton_pago: botonPago,
     extras: _extrasConf2
-  }, r.lang_cliente || 'es');
+  });
   const html = plantillaEmail(
     (_pc2 && _pc2.email) ||
     `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
@@ -10208,7 +10194,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
         numero_reserva: r.numero_reserva,
         origen: r.origen || '—',
         destino: r.destino || '—',
-        fecha: r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—',
+        fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—',
         hora: r.hora ? r.hora.slice(0,5) : '—',
         categoria: r.categoria_nombre || '—',
         importe_deposito: importe,
@@ -10217,7 +10203,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
         url_pago: urlCortaConf,
         url_corta: urlCortaConf,
         extras: _extrasWa2
-      }, r.lang_cliente || 'es');
+      });
       const textoWa = (_pc2wa && _pc2wa.whatsapp) ||
         ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Revisa tu email para ver los detalles y el enlace de pago del depósito.');
       await pool.query(
@@ -10256,7 +10242,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
   }
 
   const importe = condiciones ? parseFloat(condiciones.importe_deposito).toFixed(2) : '10.00';
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '';
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
   const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
   const lang = r.lang_cliente || 'es';
 
@@ -10284,8 +10270,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
   await pool.query('UPDATE reservas SET stripe_session_id = $1 WHERE id = $2', [session.id, r.id]);
 
   // Enviar email con nuevo enlace
-  const _txtBotonReenvio = obtenerTexto('email_boton_pagar_deposito', r.lang_cliente || 'es').replace('{importe}', importe);
-  const botonPagoReenvio = `<p style="text-align:center;margin:12px 0;"><a href="${session.url}" class="boton">💳 ${_txtBotonReenvio}</a></p>`;
+  const botonPagoReenvio = `<p style="text-align:center;margin:12px 0;"><a href="${session.url}" class="boton">💳 Pagar depósito de ${importe} €</a></p>`;
   const codigoPagoEmail = await generarCodigoCorto('pago', r.id, null, session.url);
   const urlCortaEmail = `${BASE_URL}/v/${codigoPagoEmail}`;
   const _pep = await obtenerPlantilla('cliente_enlace_pago', {
@@ -10294,7 +10279,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
     importe: importe,
     url_pago: urlCortaEmail,
     boton_pago: botonPagoReenvio
-  }, lang);
+  });
   const html = plantillaEmail(
     (_pep && _pep.email) ||
     `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
@@ -10325,7 +10310,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
         importe: importe,
         url_pago: urlCorta,
         url_corta: urlCorta
-      }, lang);
+      });
       const textoWa = (_pepwa && _pepwa.whatsapp) ||
         `Hola, *${r.nombre_cliente}* 👋\n\n💳 Te reenviamos el enlace de pago para confirmar tu reserva *${r.numero_reserva}*.\n\n👉 ${urlCorta}\n\n❓ Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
       await pool.query(
@@ -10351,7 +10336,7 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
     const _pvM = await obtenerPlantilla('cliente_voucher', {
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva
-    }, r.lang_cliente || 'es');
+    });
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pvM && _pvM.asunto) || ('Voucher de traslado — ' + r.numero_reserva),
@@ -10440,7 +10425,7 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva,
       numero_factura: resultado.numeroFactura
-    }, r.lang_cliente || 'es');
+    });
     await enviarEmailConAdjunto({
       to: r.email_cliente,
       subject: (_pf && _pf.asunto) || ('📄 Factura ' + resultado.numeroFactura + ' — Reserva ' + r.numero_reserva),
@@ -10552,31 +10537,25 @@ async function formatearExtrasEmail(reservaId, lang) {
       }
     }
 
-    const txtTitulo    = obtenerTexto('email_extras_titulo',     _lang);
-    const txtIncluido  = obtenerTexto('email_extras_incluido',   _lang);
-    const txtConductor = obtenerTexto('email_extras_conductor',  _lang);
-    const txtNota      = obtenerTexto('email_extras_total_nota', _lang);
-    const txtTotal     = obtenerTexto('reserva_total_extras',    _lang);
-
     let lineas = '';
     for (const n of incluidos) {
-      lineas += '&nbsp;&nbsp;&#183; ' + n + ' <span style="color:#2e7d32;font-size:12px;">(' + txtIncluido + ')</span><br>';
+      lineas += '&nbsp;&nbsp;&#183; ' + n + ' <span style="color:#2e7d32;font-size:12px;">(incluido)</span><br>';
     }
     for (const ex of aCobrar) {
-      lineas += '&nbsp;&nbsp;&#183; ' + ex.nombre + ' <span style="color:#856404;font-size:12px;">' + ex.precio.toFixed(2) + ' &euro; &mdash; ' + txtConductor + '</span><br>';
+      lineas += '&nbsp;&nbsp;&#183; ' + ex.nombre + ' <span style="color:#856404;font-size:12px;">' + ex.precio.toFixed(2) + ' &euro; &mdash; a pagar al conductor</span><br>';
     }
 
     let totalHtml = '';
     if (aCobrar.length) {
       const total = aCobrar.reduce((s, e) => s + e.precio, 0);
       totalHtml = '<div class="caja-amarilla" style="margin-top:10px;margin-bottom:0;">'
-                + '<strong>&#128176; ' + txtTotal + ': ' + total.toFixed(2) + ' &euro;</strong><br>'
-                + '<span style="font-size:11px;">' + txtNota + '</span>'
+                + '<strong>&#128176; Total extras a pagar al conductor: ' + total.toFixed(2) + ' &euro;</strong><br>'
+                + '<span style="font-size:11px;">Este importe se abona directamente al conductor al finalizar el servicio.</span>'
                 + '</div>';
     }
 
     return '<div class="info-box">'
-         + '<strong>&#129524; ' + txtTitulo + '</strong><br>'
+         + '<strong>&#129524; Extras seleccionados:</strong><br>'
          + lineas
          + totalHtml
          + '</div>';
@@ -10615,21 +10594,16 @@ async function formatearExtrasWhatsapp(reservaId, lang) {
       }
     }
 
-    const txtTitulo    = obtenerTexto('email_extras_titulo',    _lang);
-    const txtIncluido  = obtenerTexto('email_extras_incluido',  _lang);
-    const txtConductor = obtenerTexto('email_extras_conductor', _lang);
-    const txtTotal     = obtenerTexto('reserva_total_extras',   _lang);
-
-    let texto = '\n🧳 *' + txtTitulo + '*\n';
+    let texto = '\n🧳 *Extras seleccionados:*\n';
     for (const n of incluidos) {
-      texto += '· ' + n + ' _(' + txtIncluido + ')_\n';
+      texto += '· ' + n + ' _(incluido)_\n';
     }
     for (const ex of aCobrar) {
-      texto += '· ' + ex.nombre + ' _(' + ex.precio.toFixed(2) + ' € — ' + txtConductor + ')_\n';
+      texto += '· ' + ex.nombre + ' _(' + ex.precio.toFixed(2) + ' € — a pagar al conductor)_\n';
     }
     if (aCobrar.length) {
       const total = aCobrar.reduce((s, e) => s + e.precio, 0);
-      texto += '💰 *' + txtTotal + ': ' + total.toFixed(2) + ' €*\n';
+      texto += '💰 *Total extras a pagar al conductor: ' + total.toFixed(2) + ' €*\n';
     }
     return texto;
   } catch(e) {
@@ -10638,32 +10612,14 @@ async function formatearExtrasWhatsapp(reservaId, lang) {
   }
 }
 
-async function obtenerPlantilla(clave, vars, lang) {
+async function obtenerPlantilla(clave, vars) {
   try {
-    // Si hay idioma y no es español, buscar primero en traducciones
-    const _lang = (lang && lang !== 'es' && ['en','de','sv','no','nl','it','fr','fi','ru'].includes(lang)) ? lang : null;
-    let p = null;
-
-    if (_lang) {
-      const rt = await pool.query(
-        'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion_traducciones WHERE plantilla_clave = $1 AND lang_code = $2',
-        [clave, _lang]
-      );
-      if (rt.rows.length && (rt.rows[0].cuerpo_email || rt.rows[0].cuerpo_whatsapp)) {
-        p = rt.rows[0];
-      }
-    }
-
-    // Si no hay traducción, usar la plantilla en español (siempre existe)
-    if (!p) {
-      const r = await pool.query(
-        'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion WHERE clave = $1',
-        [clave]
-      );
-      if (!r.rows.length) return null;
-      p = r.rows[0];
-    }
-
+    const r = await pool.query(
+      'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion WHERE clave = $1',
+      [clave]
+    );
+    if (!r.rows.length) return null;
+    const p = r.rows[0];
     const sustituir = (txt) => {
       if (!txt) return txt;
       return txt.replace(/\{([^}]+)\}/g, (_, k) => {
@@ -12727,7 +12683,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
 
   // Confirmar al cliente
   try {
-    const fechaTextoCancel = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+    const fechaTextoCancel = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
     const avisoDeposito = r.deposito_pagado
       ? (fueraDePlazo
           ? '<p style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:10px 14px;font-size:13px;color:#856404;">⚠️ La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía ha sido retenido según nuestra política de cancelación.</p>'
@@ -12740,7 +12696,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
       destino: r.destino || '—',
       fecha: fechaTextoCancel,
       aviso_deposito: avisoDeposito
-    }, r.lang_cliente || 'es');
+    });
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pcancelE && _pcancelE.asunto) || ('Tu reserva ' + r.numero_reserva + ' ha sido cancelada'),
@@ -12761,7 +12717,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
   // WhatsApp al cliente
   if (r.telefono_cliente) {
     try {
-      const fechaTextoWa = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+      const fechaTextoWa = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
       const _pcancelWa = await obtenerPlantilla('cliente_cancelacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -12769,7 +12725,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
         destino: r.destino || '—',
         fecha: fechaTextoWa,
         aviso_deposito: fueraDePlazo ? '⚠️ La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido.' : '✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve.'
-      }, r.lang_cliente || 'es');
+      });
       const textoWa = (_pcancelWa && _pcancelWa.whatsapp) || (fueraDePlazo
         ? `Hola, ${r.nombre_cliente} 👋\n\nTu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTextoWa} ha sido cancelada.\n\n⚠️ La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido según nuestra política de cancelación.\n\nSi tienes alguna duda, contáctanos. Un saludo 🙏`
         : `Hola, ${r.nombre_cliente} 👋\n\nTu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTextoWa} ha sido cancelada correctamente.\n\n✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.\n\nUn saludo 🙏`);
@@ -12815,7 +12771,7 @@ app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(
       `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
        JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`, [r.id]
     );
-    const fechaViaje = ra.fecha ? new Date(ra.fecha).toLocaleDateString(langALocale(ra.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—';
+    const fechaViaje = ra.fecha ? new Date(ra.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
     const lineas = [
       '<strong>Ruta:</strong> ' + (ra.origen || '—') + ' → ' + (ra.destino || '—'),
       '<strong>Fecha:</strong> ' + fechaViaje,
@@ -12832,7 +12788,7 @@ app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(
     const _pma = await obtenerPlantilla('cliente_modificacion_aprobada', {
       nombre_cliente: ra.nombre_cliente,
       numero_reserva: ra.numero_reserva
-    }, ra.lang_cliente || 'es');
+    });
     await enviarEmail({
       to: ra.email_cliente,
       subject: (_pma && _pma.asunto) || ('✅ Tu modificación ha sido aprobada — ' + ra.numero_reserva),
@@ -13023,7 +12979,7 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
 
     // Enviar email al cliente con resumen actualizado
     try {
-      const fechaViaje = ra.fecha ? new Date(ra.fecha).toLocaleDateString(langALocale(ra.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—';
+      const fechaViaje = ra.fecha ? new Date(ra.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
       const lineas = [
         '<strong>Ruta:</strong> ' + (ra.origen || '—') + ' → ' + (ra.destino || '—'),
         '<strong>Fecha:</strong> ' + fechaViaje,
@@ -13071,7 +13027,7 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
   // Notificar al cliente por email
   try {
     const reserva = await pool.query(
-      'SELECT nombre_cliente, email_cliente, numero_reserva, lang_cliente FROM reservas WHERE id = $1',
+      'SELECT nombre_cliente, email_cliente, numero_reserva FROM reservas WHERE id = $1',
       [req.params.id]
     );
     if (reserva.rows.length) {
@@ -13080,7 +13036,7 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
         mensaje: mensaje.trim().replace(/\n/g,'<br>')
-      }, r.lang_cliente || 'es');
+      });
       await enviarEmail({
         to: r.email_cliente,
         subject: (_pmsg && _pmsg.asunto) || ('💬 Tienes un mensaje sobre tu reserva ' + r.numero_reserva),
@@ -13152,7 +13108,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
   try {
     const adjunto = facturaBuffer ? { filename: 'factura-' + r.numero_reserva + '.pdf', content: facturaBuffer } : null;
     const fnEmail = adjunto ? enviarEmailConAdjunto : enviarEmail;
-    const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—';
+    const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
     const _pdl = await obtenerPlantilla('cliente_deposito_liberado', {
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva,
@@ -13160,7 +13116,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
       destino: r.destino || '—',
       fecha: fechaViaje,
       numero_factura: numeroFactura || ''
-    }, r.lang_cliente || 'es');
+    });
     await fnEmail({
       to: r.email_cliente,
       subject: (_pdl && _pdl.asunto) || ('✅ Servicio completado — ' + r.numero_reserva),
@@ -13190,7 +13146,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
     );
     if (conductorQ.rows.length && conductorQ.rows[0].email) {
       const chofer = conductorQ.rows[0];
-      const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—';
+      const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
       const _pgs = await obtenerPlantilla('chofer_gracias_servicio', {
         nombre_chofer: chofer.nombre,
         numero_reserva: r.numero_reserva,
@@ -13221,7 +13177,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
   // WhatsApp al cliente
   if (r.telefono_cliente) {
     try {
-      const fechaViajeDl = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—';
+      const fechaViajeDl = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
       const _pdlwa = await obtenerPlantilla('cliente_deposito_liberado', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -13229,7 +13185,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
         destino: r.destino || '—',
         fecha: fechaViajeDl,
         numero_factura: numeroFactura || ''
-      }, r.lang_cliente || 'es');
+      });
       const textoWa = (_pdlwa && _pdlwa.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nEl depósito de garantía de tu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) ha sido liberado. El importe quedará disponible en tu tarjeta en un plazo de 5 a 10 días hábiles según tu entidad bancaria.\n\nUn saludo, el equipo de Traslados GC 🙏`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
@@ -13249,7 +13205,7 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
 
   await pool.query('UPDATE reservas SET deposito_retenido_noshow = TRUE WHERE id = $1', [req.params.id]);
 
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), {day:'numeric', month:'long', year:'numeric'}) : '—';
+  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
   const _cfgNs2b = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
   const importe = ((_cfgNs2b.rows[0] && _cfgNs2b.rows[0].importe_deposito) || 10).toString();
 
@@ -13262,7 +13218,7 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
       destino: r.destino || '—',
       fecha: fechaViaje,
       importe: importe
-    }, r.lang_cliente || 'es');
+    });
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pns2 && _pns2.asunto) || ('🔒 Depósito retenido por no-show — ' + r.numero_reserva),
@@ -13293,7 +13249,7 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
         destino: r.destino || '—',
         fecha: fechaViaje,
         importe: importe
-      }, r.lang_cliente || 'es');
+      });
       const textoWa = (_pns2wa && _pns2wa.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) no pudo realizarse al no presentarse en el punto de recogida. El depósito de garantía ha sido retenido según nuestra política de reservas.\n\nSi crees que ha habido un error, contáctanos. Un saludo 🙏`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
@@ -13631,7 +13587,7 @@ app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, re
     nombre_cliente: r.nombre_cliente,
     numero_reserva: r.numero_reserva,
     numero_factura: factura.numero_factura
-  }, r.lang_cliente || 'es');
+  });
   await enviarEmailConAdjunto({
     to: emailFinal,
     subject: (_pf && _pf.asunto) || ('📄 Factura ' + factura.numero_factura + ' — Reserva ' + r.numero_reserva),
@@ -13675,7 +13631,7 @@ app.get('/api/whatsapp/plantilla/:clave', requierePuenteWhatsapp, asyncHandler(a
 
 app.get('/api/whatsapp/mensajes-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, telefono, texto, url_documento, nombre_documento FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
+    'SELECT id, telefono, texto, url_documento, nombre_documento, documento_base64 FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
   );
   res.json(result.rows);
 }));
@@ -13888,68 +13844,35 @@ app.get('/admin/plantillas-comunicacion/:clave/traducciones', requireAdmin, asyn
 app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandler(async (req, res) => {
   // Devuelve todas las plantillas cliente con estado por idioma — igual que /admin/textos
   const plantillas = await pool.query(
-    `SELECT clave, nombre, asunto_email, cuerpo_email, cuerpo_whatsapp, actualizado_en
+    `SELECT clave, nombre, asunto_email, cuerpo_email, cuerpo_whatsapp
      FROM plantillas_comunicacion WHERE categoria = 'cliente' ORDER BY nombre`
   );
   const traducciones = await pool.query(
-    `SELECT plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp,
-            generado_por_ia, revisado_email, revisado_wa, actualizado_en
+    `SELECT plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp
      FROM plantillas_comunicacion_traducciones`
   );
 
-  // Mapa: plantilla_clave -> { lang_code -> { email, wa, generado_por_ia, actualizado_en } }
+  // Mapa: plantilla_clave -> { lang_code -> { email: bool, wa: bool } }
   const mapaTrads = {};
   for (const t of traducciones.rows) {
     if (!mapaTrads[t.plantilla_clave]) mapaTrads[t.plantilla_clave] = {};
     mapaTrads[t.plantilla_clave][t.lang_code] = {
-      email:           !!(t.cuerpo_email && t.cuerpo_email.trim()),
-      wa:              !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()),
-      asunto:          !!(t.asunto_email && t.asunto_email.trim()),
-      generado_por_ia: !!t.generado_por_ia,
-      revisado_email:  !!t.revisado_email,
-      revisado_wa:     !!t.revisado_wa,
-      actualizado_en:  t.actualizado_en
+      email: !!(t.cuerpo_email && t.cuerpo_email.trim()),
+      wa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()),
+      asunto: !!(t.asunto_email && t.asunto_email.trim())
     };
   }
 
   const idiomas = IDIOMAS_TRADUCIBLES; // excluye español — es el original
 
   const lista = plantillas.rows.map(function(p) {
-    // estado: null = sin traducción, 'ia' = generado por IA pendiente revisión,
-    //         'desactualizado' = español más reciente que la traducción, 'ok' = revisado y al día
     const estadoEmail = { es: !!(p.cuerpo_email && p.cuerpo_email.trim()) };
     const estadoWa    = { es: !!(p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim()) };
-
     for (const lang of idiomas) {
       const t = mapaTrads[p.clave] && mapaTrads[p.clave][lang];
-
-      // Estado Email — canal independiente
-      if (!t || !t.email) {
-        estadoEmail[lang] = null;
-      } else if (t.revisado_email) {
-        estadoEmail[lang] = 'ok';
-      } else if (t.generado_por_ia) {
-        estadoEmail[lang] = 'ia';
-      } else if (p.actualizado_en && t.actualizado_en && new Date(p.actualizado_en) > new Date(t.actualizado_en)) {
-        estadoEmail[lang] = 'desactualizado';
-      } else {
-        estadoEmail[lang] = 'ok';
-      }
-
-      // Estado WhatsApp — canal independiente
-      if (!t || !t.wa) {
-        estadoWa[lang] = null;
-      } else if (t.revisado_wa) {
-        estadoWa[lang] = 'ok';
-      } else if (t.generado_por_ia) {
-        estadoWa[lang] = 'ia';
-      } else if (p.actualizado_en && t.actualizado_en && new Date(p.actualizado_en) > new Date(t.actualizado_en)) {
-        estadoWa[lang] = 'desactualizado';
-      } else {
-        estadoWa[lang] = 'ok';
-      }
+      estadoEmail[lang] = !!(t && t.email);
+      estadoWa[lang]    = !!(t && t.wa);
     }
-
     return {
       clave: p.clave,
       nombre: p.nombre,
@@ -13967,173 +13890,21 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
 // PUT — guardar o actualizar una traducción
 app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const { clave, lang } = req.params;
-  const { asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, solo_aprobar, tipo } = req.body;
-
-  // Modo aprobación: actualiza revisado_email o revisado_wa segun el tipo, sin tocar el otro canal
-  if (solo_aprobar) {
-    if (tipo === 'email') {
-      await pool.query(
-        `UPDATE plantillas_comunicacion_traducciones
-         SET revisado_email = true, actualizado_en = NOW()
-         WHERE plantilla_clave = $1 AND lang_code = $2`,
-        [clave, lang]
-      );
-    } else if (tipo === 'wa') {
-      await pool.query(
-        `UPDATE plantillas_comunicacion_traducciones
-         SET revisado_wa = true, actualizado_en = NOW()
-         WHERE plantilla_clave = $1 AND lang_code = $2`,
-        [clave, lang]
-      );
-    }
-    return res.json({ ok: true });
-  }
-
-  // Al guardar manualmente se marca el canal correspondiente como revisado
-  const esEmail = !!(cuerpo_email && cuerpo_email.trim());
-  const esWa    = !!(cuerpo_whatsapp && cuerpo_whatsapp.trim());
+  const { asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia } = req.body;
   await pool.query(
     `INSERT INTO plantillas_comunicacion_traducciones
-       (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, revisado_email, revisado_wa, actualizado_en)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+       (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW())
      ON CONFLICT (plantilla_clave, lang_code)
      DO UPDATE SET
-       asunto_email    = EXCLUDED.asunto_email,
-       cuerpo_email    = EXCLUDED.cuerpo_email,
+       asunto_email = EXCLUDED.asunto_email,
+       cuerpo_email = EXCLUDED.cuerpo_email,
        cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp,
        generado_por_ia = EXCLUDED.generado_por_ia,
-       revisado_email  = CASE WHEN EXCLUDED.revisado_email THEN true ELSE plantillas_comunicacion_traducciones.revisado_email END,
-       revisado_wa     = CASE WHEN EXCLUDED.revisado_wa     THEN true ELSE plantillas_comunicacion_traducciones.revisado_wa     END,
-       actualizado_en  = NOW()`,
-    [clave, lang, asunto_email || null, cuerpo_email || null, cuerpo_whatsapp || null, !!generado_por_ia, esEmail, esWa]
+       actualizado_en = NOW()`,
+    [clave, lang, asunto_email || null, cuerpo_email || null, cuerpo_whatsapp || null, !!generado_por_ia]
   );
   res.json({ ok: true });
-}));
-
-// POST — generar traducciones de comunicaciones cliente con IA para un idioma
-// Detecta qué plantillas de cliente faltan en ese idioma y las genera una a una.
-// Email y WhatsApp se procesan por separado con sus generadores dedicados (15 y 16).
-// Guarda directamente en BD sin revisión previa (igual que otros generadores masivos).
-app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
-  const lang = req.params.lang;
-  const tipo = req.body && req.body.tipo; // 'email' | 'wa'
-
-  if (!IDIOMAS_TRADUCIBLES.includes(lang)) {
-    return res.status(400).json({ error: 'Idioma no válido' });
-  }
-  if (!['email', 'wa'].includes(tipo)) {
-    return res.status(400).json({ error: 'Parámetro tipo inválido. Usa email o wa.' });
-  }
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.' });
-  }
-
-  const plantillas = await pool.query(
-    `SELECT clave, nombre, asunto_email, cuerpo_email, cuerpo_whatsapp
-     FROM plantillas_comunicacion WHERE categoria = 'cliente' ORDER BY nombre`
-  );
-
-  const tradExistentes = await pool.query(
-    `SELECT plantilla_clave, asunto_email, cuerpo_email, cuerpo_whatsapp
-     FROM plantillas_comunicacion_traducciones WHERE lang_code = $1`,
-    [lang]
-  );
-  const mapaExistentes = {};
-  for (const t of tradExistentes.rows) {
-    mapaExistentes[t.plantilla_clave] = {
-      tieneEmail: !!(t.cuerpo_email && t.cuerpo_email.trim()),
-      tieneWa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim())
-    };
-  }
-
-  const nombreIdioma = await getNombreIdioma(lang);
-  let generadas = 0;
-  const errores = [];
-
-  for (const p of plantillas.rows) {
-    const existente = mapaExistentes[p.clave] || { tieneEmail: false, tieneWa: false };
-    const filaActual = tradExistentes.rows.find(function (t) { return t.plantilla_clave === p.clave; }) || {};
-    let nuevoAsunto = null;
-    let nuevoEmail  = null;
-    let nuevoWa     = null;
-
-    if (tipo === 'email' && !existente.tieneEmail && p.cuerpo_email && p.cuerpo_email.trim()) {
-      try {
-        const promptEmail = iaPrompts.GENERADOR_EMAIL_COMUNICACIONES(
-          nombreIdioma,
-          p.asunto_email || '',
-          p.cuerpo_email
-        );
-        const respEmail = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: promptEmail }] })
-        });
-        if (!respEmail.ok) throw new Error('API error ' + respEmail.status);
-        const dataEmail = await respEmail.json();
-        const limpiEmail = dataEmail.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-        console.log('[GEN15] Email', p.clave, lang, '—', limpiEmail.slice(0, 150));
-        const parsedEmail = JSON.parse(limpiEmail);
-        nuevoAsunto = parsedEmail.asunto_email || null;
-        nuevoEmail  = parsedEmail.cuerpo_email  || null;
-      } catch (err) {
-        console.error('[GEN15] Error email', p.clave, lang, err.message);
-        errores.push(p.clave + ' (email): ' + err.message.slice(0, 80));
-      }
-    }
-
-    if (tipo === 'wa' && !existente.tieneWa && p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim()) {
-      try {
-        const promptWa = iaPrompts.GENERADOR_WA_COMUNICACIONES(
-          nombreIdioma,
-          p.cuerpo_whatsapp
-        );
-        const respWa = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: promptWa }] })
-        });
-        if (!respWa.ok) throw new Error('API error ' + respWa.status);
-        const dataWa = await respWa.json();
-        const limpiWa = dataWa.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-        console.log('[GEN16] WA', p.clave, lang, '—', limpiWa.slice(0, 150));
-        const parsedWa = JSON.parse(limpiWa);
-        nuevoWa = (parsedWa.cuerpo_whatsapp && parsedWa.cuerpo_whatsapp !== 'null')
-          ? parsedWa.cuerpo_whatsapp
-          : null;
-      } catch (err) {
-        console.error('[GEN16] Error WA', p.clave, lang, err.message);
-        errores.push(p.clave + ' (wa): ' + err.message.slice(0, 80));
-      }
-    }
-
-    if (nuevoEmail !== null || nuevoWa !== null) {
-      await pool.query(
-        `INSERT INTO plantillas_comunicacion_traducciones
-           (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en)
-         VALUES ($1, $2, $3, $4, $5, TRUE, NOW())
-         ON CONFLICT (plantilla_clave, lang_code)
-         DO UPDATE SET
-           asunto_email    = COALESCE(EXCLUDED.asunto_email,    plantillas_comunicacion_traducciones.asunto_email),
-           cuerpo_email    = COALESCE(EXCLUDED.cuerpo_email,    plantillas_comunicacion_traducciones.cuerpo_email),
-           cuerpo_whatsapp = COALESCE(EXCLUDED.cuerpo_whatsapp, plantillas_comunicacion_traducciones.cuerpo_whatsapp),
-           generado_por_ia = TRUE,
-           actualizado_en  = NOW()`,
-        [
-          p.clave,
-          lang,
-          nuevoAsunto || filaActual.asunto_email || null,
-          nuevoEmail  || filaActual.cuerpo_email  || null,
-          nuevoWa     || filaActual.cuerpo_whatsapp || null
-        ]
-      );
-      generadas++;
-    }
-  }
-
-  res.json({ ok: true, generadas, errores });
 }));
 
 // ─── Tarea automática: cancelar reservas confirmadas sin pago de depósito ────
@@ -14161,7 +13932,7 @@ async function cancelarReservasSinPago() {
         const fechaLimite = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
         if (ahora < fechaLimite) continue; // aún dentro del plazo
 
-        const fechaTexto = new Date(r.fecha).toLocaleDateString(langALocale(r.lang_cliente || 'es'), { day: 'numeric', month: 'long', year: 'numeric' });
+        const fechaTexto = new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 
         // Cancelar la reserva
         await pool.query(
@@ -14179,7 +13950,7 @@ async function cancelarReservasSinPago() {
             origen: r.origen || '—',
             destino: r.destino || '—',
             fecha: fechaTexto
-          }, r.lang_cliente || 'es');
+          });
           await enviarEmail({
             to: r.email_cliente,
             subject: (_pcliente && _pcliente.asunto) || ('❌ Tu reserva ' + r.numero_reserva + ' ha sido cancelada por falta de pago'),
@@ -14207,7 +13978,7 @@ async function cancelarReservasSinPago() {
               origen: r.origen || '—',
               destino: r.destino || '—',
               fecha: fechaTexto
-            }, r.lang_cliente || 'es');
+            });
             const textoWaCliente = (_pclientewa && _pclientewa.whatsapp) ||
               `Hola, ${r.nombre_cliente} 👋\n\n❌ Tu reserva ${r.numero_reserva} ha sido cancelada automáticamente.\n\nNo hemos recibido el pago del depósito de garantía en el plazo establecido.\n\n📍 Ruta: ${r.origen || '—'} → ${r.destino || '—'}\n📅 Fecha: ${fechaTexto}\n\nSi deseas realizar este traslado, puedes enviarnos una nueva solicitud. Un saludo 🙏`;
             await pool.query(
