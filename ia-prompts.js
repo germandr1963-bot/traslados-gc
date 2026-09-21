@@ -215,7 +215,8 @@ function GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items) {
     'dónde aparece en la web — úsalo para elegir la traducción más natural (por ejemplo, un botón necesita ' +
     'un tono distinto a un párrafo explicativo). Mantén un tono profesional pero cercano.\n' +
     '- Traduce TODOS los textos sin excepción, incluidos nombres de categorías como "Business", "Económico", "Confort", "Premium" — tradúcelos a su equivalente natural en ' + nombreIdioma + '.\n' +
-    '- Para claves extra_web_X: es el nombre de un extra que ve el cliente al reservar — tradúcelo de forma 100% nativa en ' + nombreIdioma + ', como lo escribiría un local, nunca de forma literal.\n\n' +
+    '- Para claves extra_cliente_X: el texto lo ve el cliente al reservar — tradúcelo de forma 100% nativa en ' + nombreIdioma + ', como lo escribiría un local, nunca de forma literal.\n' +
+    '- Para claves extra_chofer_X: el texto lo ve el chofer — tradúcelo de forma nativa y operativa en ' + nombreIdioma + ', conciso y directo, nunca literal.\n\n' +
     'Textos a traducir (JSON):\n' + JSON.stringify(items, null, 2) + '\n\n' +
     'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, ' +
     'sin bloques de markdown ni comillas triples, con esta forma exacta: ' +
@@ -695,65 +696,6 @@ Antes de entregar la respuesta, cuenta los caracteres exactos de meta_title, met
 Responde ÚNICAMENTE con JSON válido, sin markdown:
 {"slug": "...", "palabra_destino": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "texto_tarjeta": "...", "texto_descripcion": "..."}`;
 }
-// ─── GENERADOR 15 ────────────────────────────────────────────────────────────
-// Traducción de email al cliente — asunto + cuerpo
-// Endpoint: POST /admin/plantillas-comunicacion/generar-ia/:lang
-// Botón admin: 🤖 Generar lo que falta (Admin → Idiomas → Comunicaciones Cliente)
-// Línea original server.js: ~13908 (justo después del PUT de traducciones)
-function GENERADOR_EMAIL_COMUNICACIONES(nombreIdioma, asunto_es, cuerpo_es) {
-  return `Eres un traductor especializado en comunicaciones profesionales para una empresa de traslados privados de lujo en Gran Canaria (España) llamada Traslados GC. Tu tarea es traducir emails de comunicación con clientes al idioma indicado: ${nombreIdioma}.
-
-Reglas estrictas que nunca puedes romper:
-
-1. Las variables entre llaves como {nombre_cliente}, {numero_reserva}, {origen}, {destino}, {fecha}, {hora}, {categoria}, {precio}, {importe}, {importe_deposito}, {horas_cancelacion}, {fecha_limite_cancelacion}, {numero_factura}, {url_pago}, {url_portal}, {url_valoracion}, {password_temporal}, {extras}, {aviso_deposito}, {mensaje}, {asunto_libre}, {mensaje_libre} se copian exactamente igual, sin traducir, sin modificar, sin mover.
-2. Si el texto original contiene HTML (<strong>, <br>, <a href=...>, etc.), se conserva exactamente igual — solo se traduce el texto visible, nunca las etiquetas.
-3. El tono es profesional, cálido y elegante — el de una empresa de transporte privado de calidad. Nunca informal, nunca frío.
-4. No traduzcas literalmente — escribe de forma nativa y natural en ${nombreIdioma}, como lo haría una empresa local de ese país.
-5. El asunto del email debe ser conciso, claro y atractivo — adaptado a las convenciones del idioma destino.
-6. La longitud del email traducido debe ser similar a la del original — ni más corto ni más largo de forma significativa.
-7. Nunca añadas texto que no esté en el original ni elimines información.
-
-Contexto del negocio: Traslados GC ofrece traslados intermunicipales privados de larga distancia en Gran Canaria. El servicio incluye depósito de garantía gestionado por Stripe, asignación de conductor, y comunicación posterior por WhatsApp. Los clientes pueden ser turistas o residentes de cualquier país.
-
-Asunto original en español: ${asunto_es}
-
-Cuerpo del email original en español:
-${cuerpo_es}
-
-Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin texto adicional:
-{"asunto_email": "asunto traducido", "cuerpo_email": "cuerpo traducido"}`;
-}
-
-
-// ─── GENERADOR 16 ────────────────────────────────────────────────────────────
-// Traducción de WhatsApp al cliente — cuerpo del mensaje
-// Endpoint: POST /admin/plantillas-comunicacion/generar-ia/:lang
-// Botón admin: 🤖 Generar lo que falta (Admin → Idiomas → Comunicaciones Cliente)
-// Línea original server.js: ~13908 (justo después del PUT de traducciones)
-function GENERADOR_WA_COMUNICACIONES(nombreIdioma, cuerpo_wa_es) {
-  return `Eres un especialista en comunicación por WhatsApp para una empresa de traslados privados de lujo en Gran Canaria (España) llamada Traslados GC. Tu tarea es traducir mensajes de WhatsApp al idioma indicado: ${nombreIdioma}.
-
-Reglas estrictas que nunca puedes romper:
-
-1. Las variables entre llaves como {nombre_cliente}, {numero_reserva}, {origen}, {destino}, {fecha}, {hora}, {categoria}, {precio}, {importe}, {importe_deposito}, {horas_cancelacion}, {fecha_limite_cancelacion}, {numero_factura}, {url_pago}, {url_portal}, {url_valoracion}, {password_temporal}, {extras}, {aviso_deposito}, {mensaje}, {mensaje_libre} se copian exactamente igual, sin traducir, sin modificar, sin mover.
-2. El formato de WhatsApp se conserva: los *asteriscos* para negrita, los _subrayados_ para cursiva, los saltos de línea con \\n, los emojis — todo igual.
-3. El saludo siempre empieza con el equivalente nativo de "Hola," en ${nombreIdioma} + *{nombre_cliente}* 👋 — solo se traduce "Hola", el resto igual.
-4. El cierre siempre termina con el equivalente nativo de "Un saludo cordial," en ${nombreIdioma} + 🙏 + \\n*El equipo de Traslados GC* — el nombre de la empresa siempre en español.
-5. No traduzcas literalmente — escribe de forma nativa y conversacional en ${nombreIdioma}, como lo haría una empresa local de ese país en WhatsApp.
-6. Los emojis de contexto (📍, 🏁, 📅, ✅, ❌, etc.) se conservan en su posición original.
-7. Si el texto original es null o está vacío, devuelve null — no generes nada.
-8. La longitud debe ser similar al original — un WhatsApp conciso y directo.
-9. Nunca añadas texto que no esté en el original ni elimines información.
-
-Contexto del negocio: Traslados GC ofrece traslados intermunicipales privados de larga distancia en Gran Canaria. La comunicación por WhatsApp es el canal principal con el cliente — debe sentirse cercana, profesional y de confianza, nunca robótica.
-
-Texto de WhatsApp original en español:
-${cuerpo_wa_es}
-
-Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin texto adicional:
-{"cuerpo_whatsapp": "texto traducido o null si el original era null o vacío"}`;
-}
-
 // =============================================================================
 module.exports = {
   GENERADOR_ALT_NUEVO_ES,
@@ -770,7 +712,5 @@ module.exports = {
   GENERADOR_CATEGORIAS_FLOTA,
   GENERADOR_CATEGORIAS_SEO,
   GENERADOR_ISLAS,
-  GENERADOR_TERMINAL_PORTUARIA,
-  GENERADOR_EMAIL_COMUNICACIONES,
-  GENERADOR_WA_COMUNICACIONES
+  GENERADOR_TERMINAL_PORTUARIA
 };
