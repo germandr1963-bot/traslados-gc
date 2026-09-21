@@ -709,6 +709,14 @@ footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13
       </div>
       <p class="nota-extras"><%= t('reserva_nota_extras') %></p>
 
+      <!-- Servicios siempre incluidos -->
+      <div id="bloque-servicios-incluidos" style="display:none;margin-top:24px;border:1px solid var(--gris-borde);border-radius:12px;overflow:hidden;">
+        <div style="background:var(--gris-fondo);padding:12px 16px;border-bottom:1px solid var(--gris-borde);">
+          <span style="font-size:15px;font-weight:700;color:var(--texto-oscuro);">⭐ <span id="servicios-incluidos-titulo"></span></span>
+        </div>
+        <ul id="lista-servicios-incluidos" style="list-style:none;margin:0;padding:0;"></ul>
+      </div>
+
       <div id="resumen-final" style="display:none;">
         <h3 id="resumen-titulo" style="text-align:center;font-family:'Big Shoulders Display',sans-serif;font-size:20px;font-weight:600;color:var(--texto-oscuro);margin:0 0 14px;"><%= t('reserva_resumen_titulo') %></h3>
         <div id="resumen-final-contenido" class="resumen-box"></div>
@@ -803,7 +811,8 @@ var TXT = {
   resAtraque:     '<%- t("reserva_res_atraque").replace(/'/g, "\\'") %>',
   resVuelo:       '<%- t("reserva_res_vuelo").replace(/'/g, "\\'") %>',
   resBarco:       '<%- t("reserva_res_barco").replace(/'/g, "\\'") %>',
-  extrasGratis:   '<%- t("extras_gratis").replace(/'/g, "\\'") %>'
+  extrasGratis:         '<%- t("extras_gratis").replace(/'/g, "\\'") %>',
+  serviciosInclTitulo:  '<%- t("servicios_incluidos_titulo").replace(/'/g, "\\'") %>'
 };
 // Las píldoras de idioma conservan la ruta y categoría elegidas
 document.addEventListener('DOMContentLoaded', function() {
@@ -944,12 +953,30 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
       return;
     }
     lista.innerHTML = extras.map(function(ex){
-      return '<div class="extra-item" id="extra-' + ex.id + '" onclick="toggleExtra(' + ex.id + ')">' +
-        '<div class="extra-check" id="check-' + ex.id + '"></div>' +
+      return '<div class="extra-item" id="extra-' + ex.id_ui + '" onclick="toggleExtra(\'' + ex.id_ui + '\')">' +
+        '<div class="extra-check" id="check-' + ex.id_ui + '"></div>' +
         '<span class="extra-nombre">' + (ex.nombre_traducido || ex.nombre) + '</span>' +
         '<span class="extra-precio">' + (Number(ex.precio) === 0 ? TXT.extrasGratis : Number(ex.precio).toFixed(2) + ' €') + '</span>' +
       '</div>';
     }).join('');
+  });
+
+  // Cargar servicios siempre incluidos
+  fetch('/api/servicios-incluidos?lang=' + LANG).then(function(r){ return r.json(); }).then(function(servicios){
+    if (!servicios.length) return;
+    var bloque = document.getElementById('bloque-servicios-incluidos');
+    var lista  = document.getElementById('lista-servicios-incluidos');
+    lista.innerHTML = servicios.map(function(sv){
+      return '<li style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--gris-borde);">' +
+        '<span style="font-size:20px;min-width:28px;text-align:center;">' + (sv.icono || '') + '</span>' +
+        '<span style="font-size:14px;color:var(--texto-oscuro);">' + sv.texto + '</span>' +
+      '</li>';
+    }).join('');
+    // Quitar borde inferior del último elemento
+    var items = lista.querySelectorAll('li');
+    if (items.length) items[items.length - 1].style.borderBottom = 'none';
+    document.getElementById('servicios-incluidos-titulo').textContent = TXT.serviciosInclTitulo;
+    bloque.style.display = 'block';
   });
 
   // Si el cliente ya tiene sesión abierta, prellenar sus datos de contacto y mostrar banner
@@ -1244,17 +1271,41 @@ document.getElementById('modal-cotizacion').addEventListener('click', function(e
 });
 
 // ── Extras ──────────────────────────────────────────────────────────────────
-function toggleExtra(id) {
-  var ex = extrasData.find(function(e){ return e.id === id; });
-  var idx = extrasSeleccionados.findIndex(function(e){ return e.id === id; });
-  var item = document.getElementById('extra-' + id);
-  var check = document.getElementById('check-' + id);
-  if (idx === -1) { extrasSeleccionados.push(ex); item.classList.add('seleccionado'); check.textContent = '✓'; }
-  else { extrasSeleccionados.splice(idx,1); item.classList.remove('seleccionado'); check.textContent = ''; }
+function toggleExtra(idUi) {
+  var ex = extrasData.find(function(e){ return e.id_ui === idUi; });
+  if (!ex) return;
+  var idx = extrasSeleccionados.findIndex(function(e){ return e.id_ui === idUi; });
+  var item = document.getElementById('extra-' + idUi);
+  var check = document.getElementById('check-' + idUi);
+
+  if (idx === -1) {
+    // Si ya hay seleccionada otra modalidad del mismo extra, desmarcamos la anterior
+    var otraIdx = extrasSeleccionados.findIndex(function(e){ return e.extra_id === ex.extra_id; });
+    if (otraIdx !== -1) {
+      var otraUi = extrasSeleccionados[otraIdx].id_ui;
+      extrasSeleccionados.splice(otraIdx, 1);
+      var otraItem = document.getElementById('extra-' + otraUi);
+      var otraCheck = document.getElementById('check-' + otraUi);
+      if (otraItem) otraItem.classList.remove('seleccionado');
+      if (otraCheck) otraCheck.textContent = '';
+    }
+    extrasSeleccionados.push(ex);
+    item.classList.add('seleccionado');
+    check.textContent = '✓';
+  } else {
+    extrasSeleccionados.splice(idx, 1);
+    item.classList.remove('seleccionado');
+    check.textContent = '';
+  }
+
   var total = extrasSeleccionados.reduce(function(s,e){ return s + Number(e.precio); }, 0);
   var box = document.getElementById('total-extras');
   box.style.display = extrasSeleccionados.length ? 'flex' : 'none';
   document.getElementById('total-extras-precio').textContent = total.toFixed(2) + ' €';
+
+  // Si el resumen ya está visible, actualizarlo automáticamente
+  var resumen = document.getElementById('resumen-final');
+  if (resumen && resumen.style.display !== 'none') mostrarResumen();
 }
 
 // ── Navegación ──────────────────────────────────────────────────────────────
@@ -1489,7 +1540,8 @@ function confirmarEnvio() {
       ? document.getElementById('otra-persona-prefijo').value + ' ' + document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'')
       : '',
     email_pasajero_otro: document.getElementById('otra-persona-email').value.trim(),
-    extras: extrasSeleccionados.map(function(e){ return { id: e.id, precio: e.precio }; })
+    extras: extrasSeleccionados.map(function(e){ return { id: e.extra_id, precio: e.precio }; }),
+    lang_cliente: LANG
   };
 
   fetch('/api/reservas', {
