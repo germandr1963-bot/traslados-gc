@@ -1047,6 +1047,25 @@ async function initSchema() {
        ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
       [claveExtra, 'Nombre del extra "' + ex.nombre + '" tal como aparece en la página de reserva', ex.nombre]
     );
+    const claveWeb = 'extra_web_' + ex.id;
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Extras', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+      [claveWeb, 'Descripción del extra "' + ex.nombre + '" para el cliente y el chofer', ex.nombre]
+    );
+  }
+
+  // Sincronizar textos de servicios incluidos como textos traducibles
+  const serviciosIncluidos = await pool.query('SELECT id, icono, texto FROM servicios_incluidos ORDER BY orden, id');
+  for (const sv of serviciosIncluidos.rows) {
+    const claveServicio = 'servicio_incluido_' + sv.id;
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Servicios incluidos', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+      [claveServicio, sv.icono + ' ' + sv.texto + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', sv.texto]
+    );
   }
 
   // Textos del bloque "Próximamente" en la página de listado de destinos
@@ -1449,6 +1468,20 @@ async function initSchema() {
     WHERE NOT EXISTS (SELECT 1 FROM extras e WHERE e.nombre = v.nombre);
   `);
 
+  // ─── Servicios incluidos — bloque informativo para el cliente ───────────────
+  // Tabla independiente, sin relación con choferes ni extras seleccionables.
+  // Se muestra al final del paso 3 de reserva como "⭐ Servicios que siempre te incluimos".
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS servicios_incluidos (
+      id SERIAL PRIMARY KEY,
+      icono TEXT NOT NULL DEFAULT '',
+      texto TEXT NOT NULL,
+      orden INT DEFAULT 0,
+      activo BOOLEAN DEFAULT FALSE,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
   // ─── Avisos de reserva (Grupo B: información pura, sin precio, el chofer ──
   // no decide nada, solo se entera). Distinto de "extras": no filtra choferes.
   await pool.query(`
@@ -1658,6 +1691,7 @@ async function initSchema() {
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_devolucion_pendiente BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_retenido_noshow BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS lang_cliente VARCHAR(10) DEFAULT 'es'`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS whatsapp_mensajes_pendientes (
       id SERIAL PRIMARY KEY,
@@ -1849,6 +1883,7 @@ Hola, <strong>{nombre_cliente}</strong> 👋
   🏁 Destino: {destino}
   📅 Fecha: {fecha} · {hora}
 </div>
+{extras}
 <span style="font-size:13px;color:#888;">💾 Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.</span>
 
 <span style="font-size:13px;color:#888;">⏱️ El plazo máximo para confirmarte un conductor es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.</span>
@@ -1856,7 +1891,7 @@ Hola, <strong>{nombre_cliente}</strong> 👋
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n📨 Hemos recibido tu solicitud de traslado. Estamos trabajando en ella y en breve recibirás confirmación.\n\n🔖 *Tu número de reserva es:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\n💾 Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.\n\n⏱️ El plazo máximo para confirmarte un conductor es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n📨 Hemos recibido tu solicitud de traslado. Estamos trabajando en ella y en breve recibirás confirmación.\n\n🔖 *Tu número de reserva es:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n{extras}\n💾 Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.\n\n⏱️ El plazo máximo para confirmarte un conductor es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_confirmacion', nombre: 'Traslado confirmado (al cliente)', categoria: 'cliente',
       asunto_email: 'Traslado confirmado \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -1874,6 +1909,7 @@ Hola, <strong>{nombre_cliente}</strong> 👋
   🚗 Categoría: {categoria}
   🧭 Conductor: {conductor}
 </div>
+{extras}
 <div class="caja-verde">
   <span style="font-weight:600;">💳 Depósito de garantía — {importe_deposito} €</span><br>
   <span style="font-size:13px;">Para garantizar tu plaza, realiza el pago del depósito de <strong>{importe_deposito} €</strong>. El voucher de tu traslado te llegará automáticamente al confirmar el pago.</span><br>
@@ -1887,7 +1923,7 @@ Hola, <strong>{nombre_cliente}</strong> 👋
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n✅ *¡Tu traslado está confirmado! Hemos asignado un conductor para tu servicio.*\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n\n💳 *Depósito de garantía — {importe_deposito} €*\nPara garantizar tu plaza, realiza el pago del depósito de {importe_deposito} €. El voucher de tu traslado te llegará automáticamente al confirmar el pago.\n\n⚠️ *Importante:* Si no recibimos el pago {horas_cancelacion} horas antes de tu traslado, la reserva será cancelada.\n\n✔️ El depósito te será devuelto íntegramente una vez completado el servicio.\n\n🗓️ *Cancelación gratuita hasta el {fecha_limite_cancelacion}.* Después de esa fecha, el depósito de {importe_deposito} € no será reembolsable.\n\n👉 {url_pago}\n\n📲 Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n✅ *¡Tu traslado está confirmado! Hemos asignado un conductor para tu servicio.*\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n{extras}\n💳 *Depósito de garantía — {importe_deposito} €*\nPara garantizar tu plaza, realiza el pago del depósito de {importe_deposito} €. El voucher de tu traslado te llegará automáticamente al confirmar el pago.\n\n⚠️ *Importante:* Si no recibimos el pago {horas_cancelacion} horas antes de tu traslado, la reserva será cancelada.\n\n✔️ El depósito te será devuelto íntegramente una vez completado el servicio.\n\n🗓️ *Cancelación gratuita hasta el {fecha_limite_cancelacion}.* Después de esa fecha, el depósito de {importe_deposito} € no será reembolsable.\n\n👉 {url_pago}\n\n📲 Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_enlace_pago', nombre: 'Enlace de pago (dep\u00f3sito)', categoria: 'cliente',
       asunto_email: 'Enlace de pago \u2014 Reserva {numero_reserva}',
       cuerpo_email: `
@@ -2850,6 +2886,32 @@ app.get('/api/extras-info', asyncHandler(async (req, res) => {
   res.json(rows);
 }));
 
+// Servicios incluidos — bloque informativo al final del paso 3 de reserva
+app.get('/api/servicios-incluidos', asyncHandler(async (req, res) => {
+  const lang = (req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es';
+  const result = await pool.query(
+    'SELECT id, icono, texto, orden FROM servicios_incluidos WHERE activo = TRUE ORDER BY orden, id'
+  );
+  if (lang !== 'es') {
+    const traducciones = await pool.query(
+      `SELECT ti.clave, COALESCE(tit.texto, ti.texto_es) AS texto_traducido
+       FROM textos_interfaz ti
+       LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+       WHERE ti.modulo = 'Servicios incluidos'`,
+      [lang]
+    );
+    const mapa = {};
+    for (const t of traducciones.rows) {
+      mapa[t.clave] = t.texto_traducido;
+    }
+    for (const sv of result.rows) {
+      const clave = 'servicio_incluido_' + sv.id;
+      if (mapa[clave]) sv.texto = mapa[clave];
+    }
+  }
+  res.json(result.rows);
+}));
+
 app.get('/api/marcas-vehiculos', asyncHandler(async (req, res) => {
   const marcas = await pool.query('SELECT id, nombre FROM marcas_vehiculos ORDER BY nombre');
   const modelos = await pool.query('SELECT id, marca_id, nombre FROM modelos_vehiculos ORDER BY nombre');
@@ -2869,7 +2931,8 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     es_para_otra_persona, nombre_pasajero_otro, telefono_pasajero_otro,
     email_pasajero_otro,
     pasaporte_dni,
-    extras
+    extras,
+    lang_cliente
   } = req.body;
 
   if (!origen || !destino || !categoria_id || !fecha || !nombre_cliente || !telefono_cliente || !email_cliente) {
@@ -2934,11 +2997,12 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       num_pasajeros, notas_cliente, estado_aviso_whatsapp,
       es_para_otra_persona, nombre_pasajero_otro, telefono_pasajero_otro,
       email_pasajero_otro,
-      pasaporte_dni
+      pasaporte_dni,
+      lang_cliente
     )
      VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, 'pendiente',
              $10, $11, $12, $13, $14, $15, $16, $17, $18, 'pendiente',
-             $19, $20, $21, $22, $23)
+             $19, $20, $21, $22, $23, $24)
      RETURNING id`,
     [
       numeroReserva, categoria_id, fecha, horaGuardar,
@@ -2952,7 +3016,8 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       es_para_otra_persona ? nombre_pasajero_otro.trim() : null,
       (es_para_otra_persona && telefono_pasajero_otro && telefono_pasajero_otro.trim()) ? telefono_pasajero_otro.trim() : null,
       (es_para_otra_persona && email_pasajero_otro && email_pasajero_otro.trim()) ? email_pasajero_otro.trim() : null,
-      pasaporte_dni ? pasaporte_dni.trim() : null
+      pasaporte_dni ? pasaporte_dni.trim() : null,
+      (lang_cliente && ['es','en','de','sv','no','nl','it','fr','fi','ru'].includes(lang_cliente)) ? lang_cliente : 'es'
     ]
   );
 
@@ -3012,15 +3077,19 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
 
   // Email de pre-reserva al cliente
   try {
-    const fechaTexto = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+    const _langCliente = (lang_cliente && ['es','en','de','sv','no','nl','it','fr','fi','ru'].includes(lang_cliente)) ? lang_cliente : 'es';
+    const _localeCliente = _langCliente === 'es' ? 'es-ES' : _langCliente === 'en' ? 'en-GB' : _langCliente === 'de' ? 'de-DE' : _langCliente === 'sv' ? 'sv-SE' : _langCliente === 'no' ? 'nb-NO' : _langCliente === 'nl' ? 'nl-NL' : _langCliente === 'it' ? 'it-IT' : _langCliente === 'fr' ? 'fr-FR' : _langCliente === 'fi' ? 'fi-FI' : _langCliente === 'ru' ? 'ru-RU' : 'es-ES';
+    const fechaTexto = fecha ? new Date(fecha + 'T12:00:00').toLocaleDateString(_localeCliente, {day:'numeric', month:'long', year:'numeric'}) : '';
     const horaTexto = hora ? hora.slice(0, 5) : '—';
+    const _extrasAcuse = await formatearExtrasEmail(reservaId, _langCliente);
     const _par = await obtenerPlantilla('cliente_acuse_recibo', {
       nombre_cliente: nombre_cliente.trim(),
       numero_reserva: numeroReserva,
       origen: origen || '—',
       destino: destino || '—',
       fecha: fechaTexto,
-      hora: horaTexto
+      hora: horaTexto,
+      extras: _extrasAcuse
     });
     const htmlEmail = plantillaEmail(
       (_par && _par.email) ||
@@ -4177,18 +4246,21 @@ app.post('/admin/seo/rutas/:id/generar-ia', requireAdmin, asyncHandler(async (re
     if (tradDestino.rows[0] && tradDestino.rows[0].nombre) destinoParaGenerador = tradDestino.rows[0].nombre;
   }
 
-  const ALFABETO_LATINO = ['es','en','de','fr','it','nl','sv','no','fi','pt','pl','cs','ro','hu','sk','hr','sl','da'];
-  const ALFABETO_CIRILI = ['ru','bg','uk','sr','mk'];
-  let reglasSlug = '';
-  if (lang === 'fr') {
-    reglasSlug = `El slug debe estar en francés, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales. El nombre de la isla "Gran Canaria" en el slug es siempre "grande-canarie". Ejemplo para "Aeropuerto de Gran Canaria → Las Palmas": "aeroport-de-grande-canarie-a-las-palmas".`;
-  } else if (ALFABETO_CIRILI.includes(lang)) {
-    reglasSlug = `El slug debe ser una transliteración al latín del trayecto en ${nombreIdioma}, usando solo a-z y guiones. El nombre de la isla "Gran Canaria" se transliterada siempre como "gran-kanariya". Ejemplo en ruso para "Aeropuerto de Gran Canaria → Las Palmas": "aeroport-gran-kanariya-v-las-palmas".`;
-  } else if (ALFABETO_LATINO.includes(lang)) {
-    reglasSlug = `El slug debe estar en ${nombreIdioma}, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). El nombre de la isla "Gran Canaria" en el slug es siempre "gran-canaria". Debe describir el trayecto de origen a destino. Ejemplo en inglés para "Aeropuerto de Gran Canaria → Las Palmas": "gran-canaria-airport-to-las-palmas".`;
-  } else {
-    reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones. Describe el trayecto de origen a destino en inglés.`;
-  }
+  const SLUG_RUTA = {
+    es: (o, d) => `${o}-a-${d}-en-taxi-traslado`,
+    en: (o, d) => `${o}-to-${d}-by-taxi-transfer`,
+    de: (o, d) => `${o}-nach-${d}-per-taxi-transfer`,
+    sv: (o, d) => `${o}-till-${d}-med-taxi-transfer`,
+    no: (o, d) => `${o}-til-${d}-med-taxi-transfer`,
+    nl: (o, d) => `${o}-naar-${d}-per-taxi-transfer`,
+    it: (o, d) => `${o}-a-${d}-in-taxi-transfer`,
+    fr: (o, d) => `${o}-a-${d}-en-taxi-transfert`,
+    fi: (o, d) => `${o}-${d}-taksilla-transfer`,
+    ru: (o, d) => `${o}-v-${d}-na-taksi-transfer`,
+  };
+  const slugRutaFn = SLUG_RUTA[lang] || SLUG_RUTA['en'];
+  const slugRutaEjemplo = slugRutaFn('aeropuerto-gran-canaria', 'las-palmas-de-gran-canaria');
+  const reglasSlug = `El slug debe seguir EXACTAMENTE este patrón para ${nombreIdioma}: ${slugRutaFn('[origen]', '[destino]')}. Solo letras minúsculas a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). Sin cirílico. Usa los nombres completos de origen y destino, nunca abreviados. Ejemplo de resultado esperado: "${slugRutaEjemplo}".`;
 
   const items = [{ route_id: parseInt(req.params.id), origen: origenParaGenerador, destino: destinoParaGenerador, reglasSlug }];
   const prompt = iaPrompts.GENERADOR_RUTAS_SEO(nombreIdioma, items);
@@ -5862,18 +5934,21 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
   const nombreIdioma = await getNombreIdioma(lang);
 
   // Regla de slug según alfabeto del idioma
-  const ALFABETO_LATINO = ['es','en','de','fr','it','nl','sv','no','fi','pt','pl','cs','ro','hu','sk','hr','sl','da'];
-  const ALFABETO_CIRILI = ['ru','bg','uk','sr','mk'];
-  let reglasSlug = '';
-  if (lang === 'fr') {
-    reglasSlug = `El slug debe estar en francés, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales. El nombre de la isla "Gran Canaria" en el slug es siempre "grande-canarie". Ejemplo para "Aeropuerto de Gran Canaria" en francés: "aeroport-de-grande-canarie".`;
-  } else if (ALFABETO_CIRILI.includes(lang)) {
-    reglasSlug = `El slug debe ser una transliteración al latín del nombre en ${nombreIdioma}, usando solo a-z y guiones. En ruso "Aeropuerto de Gran Canaria" se transliteraría como "aeroport-gran-kanariya" — sigue ese mismo criterio para ${nombreIdioma}.`;
-  } else if (ALFABETO_LATINO.includes(lang)) {
-    reglasSlug = `El slug debe estar en ${nombreIdioma}, usando solo caracteres a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). El nombre de la isla "Gran Canaria" en el slug es siempre "gran-canaria". Ejemplo para "Aeropuerto de Gran Canaria": "aeropuerto-gran-canaria".`;
-  } else {
-    reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones. El nombre del destino en inglés. Ejemplo: "gran-canaria-airport".`;
-  }
+  const SLUG_DESTINO = {
+    es: (d) => `traslado-${d}-taxi-transfer`,
+    en: (d) => `${d}-taxi-transfer`,
+    de: (d) => `${d}-taxi-transfer`,
+    sv: (d) => `${d}-taxi-transfer`,
+    no: (d) => `${d}-taxi-transfer`,
+    nl: (d) => `${d}-taxi-transfer`,
+    it: (d) => `${d}-taxi-trasferimento`,
+    fr: (d) => `${d}-taxi-transfert`,
+    fi: (d) => `${d}-taxi-transfer-kuljetus`,
+    ru: (d) => `${d}-taksi-transfer`,
+  };
+  const slugFn = SLUG_DESTINO[lang] || SLUG_DESTINO['en'];
+  const slugEjemplo = slugFn('aeropuerto-gran-canaria');
+  const reglasSlug = `El slug debe seguir EXACTAMENTE este patrón para ${nombreIdioma}: ${slugFn('[nombre-del-destino]')}. Solo letras minúsculas a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). Sin cirílico. Ejemplo de resultado esperado: "${slugEjemplo}".`;
 
   const MAX_CHARS_TITULO = {es:60,en:62,de:55,fr:60,it:60,nl:57,sv:57,no:57,fi:54,ru:50};
   const MAX_CHARS_DESC   = {es:155,en:160,de:140,fr:155,it:158,nl:148,sv:150,no:152,fi:138,ru:128};
@@ -9298,6 +9373,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
            </div>`
         : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
 
+      const _extrasConf1 = await formatearExtrasEmail(r.id, r.lang_cliente || 'es');
       const _pc1 = await obtenerPlantilla('cliente_confirmacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -9310,7 +9386,8 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         importe_deposito: importe,
         horas_cancelacion: horas,
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
-        boton_pago: botonPago
+        boton_pago: botonPago,
+        extras: _extrasConf1
       });
       const html = plantillaEmail(
         (_pc1 && _pc1.email) ||
@@ -9362,6 +9439,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         const codigoPago = await generarCodigoCorto('pago', r.id, null, urlPago);
         urlPagoCorta = BASE_URL + '/v/' + codigoPago;
       }
+      const _extrasWa1 = await formatearExtrasWhatsapp(r.id, r.lang_cliente || 'es');
       const _pc1wa = await obtenerPlantilla('cliente_confirmacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -9373,7 +9451,8 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         importe_deposito: importe,
         horas_cancelacion: horas,
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
-        url_pago: urlPagoCorta
+        url_pago: urlPagoCorta,
+        extras: _extrasWa1
       });
       const textoWa = (_pc1wa && _pc1wa.whatsapp) ||
         ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Hemos asignado un conductor para tu servicio. Revisa tu email para todos los detalles y el enlace de pago del depósito.');
@@ -10050,6 +10129,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
        </div>`
     : `<p style="color:#888;font-size:13px;">Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.</p>`;
 
+  const _extrasConf2 = await formatearExtrasEmail(r.id, r.lang_cliente || 'es');
   const _pc2 = await obtenerPlantilla('cliente_confirmacion', {
     nombre_cliente: r.nombre_cliente,
     numero_reserva: r.numero_reserva,
@@ -10062,7 +10142,8 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
     importe_deposito: importe,
     horas_cancelacion: horas,
     fecha_limite_cancelacion: _textoLimiteCancelEmail,
-    boton_pago: botonPago
+    boton_pago: botonPago,
+    extras: _extrasConf2
   });
   const html = plantillaEmail(
     (_pc2 && _pc2.email) ||
@@ -10107,6 +10188,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
   try {
     if (r.telefono_cliente) {
       const urlCortaConf = urlPago ? `${BASE_URL}/v/${await generarCodigoCorto('pago', r.id, null, urlPago)}` : '';
+  const _extrasWa2 = await formatearExtrasWhatsapp(r.id, r.lang_cliente || 'es');
       const _pc2wa = await obtenerPlantilla('cliente_confirmacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
@@ -10119,7 +10201,8 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
         horas_cancelacion: horas,
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
         url_pago: urlCortaConf,
-        url_corta: urlCortaConf
+        url_corta: urlCortaConf,
+        extras: _extrasWa2
       });
       const textoWa = (_pc2wa && _pc2wa.whatsapp) ||
         ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Revisa tu email para ver los detalles y el enlace de pago del depósito.');
@@ -10423,6 +10506,112 @@ app.get('/factura-comision-descarga/:numero/:firma/:nombre?', asyncHandler(async
   res.send(row.rows[0].pdf);
 }));
 
+// Devuelve el bloque HTML de extras de una reserva, con nombres en el idioma del cliente.
+// Retorna cadena vacía si la reserva no tiene extras.
+// Devuelve el bloque HTML de extras de una reserva, con nombres en el idioma del cliente.
+// Retorna cadena vacía si la reserva no tiene extras.
+async function formatearExtrasEmail(reservaId, lang) {
+  try {
+    const result = await pool.query(
+      `SELECT re.extra_id, re.precio_en_reserva
+       FROM reservas_extras re
+       JOIN extras e ON e.id = re.extra_id
+       WHERE re.reserva_id = $1
+       ORDER BY e.bloque, e.orden`,
+      [reservaId]
+    );
+    if (!result.rows.length) return '';
+
+    const _lang = (lang && ['es','en','de','sv','no','nl','it','fr','fi','ru'].includes(lang)) ? lang : 'es';
+
+    const incluidos = [];
+    const aCobrar  = [];
+
+    for (const row of result.rows) {
+      const nombre = obtenerTexto('extra_web_' + row.extra_id, _lang);
+      const precio = parseFloat(row.precio_en_reserva);
+      if (!precio || precio === 0) {
+        incluidos.push(nombre);
+      } else {
+        aCobrar.push({ nombre, precio });
+      }
+    }
+
+    let lineas = '';
+    for (const n of incluidos) {
+      lineas += '&nbsp;&nbsp;&#183; ' + n + ' <span style="color:#2e7d32;font-size:12px;">(incluido)</span><br>';
+    }
+    for (const ex of aCobrar) {
+      lineas += '&nbsp;&nbsp;&#183; ' + ex.nombre + ' <span style="color:#856404;font-size:12px;">' + ex.precio.toFixed(2) + ' &euro; &mdash; a pagar al conductor</span><br>';
+    }
+
+    let totalHtml = '';
+    if (aCobrar.length) {
+      const total = aCobrar.reduce((s, e) => s + e.precio, 0);
+      totalHtml = '<div class="caja-amarilla" style="margin-top:10px;margin-bottom:0;">'
+                + '<strong>&#128176; Total extras a pagar al conductor: ' + total.toFixed(2) + ' &euro;</strong><br>'
+                + '<span style="font-size:11px;">Este importe se abona directamente al conductor al finalizar el servicio.</span>'
+                + '</div>';
+    }
+
+    return '<div class="info-box">'
+         + '<strong>&#129524; Extras seleccionados:</strong><br>'
+         + lineas
+         + totalHtml
+         + '</div>';
+  } catch(e) {
+    console.warn('formatearExtrasEmail error:', e.message);
+    return '';
+  }
+}
+
+// Devuelve el bloque de extras en texto plano para WhatsApp.
+// Retorna cadena vacía si la reserva no tiene extras.
+async function formatearExtrasWhatsapp(reservaId, lang) {
+  try {
+    const result = await pool.query(
+      `SELECT re.extra_id, re.precio_en_reserva
+       FROM reservas_extras re
+       JOIN extras e ON e.id = re.extra_id
+       WHERE re.reserva_id = $1
+       ORDER BY e.bloque, e.orden`,
+      [reservaId]
+    );
+    if (!result.rows.length) return '';
+
+    const _lang = (lang && ['es','en','de','sv','no','nl','it','fr','fi','ru'].includes(lang)) ? lang : 'es';
+
+    const incluidos = [];
+    const aCobrar  = [];
+
+    for (const row of result.rows) {
+      const nombre = obtenerTexto('extra_web_' + row.extra_id, _lang);
+      const precio = parseFloat(row.precio_en_reserva);
+      if (!precio || precio === 0) {
+        incluidos.push(nombre);
+      } else {
+        aCobrar.push({ nombre, precio });
+      }
+    }
+
+    let texto = '\n🧳 *Extras seleccionados:*\n';
+    for (const n of incluidos) {
+      texto += '· ' + n + ' _(incluido)_\n';
+    }
+    for (const ex of aCobrar) {
+      texto += '· ' + ex.nombre + ' _(' + ex.precio.toFixed(2) + ' € — a pagar al conductor)_\n';
+    }
+    if (aCobrar.length) {
+      const total = aCobrar.reduce((s, e) => s + e.precio, 0);
+      texto += '💰 *Total extras a pagar al conductor: ' + total.toFixed(2) + ' €*\n';
+    }
+    return texto;
+  } catch(e) {
+    console.warn('formatearExtrasWhatsapp error:', e.message);
+    return '';
+  }
+}
+
 async function obtenerPlantilla(clave, vars) {
   try {
     const r = await pool.query(
@@ -10625,6 +10814,58 @@ app.post('/admin/preferencias-sugerencias/:id/estado', requireAdmin, asyncHandle
 
 app.post('/admin/preferencias-sugerencias/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM preferencias_sugerencias WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// ─── Admin: servicios incluidos ───────────────────────────────────────────────
+app.get('/admin/servicios-incluidos', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query('SELECT id, icono, texto, orden, activo FROM servicios_incluidos ORDER BY orden, id');
+  res.json({ servicios: result.rows });
+}));
+
+app.post('/admin/servicios-incluidos', requireAdmin, asyncHandler(async (req, res) => {
+  const { icono, texto, orden } = req.body;
+  if (!texto || !texto.trim()) return res.status(400).json({ error: 'El texto es obligatorio.' });
+  const result = await pool.query(
+    'INSERT INTO servicios_incluidos (icono, texto, orden, activo) VALUES ($1, $2, $3, FALSE) RETURNING id',
+    [(icono || '').trim(), texto.trim(), parseInt(orden, 10) || 0]
+  );
+  const nuevoId = result.rows[0].id;
+  const clave = 'servicio_incluido_' + nuevoId;
+  await pool.query(
+    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+     VALUES ($1, 'Servicios incluidos', $2, $3)
+     ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+    [clave, (icono || '').trim() + ' ' + texto.trim() + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', texto.trim()]
+  );
+  res.json({ ok: true, id: nuevoId });
+}));
+
+app.post('/admin/servicios-incluidos/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
+  const { icono, texto, orden } = req.body;
+  if (!texto || !texto.trim()) return res.status(400).json({ error: 'El texto es obligatorio.' });
+  await pool.query(
+    'UPDATE servicios_incluidos SET icono = $1, texto = $2, orden = $3 WHERE id = $4',
+    [(icono || '').trim(), texto.trim(), parseInt(orden, 10) || 0, req.params.id]
+  );
+  const clave = 'servicio_incluido_' + req.params.id;
+  await pool.query(
+    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+     VALUES ($1, 'Servicios incluidos', $2, $3)
+     ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+    [clave, (icono || '').trim() + ' ' + texto.trim() + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', texto.trim()]
+  );
+  res.json({ ok: true });
+}));
+
+app.post('/admin/servicios-incluidos/:id/activo', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE servicios_incluidos SET activo = $1 WHERE id = $2', [!!req.body.activo, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/servicios-incluidos/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM servicios_incluidos WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM textos_interfaz WHERE clave = $1', ['servicio_incluido_' + req.params.id]);
   res.json({ ok: true });
 }));
 
@@ -13583,6 +13824,250 @@ app.put('/admin/plantillas-comunicacion/:clave', requireAdmin, asyncHandler(asyn
   );
   if (!result.rows.length) return res.status(404).json({ error: 'Plantilla no encontrada.' });
   res.json({ ok: true, plantilla: result.rows[0] });
+}));
+
+// ─── Traducciones de plantillas de comunicación ──────────────────────────────
+
+// GET — obtener todas las traducciones de una plantilla
+app.get('/admin/plantillas-comunicacion/:clave/traducciones', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en
+     FROM plantillas_comunicacion_traducciones
+     WHERE plantilla_clave = $1
+     ORDER BY lang_code`,
+    [req.params.clave]
+  );
+  res.json({ traducciones: result.rows });
+}));
+
+// GET — obtener traducciones de todas las plantillas cliente para un idioma (para el panel resumen)
+app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandler(async (req, res) => {
+  // Devuelve todas las plantillas cliente con estado por idioma — igual que /admin/textos
+  const plantillas = await pool.query(
+    `SELECT clave, nombre, asunto_email, cuerpo_email, cuerpo_whatsapp, actualizado_en
+     FROM plantillas_comunicacion WHERE categoria = 'cliente' ORDER BY nombre`
+  );
+  const traducciones = await pool.query(
+    `SELECT plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp,
+            generado_por_ia, actualizado_en
+     FROM plantillas_comunicacion_traducciones`
+  );
+
+  // Mapa: plantilla_clave -> { lang_code -> { email, wa, generado_por_ia, actualizado_en } }
+  const mapaTrads = {};
+  for (const t of traducciones.rows) {
+    if (!mapaTrads[t.plantilla_clave]) mapaTrads[t.plantilla_clave] = {};
+    mapaTrads[t.plantilla_clave][t.lang_code] = {
+      email:          !!(t.cuerpo_email && t.cuerpo_email.trim()),
+      wa:             !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()),
+      asunto:         !!(t.asunto_email && t.asunto_email.trim()),
+      generado_por_ia: !!t.generado_por_ia,
+      actualizado_en:  t.actualizado_en
+    };
+  }
+
+  const idiomas = IDIOMAS_TRADUCIBLES; // excluye español — es el original
+
+  const lista = plantillas.rows.map(function(p) {
+    // estado: null = sin traducción, 'ia' = generado por IA pendiente revisión,
+    //         'desactualizado' = español más reciente que la traducción, 'ok' = revisado y al día
+    const estadoEmail = { es: !!(p.cuerpo_email && p.cuerpo_email.trim()) };
+    const estadoWa    = { es: !!(p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim()) };
+
+    for (const lang of idiomas) {
+      const t = mapaTrads[p.clave] && mapaTrads[p.clave][lang];
+
+      if (!t || !t.email) {
+        estadoEmail[lang] = null;
+      } else if (t.generado_por_ia) {
+        estadoEmail[lang] = 'ia';
+      } else if (p.actualizado_en && t.actualizado_en && new Date(p.actualizado_en) > new Date(t.actualizado_en)) {
+        estadoEmail[lang] = 'desactualizado';
+      } else {
+        estadoEmail[lang] = 'ok';
+      }
+
+      if (!t || !t.wa) {
+        estadoWa[lang] = null;
+      } else if (t.generado_por_ia) {
+        estadoWa[lang] = 'ia';
+      } else if (p.actualizado_en && t.actualizado_en && new Date(p.actualizado_en) > new Date(t.actualizado_en)) {
+        estadoWa[lang] = 'desactualizado';
+      } else {
+        estadoWa[lang] = 'ok';
+      }
+    }
+
+    return {
+      clave: p.clave,
+      nombre: p.nombre,
+      texto_es_email: p.cuerpo_email || '',
+      texto_es_wa: p.cuerpo_whatsapp || '',
+      asunto_es: p.asunto_email || '',
+      estado_email: estadoEmail,
+      estado_wa: estadoWa
+    };
+  });
+
+  res.json({ plantillas: lista, idiomas });
+}));
+
+// PUT — guardar o actualizar una traducción
+app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const { clave, lang } = req.params;
+  const { asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, solo_aprobar } = req.body;
+
+  // Modo aprobación masiva: solo marca generado_por_ia=false sin tocar el contenido
+  if (solo_aprobar) {
+    await pool.query(
+      `UPDATE plantillas_comunicacion_traducciones
+       SET generado_por_ia = false, actualizado_en = NOW()
+       WHERE plantilla_clave = $1 AND lang_code = $2`,
+      [clave, lang]
+    );
+    return res.json({ ok: true });
+  }
+
+  await pool.query(
+    `INSERT INTO plantillas_comunicacion_traducciones
+       (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW())
+     ON CONFLICT (plantilla_clave, lang_code)
+     DO UPDATE SET
+       asunto_email = EXCLUDED.asunto_email,
+       cuerpo_email = EXCLUDED.cuerpo_email,
+       cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp,
+       generado_por_ia = EXCLUDED.generado_por_ia,
+       actualizado_en = NOW()`,
+    [clave, lang, asunto_email || null, cuerpo_email || null, cuerpo_whatsapp || null, !!generado_por_ia]
+  );
+  res.json({ ok: true });
+}));
+
+// POST — generar traducciones de comunicaciones cliente con IA para un idioma
+// Detecta qué plantillas de cliente faltan en ese idioma y las genera una a una.
+// Email y WhatsApp se procesan por separado con sus generadores dedicados (15 y 16).
+// Guarda directamente en BD sin revisión previa (igual que otros generadores masivos).
+app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  const tipo = req.body && req.body.tipo; // 'email' | 'wa'
+
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  if (!['email', 'wa'].includes(tipo)) {
+    return res.status(400).json({ error: 'Parámetro tipo inválido. Usa email o wa.' });
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.' });
+  }
+
+  const plantillas = await pool.query(
+    `SELECT clave, nombre, asunto_email, cuerpo_email, cuerpo_whatsapp
+     FROM plantillas_comunicacion WHERE categoria = 'cliente' ORDER BY nombre`
+  );
+
+  const tradExistentes = await pool.query(
+    `SELECT plantilla_clave, asunto_email, cuerpo_email, cuerpo_whatsapp
+     FROM plantillas_comunicacion_traducciones WHERE lang_code = $1`,
+    [lang]
+  );
+  const mapaExistentes = {};
+  for (const t of tradExistentes.rows) {
+    mapaExistentes[t.plantilla_clave] = {
+      tieneEmail: !!(t.cuerpo_email && t.cuerpo_email.trim()),
+      tieneWa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim())
+    };
+  }
+
+  const nombreIdioma = await getNombreIdioma(lang);
+  let generadas = 0;
+  const errores = [];
+
+  for (const p of plantillas.rows) {
+    const existente = mapaExistentes[p.clave] || { tieneEmail: false, tieneWa: false };
+    const filaActual = tradExistentes.rows.find(function (t) { return t.plantilla_clave === p.clave; }) || {};
+    let nuevoAsunto = null;
+    let nuevoEmail  = null;
+    let nuevoWa     = null;
+
+    if (tipo === 'email' && !existente.tieneEmail && p.cuerpo_email && p.cuerpo_email.trim()) {
+      try {
+        const promptEmail = iaPrompts.GENERADOR_EMAIL_COMUNICACIONES(
+          nombreIdioma,
+          p.asunto_email || '',
+          p.cuerpo_email
+        );
+        const respEmail = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: promptEmail }] })
+        });
+        if (!respEmail.ok) throw new Error('API error ' + respEmail.status);
+        const dataEmail = await respEmail.json();
+        const limpiEmail = dataEmail.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+        console.log('[GEN15] Email', p.clave, lang, '—', limpiEmail.slice(0, 150));
+        const parsedEmail = JSON.parse(limpiEmail);
+        nuevoAsunto = parsedEmail.asunto_email || null;
+        nuevoEmail  = parsedEmail.cuerpo_email  || null;
+      } catch (err) {
+        console.error('[GEN15] Error email', p.clave, lang, err.message);
+        errores.push(p.clave + ' (email): ' + err.message.slice(0, 80));
+      }
+    }
+
+    if (tipo === 'wa' && !existente.tieneWa && p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim()) {
+      try {
+        const promptWa = iaPrompts.GENERADOR_WA_COMUNICACIONES(
+          nombreIdioma,
+          p.cuerpo_whatsapp
+        );
+        const respWa = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: promptWa }] })
+        });
+        if (!respWa.ok) throw new Error('API error ' + respWa.status);
+        const dataWa = await respWa.json();
+        const limpiWa = dataWa.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+        console.log('[GEN16] WA', p.clave, lang, '—', limpiWa.slice(0, 150));
+        const parsedWa = JSON.parse(limpiWa);
+        nuevoWa = (parsedWa.cuerpo_whatsapp && parsedWa.cuerpo_whatsapp !== 'null')
+          ? parsedWa.cuerpo_whatsapp
+          : null;
+      } catch (err) {
+        console.error('[GEN16] Error WA', p.clave, lang, err.message);
+        errores.push(p.clave + ' (wa): ' + err.message.slice(0, 80));
+      }
+    }
+
+    if (nuevoEmail !== null || nuevoWa !== null) {
+      await pool.query(
+        `INSERT INTO plantillas_comunicacion_traducciones
+           (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en)
+         VALUES ($1, $2, $3, $4, $5, TRUE, NOW())
+         ON CONFLICT (plantilla_clave, lang_code)
+         DO UPDATE SET
+           asunto_email    = COALESCE(EXCLUDED.asunto_email,    plantillas_comunicacion_traducciones.asunto_email),
+           cuerpo_email    = COALESCE(EXCLUDED.cuerpo_email,    plantillas_comunicacion_traducciones.cuerpo_email),
+           cuerpo_whatsapp = COALESCE(EXCLUDED.cuerpo_whatsapp, plantillas_comunicacion_traducciones.cuerpo_whatsapp),
+           generado_por_ia = TRUE,
+           actualizado_en  = NOW()`,
+        [
+          p.clave,
+          lang,
+          nuevoAsunto || filaActual.asunto_email || null,
+          nuevoEmail  || filaActual.cuerpo_email  || null,
+          nuevoWa     || filaActual.cuerpo_whatsapp || null
+        ]
+      );
+      generadas++;
+    }
+  }
+
+  res.json({ ok: true, generadas, errores });
 }));
 
 // ─── Tarea automática: cancelar reservas confirmadas sin pago de depósito ────
