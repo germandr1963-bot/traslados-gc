@@ -452,7 +452,6 @@ table.tabla-precios input {
           <span id="bloque2-flota-icono" style="font-size:14px;">▶</span>
           <h2 style="font-size:18px;margin:0;">Página de flota — categorías</h2>
           <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
-          <span id="bloque2-flota-pct" style="font-size:12px;margin-left:auto;"></span>
         </div>
 
         <div id="bloque2-flota-contenido" style="display:none;margin-top:16px;">
@@ -472,128 +471,6 @@ table.tabla-precios input {
           </table>
 
           <div id="editor-categorias-ia" class="tarjeta oculto" style="margin-top:20px;max-width:700px;"></div>
-        </div>
-      </div>
-
-      <!-- ─── BLOQUE 3 — Comunicaciones Cliente ────────────────────────────── -->
-      <div style="margin-top:32px;border-top:2px solid var(--gris-borde);padding-top:24px;">
-        <div style="cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none;" onclick="toggleBloqueComunicacionesCliente()">
-          <span id="bloque-com-cliente-icono" style="font-size:14px;">▶</span>
-          <h2 style="font-size:18px;margin:0;">Comunicaciones — Cliente</h2>
-          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
-          <span id="bloque-com-cliente-pct" style="font-size:12px;margin-left:auto;"></span>
-        </div>
-
-        <div id="bloque-com-cliente-contenido" style="display:none;margin-top:20px;">
-          <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Traducciones de los emails y WhatsApp que recibe el cliente. El español es el original — se edita desde Admin → Comunicaciones. Aquí se gestionan los demás idiomas.</p>
-
-          <!-- Tabla EMAIL -->
-          <div style="margin-bottom:24px;">
-            <h3 style="font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px;">
-              📧 Cliente — Email
-              <span id="com-email-pct" style="font-size:12px;font-weight:400;color:var(--texto-muted);"></span>
-            </h3>
-            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-              <select id="select-com-email-ia" class="campo" style="height:34px;width:auto;"></select>
-              <button class="boton-costa" onclick="generarComunicacionesClienteIA('email', 'select-com-email-ia', 'com-email-msg-ia')">🤖 Generar Emails</button>
-              <span id="com-email-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
-            </div>
-            <div class="tabla-envoltura">
-              <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
-                <thead id="thead-com-email"></thead>
-                <tbody id="tbody-com-email"></tbody>
-              </table>
-            </div>
-            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
-              <button class="boton-primario" style="padding:7px 16px;font-size:0.85rem;" onclick="aprobarTodoComunicaciones('email')">✅ Aprobar todo Email</button>
-              <span id="com-email-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
-            </div>
-          </div>
-
-          <!-- Tabla WHATSAPP -->
-          <div>
-            <h3 style="font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px;">
-              📱 Cliente — WhatsApp
-              <span id="com-wa-pct" style="font-size:12px;font-weight:400;color:var(--texto-muted);"></span>
-            </h3>
-            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-              <select id="select-com-wa-ia" class="campo" style="height:34px;width:auto;"></select>
-              <button class="boton-costa" onclick="generarComunicacionesClienteIA('wa', 'select-com-wa-ia', 'com-wa-msg-ia')">🤖 Generar WhatsApp</button>
-              <span id="com-wa-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
-            </div>
-            <div class="tabla-envoltura">
-              <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
-                <thead id="thead-com-wa"></thead>
-                <tbody id="tbody-com-wa"></tbody>
-              </table>
-            </div>
-            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
-              <button class="boton-primario" style="padding:7px 16px;font-size:0.85rem;" onclick="aprobarTodoComunicaciones('wa')">✅ Aprobar todo WhatsApp</button>
-              <span id="com-wa-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Modal edición comunicación traducida -->
-      <div id="modal-com-trad" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;">
-        <div class="tarjeta" style="width:100%;max-width:1100px;margin:auto;position:relative;">
-
-          <!-- Cabecera -->
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <div>
-              <h3 style="margin:0;" id="modal-com-trad-titulo">Editar traducción</h3>
-              <span id="modal-com-trad-subtitulo" style="font-size:12px;color:var(--texto-muted);font-family:monospace;"></span>
-            </div>
-            <button onclick="cerrarModalComTrad()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--texto-muted);">×</button>
-          </div>
-
-          <!-- Dos columnas -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
-
-            <!-- Columna izquierda — Original en español + traducción limpia (solo lectura) -->
-            <div style="display:flex;flex-direction:column;gap:14px;">
-
-              <!-- Español -->
-              <div style="background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
-                <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;">📋 Original en español</p>
-                <div id="modal-com-trad-ref-asunto" style="font-size:12px;font-weight:600;margin-bottom:8px;"></div>
-                <iframe id="modal-com-trad-ref-texto" style="width:100%;height:200px;border:none;background:#fff;border-radius:4px;" sandbox="allow-same-origin"></iframe>
-              </div>
-
-              <!-- Preview real — exactamente como lo ve el cliente -->
-              <div style="background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
-                <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;" id="modal-com-trad-ref-trad-label">🌐 Preview</p>
-                <div id="modal-com-trad-ref-asunto-trad" style="font-size:12px;font-weight:600;margin-bottom:8px;display:none;"></div>
-                <iframe id="modal-com-trad-ref-trad" style="width:100%;height:200px;border:none;background:#fff;border-radius:4px;" sandbox="allow-same-origin"></iframe>
-              </div>
-
-            </div>
-
-            <!-- Columna derecha — Editable en el idioma destino -->
-            <div>
-              <!-- Campo asunto (solo email) -->
-              <div id="modal-com-trad-campo-asunto" style="margin-bottom:12px;">
-                <label class="etiqueta">Asunto del email (<span id="modal-com-trad-lang-label"></span>)</label>
-                <input type="text" id="modal-com-trad-asunto" class="campo" placeholder="Asunto traducido">
-              </div>
-
-              <!-- Campo texto -->
-              <div style="margin-bottom:4px;">
-                <label class="etiqueta" id="modal-com-trad-campo-label">Traducción</label>
-                <p style="font-size:12px;color:var(--texto-muted);margin:0 0 6px;">Las variables <code>{entre_llaves}</code> no se traducen — déjalas exactamente igual.</p>
-                <textarea id="modal-com-trad-texto" class="campo" rows="16" style="font-family:monospace;font-size:13px;resize:vertical;"></textarea>
-              </div>
-            </div>
-          </div>
-
-          <!-- Botones -->
-          <div style="display:flex;gap:10px;margin-top:20px;align-items:center;flex-wrap:wrap;">
-            <button class="boton-primario" onclick="guardarComTrad()">💾 Guardar</button>
-            <button class="boton-secundario" onclick="cerrarModalComTrad()">Cancelar</button>
-            <span id="modal-com-trad-msg-ok" style="font-size:13px;color:green;display:none;">✓ Guardado</span>
-            <span id="modal-com-trad-msg-err" style="font-size:13px;color:red;display:none;">Error al guardar</span>
-          </div>
         </div>
       </div>
 
@@ -1312,14 +1189,13 @@ table.tabla-precios input {
       <h1>Comunicaciones</h1>
       <p class="subtitulo">Plantillas de email y WhatsApp. Edita el texto, guarda los cambios y se aplican desde ese momento en todos los envíos automáticos.</p>
 
-      <!-- Filtro de categoría + selector de idioma -->
+      <!-- Filtro de categoría -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;align-items:center;">
         <button class="boton-costa" style="font-size:0.85rem;" onclick="filtrarPlantillas('todas')" id="filtro-todas">Todas</button>
         <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="filtrarPlantillas('cliente')" id="filtro-cliente">&#128100; Cliente</button>
         <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="filtrarPlantillas('chofer')" id="filtro-chofer">&#128663; Chofer</button>
         <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="filtrarPlantillas('interno')" id="filtro-interno">&#128274; Interno</button>
         <span style="font-size:13px;color:var(--texto-muted);margin-left:8px;" id="com-total-info"></span>
-
       </div>
 
       <!-- Lista de plantillas -->
@@ -1364,7 +1240,6 @@ table.tabla-precios input {
                 <code>{numero_factura}</code> <code>{mensaje}</code> <code>{url_valoracion}</code>
                 <code>{url_pago}</code> <code>{url_portal}</code> <code>{password_temporal}</code>
                 <code>{asunto_libre}</code> <code>{mensaje_libre}</code>
-                <code>{extras}</code>
               </p>
             </div>
           </div>
@@ -1385,7 +1260,6 @@ table.tabla-precios input {
                 <code>{numero_factura}</code> <code>{mensaje}</code> <code>{url_valoracion}</code>
                 <code>{url_pago}</code> <code>{url_portal}</code> <code>{password_temporal}</code>
                 <code>{asunto_libre}</code> <code>{mensaje_libre}</code>
-                <code>{extras}</code>
               </p>
             </div>
           </div>
@@ -1398,9 +1272,6 @@ table.tabla-precios input {
           </div>
         </div>
       </div>
-
-
-
     <!-- Plantilla base de marca -->
       <div style="margin-top:40px;border-top:2px solid var(--borde);padding-top:28px;">
         <h2 style="font-size:1rem;margin-bottom:4px;">&#127775; Plantilla base de marca</h2>
@@ -1464,8 +1335,6 @@ table.tabla-precios input {
           </div>
         </div>
       </div>
-
-
     </div>
 
     <div id="seccion-extras" class="oculto">
@@ -1497,37 +1366,6 @@ table.tabla-precios input {
         <button class="boton-primario" onclick="abrirFormularioPreferencia(null)">+ Añadir preferencia</button>
       </div>
       <div id="lista-preferencias"></div>
-
-      <h2 style="margin-bottom:4px;margin-top:32px;">Servicios incluidos</h2>
-      <p class="subtitulo" style="margin-top:0;">Se muestran al cliente al final del paso de extras como "⭐ Servicios que siempre te incluimos". Sin checkbox ni precio — solo información.</p>
-      <div class="tarjeta" style="margin-bottom:12px;">
-        <button class="boton-primario" onclick="abrirFormularioServicio(null)">+ Añadir servicio</button>
-      </div>
-      <div id="lista-servicios-incluidos"></div>
-
-      <!-- Modal formulario servicio incluido -->
-      <div id="modal-servicio" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;">
-        <div class="tarjeta" style="width:100%;max-width:440px;position:relative;">
-          <h3 style="margin-top:0;" id="modal-servicio-titulo">Nuevo servicio incluido</h3>
-          <div style="margin-bottom:12px;">
-            <label class="etiqueta">Icono (emoji)</label>
-            <input type="text" id="servicio-icono" class="campo" placeholder="Ej: ✈️" style="max-width:80px;">
-          </div>
-          <div style="margin-bottom:12px;">
-            <label class="etiqueta">Texto visible al cliente</label>
-            <input type="text" id="servicio-texto" class="campo" placeholder="Ej: Seguimiento de vuelo en tiempo real">
-          </div>
-          <div style="margin-bottom:20px;">
-            <label class="etiqueta">Orden</label>
-            <input type="number" id="servicio-orden" class="campo" value="0" min="0" style="max-width:80px;">
-          </div>
-          <p id="servicio-msg" style="color:var(--rojo-error);font-size:13px;margin-bottom:8px;"></p>
-          <div style="display:flex;gap:10px;">
-            <button class="boton-primario" onclick="guardarServicio()">Guardar</button>
-            <button class="boton-secundario" onclick="cerrarModalServicio()">Cancelar</button>
-          </div>
-        </div>
-      </div>
 
       <h2 style="margin-bottom:4px;margin-top:32px;">Sugerencias de preferencias</h2>
       <p class="subtitulo" style="margin-top:0;">Propuestas enviadas por los clientes desde su panel. Para convertir una en preferencia real, usa "+ Añadir preferencia".</p>
@@ -1597,7 +1435,6 @@ table.tabla-precios input {
               <option value="D">Equipaje especial</option>
               <option value="E">Accesibilidad y movilidad reducida</option>
               <option value="F">Comodidades y servicios premium</option>
-              <option value="G">Incluidos en todos los traslados</option>
             </select>
           </div>
           <div style="margin-bottom:12px;">
@@ -1605,7 +1442,6 @@ table.tabla-precios input {
             <select id="extra-tipo" class="campo">
               <option value="checkbox">Casilla (sí / no)</option>
               <option value="contador">Contador (cantidad)</option>
-              <option value="informativo">Informativo (sin selección)</option>
             </select>
           </div>
           <div style="margin-bottom:12px;">
@@ -1939,7 +1775,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
     if (boton.dataset.seccion === 'cotizaciones') cargarCotizaciones();
     if (boton.dataset.seccion === 'reservas') cargarReservas();
-    if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); cargarPreferencias(); cargarSugerenciasPreferencias(); cargarServiciosIncluidos(); }
+    if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); cargarPreferencias(); cargarSugerenciasPreferencias(); }
     if (boton.dataset.seccion === 'clientes') cargarClientes();
     if (boton.dataset.seccion === 'equipo') cargarEquipo();
     if (boton.dataset.seccion === 'pagina-rutas') cargarPaginaRutas();
@@ -4409,17 +4245,6 @@ function cargarTablaCategoriasIA() {
       categoriasIACache = datos;
       renderizarCabeceraCategoriasIA(datos.idiomas);
       renderizarTablaCategoriasIA(datos);
-      // Calcular % traducido de categorías y mostrarlo en la cabecera del colapsable
-      var cats = datos.categorias || [];
-      var idiomas = datos.idiomas || [];
-      var total = cats.length * idiomas.length;
-      var traducidos = cats.reduce(function(sum, c) {
-        return sum + idiomas.filter(function(l) { return c.estado[l]; }).length;
-      }, 0);
-      var pct = total > 0 ? Math.round(traducidos / total * 100) : 0;
-      var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
-      var elPct = document.getElementById('bloque2-flota-pct');
-      if (elPct) elPct.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
     });
 }
 
@@ -4582,21 +4407,36 @@ function renderizarTablaTextos(datos) {
         { bloque: 'F', ids: [23, 15, 16, 29, 25, 30, 4, 21, 35],   titulo: 'Comodidades y servicios premium' }
       ];
 
-      // Agrupar textos por id de extra (nombre + web)
+      // Agrupar textos por id de extra
       var extrasMap = {};
+      var extrasSueltos = [];
       textos.forEach(function(t) {
-        var m = t.clave.match(/^extra_(nombre|web)_(\d+)$/);
-        if (!m) return;
+        var m = t.clave.match(/^extra_(nombre|cliente|chofer)_(\d+)$/);
+        if (!m) { extrasSueltos.push(t); return; }
         var tipo = m[1];
         var num  = m[2];
         if (!extrasMap[num]) { extrasMap[num] = {}; }
         extrasMap[num][tipo] = t;
       });
 
+      // Pintar extras sueltos (extras_gratis, etc.)
+      extrasSueltos.forEach(function(t) {
+        var celdas = IDIOMAS_TEXTOS.map(function(lang) {
+          var ok = t.estado[lang];
+          return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+        }).join('');
+        html += '<tr class="' + seccionId + '" style="display:none;">' +
+          '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;padding-left:40px;"><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
+          '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(t.modulo) + '</td>' +
+          celdas +
+          '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
+        '</tr>';
+      });
+
       // Pintar departamentos con cabecera colapsable y extras dentro
       DEPARTAMENTOS.forEach(function(dep) {
         var depSecId = seccionId + '-dep-' + dep.bloque;
-        // Cabecera de departamento — colapsable
+        // Cabecera de departamento
         html += '<tr class="' + seccionId + '" style="display:none;background:#e8f0fe;cursor:pointer;" onclick="toggleSeccionTextos(\'' + depSecId + '\', this)">' +
           '<td colspan="' + totalCols + '" style="padding:10px 20px 10px 32px;font-size:13px;font-weight:700;user-select:none;color:#1a3a6b;letter-spacing:0.01em;">' +
             '<span id="' + depSecId + '-icono">▶</span> ' +
@@ -4604,24 +4444,52 @@ function renderizarTablaTextos(datos) {
             ' <span style="font-size:11px;font-weight:400;color:#5a7ab0;margin-left:6px;">Bloque ' + dep.bloque + ' · ' + dep.ids.length + ' extras</span>' +
           '</td>' +
         '</tr>';
-        // Una fila directa por extra (extra_web_X)
+        // Extras del departamento
         dep.ids.forEach(function(id) {
           var numStr = String(id);
           var grupo = extrasMap[numStr];
           if (!grupo) return;
-          var tNombre = grupo.nombre;
-          var tWeb    = grupo.web;
-          if (!tWeb) return;
-          var celdas = IDIOMAS_TEXTOS.map(function(lang) {
-            var ok = tWeb.estado[lang];
-            return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
-          }).join('');
-          html += '<tr class="' + depSecId + '" style="display:none;">' +
-            '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;padding-left:56px;"><strong>' + escapar(tNombre ? tNombre.texto_es : 'Extra ' + numStr) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(tWeb.clave) + '</span></td>' +
-            '<td style="font-size:12px;color:var(--texto-muted);">Web</td>' +
-            celdas +
-            '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + tWeb.id + ')">✏️ Editar</button></td>' +
+          var tNombre  = grupo.nombre;
+          var tCliente = grupo.cliente;
+          var tChofer  = grupo.chofer;
+          var extraSecId = seccionId + '-extra-' + numStr;
+
+          // Fila cabecera del extra — colapsable
+          html += '<tr class="' + depSecId + '" style="display:none;background:var(--gris-fondo);cursor:pointer;" onclick="toggleSeccionTextos(\'' + extraSecId + '\', this)">' +
+            '<td colspan="' + totalCols + '" style="padding:8px 20px 8px 56px;font-size:13px;user-select:none;">' +
+              '<span id="' + extraSecId + '-icono">▶</span> ' +
+              '<strong>' + escapar(tNombre ? tNombre.texto_es : 'Extra ' + numStr) + '</strong>' +
+              ' <span style="font-size:11px;font-weight:400;color:var(--texto-muted);">(' + escapar('extra_nombre_' + numStr) + ')</span>' +
+            '</td>' +
           '</tr>';
+
+          // Fila cliente
+          if (tCliente) {
+            var celdasC = IDIOMAS_TEXTOS.map(function(lang) {
+              var ok = tCliente.estado[lang];
+              return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+            }).join('');
+            html += '<tr class="' + extraSecId + '" style="display:none;">' +
+              '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;padding-left:72px;"><strong>' + escapar(tCliente.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(tCliente.clave) + '</span></td>' +
+              '<td style="font-size:12px;color:var(--texto-muted);">Cliente</td>' +
+              celdasC +
+              '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + tCliente.id + ')">✏️ Editar</button></td>' +
+            '</tr>';
+          }
+
+          // Fila chofer
+          if (tChofer) {
+            var celdasCh = IDIOMAS_TEXTOS.map(function(lang) {
+              var ok = tChofer.estado[lang];
+              return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+            }).join('');
+            html += '<tr class="' + extraSecId + '" style="display:none;">' +
+              '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;padding-left:72px;"><strong>' + escapar(tChofer.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(tChofer.clave) + '</span></td>' +
+              '<td style="font-size:12px;color:var(--texto-muted);">Chofer</td>' +
+              celdasCh +
+              '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + tChofer.id + ')">✏️ Editar</button></td>' +
+            '</tr>';
+          }
         });
       });
 
@@ -4756,421 +4624,6 @@ function toggleBloque2Flota() {
   contenido.style.display = visible ? 'none' : 'block';
   if (icono) icono.textContent = visible ? '▶' : '▼';
 }
-
-// ─── Bloque 3 — Comunicaciones Cliente ───────────────────────────────────────
-var _comClienteDatos = null;
-var _comClienteClaveTrad = null;
-var _comClienteTipoTrad = null; // 'email' o 'wa'
-var _comClienteLangTrad = null;
-
-function toggleBloqueComunicacionesCliente() {
-  var contenido = document.getElementById('bloque-com-cliente-contenido');
-  var icono = document.getElementById('bloque-com-cliente-icono');
-  if (!contenido) return;
-  var visible = contenido.style.display !== 'none';
-  contenido.style.display = visible ? 'none' : 'block';
-  if (icono) icono.textContent = visible ? '▶' : '▼';
-  if (!visible && !_comClienteDatos) cargarComunicacionesCliente();
-}
-
-function cargarComunicacionesCliente() {
-  fetch('/admin/plantillas-comunicacion-traducciones')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      _comClienteDatos = data;
-      renderizarComunicacionesCliente(data);
-      // Poblar selectores IA
-      var opcionesIdioma = data.idiomas.map(function(l) {
-        return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
-      }).join('');
-      var selEmail = document.getElementById('select-com-email-ia');
-      if (selEmail) selEmail.innerHTML = opcionesIdioma;
-      var selWa = document.getElementById('select-com-wa-ia');
-      if (selWa) selWa.innerHTML = opcionesIdioma;
-      // Calcular % global (media de aprobados email + wa) y mostrarlo en la cabecera del bloque
-      var plantillas = data.plantillas || [];
-      var idiomas = data.idiomas || [];
-      var aprobEmail = plantillas.reduce(function(sum, p) {
-        return sum + idiomas.filter(function(l) { return p.estado_email[l] === 'ok'; }).length;
-      }, 0);
-      var aprobWa = plantillas.reduce(function(sum, p) {
-        return sum + idiomas.filter(function(l) { return p.estado_wa[l] === 'ok'; }).length;
-      }, 0);
-      var totalCeldas = plantillas.length * idiomas.length;
-      var pct = totalCeldas > 0 ? Math.round((aprobEmail + aprobWa) / (totalCeldas * 2) * 100) : 0;
-      var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
-      var el = document.getElementById('bloque-com-cliente-pct');
-      if (el) el.innerHTML = '<span style="color:' + color + ';">' + pct + '% aprobado</span>';
-    })
-    .catch(function() {
-      var el = document.getElementById('bloque-com-cliente-pct');
-      if (el) el.textContent = 'Error cargando';
-    });
-}
-
-function renderizarComunicacionesCliente(data) {
-  var plantillas = data.plantillas || [];
-  var idiomas = data.idiomas || [];
-  var totalCols = 1 + 1 + idiomas.length + 1; // nombre + ES + idiomas + acción
-
-  // Cabeceras
-  var cabecera = '<tr><th style="text-align:left;">Plantilla</th>' +
-    '<th style="text-align:center;">ES</th>' +
-    idiomas.map(function(l) { return '<th style="text-align:center;">' + l.toUpperCase() + '</th>'; }).join('') +
-    '<th style="text-align:center;">Acción</th></tr>';
-
-  document.getElementById('thead-com-email').innerHTML = cabecera;
-  document.getElementById('thead-com-wa').innerHTML = cabecera;
-
-  // Calcular % Email — solo cuenta 'ok' (aprobado)
-  var aprobadosEmail = plantillas.reduce(function(sum, p) {
-    return sum + idiomas.filter(function(l) { return p.estado_email[l] === 'ok'; }).length;
-  }, 0);
-  var totalEmail = plantillas.length * idiomas.length;
-  var pctEmail = totalEmail > 0 ? Math.round(aprobadosEmail / totalEmail * 100) : 0;
-  var colorEmail = pctEmail === 100 ? '#2e7d32' : pctEmail > 50 ? '#b45309' : 'var(--rojo-error)';
-  var elEmail = document.getElementById('com-email-pct');
-  if (elEmail) elEmail.innerHTML = '<span style="color:' + colorEmail + ';">' + pctEmail + '% aprobado</span>';
-
-  // Calcular % WhatsApp — solo cuenta 'ok' (aprobado)
-  var aprobadosWa = plantillas.reduce(function(sum, p) {
-    return sum + idiomas.filter(function(l) { return p.estado_wa[l] === 'ok'; }).length;
-  }, 0);
-  var totalWa = plantillas.length * idiomas.length;
-  var pctWa = totalWa > 0 ? Math.round(aprobadosWa / totalWa * 100) : 0;
-  var colorWa = pctWa === 100 ? '#2e7d32' : pctWa > 50 ? '#b45309' : 'var(--rojo-error)';
-  var elWa = document.getElementById('com-wa-pct');
-  if (elWa) elWa.innerHTML = '<span style="color:' + colorWa + ';">' + pctWa + '% aprobado</span>';
-
-  // ── Helper: pinta la celda según el estado de la traducción ──
-  // null        → punto rojo    (sin traducción)
-  // 'ia'        → ✓ naranja     (generado por IA, pendiente de revisar)
-  // 'desactualizado' → ✓ rojo   (español modificado después de traducir)
-  // 'ok'        → ✓ verde       (revisado y al día)
-  // true/false  → compatibilidad con la celda ES que sigue siendo booleano
-  function celdaEstado(estado) {
-    if (estado === null || estado === undefined || estado === false) {
-      return '<td style="text-align:center;"><span style="color:var(--rojo-error);">·</span></td>';
-    }
-    if (estado === true || estado === 'ok') {
-      return '<td style="text-align:center;"><span style="color:#2e7d32;font-weight:600;" title="Revisado y al día">✓</span></td>';
-    }
-    if (estado === 'ia') {
-      return '<td style="text-align:center;"><span style="color:#b45309;font-weight:600;" title="Generado por IA — pendiente de revisar">✓</span></td>';
-    }
-    if (estado === 'desactualizado') {
-      return '<td style="text-align:center;"><span style="color:var(--rojo-error);font-weight:600;" title="El español fue modificado — hay que retraducir">✓</span></td>';
-    }
-    return '<td style="text-align:center;"><span style="color:var(--rojo-error);">·</span></td>';
-  }
-
-  // Filas Email
-  var htmlEmail = '';
-  var htmlWa = '';
-
-  plantillas.forEach(function(p) {
-    // Celdas Email
-    var celdasEmail = celdaEstado(p.estado_email['es']) +
-      idiomas.map(function(l) { return celdaEstado(p.estado_email[l]); }).join('');
-
-    htmlEmail += '<tr>' +
-      '<td><strong style="font-size:12px;">' + p.nombre + '</strong><br>' +
-      '<span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + p.clave + '</span></td>' +
-      celdasEmail +
-      '<td style="text-align:center;"><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;" ' +
-      'data-clave="' + p.clave + '" data-tipo="email" onclick="abrirModalComTradBtn(this)">✏️ Editar</button></td>' +
-      '</tr>';
-
-    // Celdas WhatsApp
-    var celdasWa = celdaEstado(p.estado_wa['es']) +
-      idiomas.map(function(l) { return celdaEstado(p.estado_wa[l]); }).join('');
-
-    htmlWa += '<tr>' +
-      '<td><strong style="font-size:12px;">' + p.nombre + '</strong><br>' +
-      '<span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + p.clave + '</span></td>' +
-      celdasWa +
-      '<td style="text-align:center;"><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;" ' +
-      'data-clave="' + p.clave + '" data-tipo="wa" onclick="abrirModalComTradBtn(this)">✏️ Editar</button></td>' +
-      '</tr>';
-  });
-
-  document.getElementById('tbody-com-email').innerHTML = htmlEmail;
-  document.getElementById('tbody-com-wa').innerHTML = htmlWa;
-}
-
-// ── Aprobar todo — aprueba de una vez todos los ítems con traducción del idioma activo ──
-function aprobarTodoComunicaciones(tipo) {
-  var selId = (tipo === 'wa') ? 'select-com-wa-ia' : 'select-com-email-ia';
-  var msgId = (tipo === 'wa') ? 'com-wa-aprobar-msg' : 'com-email-aprobar-msg';
-  var sel = document.getElementById(selId);
-  var msg = document.getElementById(msgId);
-  var lang = sel ? sel.value : '';
-  if (!lang) { alert('Selecciona primero un idioma en el selector correspondiente.'); return; }
-
-  var plantillas = _comClienteDatos && _comClienteDatos.plantillas ? _comClienteDatos.plantillas : [];
-  var campoEstado = (tipo === 'wa') ? 'estado_wa' : 'estado_email';
-
-  // Solo las que tienen traducción (no son null/false) y aún no están aprobadas
-  var pendientes = plantillas.filter(function(p) {
-    var e = p[campoEstado][lang];
-    return e && e !== 'ok';
-  });
-
-  if (pendientes.length === 0) {
-    if (msg) { msg.textContent = '✅ Todo ya está aprobado.'; msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 3000); }
-    return;
-  }
-
-  if (msg) { msg.textContent = 'Aprobando ' + pendientes.length + ' plantilla(s)…'; msg.style.display = 'inline'; }
-
-  // Llamadas en serie para no saturar
-  var promesas = pendientes.map(function(p) {
-    var body = { revisado: true };
-    // Incluimos el contenido existente para que el endpoint no lo borre
-    var claveCuerpo = (tipo === 'wa') ? 'cuerpo_whatsapp' : 'cuerpo_email';
-    var claveAsunto = 'asunto_email';
-    // El endpoint PUT espera asunto_email + cuerpo_email o cuerpo_whatsapp
-    // Obtenemos los valores actuales de la caché
-    var tradActual = p._trad && p._trad[lang] ? p._trad[lang] : {};
-    return fetch('/admin/plantillas-comunicacion/' + p.clave + '/traducciones/' + lang, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ revisado: true, solo_aprobar: true })
-    }).then(function(r) { return r.json(); });
-  });
-
-  Promise.all(promesas).then(function(resultados) {
-    var errores = resultados.filter(function(r) { return r && r.error; });
-    if (errores.length > 0) {
-      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error en ' + errores.length + ' plantilla(s). Revisa la consola.'; msg.style.display = 'inline'; }
-    } else {
-      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ ' + pendientes.length + ' plantilla(s) aprobada(s).'; msg.style.display = 'inline'; }
-      setTimeout(function() { if (msg) msg.style.display = 'none'; }, 4000);
-    }
-    cargarComunicacionesCliente();
-  }).catch(function(err) {
-    if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de red. Inténtalo de nuevo.'; msg.style.display = 'inline'; }
-  });
-}
-
-function abrirModalComTradBtn(btn) {
-  var clave = btn.dataset.clave;
-  var tipo = btn.dataset.tipo;
-  var selId = (tipo === 'wa') ? 'select-com-wa-ia' : 'select-com-email-ia';
-  var sel = document.getElementById(selId);
-  var lang = sel ? sel.value : '';
-  if (!lang) { alert('Selecciona primero un idioma en el selector correspondiente.'); return; }
-  abrirModalComTrad(clave, tipo, lang);
-}
-
-function abrirModalComTrad(clave, tipo, lang) {
-  _comClienteClaveTrad = clave;
-  _comClienteTipoTrad = tipo;
-  _comClienteLangTrad = lang;
-
-  var plantilla = _comClienteDatos && _comClienteDatos.plantillas.find(function(p) { return p.clave === clave; });
-  var nombre = plantilla ? plantilla.nombre : clave;
-
-  document.getElementById('modal-com-trad-titulo').textContent = nombre;
-  document.getElementById('modal-com-trad-subtitulo').textContent = clave + ' · ' + lang.toUpperCase() + ' · ' + (tipo === 'email' ? 'Email' : 'WhatsApp');
-  document.getElementById('modal-com-trad-lang-label').textContent = lang.toUpperCase();
-  document.getElementById('modal-com-trad-asunto').value = '';
-  document.getElementById('modal-com-trad-texto').value = '';
-  document.getElementById('modal-com-trad-msg-ok').style.display = 'none';
-  document.getElementById('modal-com-trad-msg-err').style.display = 'none';
-
-  // Mostrar campo asunto solo en email
-  document.getElementById('modal-com-trad-campo-asunto').style.display = tipo === 'email' ? 'block' : 'none';
-  document.getElementById('modal-com-trad-campo-label').textContent = tipo === 'email'
-    ? 'Cuerpo del email (' + lang.toUpperCase() + ')'
-    : 'Texto WhatsApp (' + lang.toUpperCase() + ')';
-
-  // Helper — escribe en el iframe del español
-  function actualizarRefEsIframe(html) {
-    var iframe = document.getElementById('modal-com-trad-ref-texto');
-    if (!iframe) return;
-    var doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write((html || '').replace(/\n/g, '<br>'));
-    doc.close();
-    setTimeout(function() {
-      try { iframe.style.height = (doc.body.scrollHeight + 20) + 'px'; } catch(e) {}
-    }, 50);
-  }
-
-  // Referencia en español
-  if (plantilla) {
-    var refAsunto = document.getElementById('modal-com-trad-ref-asunto');
-    if (tipo === 'email') {
-      if (refAsunto) refAsunto.innerHTML = '<strong>Asunto:</strong> ' + (plantilla.asunto_es || '—');
-      actualizarRefEsIframe(plantilla.texto_es_email || '');
-    } else {
-      if (refAsunto) refAsunto.innerHTML = '';
-      var waEs = (plantilla.texto_es_wa || '')
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
-        .replace(/\n/g, '<br>');
-      actualizarRefEsIframe('<p style="font-family:sans-serif;font-size:14px;line-height:1.6;">' + waEs + '</p>');
-    }
-  }
-
-  // Helper — escribe en el iframe de preview
-  function actualizarPreviewIframe(html) {
-    var iframe = document.getElementById('modal-com-trad-ref-trad');
-    if (!iframe) return;
-    var doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write((html || '<p style="color:#999;font-size:12px;">— sin traducción aún —</p>').replace(/\n/g, '<br>'));
-    doc.close();
-    setTimeout(function() {
-      try { iframe.style.height = (doc.body.scrollHeight + 20) + 'px'; } catch(e) {}
-    }, 50);
-  }
-
-  // Limpiar preview mientras carga
-  var refAsuntoTrad = document.getElementById('modal-com-trad-ref-asunto-trad');
-  var refTradLabel = document.getElementById('modal-com-trad-ref-trad-label');
-  actualizarPreviewIframe('<p style="color:#999;font-size:12px;">Cargando…</p>');
-  if (refAsuntoTrad) { refAsuntoTrad.textContent = ''; refAsuntoTrad.style.display = 'none'; }
-  if (refTradLabel) refTradLabel.textContent = '🌐 Preview ' + lang.toUpperCase();
-
-  // Conectar preview en tiempo real al textarea
-  var textarea = document.getElementById('modal-com-trad-texto');
-  if (textarea._previewHandler) textarea.removeEventListener('input', textarea._previewHandler);
-  textarea._previewHandler = function() {
-    if (tipo === 'email') {
-      actualizarPreviewIframe(textarea.value);
-    } else {
-      // WhatsApp: texto plano con negritas y saltos
-      var waHtml = textarea.value
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
-        .replace(/\n/g, '<br>');
-      actualizarPreviewIframe('<p style="font-family:sans-serif;font-size:14px;line-height:1.6;">' + waHtml + '</p>');
-    }
-  };
-  textarea.addEventListener('input', textarea._previewHandler);
-
-  // Cargar traducción existente — rellena el textarea editable Y la preview
-  fetch('/admin/plantillas-comunicacion/' + clave + '/traducciones')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      var trad = (d.traducciones || []).find(function(t) { return t.lang_code === lang; });
-      if (trad) {
-        if (tipo === 'email') {
-          document.getElementById('modal-com-trad-asunto').value = trad.asunto_email || '';
-          textarea.value = trad.cuerpo_email || '';
-          if (refAsuntoTrad && trad.asunto_email) {
-            refAsuntoTrad.innerHTML = '<strong>Asunto:</strong> ' + trad.asunto_email;
-            refAsuntoTrad.style.display = 'block';
-          }
-          actualizarPreviewIframe(trad.cuerpo_email || '');
-        } else {
-          textarea.value = trad.cuerpo_whatsapp || '';
-          var waHtml = (trad.cuerpo_whatsapp || '')
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
-            .replace(/\n/g, '<br>');
-          actualizarPreviewIframe('<p style="font-family:sans-serif;font-size:14px;line-height:1.6;">' + waHtml + '</p>');
-        }
-      } else {
-        actualizarPreviewIframe('<p style="color:#999;font-size:12px;">— sin traducción aún —</p>');
-      }
-    });
-
-  document.getElementById('modal-com-trad').classList.remove('oculto');
-}
-
-function cerrarModalComTrad() {
-  document.getElementById('modal-com-trad').classList.add('oculto');
-  _comClienteClaveTrad = null;
-  _comClienteTipoTrad = null;
-  _comClienteLangTrad = null;
-}
-
-function guardarComTrad() {
-  if (!_comClienteClaveTrad || !_comClienteTipoTrad || !_comClienteLangTrad) return;
-  var texto = document.getElementById('modal-com-trad-texto').value.trim();
-  var asunto = document.getElementById('modal-com-trad-asunto').value.trim();
-  document.getElementById('modal-com-trad-msg-ok').style.display = 'none';
-  document.getElementById('modal-com-trad-msg-err').style.display = 'none';
-
-  // Leer traducción existente para no borrar el otro campo
-  fetch('/admin/plantillas-comunicacion/' + _comClienteClaveTrad + '/traducciones')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      var trad = (d.traducciones || []).find(function(t) { return t.lang_code === _comClienteLangTrad; }) || {};
-      var body = {
-        asunto_email:    _comClienteTipoTrad === 'email' ? asunto : (trad.asunto_email || ''),
-        cuerpo_email:    _comClienteTipoTrad === 'email' ? texto  : (trad.cuerpo_email || ''),
-        cuerpo_whatsapp: _comClienteTipoTrad === 'wa'    ? texto  : (trad.cuerpo_whatsapp || ''),
-        generado_por_ia: false
-      };
-      return fetch('/admin/plantillas-comunicacion/' + _comClienteClaveTrad + '/traducciones/' + _comClienteLangTrad, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (d.ok) {
-        document.getElementById('modal-com-trad-msg-ok').style.display = 'inline';
-        _comClienteDatos = null; // forzar recarga
-        cargarComunicacionesCliente();
-      } else {
-        document.getElementById('modal-com-trad-msg-err').style.display = 'inline';
-      }
-    })
-    .catch(function() { document.getElementById('modal-com-trad-msg-err').style.display = 'inline'; });
-}
-
-function generarComunicacionesClienteIA(tipo, selId, msgId) {
-  var lang = document.getElementById(selId).value;
-  var msg = document.getElementById(msgId);
-  if (!lang) {
-    msg.textContent = 'Selecciona un idioma.';
-    msg.style.color = 'var(--rojo-error)';
-    msg.style.display = 'inline';
-    setTimeout(function() { msg.style.display = 'none'; }, 3000);
-    return;
-  }
-  msg.textContent = '🤖 Generando con IA, puede tardar unos segundos...';
-  msg.style.color = 'var(--acento)';
-  msg.style.display = 'inline';
-
-  fetch('/admin/plantillas-comunicacion/generar-ia/' + lang, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tipo: tipo })
-  })
-    .then(function(r) { return r.json(); })
-    .then(function(respuesta) {
-      if (!respuesta.ok) {
-        msg.textContent = '❌ Error: ' + (respuesta.error || 'Error al generar');
-        msg.style.color = 'var(--rojo-error)';
-        return;
-      }
-      if (respuesta.generadas === 0) {
-        msg.textContent = '✅ Ya estaba todo generado en ' + lang.toUpperCase() + '.';
-        msg.style.color = '#2e7d32';
-      } else {
-        msg.textContent = '✅ ' + respuesta.generadas + ' plantilla(s) generadas en ' + lang.toUpperCase() + '.';
-        msg.style.color = '#2e7d32';
-        _comClienteDatos = null;
-        cargarComunicacionesCliente();
-      }
-      if (respuesta.errores && respuesta.errores.length > 0) {
-        console.warn('[GEN15/16] Errores parciales:', respuesta.errores);
-        msg.textContent += ' (' + respuesta.errores.length + ' con error — ver consola)';
-      }
-    })
-    .catch(function() {
-      msg.textContent = '❌ No se pudo conectar con la IA. Inténtalo de nuevo.';
-      msg.style.color = 'var(--rojo-error)';
-    });
-}
-
 
 function abrirEditorTexto(textoId) {
   var texto = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
@@ -7993,7 +7446,7 @@ function pintarBloquesExtras(lista, contenedorId) {
     var filas = porBloque[b].map(function (ex) {
       return '<tr>' +
         '<td>' + ex.nombre + (ex.notas_chofer ? '<div style="font-size:11px;color:var(--texto-muted);">' + ex.notas_chofer + '</div>' : '') + '</td>' +
-        '<td>' + (ex.tipo_seleccion === 'contador' ? 'Contador' : ex.tipo_seleccion === 'informativo' ? 'Informativo' : 'Casilla') + '</td>' +
+        '<td>' + (ex.tipo_seleccion === 'contador' ? 'Contador' : 'Casilla') + '</td>' +
         '<td>' + Number(ex.precio).toFixed(2) + ' €</td>' +
         '<td><span class="' + (ex.activo ? 'insignia-ok' : 'insignia-suspendido') + '">' + (ex.activo ? 'Publicado' : 'Borrador') + '</span></td>' +
         '<td style="text-align:center;"><input type="checkbox" ' + (ex.en_asistente ? 'checked' : '') + ' style="width:18px;height:18px;cursor:pointer;" onchange="toggleAsistenteExtra(' + ex.id + ',this.checked)"></td>' +
@@ -8212,111 +7665,6 @@ function eliminarPreferencia(id) {
       } else {
         alert(d.error || 'No se pudo eliminar.');
       }
-    });
-}
-
-function eliminarPreferencia(id) {
-  if (!confirm('¿Eliminar esta preferencia? Esta acción no se puede deshacer.')) return;
-  fetch('/admin/preferencias/' + id + '/eliminar', { method: 'POST' })
-    .then(function (r) { return r.json(); })
-    .then(function (d) {
-      if (d.ok) {
-        cargarPreferencias();
-      } else {
-        alert(d.error || 'No se pudo eliminar.');
-      }
-    });
-}
-
-// ── Servicios incluidos ──────────────────────────────────────────────────────
-var servicioEditandoId = null;
-
-function pintarServiciosIncluidos(lista) {
-  var cont = document.getElementById('lista-servicios-incluidos');
-  if (!lista.length) {
-    cont.innerHTML = '<p style="color:var(--texto-muted);padding:12px 0;">Nada aquí todavía.</p>';
-    return;
-  }
-  var filas = lista.map(function (sv) {
-    return '<tr>' +
-      '<td style="font-size:20px;text-align:center;width:40px;">' + (sv.icono || '') + '</td>' +
-      '<td>' + sv.texto + '</td>' +
-      '<td style="text-align:center;">' + sv.orden + '</td>' +
-      '<td><span class="' + (sv.activo ? 'insignia-ok' : 'insignia-suspendido') + '">' + (sv.activo ? 'Publicado' : 'Borrador') + '</span></td>' +
-      '<td>' +
-        '<button class="boton-costa" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="abrirFormularioServicio(' + sv.id + ')">✏️ Editar</button>' +
-        '<button class="boton-secundario" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="toggleActivoServicio(' + sv.id + ',' + sv.activo + ')">' + (sv.activo ? '⏸ Borrador' : '▶ Publicar') + '</button>' +
-        '<button class="boton-peligro" style="font-size:12px;padding:4px 10px;" onclick="eliminarServicio(' + sv.id + ')">🗑️</button>' +
-      '</td>' +
-    '</tr>';
-  }).join('');
-  cont.innerHTML = '<div class="tarjeta"><table class="tabla-admin"><thead><tr><th>Icono</th><th>Texto</th><th>Orden</th><th>Estado</th><th>Acciones</th></tr></thead>' +
-    '<tbody>' + filas + '</tbody></table></div>';
-}
-
-function cargarServiciosIncluidos() {
-  fetch('/admin/servicios-incluidos')
-    .then(function (r) { return r.json(); })
-    .then(function (data) { window._serviciosCache = data.servicios; pintarServiciosIncluidos(data.servicios); });
-}
-
-function abrirFormularioServicio(id) {
-  servicioEditandoId = id;
-  document.getElementById('servicio-msg').textContent = '';
-  if (id === null) {
-    document.getElementById('modal-servicio-titulo').textContent = 'Nuevo servicio incluido';
-    document.getElementById('servicio-icono').value = '';
-    document.getElementById('servicio-texto').value = '';
-    document.getElementById('servicio-orden').value = '0';
-  } else {
-    var sv = (window._serviciosCache || []).find(function (s) { return s.id === id; });
-    if (!sv) return;
-    document.getElementById('modal-servicio-titulo').textContent = 'Editar servicio incluido';
-    document.getElementById('servicio-icono').value = sv.icono || '';
-    document.getElementById('servicio-texto').value = sv.texto || '';
-    document.getElementById('servicio-orden').value = sv.orden || 0;
-  }
-  document.getElementById('modal-servicio').classList.remove('oculto');
-}
-
-function cerrarModalServicio() {
-  document.getElementById('modal-servicio').classList.add('oculto');
-}
-
-function guardarServicio() {
-  var icono  = document.getElementById('servicio-icono').value.trim();
-  var texto  = document.getElementById('servicio-texto').value.trim();
-  var orden  = document.getElementById('servicio-orden').value;
-  var msg    = document.getElementById('servicio-msg');
-  if (!texto) { msg.textContent = 'El texto es obligatorio.'; return; }
-  var url    = servicioEditandoId === null ? '/admin/servicios-incluidos' : '/admin/servicios-incluidos/' + servicioEditandoId + '/editar';
-  fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ icono: icono, texto: texto, orden: parseInt(orden, 10) || 0 })
-  })
-    .then(function (r) { return r.json(); })
-    .then(function (d) {
-      if (d.ok) { cerrarModalServicio(); cargarServiciosIncluidos(); }
-      else { msg.textContent = d.error || 'No se pudo guardar.'; }
-    });
-}
-
-function toggleActivoServicio(id, activo) {
-  fetch('/admin/servicios-incluidos/' + id + '/activo', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ activo: !activo })
-  }).then(function () { cargarServiciosIncluidos(); });
-}
-
-function eliminarServicio(id) {
-  if (!confirm('¿Eliminar este servicio? Esta acción no se puede deshacer.')) return;
-  fetch('/admin/servicios-incluidos/' + id + '/eliminar', { method: 'POST' })
-    .then(function (r) { return r.json(); })
-    .then(function (d) {
-      if (d.ok) { cargarServiciosIncluidos(); }
-      else { alert(d.error || 'No se pudo eliminar.'); }
     });
 }
 
@@ -8582,7 +7930,6 @@ function guardarPlantillaMarca() {
 var _plantillasCom = [];
 var _plantillaComActual = null;
 var _filtroCom = 'todas';
-
 
 function cargarPlantillasCom() {
   fetch('/admin/plantillas-comunicacion')
