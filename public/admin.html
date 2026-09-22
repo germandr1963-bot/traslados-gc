@@ -609,7 +609,7 @@ table.tabla-precios input {
               <div style="margin-bottom:4px;">
                 <label class="etiqueta" id="modal-com-trad-campo-label">Traducción</label>
                 <p style="font-size:12px;color:var(--texto-muted);margin:0 0 6px;">Las variables <code>{entre_llaves}</code> no se traducen — déjalas exactamente igual.</p>
-                <textarea id="modal-com-trad-texto" class="campo" rows="16" style="font-family:monospace;font-size:13px;resize:vertical;"></textarea>
+                <textarea id="modal-com-trad-texto" class="campo" style="font-family:monospace;font-size:13px;resize:vertical;min-height:400px;width:100%;"></textarea>
               </div>
             </div>
           </div>
@@ -5061,10 +5061,7 @@ function abrirModalComTrad(clave, tipo, lang) {
     doc.close();
     setTimeout(function() {
       try { iframe.style.height = (doc.body.scrollHeight + 20) + 'px'; } catch(e) {}
-    }, 50);
-  }
-
-  // Referencia en español
+    }, 300);
   if (plantilla) {
     var refAsunto = document.getElementById('modal-com-trad-ref-asunto');
     if (tipo === 'email') {
@@ -5090,7 +5087,7 @@ function abrirModalComTrad(clave, tipo, lang) {
     doc.close();
     setTimeout(function() {
       try { iframe.style.height = (doc.body.scrollHeight + 20) + 'px'; } catch(e) {}
-    }, 50);
+    }, 300);
   }
 
   // Limpiar preview mientras carga
@@ -5142,6 +5139,9 @@ function abrirModalComTrad(clave, tipo, lang) {
       } else {
         actualizarPreviewIframe('<p style="color:#999;font-size:12px;">— sin traducción aún —</p>');
       }
+      // Ajustar altura del textarea al contenido
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.max(400, textarea.scrollHeight + 20) + 'px';
     });
 
   document.getElementById('modal-com-trad').classList.remove('oculto');
