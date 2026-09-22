@@ -5161,9 +5161,7 @@ function guardarComTrad() {
         asunto_email:    _comClienteTipoTrad === 'email' ? asunto : (trad.asunto_email || ''),
         cuerpo_email:    _comClienteTipoTrad === 'email' ? texto  : (trad.cuerpo_email || ''),
         cuerpo_whatsapp: _comClienteTipoTrad === 'wa'    ? texto  : (trad.cuerpo_whatsapp || ''),
-        generado_por_ia: false,
-        revisado_email:  _comClienteTipoTrad === 'email' ? true : (trad.revisado_email || false),
-        revisado_wa:     _comClienteTipoTrad === 'wa'    ? true : (trad.revisado_wa    || false)
+        generado_por_ia: false
       };
       return fetch('/admin/plantillas-comunicacion/' + _comClienteClaveTrad + '/traducciones/' + _comClienteLangTrad, {
         method: 'PUT',
@@ -5173,11 +5171,20 @@ function guardarComTrad() {
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      if (d.ok) {
+      if (!d.ok) { document.getElementById('modal-com-trad-msg-err').style.display = 'inline'; return; }
+      return fetch('/admin/plantillas-comunicacion/' + _comClienteClaveTrad + '/traducciones/' + _comClienteLangTrad, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ solo_aprobar: true, tipo: _comClienteTipoTrad })
+      });
+    })
+    .then(function(r) { if (r) return r.json(); })
+    .then(function(d) {
+      if (d && d.ok) {
         document.getElementById('modal-com-trad-msg-ok').style.display = 'inline';
-        _comClienteDatos = null; // forzar recarga
+        _comClienteDatos = null;
         cargarComunicacionesCliente();
-      } else {
+      } else if (d) {
         document.getElementById('modal-com-trad-msg-err').style.display = 'inline';
       }
     })
