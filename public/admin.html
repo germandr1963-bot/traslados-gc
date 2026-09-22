@@ -4843,13 +4843,15 @@ function cargarComunicacionesCliente() {
       var elNum = document.getElementById('bloque-com-cliente-num');
       if (elNum) elNum.textContent = '(' + (plantillas.length * 2) + ' textos)';
       var aprobEmail = plantillas.reduce(function(sum, p) {
-        return sum + idiomas.filter(function(l) { return p.estado_email[l] === 'ok'; }).length;
+        return sum + idiomas.filter(function(l) { return !!p.estado_email[l]; }).length;
       }, 0);
       var aprobWa = plantillas.reduce(function(sum, p) {
-        return sum + idiomas.filter(function(l) { return p.estado_wa[l] === 'ok'; }).length;
+        return sum + idiomas.filter(function(l) { return !!p.estado_wa[l]; }).length;
       }, 0);
       var totalCeldas = plantillas.length * idiomas.length;
-      var pct = totalCeldas > 0 ? Math.round((aprobEmail + aprobWa) / (totalCeldas * 2) * 100) : 0;
+      var pctEmail = totalCeldas > 0 ? Math.round(aprobEmail / totalCeldas * 100) : 0;
+      var pctWa    = totalCeldas > 0 ? Math.round(aprobWa    / totalCeldas * 100) : 0;
+      var pct = Math.round((pctEmail + pctWa) / 2);
       var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
       var el = document.getElementById('bloque-com-cliente-pct');
       if (el) el.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
