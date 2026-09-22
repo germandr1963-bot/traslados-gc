@@ -14005,23 +14005,25 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
       if (tipo === 'email') {
         await pool.query(
           `INSERT INTO plantillas_comunicacion_traducciones
-             (plantilla_clave, lang_code, asunto_email, cuerpo_email, generado_por_ia, actualizado_en)
-           VALUES ($1, $2, $3, $4, TRUE, NOW())
+             (plantilla_clave, lang_code, asunto_email, cuerpo_email, generado_por_ia, revisado_email, actualizado_en)
+           VALUES ($1, $2, $3, $4, TRUE, FALSE, NOW())
            ON CONFLICT (plantilla_clave, lang_code) DO UPDATE
              SET asunto_email = EXCLUDED.asunto_email,
                  cuerpo_email = EXCLUDED.cuerpo_email,
                  generado_por_ia = TRUE,
+                 revisado_email = FALSE,
                  actualizado_en = NOW()`,
           [p.clave, lang, parsed.asunto_email || null, parsed.cuerpo_email || null]
         );
       } else {
         await pool.query(
           `INSERT INTO plantillas_comunicacion_traducciones
-             (plantilla_clave, lang_code, cuerpo_whatsapp, generado_por_ia, actualizado_en)
-           VALUES ($1, $2, $3, TRUE, NOW())
+             (plantilla_clave, lang_code, cuerpo_whatsapp, generado_por_ia, revisado_wa, actualizado_en)
+           VALUES ($1, $2, $3, TRUE, FALSE, NOW())
            ON CONFLICT (plantilla_clave, lang_code) DO UPDATE
              SET cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp,
                  generado_por_ia = TRUE,
+                 revisado_wa = FALSE,
                  actualizado_en = NOW()`,
           [p.clave, lang, parsed.cuerpo_whatsapp || null]
         );
@@ -14064,14 +14066,16 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
 
   await pool.query(
     `INSERT INTO plantillas_comunicacion_traducciones
-       (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW())
+       (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, revisado_email, revisado_wa, actualizado_en)
+     VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE, NOW())
      ON CONFLICT (plantilla_clave, lang_code)
      DO UPDATE SET
        asunto_email = EXCLUDED.asunto_email,
        cuerpo_email = EXCLUDED.cuerpo_email,
        cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp,
        generado_por_ia = EXCLUDED.generado_por_ia,
+       revisado_email = FALSE,
+       revisado_wa = FALSE,
        actualizado_en = NOW()`,
     [clave, lang, asunto_email || null, cuerpo_email || null, cuerpo_whatsapp || null, !!generado_por_ia]
   );
