@@ -13848,18 +13848,20 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
      FROM plantillas_comunicacion WHERE categoria = 'cliente' ORDER BY nombre`
   );
   const traducciones = await pool.query(
-    `SELECT plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp
+    `SELECT plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp,
+            revisado_email, revisado_wa
      FROM plantillas_comunicacion_traducciones`
   );
 
-  // Mapa: plantilla_clave -> { lang_code -> { email: bool, wa: bool } }
+  // Mapa: plantilla_clave -> { lang_code -> { tieneEmail, tieneWa, revisadoEmail, revisadoWa } }
   const mapaTrads = {};
   for (const t of traducciones.rows) {
     if (!mapaTrads[t.plantilla_clave]) mapaTrads[t.plantilla_clave] = {};
     mapaTrads[t.plantilla_clave][t.lang_code] = {
-      email: !!(t.cuerpo_email && t.cuerpo_email.trim()),
-      wa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()),
-      asunto: !!(t.asunto_email && t.asunto_email.trim())
+      tieneEmail:    !!(t.cuerpo_email && t.cuerpo_email.trim()),
+      tieneWa:       !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()),
+      revisadoEmail: !!t.revisado_email,
+      revisadoWa:    !!t.revisado_wa
     };
   }
 
@@ -13870,8 +13872,20 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
     const estadoWa    = { es: !!(p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim()) };
     for (const lang of idiomas) {
       const t = mapaTrads[p.clave] && mapaTrads[p.clave][lang];
-      estadoEmail[lang] = !!(t && t.email);
-      estadoWa[lang]    = !!(t && t.wa);
+      if (!t || !t.tieneEmail) {
+        estadoEmail[lang] = null;
+      } else if (t.revisadoEmail) {
+        estadoEmail[lang] = 'ok';
+      } else {
+        estadoEmail[lang] = 'ia';
+      }
+      if (!t || !t.tieneWa) {
+        estadoWa[lang] = null;
+      } else if (t.revisadoWa) {
+        estadoWa[lang] = 'ok';
+      } else {
+        estadoWa[lang] = 'ia';
+      }
     }
     return {
       clave: p.clave,
