@@ -4855,15 +4855,13 @@ function cargarComunicacionesCliente() {
       var elNum = document.getElementById('bloque-com-cliente-num');
       if (elNum) elNum.textContent = '(' + (plantillas.length * 2) + ' textos)';
       var aprobEmail = plantillas.reduce(function(sum, p) {
-        return sum + idiomas.filter(function(l) { return !!p.estado_email[l]; }).length;
+        return sum + idiomas.filter(function(l) { return p.estado_email[l] === 'ok'; }).length;
       }, 0);
       var aprobWa = plantillas.reduce(function(sum, p) {
-        return sum + idiomas.filter(function(l) { return !!p.estado_wa[l]; }).length;
+        return sum + idiomas.filter(function(l) { return p.estado_wa[l] === 'ok'; }).length;
       }, 0);
       var totalCeldas = plantillas.length * idiomas.length;
-      var pctEmail = totalCeldas > 0 ? Math.round(aprobEmail / totalCeldas * 100) : 0;
-      var pctWa    = totalCeldas > 0 ? Math.round(aprobWa    / totalCeldas * 100) : 0;
-      var pct = Math.round((pctEmail + pctWa) / 2);
+      var pct = totalCeldas > 0 ? Math.round((aprobEmail + aprobWa) / (totalCeldas * 2) * 100) : 0;
       var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
       var el = document.getElementById('bloque-com-cliente-pct');
       if (el) el.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
@@ -4896,7 +4894,7 @@ function renderizarComunicacionesCliente(data) {
 
   // Calcular % Email — cuenta cualquier valor truthy (true, 'ok', 'ia', etc.)
   var aprobadosEmail = plantillas.reduce(function(sum, p) {
-    return sum + idiomas.filter(function(l) { return !!p.estado_email[l]; }).length;
+    return sum + idiomas.filter(function(l) { return p.estado_email[l] === 'ok'; }).length;
   }, 0);
   var totalEmail = plantillas.length * idiomas.length;
   var pctEmail = totalEmail > 0 ? Math.round(aprobadosEmail / totalEmail * 100) : 0;
@@ -4906,7 +4904,7 @@ function renderizarComunicacionesCliente(data) {
 
   // Calcular % WhatsApp — cuenta cualquier valor truthy (true, 'ok', 'ia', etc.)
   var aprobadosWa = plantillas.reduce(function(sum, p) {
-    return sum + idiomas.filter(function(l) { return !!p.estado_wa[l]; }).length;
+    return sum + idiomas.filter(function(l) { return p.estado_wa[l] === 'ok'; }).length;
   }, 0);
   var totalWa = plantillas.length * idiomas.length;
   var pctWa = totalWa > 0 ? Math.round(aprobadosWa / totalWa * 100) : 0;
