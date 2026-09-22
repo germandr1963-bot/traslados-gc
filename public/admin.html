@@ -4880,9 +4880,9 @@ function renderizarComunicacionesCliente(data) {
   var elWaNum = document.getElementById('com-wa-num');
   if (elWaNum) elWaNum.textContent = '(' + plantillas.length + ' textos)';
 
-  // Calcular % Email — solo cuenta 'ok' (aprobado)
+  // Calcular % Email — cuenta cualquier valor truthy (true, 'ok', 'ia', etc.)
   var aprobadosEmail = plantillas.reduce(function(sum, p) {
-    return sum + idiomas.filter(function(l) { return p.estado_email[l] === 'ok'; }).length;
+    return sum + idiomas.filter(function(l) { return !!p.estado_email[l]; }).length;
   }, 0);
   var totalEmail = plantillas.length * idiomas.length;
   var pctEmail = totalEmail > 0 ? Math.round(aprobadosEmail / totalEmail * 100) : 0;
@@ -4890,9 +4890,9 @@ function renderizarComunicacionesCliente(data) {
   var elEmail = document.getElementById('com-email-pct');
   if (elEmail) elEmail.innerHTML = '<span style="color:' + colorEmail + ';">' + pctEmail + '% traducido</span>';
 
-  // Calcular % WhatsApp — solo cuenta 'ok' (aprobado)
+  // Calcular % WhatsApp — cuenta cualquier valor truthy (true, 'ok', 'ia', etc.)
   var aprobadosWa = plantillas.reduce(function(sum, p) {
-    return sum + idiomas.filter(function(l) { return p.estado_wa[l] === 'ok'; }).length;
+    return sum + idiomas.filter(function(l) { return !!p.estado_wa[l]; }).length;
   }, 0);
   var totalWa = plantillas.length * idiomas.length;
   var pctWa = totalWa > 0 ? Math.round(aprobadosWa / totalWa * 100) : 0;
