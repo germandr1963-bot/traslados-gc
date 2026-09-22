@@ -585,14 +585,14 @@ table.tabla-precios input {
               <div style="background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
                 <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;">📋 Original en español</p>
                 <div id="modal-com-trad-ref-asunto" style="font-size:12px;font-weight:600;margin-bottom:8px;"></div>
-                <iframe id="modal-com-trad-ref-texto" style="width:100%;height:auto;min-height:40px;border:none;background:#fff;border-radius:4px;" sandbox="allow-same-origin"></iframe>
+                <div id="modal-com-trad-ref-texto" style="width:100%;background:#fff;border-radius:4px;padding:10px;box-sizing:border-box;font-family:sans-serif;font-size:14px;line-height:1.6;word-break:break-word;"></div>
               </div>
 
               <!-- Preview real — exactamente como lo ve el cliente -->
               <div style="background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
                 <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;" id="modal-com-trad-ref-trad-label">🌐 Preview</p>
                 <div id="modal-com-trad-ref-asunto-trad" style="font-size:12px;font-weight:600;margin-bottom:8px;display:none;"></div>
-                <iframe id="modal-com-trad-ref-trad" style="width:100%;height:auto;min-height:40px;border:none;background:#fff;border-radius:4px;" sandbox="allow-same-origin"></iframe>
+                <div id="modal-com-trad-ref-trad" style="width:100%;background:#fff;border-radius:4px;padding:10px;box-sizing:border-box;font-family:sans-serif;font-size:14px;line-height:1.6;word-break:break-word;"></div>
               </div>
 
             </div>
@@ -5053,16 +5053,9 @@ function abrirModalComTrad(clave, tipo, lang) {
 
   // Helper — escribe en el iframe del español
   function actualizarRefEsIframe(html) {
-    var iframe = document.getElementById('modal-com-trad-ref-texto');
-    if (!iframe) return;
-    var doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write((html || '').replace(/\n/g, '<br>'));
-    doc.close();
-    iframe.onload = function() {
-      try { iframe.style.height = (doc.body.scrollHeight + 20) + 'px'; } catch(e) {}
-    };
-    try { iframe.style.height = (doc.body.scrollHeight + 20) + 'px'; } catch(e) {}
+    var el = document.getElementById('modal-com-trad-ref-texto');
+    if (!el) return;
+    el.innerHTML = (html || '').replace(/\n/g, '<br>');
   }
 
   // Referencia en español
@@ -5083,16 +5076,9 @@ function abrirModalComTrad(clave, tipo, lang) {
 
   // Helper — escribe en el iframe de preview
   function actualizarPreviewIframe(html) {
-    var iframe = document.getElementById('modal-com-trad-ref-trad');
-    if (!iframe) return;
-    var doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write((html || '<p style="color:#999;font-size:12px;">— sin traducción aún —</p>').replace(/\n/g, '<br>'));
-    doc.close();
-    iframe.onload = function() {
-      try { iframe.style.height = (doc.body.scrollHeight + 20) + 'px'; } catch(e) {}
-    };
-    try { iframe.style.height = (doc.body.scrollHeight + 20) + 'px'; } catch(e) {}
+    var el = document.getElementById('modal-com-trad-ref-trad');
+    if (!el) return;
+    el.innerHTML = (html || '<p style="color:#999;font-size:12px;">— sin traducción aún —</p>').replace(/\n/g, '<br>');
   }
 
   // Limpiar preview mientras carga
