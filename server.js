@@ -13887,6 +13887,142 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
   res.json({ plantillas: lista, idiomas });
 }));
 
+// POST — generar con IA las traducciones que faltan (email o WhatsApp)
+// Llamado desde Admin → Idiomas → Comunicaciones Cliente → 🤖 Generar Emails / 🤖 Generar WhatsApp
+app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  const { tipo } = req.body; // 'email' o 'wa'
+
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) {
+    return res.status(400).json({ ok: false, error: 'Idioma no válido' });
+  }
+  if (tipo !== 'email' && tipo !== 'wa') {
+    return res.status(400).json({ ok: false, error: 'Tipo no válido — debe ser email o wa' });
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ ok: false, error: 'Falta ANTHROPIC_API_KEY en las variables de entorno.' });
+  }
+
+  // Leer todas las plantillas de categoría cliente
+  const plantillas = await pool.query(
+    `SELECT clave, asunto_email, cuerpo_email, cuerpo_whatsapp
+     FROM plantillas_comunicacion
+     WHERE categoria = 'cliente'
+     ORDER BY clave`
+  );
+
+  // Leer qué traducciones ya existen para este idioma
+  const yaExisten = await pool.query(
+    `SELECT plantilla_clave, cuerpo_email, cuerpo_whatsapp
+     FROM plantillas_comunicacion_traducciones
+     WHERE lang_code = $1`,
+    [lang]
+  );
+  const mapaExistentes = {};
+  for (const t of yaExisten.rows) {
+    mapaExistentes[t.plantilla_clave] = {
+      tieneEmail: !!(t.cuerpo_email && t.cuerpo_email.trim()),
+      tieneWa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim())
+    };
+  }
+
+  // Filtrar solo las que faltan según el tipo solicitado
+  const pendientes = plantillas.rows.filter(function(p) {
+    const existente = mapaExistentes[p.clave];
+    if (tipo === 'email') {
+      return !(existente && existente.tieneEmail);
+    } else {
+      return !(existente && existente.tieneWa);
+    }
+  });
+
+  if (pendientes.length === 0) {
+    return res.json({ ok: true, generadas: 0, errores: [] });
+  }
+
+  const nombreIdioma = await getNombreIdioma(lang);
+  let generadas = 0;
+  const errores = [];
+
+  for (const p of pendientes) {
+    try {
+      let prompt, campoRespuesta;
+
+      if (tipo === 'email') {
+        // No generar si no hay cuerpo original
+        if (!p.cuerpo_email || !p.cuerpo_email.trim()) continue;
+        prompt = iaPrompts.GENERADOR_EMAIL_COMUNICACIONES(nombreIdioma, p.asunto_email || '', p.cuerpo_email);
+        campoRespuesta = 'email';
+      } else {
+        // No generar si no hay cuerpo original
+        if (!p.cuerpo_whatsapp || !p.cuerpo_whatsapp.trim()) continue;
+        prompt = iaPrompts.GENERADOR_WA_COMUNICACIONES(nombreIdioma, p.cuerpo_whatsapp);
+        campoRespuesta = 'wa';
+      }
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 4000,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+
+      if (!response.ok) {
+        const cuerpoError = await response.text();
+        errores.push({ clave: p.clave, error: 'API error ' + response.status + ': ' + cuerpoError.slice(0, 200) });
+        continue;
+      }
+
+      const data = await response.json();
+      const textoRespuesta = data.content.map(function(b) { return b.text || ''; }).join('');
+      const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
+      console.log('[GEN' + (tipo === 'email' ? '15' : '16') + '] ' + p.clave + ' → ' + lang + ':', limpio.slice(0, 200));
+      const parsed = JSON.parse(limpio);
+
+      if (tipo === 'email') {
+        await pool.query(
+          `INSERT INTO plantillas_comunicacion_traducciones
+             (plantilla_clave, lang_code, asunto_email, cuerpo_email, generado_por_ia, actualizado_en)
+           VALUES ($1, $2, $3, $4, TRUE, NOW())
+           ON CONFLICT (plantilla_clave, lang_code) DO UPDATE
+             SET asunto_email = EXCLUDED.asunto_email,
+                 cuerpo_email = EXCLUDED.cuerpo_email,
+                 generado_por_ia = TRUE,
+                 actualizado_en = NOW()`,
+          [p.clave, lang, parsed.asunto_email || null, parsed.cuerpo_email || null]
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO plantillas_comunicacion_traducciones
+             (plantilla_clave, lang_code, cuerpo_whatsapp, generado_por_ia, actualizado_en)
+           VALUES ($1, $2, $3, TRUE, NOW())
+           ON CONFLICT (plantilla_clave, lang_code) DO UPDATE
+             SET cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp,
+                 generado_por_ia = TRUE,
+                 actualizado_en = NOW()`,
+          [p.clave, lang, parsed.cuerpo_whatsapp || null]
+        );
+      }
+
+      generadas++;
+    } catch (err) {
+      console.error('[GEN15/16] Error en ' + p.clave + ':', err.message);
+      errores.push({ clave: p.clave, error: err.message });
+    }
+  }
+
+  res.json({ ok: true, generadas, errores });
+}));
+
 // PUT — guardar o actualizar una traducción
 app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const { clave, lang } = req.params;
