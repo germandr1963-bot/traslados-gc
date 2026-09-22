@@ -14067,17 +14067,17 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
   await pool.query(
     `INSERT INTO plantillas_comunicacion_traducciones
        (plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, revisado_email, revisado_wa, actualizado_en)
-     VALUES ($1, $2, $3, $4, $5, $6, FALSE, FALSE, NOW())
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
      ON CONFLICT (plantilla_clave, lang_code)
      DO UPDATE SET
        asunto_email = EXCLUDED.asunto_email,
        cuerpo_email = EXCLUDED.cuerpo_email,
        cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp,
        generado_por_ia = EXCLUDED.generado_por_ia,
-       revisado_email = FALSE,
-       revisado_wa = FALSE,
+       revisado_email = EXCLUDED.revisado_email,
+       revisado_wa = EXCLUDED.revisado_wa,
        actualizado_en = NOW()`,
-    [clave, lang, asunto_email || null, cuerpo_email || null, cuerpo_whatsapp || null, !!generado_por_ia]
+    [clave, lang, asunto_email || null, cuerpo_email || null, cuerpo_whatsapp || null, !!generado_por_ia, !!revisado_email, !!revisado_wa]
   );
   res.json({ ok: true });
 }));
