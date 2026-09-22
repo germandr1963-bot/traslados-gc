@@ -5062,6 +5062,9 @@ function abrirModalComTrad(clave, tipo, lang) {
     setTimeout(function() {
       try { iframe.style.height = (doc.body.scrollHeight + 20) + 'px'; } catch(e) {}
     }, 300);
+  }
+
+  // Referencia en español
   if (plantilla) {
     var refAsunto = document.getElementById('modal-com-trad-ref-asunto');
     if (tipo === 'email') {
