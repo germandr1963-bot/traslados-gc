@@ -4626,12 +4626,24 @@ function renderizarTablaTextos(datos) {
       // Pintar departamentos con cabecera colapsable y extras dentro
       DEPARTAMENTOS.forEach(function(dep) {
         var depSecId = seccionId + '-dep-' + dep.bloque;
+        // Calcular % del departamento
+        var depTraducidos = 0;
+        var depTotal = 0;
+        dep.ids.forEach(function(id) {
+          var tWeb = extrasMap[String(id)] && extrasMap[String(id)].web;
+          if (!tWeb) return;
+          depTotal += IDIOMAS_TEXTOS.length;
+          depTraducidos += IDIOMAS_TEXTOS.filter(function(l) { return !!tWeb.estado[l]; }).length;
+        });
+        var depPct = depTotal > 0 ? Math.round(depTraducidos / depTotal * 100) : 0;
+        var depColor = depPct === 100 ? '#2e7d32' : depPct > 50 ? '#b45309' : 'var(--rojo-error)';
         // Cabecera de departamento — colapsable
         html += '<tr class="' + seccionId + '" style="display:none;background:#e8f0fe;cursor:pointer;" onclick="toggleSeccionTextos(\'' + depSecId + '\', this)">' +
           '<td colspan="' + totalCols + '" style="padding:10px 20px 10px 32px;font-size:13px;font-weight:700;user-select:none;color:#1a3a6b;letter-spacing:0.01em;">' +
             '<span id="' + depSecId + '-icono">▶</span> ' +
             dep.titulo +
             ' <span style="font-size:11px;font-weight:400;color:#5a7ab0;margin-left:6px;">Bloque ' + dep.bloque + ' · ' + dep.ids.length + ' extras</span>' +
+            ' <span style="float:right;font-size:12px;font-weight:600;color:' + depColor + ';">' + depPct + '% traducido</span>' +
           '</td>' +
         '</tr>';
         // Una fila directa por extra (extra_web_X)
