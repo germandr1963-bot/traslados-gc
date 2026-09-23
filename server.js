@@ -10647,6 +10647,65 @@ app.get('/factura-comision-descarga/:numero/:firma/:nombre?', asyncHandler(async
 // Retorna cadena vacía si la reserva no tiene extras.
 // Devuelve el bloque HTML de extras de una reserva, con nombres en el idioma del cliente.
 // Retorna cadena vacía si la reserva no tiene extras.
+// ─── Multiidioma de los mensajes al cliente ─────────────────────────────────
+// Frase (🧩) en el idioma del cliente: traducción aprobada; si no hay, el español
+// de Admin → Comunicaciones; si falla la base de datos, el texto de respaldo.
+async function obtenerFrase(clave, lang, respaldo) {
+  try {
+    if (lang && lang !== 'es') {
+      const t = await pool.query(
+        `SELECT texto FROM frases_comunicacion_traducciones
+         WHERE frase_clave = $1 AND lang_code = $2 AND revisado = TRUE`,
+        [clave, lang]
+      );
+      if (t.rows.length && t.rows[0].texto && t.rows[0].texto.trim()) return t.rows[0].texto;
+    }
+    const e = await pool.query('SELECT texto_es FROM frases_comunicacion WHERE clave = $1', [clave]);
+    if (e.rows.length && e.rows[0].texto_es) return e.rows[0].texto_es;
+  } catch (err) {
+    console.warn('obtenerFrase (' + clave + ', ' + lang + '):', err.message);
+  }
+  return respaldo;
+}
+
+// Origen/destino de una reserva en el idioma del cliente. Se guarda como
+// "Nombre en español" o "Nombre en español — dirección escrita por el cliente":
+// se traduce solo el nombre y la dirección se deja tal cual.
+async function traducirLugarCliente(texto, lang) {
+  if (!texto || !lang || lang === 'es') return texto;
+  try {
+    const partes = String(texto).split(' — ');
+    const r = await pool.query(
+      `SELECT dt.nombre FROM destinos d
+       JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $2
+       WHERE d.nombre = $1`,
+      [partes[0], lang]
+    );
+    if (r.rows.length && r.rows[0].nombre && r.rows[0].nombre.trim()) {
+      partes[0] = r.rows[0].nombre;
+      return partes.join(' — ');
+    }
+  } catch (err) {
+    console.warn('traducirLugarCliente:', err.message);
+  }
+  return texto;
+}
+
+// Nombre de la categoría de vehículo en el idioma del cliente (misma traducción que la web)
+async function traducirCategoriaCliente(nombre, lang) {
+  if (!nombre || !lang || lang === 'es') return nombre;
+  try {
+    const r = await pool.query('SELECT id FROM categorias_vehiculos WHERE nombre = $1', [nombre]);
+    if (r.rows.length) {
+      const t = obtenerTexto('categoria_nombre_' + r.rows[0].id, lang);
+      if (t && t.indexOf('[[') !== 0) return t;
+    }
+  } catch (err) {
+    console.warn('traducirCategoriaCliente:', err.message);
+  }
+  return nombre;
+}
+
 async function formatearExtrasEmail(reservaId, lang) {
   try {
     const result = await pool.query(
@@ -10674,25 +10733,32 @@ async function formatearExtrasEmail(reservaId, lang) {
       }
     }
 
+    // Palabras fijas del bloque (🧩 Frases): en el idioma del cliente
+    const fTitulo   = await obtenerFrase('frase_extras_titulo',   _lang, 'Extras seleccionados:');
+    const fIncluido = await obtenerFrase('frase_extras_incluido', _lang, 'incluido');
+    const fAPagar   = await obtenerFrase('frase_extras_a_pagar',  _lang, 'a pagar al conductor');
+    const fTotal    = await obtenerFrase('frase_extras_total',    _lang, 'Total extras a pagar al conductor: {total} €');
+    const fNota     = await obtenerFrase('frase_extras_nota',     _lang, 'Este importe se abona directamente al conductor al finalizar el servicio.');
+
     let lineas = '';
     for (const n of incluidos) {
-      lineas += '&nbsp;&nbsp;&#183; ' + n + ' <span style="color:#2e7d32;font-size:12px;">(incluido)</span><br>';
+      lineas += '&nbsp;&nbsp;&#183; ' + n + ' <span style="color:#2e7d32;font-size:12px;">(' + fIncluido + ')</span><br>';
     }
     for (const ex of aCobrar) {
-      lineas += '&nbsp;&nbsp;&#183; ' + ex.nombre + ' <span style="color:#856404;font-size:12px;">' + ex.precio.toFixed(2) + ' &euro; &mdash; a pagar al conductor</span><br>';
+      lineas += '&nbsp;&nbsp;&#183; ' + ex.nombre + ' <span style="color:#856404;font-size:12px;">' + ex.precio.toFixed(2) + ' &euro; &mdash; ' + fAPagar + '</span><br>';
     }
 
     let totalHtml = '';
     if (aCobrar.length) {
       const total = aCobrar.reduce((s, e) => s + e.precio, 0);
       totalHtml = '<div class="caja-amarilla" style="margin-top:10px;margin-bottom:0;">'
-                + '<strong>&#128176; Total extras a pagar al conductor: ' + total.toFixed(2) + ' &euro;</strong><br>'
-                + '<span style="font-size:11px;">Este importe se abona directamente al conductor al finalizar el servicio.</span>'
+                + '<strong>&#128176; ' + fTotal.replace('{total}', total.toFixed(2)) + '</strong><br>'
+                + '<span style="font-size:11px;">' + fNota + '</span>'
                 + '</div>';
     }
 
     return '<div class="info-box">'
-         + '<strong>&#129524; Extras seleccionados:</strong><br>'
+         + '<strong>&#129524; ' + fTitulo + '</strong><br>'
          + lineas
          + totalHtml
          + '</div>';
@@ -10731,16 +10797,22 @@ async function formatearExtrasWhatsapp(reservaId, lang) {
       }
     }
 
-    let texto = '\n🧳 *Extras seleccionados:*\n';
+    // Palabras fijas del bloque (🧩 Frases): en el idioma del cliente
+    const fTitulo   = await obtenerFrase('frase_extras_titulo',   _lang, 'Extras seleccionados:');
+    const fIncluido = await obtenerFrase('frase_extras_incluido', _lang, 'incluido');
+    const fAPagar   = await obtenerFrase('frase_extras_a_pagar',  _lang, 'a pagar al conductor');
+    const fTotal    = await obtenerFrase('frase_extras_total',    _lang, 'Total extras a pagar al conductor: {total} €');
+
+    let texto = '\n🧳 *' + fTitulo + '*\n';
     for (const n of incluidos) {
-      texto += '· ' + n + ' _(incluido)_\n';
+      texto += '· ' + n + ' _(' + fIncluido + ')_\n';
     }
     for (const ex of aCobrar) {
-      texto += '· ' + ex.nombre + ' _(' + ex.precio.toFixed(2) + ' € — a pagar al conductor)_\n';
+      texto += '· ' + ex.nombre + ' _(' + ex.precio.toFixed(2) + ' € — ' + fAPagar + ')_\n';
     }
     if (aCobrar.length) {
       const total = aCobrar.reduce((s, e) => s + e.precio, 0);
-      texto += '💰 *Total extras a pagar al conductor: ' + total.toFixed(2) + ' €*\n';
+      texto += '💰 *' + fTotal.replace('{total}', total.toFixed(2)) + '*\n';
     }
     return texto;
   } catch(e) {
@@ -10781,6 +10853,11 @@ async function obtenerPlantilla(clave, vars, lang) {
       } catch(eT) {
         console.warn('obtenerPlantilla traducción no disponible (' + clave + ', ' + lang + '), se usa español:', eT.message);
       }
+      // Nombres de origen, destino y categoría en el idioma del cliente
+      vars = Object.assign({}, vars || {});
+      if (vars.origen)    vars.origen    = await traducirLugarCliente(vars.origen, lang);
+      if (vars.destino)   vars.destino   = await traducirLugarCliente(vars.destino, lang);
+      if (vars.categoria) vars.categoria = await traducirCategoriaCliente(vars.categoria, lang);
     }
     const sustituir = (txt) => {
       if (!txt) return txt;
