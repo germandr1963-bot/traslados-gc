@@ -10612,7 +10612,7 @@ async function formatearExtrasWhatsapp(reservaId, lang) {
   }
 }
 
-async function obtenerPlantilla(clave, vars) {
+async function obtenerPlantilla(clave, vars, lang) {
   try {
     const r = await pool.query(
       'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion WHERE clave = $1',
@@ -10620,6 +10620,31 @@ async function obtenerPlantilla(clave, vars) {
     );
     if (!r.rows.length) return null;
     const p = r.rows[0];
+    // Multiidioma: si se indica un idioma distinto de 'es' y hay traducción APROBADA
+    // se usa la traducción; cada canal (email / WhatsApp) va por separado.
+    // Si no hay idioma, no hay traducción, no está aprobada o falla algo -> español (como siempre).
+    if (lang && lang !== 'es') {
+      try {
+        const t = await pool.query(
+          `SELECT asunto_email, cuerpo_email, cuerpo_whatsapp, revisado_email, revisado_wa
+           FROM plantillas_comunicacion_traducciones
+           WHERE plantilla_clave = $1 AND lang_code = $2`,
+          [clave, lang]
+        );
+        if (t.rows.length) {
+          const tr = t.rows[0];
+          if (tr.revisado_email && tr.cuerpo_email) {
+            p.cuerpo_email = tr.cuerpo_email;
+            if (tr.asunto_email) p.asunto_email = tr.asunto_email;
+          }
+          if (tr.revisado_wa && tr.cuerpo_whatsapp) {
+            p.cuerpo_whatsapp = tr.cuerpo_whatsapp;
+          }
+        }
+      } catch(eT) {
+        console.warn('obtenerPlantilla traducción no disponible (' + clave + ', ' + lang + '), se usa español:', eT.message);
+      }
+    }
     const sustituir = (txt) => {
       if (!txt) return txt;
       return txt.replace(/\{([^}]+)\}/g, (_, k) => {
