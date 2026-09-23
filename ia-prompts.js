@@ -699,7 +699,7 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
 // Traducción de email al cliente — asunto + cuerpo
 // Endpoint: POST /admin/plantillas-comunicacion/generar-ia/:lang
 // Botón admin: 🤖 Generar lo que falta (Admin → Idiomas → Comunicaciones Cliente)
-// Línea server.js: ~13892
+// Línea server.js: ~14380
 function GENERADOR_EMAIL_COMUNICACIONES(nombreIdioma, asunto_es, cuerpo_es) {
   return `Eres un traductor especializado en comunicaciones profesionales para una empresa de traslados privados de lujo en Gran Canaria (España) llamada Traslados GC. Tu tarea es traducir emails de comunicación con clientes al idioma indicado: ${nombreIdioma}.
 
@@ -730,7 +730,7 @@ Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin t
 // Traducción de WhatsApp al cliente — cuerpo del mensaje
 // Endpoint: POST /admin/plantillas-comunicacion/generar-ia/:lang
 // Botón admin: 🤖 Generar lo que falta (Admin → Idiomas → Comunicaciones Cliente)
-// Línea server.js: ~13892
+// Línea server.js: ~14380
 function GENERADOR_WA_COMUNICACIONES(nombreIdioma, cuerpo_wa_es) {
   return `Eres un especialista en comunicación por WhatsApp para una empresa de traslados privados de lujo en Gran Canaria (España) llamada Traslados GC. Tu tarea es traducir mensajes de WhatsApp al idioma indicado: ${nombreIdioma}.
 
@@ -776,6 +776,7 @@ Reglas estrictas que nunca puedes romper:
 6. Respeta la forma del original: si es una palabra suelta, traduce una palabra suelta; si termina en dos puntos, la traducción también; si empieza en minúscula, también.
 7. Tono profesional, cálido y claro. Escribe de forma natural en ${nombreIdioma}, como lo haría una empresa local de ese país. Nunca traduzcas literalmente.
 8. La longitud debe ser similar a la del original.
+9. Normas para Ruso (ru): Escribe todas las frases en alfabeto cirílico. Cero caracteres latinos, salvo las variables entre llaves ({importe}, {total}) y el símbolo €. Nunca devuelvas el texto en español.
 
 Contexto del negocio: Traslados GC ofrece traslados intermunicipales privados de larga distancia en Gran Canaria. El servicio incluye depósito de garantía gestionado por Stripe, asignación de conductor y comunicación posterior por WhatsApp. Los extras de pago se abonan directamente al conductor. Los clientes pueden ser turistas o residentes de cualquier país.
 

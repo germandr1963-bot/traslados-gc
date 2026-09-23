@@ -14401,13 +14401,12 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
 
   if (pendientes.length === 0) return res.json({ ok: true, generadas: 0, errores: [] });
 
-  // Nombre del idioma en español ("ruso", "inglés"...): el Generador 17 está escrito en español
-  // y con frases tan cortas el nombre nativo del idioma (p. ej. en cirílico) puede confundir a la IA.
-  const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || await getNombreIdioma(lang);
+  const nombreIdioma = await getNombreIdioma(lang);
   console.log('[GEN17] ' + lang + ': idioma enviado a la IA = ' + nombreIdioma + ', frases pendientes = ' + pendientes.length);
   const prompt = iaPrompts.GENERADOR_FRASES_COMUNICACIONES(nombreIdioma, pendientes);
 
   let parsed;
+  let textoRespuestaCompleta = '';
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -14430,24 +14429,40 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
     const textoRespuesta = data.content.map(function(b) { return b.text || ''; }).join('');
     const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
     console.log('[GEN17] ' + lang + ':', limpio.slice(0, 200));
-    // Se toma solo el primer objeto JSON completo: si la IA añade comentarios después, se ignoran
-    let ini = limpio.indexOf('{'), fin = -1, prof = 0, enTexto = false, escape = false;
-    for (let i = ini; ini >= 0 && i < limpio.length; i++) {
+    textoRespuestaCompleta = limpio;
+    // Se leen TODOS los objetos JSON completos de la respuesta (la IA a veces escribe primero
+    // las frases originales y después la traducción) y se ignora cualquier comentario suyo.
+    const objetos = [];
+    let ini = -1, prof = 0, enTexto = false, escape = false;
+    for (let i = 0; i < limpio.length; i++) {
       const ch = limpio[i];
       if (enTexto) {
         if (escape) escape = false;
         else if (ch === '\\') escape = true;
         else if (ch === '"') enTexto = false;
-      } else if (ch === '"') enTexto = true;
-      else if (ch === '{') prof++;
-      else if (ch === '}') { prof--; if (prof === 0) { fin = i; break; } }
+      } else if (ch === '"') { if (prof > 0) enTexto = true; }
+      else if (ch === '{') { if (prof === 0) ini = i; prof++; }
+      else if (ch === '}' && prof > 0) {
+        prof--;
+        if (prof === 0) {
+          try { objetos.push(JSON.parse(limpio.slice(ini, i + 1))); } catch (eObj) { /* no era JSON válido */ }
+        }
+      }
     }
-    if (ini < 0 || fin < 0) throw new Error('La respuesta de la IA no contiene un JSON completo');
-    try {
-      parsed = JSON.parse(limpio.slice(ini, fin + 1));
-    } catch (eJson) {
-      console.error('[GEN17] Respuesta completa de la IA (' + lang + '):', limpio.slice(0, 4000));
-      throw eJson;
+    if (!objetos.length) {
+      console.error('[GEN17] Respuesta completa de la IA (' + lang + '):', limpio.slice(0, 6000));
+      throw new Error('La respuesta de la IA no contiene un JSON válido');
+    }
+    // Se elige el objeto con más frases realmente traducidas (distintas del español)
+    const traducidasEn = function(obj) {
+      return pendientes.filter(function(f) {
+        const t = obj[f.clave];
+        return typeof t === 'string' && t.trim() && t.trim() !== (f.texto_es || '').trim();
+      }).length;
+    };
+    parsed = objetos.reduce(function(mejor, obj) { return traducidasEn(obj) > traducidasEn(mejor) ? obj : mejor; }, objetos[0]);
+    if (objetos.length > 1) {
+      console.log('[GEN17] ' + lang + ': la IA escribió ' + objetos.length + ' respuestas; se usa la que tiene ' + traducidasEn(parsed) + ' frases traducidas.');
     }
   } catch (err) {
     console.error('[GEN17] Error:', err.message);
@@ -14462,6 +14477,7 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
   }).length;
   if (pendientes.length >= 3 && iguales > pendientes.length / 2) {
     console.error('[GEN17] ' + lang + ': la IA devolvió ' + iguales + ' de ' + pendientes.length + ' frases sin traducir. No se guarda nada. Idioma enviado: ' + nombreIdioma);
+    console.error('[GEN17] Respuesta completa de la IA (' + lang + '):', textoRespuestaCompleta.slice(0, 6000));
     return res.json({ ok: false, error: 'La IA devolvió el texto en español sin traducir. No se ha guardado nada — vuelve a pulsar Generar.' });
   }
 
