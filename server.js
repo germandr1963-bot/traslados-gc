@@ -10072,7 +10072,7 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         const _pvA = await obtenerPlantilla('cliente_voucher', {
           nombre_cliente: r.nombre_cliente,
           numero_reserva: r.numero_reserva
-        });
+        }, r.lang_cliente || 'es');
         if (htmlVoucher) {
           await enviarEmail({
             to: r.email_cliente,
@@ -10481,7 +10481,7 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
     const _pvM = await obtenerPlantilla('cliente_voucher', {
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva
-    });
+    }, r.lang_cliente || 'es');
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pvM && _pvM.asunto) || ('Voucher de traslado — ' + r.numero_reserva),
