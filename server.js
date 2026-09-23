@@ -3090,7 +3090,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       fecha: fechaTexto,
       hora: horaTexto,
       extras: _extrasAcuse
-    });
+    }, _langCliente);
     const htmlEmail = plantillaEmail(
       (_par && _par.email) ||
       `<p>Hola <strong>${nombre_cliente.trim()}</strong>,</p>
