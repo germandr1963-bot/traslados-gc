@@ -699,7 +699,7 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
 // Traducción de email al cliente — asunto + cuerpo
 // Endpoint: POST /admin/plantillas-comunicacion/generar-ia/:lang
 // Botón admin: 🤖 Generar lo que falta (Admin → Idiomas → Comunicaciones Cliente)
-// Línea server.js: ~14380
+// Línea server.js: ~13892
 function GENERADOR_EMAIL_COMUNICACIONES(nombreIdioma, asunto_es, cuerpo_es) {
   return `Eres un traductor especializado en comunicaciones profesionales para una empresa de traslados privados de lujo en Gran Canaria (España) llamada Traslados GC. Tu tarea es traducir emails de comunicación con clientes al idioma indicado: ${nombreIdioma}.
 
@@ -730,7 +730,7 @@ Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin t
 // Traducción de WhatsApp al cliente — cuerpo del mensaje
 // Endpoint: POST /admin/plantillas-comunicacion/generar-ia/:lang
 // Botón admin: 🤖 Generar lo que falta (Admin → Idiomas → Comunicaciones Cliente)
-// Línea server.js: ~14380
+// Línea server.js: ~13892
 function GENERADOR_WA_COMUNICACIONES(nombreIdioma, cuerpo_wa_es) {
   return `Eres un especialista en comunicación por WhatsApp para una empresa de traslados privados de lujo en Gran Canaria (España) llamada Traslados GC. Tu tarea es traducir mensajes de WhatsApp al idioma indicado: ${nombreIdioma}.
 
@@ -761,9 +761,10 @@ Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin t
 // Botón admin: 🤖 Generar Frases (Admin → Idiomas → Comunicaciones Cliente → 🧩 Cliente — Frases)
 // Línea server.js: ~14380
 function GENERADOR_FRASES_COMUNICACIONES(nombreIdioma, items) {
-  const lista = items.map(function(f) {
-    return '- clave: ' + f.clave + '\n  contexto: ' + (f.contexto || '') + '\n  texto original: ' + f.texto_es;
-  }).join('\n');
+  // Mismo formato que GENERADOR_INTERFAZ_TEXTOS: los textos se entregan en JSON (clave, contexto, texto)
+  const lista = JSON.stringify(items.map(function(f) {
+    return { clave: f.clave, contexto: f.contexto || '', texto: f.texto_es };
+  }), null, 2);
   return `Eres un traductor especializado en comunicaciones profesionales para una empresa de traslados privados de calidad en Gran Canaria (España) llamada Traslados GC. Tu tarea es traducir frases cortas que se insertan dentro de los emails y mensajes de WhatsApp al cliente (botones, avisos, etiquetas y palabras sueltas) al idioma indicado: ${nombreIdioma}.
 
 Reglas estrictas que nunca puedes romper:
@@ -780,11 +781,11 @@ Reglas estrictas que nunca puedes romper:
 
 Contexto del negocio: Traslados GC ofrece traslados intermunicipales privados de larga distancia en Gran Canaria. El servicio incluye depósito de garantía gestionado por Stripe, asignación de conductor y comunicación posterior por WhatsApp. Los extras de pago se abonan directamente al conductor. Los clientes pueden ser turistas o residentes de cualquier país.
 
-Frases a traducir del español al ${nombreIdioma} (clave, contexto y texto original en español):
+Frases a traducir del español al ${nombreIdioma} (JSON):
 ${lista}
 
-Responde EXCLUSIVAMENTE con JSON válido, sin texto adicional antes ni después, sin bloques de código markdown, con exactamente las mismas claves y todas las frases traducidas al ${nombreIdioma}:
-{"clave": "traducción", ...}`;
+Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, sin bloques de markdown ni comillas triples, con todas las frases traducidas al ${nombreIdioma} y con esta forma exacta:
+{"clave1": "traducción1", "clave2": "traducción2"}`;
 }
 
 // =============================================================================

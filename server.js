@@ -14391,12 +14391,24 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
     'SELECT clave, contexto, texto_es FROM frases_comunicacion ORDER BY orden, clave'
   );
   const yaExisten = await pool.query(
-    'SELECT frase_clave, texto, desactualizado FROM frases_comunicacion_traducciones WHERE lang_code = $1',
+    'SELECT frase_clave, texto, desactualizado, revisado FROM frases_comunicacion_traducciones WHERE lang_code = $1',
     [lang]
   );
-  // "tiene" = traducción existente y al día; las desactualizadas se vuelven a generar
+  // Una frase de 3 palabras o más idéntica al español no está traducida
+  // (palabras sueltas como "Extras" pueden coincidir en algunos idiomas y se aceptan).
+  const sinTraducir = function(traduccion, textoEs) {
+    const a = (traduccion || '').trim(), b = (textoEs || '').trim();
+    return a === b && b.split(/\s+/).length >= 3;
+  };
+  const textoEsDe = {};
+  for (const f of frases.rows) textoEsDe[f.clave] = f.texto_es;
+  // "tiene" = traducción existente y al día; se vuelven a generar las desactualizadas
+  // y las que se guardaron sin aprobar idénticas al español
   const tiene = {};
-  for (const t of yaExisten.rows) tiene[t.frase_clave] = !!(t.texto && t.texto.trim()) && !t.desactualizado;
+  for (const t of yaExisten.rows) {
+    tiene[t.frase_clave] = !!(t.texto && t.texto.trim()) && !t.desactualizado &&
+      !(!t.revisado && sinTraducir(t.texto, textoEsDe[t.frase_clave]));
+  }
   const pendientes = frases.rows.filter(function(f) { return !tiene[f.clave] && f.texto_es && f.texto_es.trim(); });
 
   if (pendientes.length === 0) return res.json({ ok: true, generadas: 0, errores: [] });
@@ -14487,6 +14499,20 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
     const traduccion = parsed[f.clave];
     if (!traduccion || typeof traduccion !== 'string' || !traduccion.trim()) {
       errores.push({ clave: f.clave, error: 'Sin traducción en la respuesta' });
+      continue;
+    }
+    // No se guarda una frase que vuelve igual que en español
+    if (sinTraducir(traduccion, f.texto_es)) {
+      console.warn('[GEN17] ' + lang + ': ' + f.clave + ' volvió sin traducir — no se guarda.');
+      errores.push({ clave: f.clave, error: 'Volvió sin traducir' });
+      continue;
+    }
+    // No se guarda una frase que pierde o cambia sus variables {entre_llaves}
+    const varsEs = ((f.texto_es || '').match(/\{[a-z_]+\}/g) || []).sort().join(',');
+    const varsTr = (traduccion.match(/\{[a-z_]+\}/g) || []).sort().join(',');
+    if (varsEs !== varsTr) {
+      console.warn('[GEN17] ' + lang + ': ' + f.clave + ' con variables alteradas (' + varsTr + ' en vez de ' + varsEs + ') — no se guarda.');
+      errores.push({ clave: f.clave, error: 'Variables alteradas' });
       continue;
     }
     await pool.query(
