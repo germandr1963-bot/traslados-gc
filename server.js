@@ -14427,10 +14427,39 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
     const textoRespuesta = data.content.map(function(b) { return b.text || ''; }).join('');
     const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
     console.log('[GEN17] ' + lang + ':', limpio.slice(0, 200));
-    parsed = JSON.parse(limpio);
+    // Se toma solo el primer objeto JSON completo: si la IA añade comentarios después, se ignoran
+    let ini = limpio.indexOf('{'), fin = -1, prof = 0, enTexto = false, escape = false;
+    for (let i = ini; ini >= 0 && i < limpio.length; i++) {
+      const ch = limpio[i];
+      if (enTexto) {
+        if (escape) escape = false;
+        else if (ch === '\\') escape = true;
+        else if (ch === '"') enTexto = false;
+      } else if (ch === '"') enTexto = true;
+      else if (ch === '{') prof++;
+      else if (ch === '}') { prof--; if (prof === 0) { fin = i; break; } }
+    }
+    if (ini < 0 || fin < 0) throw new Error('La respuesta de la IA no contiene un JSON completo');
+    try {
+      parsed = JSON.parse(limpio.slice(ini, fin + 1));
+    } catch (eJson) {
+      console.error('[GEN17] Respuesta completa de la IA (' + lang + '):', limpio.slice(0, 4000));
+      throw eJson;
+    }
   } catch (err) {
     console.error('[GEN17] Error:', err.message);
     return res.json({ ok: false, error: err.message });
+  }
+
+  // Freno de seguridad: si la mayoría de frases vuelven igual que en español, la IA no tradujo.
+  // En ese caso no se guarda nada (así nunca quedan frases en español marcadas como traducidas).
+  const iguales = pendientes.filter(function(f) {
+    const t = parsed[f.clave];
+    return typeof t === 'string' && t.trim() === (f.texto_es || '').trim();
+  }).length;
+  if (pendientes.length >= 3 && iguales > pendientes.length / 2) {
+    console.error('[GEN17] ' + lang + ': la IA devolvió ' + iguales + ' de ' + pendientes.length + ' frases sin traducir. No se guarda nada.');
+    return res.json({ ok: false, error: 'La IA devolvió el texto en español sin traducir. No se ha guardado nada — vuelve a pulsar Generar.' });
   }
 
   let generadas = 0;
