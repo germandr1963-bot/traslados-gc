@@ -755,6 +755,36 @@ Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin t
 {"cuerpo_whatsapp": "texto traducido o null si el original era null o vacío"}`;
 }
 
+// ─── GENERADOR 17 ────────────────────────────────────────────────────────────
+// Traducción de frases cortas dentro de emails y WhatsApp al cliente — botones, avisos, etiquetas
+// Endpoint: POST /admin/frases-comunicacion/generar-ia/:lang
+// Botón admin: 🤖 Generar Frases (Admin → Idiomas → Comunicaciones Cliente → 🧩 Cliente — Frases)
+// Línea server.js: ~14294
+function GENERADOR_FRASES_COMUNICACIONES(nombreIdioma, items) {
+  const lista = items.map(function(f) {
+    return '- clave: ' + f.clave + '\n  contexto: ' + (f.contexto || '') + '\n  texto original: ' + f.texto_es;
+  }).join('\n');
+  return `Eres un traductor especializado en comunicaciones profesionales para una empresa de traslados privados de calidad en Gran Canaria (España) llamada Traslados GC. Tu tarea es traducir al ${nombreIdioma} frases cortas que se insertan dentro de los emails y mensajes de WhatsApp que recibe el cliente: textos de botones, avisos, etiquetas y palabras sueltas.
+
+Reglas estrictas que nunca puedes romper:
+
+1. Traduce solo la frase. No añadas saludos, despedidas, firmas, emojis ni ningún texto que no esté en el original.
+2. Las variables entre llaves, como {importe} o {total}, se copian exactamente igual: sin traducir y sin modificar.
+3. Las cifras y los símbolos (€, :, —) se conservan.
+4. Usa el contexto de cada frase para elegir la traducción correcta: un botón debe sonar a botón, una etiqueta a etiqueta y un aviso a aviso.
+5. Respeta la forma del original: si es una palabra suelta, traduce una palabra suelta; si termina en dos puntos, la traducción también; si empieza en minúscula, también.
+6. Tono profesional, cálido y claro. Escribe de forma natural en ${nombreIdioma}, como lo haría una empresa local de ese país. Nunca traduzcas literalmente.
+7. La longitud debe ser similar a la del original.
+
+Contexto del negocio: Traslados GC ofrece traslados intermunicipales privados de larga distancia en Gran Canaria. El servicio incluye depósito de garantía gestionado por Stripe, asignación de conductor y comunicación posterior por WhatsApp. Los extras de pago se abonan directamente al conductor. Los clientes pueden ser turistas o residentes de cualquier país.
+
+Frases a traducir (clave, contexto y texto original en español):
+${lista}
+
+Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown ni texto adicional, con exactamente las mismas claves:
+{"clave": "traducción", ...}`;
+}
+
 // =============================================================================
 module.exports = {
   GENERADOR_ALT_NUEVO_ES,
@@ -773,5 +803,6 @@ module.exports = {
   GENERADOR_ISLAS,
   GENERADOR_TERMINAL_PORTUARIA,
   GENERADOR_EMAIL_COMUNICACIONES,
-  GENERADOR_WA_COMUNICACIONES
+  GENERADOR_WA_COMUNICACIONES,
+  GENERADOR_FRASES_COMUNICACIONES
 };

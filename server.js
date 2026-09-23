@@ -730,46 +730,6 @@ async function initSchema() {
     );
   }
 
-  // ─── Frases fijas de los mensajes al cliente (traducibles desde Idiomas) ───
-  const TEXTOS_COMUNICACIONES_CLIENTE = [
-    { clave: 'com_boton_pagar_deposito', modulo: 'Comunicaciones cliente — frases', contexto: 'Texto del botón de pago del depósito en los emails de confirmación y de enlace de pago. Mantener {importe} tal cual, sin traducir', es: 'Pagar depósito de {importe} €' },
-    { clave: 'com_sin_enlace_pago', modulo: 'Comunicaciones cliente — frases', contexto: 'Frase que sustituye al botón de pago cuando no se pudo generar el enlace de pago', es: 'Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.' },
-    { clave: 'com_boton_valorar', modulo: 'Comunicaciones cliente — frases', contexto: 'Texto del botón del email que invita al cliente a valorar su traslado', es: 'Valorar mi traslado' },
-    { clave: 'com_cancel_email_fuera_plazo', modulo: 'Comunicaciones cliente — frases', contexto: 'Aviso en el email de cancelación: cancelada fuera de plazo, depósito retenido', es: 'La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía ha sido retenido según nuestra política de cancelación.' },
-    { clave: 'com_cancel_email_dentro_plazo_deposito', modulo: 'Comunicaciones cliente — frases', contexto: 'Aviso en el email de cancelación: cancelada dentro de plazo, se devolverá el depósito', es: 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.' },
-    { clave: 'com_cancel_email_dentro_plazo', modulo: 'Comunicaciones cliente — frases', contexto: 'Aviso en el email de cancelación cuando no había depósito pagado', es: 'La cancelación se ha realizado dentro del plazo establecido.' },
-    { clave: 'com_cancel_wa_fuera_plazo', modulo: 'Comunicaciones cliente — frases', contexto: 'Aviso en el WhatsApp de cancelación: cancelada fuera de plazo, depósito retenido', es: 'La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido.' },
-    { clave: 'com_cancel_wa_dentro_plazo', modulo: 'Comunicaciones cliente — frases', contexto: 'Aviso en el WhatsApp de cancelación: cancelada dentro de plazo, se devolverá el depósito', es: 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve.' },
-    { clave: 'com_extras_titulo', modulo: 'Comunicaciones cliente — frases', contexto: 'Título del bloque de extras en emails y WhatsApp al cliente', es: 'Extras seleccionados:' },
-    { clave: 'com_extras_incluido', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta junto a un extra gratuito en emails y WhatsApp', es: 'incluido' },
-    { clave: 'com_extras_a_pagar', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta junto al precio de un extra de pago, ej: "5.00 € — a pagar al conductor"', es: 'a pagar al conductor' },
-    { clave: 'com_extras_total', modulo: 'Comunicaciones cliente — frases', contexto: 'Línea del total de extras de pago. Mantener {total} tal cual, sin traducir', es: 'Total extras a pagar al conductor: {total} €' },
-    { clave: 'com_extras_nota', modulo: 'Comunicaciones cliente — frases', contexto: 'Nota bajo el total de extras en el email', es: 'Este importe se abona directamente al conductor al finalizar el servicio.' },
-    { clave: 'com_resumen_ruta', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Ruta' },
-    { clave: 'com_resumen_fecha', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Fecha' },
-    { clave: 'com_resumen_hora_recogida', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Hora de recogida' },
-    { clave: 'com_resumen_pasajeros', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Pasajeros' },
-    { clave: 'com_resumen_categoria', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Categoría' },
-    { clave: 'com_resumen_precio_estimado', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Precio estimado' },
-    { clave: 'com_resumen_dir_recogida', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Dirección de recogida' },
-    { clave: 'com_resumen_dir_destino', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Dirección de destino' },
-    { clave: 'com_resumen_vuelo', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Vuelo' },
-    { clave: 'com_resumen_llegada', modulo: 'Comunicaciones cliente — frases', contexto: 'Palabra tras el número de vuelo, ej: "IB1234 · Llegada 10:30"', es: 'Llegada' },
-    { clave: 'com_resumen_barco', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Barco' },
-    { clave: 'com_resumen_atraque', modulo: 'Comunicaciones cliente — frases', contexto: 'Palabra tras el nombre del barco, ej: "Volcán de Tijarafe · Atraque 10:30"', es: 'Atraque' },
-    { clave: 'com_resumen_extras', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Extras' },
-    { clave: 'com_resumen_notas', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Notas' }
-  ];
-
-  for (const t of TEXTOS_COMUNICACIONES_CLIENTE) {
-    await pool.query(
-      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (clave) DO UPDATE SET modulo = $2, contexto = $3, texto_es = $4`,
-      [t.clave, t.modulo, t.contexto, t.es]
-    );
-  }
-
   // ─── Textos de la página de inicio (index.ejs) ───────────────────────────
   const TEXTOS_HOME = [
     { clave: 'home_page_title',          contexto: 'Título de la pestaña del navegador en la página de inicio', es: 'Traslados GC — Traslados de larga distancia en Gran Canaria', en: 'Traslados GC — Long-distance transfers in Gran Canaria' },
@@ -2460,6 +2420,72 @@ Pulsa el botón para crear una nueva contraseña:
     );
   }
   console.log('Plantillas de comunicaci\u00f3n cargadas.');
+
+  // ─── Frases que van DENTRO de los emails y WhatsApp al cliente ─────────────
+  // (botones, avisos, etiquetas). El español se edita en Admin → Comunicaciones
+  // y se traducen en Admin → Idiomas → Comunicaciones Cliente → 🧩 Frases (Generador 17).
+  // canal: 'email', 'wa' o 'ambos' — solo informativo, indica dónde se usa cada frase.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS frases_comunicacion (
+      clave TEXT PRIMARY KEY,
+      canal TEXT NOT NULL DEFAULT 'email',
+      contexto TEXT,
+      texto_es TEXT NOT NULL,
+      orden INTEGER DEFAULT 0,
+      actualizado_en TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS frases_comunicacion_traducciones (
+      frase_clave TEXT NOT NULL,
+      lang_code TEXT NOT NULL,
+      texto TEXT,
+      generado_por_ia BOOLEAN DEFAULT FALSE,
+      revisado BOOLEAN DEFAULT FALSE,
+      actualizado_en TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (frase_clave, lang_code)
+    )
+  `);
+  const frasesBase = [
+    { clave: 'frase_boton_pagar_deposito', canal: 'email', orden: 10, contexto: 'Texto del botón de pago del depósito (emails de confirmación y de enlace de pago). Mantener {importe} tal cual', es: 'Pagar depósito de {importe} €' },
+    { clave: 'frase_sin_enlace_pago', canal: 'email', orden: 20, contexto: 'Frase que sustituye al botón de pago cuando no se pudo generar el enlace de pago', es: 'Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.' },
+    { clave: 'frase_boton_valorar', canal: 'email', orden: 30, contexto: 'Texto del botón que invita al cliente a valorar su traslado', es: 'Valorar mi traslado' },
+    { clave: 'frase_cancel_email_fuera_plazo', canal: 'email', orden: 40, contexto: 'Aviso en el email de cancelación: cancelada fuera de plazo, depósito retenido', es: 'La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía ha sido retenido según nuestra política de cancelación.' },
+    { clave: 'frase_cancel_email_dentro_plazo_deposito', canal: 'email', orden: 50, contexto: 'Aviso en el email de cancelación: cancelada dentro de plazo, se devolverá el depósito', es: 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.' },
+    { clave: 'frase_cancel_email_dentro_plazo', canal: 'email', orden: 60, contexto: 'Aviso en el email de cancelación cuando no había depósito pagado', es: 'La cancelación se ha realizado dentro del plazo establecido.' },
+    { clave: 'frase_cancel_wa_fuera_plazo', canal: 'wa', orden: 70, contexto: 'Aviso en el WhatsApp de cancelación: cancelada fuera de plazo, depósito retenido', es: 'La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido.' },
+    { clave: 'frase_cancel_wa_dentro_plazo', canal: 'wa', orden: 80, contexto: 'Aviso en el WhatsApp de cancelación: cancelada dentro de plazo, se devolverá el depósito', es: 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve.' },
+    { clave: 'frase_extras_titulo', canal: 'ambos', orden: 90, contexto: 'Título del bloque de extras', es: 'Extras seleccionados:' },
+    { clave: 'frase_extras_incluido', canal: 'ambos', orden: 100, contexto: 'Etiqueta junto a un extra gratuito', es: 'incluido' },
+    { clave: 'frase_extras_a_pagar', canal: 'ambos', orden: 110, contexto: 'Etiqueta junto al precio de un extra de pago, ej: "5.00 € — a pagar al conductor"', es: 'a pagar al conductor' },
+    { clave: 'frase_extras_total', canal: 'ambos', orden: 120, contexto: 'Línea del total de extras de pago. Mantener {total} tal cual', es: 'Total extras a pagar al conductor: {total} €' },
+    { clave: 'frase_extras_nota', canal: 'email', orden: 130, contexto: 'Nota bajo el total de extras', es: 'Este importe se abona directamente al conductor al finalizar el servicio.' },
+    { clave: 'frase_resumen_ruta', canal: 'email', orden: 140, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Ruta' },
+    { clave: 'frase_resumen_fecha', canal: 'email', orden: 150, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Fecha' },
+    { clave: 'frase_resumen_hora_recogida', canal: 'email', orden: 160, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Hora de recogida' },
+    { clave: 'frase_resumen_pasajeros', canal: 'email', orden: 170, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Pasajeros' },
+    { clave: 'frase_resumen_categoria', canal: 'email', orden: 180, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Categoría' },
+    { clave: 'frase_resumen_precio_estimado', canal: 'email', orden: 190, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Precio estimado' },
+    { clave: 'frase_resumen_dir_recogida', canal: 'email', orden: 200, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Dirección de recogida' },
+    { clave: 'frase_resumen_dir_destino', canal: 'email', orden: 210, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Dirección de destino' },
+    { clave: 'frase_resumen_vuelo', canal: 'email', orden: 220, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Vuelo' },
+    { clave: 'frase_resumen_llegada', canal: 'email', orden: 230, contexto: 'Palabra tras el número de vuelo, ej: "IB1234 · Llegada 10:30"', es: 'Llegada' },
+    { clave: 'frase_resumen_barco', canal: 'email', orden: 240, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Barco' },
+    { clave: 'frase_resumen_atraque', canal: 'email', orden: 250, contexto: 'Palabra tras el nombre del barco, ej: "Volcán de Tijarafe · Atraque 10:30"', es: 'Atraque' },
+    { clave: 'frase_resumen_extras', canal: 'email', orden: 260, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Extras' },
+    { clave: 'frase_resumen_notas', canal: 'email', orden: 270, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Notas' }
+  ];
+  // ON CONFLICT DO NOTHING: nunca sobreescribe lo que se edite desde el Admin
+  for (const f of frasesBase) {
+    await pool.query(
+      `INSERT INTO frases_comunicacion (clave, canal, contexto, texto_es, orden)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (clave) DO NOTHING`,
+      [f.clave, f.canal, f.contexto, f.es, f.orden]
+    );
+  }
+  console.log('Frases de comunicaci\u00f3n cargadas.');
+
 
   // ─── Destinos: columnas para página pública de rutas ─────────────────────
   await pool.query(`ALTER TABLE destinos ADD COLUMN IF NOT EXISTS isla TEXT DEFAULT 'Gran Canaria'`);
@@ -14174,6 +14200,171 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
     [clave, lang, asunto_email || null, cuerpo_email || null, cuerpo_whatsapp || null, !!generado_por_ia]
   );
   res.json({ ok: true });
+}));
+
+// ─── Frases dentro de los mensajes al cliente (🧩) ─────────────────────────────
+// Mismo funcionamiento que las traducciones de plantillas de comunicación:
+// la IA guarda con marca "pendiente" (naranja) y solo cuentan las aprobadas (verde).
+
+// GET — lista de frases en español (Admin → Comunicaciones)
+app.get('/admin/frases-comunicacion', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT clave, canal, contexto, texto_es, orden, actualizado_en FROM frases_comunicacion ORDER BY orden, clave'
+  );
+  res.json({ frases: result.rows });
+}));
+
+// PUT — editar el español de una frase (Admin → Comunicaciones)
+app.put('/admin/frases-comunicacion/:clave', requireAdmin, asyncHandler(async (req, res) => {
+  const { texto_es } = req.body;
+  if (!texto_es || !texto_es.trim()) return res.status(400).json({ error: 'El texto no puede estar vacío.' });
+  const result = await pool.query(
+    `UPDATE frases_comunicacion SET texto_es = $1, actualizado_en = NOW()
+     WHERE clave = $2 RETURNING *`,
+    [texto_es.trim(), req.params.clave]
+  );
+  if (!result.rows.length) return res.status(404).json({ error: 'Frase no encontrada.' });
+  res.json({ ok: true, frase: result.rows[0] });
+}));
+
+// GET — estado de traducción de todas las frases (Admin → Idiomas → Comunicaciones Cliente → 🧩 Frases)
+app.get('/admin/frases-comunicacion-traducciones', requireAdmin, asyncHandler(async (req, res) => {
+  const frases = await pool.query(
+    'SELECT clave, canal, contexto, texto_es FROM frases_comunicacion ORDER BY orden, clave'
+  );
+  const traducciones = await pool.query(
+    'SELECT frase_clave, lang_code, texto, revisado FROM frases_comunicacion_traducciones'
+  );
+  const mapa = {};
+  for (const t of traducciones.rows) {
+    if (!mapa[t.frase_clave]) mapa[t.frase_clave] = {};
+    mapa[t.frase_clave][t.lang_code] = { tiene: !!(t.texto && t.texto.trim()), revisado: !!t.revisado };
+  }
+  const idiomas = IDIOMAS_TRADUCIBLES; // excluye español — es el original
+  const lista = frases.rows.map(function(f) {
+    const estado = { es: !!(f.texto_es && f.texto_es.trim()) };
+    for (const lang of idiomas) {
+      const t = mapa[f.clave] && mapa[f.clave][lang];
+      if (!t || !t.tiene) estado[lang] = null;
+      else if (t.revisado) estado[lang] = 'ok';
+      else estado[lang] = 'ia';
+    }
+    return { clave: f.clave, canal: f.canal, contexto: f.contexto || '', texto_es: f.texto_es || '', estado: estado };
+  });
+  res.json({ frases: lista, idiomas });
+}));
+
+// GET — todas las traducciones de una frase
+app.get('/admin/frases-comunicacion/:clave/traducciones', requireAdmin, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT lang_code, texto, generado_por_ia, revisado, actualizado_en
+     FROM frases_comunicacion_traducciones WHERE frase_clave = $1 ORDER BY lang_code`,
+    [req.params.clave]
+  );
+  res.json({ traducciones: result.rows });
+}));
+
+// PUT — guardar una traducción, o solo aprobarla (solo_aprobar: nunca toca el contenido)
+app.put('/admin/frases-comunicacion/:clave/traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const { clave, lang } = req.params;
+  const { texto, generado_por_ia, solo_aprobar } = req.body;
+
+  if (solo_aprobar) {
+    await pool.query(
+      `UPDATE frases_comunicacion_traducciones
+       SET revisado = TRUE, actualizado_en = NOW()
+       WHERE frase_clave = $1 AND lang_code = $2`,
+      [clave, lang]
+    );
+    return res.json({ ok: true });
+  }
+
+  await pool.query(
+    `INSERT INTO frases_comunicacion_traducciones
+       (frase_clave, lang_code, texto, generado_por_ia, revisado, actualizado_en)
+     VALUES ($1, $2, $3, $4, FALSE, NOW())
+     ON CONFLICT (frase_clave, lang_code)
+     DO UPDATE SET texto = EXCLUDED.texto, generado_por_ia = EXCLUDED.generado_por_ia, actualizado_en = NOW()`,
+    [clave, lang, texto || null, !!generado_por_ia]
+  );
+  res.json({ ok: true });
+}));
+
+// POST — generar con IA (Generador 17) las frases que faltan en un idioma
+app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) {
+    return res.status(400).json({ ok: false, error: 'Idioma no válido' });
+  }
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ ok: false, error: 'Falta ANTHROPIC_API_KEY en las variables de entorno.' });
+  }
+
+  const frases = await pool.query(
+    'SELECT clave, contexto, texto_es FROM frases_comunicacion ORDER BY orden, clave'
+  );
+  const yaExisten = await pool.query(
+    'SELECT frase_clave, texto FROM frases_comunicacion_traducciones WHERE lang_code = $1',
+    [lang]
+  );
+  const tiene = {};
+  for (const t of yaExisten.rows) tiene[t.frase_clave] = !!(t.texto && t.texto.trim());
+  const pendientes = frases.rows.filter(function(f) { return !tiene[f.clave] && f.texto_es && f.texto_es.trim(); });
+
+  if (pendientes.length === 0) return res.json({ ok: true, generadas: 0, errores: [] });
+
+  const nombreIdioma = await getNombreIdioma(lang);
+  const prompt = iaPrompts.GENERADOR_FRASES_COMUNICACIONES(nombreIdioma, pendientes);
+
+  let parsed;
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (!response.ok) {
+      const cuerpoError = await response.text();
+      return res.json({ ok: false, error: 'API error ' + response.status + ': ' + cuerpoError.slice(0, 200) });
+    }
+    const data = await response.json();
+    const textoRespuesta = data.content.map(function(b) { return b.text || ''; }).join('');
+    const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
+    console.log('[GEN17] ' + lang + ':', limpio.slice(0, 200));
+    parsed = JSON.parse(limpio);
+  } catch (err) {
+    console.error('[GEN17] Error:', err.message);
+    return res.json({ ok: false, error: err.message });
+  }
+
+  let generadas = 0;
+  const errores = [];
+  for (const f of pendientes) {
+    const traduccion = parsed[f.clave];
+    if (!traduccion || typeof traduccion !== 'string' || !traduccion.trim()) {
+      errores.push({ clave: f.clave, error: 'Sin traducción en la respuesta' });
+      continue;
+    }
+    await pool.query(
+      `INSERT INTO frases_comunicacion_traducciones
+         (frase_clave, lang_code, texto, generado_por_ia, revisado, actualizado_en)
+       VALUES ($1, $2, $3, TRUE, FALSE, NOW())
+       ON CONFLICT (frase_clave, lang_code) DO UPDATE
+         SET texto = EXCLUDED.texto, generado_por_ia = TRUE, revisado = FALSE, actualizado_en = NOW()`,
+      [f.clave, lang, traduccion.trim()]
+    );
+    generadas++;
+  }
+  res.json({ ok: true, generadas, errores });
 }));
 
 // ─── Tarea automática: cancelar reservas confirmadas sin pago de depósito ────
