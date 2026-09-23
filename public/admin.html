@@ -1487,6 +1487,27 @@ table.tabla-precios input {
 
 
 
+      <!-- Modal editor de frase (🧩 Frases dentro de los mensajes al cliente) -->
+      <div id="modal-frase-com" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;">
+        <div class="tarjeta" style="width:100%;max-width:640px;margin:auto;position:relative;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <h3 style="margin:0;">Editar frase</h3>
+            <button onclick="cerrarModalFraseCom()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--texto-muted);">×</button>
+          </div>
+          <p id="modal-frase-com-sub" style="font-size:12px;color:var(--texto-muted);font-family:monospace;margin:0 0 12px;"></p>
+          <p id="modal-frase-com-contexto" style="font-size:13px;color:var(--texto-muted);margin:0 0 12px;"></p>
+          <label class="etiqueta">Texto en español</label>
+          <p style="font-size:12px;color:var(--texto-muted);margin:0 0 6px;">Las variables en <code>{llaves}</code> se sustituyen automáticamente — no las cambies.</p>
+          <textarea id="modal-frase-com-texto" class="campo" rows="3" style="font-family:monospace;font-size:13px;resize:vertical;"></textarea>
+          <div style="display:flex;gap:10px;margin-top:20px;align-items:center;">
+            <button class="boton-primario" onclick="guardarFraseCom()">&#128190; Guardar cambios</button>
+            <button class="boton-secundario" onclick="cerrarModalFraseCom()">Cancelar</button>
+            <span id="modal-frase-com-ok" style="font-size:13px;color:green;display:none;">&#10003; Guardado correctamente</span>
+            <span id="modal-frase-com-err" style="font-size:13px;color:red;display:none;">Error al guardar</span>
+          </div>
+        </div>
+      </div>
+
     <!-- Plantilla base de marca -->
       <div style="margin-top:40px;border-top:2px solid var(--borde);padding-top:28px;">
         <h2 style="font-size:1rem;margin-bottom:4px;">&#127775; Plantilla base de marca</h2>
@@ -5043,7 +5064,8 @@ function aprobarTodoComunicaciones(tipo) {
   plantillas.forEach(function(p) {
     idiomas.forEach(function(lang) {
       var e = p[campoEstado][lang];
-      if (e && e !== 'ok') {
+      // Las desactualizadas (rojo) no se aprueban en bloque: hay que retraducirlas o revisarlas una a una
+      if (e && e !== 'ok' && e !== 'desactualizado') {
         pendientes.push({ clave: p.clave, lang: lang });
       }
     });
@@ -5387,6 +5409,9 @@ function renderizarComFrases(data) {
     if (estado === 'ia') {
       return '<td style="text-align:center;"><span style="color:#b45309;font-weight:600;" title="Generado por IA — pendiente de revisar">✓</span></td>';
     }
+    if (estado === 'desactualizado') {
+      return '<td style="text-align:center;"><span style="color:var(--rojo-error);font-weight:600;" title="El español fue modificado — hay que retraducir">✓</span></td>';
+    }
     return '<td style="text-align:center;"><span style="color:var(--rojo-error);">·</span></td>';
   }
   function etiquetaCanal(canal) {
@@ -5420,7 +5445,7 @@ function aprobarTodoComFrases() {
   frases.forEach(function(f) {
     idiomas.forEach(function(lang) {
       var e = f.estado[lang];
-      if (e && e !== 'ok') pendientes.push({ clave: f.clave, lang: lang });
+      if (e && e !== 'ok' && e !== 'desactualizado') pendientes.push({ clave: f.clave, lang: lang });
     });
   });
   if (pendientes.length === 0) {
@@ -8985,6 +9010,7 @@ function cargarPlantillasCom() {
     .then(function(data) {
       _plantillasCom = data.plantillas || [];
       renderPlantillasCom();
+      cargarFrasesCom();
     })
     .catch(function() {
       document.getElementById('lista-plantillas-com').innerHTML =
@@ -9040,10 +9066,98 @@ function renderPlantillasCom() {
       html += '</tr>';
     });
     html += '</tbody></table></div>';
+    // 🧩 Frases que van dentro de los mensajes al cliente (se rellena con renderFrasesCom)
+    if (cat === 'cliente') html += '<div id="lista-frases-com"></div>';
   });
 
   if (!html) html = '<p style="color:var(--texto-muted);">No hay plantillas en esta categor�a.</p>';
   document.getElementById('lista-plantillas-com').innerHTML = html;
+  renderFrasesCom();
+}
+
+// ─── 🧩 Frases dentro de los mensajes al cliente (español) ───────────────────
+// Se muestran bajo las plantillas de Cliente. Las traducciones se hacen en
+// Admin → Idiomas → Comunicaciones — Cliente → 🧩 Cliente — Frases.
+var _frasesCom = [];
+var _fraseComActual = null;
+
+function cargarFrasesCom() {
+  fetch('/admin/frases-comunicacion')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _frasesCom = data.frases || [];
+      renderFrasesCom();
+    })
+    .catch(function() {
+      var cont = document.getElementById('lista-frases-com');
+      if (cont) cont.innerHTML = '<p style="color:red;">Error cargando frases.</p>';
+    });
+}
+
+function renderFrasesCom() {
+  var cont = document.getElementById('lista-frases-com');
+  if (!cont) return;
+  if (!_frasesCom.length) { cont.innerHTML = ''; return; }
+  function esc(t) {
+    return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function canalTxt(c) { return c === 'wa' ? '&#128241; WhatsApp' : c === 'ambos' ? '&#128231;&#128241; Email y WhatsApp' : '&#128231; Email'; }
+  var html = '<h2 style="margin-top:20px;margin-bottom:4px;font-size:0.95rem;">&#129513; Frases dentro de los mensajes al cliente <span style="font-size:12px;font-weight:400;color:var(--texto-muted);">(' + _frasesCom.length + ' frases)</span></h2>';
+  html += '<p style="font-size:12px;color:var(--texto-muted);margin:0 0 8px;">Botones, avisos y etiquetas que el sistema coloca dentro de los emails y WhatsApp.</p>';
+  html += '<div class="tabla-envoltura"><table class="tabla-admin" style="font-size:0.85rem;width:100%;">';
+  html += '<thead><tr><th style="text-align:left;">Frase</th><th style="text-align:center;width:170px;">Dónde se usa</th><th style="text-align:right;width:100px;"></th></tr></thead><tbody>';
+  _frasesCom.forEach(function(f) {
+    html += '<tr>';
+    html += '<td><strong>' + esc(f.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + f.clave + '</span></td>';
+    html += '<td style="text-align:center;font-size:12px;">' + canalTxt(f.canal) + '</td>';
+    html += '<td style="text-align:right;"><button class="boton-primario" style="font-size:0.8rem;padding:6px 12px;" data-clave="' + f.clave + '" onclick="abrirModalFraseCom(this.dataset.clave)">&#9998; Editar</button></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  cont.innerHTML = html;
+}
+
+function abrirModalFraseCom(clave) {
+  var f = _frasesCom.find(function(x) { return x.clave === clave; });
+  if (!f) return;
+  _fraseComActual = f;
+  var canal = f.canal === 'wa' ? 'WhatsApp' : f.canal === 'ambos' ? 'Email y WhatsApp' : 'Email';
+  document.getElementById('modal-frase-com-sub').textContent = f.clave + ' · ' + canal;
+  document.getElementById('modal-frase-com-contexto').textContent = f.contexto ? 'Dónde aparece: ' + f.contexto : '';
+  document.getElementById('modal-frase-com-texto').value = f.texto_es || '';
+  document.getElementById('modal-frase-com-ok').style.display = 'none';
+  document.getElementById('modal-frase-com-err').style.display = 'none';
+  document.getElementById('modal-frase-com').classList.remove('oculto');
+  document.getElementById('modal-frase-com').style.display = 'flex';
+}
+
+function cerrarModalFraseCom() {
+  document.getElementById('modal-frase-com').classList.add('oculto');
+  document.getElementById('modal-frase-com').style.display = 'none';
+  _fraseComActual = null;
+}
+
+function guardarFraseCom() {
+  if (!_fraseComActual) return;
+  var texto = document.getElementById('modal-frase-com-texto').value.trim();
+  document.getElementById('modal-frase-com-ok').style.display = 'none';
+  document.getElementById('modal-frase-com-err').style.display = 'none';
+  if (!texto) { document.getElementById('modal-frase-com-err').style.display = 'inline'; return; }
+  fetch('/admin/frases-comunicacion/' + _fraseComActual.clave, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto_es: texto })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d && d.ok) {
+        document.getElementById('modal-frase-com-ok').style.display = 'inline';
+        cargarFrasesCom();
+      } else {
+        document.getElementById('modal-frase-com-err').style.display = 'inline';
+      }
+    })
+    .catch(function() { document.getElementById('modal-frase-com-err').style.display = 'inline'; });
 }
 
 function abrirModalPlantilla(clave) {
