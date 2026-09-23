@@ -5572,18 +5572,22 @@ function generarComFrasesIA() {
         msg.style.color = 'var(--rojo-error)';
         return;
       }
-      if (respuesta.generadas === 0) {
+      var nErr = respuesta.errores ? respuesta.errores.length : 0;
+      if (respuesta.generadas === 0 && nErr === 0) {
         msg.textContent = '✅ Ya estaba todo generado en ' + lang.toUpperCase() + '.';
         msg.style.color = '#2e7d32';
-      } else {
+      } else if (respuesta.generadas > 0) {
         msg.textContent = '✅ ' + respuesta.generadas + ' frase(s) generadas en ' + lang.toUpperCase() + '.';
         msg.style.color = '#2e7d32';
         _comFrasesDatos = null;
         cargarComFrases();
+      } else {
+        msg.textContent = '';
       }
-      if (respuesta.errores && respuesta.errores.length > 0) {
-        console.warn('[GEN17] Errores parciales:', respuesta.errores);
-        msg.textContent += ' (' + respuesta.errores.length + ' con error — ver consola)';
+      if (nErr > 0) {
+        console.warn('[GEN17] Frases no guardadas:', respuesta.errores);
+        msg.textContent += (msg.textContent ? ' ' : '') + '⚠️ ' + nErr + ' frase(s) no se han guardado (sin traducir o con variables alteradas) — vuelve a pulsar Generar.';
+        if (respuesta.generadas === 0) msg.style.color = '#b45309';
       }
     })
     .catch(function() {
