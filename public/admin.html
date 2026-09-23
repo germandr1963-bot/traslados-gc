@@ -553,6 +553,34 @@ table.tabla-precios input {
                     </td>
                   </tr>
 
+
+                  <!-- Sub-fila FRASES (🧩 trozos que van dentro de emails y WhatsApp) -->
+                  <tr style="background:#e8f0fe;cursor:pointer;" onclick="toggleComFrases()">
+                    <td style="padding:10px 20px 10px 32px;font-size:13px;font-weight:700;user-select:none;color:#1a3a6b;">
+                      <span id="com-frases-icono">▶</span>
+                      🧩 Cliente — Frases
+                      <span id="com-frases-num" style="font-size:11px;font-weight:400;color:#5a7ab0;margin-left:6px;"></span>
+                      <span id="com-frases-pct" style="float:right;font-size:12px;font-weight:600;"></span>
+                    </td>
+                  </tr>
+                  <tr id="com-frases-fila" style="display:none;">
+                    <td style="padding:16px 14px 16px 32px;">
+                      <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;">Botones, avisos y etiquetas que el sistema coloca dentro de los emails y WhatsApp. Cada frase indica dónde se usa.</p>
+                      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+                        <select id="select-com-frases-ia" class="campo" style="height:34px;width:auto;"></select>
+                        <button class="boton-costa" onclick="generarComFrasesIA()">🤖 Generar Frases</button>
+                        <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoComFrases()">✅ Aprobar todo</button>
+                        <span id="com-frases-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
+                        <span id="com-frases-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
+                      </div>
+                      <div class="tabla-envoltura">
+                        <table class="tabla-admin" style="font-size:0.85rem;width:100%;">
+                          <thead id="thead-com-frases"></thead>
+                          <tbody id="tbody-com-frases"></tbody>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -561,6 +589,37 @@ table.tabla-precios input {
 
         </tbody>
       </table>
+
+      <!-- Modal edición frase traducida (🧩 Cliente — Frases) -->
+      <div id="modal-com-frase" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;">
+        <div class="tarjeta" style="width:100%;max-width:800px;margin:auto;position:relative;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+              <h3 style="margin:0;" id="modal-com-frase-titulo">Editar traducción</h3>
+              <span id="modal-com-frase-subtitulo" style="font-size:12px;color:var(--texto-muted);font-family:monospace;"></span>
+            </div>
+            <button onclick="cerrarModalComFrase()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--texto-muted);">×</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+            <div style="background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
+              <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;">📋 Original en español</p>
+              <div id="modal-com-frase-ref-texto" style="width:100%;background:#fff;border-radius:4px;padding:10px;box-sizing:border-box;font-family:sans-serif;font-size:14px;line-height:1.6;word-break:break-word;"></div>
+              <p id="modal-com-frase-ref-contexto" style="font-size:12px;color:var(--texto-muted);margin:10px 0 0;"></p>
+            </div>
+            <div>
+              <label class="etiqueta" id="modal-com-frase-campo-label">Traducción</label>
+              <p style="font-size:12px;color:var(--texto-muted);margin:0 0 6px;">Las variables <code>{entre_llaves}</code> no se traducen — déjalas exactamente igual.</p>
+              <textarea id="modal-com-frase-texto" class="campo" style="font-family:monospace;font-size:13px;resize:vertical;width:100%;overflow:hidden;"></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:20px;align-items:center;flex-wrap:wrap;">
+            <button class="boton-primario" onclick="guardarComFrase()">💾 Guardar</button>
+            <button class="boton-secundario" onclick="cerrarModalComFrase()">Cancelar</button>
+            <span id="modal-com-frase-msg-ok" style="font-size:13px;color:green;display:none;">✓ Guardado</span>
+            <span id="modal-com-frase-msg-err" style="font-size:13px;color:red;display:none;">Error al guardar</span>
+          </div>
+        </div>
+      </div>
 
       <!-- Modal edición comunicación traducida -->
       <div id="modal-com-trad" class="oculto" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;">
@@ -4865,6 +4924,8 @@ function cargarComunicacionesCliente() {
       var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
       var el = document.getElementById('bloque-com-cliente-pct');
       if (el) el.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
+      // 🧩 Frases: se cargan después y recalculan el contador y el % global del bloque
+      cargarComFrases();
     })
     .catch(function() {
       var el = document.getElementById('bloque-com-cliente-pct');
@@ -5235,6 +5296,276 @@ function generarComunicacionesClienteIA(tipo, selId, msgId) {
     });
 }
 
+
+// ─── Bloque 3 — Comunicaciones Cliente → 🧩 Frases ───────────────────────────
+// Mismo funcionamiento que Email / WhatsApp: rojo = sin traducción,
+// naranja = generado por IA pendiente de aprobar, verde = aprobado (solo el verde cuenta en el %).
+var _comFrasesDatos = null;
+var _comFraseClaveTrad = null;
+var _comFraseLangTrad = null;
+
+function toggleComFrases() {
+  var fila = document.getElementById('com-frases-fila');
+  var icono = document.getElementById('com-frases-icono');
+  if (!fila) return;
+  var visible = fila.style.display !== 'none';
+  fila.style.display = visible ? 'none' : '';
+  if (icono) icono.textContent = visible ? '▶' : '▼';
+}
+
+function cargarComFrases() {
+  fetch('/admin/frases-comunicacion-traducciones')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _comFrasesDatos = data;
+      renderizarComFrases(data);
+      var sel = document.getElementById('select-com-frases-ia');
+      var langActual = sel ? sel.value : '';
+      if (sel) {
+        sel.innerHTML = (data.idiomas || []).map(function(l) {
+          return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
+        }).join('');
+        if (langActual) sel.value = langActual;
+      }
+      actualizarPctGlobalComCliente();
+    })
+    .catch(function() {
+      var el = document.getElementById('com-frases-pct');
+      if (el) el.textContent = 'Error cargando';
+    });
+}
+
+// % global del bloque = aprobados (Email + WhatsApp + Frases) ÷ total de los tres
+function actualizarPctGlobalComCliente() {
+  if (!_comClienteDatos || !_comFrasesDatos) return;
+  var plantillas = _comClienteDatos.plantillas || [];
+  var idiomas = _comClienteDatos.idiomas || [];
+  var frases = _comFrasesDatos.frases || [];
+  var idiomasF = _comFrasesDatos.idiomas || [];
+  var aprob = plantillas.reduce(function(sum, p) {
+    return sum + idiomas.filter(function(l) { return p.estado_email[l] === 'ok'; }).length
+               + idiomas.filter(function(l) { return p.estado_wa[l] === 'ok'; }).length;
+  }, 0);
+  aprob += frases.reduce(function(sum, f) {
+    return sum + idiomasF.filter(function(l) { return f.estado[l] === 'ok'; }).length;
+  }, 0);
+  var total = plantillas.length * idiomas.length * 2 + frases.length * idiomasF.length;
+  var pct = total > 0 ? Math.round(aprob / total * 100) : 0;
+  var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
+  var elNum = document.getElementById('bloque-com-cliente-num');
+  if (elNum) elNum.textContent = '(' + (plantillas.length * 2 + frases.length) + ' textos)';
+  var el = document.getElementById('bloque-com-cliente-pct');
+  if (el) el.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
+}
+
+function renderizarComFrases(data) {
+  var frases = data.frases || [];
+  var idiomas = data.idiomas || [];
+
+  document.getElementById('thead-com-frases').innerHTML =
+    '<tr><th style="text-align:left;">Frase</th>' +
+    '<th style="text-align:center;">ES</th>' +
+    idiomas.map(function(l) { return '<th style="text-align:center;">' + l.toUpperCase() + '</th>'; }).join('') +
+    '<th style="text-align:center;">Acción</th></tr>';
+
+  var elNum = document.getElementById('com-frases-num');
+  if (elNum) elNum.textContent = '(' + frases.length + ' textos)';
+
+  var aprobados = frases.reduce(function(sum, f) {
+    return sum + idiomas.filter(function(l) { return f.estado[l] === 'ok'; }).length;
+  }, 0);
+  var total = frases.length * idiomas.length;
+  var pct = total > 0 ? Math.round(aprobados / total * 100) : 0;
+  var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
+  var elPct = document.getElementById('com-frases-pct');
+  if (elPct) elPct.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
+
+  function celda(estado) {
+    if (estado === true || estado === 'ok') {
+      return '<td style="text-align:center;"><span style="color:#2e7d32;font-weight:600;" title="Revisado y al día">✓</span></td>';
+    }
+    if (estado === 'ia') {
+      return '<td style="text-align:center;"><span style="color:#b45309;font-weight:600;" title="Generado por IA — pendiente de revisar">✓</span></td>';
+    }
+    return '<td style="text-align:center;"><span style="color:var(--rojo-error);">·</span></td>';
+  }
+  function etiquetaCanal(canal) {
+    var txt = canal === 'wa' ? '📱 WhatsApp' : canal === 'ambos' ? '📧📱 Email y WhatsApp' : '📧 Email';
+    return '<span style="display:inline-block;margin-top:3px;font-size:10px;font-weight:600;color:#1a3a6b;background:#e8f0fe;border-radius:10px;padding:1px 8px;">' + txt + '</span>';
+  }
+  function esc(t) {
+    return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  var html = '';
+  frases.forEach(function(f) {
+    html += '<tr>' +
+      '<td><strong style="font-size:12px;">' + esc(f.texto_es) + '</strong><br>' +
+      '<span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + f.clave + '</span><br>' +
+      etiquetaCanal(f.canal) + '</td>' +
+      celda(f.estado['es']) +
+      idiomas.map(function(l) { return celda(f.estado[l]); }).join('') +
+      '<td style="text-align:center;"><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;" ' +
+      'data-clave="' + f.clave + '" onclick="abrirModalComFraseBtn(this)">✏️ Editar</button></td>' +
+      '</tr>';
+  });
+  document.getElementById('tbody-com-frases').innerHTML = html;
+}
+
+function aprobarTodoComFrases() {
+  var msg = document.getElementById('com-frases-aprobar-msg');
+  var frases = _comFrasesDatos && _comFrasesDatos.frases ? _comFrasesDatos.frases : [];
+  var idiomas = _comFrasesDatos && _comFrasesDatos.idiomas ? _comFrasesDatos.idiomas : [];
+  var pendientes = [];
+  frases.forEach(function(f) {
+    idiomas.forEach(function(lang) {
+      var e = f.estado[lang];
+      if (e && e !== 'ok') pendientes.push({ clave: f.clave, lang: lang });
+    });
+  });
+  if (pendientes.length === 0) {
+    if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ Todo ya estaba aprobado.'; msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 3000); }
+    return;
+  }
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Aprobando ' + pendientes.length + ' traducción(es)…'; msg.style.display = 'inline'; }
+  var promesas = pendientes.map(function(item) {
+    return fetch('/admin/frases-comunicacion/' + item.clave + '/traducciones/' + item.lang, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ solo_aprobar: true })
+    }).then(function(r) { return r.json(); });
+  });
+  Promise.all(promesas).then(function(resultados) {
+    var errores = resultados.filter(function(r) { return !r || !r.ok; });
+    if (errores.length > 0) {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error en ' + errores.length + ' traducción(es).'; msg.style.display = 'inline'; }
+    } else {
+      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ ' + pendientes.length + ' traducción(es) aprobada(s).'; msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 4000); }
+    }
+    _comFrasesDatos = null;
+    cargarComFrases();
+  }).catch(function() {
+    if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de red. Inténtalo de nuevo.'; msg.style.display = 'inline'; }
+  });
+}
+
+function abrirModalComFraseBtn(btn) {
+  var sel = document.getElementById('select-com-frases-ia');
+  var lang = sel ? sel.value : '';
+  if (!lang) { alert('Selecciona primero un idioma en el selector correspondiente.'); return; }
+  abrirModalComFrase(btn.dataset.clave, lang);
+}
+
+function abrirModalComFrase(clave, lang) {
+  _comFraseClaveTrad = clave;
+  _comFraseLangTrad = lang;
+  var f = _comFrasesDatos && _comFrasesDatos.frases.find(function(x) { return x.clave === clave; });
+  var canalTxt = f ? (f.canal === 'wa' ? 'WhatsApp' : f.canal === 'ambos' ? 'Email y WhatsApp' : 'Email') : '';
+  document.getElementById('modal-com-frase-titulo').textContent = f ? f.texto_es : clave;
+  document.getElementById('modal-com-frase-subtitulo').textContent = clave + ' · ' + lang.toUpperCase() + (canalTxt ? ' · ' + canalTxt : '');
+  document.getElementById('modal-com-frase-ref-texto').textContent = f ? f.texto_es : '';
+  document.getElementById('modal-com-frase-ref-contexto').textContent = f && f.contexto ? 'Dónde aparece: ' + f.contexto : '';
+  document.getElementById('modal-com-frase-campo-label').textContent = 'Traducción (' + lang.toUpperCase() + ')';
+  document.getElementById('modal-com-frase-msg-ok').style.display = 'none';
+  document.getElementById('modal-com-frase-msg-err').style.display = 'none';
+  var textarea = document.getElementById('modal-com-frase-texto');
+  textarea.value = '';
+  fetch('/admin/frases-comunicacion/' + clave + '/traducciones')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var trad = (d.traducciones || []).find(function(t) { return t.lang_code === lang; });
+      textarea.value = trad && trad.texto ? trad.texto : '';
+      textarea.style.height = 'auto';
+      textarea.style.height = (textarea.scrollHeight + 20) + 'px';
+    });
+  document.getElementById('modal-com-frase').classList.remove('oculto');
+}
+
+function cerrarModalComFrase() {
+  document.getElementById('modal-com-frase').classList.add('oculto');
+  _comFraseClaveTrad = null;
+  _comFraseLangTrad = null;
+}
+
+// Guardar = guarda la traducción y la marca aprobada (verde), igual que en Email / WhatsApp
+function guardarComFrase() {
+  if (!_comFraseClaveTrad || !_comFraseLangTrad) return;
+  var texto = document.getElementById('modal-com-frase-texto').value.trim();
+  document.getElementById('modal-com-frase-msg-ok').style.display = 'none';
+  document.getElementById('modal-com-frase-msg-err').style.display = 'none';
+  if (!texto) { document.getElementById('modal-com-frase-msg-err').style.display = 'inline'; return; }
+  var clave = _comFraseClaveTrad, lang = _comFraseLangTrad;
+  fetch('/admin/frases-comunicacion/' + clave + '/traducciones/' + lang, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto: texto, generado_por_ia: false })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) { document.getElementById('modal-com-frase-msg-err').style.display = 'inline'; return; }
+      return fetch('/admin/frases-comunicacion/' + clave + '/traducciones/' + lang, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ solo_aprobar: true })
+      });
+    })
+    .then(function(r) { if (r) return r.json(); })
+    .then(function(d) {
+      if (d && d.ok) {
+        document.getElementById('modal-com-frase-msg-ok').style.display = 'inline';
+        _comFrasesDatos = null;
+        cargarComFrases();
+      } else if (d) {
+        document.getElementById('modal-com-frase-msg-err').style.display = 'inline';
+      }
+    })
+    .catch(function() { document.getElementById('modal-com-frase-msg-err').style.display = 'inline'; });
+}
+
+function generarComFrasesIA() {
+  var lang = document.getElementById('select-com-frases-ia').value;
+  var msg = document.getElementById('com-frases-msg-ia');
+  if (!lang) {
+    msg.textContent = 'Selecciona un idioma.';
+    msg.style.color = 'var(--rojo-error)';
+    msg.style.display = 'inline';
+    setTimeout(function() { msg.style.display = 'none'; }, 3000);
+    return;
+  }
+  msg.textContent = '🤖 Generando con IA, puede tardar unos segundos...';
+  msg.style.color = 'var(--acento)';
+  msg.style.display = 'inline';
+  fetch('/admin/frases-comunicacion/generar-ia/' + lang, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(respuesta) {
+      if (!respuesta.ok) {
+        msg.textContent = '❌ Error: ' + (respuesta.error || 'Error al generar');
+        msg.style.color = 'var(--rojo-error)';
+        return;
+      }
+      if (respuesta.generadas === 0) {
+        msg.textContent = '✅ Ya estaba todo generado en ' + lang.toUpperCase() + '.';
+        msg.style.color = '#2e7d32';
+      } else {
+        msg.textContent = '✅ ' + respuesta.generadas + ' frase(s) generadas en ' + lang.toUpperCase() + '.';
+        msg.style.color = '#2e7d32';
+        _comFrasesDatos = null;
+        cargarComFrases();
+      }
+      if (respuesta.errores && respuesta.errores.length > 0) {
+        console.warn('[GEN17] Errores parciales:', respuesta.errores);
+        msg.textContent += ' (' + respuesta.errores.length + ' con error — ver consola)';
+      }
+    })
+    .catch(function() {
+      msg.textContent = '❌ No se pudo conectar con la IA. Inténtalo de nuevo.';
+      msg.style.color = 'var(--rojo-error)';
+    });
+}
 
 function abrirEditorTexto(textoId) {
   var texto = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
