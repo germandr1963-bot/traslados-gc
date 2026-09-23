@@ -739,7 +739,7 @@ Reglas estrictas que nunca puedes romper:
 1. Las variables entre llaves como {nombre_cliente}, {numero_reserva}, {origen}, {destino}, {fecha}, {hora}, {categoria}, {precio}, {importe}, {importe_deposito}, {horas_cancelacion}, {fecha_limite_cancelacion}, {numero_factura}, {url_pago}, {url_portal}, {url_valoracion}, {password_temporal}, {extras}, {aviso_deposito}, {mensaje}, {mensaje_libre} se copian exactamente igual, sin traducir, sin modificar, sin mover.
 2. El formato de WhatsApp se conserva: los *asteriscos* para negrita, los _subrayados_ para cursiva, los saltos de línea con \\n, los emojis — todo igual.
 3. El saludo siempre empieza con el equivalente nativo de "Hola," en ${nombreIdioma} + *{nombre_cliente}* 👋 — solo se traduce "Hola", el resto igual.
-4. El cierre siempre termina con el equivalente nativo de "Un saludo cordial," en ${nombreIdioma} + 🙏 + \\n*El equipo de Traslados GC* — el nombre de la empresa siempre en español.
+4. El cierre siempre termina con el equivalente nativo de "Un saludo cordial," en ${nombreIdioma} + 🙏 + \\n*[equivalente nativo de "El equipo de Traslados GC" en ${nombreIdioma}]* — solo se traduce "El equipo de"; el nombre de la empresa "Traslados GC" nunca se traduce.
 5. No traduzcas literalmente — escribe de forma nativa y conversacional en ${nombreIdioma}, como lo haría una empresa local de ese país en WhatsApp.
 6. Los emojis de contexto (📍, 🏁, 📅, ✅, ❌, etc.) se conservan en su posición original.
 7. Si el texto original es null o está vacío, devuelve null — no generes nada.
