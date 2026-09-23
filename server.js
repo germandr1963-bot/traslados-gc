@@ -13865,6 +13865,17 @@ function requierePuenteWhatsapp(req, res, next) {
 app.get('/api/whatsapp/plantilla/:clave', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   // 'lang' (opcional) = idioma del cliente; no se usa como variable del texto
   const { lang, ...varsPlantilla } = req.query;
+  // Acuse de recibo: puente.js no envía los extras, así que el servidor los añade
+  // (en el idioma del cliente) para que el hueco {extras} no salga vacío en el WhatsApp.
+  if (req.params.clave === 'cliente_acuse_recibo' && varsPlantilla.extras === undefined && varsPlantilla.numero_reserva) {
+    try {
+      const rv = await pool.query('SELECT id FROM reservas WHERE numero_reserva = $1', [varsPlantilla.numero_reserva]);
+      varsPlantilla.extras = rv.rows.length ? await formatearExtrasWhatsapp(rv.rows[0].id, lang || 'es') : '';
+    } catch (eEx) {
+      console.warn('Extras para el WhatsApp del acuse:', eEx.message);
+      varsPlantilla.extras = '';
+    }
+  }
   const resultado = await obtenerPlantilla(req.params.clave, varsPlantilla, lang);
   if (!resultado) return res.json({ ok: false });
   res.json({ ok: true, whatsapp: resultado.whatsapp });
