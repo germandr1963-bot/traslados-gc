@@ -13649,7 +13649,9 @@ function requierePuenteWhatsapp(req, res, next) {
 
 // Endpoint para que puente.js pueda leer plantillas de comunicacion
 app.get('/api/whatsapp/plantilla/:clave', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
-  const resultado = await obtenerPlantilla(req.params.clave, req.query);
+  // 'lang' (opcional) = idioma del cliente; no se usa como variable del texto
+  const { lang, ...varsPlantilla } = req.query;
+  const resultado = await obtenerPlantilla(req.params.clave, varsPlantilla, lang);
   if (!resultado) return res.json({ ok: false });
   res.json({ ok: true, whatsapp: resultado.whatsapp });
 }));
@@ -13679,7 +13681,7 @@ app.get('/api/whatsapp/choferes-disponibles', requierePuenteWhatsapp, asyncHandl
 app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino,
-            r.nombre_cliente, r.telefono_cliente,
+            r.nombre_cliente, r.telefono_cliente, r.lang_cliente,
             cv.nombre AS categoria_nombre
      FROM reservas r
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
@@ -13694,7 +13696,7 @@ app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandle
 // seguimos buscando chofer.
 app.get('/api/whatsapp/reservas-15min-sin-respuesta', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.telefono_cliente, r.email_cliente
+    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.telefono_cliente, r.email_cliente, r.lang_cliente
      FROM reservas r
      WHERE r.estado_aviso_whatsapp = 'enviado'
        AND r.whatsapp_aviso_enviado_en IS NOT NULL
@@ -13709,7 +13711,7 @@ app.get('/api/whatsapp/reservas-15min-sin-respuesta', requierePuenteWhatsapp, as
 // aceptado. El puente las usa para avisar al cliente de la cancelación.
 app.get('/api/whatsapp/reservas-24h-sin-respuesta', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.telefono_cliente, r.email_cliente
+    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.telefono_cliente, r.email_cliente, r.lang_cliente
      FROM reservas r
      WHERE r.estado_aviso_whatsapp IN ('enviado', 'sin_respuesta')
        AND r.creado_en <= NOW() - INTERVAL '24 hours'
