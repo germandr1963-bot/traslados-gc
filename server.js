@@ -730,6 +730,43 @@ async function initSchema() {
     );
   }
 
+  // Limpieza: estas 27 frases estuvieron un tiempo en Textos de interfaz (bloque
+  // "Comunicaciones cliente — frases"). Ahora viven en frases_comunicacion y se
+  // gestionan desde Comunicaciones. Se borran solo estas claves exactas de ese bloque
+  // (sus traducciones se borran solas por ON DELETE CASCADE).
+  await pool.query(
+    `DELETE FROM textos_interfaz WHERE modulo = $1 AND clave = ANY($2::text[])`,
+    ['Comunicaciones cliente \u2014 frases', [
+    'com_boton_pagar_deposito',
+    'com_sin_enlace_pago',
+    'com_boton_valorar',
+    'com_cancel_email_fuera_plazo',
+    'com_cancel_email_dentro_plazo_deposito',
+    'com_cancel_email_dentro_plazo',
+    'com_cancel_wa_fuera_plazo',
+    'com_cancel_wa_dentro_plazo',
+    'com_extras_titulo',
+    'com_extras_incluido',
+    'com_extras_a_pagar',
+    'com_extras_total',
+    'com_extras_nota',
+    'com_resumen_ruta',
+    'com_resumen_fecha',
+    'com_resumen_hora_recogida',
+    'com_resumen_pasajeros',
+    'com_resumen_categoria',
+    'com_resumen_precio_estimado',
+    'com_resumen_dir_recogida',
+    'com_resumen_dir_destino',
+    'com_resumen_vuelo',
+    'com_resumen_llegada',
+    'com_resumen_barco',
+    'com_resumen_atraque',
+    'com_resumen_extras',
+    'com_resumen_notas'
+    ]]
+  );
+
   // ─── Textos de la página de inicio (index.ejs) ───────────────────────────
   const TEXTOS_HOME = [
     { clave: 'home_page_title',          contexto: 'Título de la pestaña del navegador en la página de inicio', es: 'Traslados GC — Traslados de larga distancia en Gran Canaria', en: 'Traslados GC — Long-distance transfers in Gran Canaria' },
@@ -2484,6 +2521,11 @@ Pulsa el botón para crear una nueva contraseña:
       [f.clave, f.canal, f.contexto, f.es, f.orden]
     );
   }
+  // Marca "desactualizado": se activa cuando se cambia el español después de traducir.
+  // El cliente sigue recibiendo la traducción aprobada; en Idiomas sale en rojo para ajustarla.
+  await pool.query(`ALTER TABLE plantillas_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado_email BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE plantillas_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado_wa BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE frases_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado BOOLEAN DEFAULT FALSE`);
   console.log('Frases de comunicaci\u00f3n cargadas.');
 
 
@@ -13937,6 +13979,10 @@ app.get('/admin/plantillas-comunicacion/:clave', requireAdmin, asyncHandler(asyn
 // PUT: guardar cambios en una plantilla
 app.put('/admin/plantillas-comunicacion/:clave', requireAdmin, asyncHandler(async (req, res) => {
   const { asunto_email, cuerpo_email, cuerpo_whatsapp, nombre } = req.body;
+  const anterior = await pool.query(
+    'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion WHERE clave = $1',
+    [req.params.clave]
+  );
   const result = await pool.query(
     `UPDATE plantillas_comunicacion
      SET asunto_email = $1, cuerpo_email = $2, cuerpo_whatsapp = $3, nombre = $4, actualizado_en = NOW()
@@ -13945,6 +13991,28 @@ app.put('/admin/plantillas-comunicacion/:clave', requireAdmin, asyncHandler(asyn
     [asunto_email, cuerpo_email, cuerpo_whatsapp || null, nombre, req.params.clave]
   );
   if (!result.rows.length) return res.status(404).json({ error: 'Plantilla no encontrada.' });
+  // Si cambió el español, las traducciones de ese canal pasan a "desactualizado" (rojo en Idiomas).
+  // Cambiar solo el nombre interno no marca nada.
+  if (anterior.rows.length) {
+    const a = anterior.rows[0];
+    const n = result.rows[0];
+    const cambioEmail = (a.asunto_email || '') !== (n.asunto_email || '') || (a.cuerpo_email || '') !== (n.cuerpo_email || '');
+    const cambioWa = (a.cuerpo_whatsapp || '') !== (n.cuerpo_whatsapp || '');
+    if (cambioEmail) {
+      await pool.query(
+        `UPDATE plantillas_comunicacion_traducciones SET desactualizado_email = TRUE
+         WHERE plantilla_clave = $1 AND cuerpo_email IS NOT NULL AND cuerpo_email <> ''`,
+        [req.params.clave]
+      );
+    }
+    if (cambioWa) {
+      await pool.query(
+        `UPDATE plantillas_comunicacion_traducciones SET desactualizado_wa = TRUE
+         WHERE plantilla_clave = $1 AND cuerpo_whatsapp IS NOT NULL AND cuerpo_whatsapp <> ''`,
+        [req.params.clave]
+      );
+    }
+  }
   res.json({ ok: true, plantilla: result.rows[0] });
 }));
 
@@ -13971,7 +14039,7 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
   );
   const traducciones = await pool.query(
     `SELECT plantilla_clave, lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp,
-            revisado_email, revisado_wa
+            revisado_email, revisado_wa, desactualizado_email, desactualizado_wa
      FROM plantillas_comunicacion_traducciones`
   );
 
@@ -13983,7 +14051,9 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
       tieneEmail:    !!(t.cuerpo_email && t.cuerpo_email.trim()),
       tieneWa:       !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()),
       revisadoEmail: !!t.revisado_email,
-      revisadoWa:    !!t.revisado_wa
+      revisadoWa:    !!t.revisado_wa,
+      desactEmail:   !!t.desactualizado_email,
+      desactWa:      !!t.desactualizado_wa
     };
   }
 
@@ -13996,6 +14066,8 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
       const t = mapaTrads[p.clave] && mapaTrads[p.clave][lang];
       if (!t || !t.tieneEmail) {
         estadoEmail[lang] = null;
+      } else if (t.desactEmail) {
+        estadoEmail[lang] = 'desactualizado';
       } else if (t.revisadoEmail) {
         estadoEmail[lang] = 'ok';
       } else {
@@ -14003,6 +14075,8 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
       }
       if (!t || !t.tieneWa) {
         estadoWa[lang] = null;
+      } else if (t.desactWa) {
+        estadoWa[lang] = 'desactualizado';
       } else if (t.revisadoWa) {
         estadoWa[lang] = 'ok';
       } else {
@@ -14051,7 +14125,7 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
 
   // Leer qué traducciones ya existen para este idioma
   const yaExisten = await pool.query(
-    `SELECT plantilla_clave, cuerpo_email, cuerpo_whatsapp
+    `SELECT plantilla_clave, cuerpo_email, cuerpo_whatsapp, desactualizado_email, desactualizado_wa
      FROM plantillas_comunicacion_traducciones
      WHERE lang_code = $1`,
     [lang]
@@ -14059,12 +14133,12 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
   const mapaExistentes = {};
   for (const t of yaExisten.rows) {
     mapaExistentes[t.plantilla_clave] = {
-      tieneEmail: !!(t.cuerpo_email && t.cuerpo_email.trim()),
-      tieneWa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim())
+      tieneEmail: !!(t.cuerpo_email && t.cuerpo_email.trim()) && !t.desactualizado_email,
+      tieneWa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()) && !t.desactualizado_wa
     };
   }
 
-  // Filtrar solo las que faltan según el tipo solicitado
+  // Filtrar las que faltan o están desactualizadas (español cambiado) según el tipo solicitado
   const pendientes = plantillas.rows.filter(function(p) {
     const existente = mapaExistentes[p.clave];
     if (tipo === 'email') {
@@ -14134,6 +14208,7 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
                  cuerpo_email = EXCLUDED.cuerpo_email,
                  generado_por_ia = TRUE,
                  revisado_email = FALSE,
+                 desactualizado_email = FALSE,
                  actualizado_en = NOW()`,
           [p.clave, lang, parsed.asunto_email || null, parsed.cuerpo_email || null]
         );
@@ -14146,6 +14221,7 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
              SET cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp,
                  generado_por_ia = TRUE,
                  revisado_wa = FALSE,
+                 desactualizado_wa = FALSE,
                  actualizado_en = NOW()`,
           [p.clave, lang, parsed.cuerpo_whatsapp || null]
         );
@@ -14171,14 +14247,14 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
     if (tipo === 'wa') {
       await pool.query(
         `UPDATE plantillas_comunicacion_traducciones
-         SET revisado_wa = TRUE, actualizado_en = NOW()
+         SET revisado_wa = TRUE, desactualizado_wa = FALSE, actualizado_en = NOW()
          WHERE plantilla_clave = $1 AND lang_code = $2`,
         [clave, lang]
       );
     } else {
       await pool.query(
         `UPDATE plantillas_comunicacion_traducciones
-         SET revisado_email = TRUE, actualizado_en = NOW()
+         SET revisado_email = TRUE, desactualizado_email = FALSE, actualizado_en = NOW()
          WHERE plantilla_clave = $1 AND lang_code = $2`,
         [clave, lang]
       );
@@ -14218,12 +14294,21 @@ app.get('/admin/frases-comunicacion', requireAdmin, asyncHandler(async (req, res
 app.put('/admin/frases-comunicacion/:clave', requireAdmin, asyncHandler(async (req, res) => {
   const { texto_es } = req.body;
   if (!texto_es || !texto_es.trim()) return res.status(400).json({ error: 'El texto no puede estar vacío.' });
+  const anterior = await pool.query('SELECT texto_es FROM frases_comunicacion WHERE clave = $1', [req.params.clave]);
   const result = await pool.query(
     `UPDATE frases_comunicacion SET texto_es = $1, actualizado_en = NOW()
      WHERE clave = $2 RETURNING *`,
     [texto_es.trim(), req.params.clave]
   );
   if (!result.rows.length) return res.status(404).json({ error: 'Frase no encontrada.' });
+  // Si cambió el español, sus traducciones pasan a "desactualizado" (rojo en Idiomas)
+  if (anterior.rows.length && (anterior.rows[0].texto_es || '') !== result.rows[0].texto_es) {
+    await pool.query(
+      `UPDATE frases_comunicacion_traducciones SET desactualizado = TRUE
+       WHERE frase_clave = $1 AND texto IS NOT NULL AND texto <> ''`,
+      [req.params.clave]
+    );
+  }
   res.json({ ok: true, frase: result.rows[0] });
 }));
 
@@ -14233,12 +14318,12 @@ app.get('/admin/frases-comunicacion-traducciones', requireAdmin, asyncHandler(as
     'SELECT clave, canal, contexto, texto_es FROM frases_comunicacion ORDER BY orden, clave'
   );
   const traducciones = await pool.query(
-    'SELECT frase_clave, lang_code, texto, revisado FROM frases_comunicacion_traducciones'
+    'SELECT frase_clave, lang_code, texto, revisado, desactualizado FROM frases_comunicacion_traducciones'
   );
   const mapa = {};
   for (const t of traducciones.rows) {
     if (!mapa[t.frase_clave]) mapa[t.frase_clave] = {};
-    mapa[t.frase_clave][t.lang_code] = { tiene: !!(t.texto && t.texto.trim()), revisado: !!t.revisado };
+    mapa[t.frase_clave][t.lang_code] = { tiene: !!(t.texto && t.texto.trim()), revisado: !!t.revisado, desact: !!t.desactualizado };
   }
   const idiomas = IDIOMAS_TRADUCIBLES; // excluye español — es el original
   const lista = frases.rows.map(function(f) {
@@ -14246,6 +14331,7 @@ app.get('/admin/frases-comunicacion-traducciones', requireAdmin, asyncHandler(as
     for (const lang of idiomas) {
       const t = mapa[f.clave] && mapa[f.clave][lang];
       if (!t || !t.tiene) estado[lang] = null;
+      else if (t.desact) estado[lang] = 'desactualizado';
       else if (t.revisado) estado[lang] = 'ok';
       else estado[lang] = 'ia';
     }
@@ -14272,7 +14358,7 @@ app.put('/admin/frases-comunicacion/:clave/traducciones/:lang', requireAdmin, as
   if (solo_aprobar) {
     await pool.query(
       `UPDATE frases_comunicacion_traducciones
-       SET revisado = TRUE, actualizado_en = NOW()
+       SET revisado = TRUE, desactualizado = FALSE, actualizado_en = NOW()
        WHERE frase_clave = $1 AND lang_code = $2`,
       [clave, lang]
     );
@@ -14305,11 +14391,12 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
     'SELECT clave, contexto, texto_es FROM frases_comunicacion ORDER BY orden, clave'
   );
   const yaExisten = await pool.query(
-    'SELECT frase_clave, texto FROM frases_comunicacion_traducciones WHERE lang_code = $1',
+    'SELECT frase_clave, texto, desactualizado FROM frases_comunicacion_traducciones WHERE lang_code = $1',
     [lang]
   );
+  // "tiene" = traducción existente y al día; las desactualizadas se vuelven a generar
   const tiene = {};
-  for (const t of yaExisten.rows) tiene[t.frase_clave] = !!(t.texto && t.texto.trim());
+  for (const t of yaExisten.rows) tiene[t.frase_clave] = !!(t.texto && t.texto.trim()) && !t.desactualizado;
   const pendientes = frases.rows.filter(function(f) { return !tiene[f.clave] && f.texto_es && f.texto_es.trim(); });
 
   if (pendientes.length === 0) return res.json({ ok: true, generadas: 0, errores: [] });
@@ -14359,7 +14446,7 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
          (frase_clave, lang_code, texto, generado_por_ia, revisado, actualizado_en)
        VALUES ($1, $2, $3, TRUE, FALSE, NOW())
        ON CONFLICT (frase_clave, lang_code) DO UPDATE
-         SET texto = EXCLUDED.texto, generado_por_ia = TRUE, revisado = FALSE, actualizado_en = NOW()`,
+         SET texto = EXCLUDED.texto, generado_por_ia = TRUE, revisado = FALSE, desactualizado = FALSE, actualizado_en = NOW()`,
       [f.clave, lang, traduccion.trim()]
     );
     generadas++;
