@@ -759,7 +759,7 @@ Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin t
 // Traducción de frases cortas dentro de emails y WhatsApp al cliente — botones, avisos, etiquetas
 // Endpoint: POST /admin/frases-comunicacion/generar-ia/:lang
 // Botón admin: 🤖 Generar Frases (Admin → Idiomas → Comunicaciones Cliente → 🧩 Cliente — Frases)
-// Línea server.js: ~14294
+// Línea server.js: ~14380
 function GENERADOR_FRASES_COMUNICACIONES(nombreIdioma, items) {
   const lista = items.map(function(f) {
     return '- clave: ' + f.clave + '\n  contexto: ' + (f.contexto || '') + '\n  texto original: ' + f.texto_es;

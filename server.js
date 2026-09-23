@@ -14401,7 +14401,10 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
 
   if (pendientes.length === 0) return res.json({ ok: true, generadas: 0, errores: [] });
 
-  const nombreIdioma = await getNombreIdioma(lang);
+  // Nombre del idioma en español ("ruso", "inglés"...): el Generador 17 está escrito en español
+  // y con frases tan cortas el nombre nativo del idioma (p. ej. en cirílico) puede confundir a la IA.
+  const nombreIdioma = NOMBRE_IDIOMA_ES[lang] || await getNombreIdioma(lang);
+  console.log('[GEN17] ' + lang + ': idioma enviado a la IA = ' + nombreIdioma + ', frases pendientes = ' + pendientes.length);
   const prompt = iaPrompts.GENERADOR_FRASES_COMUNICACIONES(nombreIdioma, pendientes);
 
   let parsed;
@@ -14458,7 +14461,7 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
     return typeof t === 'string' && t.trim() === (f.texto_es || '').trim();
   }).length;
   if (pendientes.length >= 3 && iguales > pendientes.length / 2) {
-    console.error('[GEN17] ' + lang + ': la IA devolvió ' + iguales + ' de ' + pendientes.length + ' frases sin traducir. No se guarda nada.');
+    console.error('[GEN17] ' + lang + ': la IA devolvió ' + iguales + ' de ' + pendientes.length + ' frases sin traducir. No se guarda nada. Idioma enviado: ' + nombreIdioma);
     return res.json({ ok: false, error: 'La IA devolvió el texto en español sin traducir. No se ha guardado nada — vuelve a pulsar Generar.' });
   }
 
