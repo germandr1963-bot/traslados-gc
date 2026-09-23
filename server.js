@@ -730,6 +730,46 @@ async function initSchema() {
     );
   }
 
+  // ─── Frases fijas de los mensajes al cliente (traducibles desde Idiomas) ───
+  const TEXTOS_COMUNICACIONES_CLIENTE = [
+    { clave: 'com_boton_pagar_deposito', modulo: 'Comunicaciones cliente — frases', contexto: 'Texto del botón de pago del depósito en los emails de confirmación y de enlace de pago. Mantener {importe} tal cual, sin traducir', es: 'Pagar depósito de {importe} €' },
+    { clave: 'com_sin_enlace_pago', modulo: 'Comunicaciones cliente — frases', contexto: 'Frase que sustituye al botón de pago cuando no se pudo generar el enlace de pago', es: 'Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.' },
+    { clave: 'com_boton_valorar', modulo: 'Comunicaciones cliente — frases', contexto: 'Texto del botón del email que invita al cliente a valorar su traslado', es: 'Valorar mi traslado' },
+    { clave: 'com_cancel_email_fuera_plazo', modulo: 'Comunicaciones cliente — frases', contexto: 'Aviso en el email de cancelación: cancelada fuera de plazo, depósito retenido', es: 'La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía ha sido retenido según nuestra política de cancelación.' },
+    { clave: 'com_cancel_email_dentro_plazo_deposito', modulo: 'Comunicaciones cliente — frases', contexto: 'Aviso en el email de cancelación: cancelada dentro de plazo, se devolverá el depósito', es: 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.' },
+    { clave: 'com_cancel_email_dentro_plazo', modulo: 'Comunicaciones cliente — frases', contexto: 'Aviso en el email de cancelación cuando no había depósito pagado', es: 'La cancelación se ha realizado dentro del plazo establecido.' },
+    { clave: 'com_cancel_wa_fuera_plazo', modulo: 'Comunicaciones cliente — frases', contexto: 'Aviso en el WhatsApp de cancelación: cancelada fuera de plazo, depósito retenido', es: 'La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido.' },
+    { clave: 'com_cancel_wa_dentro_plazo', modulo: 'Comunicaciones cliente — frases', contexto: 'Aviso en el WhatsApp de cancelación: cancelada dentro de plazo, se devolverá el depósito', es: 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve.' },
+    { clave: 'com_extras_titulo', modulo: 'Comunicaciones cliente — frases', contexto: 'Título del bloque de extras en emails y WhatsApp al cliente', es: 'Extras seleccionados:' },
+    { clave: 'com_extras_incluido', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta junto a un extra gratuito en emails y WhatsApp', es: 'incluido' },
+    { clave: 'com_extras_a_pagar', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta junto al precio de un extra de pago, ej: "5.00 € — a pagar al conductor"', es: 'a pagar al conductor' },
+    { clave: 'com_extras_total', modulo: 'Comunicaciones cliente — frases', contexto: 'Línea del total de extras de pago. Mantener {total} tal cual, sin traducir', es: 'Total extras a pagar al conductor: {total} €' },
+    { clave: 'com_extras_nota', modulo: 'Comunicaciones cliente — frases', contexto: 'Nota bajo el total de extras en el email', es: 'Este importe se abona directamente al conductor al finalizar el servicio.' },
+    { clave: 'com_resumen_ruta', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Ruta' },
+    { clave: 'com_resumen_fecha', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Fecha' },
+    { clave: 'com_resumen_hora_recogida', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Hora de recogida' },
+    { clave: 'com_resumen_pasajeros', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Pasajeros' },
+    { clave: 'com_resumen_categoria', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Categoría' },
+    { clave: 'com_resumen_precio_estimado', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Precio estimado' },
+    { clave: 'com_resumen_dir_recogida', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Dirección de recogida' },
+    { clave: 'com_resumen_dir_destino', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Dirección de destino' },
+    { clave: 'com_resumen_vuelo', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Vuelo' },
+    { clave: 'com_resumen_llegada', modulo: 'Comunicaciones cliente — frases', contexto: 'Palabra tras el número de vuelo, ej: "IB1234 · Llegada 10:30"', es: 'Llegada' },
+    { clave: 'com_resumen_barco', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Barco' },
+    { clave: 'com_resumen_atraque', modulo: 'Comunicaciones cliente — frases', contexto: 'Palabra tras el nombre del barco, ej: "Volcán de Tijarafe · Atraque 10:30"', es: 'Atraque' },
+    { clave: 'com_resumen_extras', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Extras' },
+    { clave: 'com_resumen_notas', modulo: 'Comunicaciones cliente — frases', contexto: 'Etiqueta del resumen de reserva en el email de reserva actualizada', es: 'Notas' }
+  ];
+
+  for (const t of TEXTOS_COMUNICACIONES_CLIENTE) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (clave) DO UPDATE SET modulo = $2, contexto = $3, texto_es = $4`,
+      [t.clave, t.modulo, t.contexto, t.es]
+    );
+  }
+
   // ─── Textos de la página de inicio (index.ejs) ───────────────────────────
   const TEXTOS_HOME = [
     { clave: 'home_page_title',          contexto: 'Título de la pestaña del navegador en la página de inicio', es: 'Traslados GC — Traslados de larga distancia en Gran Canaria', en: 'Traslados GC — Long-distance transfers in Gran Canaria' },
@@ -1981,6 +2021,35 @@ Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n✅ Hemos revisado y aprobado los cambios en tu reserva *{numero_reserva}*.\n\n🔍 Accede a tu portal para ver todos los detalles actualizados.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+    { clave: 'cliente_problema_pago', nombre: 'Problema con el pago del dep\u00f3sito', categoria: 'cliente',
+      asunto_email: 'Problema con el pago \u2014 {numero_reserva}',
+      cuerpo_email: `
+Hola, <strong>{nombre_cliente}</strong> 👋
+
+⚠️ No hemos podido procesar el pago del depósito para tu reserva <strong>{numero_reserva}</strong>.
+<div class="caja-amarilla">Por favor, contacta con nosotros por WhatsApp para resolver el pago y confirmar tu traslado.</div>
+<span style="font-size:13px;color:#888;">Si crees que es un error, puedes intentarlo de nuevo.</span>
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
+`,
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n⚠️ No hemos podido procesar el pago del depósito para tu reserva *{numero_reserva}*.\n\nPor favor, contacta con nosotros por WhatsApp para resolver el pago y confirmar tu traslado.\n\nSi crees que es un error, puedes intentarlo de nuevo.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+    { clave: 'cliente_reserva_actualizada', nombre: 'Reserva actualizada por el equipo', categoria: 'cliente',
+      asunto_email: '\u270f\ufe0f Tu reserva {numero_reserva} ha sido actualizada',
+      cuerpo_email: `
+Hola, <strong>{nombre_cliente}</strong> 👋
+
+✏️ Tu reserva <strong>{numero_reserva}</strong> ha sido actualizada por nuestro equipo.
+
+<strong>Resumen actualizado:</strong>
+<div class="info-box">{resumen}</div>
+🔍 Si tienes alguna pregunta, accede a tu portal:
+<a href="{url_portal}" style="color:#C1502E;">{url_portal}</a>
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
+`,
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n✏️ Tu reserva *{numero_reserva}* ha sido actualizada por nuestro equipo.\n\n🔍 Si tienes alguna pregunta, accede a tu portal:\n{url_portal}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_mensaje_admin', nombre: 'Mensaje del equipo al cliente', categoria: 'cliente',
       asunto_email: '\ud83d\udcac Tienes un mensaje sobre tu reserva {numero_reserva}',
       cuerpo_email: `
