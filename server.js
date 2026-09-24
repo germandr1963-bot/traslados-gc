@@ -1248,6 +1248,41 @@ async function initSchema() {
     );
   }
 
+  // Página de valoración (/valorar). ON CONFLICT DO NOTHING: se crean la primera vez
+  // y nunca sobrescriben lo editado en el Admin.
+  const TEXTOS_PAGINA_VALORACION = [
+    { clave: 'val_pestana',              contexto: 'Título de la pestaña del navegador en la página de valoración (el programa añade " — Traslados GC")', es: 'Valora tu traslado' },
+    { clave: 'val_descripcion',          contexto: 'Descripción de la página de valoración al compartir el enlace (vista previa en WhatsApp, redes)', es: 'Cuéntanos cómo fue tu experiencia. Tu opinión nos ayuda a mejorar.' },
+    { clave: 'val_migas_inicio',         contexto: 'Enlace "Inicio" arriba de la página de valoración (ruta de navegación)', es: 'Inicio' },
+    { clave: 'val_migas_actual',         contexto: 'Nombre de la página en la ruta de navegación, arriba: Inicio › Valorar traslado', es: 'Valorar traslado' },
+    { clave: 'val_cargando',             contexto: 'Texto mientras se carga la página de valoración', es: 'Cargando...' },
+    { clave: 'val_titulo',               contexto: 'Título grande de la página de valoración (el programa añade el emoji del taxi detrás)', es: '¿Qué tal tu traslado?' },
+    { clave: 'val_subtitulo',            contexto: 'Frase bajo el título de la página de valoración', es: 'Tu valoración es opcional y nos ayuda a mejorar.' },
+    { clave: 'val_etiqueta_reserva',     contexto: 'Palabra delante del número de reserva, bajo la ruta (ej: Reserva ABC123)', es: 'Reserva' },
+    { clave: 'val_etiqueta_conductor',   contexto: 'Etiqueta sobre las estrellas para valorar al conductor', es: 'Tu conductor' },
+    { clave: 'val_etiqueta_servicio',    contexto: 'Etiqueta sobre las estrellas para valorar el servicio', es: 'El servicio' },
+    { clave: 'val_etiqueta_comentario',  contexto: 'Etiqueta sobre la caja de comentario', es: 'Comentario (opcional)' },
+    { clave: 'val_placeholder_comentario', contexto: 'Texto gris de ejemplo dentro de la caja de comentario vacía', es: 'Cuéntanos tu experiencia' },
+    { clave: 'val_btn_omitir',           contexto: 'Botón para no valorar', es: 'Omitir' },
+    { clave: 'val_btn_enviar',           contexto: 'Botón para enviar la valoración', es: 'Enviar valoración' },
+    { clave: 'val_btn_enviando',         contexto: 'Texto del botón mientras se envía la valoración', es: 'Enviando...' },
+    { clave: 'val_gracias_titulo',       contexto: 'Título tras enviar u omitir la valoración', es: '¡Gracias por tu valoración!' },
+    { clave: 'val_gracias_texto',        contexto: 'Texto tras enviar u omitir la valoración', es: 'Tu opinión nos ayuda a seguir mejorando el servicio.' },
+    { clave: 'val_btn_inicio',           contexto: 'Botón para ir a la portada tras valorar', es: 'Ir al inicio' },
+    { clave: 'val_error_enlace',         contexto: 'Aviso cuando el enlace de valoración no es válido', es: 'Este enlace no es válido o ya ha sido utilizado.' },
+    { clave: 'val_error_estrellas',      contexto: 'Aviso si se pulsa Enviar sin marcar las estrellas', es: 'Marca las estrellas del conductor y del servicio (o pulsa Omitir).' },
+    { clave: 'val_error_enviar',         contexto: 'Aviso si la valoración no se ha podido guardar', es: 'Error al enviar la valoración.' },
+    { clave: 'val_error_conexion',       contexto: 'Aviso si falla la conexión al enviar la valoración', es: 'Error de conexión. Inténtalo de nuevo.' },
+  ];
+  for (const tx of TEXTOS_PAGINA_VALORACION) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Página de valoración', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
   await cargarTextosCache();
 
   // ─── Tarifario de precios ─────────────────────────────────────────────────
@@ -8568,9 +8603,25 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
 }));
 
 // ─── Valoración pública (enlace único por token) ──────────────────────────────
-app.get('/valorar', (req, res) => {
-  res.sendFile(__dirname + '/public/valorar.html');
-});
+// Idioma: el de la reserva del enlace. Textos en Admin → Idiomas → Textos de interfaz → fila "Página de valoración".
+app.get('/valorar', asyncHandler(async (req, res) => {
+  let lang = 'es';
+  let ruta = '';
+  try {
+    if (req.query.token) {
+      const q = await pool.query('SELECT origen, destino, lang_cliente FROM reservas WHERE token_valoracion = $1', [String(req.query.token)]);
+      if (q.rows.length) {
+        if (q.rows[0].lang_cliente && IDIOMAS_PERMITIDOS.includes(q.rows[0].lang_cliente)) lang = q.rows[0].lang_cliente;
+        ruta = ((await traducirLugarCliente(q.rows[0].origen, lang)) || '') + ' → ' + ((await traducirLugarCliente(q.rows[0].destino, lang)) || '');
+      }
+    }
+  } catch (err) {
+    console.warn('Página valoración (idioma):', err.message);
+  }
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  const urlInicio = lang === 'es' ? '/' : '/' + lang + '/';
+  res.render('valorar', { lang, t, urlInicio, ruta, BASE_URL });
+}));
 
 app.get('/api/valoracion/info', asyncHandler(async (req, res) => {
   const { token } = req.query;
