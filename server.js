@@ -9480,7 +9480,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
           const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             mode: 'payment',
-            locale: lang,
+            locale: lang === 'no' ? 'nb' : lang,
             line_items: [{
               price_data: {
                 currency: 'eur',
@@ -10001,7 +10001,7 @@ app.post('/admin/reservas/:id/stripe-session', requireAdmin, asyncHandler(async 
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],
     mode: 'payment',
-    locale: lang,
+    locale: lang === 'no' ? 'nb' : lang,
     line_items: [{
       price_data: {
         currency: 'eur',
@@ -10239,7 +10239,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         mode: 'payment',
-        locale: lang,
+        locale: lang === 'no' ? 'nb' : lang,
         line_items: [{
           price_data: {
             currency: 'eur',
@@ -10394,7 +10394,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],
     mode: 'payment',
-    locale: lang,
+    locale: lang === 'no' ? 'nb' : lang,
     line_items: [{
       price_data: {
         currency: 'eur',
