@@ -8308,7 +8308,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   // Verificar que la reserva pertenece a este chofer y está confirmada
   const check = await pool.query(
     `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
-            r.origen, r.destino, r.fecha,
+            r.origen, r.destino, r.fecha, r.lang_cliente,
             c.nombre AS nombre_chofer, c.telefono AS telefono_chofer
      FROM reservas r
      LEFT JOIN conductores c ON c.id = $2
@@ -8374,19 +8374,22 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   const enlaceCorto = `${BASE_URL}/v/${codigo}`;
   const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
 
-  // Email al cliente
+  // Email al cliente (en su idioma; el mensaje al chofer sigue en español)
+  const _langVal = r.lang_cliente || 'es';
+  const fechaTextoCliente = r.fecha ? fechaCliente(r.fecha, _langVal) : '—';
+  const _txtBotonValorar = await obtenerFrase('frase_boton_valorar', _langVal, 'Valorar mi traslado');
   const botonValoracion = `<div style="text-align:center;margin:12px 0;">
-    <a href="${enlaceCorto}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">⭐ Valorar mi traslado</a>
+    <a href="${enlaceCorto}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">⭐ ${_txtBotonValorar}</a>
   </div>`;
   const _pval = await obtenerPlantilla('cliente_valoracion', {
     nombre_cliente: r.nombre_cliente,
     numero_reserva: r.numero_reserva,
     origen: r.origen || '—',
     destino: r.destino || '—',
-    fecha: fechaTexto,
+    fecha: fechaTextoCliente,
     url_valoracion: enlaceCorto,
     boton_valoracion: botonValoracion
-  });
+  }, _langVal);
   const html = plantillaEmail(
     (_pval && _pval.email) ||
     `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
