@@ -1318,6 +1318,48 @@ async function initSchema() {
     );
   }
 
+  // Voucher (el del email y el PDF), en el idioma del cliente. ON CONFLICT DO NOTHING:
+  // se crean la primera vez y nunca sobrescriben lo editado en el Admin.
+  const TEXTOS_VOUCHER = [
+    { clave: 'vou_hola',              contexto: 'Saludo del voucher; el programa añade detrás el nombre del cliente y una coma (ej: Hola Ana,)', es: 'Hola' },
+    { clave: 'vou_confirmado',        contexto: 'Aviso verde arriba del voucher', es: 'Depósito recibido. Tu traslado está confirmado.' },
+    { clave: 'vou_titulo',            contexto: 'Título pequeño del voucher, encima del número de reserva', es: 'Voucher de Traslado' },
+    { clave: 'vou_numero',            contexto: 'Abreviatura de "número" delante del número de reserva (ej: Nº ABC123)', es: 'Nº' },
+    { clave: 'vou_tu_conductor',      contexto: 'Texto pequeño bajo la foto y el nombre del conductor', es: 'Tu conductor' },
+    { clave: 'vou_conductor',         contexto: 'Etiqueta delante del nombre del conductor cuando no hay foto (ej: Conductor: Juan)', es: 'Conductor' },
+    { clave: 'vou_foto_alt',          contexto: 'Descripción de la foto del conductor (no se ve, la leen los lectores de pantalla)', es: 'Foto del conductor' },
+    { clave: 'vou_origen',            contexto: 'Etiqueta del lugar de recogida en el voucher', es: 'Origen' },
+    { clave: 'vou_destino',           contexto: 'Etiqueta del lugar de destino en el voucher', es: 'Destino' },
+    { clave: 'vou_fecha',             contexto: 'Etiqueta de la fecha del viaje en el voucher', es: 'Fecha' },
+    { clave: 'vou_hora',              contexto: 'Etiqueta de la hora del viaje en el voucher', es: 'Hora' },
+    { clave: 'vou_categoria',         contexto: 'Etiqueta de la categoría de vehículo en el voucher', es: 'Categoría' },
+    { clave: 'vou_pasajeros',         contexto: 'Etiqueta del número de pasajeros en el voucher', es: 'Pasajeros' },
+    { clave: 'vou_dir_recogida',      contexto: 'Etiqueta de la dirección de recogida en el voucher', es: 'Dirección de recogida' },
+    { clave: 'vou_dir_destino',       contexto: 'Etiqueta de la dirección de destino en el voucher', es: 'Dirección de destino' },
+    { clave: 'vou_vuelo',             contexto: 'Etiqueta del número de vuelo en el voucher', es: 'Vuelo' },
+    { clave: 'vou_llegada',           contexto: 'Palabra tras el número de vuelo, antes de la hora (ej: IB1234 · Llegada 10:30)', es: 'Llegada' },
+    { clave: 'vou_barco',             contexto: 'Etiqueta del nombre del barco en el voucher', es: 'Barco' },
+    { clave: 'vou_atraque',           contexto: 'Palabra tras el nombre del barco, antes de la hora (ej: Volcán de Tijarafe · Atraque 10:30)', es: 'Atraque' },
+    { clave: 'vou_notas',             contexto: 'Etiqueta de las notas del cliente en el voucher', es: 'Notas' },
+    { clave: 'vou_extras',            contexto: 'Título de la lista de extras en el voucher', es: 'Extras' },
+    { clave: 'vou_incluido',          contexto: 'Palabra entre paréntesis detrás de un extra gratuito (ej: Agua a bordo (incluido))', es: 'incluido' },
+    { clave: 'vou_a_pagar',           contexto: 'Texto entre paréntesis detrás de un extra de pago, tras el precio (ej: 5.00 € — a pagar al conductor al final del servicio)', es: 'a pagar al conductor al final del servicio' },
+    { clave: 'vou_total_extras',      contexto: 'Texto de la caja amarilla del voucher; el programa añade detrás el importe (ej: ... conductor: 5.00 €)', es: 'Total de extras a pagar al conductor:' },
+    { clave: 'vou_total_extras_nota', contexto: 'Frase pequeña bajo el total de extras en el voucher', es: 'Este importe se abona directamente al conductor al final del servicio, aparte del precio del traslado.' },
+    { clave: 'vou_nota_pie',          contexto: 'Nota al final del voucher', es: 'Muestra este voucher a tu conductor al inicio del servicio. El precio final será el que marque el taxímetro.' },
+    { clave: 'vou_cancelacion',       contexto: 'Aviso de cancelación en el voucher. Mantén {fecha} EXACTAMENTE así, sin traducir: el programa pone ahí la fecha y la hora límite', es: 'Cancelación gratuita hasta el {fecha}.' },
+    { clave: 'vou_cancelacion_despues', contexto: 'Frase tras el aviso de cancelación en el voucher. Mantén {importe} EXACTAMENTE así, sin traducir: el programa pone ahí el importe del depósito', es: 'Después de esa fecha, el depósito de {importe} € no será reembolsado.' },
+    { clave: 'vou_nombre_archivo',    contexto: 'Palabra con la que empieza el nombre del archivo PDF del voucher (ej: voucher-ABC123.pdf). Una sola palabra, en minúsculas, sin acentos', es: 'voucher' },
+  ];
+  for (const tx of TEXTOS_VOUCHER) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Voucher', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
   await cargarTextosCache();
 
   // ─── Tarifario de precios ─────────────────────────────────────────────────
@@ -9746,6 +9788,33 @@ app.get('/admin/conductores-aprobados', requireAdmin, asyncHandler(async (req, r
 }));
 
 // ─── Helper: generar HTML del voucher ────────────────────────────────────────
+// ─── Voucher en el idioma del cliente ────────────────────────────────────────
+// Textos en Admin → Idiomas → Textos de interfaz → fila "Voucher".
+function palabraArchivoVoucher(lang) {
+  let w = obtenerTexto('vou_nombre_archivo', lang || 'es');
+  if (!w || w.indexOf('[[') === 0) w = 'voucher';
+  w = w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return w || 'voucher';
+}
+function textoVoucherConDato(clave, lang, marca, valor) {
+  const t = obtenerTexto(clave, lang);
+  return t.indexOf(marca) !== -1 ? t.replace(marca, valor) : t + ' (' + valor + ')';
+}
+async function datosIdiomaVoucher(r) {
+  let lang = r.lang_cliente || 'es';
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) lang = 'es';
+  const tv = function(clave) { return obtenerTexto(clave, lang); };
+  const origen = (await traducirLugarCliente(r.origen, lang)) || '\u2014';
+  const destino = (await traducirLugarCliente(r.destino, lang)) || '\u2014';
+  const categoria = (await traducirCategoriaCliente(r.categoria_nombre, lang)) || '\u2014';
+  const nombreExtra = function(e) {
+    if (lang === 'es') return e.nombre;
+    const t = obtenerTexto('extra_web_' + e.extra_id, lang);
+    return (t && t.indexOf('[[') !== 0) ? t : e.nombre;
+  };
+  return { lang, tv, origen, destino, categoria, nombreExtra };
+}
+
 async function generarHtmlVoucher(reservaId) {
   const result = await pool.query(
     `SELECT r.*, cv.nombre AS categoria_nombre,
@@ -9758,11 +9827,12 @@ async function generarHtmlVoucher(reservaId) {
   );
   if (!result.rows.length) return null;
   const r = result.rows[0];
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
+  const { lang: _lv, tv, origen: _origenV, destino: _destinoV, categoria: _categoriaV, nombreExtra } = await datosIdiomaVoucher(r);
+  const fechaViaje = r.fecha ? fechaCliente(r.fecha, _lv) : '';
 
   // Extras de la reserva
   const extrasResult = await pool.query(
-    `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
+    `SELECT e.nombre, re.extra_id, re.precio_en_reserva FROM reservas_extras re
      JOIN extras e ON e.id = re.extra_id
      WHERE re.reserva_id = $1 ORDER BY e.bloque, e.orden`,
     [reservaId]
@@ -9773,22 +9843,22 @@ async function generarHtmlVoucher(reservaId) {
   const totalExtras = extrasACobrar.reduce((sum, e) => sum + parseFloat(e.precio_en_reserva), 0);
 
   const extrasHtml = extrasReserva.length ? `
-    <br><strong>Extras:</strong>
-    ${extrasIncluidos.map(e => `<br>&nbsp;&nbsp;· ${e.nombre} <span style="color:#2e7d32;font-size:12px;">(incluido)</span>`).join('')}
-    ${extrasACobrar.map(e => `<br>&nbsp;&nbsp;· ${e.nombre} <span style="color:#856404;font-size:12px;">(${parseFloat(e.precio_en_reserva).toFixed(2)} € — a pagar al conductor al final del servicio)</span>`).join('')}
+    <br><strong>${tv('vou_extras')}:</strong>
+    ${extrasIncluidos.map(e => `<br>&nbsp;&nbsp;· ${nombreExtra(e)} <span style="color:#2e7d32;font-size:12px;">(${tv('vou_incluido')})</span>`).join('')}
+    ${extrasACobrar.map(e => `<br>&nbsp;&nbsp;· ${nombreExtra(e)} <span style="color:#856404;font-size:12px;">(${parseFloat(e.precio_en_reserva).toFixed(2)} € — ${tv('vou_a_pagar')})</span>`).join('')}
   ` : '';
 
   const totalExtrasHtml = extrasACobrar.length ? `
     <div style="background:#fff8e1;border:1px solid #D9A441;border-radius:6px;padding:10px 14px;margin-top:12px;font-size:13px;color:#1C1815;">
-      <strong>💰 Total de extras a pagar al conductor: ${totalExtras.toFixed(2)} €</strong><br>
-      <span style="font-size:12px;color:#555;">Este importe se abona directamente al conductor al final del servicio, aparte del precio del traslado.</span>
+      <strong>💰 ${tv('vou_total_extras')} ${totalExtras.toFixed(2)} €</strong><br>
+      <span style="font-size:12px;color:#555;">${tv('vou_total_extras_nota')}</span>
     </div>` : '';
 
   // Fecha límite de cancelación gratuita para el voucher
   const _cfgNoshowVoucher = await obtenerConfigNoshow(r.fecha);
   const _fechaLimiteVoucher = calcularFechaCancelacion(new Date(r.fecha), r.hora, _cfgNoshowVoucher.horas_cancelacion);
   const _importeVoucher = parseFloat(_cfgNoshowVoucher.importe_deposito).toFixed(2);
-  const _textoLimiteVoucher = _fechaLimiteVoucher.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) + ' a las ' + _fechaLimiteVoucher.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+  const _textoLimiteVoucher = fechaHoraCliente(_fechaLimiteVoucher, _lv);
 
   // Foto del chofer solo si está aprobada
   const slugChofer = r.conductor_nombre
@@ -9799,13 +9869,13 @@ async function generarHtmlVoucher(reservaId) {
     : null;
   const fotoChoferHtml = (r.conductor_foto && r.conductor_foto_estado === 'aprobada' && slugChofer)
     ? `<div style="text-align:center;margin:16px 0;">
-        <img src="${BASE_URL}/foto-chofer/${slugChofer}" alt="Foto del conductor" style="width:90px;height:90px;object-fit:cover;border-radius:50%;border:3px solid #d4956a;">
+        <img src="${BASE_URL}/foto-chofer/${slugChofer}" alt="${tv('vou_foto_alt')}" style="width:90px;height:90px;object-fit:cover;border-radius:50%;border:3px solid #d4956a;">
         <p style="margin:6px 0 0 0;font-size:13px;font-weight:600;color:#2c2c2c;">${r.conductor_nombre || ''}</p>
-        <p style="margin:2px 0 0 0;font-size:11px;color:#888;">Tu conductor</p>
+        <p style="margin:2px 0 0 0;font-size:11px;color:#888;">${tv('vou_tu_conductor')}</p>
        </div>`
-    : (r.conductor_nombre ? `<p style="text-align:center;font-size:13px;font-weight:600;margin:12px 0;"><strong>Conductor:</strong> ${r.conductor_nombre}</p>` : '');
+    : (r.conductor_nombre ? `<p style="text-align:center;font-size:13px;font-weight:600;margin:12px 0;"><strong>${tv('vou_conductor')}:</strong> ${r.conductor_nombre}</p>` : '');
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+  return `<!DOCTYPE html><html lang="${_lv}"><head><meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <style>
     body{margin:0;padding:0;background:#f5f5f5;}
@@ -9825,25 +9895,25 @@ async function generarHtmlVoucher(reservaId) {
       <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
     </div>
     <div class="body">
-      <p>Hola <strong>${r.nombre_cliente}</strong>,</p>
-      <div class="pagado">✔ Depósito recibido. Tu traslado está confirmado.</div>
+      <p>${tv('vou_hola')} <strong>${r.nombre_cliente}</strong>,</p>
+      <div class="pagado">✔ ${tv('vou_confirmado')}</div>
       <div class="voucher-box">
-        <p style="text-align:center;margin:0 0 12px 0;font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;">Voucher de Traslado</p>
-        <p style="text-align:center;margin:0 0 16px 0;">Nº <span class="pnr">${r.numero_reserva}</span></p>
+        <p style="text-align:center;margin:0 0 12px 0;font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;">${tv('vou_titulo')}</p>
+        <p style="text-align:center;margin:0 0 16px 0;">${tv('vou_numero')} <span class="pnr">${r.numero_reserva}</span></p>
         ${fotoChoferHtml}
         <div class="info-box">
-          <strong>Origen:</strong> ${r.origen || '—'}<br>
-          <strong>Destino:</strong> ${r.destino || '—'}<br>
-          <strong>Fecha:</strong> ${fechaViaje}<br>
-          <strong>Hora:</strong> ${r.hora ? r.hora.slice(0,5) : '—'}<br>
-          <strong>Categoría:</strong> ${r.categoria_nombre || '—'}<br>
-          <strong>Pasajeros:</strong> ${r.num_pasajeros || '—'}${r.direccion_recogida ? '<br><strong>Dirección de recogida:</strong> ' + r.direccion_recogida : ''}${r.direccion_destino ? '<br><strong>Dirección de destino:</strong> ' + r.direccion_destino : ''}${r.numero_vuelo ? '<br><strong>Vuelo:</strong> ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · Llegada ' + r.hora_llegada_vuelo.slice(0,5) : '') : ''}${r.nombre_barco ? '<br><strong>Barco:</strong> ' + r.nombre_barco + (r.hora_atraque ? ' · Atraque ' + r.hora_atraque.slice(0,5) : '') : ''}${r.notas_cliente ? '<br><strong>Notas:</strong> ' + r.notas_cliente : ''}${extrasHtml}
+          <strong>${tv('vou_origen')}:</strong> ${_origenV}<br>
+          <strong>${tv('vou_destino')}:</strong> ${_destinoV}<br>
+          <strong>${tv('vou_fecha')}:</strong> ${fechaViaje}<br>
+          <strong>${tv('vou_hora')}:</strong> ${r.hora ? r.hora.slice(0,5) : '—'}<br>
+          <strong>${tv('vou_categoria')}:</strong> ${_categoriaV}<br>
+          <strong>${tv('vou_pasajeros')}:</strong> ${r.num_pasajeros || '—'}${r.direccion_recogida ? '<br><strong>' + tv('vou_dir_recogida') + ':</strong> ' + r.direccion_recogida : ''}${r.direccion_destino ? '<br><strong>' + tv('vou_dir_destino') + ':</strong> ' + r.direccion_destino : ''}${r.numero_vuelo ? '<br><strong>' + tv('vou_vuelo') + ':</strong> ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · ' + tv('vou_llegada') + ' ' + r.hora_llegada_vuelo.slice(0,5) : '') : ''}${r.nombre_barco ? '<br><strong>' + tv('vou_barco') + ':</strong> ' + r.nombre_barco + (r.hora_atraque ? ' · ' + tv('vou_atraque') + ' ' + r.hora_atraque.slice(0,5) : '') : ''}${r.notas_cliente ? '<br><strong>' + tv('vou_notas') + ':</strong> ' + r.notas_cliente : ''}${extrasHtml}
         </div>
         ${totalExtrasHtml}
       </div>
-      <p style="font-size:13px;color:#888;">Muestra este voucher a tu conductor al inicio del servicio. El precio final será el que marque el taxímetro.</p>
+      <p style="font-size:13px;color:#888;">${tv('vou_nota_pie')}</p>
       <div style="background:#fff3cd;border-radius:6px;padding:10px 14px;margin-top:14px;font-size:12px;color:#856404;">
-        <strong>⚠️ Cancelación gratuita hasta el ${_textoLimiteVoucher}.</strong> Después de esa fecha, el depósito de ${_importeVoucher} € no será reembolsado.
+        <strong>⚠️ ${textoVoucherConDato('vou_cancelacion', _lv, '{fecha}', _textoLimiteVoucher)}</strong> ${textoVoucherConDato('vou_cancelacion_despues', _lv, '{importe}', _importeVoucher)}
       </div>
     </div>
     <div class="footer">Traslados GC · Gran Canaria</div>
@@ -9863,11 +9933,12 @@ async function generarVoucherPDF(reservaId) {
   );
   if (!result.rows.length) return null;
   const r = result.rows[0];
+  const { lang: _lv, tv, origen: _origenV, destino: _destinoV, categoria: _categoriaV, nombreExtra } = await datosIdiomaVoucher(r);
 
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '\u2014';
+  const fechaViaje = r.fecha ? fechaCliente(r.fecha, _lv) : '\u2014';
 
   const extrasResult = await pool.query(
-    `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
+    `SELECT e.nombre, re.extra_id, re.precio_en_reserva FROM reservas_extras re
      JOIN extras e ON e.id = re.extra_id
      WHERE re.reserva_id = $1 ORDER BY e.bloque, e.orden`,
     [reservaId]
@@ -9880,8 +9951,7 @@ async function generarVoucherPDF(reservaId) {
   const _cfgNoshow = await obtenerConfigNoshow(r.fecha);
   const _fechaLimite = calcularFechaCancelacion(new Date(r.fecha), r.hora, _cfgNoshow.horas_cancelacion);
   const _importe = parseFloat(_cfgNoshow.importe_deposito).toFixed(2);
-  const _textoLimite = _fechaLimite.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) +
-    ' a las ' + _fechaLimite.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const _textoLimite = fechaHoraCliente(_fechaLimite, _lv);
 
   let fotoChoferBuffer = null;
   if (r.conductor_foto && r.conductor_foto_estado === 'aprobada' && r.conductor_foto.startsWith('data:image/')) {
@@ -9895,6 +9965,20 @@ async function generarVoucherPDF(reservaId) {
     doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), numero_reserva: r.numero_reserva }));
     doc.on('error', reject);
 
+    // Letra con todos los alfabetos (ruso incluido). Si faltan los archivos, la de siempre.
+    let FUENTE = 'Helvetica', FUENTE_NEGRITA = 'Helvetica-Bold';
+    try {
+      const _fR = path.join(__dirname, 'fonts', 'DejaVuSans.ttf');
+      const _fB = path.join(__dirname, 'fonts', 'DejaVuSans-Bold.ttf');
+      if (require('fs').existsSync(_fR) && require('fs').existsSync(_fB)) {
+        doc.registerFont('Texto', _fR);
+        doc.registerFont('TextoNegrita', _fB);
+        FUENTE = 'Texto'; FUENTE_NEGRITA = 'TextoNegrita';
+      }
+    } catch (errFuente) {
+      console.warn('Voucher PDF: letra DejaVu no disponible, se usa Helvetica:', errFuente.message);
+    }
+
     const PW = doc.page.width;
     const PH = doc.page.height;
     const ML = 40;
@@ -9903,27 +9987,27 @@ async function generarVoucherPDF(reservaId) {
 
     // Cabecera
     doc.rect(0, 0, PW, 72).fill('#2c2c2c');
-    doc.fontSize(18).font('Helvetica-Bold').fillColor('#d4956a').text('Traslados GC', ML, 18, { align: 'center', width: W });
-    doc.fontSize(10).font('Helvetica').fillColor('#aaaaaa').text('Gran Canaria', ML, 42, { align: 'center', width: W });
+    doc.fontSize(18).font(FUENTE_NEGRITA).fillColor('#d4956a').text('Traslados GC', ML, 18, { align: 'center', width: W });
+    doc.fontSize(10).font(FUENTE).fillColor('#aaaaaa').text('Gran Canaria', ML, 42, { align: 'center', width: W });
     y = 90;
 
     // Saludo
-    doc.fontSize(12).font('Helvetica').fillColor('#1C1815').text('Hola ', ML, y, { continued: true }).font('Helvetica-Bold').text(r.nombre_cliente + ',');
+    doc.fontSize(12).font(FUENTE).fillColor('#1C1815').text(tv('vou_hola') + ' ', ML, y, { continued: true }).font(FUENTE_NEGRITA).text(r.nombre_cliente + ',');
     y = doc.y + 10;
 
     // Caja verde dep\u00f3sito
     doc.rect(ML, y, W, 28).fill('#d1e7dd');
-    doc.fontSize(11).font('Helvetica-Bold').fillColor('#0f5132').text('Dep\u00f3sito recibido. Tu traslado est\u00e1 confirmado.', ML + 10, y + 8, { width: W - 20 });
+    doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#0f5132').text(tv('vou_confirmado'), ML + 10, y + 8, { width: W - 20 });
     y += 28 + 14;
 
     // Voucher box
     const yInicioVoucher = y;
     const bordeVoucher = '#d4956a';
 
-    doc.fontSize(9).font('Helvetica').fillColor('#888888').text('Voucher de Traslado', ML + 16, y + 10, { align: 'center', width: W - 32 });
+    doc.fontSize(9).font(FUENTE).fillColor('#888888').text(tv('vou_titulo'), ML + 16, y + 10, { align: 'center', width: W - 32 });
     y += 26;
 
-    doc.fontSize(20).font('Helvetica-Bold').fillColor('#C1502E').text('N\u00BA ' + r.numero_reserva, ML + 16, y, { align: 'center', width: W - 32 });
+    doc.fontSize(20).font(FUENTE_NEGRITA).fillColor('#C1502E').text(tv('vou_numero') + ' ' + r.numero_reserva, ML + 16, y, { align: 'center', width: W - 32 });
     y = doc.y + 12;
 
     // Foto conductor
@@ -9937,13 +10021,13 @@ async function generarVoucherPDF(reservaId) {
         doc.restore();
         doc.circle(fotoX + fotoSize / 2, y + fotoSize / 2, fotoSize / 2).lineWidth(2).strokeColor(bordeVoucher).stroke();
         y += fotoSize + 6;
-        doc.fontSize(11).font('Helvetica-Bold').fillColor('#2c2c2c').text(r.conductor_nombre || '', ML + 16, y, { align: 'center', width: W - 32 });
+        doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#2c2c2c').text(r.conductor_nombre || '', ML + 16, y, { align: 'center', width: W - 32 });
         y = doc.y + 2;
-        doc.fontSize(9).font('Helvetica').fillColor('#888888').text('Tu conductor', ML + 16, y, { align: 'center', width: W - 32 });
+        doc.fontSize(9).font(FUENTE).fillColor('#888888').text(tv('vou_tu_conductor'), ML + 16, y, { align: 'center', width: W - 32 });
         y = doc.y + 12;
       } catch(e) { y += 8; }
     } else if (r.conductor_nombre) {
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815').text('Conductor: ' + r.conductor_nombre, ML + 16, y, { align: 'center', width: W - 32 });
+      doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815').text(tv('vou_conductor') + ': ' + r.conductor_nombre, ML + 16, y, { align: 'center', width: W - 32 });
       y = doc.y + 12;
     }
 
@@ -9951,17 +10035,17 @@ async function generarVoucherPDF(reservaId) {
     const infoX = ML + 16;
     const infoW = W - 32;
     const lineas = [];
-    lineas.push({ l: 'Origen', v: r.origen || '\u2014' });
-    lineas.push({ l: 'Destino', v: r.destino || '\u2014' });
-    lineas.push({ l: 'Fecha', v: fechaViaje });
-    lineas.push({ l: 'Hora', v: r.hora ? r.hora.slice(0, 5) : '\u2014' });
-    lineas.push({ l: 'Categor\u00eda', v: r.categoria_nombre || '\u2014' });
-    lineas.push({ l: 'Pasajeros', v: String(r.num_pasajeros || '\u2014') });
-    if (r.direccion_recogida) lineas.push({ l: 'Direcci\u00f3n de recogida', v: r.direccion_recogida });
-    if (r.direccion_destino)  lineas.push({ l: 'Direcci\u00f3n de destino', v: r.direccion_destino });
-    if (r.numero_vuelo) lineas.push({ l: 'Vuelo', v: r.numero_vuelo + (r.hora_llegada_vuelo ? ' \u00b7 Llegada ' + r.hora_llegada_vuelo.slice(0, 5) : '') });
-    if (r.nombre_barco) lineas.push({ l: 'Barco', v: r.nombre_barco + (r.hora_atraque ? ' \u00b7 Atraque ' + r.hora_atraque.slice(0, 5) : '') });
-    if (r.notas_cliente) lineas.push({ l: 'Notas', v: r.notas_cliente });
+    lineas.push({ l: tv('vou_origen'), v: _origenV });
+    lineas.push({ l: tv('vou_destino'), v: _destinoV });
+    lineas.push({ l: tv('vou_fecha'), v: fechaViaje });
+    lineas.push({ l: tv('vou_hora'), v: r.hora ? r.hora.slice(0, 5) : '\u2014' });
+    lineas.push({ l: tv('vou_categoria'), v: _categoriaV });
+    lineas.push({ l: tv('vou_pasajeros'), v: String(r.num_pasajeros || '\u2014') });
+    if (r.direccion_recogida) lineas.push({ l: tv('vou_dir_recogida'), v: r.direccion_recogida });
+    if (r.direccion_destino)  lineas.push({ l: tv('vou_dir_destino'), v: r.direccion_destino });
+    if (r.numero_vuelo) lineas.push({ l: tv('vou_vuelo'), v: r.numero_vuelo + (r.hora_llegada_vuelo ? ' \u00b7 ' + tv('vou_llegada') + ' ' + r.hora_llegada_vuelo.slice(0, 5) : '') });
+    if (r.nombre_barco) lineas.push({ l: tv('vou_barco'), v: r.nombre_barco + (r.hora_atraque ? ' \u00b7 ' + tv('vou_atraque') + ' ' + r.hora_atraque.slice(0, 5) : '') });
+    if (r.notas_cliente) lineas.push({ l: tv('vou_notas'), v: r.notas_cliente });
 
     const altoLinea = 18;
     const altoExtrasEst = extrasReserva.length ? (20 + extrasReserva.length * 16) : 0;
@@ -9971,23 +10055,23 @@ async function generarVoucherPDF(reservaId) {
 
     let yInfo = y + 10;
     lineas.forEach(({ l, v }) => {
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815').text(l + ': ', infoX + 8, yInfo, { continued: true, width: infoW - 16 });
-      doc.font('Helvetica').fillColor('#333333').text(v, { width: infoW - 16 });
+      doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815').text(l + ': ', infoX + 8, yInfo, { continued: true, width: infoW - 16 });
+      doc.font(FUENTE).fillColor('#333333').text(v, { width: infoW - 16 });
       yInfo = doc.y + 3;
     });
 
     if (extrasReserva.length) {
       yInfo += 4;
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815').text('Extras:', infoX + 8, yInfo);
+      doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815').text(tv('vou_extras') + ':', infoX + 8, yInfo);
       yInfo = doc.y + 2;
       extrasIncluidos.forEach(e => {
-        doc.fontSize(10).font('Helvetica').fillColor('#1C1815').text('  \u00b7 ' + e.nombre + ' ', infoX + 8, yInfo, { continued: true });
-        doc.fillColor('#2e7d32').text('(incluido)');
+        doc.fontSize(10).font(FUENTE).fillColor('#1C1815').text('  \u00b7 ' + nombreExtra(e) + ' ', infoX + 8, yInfo, { continued: true });
+        doc.fillColor('#2e7d32').text('(' + tv('vou_incluido') + ')');
         yInfo = doc.y + 2;
       });
       extrasACobrar.forEach(e => {
-        doc.fontSize(10).font('Helvetica').fillColor('#1C1815').text('  \u00b7 ' + e.nombre + ' ', infoX + 8, yInfo, { continued: true });
-        doc.fillColor('#856404').text('(' + parseFloat(e.precio_en_reserva).toFixed(2) + ' \u20ac \u2014 a pagar al conductor al final del servicio)');
+        doc.fontSize(10).font(FUENTE).fillColor('#1C1815').text('  \u00b7 ' + nombreExtra(e) + ' ', infoX + 8, yInfo, { continued: true });
+        doc.fillColor('#856404').text('(' + parseFloat(e.precio_en_reserva).toFixed(2) + ' \u20ac \u2014 ' + tv('vou_a_pagar') + ')');
         yInfo = doc.y + 2;
       });
     }
@@ -9996,13 +10080,17 @@ async function generarVoucherPDF(reservaId) {
 
     // Total extras
     if (extrasACobrar.length) {
-      const altoTotal = 44;
+      // La caja crece si el texto traducido ocupa más de una línea
+      const _txtTot = '\u2022 ' + tv('vou_total_extras') + ' ' + totalExtras.toFixed(2) + ' \u20ac';
+      const _hTot1 = doc.fontSize(11).font(FUENTE_NEGRITA).heightOfString(_txtTot, { width: W - 20 });
+      const _hTot2 = doc.fontSize(9).font(FUENTE).heightOfString(tv('vou_total_extras_nota'), { width: W - 20 });
+      const altoTotal = Math.max(44, 8 + _hTot1 + 3 + _hTot2 + 8);
       doc.rect(ML, y, W, altoTotal).fill('#fff8e1');
       doc.rect(ML, y, W, altoTotal).lineWidth(0.5).strokeColor('#D9A441').stroke();
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815')
-        .text('\u2022 Total de extras a pagar al conductor: ' + totalExtras.toFixed(2) + ' \u20ac', ML + 10, y + 8, { width: W - 20 });
-      doc.fontSize(9).font('Helvetica').fillColor('#555555')
-        .text('Este importe se abona directamente al conductor al final del servicio, aparte del precio del traslado.', ML + 10, y + 24, { width: W - 20 });
+      doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815')
+        .text(_txtTot, ML + 10, y + 8, { width: W - 20 });
+      doc.fontSize(9).font(FUENTE).fillColor('#555555')
+        .text(tv('vou_total_extras_nota'), ML + 10, Math.max(y + 24, y + 8 + _hTot1 + 3), { width: W - 20 });
       y += altoTotal + 8;
     }
 
@@ -10012,22 +10100,27 @@ async function generarVoucherPDF(reservaId) {
     y = yFinVoucher + 14;
 
     // Nota pie
-    doc.fontSize(10).font('Helvetica').fillColor('#888888')
-      .text('Muestra este voucher a tu conductor al inicio del servicio. El precio final ser\u00e1 el que marque el tax\u00edmetro.', ML, y, { width: W });
+    doc.fontSize(10).font(FUENTE).fillColor('#888888')
+      .text(tv('vou_nota_pie'), ML, y, { width: W });
     y = doc.y + 10;
 
     // Caja cancelaci\u00f3n
-    const altoCancelacion = 44;
+    // La caja crece si el texto traducido ocupa más de una línea
+    const _txtCan1 = '\u2022 ' + textoVoucherConDato('vou_cancelacion', _lv, '{fecha}', _textoLimite);
+    const _txtCan2 = textoVoucherConDato('vou_cancelacion_despues', _lv, '{importe}', _importe);
+    const _hCan1 = doc.fontSize(10).font(FUENTE_NEGRITA).heightOfString(_txtCan1, { width: W - 20 });
+    const _hCan2 = doc.fontSize(10).font(FUENTE).heightOfString(_txtCan2, { width: W - 20 });
+    const altoCancelacion = Math.max(44, 8 + _hCan1 + 3 + _hCan2 + 8);
     doc.rect(ML, y, W, altoCancelacion).fill('#fff3cd');
-    doc.fontSize(10).font('Helvetica-Bold').fillColor('#856404')
-      .text('\u2022 Cancelaci\u00f3n gratuita hasta el ' + _textoLimite + '.', ML + 10, y + 8, { width: W - 20 });
-    doc.fontSize(10).font('Helvetica').fillColor('#856404')
-      .text('Despu\u00e9s de esa fecha, el dep\u00f3sito de ' + _importe + ' \u20ac no ser\u00e1 reembolsado.', ML + 10, y + 24, { width: W - 20 });
+    doc.fontSize(10).font(FUENTE_NEGRITA).fillColor('#856404')
+      .text(_txtCan1, ML + 10, y + 8, { width: W - 20 });
+    doc.fontSize(10).font(FUENTE).fillColor('#856404')
+      .text(_txtCan2, ML + 10, Math.max(y + 24, y + 8 + _hCan1 + 3), { width: W - 20 });
     y += altoCancelacion + 14;
 
     // Footer
     doc.rect(0, PH - 36, PW, 36).fill('#f5f0ea');
-    doc.fontSize(10).font('Helvetica').fillColor('#888888')
+    doc.fontSize(10).font(FUENTE).fillColor('#888888')
       .text('Traslados GC \u00b7 Gran Canaria', ML, PH - 22, { align: 'center', width: W });
 
     doc.end();
@@ -10200,7 +10293,7 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         if (r.telefono_cliente) {
           try {
             const firma = firmarVoucher(reservaId);
-            const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
+            const nombreDoc = `${palabraArchivoVoucher(r.lang_cliente)}-${r.numero_reserva}.pdf`;
             const urlDoc = `${BASE_URL}/voucher-descarga/${reservaId}/${firma}/${nombreDoc}`;
             const textoWaVoucherA = (_pvA && _pvA.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`;
             await pool.query(
@@ -10662,7 +10755,7 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
     if (r.telefono_cliente) {
       try {
         const firma = firmarVoucher(req.params.id);
-        const nombreDoc = `voucher-${r.numero_reserva}.pdf`;
+        const nombreDoc = `${palabraArchivoVoucher(r.lang_cliente)}-${r.numero_reserva}.pdf`;
         const urlDoc = `${BASE_URL}/voucher-descarga/${req.params.id}/${firma}/${nombreDoc}`;
         const textoWaVoucherM = (_pvM && _pvM.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`;
         await pool.query(

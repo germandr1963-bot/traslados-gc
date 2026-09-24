@@ -215,7 +215,8 @@ function GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items) {
     'dónde aparece en la web — úsalo para elegir la traducción más natural (por ejemplo, un botón necesita ' +
     'un tono distinto a un párrafo explicativo). Mantén un tono profesional pero cercano.\n' +
     '- Traduce TODOS los textos sin excepción, incluidos nombres de categorías como "Business", "Económico", "Confort", "Premium" — tradúcelos a su equivalente natural en ' + nombreIdioma + '.\n' +
-    '- Para claves extra_web_X: es el nombre de un extra que ve el cliente al reservar — tradúcelo de forma 100% nativa en ' + nombreIdioma + ', como lo escribiría un local, nunca de forma literal.\n\n' +
+    '- Para claves extra_web_X: es el nombre de un extra que ve el cliente al reservar — tradúcelo de forma 100% nativa en ' + nombreIdioma + ', como lo escribiría un local, nunca de forma literal.\n' +
+    '- Si un texto contiene marcas entre llaves, como {fecha} o {importe}, cópialas exactamente igual, sin traducirlas ni cambiarlas: el programa pone ahí un dato real.\n\n' +
     'Textos a traducir (JSON):\n' + JSON.stringify(items, null, 2) + '\n\n' +
     'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, ' +
     'sin bloques de markdown ni comillas triples, con esta forma exacta: ' +
