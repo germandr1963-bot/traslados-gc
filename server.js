@@ -1227,6 +1227,27 @@ async function initSchema() {
     );
   }
 
+  // Páginas de retorno de Stripe (/pago-exitoso y /pago-cancelado).
+  // ON CONFLICT DO NOTHING: se crean la primera vez y nunca sobrescriben lo editado en el Admin.
+  const TEXTOS_PAGINAS_PAGO = [
+    { clave: 'pago_ok_pestana',       contexto: 'Título de la pestaña del navegador en la página de pago completado', es: 'Pago completado' },
+    { clave: 'pago_ok_titulo',        contexto: 'Título grande de la página de pago completado', es: '¡Pago completado!' },
+    { clave: 'pago_ok_texto',         contexto: 'Texto de la página de pago completado', es: 'Tu depósito ha sido procesado correctamente. En breve recibirás el voucher de tu traslado en tu email.' },
+    { clave: 'pago_cancel_titulo',    contexto: 'Título de la pestaña y título grande de la página de pago cancelado', es: 'Pago cancelado' },
+    { clave: 'pago_cancel_texto',     contexto: 'Texto de la página de pago cancelado', es: 'No se ha procesado ningún cobro. Si necesitas ayuda para completar el pago, contáctanos por WhatsApp.' },
+    { clave: 'pago_etiqueta_reserva', contexto: 'Etiqueta delante del número de reserva en las páginas de pago completado y cancelado', es: 'Reserva:' },
+    { clave: 'pago_stripe_concepto',  contexto: 'Concepto que ve el cliente arriba en la página de pago de Stripe. El programa añade detrás el número de reserva (ej: GCA123)', es: 'Depósito de garantía — Traslado' },
+    { clave: 'pago_btn_volver',       contexto: 'Botón para volver a la portada desde las páginas de pago completado y cancelado', es: 'Volver al inicio' },
+  ];
+  for (const tx of TEXTOS_PAGINAS_PAGO) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Páginas de pago', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
   await cargarTextosCache();
 
   // ─── Tarifario de precios ─────────────────────────────────────────────────
@@ -9477,6 +9498,8 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         try {
           const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
           const lang = r.lang_cliente || 'es';
+          const _stripeNombre1 = obtenerTexto('pago_stripe_concepto', lang) + ' ' + r.numero_reserva;
+          const _stripeFecha1 = fechaCliente(r.fecha, lang);
           const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             mode: 'payment',
@@ -9486,8 +9509,8 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
                 currency: 'eur',
                 unit_amount: Math.round(parseFloat(condiciones ? condiciones.importe_deposito : 10) * 100),
                 product_data: {
-                  name: 'Depósito de garantía — Traslado ' + r.numero_reserva,
-                  description: (r.origen || '') + ' → ' + (r.destino || '') + (fechaViaje ? ' · ' + fechaViaje : '')
+                  name: _stripeNombre1,
+                  description: ((await traducirLugarCliente(r.origen, lang)) || '') + ' → ' + ((await traducirLugarCliente(r.destino, lang)) || '') + (_stripeFecha1 ? ' · ' + _stripeFecha1 : '')
                 }
               },
               quantity: 1
@@ -9997,6 +10020,8 @@ app.post('/admin/reservas/:id/stripe-session', requireAdmin, asyncHandler(async 
   // Detectar idioma de la reserva para Stripe
   const lang = r.lang_cliente || 'es';
   const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+  const _stripeNombre2 = obtenerTexto('pago_stripe_concepto', lang) + ' ' + r.numero_reserva;
+  const _stripeFecha2 = fechaCliente(r.fecha, lang);
 
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],
@@ -10007,9 +10032,9 @@ app.post('/admin/reservas/:id/stripe-session', requireAdmin, asyncHandler(async 
         currency: 'eur',
         unit_amount: importe,
         product_data: {
-          name: 'Depósito de garantía — Traslado ' + r.numero_reserva,
-          description: (r.origen || '') + ' → ' + (r.destino || '') +
-            (r.fecha ? ' · ' + new Date(r.fecha).toLocaleDateString('es-ES') : '')
+          name: _stripeNombre2,
+          description: ((await traducirLugarCliente(r.origen, lang)) || '') + ' → ' + ((await traducirLugarCliente(r.destino, lang)) || '') +
+            (_stripeFecha2 ? ' · ' + _stripeFecha2 : '')
         }
       },
       quantity: 1
@@ -10164,37 +10189,60 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
 }));
 
 // Páginas de retorno de Stripe
-app.get('/pago-exitoso', (req, res) => {
-  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
+// El idioma sale de la propia reserva (sirve también para enlaces de pago ya enviados).
+// Textos en Admin → Idiomas → Textos de interfaz → fila "Páginas de pago".
+async function datosPaginaPago(req) {
+  let lang = 'es';
+  let numero = '';
+  try {
+    if (req.query.reserva) {
+      const r = await pool.query('SELECT numero_reserva, lang_cliente FROM reservas WHERE numero_reserva = $1', [String(req.query.reserva)]);
+      if (r.rows.length) {
+        numero = r.rows[0].numero_reserva || '';
+        if (r.rows[0].lang_cliente && IDIOMAS_PERMITIDOS.includes(r.rows[0].lang_cliente)) lang = r.rows[0].lang_cliente;
+      }
+    }
+  } catch (err) {
+    console.warn('datosPaginaPago:', err.message);
+  }
+  const urlInicio = lang === 'es' ? '/' : '/' + lang + '/';
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  return { lang, numero, urlInicio, t };
+}
+
+app.get('/pago-exitoso', asyncHandler(async (req, res) => {
+  const { lang, numero, urlInicio, t } = await datosPaginaPago(req);
+  res.send(`<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>Pago completado</title>
+  <title>${t('pago_ok_pestana')}</title>
   <style>body{font-family:Arial,sans-serif;text-align:center;padding:60px 20px;background:#f5f5f5;}
   .box{background:#fff;border-radius:12px;padding:40px;max-width:480px;margin:0 auto;}
   .icono{font-size:48px;margin-bottom:16px;}h1{color:#2d7a4f;}p{color:#555;}</style>
   </head><body><div class="box">
   <div class="icono">✅</div>
-  <h1>¡Pago completado!</h1>
-  <p>Tu depósito ha sido procesado correctamente. En breve recibirás el voucher de tu traslado en tu email.</p>
-  <p style="font-size:13px;color:#aaa;">Reserva: <strong>${req.query.reserva || ''}</strong></p>
-  <a href="/" style="display:inline-block;margin-top:24px;background:#C1502E;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;">Volver al inicio</a>
+  <h1>${t('pago_ok_titulo')}</h1>
+  <p>${t('pago_ok_texto')}</p>
+  <p style="font-size:13px;color:#aaa;">${t('pago_etiqueta_reserva')} <strong>${numero}</strong></p>
+  <a href="${urlInicio}" style="display:inline-block;margin-top:24px;background:#C1502E;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;">${t('pago_btn_volver')}</a>
   </div></body></html>`);
-});
+}));
 
-app.get('/pago-cancelado', (req, res) => {
-  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
+app.get('/pago-cancelado', asyncHandler(async (req, res) => {
+  const { lang, numero, urlInicio, t } = await datosPaginaPago(req);
+  res.send(`<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>Pago cancelado</title>
+  <title>${t('pago_cancel_titulo')}</title>
   <style>body{font-family:Arial,sans-serif;text-align:center;padding:60px 20px;background:#f5f5f5;}
   .box{background:#fff;border-radius:12px;padding:40px;max-width:480px;margin:0 auto;}
   .icono{font-size:48px;margin-bottom:16px;}h1{color:#842029;}p{color:#555;}</style>
   </head><body><div class="box">
   <div class="icono">❌</div>
-  <h1>Pago cancelado</h1>
-  <p>No se ha procesado ningún cobro. Si necesitas ayuda para completar el pago, contáctanos por WhatsApp.</p>
-  <p style="font-size:13px;color:#aaa;">Reserva: <strong>${req.query.reserva || ''}</strong></p>
-  <a href="/" style="display:inline-block;margin-top:24px;background:#C1502E;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;">Volver al inicio</a>
+  <h1>${t('pago_cancel_titulo')}</h1>
+  <p>${t('pago_cancel_texto')}</p>
+  <p style="font-size:13px;color:#aaa;">${t('pago_etiqueta_reserva')} <strong>${numero}</strong></p>
+  <a href="${urlInicio}" style="display:inline-block;margin-top:24px;background:#C1502E;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;">${t('pago_btn_volver')}</a>
   </div></body></html>`);
-});
+}));
 
 // ─── Admin: emails de reserva ────────────────────────────────────────────────
 
@@ -10236,6 +10284,8 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
     try {
       const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
       const lang = r.lang_cliente || 'es';
+      const _stripeNombre3 = obtenerTexto('pago_stripe_concepto', lang) + ' ' + r.numero_reserva;
+      const _stripeFecha3 = fechaCliente(r.fecha, lang);
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         mode: 'payment',
@@ -10245,9 +10295,9 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
             currency: 'eur',
             unit_amount: Math.round(parseFloat(condiciones ? condiciones.importe_deposito : 10) * 100),
             product_data: {
-              name: 'Depósito de garantía — Traslado ' + r.numero_reserva,
-              description: (r.origen || '') + ' → ' + (r.destino || '') +
-                (r.fecha ? ' · ' + fechaViaje : '')
+              name: _stripeNombre3,
+              description: ((await traducirLugarCliente(r.origen, lang)) || '') + ' → ' + ((await traducirLugarCliente(r.destino, lang)) || '') +
+                (_stripeFecha3 ? ' · ' + _stripeFecha3 : '')
             }
           },
           quantity: 1
@@ -10390,6 +10440,8 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
   const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '';
   const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
   const lang = r.lang_cliente || 'es';
+  const _stripeNombre4 = obtenerTexto('pago_stripe_concepto', lang) + ' ' + r.numero_reserva;
+  const _stripeFecha4 = fechaCliente(r.fecha, lang);
 
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],
@@ -10400,8 +10452,8 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
         currency: 'eur',
         unit_amount: Math.round(parseFloat(condiciones ? condiciones.importe_deposito : 10) * 100),
         product_data: {
-          name: 'Depósito de garantía — Traslado ' + r.numero_reserva,
-          description: (r.origen || '') + ' → ' + (r.destino || '') + (fechaViaje ? ' · ' + fechaViaje : '')
+          name: _stripeNombre4,
+          description: ((await traducirLugarCliente(r.origen, lang)) || '') + ' → ' + ((await traducirLugarCliente(r.destino, lang)) || '') + (_stripeFecha4 ? ' · ' + _stripeFecha4 : '')
         }
       },
       quantity: 1
