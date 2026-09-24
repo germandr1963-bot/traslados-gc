@@ -8461,7 +8461,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
         numero_factura: numFacEmail
-      });
+      }, _langVal);
       await enviarEmailConAdjunto({
         to: r.email_cliente,
         subject: (_pfacemail && _pfacemail.asunto) || (`📄 Factura ${numFacEmail} — Reserva ${r.numero_reserva}`),
@@ -8495,7 +8495,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
           nombre_cliente: r.nombre_cliente,
           numero_reserva: r.numero_reserva,
           numero_factura: numFac
-        });
+        }, _langVal);
         const textoFacturaWa = (_pfacwa && _pfacwa.whatsapp) || `📄 Adjuntamos la factura de tu traslado *${r.numero_reserva}*.`;
         await pool.query(
           `INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento)
@@ -10705,7 +10705,7 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva,
       numero_factura: resultado.numeroFactura
-    });
+    }, r.lang_cliente || 'es');
     await enviarEmailConAdjunto({
       to: r.email_cliente,
       subject: (_pf && _pf.asunto) || ('📄 Factura ' + resultado.numeroFactura + ' — Reserva ' + r.numero_reserva),
@@ -14086,7 +14086,7 @@ app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, re
   const facturaQ = await pool.query('SELECT * FROM facturas WHERE id = $1', [req.params.id]);
   if (!facturaQ.rows.length) return res.status(404).json({ error: 'Factura no encontrada.' });
   const factura = facturaQ.rows[0];
-  const emailDestino = req.body.email || null;
+  const emailDestino = (req.body.email_destino || req.body.email || '').trim() || null;
 
   const reservaQ = await pool.query('SELECT * FROM reservas WHERE id = $1', [factura.reserva_id]);
   if (!reservaQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
@@ -14101,13 +14101,26 @@ app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, re
     nombre_cliente: r.nombre_cliente,
     numero_reserva: r.numero_reserva,
     numero_factura: factura.numero_factura
-  });
+  }, r.lang_cliente || 'es');
   await enviarEmailConAdjunto({
     to: emailFinal,
     subject: (_pf && _pf.asunto) || ('📄 Factura ' + factura.numero_factura + ' — Reserva ' + r.numero_reserva),
     html: plantillaEmail((_pf && _pf.email) || `<p>Hola <strong>${r.nombre_cliente}</strong>,</p><p>Adjuntamos la factura <strong>${factura.numero_factura}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p><p>Gracias por viajar con Traslados GC.</p>`),
     adjunto: { filename: 'factura-' + r.numero_reserva + '.pdf', content: resultado.buffer }
   });
+  // WhatsApp al cliente con la factura (igual que "Reenviar factura")
+  if (r.telefono_cliente) {
+    try {
+      const firma = firmarFactura(factura.reserva_id);
+      const nombreDoc = `factura-${factura.numero_factura}.pdf`;
+      const urlDoc = `${BASE_URL}/factura-descarga/${factura.reserva_id}/${firma}/${nombreDoc}`;
+      const textoWa = (_pf && _pf.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${factura.numero_factura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`;
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+        [r.telefono_cliente, textoWa, urlDoc, nombreDoc]
+      );
+    } catch(e) { console.warn('Error encolando WhatsApp factura (Facturas):', e.message); }
+  }
   res.json({ ok: true });
 }));
 
