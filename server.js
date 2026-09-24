@@ -13885,7 +13885,17 @@ function requierePuenteWhatsapp(req, res, next) {
 // Endpoint para que puente.js pueda leer plantillas de comunicacion
 app.get('/api/whatsapp/plantilla/:clave', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   // 'lang' (opcional) = idioma del cliente; no se usa como variable del texto
-  const { lang, ...varsPlantilla } = req.query;
+  let { lang, ...varsPlantilla } = req.query;
+  // Mensajes al cliente pedidos sin idioma (p. ej. avisos de 15 min y 24 h):
+  // se usa el idioma de la reserva. Los mensajes al chofer no se tocan.
+  if (!lang && req.params.clave.indexOf('cliente_') === 0 && varsPlantilla.numero_reserva) {
+    try {
+      const rl = await pool.query('SELECT lang_cliente FROM reservas WHERE numero_reserva = $1', [varsPlantilla.numero_reserva]);
+      if (rl.rows.length && rl.rows[0].lang_cliente) lang = rl.rows[0].lang_cliente;
+    } catch (eLang) {
+      console.warn('Idioma de la reserva para el WhatsApp (' + req.params.clave + '):', eLang.message);
+    }
+  }
   // Acuse de recibo: puente.js no envía los extras, así que el servidor los añade
   // (en el idioma del cliente) para que el hueco {extras} no salga vacío en el WhatsApp.
   if (req.params.clave === 'cliente_acuse_recibo' && varsPlantilla.extras === undefined && varsPlantilla.numero_reserva) {
@@ -13984,18 +13994,23 @@ app.post('/api/whatsapp/marcar-sin-respuesta/:id', requierePuenteWhatsapp, async
   const reserva = await pool.query(
     `UPDATE reservas SET estado_aviso_whatsapp = 'sin_respuesta'
      WHERE id = $1 AND estado_aviso_whatsapp = 'enviado'
-     RETURNING numero_reserva, nombre_cliente, email_cliente`,
+     RETURNING numero_reserva, nombre_cliente, email_cliente, lang_cliente`,
     [req.params.id]
   );
   if (!reserva.rows.length) return res.json({ ok: true, ya_marcada: true });
 
-  const { numero_reserva, nombre_cliente, email_cliente } = reserva.rows[0];
+  const { numero_reserva, nombre_cliente, email_cliente, lang_cliente } = reserva.rows[0];
 
   try {
+    // Plantilla "Seguimos gestionando" de Admin → Comunicaciones, en el idioma del cliente
+    const _pgest = await obtenerPlantilla('cliente_en_gestion', {
+      nombre_cliente: nombre_cliente,
+      numero_reserva: numero_reserva
+    }, lang_cliente || 'es');
     await enviarEmail({
       to: email_cliente,
-      subject: 'Seguimos gestionando tu traslado — ' + numero_reserva,
-      html: plantillaEmailSimple(
+      subject: (_pgest && _pgest.asunto) || ('Seguimos gestionando tu traslado — ' + numero_reserva),
+      html: (_pgest && _pgest.email) ? plantillaEmail(_pgest.email) : plantillaEmailSimple(
         nombre_cliente,
         'Seguimos gestionando tu solicitud de traslado. Aún no hemos podido confirmar chofer, pero continuamos buscando disponibilidad. Te avisaremos en cuanto tengamos una respuesta.',
         numero_reserva
@@ -14027,18 +14042,23 @@ app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asy
   const reserva = await pool.query(
     `UPDATE reservas SET estado = 'cancelada', estado_aviso_whatsapp = 'cancelada_sin_respuesta'
      WHERE id = $1 AND estado NOT IN ('cancelada', 'completada')
-     RETURNING numero_reserva, nombre_cliente, email_cliente`,
+     RETURNING numero_reserva, nombre_cliente, email_cliente, lang_cliente`,
     [req.params.id]
   );
   if (!reserva.rows.length) return res.json({ ok: true, ya_cancelada: true });
 
-  const { numero_reserva, nombre_cliente, email_cliente } = reserva.rows[0];
+  const { numero_reserva, nombre_cliente, email_cliente, lang_cliente } = reserva.rows[0];
 
   try {
+    // Plantilla "Reserva anulada" de Admin → Comunicaciones, en el idioma del cliente
+    const _panul = await obtenerPlantilla('cliente_reserva_anulada', {
+      nombre_cliente: nombre_cliente,
+      numero_reserva: numero_reserva
+    }, lang_cliente || 'es');
     await enviarEmail({
       to: email_cliente,
-      subject: 'Tu reserva ' + numero_reserva + ' ha sido anulada',
-      html: plantillaEmailSimple(
+      subject: (_panul && _panul.asunto) || ('Tu reserva ' + numero_reserva + ' ha sido anulada'),
+      html: (_panul && _panul.email) ? plantillaEmail(_panul.email) : plantillaEmailSimple(
         nombre_cliente,
         'Lamentamos informarte que no hemos podido confirmar un chofer disponible para tu traslado en la fecha solicitada, por lo que hemos anulado la reserva. Puedes enviarnos una nueva solicitud más adelante; con gusto intentaremos ayudarte si tenemos disponibilidad.',
         numero_reserva
