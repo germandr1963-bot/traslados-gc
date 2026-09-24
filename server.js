@@ -1307,6 +1307,7 @@ async function initSchema() {
     { clave: 'fac_extra',            contexto: 'Palabra delante de cada extra en la factura (ej: Extra: Silla de bebé)', es: 'Extra' },
     { clave: 'fac_total',            contexto: 'Etiqueta del importe total de la factura, en MAYÚSCULAS', es: 'TOTAL' },
     { clave: 'fac_gracias',          contexto: 'Frase final de la factura', es: 'Gracias por viajar con nosotros.' },
+    { clave: 'fac_nombre_archivo',   contexto: 'Palabra con la que empieza el nombre del archivo PDF de la factura (ej: factura-TGC-2026-0015.pdf). Una sola palabra, en minúsculas, sin acentos', es: 'factura' },
   ];
   for (const tx of TEXTOS_FACTURA_PDF) {
     await pool.query(
@@ -8501,7 +8502,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
         subject: (_pfacemail && _pfacemail.asunto) || (`📄 Factura ${numFacEmail} — Reserva ${r.numero_reserva}`),
         html: plantillaEmail((_pfacemail && _pfacemail.email) || `<p>Hola <strong>${r.nombre_cliente}</strong>,</p><p>Adjuntamos la factura <strong>${numFacEmail}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p><p>Gracias por viajar con Traslados GC.</p>`),
         adjunto: {
-          filename: `factura-${numFacEmail}.pdf`,
+          filename: `${palabraArchivoFactura(_langVal)}-${numFacEmail}.pdf`,
           content: facturaPDF.buffer,
           contentType: 'application/pdf'
         }
@@ -8524,7 +8525,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
       try {
         const firmaCierre = firmarFactura(r.id);
         const numFac = facturaPDF.numeroFactura || r.numero_reserva;
-        const urlFacturaDoc = `${BASE_URL}/factura-descarga/${r.id}/${firmaCierre}/factura-${numFac}.pdf`;
+        const urlFacturaDoc = `${BASE_URL}/factura-descarga/${r.id}/${firmaCierre}/${palabraArchivoFactura(_langVal)}-${numFac}.pdf`;
         const _pfacwa = await obtenerPlantilla('cliente_factura', {
           nombre_cliente: r.nombre_cliente,
           numero_reserva: r.numero_reserva,
@@ -8534,7 +8535,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
         await pool.query(
           `INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento)
            VALUES ($1, $2, $3, $4)`,
-          [r.telefono_cliente, textoFacturaWa, urlFacturaDoc, `factura-${numFac}.pdf`]
+          [r.telefono_cliente, textoFacturaWa, urlFacturaDoc, `${palabraArchivoFactura(_langVal)}-${numFac}.pdf`]
         );
       } catch(e) { console.warn('Error encolando WhatsApp factura:', e.message); }
     }
@@ -10744,12 +10745,12 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
       to: r.email_cliente,
       subject: (_pf && _pf.asunto) || ('📄 Factura ' + resultado.numeroFactura + ' — Reserva ' + r.numero_reserva),
       html: plantillaEmail((_pf && _pf.email) || `<p>Hola <strong>${r.nombre_cliente}</strong>,</p><p>Adjuntamos la factura <strong>${resultado.numeroFactura}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p><p>Gracias por viajar con Traslados GC.</p>`),
-      adjunto: { filename: 'factura-' + r.numero_reserva + '.pdf', content: pdfBuffer }
+      adjunto: { filename: palabraArchivoFactura(r.lang_cliente) + '-' + r.numero_reserva + '.pdf', content: pdfBuffer }
     });
     if (r.telefono_cliente) {
       try {
         const firma = firmarFactura(req.params.id);
-        const nombreDoc = `factura-${resultado.numeroFactura}.pdf`;
+        const nombreDoc = `${palabraArchivoFactura(r.lang_cliente)}-${resultado.numeroFactura}.pdf`;
         const urlDoc = `${BASE_URL}/factura-descarga/${req.params.id}/${firma}/${nombreDoc}`;
         const textoWa = (_pf && _pf.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`;
         await pool.query(
@@ -13654,7 +13655,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
 
   // Email elegante al cliente con factura adjunta
   try {
-    const adjunto = facturaBuffer ? { filename: 'factura-' + r.numero_reserva + '.pdf', content: facturaBuffer } : null;
+    const adjunto = facturaBuffer ? { filename: palabraArchivoFactura(r.lang_cliente) + '-' + r.numero_reserva + '.pdf', content: facturaBuffer } : null;
     const fnEmail = adjunto ? enviarEmailConAdjunto : enviarEmail;
     const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
     const _pdl = await obtenerPlantilla('cliente_deposito_liberado', {
@@ -13882,6 +13883,15 @@ app.post('/admin/contacto', requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 // ─── Helper: generar factura PDF ────────────────────────────────────────────
+// Palabra del nombre del archivo de la factura en el idioma del cliente (ej: "invoice").
+// Solo letras sin acentos; si no quedan letras latinas (p. ej. ruso) se usa "invoice".
+function palabraArchivoFactura(lang) {
+  let w = obtenerTexto('fac_nombre_archivo', lang || 'es');
+  if (!w || w.indexOf('[[') === 0) w = 'factura';
+  w = w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return w || 'invoice';
+}
+
 // lang: idioma del PDF. Sin indicar = español (descarga del Admin, contabilidad).
 // 'cliente' = el idioma de la reserva. Textos en Admin → Idiomas → Textos de interfaz → fila "Factura (PDF)".
 async function generarFacturaPDF(reservaId, lang) {
@@ -14166,13 +14176,13 @@ app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, re
     to: emailFinal,
     subject: (_pf && _pf.asunto) || ('📄 Factura ' + factura.numero_factura + ' — Reserva ' + r.numero_reserva),
     html: plantillaEmail((_pf && _pf.email) || `<p>Hola <strong>${r.nombre_cliente}</strong>,</p><p>Adjuntamos la factura <strong>${factura.numero_factura}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p><p>Gracias por viajar con Traslados GC.</p>`),
-    adjunto: { filename: 'factura-' + r.numero_reserva + '.pdf', content: resultado.buffer }
+    adjunto: { filename: palabraArchivoFactura(r.lang_cliente) + '-' + r.numero_reserva + '.pdf', content: resultado.buffer }
   });
   // WhatsApp al cliente con la factura (igual que "Reenviar factura")
   if (r.telefono_cliente) {
     try {
       const firma = firmarFactura(factura.reserva_id);
-      const nombreDoc = `factura-${factura.numero_factura}.pdf`;
+      const nombreDoc = `${palabraArchivoFactura(r.lang_cliente)}-${factura.numero_factura}.pdf`;
       const urlDoc = `${BASE_URL}/factura-descarga/${factura.reserva_id}/${firma}/${nombreDoc}`;
       const textoWa = (_pf && _pf.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${factura.numero_factura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`;
       await pool.query(
