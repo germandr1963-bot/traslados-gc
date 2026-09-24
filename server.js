@@ -1906,6 +1906,7 @@ async function initSchema() {
   `);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS token_valoracion TEXT UNIQUE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS completada_en TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS aviso_pago_fallido_enviado BOOLEAN DEFAULT FALSE`);
 
   // \u2500\u2500\u2500 Tabla de plantillas de comunicaci\u00f3n \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   await pool.query(`
@@ -10166,13 +10167,23 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
     if (!reservaId) return res.json({ received: true });
 
     const reserva = await pool.query('SELECT * FROM reservas WHERE id = $1', [reservaId]);
-    if (reserva.rows.length) {
+    // Solo si el depósito sigue sin pagar y la reserva sigue activa
+    // (evita avisar de un enlace viejo caducado cuando ya pagó con otro, o si está cancelada)
+    if (reserva.rows.length && !reserva.rows[0].deposito_pagado && !reserva.rows[0].aviso_pago_fallido_enviado && !['cancelada', 'completada'].includes(reserva.rows[0].estado)) {
       const r = reserva.rows[0];
+      // Se avisa una sola vez por reserva (si prueba varias tarjetas no recibe varios mensajes)
+      await pool.query('UPDATE reservas SET aviso_pago_fallido_enviado = TRUE WHERE id = $1', [r.id]);
+      const _langPp = r.lang_cliente || 'es';
       try {
+        const _ppp = await obtenerPlantilla('cliente_problema_pago', {
+          nombre_cliente: r.nombre_cliente,
+          numero_reserva: r.numero_reserva
+        }, _langPp);
         await enviarEmail({
           to: r.email_cliente,
-          subject: 'Problema con el pago — ' + r.numero_reserva,
+          subject: (_ppp && _ppp.asunto) || ('Problema con el pago — ' + r.numero_reserva),
           html: plantillaEmail(
+            (_ppp && _ppp.email) ||
             `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
              <p>No hemos podido procesar el pago del depósito para tu reserva <strong>${r.numero_reserva}</strong>.</p>
              <div class="caja-amarilla">⚠️ Por favor contacta con nosotros por WhatsApp para resolver el pago y confirmar tu traslado.</div>
@@ -10181,6 +10192,23 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         });
       } catch(emailErr) {
         console.warn('Error enviando aviso de pago fallido:', emailErr.message);
+      }
+      // WhatsApp al cliente
+      if (r.telefono_cliente) {
+        try {
+          const _pppWa = await obtenerPlantilla('cliente_problema_pago', {
+            nombre_cliente: r.nombre_cliente,
+            numero_reserva: r.numero_reserva
+          }, _langPp);
+          const textoWa = (_pppWa && _pppWa.whatsapp ? _pppWa.whatsapp.replace(/\n{3,}/g, '\n\n') : null) ||
+            `Hola, *${r.nombre_cliente}* 👋\n\n⚠️ No hemos podido procesar el pago del depósito para tu reserva *${r.numero_reserva}*.\n\nPor favor, contacta con nosotros por WhatsApp para resolver el pago y confirmar tu traslado.\n\nSi crees que es un error, puedes intentarlo de nuevo.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
+          await pool.query(
+            'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+            [r.telefono_cliente, textoWa]
+          );
+        } catch(waErr) {
+          console.warn('Error encolando WhatsApp pago fallido:', waErr.message);
+        }
       }
     }
   }
