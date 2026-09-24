@@ -13100,10 +13100,11 @@ app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(
     if (ra.nombre_barco) lineas.push('<strong>Barco:</strong> ' + ra.nombre_barco + (ra.hora_atraque ? ' · Atraque ' + ra.hora_atraque.slice(0,5) : ''));
     if (extrasQ.rows.length) lineas.push('<strong>Extras:</strong> ' + extrasQ.rows.map(e => e.nombre + ' (' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €)').join(', '));
 
+    const _langMa = ra.lang_cliente || 'es';
     const _pma = await obtenerPlantilla('cliente_modificacion_aprobada', {
       nombre_cliente: ra.nombre_cliente,
       numero_reserva: ra.numero_reserva
-    });
+    }, _langMa);
     await enviarEmail({
       to: ra.email_cliente,
       subject: (_pma && _pma.asunto) || ('✅ Tu modificación ha sido aprobada — ' + ra.numero_reserva),
@@ -13117,6 +13118,23 @@ app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(
       )
     });
   } catch(e) { console.warn('Error enviando email aprobación:', e.message); }
+
+  // WhatsApp al cliente
+  if (r.telefono_cliente) {
+    try {
+      const _langMaWa = r.lang_cliente || 'es';
+      const _pmaWa = await obtenerPlantilla('cliente_modificacion_aprobada', {
+        nombre_cliente: r.nombre_cliente,
+        numero_reserva: r.numero_reserva
+      }, _langMaWa);
+      const textoWa = (_pmaWa && _pmaWa.whatsapp ? _pmaWa.whatsapp.replace(/\n{3,}/g, '\n\n') : null) ||
+        `Hola, *${r.nombre_cliente}* 👋\n\n✅ Hemos revisado y aprobado los cambios en tu reserva *${r.numero_reserva}*.\n\n🔍 Accede a tu portal para ver todos los detalles actualizados.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [r.telefono_cliente, textoWa]
+      );
+    } catch(e) { console.warn('Error encolando WhatsApp modificación aprobada:', e.message); }
+  }
 
   res.json({ ok: true, nuevo_estado: nuevoEstado });
 }));
