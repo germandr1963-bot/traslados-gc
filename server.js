@@ -1283,6 +1283,40 @@ async function initSchema() {
     );
   }
 
+  // Factura en PDF que recibe el cliente, en su idioma. ON CONFLICT DO NOTHING:
+  // se crean la primera vez y nunca sobrescriben lo editado en el Admin.
+  const TEXTOS_FACTURA_PDF = [
+    { clave: 'fac_titulo',           contexto: 'Título grande de la factura en PDF, en MAYÚSCULAS', es: 'FACTURA' },
+    { clave: 'fac_numero',           contexto: 'Etiqueta del número de factura (ej: Nº Factura: TGC-2026-0015)', es: 'Nº Factura' },
+    { clave: 'fac_fecha',            contexto: 'Etiqueta de la fecha en que se emite la factura', es: 'Fecha' },
+    { clave: 'fac_datos_cliente',    contexto: 'Título de sección de la factura, en MAYÚSCULAS', es: 'DATOS DEL CLIENTE' },
+    { clave: 'fac_nombre',           contexto: 'Etiqueta del nombre del cliente en la factura', es: 'Nombre' },
+    { clave: 'fac_email',            contexto: 'Etiqueta del email del cliente en la factura', es: 'Email' },
+    { clave: 'fac_telefono',         contexto: 'Etiqueta del teléfono del cliente en la factura', es: 'Teléfono' },
+    { clave: 'fac_detalle_servicio', contexto: 'Título de sección de la factura, en MAYÚSCULAS', es: 'DETALLE DEL SERVICIO' },
+    { clave: 'fac_reserva',          contexto: 'Etiqueta del número de reserva en la factura', es: 'PNR / Nº Reserva' },
+    { clave: 'fac_ruta',             contexto: 'Etiqueta de la ruta (origen → destino) en la factura', es: 'Ruta' },
+    { clave: 'fac_fecha_traslado',   contexto: 'Etiqueta de la fecha del viaje en la factura', es: 'Fecha del traslado' },
+    { clave: 'fac_hora',             contexto: 'Etiqueta de la hora del viaje en la factura', es: 'Hora' },
+    { clave: 'fac_pasajeros',        contexto: 'Etiqueta del número de pasajeros en la factura', es: 'Pasajeros' },
+    { clave: 'fac_categoria',        contexto: 'Etiqueta de la categoría de vehículo en la factura', es: 'Categoría' },
+    { clave: 'fac_vuelo',            contexto: 'Etiqueta del número de vuelo en la factura', es: 'Vuelo' },
+    { clave: 'fac_barco',            contexto: 'Etiqueta del nombre del barco en la factura', es: 'Barco' },
+    { clave: 'fac_importes',         contexto: 'Título de sección de la factura, en MAYÚSCULAS', es: 'IMPORTES' },
+    { clave: 'fac_traslado',         contexto: 'Concepto del precio del viaje en la factura (el programa añade detrás la categoría entre paréntesis)', es: 'Traslado' },
+    { clave: 'fac_extra',            contexto: 'Palabra delante de cada extra en la factura (ej: Extra: Silla de bebé)', es: 'Extra' },
+    { clave: 'fac_total',            contexto: 'Etiqueta del importe total de la factura, en MAYÚSCULAS', es: 'TOTAL' },
+    { clave: 'fac_gracias',          contexto: 'Frase final de la factura', es: 'Gracias por viajar con nosotros.' },
+  ];
+  for (const tx of TEXTOS_FACTURA_PDF) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Factura (PDF)', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
   await cargarTextosCache();
 
   // ─── Tarifario de precios ─────────────────────────────────────────────────
@@ -8441,7 +8475,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   // Generar factura PDF
   let facturaPDF = null;
   try {
-    facturaPDF = await generarFacturaPDF(r.id);
+    facturaPDF = await generarFacturaPDF(r.id, 'cliente');
   } catch(e) { console.warn('Error generando factura PDF en cierre:', e.message); }
 
   // Email valoración al cliente
@@ -10698,7 +10732,7 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
   if (!facturaQ.rows.length) return res.status(400).json({ error: 'No hay factura generada para esta reserva.' });
 
   try {
-    const resultado = await generarFacturaPDF(req.params.id);
+    const resultado = await generarFacturaPDF(req.params.id, 'cliente');
     if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
     const pdfBuffer = resultado.buffer;
     const _pf = await obtenerPlantilla('cliente_factura', {
@@ -11099,7 +11133,7 @@ app.get('/factura-descarga/:id/:firma/:nombre?', asyncHandler(async (req, res) =
   if (req.params.firma !== firmarFactura(req.params.id)) {
     return res.status(403).send('Enlace no válido o caducado.');
   }
-  const resultado = await generarFacturaPDF(req.params.id);
+  const resultado = await generarFacturaPDF(req.params.id, 'cliente');
   if (!resultado) return res.status(404).send('Factura no disponible.');
   const nombreArchivo = req.params.nombre || 'factura-' + (resultado.numero_reserva || req.params.id) + '.pdf';
   res.set('Content-Type', 'application/pdf');
@@ -13611,7 +13645,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
   let facturaBuffer = null;
   let numeroFactura = null;
   try {
-    const resultado = await generarFacturaPDF(req.params.id);
+    const resultado = await generarFacturaPDF(req.params.id, 'cliente');
     if (resultado) {
       facturaBuffer = resultado.buffer;
       numeroFactura = resultado.numeroFactura;
@@ -13848,7 +13882,9 @@ app.post('/admin/contacto', requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 // ─── Helper: generar factura PDF ────────────────────────────────────────────
-async function generarFacturaPDF(reservaId) {
+// lang: idioma del PDF. Sin indicar = español (descarga del Admin, contabilidad).
+// 'cliente' = el idioma de la reserva. Textos en Admin → Idiomas → Textos de interfaz → fila "Factura (PDF)".
+async function generarFacturaPDF(reservaId, lang) {
   const reservaQ = await pool.query(
     `SELECT r.*, cv.nombre AS categoria_nombre
      FROM reservas r
@@ -13857,9 +13893,12 @@ async function generarFacturaPDF(reservaId) {
   );
   if (!reservaQ.rows.length) return null;
   const r = reservaQ.rows[0];
+  let _lang = (lang === 'cliente') ? (r.lang_cliente || 'es') : (lang || 'es');
+  if (!IDIOMAS_PERMITIDOS.includes(_lang)) _lang = 'es';
+  const tf = function(clave) { return obtenerTexto(clave, _lang); };
 
   const extrasQ = await pool.query(
-    `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
+    `SELECT e.nombre, re.extra_id, re.precio_en_reserva FROM reservas_extras re
      JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`, [reservaId]
   );
   const extras = extrasQ.rows;
@@ -13900,8 +13939,15 @@ async function generarFacturaPDF(reservaId) {
     );
   }
 
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
-  const fechaFactura = new Date().toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'});
+  const fechaViaje = r.fecha ? fechaCliente(r.fecha, _lang) : '—';
+  const fechaFactura = fechaCliente(new Date(), _lang);
+  const rutaTexto = ((await traducirLugarCliente(r.origen, _lang)) || '—') + ' → ' + ((await traducirLugarCliente(r.destino, _lang)) || '—');
+  const categoriaTexto = (await traducirCategoriaCliente(r.categoria_nombre, _lang)) || '—';
+  const nombreExtra = function(e) {
+    if (_lang === 'es') return e.nombre;
+    const t = obtenerTexto('extra_web_' + e.extra_id, _lang);
+    return (t && t.indexOf('[[') !== 0) ? t : e.nombre;
+  };
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', layout: 'portrait', margin: 50 });
@@ -13910,20 +13956,34 @@ async function generarFacturaPDF(reservaId) {
     doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), numeroFactura, numero_reserva: r.numero_reserva }));
     doc.on('error', reject);
 
+    // Letra con todos los alfabetos (ruso incluido) y la flecha →. Si faltan los archivos, la de siempre.
+    let FUENTE = 'Helvetica', FUENTE_NEGRITA = 'Helvetica-Bold';
+    try {
+      const _fR = path.join(__dirname, 'fonts', 'DejaVuSans.ttf');
+      const _fB = path.join(__dirname, 'fonts', 'DejaVuSans-Bold.ttf');
+      if (require('fs').existsSync(_fR) && require('fs').existsSync(_fB)) {
+        doc.registerFont('Texto', _fR);
+        doc.registerFont('TextoNegrita', _fB);
+        FUENTE = 'Texto'; FUENTE_NEGRITA = 'TextoNegrita';
+      }
+    } catch (errFuente) {
+      console.warn('Factura PDF: letra DejaVu no disponible, se usa Helvetica:', errFuente.message);
+    }
+
     const W = doc.page.width - 100;
     let y = 50;
 
     const linea = (texto, negrita, tam, color) => {
       if (!texto) return;
       tam = tam || 11; color = color || '#1C1815';
-      doc.fontSize(tam).font(negrita ? 'Helvetica-Bold' : 'Helvetica').fillColor(color).text(texto, 50, y, { width: W });
+      doc.fontSize(tam).font(negrita ? FUENTE_NEGRITA : FUENTE).fillColor(color).text(texto, 50, y, { width: W });
       y += tam + 5;
     };
 
     const lineaDoble = (label, valor) => {
       const yAntes = doc.y;
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#1C1815').text(label + ': ', 50, y, { continued: true, width: W });
-      doc.font('Helvetica').fillColor('#333333').text(valor || '—', { width: W });
+      doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815').text(label + ': ', 50, y, { continued: true, width: W });
+      doc.font(FUENTE).fillColor('#333333').text(valor || '—', { width: W });
       y = doc.y + 4;
     };
 
@@ -13934,7 +13994,7 @@ async function generarFacturaPDF(reservaId) {
     };
 
     // Cabecera empresa
-    doc.fontSize(18).font('Helvetica-Bold').fillColor('#1C1815').text(cfg.razon_social || 'Traslados GC', 50, y, { width: W }); y += 24;
+    doc.fontSize(18).font(FUENTE_NEGRITA).fillColor('#1C1815').text(cfg.razon_social || 'Traslados GC', 50, y, { width: W }); y += 24;
     if (cfg.nif) linea('NIF: ' + cfg.nif, false, 10, '#555555');
     if (cfg.direccion) linea(cfg.direccion, false, 10, '#555555');
     if (cfg.codigo_postal || cfg.ciudad) linea([cfg.codigo_postal, cfg.ciudad].filter(Boolean).join(' '), false, 10, '#555555');
@@ -13944,53 +14004,53 @@ async function generarFacturaPDF(reservaId) {
 
     // Título factura
     y += 6;
-    doc.fontSize(20).font('Helvetica-Bold').fillColor('#C1502E').text('FACTURA', 50, y, { align: 'center', width: W }); y += 30;
+    doc.fontSize(20).font(FUENTE_NEGRITA).fillColor('#C1502E').text(tf('fac_titulo'), 50, y, { align: 'center', width: W }); y += 30;
     separador();
 
     // Datos factura
-    lineaDoble('Nº Factura', numeroFactura);
-    lineaDoble('Fecha', fechaFactura);
+    lineaDoble(tf('fac_numero'), numeroFactura);
+    lineaDoble(tf('fac_fecha'), fechaFactura);
     separador();
 
     // Datos cliente
-    doc.fontSize(12).font('Helvetica-Bold').fillColor('#555555').text('DATOS DEL CLIENTE', 50, y, { width: W }); y += 18;
-    lineaDoble('Nombre', r.nombre_cliente);
-    lineaDoble('Email', r.email_cliente);
-    lineaDoble('Teléfono', r.telefono_cliente);
+    doc.fontSize(12).font(FUENTE_NEGRITA).fillColor('#555555').text(tf('fac_datos_cliente'), 50, y, { width: W }); y += 18;
+    lineaDoble(tf('fac_nombre'), r.nombre_cliente);
+    lineaDoble(tf('fac_email'), r.email_cliente);
+    lineaDoble(tf('fac_telefono'), r.telefono_cliente);
     separador();
 
     // Detalle servicio
-    doc.fontSize(12).font('Helvetica-Bold').fillColor('#555555').text('DETALLE DEL SERVICIO', 50, y, { width: W }); y += 18;
-    lineaDoble('PNR / Nº Reserva', r.numero_reserva);
-    lineaDoble('Ruta', (r.origen || '—') + ' → ' + (r.destino || '—'));
-    lineaDoble('Fecha del traslado', fechaViaje);
-    lineaDoble('Hora', r.hora ? r.hora.slice(0,5) : '—');
-    lineaDoble('Pasajeros', String(r.num_pasajeros || '—'));
-    lineaDoble('Categoría', r.categoria_nombre || '—');
-    if (r.numero_vuelo) lineaDoble('Vuelo', r.numero_vuelo);
-    if (r.nombre_barco) lineaDoble('Barco', r.nombre_barco);
+    doc.fontSize(12).font(FUENTE_NEGRITA).fillColor('#555555').text(tf('fac_detalle_servicio'), 50, y, { width: W }); y += 18;
+    lineaDoble(tf('fac_reserva'), r.numero_reserva);
+    lineaDoble(tf('fac_ruta'), rutaTexto);
+    lineaDoble(tf('fac_fecha_traslado'), fechaViaje);
+    lineaDoble(tf('fac_hora'), r.hora ? r.hora.slice(0,5) : '—');
+    lineaDoble(tf('fac_pasajeros'), String(r.num_pasajeros || '—'));
+    lineaDoble(tf('fac_categoria'), categoriaTexto);
+    if (r.numero_vuelo) lineaDoble(tf('fac_vuelo'), r.numero_vuelo);
+    if (r.nombre_barco) lineaDoble(tf('fac_barco'), r.nombre_barco);
     separador();
 
     // Importes
-    doc.fontSize(12).font('Helvetica-Bold').fillColor('#555555').text('IMPORTES', 50, y, { width: W }); y += 18;
-    doc.fontSize(11).font('Helvetica').fillColor('#1C1815').text('Traslado (' + (r.categoria_nombre || '—') + ')', 50, y, { continued: true, width: W });
-    doc.font('Helvetica-Bold').text('    ' + (parseFloat(r.precio_estimado) || 0).toFixed(2) + ' €'); y += 16;
+    doc.fontSize(12).font(FUENTE_NEGRITA).fillColor('#555555').text(tf('fac_importes'), 50, y, { width: W }); y += 18;
+    doc.fontSize(11).font(FUENTE).fillColor('#1C1815').text(tf('fac_traslado') + ' (' + categoriaTexto + ')', 50, y, { continued: true, width: W });
+    doc.font(FUENTE_NEGRITA).text('    ' + (parseFloat(r.precio_estimado) || 0).toFixed(2) + ' €'); y += 16;
     extras.forEach(function(e) {
-      doc.fontSize(11).font('Helvetica').fillColor('#1C1815').text('Extra: ' + e.nombre, 50, y, { continued: true, width: W });
-      doc.font('Helvetica-Bold').text('    ' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €'); y += 16;
+      doc.fontSize(11).font(FUENTE).fillColor('#1C1815').text(tf('fac_extra') + ': ' + nombreExtra(e), 50, y, { continued: true, width: W });
+      doc.font(FUENTE_NEGRITA).text('    ' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €'); y += 16;
     });
     conceptosExtra.forEach(function(c) {
-      doc.fontSize(11).font('Helvetica').fillColor('#1C1815').text(c.descripcion, 50, y, { continued: true, width: W });
-      doc.font('Helvetica-Bold').text('    ' + parseFloat(c.importe).toFixed(2) + ' €'); y += 16;
+      doc.fontSize(11).font(FUENTE).fillColor('#1C1815').text(c.descripcion, 50, y, { continued: true, width: W });
+      doc.font(FUENTE_NEGRITA).text('    ' + parseFloat(c.importe).toFixed(2) + ' €'); y += 16;
     });
     separador();
 
     // Total
-    doc.fontSize(14).font('Helvetica-Bold').fillColor('#1C1815').text('TOTAL: ', 50, y, { continued: true, width: W });
+    doc.fontSize(14).font(FUENTE_NEGRITA).fillColor('#1C1815').text(tf('fac_total') + ': ', 50, y, { continued: true, width: W });
     doc.fillColor('#C1502E').text(totalFactura.toFixed(2) + ' €'); y += 25;
     separador();
 
-    linea('Gracias por viajar con nosotros.', false, 10, '#555555');
+    linea(tf('fac_gracias'), false, 10, '#555555');
 
     doc.end();
   });
@@ -14094,7 +14154,7 @@ app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, re
   const emailFinal = emailDestino || r.email_cliente;
   if (!emailFinal) return res.status(400).json({ error: 'No hay email de destino.' });
 
-  const resultado = await generarFacturaPDF(factura.reserva_id);
+  const resultado = await generarFacturaPDF(factura.reserva_id, 'cliente');
   if (!resultado) return res.status(500).json({ error: 'Error generando la factura.' });
 
   const _pf = await obtenerPlantilla('cliente_factura', {
