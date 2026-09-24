@@ -10780,6 +10780,54 @@ async function traducirCategoriaCliente(nombre, lang) {
   return nombre;
 }
 
+// Resumen de los datos de una reserva en el idioma del cliente, para los mensajes
+// "Reserva actualizada" y "Modificación aprobada". canal: 'email' (HTML) o 'whatsapp' (texto).
+async function resumenReservaCliente(reservaId, lang, canal) {
+  const _lang = lang || 'es';
+  const rq = await pool.query(
+    `SELECT r.*, cv.nombre AS categoria_nombre FROM reservas r
+     LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id WHERE r.id = $1`,
+    [reservaId]
+  );
+  if (!rq.rows.length) return '';
+  const ra = rq.rows[0];
+  const exq = await pool.query(
+    `SELECT e.nombre, re.extra_id, re.precio_en_reserva FROM reservas_extras re
+     JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`,
+    [reservaId]
+  );
+  const f = async (clave, respaldo) => obtenerFrase(clave, _lang, respaldo);
+  const et = (txt) => canal === 'whatsapp' ? '*' + txt + ':* ' : '<strong>' + txt + ':</strong> ';
+  const origen  = (await traducirLugarCliente(ra.origen, _lang)) || '—';
+  const destino = (await traducirLugarCliente(ra.destino, _lang)) || '—';
+  const categoria = (await traducirCategoriaCliente(ra.categoria_nombre, _lang)) || '—';
+  const lineas = [
+    et(await f('frase_resumen_ruta', 'Ruta')) + origen + ' → ' + destino,
+    et(await f('frase_resumen_fecha', 'Fecha')) + (ra.fecha ? fechaCliente(ra.fecha, _lang) : '—'),
+    et(await f('frase_resumen_hora_recogida', 'Hora de recogida')) + (ra.hora ? ra.hora.slice(0,5) : '—'),
+    et(await f('frase_resumen_pasajeros', 'Pasajeros')) + (ra.num_pasajeros || '—'),
+    et(await f('frase_resumen_categoria', 'Categoría')) + categoria,
+    et(await f('frase_resumen_precio_estimado', 'Precio estimado')) + (ra.precio_estimado ? parseFloat(ra.precio_estimado).toFixed(2) + ' €' : '—'),
+  ];
+  if (ra.direccion_recogida) lineas.push(et(await f('frase_resumen_dir_recogida', 'Dirección de recogida')) + ra.direccion_recogida);
+  if (ra.direccion_destino) lineas.push(et(await f('frase_resumen_dir_destino', 'Dirección de destino')) + ra.direccion_destino);
+  if (ra.numero_vuelo) lineas.push(et(await f('frase_resumen_vuelo', 'Vuelo')) + ra.numero_vuelo + (ra.hora_llegada_vuelo ? ' · ' + (await f('frase_resumen_llegada', 'Llegada')) + ' ' + ra.hora_llegada_vuelo.slice(0,5) : ''));
+  if (ra.nombre_barco) lineas.push(et(await f('frase_resumen_barco', 'Barco')) + ra.nombre_barco + (ra.hora_atraque ? ' · ' + (await f('frase_resumen_atraque', 'Atraque')) + ' ' + ra.hora_atraque.slice(0,5) : ''));
+  if (exq.rows.length) {
+    const nombres = exq.rows.map(function(e) {
+      let n = e.nombre;
+      if (_lang !== 'es') {
+        const t = obtenerTexto('extra_web_' + e.extra_id, _lang);
+        if (t && t.indexOf('[[') !== 0) n = t;
+      }
+      return n + ' (' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €)';
+    });
+    lineas.push(et(await f('frase_resumen_extras', 'Extras')) + nombres.join(', '));
+  }
+  if (ra.notas_cliente) lineas.push(et(await f('frase_resumen_notas', 'Notas')) + ra.notas_cliente);
+  return lineas.join(canal === 'whatsapp' ? '\n' : '<br>');
+}
+
 async function formatearExtrasEmail(reservaId, lang) {
   try {
     const result = await pool.query(
@@ -13103,7 +13151,8 @@ app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(
     const _langMa = ra.lang_cliente || 'es';
     const _pma = await obtenerPlantilla('cliente_modificacion_aprobada', {
       nombre_cliente: ra.nombre_cliente,
-      numero_reserva: ra.numero_reserva
+      numero_reserva: ra.numero_reserva,
+      resumen: await resumenReservaCliente(ra.id, _langMa, 'email')
     }, _langMa);
     await enviarEmail({
       to: ra.email_cliente,
@@ -13125,7 +13174,8 @@ app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(
       const _langMaWa = r.lang_cliente || 'es';
       const _pmaWa = await obtenerPlantilla('cliente_modificacion_aprobada', {
         nombre_cliente: r.nombre_cliente,
-        numero_reserva: r.numero_reserva
+        numero_reserva: r.numero_reserva,
+        resumen: await resumenReservaCliente(r.id, _langMaWa, 'whatsapp')
       }, _langMaWa);
       const textoWa = (_pmaWa && _pmaWa.whatsapp ? _pmaWa.whatsapp.replace(/\n{3,}/g, '\n\n') : null) ||
         `Hola, *${r.nombre_cliente}* 👋\n\n✅ Hemos revisado y aprobado los cambios en tu reserva *${r.numero_reserva}*.\n\n🔍 Accede a tu portal para ver todos los detalles actualizados.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
@@ -13297,7 +13347,7 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
 
   // ── Extras finales para el email ─────────────────────────────────────────
   const extrasFinalesQ = await pool.query(
-    `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`,
+    `SELECT e.nombre, re.extra_id, re.precio_en_reserva FROM reservas_extras re JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`,
     [req.params.id]
   );
   const extrasFin = extrasFinalesQ.rows;
@@ -13310,28 +13360,51 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
       [req.params.id, 'admin', texto]
     );
 
-    // Enviar email al cliente con resumen actualizado
+    // Enviar email al cliente con resumen actualizado (plantilla de Admin → Comunicaciones, en su idioma)
+    const _langRa = ra.lang_cliente || 'es';
     try {
-      const fechaViaje = ra.fecha ? new Date(ra.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+      const fechaViaje = ra.fecha ? fechaCliente(ra.fecha, _langRa) : '—';
+      const _f = async (clave, respaldo) => obtenerFrase(clave, _langRa, respaldo);
+      const _origenRa  = (await traducirLugarCliente(ra.origen, _langRa)) || '—';
+      const _destinoRa = (await traducirLugarCliente(ra.destino, _langRa)) || '—';
+      const _catRa     = (await traducirCategoriaCliente(ra.categoria_nombre, _langRa)) || '—';
       const lineas = [
-        '<strong>Ruta:</strong> ' + (ra.origen || '—') + ' → ' + (ra.destino || '—'),
-        '<strong>Fecha:</strong> ' + fechaViaje,
-        '<strong>Hora de recogida:</strong> ' + (ra.hora ? ra.hora.slice(0,5) : '—'),
-        '<strong>Pasajeros:</strong> ' + (ra.num_pasajeros || '—'),
-        '<strong>Categoría:</strong> ' + (ra.categoria_nombre || '—'),
-        '<strong>Precio estimado:</strong> ' + (ra.precio_estimado ? parseFloat(ra.precio_estimado).toFixed(2) + ' €' : '—'),
+        '<strong>' + (await _f('frase_resumen_ruta', 'Ruta')) + ':</strong> ' + _origenRa + ' → ' + _destinoRa,
+        '<strong>' + (await _f('frase_resumen_fecha', 'Fecha')) + ':</strong> ' + fechaViaje,
+        '<strong>' + (await _f('frase_resumen_hora_recogida', 'Hora de recogida')) + ':</strong> ' + (ra.hora ? ra.hora.slice(0,5) : '—'),
+        '<strong>' + (await _f('frase_resumen_pasajeros', 'Pasajeros')) + ':</strong> ' + (ra.num_pasajeros || '—'),
+        '<strong>' + (await _f('frase_resumen_categoria', 'Categoría')) + ':</strong> ' + _catRa,
+        '<strong>' + (await _f('frase_resumen_precio_estimado', 'Precio estimado')) + ':</strong> ' + (ra.precio_estimado ? parseFloat(ra.precio_estimado).toFixed(2) + ' €' : '—'),
       ];
-      if (ra.direccion_recogida) lineas.push('<strong>Dirección de recogida:</strong> ' + ra.direccion_recogida);
-      if (ra.direccion_destino) lineas.push('<strong>Dirección de destino:</strong> ' + ra.direccion_destino);
-      if (ra.numero_vuelo) lineas.push('<strong>Vuelo:</strong> ' + ra.numero_vuelo + (ra.hora_llegada_vuelo ? ' · Llegada ' + ra.hora_llegada_vuelo.slice(0,5) : ''));
-      if (ra.nombre_barco) lineas.push('<strong>Barco:</strong> ' + ra.nombre_barco + (ra.hora_atraque ? ' · Atraque ' + ra.hora_atraque.slice(0,5) : ''));
-      if (extrasFin.length) lineas.push('<strong>Extras:</strong> ' + extrasFin.map(function(e) { return e.nombre + ' (' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €)'; }).join(', '));
-      if (ra.notas_cliente) lineas.push('<strong>Notas:</strong> ' + ra.notas_cliente);
+      if (ra.direccion_recogida) lineas.push('<strong>' + (await _f('frase_resumen_dir_recogida', 'Dirección de recogida')) + ':</strong> ' + ra.direccion_recogida);
+      if (ra.direccion_destino) lineas.push('<strong>' + (await _f('frase_resumen_dir_destino', 'Dirección de destino')) + ':</strong> ' + ra.direccion_destino);
+      if (ra.numero_vuelo) lineas.push('<strong>' + (await _f('frase_resumen_vuelo', 'Vuelo')) + ':</strong> ' + ra.numero_vuelo + (ra.hora_llegada_vuelo ? ' · ' + (await _f('frase_resumen_llegada', 'Llegada')) + ' ' + ra.hora_llegada_vuelo.slice(0,5) : ''));
+      if (ra.nombre_barco) lineas.push('<strong>' + (await _f('frase_resumen_barco', 'Barco')) + ':</strong> ' + ra.nombre_barco + (ra.hora_atraque ? ' · ' + (await _f('frase_resumen_atraque', 'Atraque')) + ' ' + ra.hora_atraque.slice(0,5) : ''));
+      if (extrasFin.length) {
+        const _nombresExtras = extrasFin.map(function(e) {
+          let n = e.nombre;
+          if (_langRa !== 'es') {
+            const t = obtenerTexto('extra_web_' + e.extra_id, _langRa);
+            if (t && t.indexOf('[[') !== 0) n = t;
+          }
+          return n + ' (' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €)';
+        });
+        lineas.push('<strong>' + (await _f('frase_resumen_extras', 'Extras')) + ':</strong> ' + _nombresExtras.join(', '));
+      }
+      if (ra.notas_cliente) lineas.push('<strong>' + (await _f('frase_resumen_notas', 'Notas')) + ':</strong> ' + ra.notas_cliente);
+
+      const _pra = await obtenerPlantilla('cliente_reserva_actualizada', {
+        nombre_cliente: ra.nombre_cliente,
+        numero_reserva: ra.numero_reserva,
+        resumen: lineas.join('<br>'),
+        url_portal: BASE_URL + '/mi-reserva'
+      }, _langRa);
 
       await enviarEmail({
         to: ra.email_cliente,
-        subject: '✏️ Tu reserva ' + ra.numero_reserva + ' ha sido actualizada',
+        subject: (_pra && _pra.asunto) || ('✏️ Tu reserva ' + ra.numero_reserva + ' ha sido actualizada'),
         html: plantillaEmail(
+          (_pra && _pra.email) ||
           `<p>Hola <strong>${ra.nombre_cliente}</strong>,</p>
            <p>Tu reserva <strong>${ra.numero_reserva}</strong> ha sido actualizada por nuestro equipo.</p>
            <p><strong>Resumen actualizado:</strong></p>
@@ -13341,6 +13414,24 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
         )
       });
     } catch(e) { console.warn('Error enviando email de modificación al cliente:', e.message); }
+
+    // WhatsApp al cliente
+    if (ra.telefono_cliente) {
+      try {
+        const _praWa = await obtenerPlantilla('cliente_reserva_actualizada', {
+          nombre_cliente: ra.nombre_cliente,
+          numero_reserva: ra.numero_reserva,
+          resumen: await resumenReservaCliente(ra.id, _langRa, 'whatsapp'),
+          url_portal: BASE_URL + '/mi-reserva'
+        }, _langRa);
+        const textoWa = (_praWa && _praWa.whatsapp ? _praWa.whatsapp.replace(/\n{3,}/g, '\n\n') : null) ||
+          `Hola, *${ra.nombre_cliente}* 👋\n\n✏️ Tu reserva *${ra.numero_reserva}* ha sido actualizada por nuestro equipo.\n\n🔍 Si tienes alguna pregunta, accede a tu portal:\n${BASE_URL}/mi-reserva\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
+        await pool.query(
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+          [ra.telefono_cliente, textoWa]
+        );
+      } catch(e) { console.warn('Error encolando WhatsApp reserva actualizada:', e.message); }
+    }
   }
 
   res.json({ ok: true, cambios: cambios.length });
