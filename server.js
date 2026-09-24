@@ -10828,7 +10828,9 @@ async function resumenReservaCliente(reservaId, lang, canal) {
         ? n + ' (' + fIncluido + ')'
         : n + ' (' + precio.toFixed(2) + ' € — ' + fAPagar + ')';
     });
-    lineas.push(et(await f('frase_resumen_extras', 'Extras')) + nombres.join(', '));
+    // Un extra por línea, en forma de lista
+    const sep = canal === 'whatsapp' ? '\n• ' : '<br>&nbsp;&nbsp;&#183; ';
+    lineas.push(et(await f('frase_resumen_extras', 'Extras')) + sep + nombres.join(sep));
   }
   if (ra.notas_cliente) lineas.push(et(await f('frase_resumen_notas', 'Notas')) + ra.notas_cliente);
   return lineas.join(canal === 'whatsapp' ? '\n' : '<br>');
