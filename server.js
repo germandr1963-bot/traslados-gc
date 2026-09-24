@@ -10814,13 +10814,19 @@ async function resumenReservaCliente(reservaId, lang, canal) {
   if (ra.numero_vuelo) lineas.push(et(await f('frase_resumen_vuelo', 'Vuelo')) + ra.numero_vuelo + (ra.hora_llegada_vuelo ? ' · ' + (await f('frase_resumen_llegada', 'Llegada')) + ' ' + ra.hora_llegada_vuelo.slice(0,5) : ''));
   if (ra.nombre_barco) lineas.push(et(await f('frase_resumen_barco', 'Barco')) + ra.nombre_barco + (ra.hora_atraque ? ' · ' + (await f('frase_resumen_atraque', 'Atraque')) + ' ' + ra.hora_atraque.slice(0,5) : ''));
   if (exq.rows.length) {
+    // Todos los extras, gratis y de pago, con las mismas palabras que la confirmación
+    const fIncluido = await f('frase_extras_incluido', 'incluido');
+    const fAPagar   = await f('frase_extras_a_pagar', 'a pagar al conductor');
     const nombres = exq.rows.map(function(e) {
       let n = e.nombre;
       if (_lang !== 'es') {
         const t = obtenerTexto('extra_web_' + e.extra_id, _lang);
         if (t && t.indexOf('[[') !== 0) n = t;
       }
-      return n + ' (' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €)';
+      const precio = parseFloat(e.precio_en_reserva);
+      return (!precio || precio === 0)
+        ? n + ' (' + fIncluido + ')'
+        : n + ' (' + precio.toFixed(2) + ' € — ' + fAPagar + ')';
     });
     lineas.push(et(await f('frase_resumen_extras', 'Extras')) + nombres.join(', '));
   }
@@ -13396,7 +13402,7 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
       const _pra = await obtenerPlantilla('cliente_reserva_actualizada', {
         nombre_cliente: ra.nombre_cliente,
         numero_reserva: ra.numero_reserva,
-        resumen: lineas.join('<br>'),
+        resumen: await resumenReservaCliente(ra.id, _langRa, 'email'),
         url_portal: BASE_URL + '/mi-reserva'
       }, _langRa);
 
