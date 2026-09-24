@@ -10467,7 +10467,8 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
   await pool.query('UPDATE reservas SET stripe_session_id = $1 WHERE id = $2', [session.id, r.id]);
 
   // Enviar email con nuevo enlace
-  const botonPagoReenvio = `<p style="text-align:center;margin:12px 0;"><a href="${session.url}" class="boton">💳 Pagar depósito de ${importe} €</a></p>`;
+  const _txtBotonPagoReenvio = (await obtenerFrase('frase_boton_pagar_deposito', lang, 'Pagar depósito de {importe} €')).replace('{importe}', importe);
+  const botonPagoReenvio = `<p style="text-align:center;margin:12px 0;"><a href="${session.url}" class="boton">💳 ${_txtBotonPagoReenvio}</a></p>`;
   const codigoPagoEmail = await generarCodigoCorto('pago', r.id, null, session.url);
   const urlCortaEmail = `${BASE_URL}/v/${codigoPagoEmail}`;
   const _pep = await obtenerPlantilla('cliente_enlace_pago', {
@@ -10476,7 +10477,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
     importe: importe,
     url_pago: urlCortaEmail,
     boton_pago: botonPagoReenvio
-  });
+  }, lang);
   const html = plantillaEmail(
     (_pep && _pep.email) ||
     `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
@@ -10507,7 +10508,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
         importe: importe,
         url_pago: urlCorta,
         url_corta: urlCorta
-      });
+      }, lang);
       const textoWa = (_pepwa && _pepwa.whatsapp) ||
         `Hola, *${r.nombre_cliente}* 👋\n\n💳 Te reenviamos el enlace de pago para confirmar tu reserva *${r.numero_reserva}*.\n\n👉 ${urlCorta}\n\n❓ Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
       await pool.query(
@@ -12995,12 +12996,13 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
 
   // Confirmar al cliente
   try {
-    const fechaTextoCancel = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+    const _langCancel = r.lang_cliente || 'es';
+    const fechaTextoCancel = r.fecha ? fechaCliente(r.fecha, _langCancel) : '—';
     const avisoDeposito = r.deposito_pagado
       ? (fueraDePlazo
-          ? '<p style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:10px 14px;font-size:13px;color:#856404;">⚠️ La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía ha sido retenido según nuestra política de cancelación.</p>'
-          : '<p style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:10px 14px;font-size:13px;color:#2e7d32;">✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.</p>')
-      : '<p style="color:#2e7d32;font-size:13px;">✅ La cancelación se ha realizado dentro del plazo establecido.</p>';
+          ? '<p style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:10px 14px;font-size:13px;color:#856404;">⚠️ ' + (await obtenerFrase('frase_cancel_email_fuera_plazo', _langCancel, 'La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía ha sido retenido según nuestra política de cancelación.')) + '</p>'
+          : '<p style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:10px 14px;font-size:13px;color:#2e7d32;">✅ ' + (await obtenerFrase('frase_cancel_email_dentro_plazo_deposito', _langCancel, 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.')) + '</p>')
+      : ''; // Sin depósito pagado: no hay nada que devolver ni retener, no se añade aviso
     const _pcancelE = await obtenerPlantilla('cliente_cancelacion', {
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva,
@@ -13008,7 +13010,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
       destino: r.destino || '—',
       fecha: fechaTextoCancel,
       aviso_deposito: avisoDeposito
-    });
+    }, _langCancel);
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pcancelE && _pcancelE.asunto) || ('Tu reserva ' + r.numero_reserva + ' ha sido cancelada'),
@@ -13029,16 +13031,17 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
   // WhatsApp al cliente
   if (r.telefono_cliente) {
     try {
-      const fechaTextoWa = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+      const _langCancelWa = r.lang_cliente || 'es';
+      const fechaTextoWa = r.fecha ? fechaCliente(r.fecha, _langCancelWa) : '—';
       const _pcancelWa = await obtenerPlantilla('cliente_cancelacion', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
         origen: r.origen || '—',
         destino: r.destino || '—',
         fecha: fechaTextoWa,
-        aviso_deposito: fueraDePlazo ? '⚠️ La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido.' : '✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve.'
-      });
-      const textoWa = (_pcancelWa && _pcancelWa.whatsapp) || (fueraDePlazo
+        aviso_deposito: !r.deposito_pagado ? '' : fueraDePlazo ? '⚠️ ' + (await obtenerFrase('frase_cancel_wa_fuera_plazo', _langCancelWa, 'La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido.')) : '✅ ' + (await obtenerFrase('frase_cancel_wa_dentro_plazo', _langCancelWa, 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve.'))
+      }, _langCancelWa);
+      const textoWa = (_pcancelWa && _pcancelWa.whatsapp ? _pcancelWa.whatsapp.replace(/\n{3,}/g, '\n\n') : null) || (fueraDePlazo
         ? `Hola, ${r.nombre_cliente} 👋\n\nTu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTextoWa} ha sido cancelada.\n\n⚠️ La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido según nuestra política de cancelación.\n\nSi tienes alguna duda, contáctanos. Un saludo 🙏`
         : `Hola, ${r.nombre_cliente} 👋\n\nTu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTextoWa} ha sido cancelada correctamente.\n\n✅ La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.\n\nUn saludo 🙏`);
       await pool.query(
@@ -14751,8 +14754,8 @@ async function cancelarReservasSinPago() {
             numero_reserva: r.numero_reserva,
             origen: r.origen || '—',
             destino: r.destino || '—',
-            fecha: fechaTexto
-          });
+            fecha: fechaCliente(r.fecha, r.lang_cliente || 'es')
+          }, r.lang_cliente || 'es');
           await enviarEmail({
             to: r.email_cliente,
             subject: (_pcliente && _pcliente.asunto) || ('❌ Tu reserva ' + r.numero_reserva + ' ha sido cancelada por falta de pago'),
@@ -14779,8 +14782,8 @@ async function cancelarReservasSinPago() {
               numero_reserva: r.numero_reserva,
               origen: r.origen || '—',
               destino: r.destino || '—',
-              fecha: fechaTexto
-            });
+              fecha: fechaCliente(r.fecha, r.lang_cliente || 'es')
+            }, r.lang_cliente || 'es');
             const textoWaCliente = (_pclientewa && _pclientewa.whatsapp) ||
               `Hola, ${r.nombre_cliente} 👋\n\n❌ Tu reserva ${r.numero_reserva} ha sido cancelada automáticamente.\n\nNo hemos recibido el pago del depósito de garantía en el plazo establecido.\n\n📍 Ruta: ${r.origen || '—'} → ${r.destino || '—'}\n📅 Fecha: ${fechaTexto}\n\nSi deseas realizar este traslado, puedes enviarnos una nueva solicitud. Un saludo 🙏`;
             await pool.query(
