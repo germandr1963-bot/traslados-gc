@@ -11304,6 +11304,32 @@ app.get('/factura-descarga/:id/:firma/:nombre?', asyncHandler(async (req, res) =
   res.send(resultado.buffer);
 }));
 
+// ─── Portal del cliente: descargar su factura (en su idioma) ─────────────────
+app.get('/api/cliente/factura/:id', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).send('No autenticado.');
+  let emailCliente = req.session.clienteEmail || null;
+  if (!emailCliente) {
+    const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+    if (!emailResult.rows.length) return res.status(401).send('No autenticado.');
+    emailCliente = emailResult.rows[0].email_cliente;
+  }
+  if (!emailCliente) return res.status(401).send('No autenticado.');
+  const reservaQ = await pool.query(
+    'SELECT id, lang_cliente FROM reservas WHERE id = $1 AND LOWER(email_cliente) = LOWER($2) AND archivada = FALSE',
+    [req.params.id, emailCliente]
+  );
+  if (!reservaQ.rows.length) return res.status(404).send('Factura no disponible.');
+  // Solo si la factura ya existe (no se crea desde el portal)
+  const facturaQ = await pool.query('SELECT id FROM facturas WHERE reserva_id = $1 LIMIT 1', [req.params.id]);
+  if (!facturaQ.rows.length) return res.status(404).send('Factura no disponible.');
+  const resultado = await generarFacturaPDF(req.params.id, 'cliente');
+  if (!resultado) return res.status(404).send('Factura no disponible.');
+  const nombreArchivo = palabraArchivoFactura(reservaQ.rows[0].lang_cliente || 'es') + '-' + (resultado.numeroFactura || resultado.numero_reserva || req.params.id) + '.pdf';
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
+  res.send(resultado.buffer);
+}));
+
 // ─── Admin: extras ────────────────────────────────────────────────────────────
 app.get('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
@@ -12957,7 +12983,8 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
     const cfgNoshow = await obtenerConfigNoshow(r.fecha);
     const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
     const ahora = new Date();
-    const esHistorial = new Date(r.fecha) < ahora;
+    // Historial solo cuando ya ha pasado la hora del viaje (no desde las 00:00 del mismo día)
+    const esHistorial = ahora >= calcularFechaCancelacion(new Date(r.fecha), r.hora, 0);
     const facturaQ = await pool.query('SELECT id FROM facturas WHERE reserva_id = $1 LIMIT 1', [r.id]);
     return Object.assign({}, r, {
       extras: extras.rows,
