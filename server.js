@@ -8583,6 +8583,38 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
     }
   }
 
+  // Aviso "Depósito liberado" al cliente (en su idioma, email + WhatsApp, sin factura: ya la recibe arriba).
+  // Se envía sin esperar a Stripe.
+  if (debeDevolver) {
+    try {
+      const _origenDl = (await traducirLugarCliente(r.origen, _langVal)) || r.origen || '—';
+      const _destinoDl = (await traducirLugarCliente(r.destino, _langVal)) || r.destino || '—';
+      const _pdlAuto = await obtenerPlantilla('cliente_deposito_liberado', {
+        nombre_cliente: r.nombre_cliente,
+        numero_reserva: r.numero_reserva,
+        origen: _origenDl,
+        destino: _destinoDl,
+        fecha: fechaTextoCliente,
+        numero_factura: ''
+      }, _langVal);
+      if (_pdlAuto && _pdlAuto.email && r.email_cliente) {
+        try {
+          await enviarEmail({
+            to: r.email_cliente,
+            subject: _pdlAuto.asunto || ('\u2705 ' + r.numero_reserva),
+            html: plantillaEmail(_pdlAuto.email)
+          });
+        } catch(e) { console.warn('Error enviando email depósito liberado (servicio terminado):', e.message); }
+      }
+      if (_pdlAuto && _pdlAuto.whatsapp && r.telefono_cliente) {
+        await pool.query(
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+          [r.telefono_cliente, _pdlAuto.whatsapp]
+        );
+      }
+    } catch(e) { console.warn('Error aviso depósito liberado (servicio terminado):', e.message); }
+  }
+
   // WhatsApp al chofer — agradecimiento
   if (r.telefono_chofer) {
     const _pchoferwa = await obtenerPlantilla('chofer_gracias_servicio', {
