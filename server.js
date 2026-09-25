@@ -13809,16 +13809,33 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
   // Notificar al cliente por email
   try {
     const reserva = await pool.query(
-      'SELECT nombre_cliente, email_cliente, numero_reserva FROM reservas WHERE id = $1',
+      'SELECT nombre_cliente, email_cliente, telefono_cliente, numero_reserva, lang_cliente FROM reservas WHERE id = $1',
       [req.params.id]
     );
     if (reserva.rows.length) {
       const r = reserva.rows[0];
+      const _langMsg = r.lang_cliente || 'es';
       const _pmsg = await obtenerPlantilla('cliente_mensaje_admin', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
         mensaje: mensaje.trim().replace(/\n/g,'<br>')
-      });
+      }, _langMsg);
+      // WhatsApp al cliente (misma plantilla, en su idioma; el texto del equipo va tal cual)
+      if (r.telefono_cliente) {
+        try {
+          const _pmsgWa = await obtenerPlantilla('cliente_mensaje_admin', {
+            nombre_cliente: r.nombre_cliente,
+            numero_reserva: r.numero_reserva,
+            mensaje: mensaje.trim()
+          }, _langMsg);
+          if (_pmsgWa && _pmsgWa.whatsapp) {
+            await pool.query(
+              'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+              [r.telefono_cliente, _pmsgWa.whatsapp]
+            );
+          }
+        } catch(e) { console.warn('Error encolando WhatsApp mensaje del equipo:', e.message); }
+      }
       await enviarEmail({
         to: r.email_cliente,
         subject: (_pmsg && _pmsg.asunto) || ('💬 Tienes un mensaje sobre tu reserva ' + r.numero_reserva),
