@@ -1044,6 +1044,14 @@ table.tabla-precios input {
           <div id="aviso-deposito-admin" style="display:none;margin-top:0.5rem;font-size:0.82rem;"></div>
         </div>
 
+        <!-- Cancelación manual (el cliente llama por teléfono) -->
+        <div id="bloque-cancelacion-manual" style="display:none;margin-top:1rem;padding:1rem;border:1px solid var(--gris-borde);border-radius:8px;background:#f9f7f4;">
+          <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">📞 Cancelación manual</p>
+          <p style="font-size:0.8rem;color:var(--texto-muted);margin:0 0 0.75rem 0;">Solo para cuando el cliente pide cancelar por teléfono. Hace lo mismo que si cancelara él desde su portal: devuelve o retiene el depósito según el plazo y avisa al cliente (email y WhatsApp) y al chofer. Si el plazo ya venció, te preguntará si el cliente lo pidió a tiempo.</p>
+          <button class="boton-peligro" style="font-size:0.82rem;margin-top:0;" onclick="cancelarPeticionCliente()">📞 Cancelar reserva por petición telefónica</button>
+          <div id="aviso-cancelacion-manual" style="display:none;margin-top:0.5rem;font-size:0.82rem;"></div>
+        </div>
+
         <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
           <button id="btn-aprobar-modificacion" class="boton-primario" style="font-size:0.82rem;display:none;" onclick="aprobarModificacion()">✅ Aprobar modificación</button>
           <button class="boton-costa" style="font-size:0.82rem;" onclick="archivarDesdeDetalle()">📦 Archivar</button>
@@ -7820,7 +7828,8 @@ function abrirDetalleReserva(id, sinScroll) {
       var btnLiberar = document.getElementById('btn-liberar-deposito');
       var btnNoshow = document.getElementById('btn-retener-noshow');
       if (r.deposito_retenido_noshow) {
-        depEl.innerHTML = '<span style="background:#fdecea;border:1px solid #f5b8b8;border-radius:6px;padding:6px 12px;font-size:13px;color:#c62828;display:inline-block;font-weight:600;">🔒 Retenido por no-show. Email y WhatsApp enviados al cliente.</span>';
+        depEl.innerHTML = '<span style="background:#fdecea;border:1px solid #f5b8b8;border-radius:6px;padding:6px 12px;font-size:13px;color:#c62828;display:inline-block;font-weight:600;">' +
+          (r.estado === 'cancelada' ? '🔒 Retenido por cancelación fuera de plazo. Email y WhatsApp enviados al cliente.' : '🔒 Retenido por no-show. Email y WhatsApp enviados al cliente.') + '</span>';
         btnLiberar.style.display = 'none';
         if (btnNoshow) btnNoshow.style.display = 'none';
       } else if (r.deposito_liberado) {
@@ -7847,6 +7856,10 @@ function abrirDetalleReserva(id, sinScroll) {
         btnLiberar.style.display = 'none';
         if (btnNoshow) btnNoshow.style.display = 'none';
       }
+      // "🔒 Cancelación tardía" sustituido por el bloque "📞 Cancelación manual" (25/09/2026)
+      if (btnNoshow) btnNoshow.style.display = 'none';
+      var bloqueCancManual = document.getElementById('bloque-cancelacion-manual');
+      if (bloqueCancManual) bloqueCancManual.style.display = (['completada', 'cancelada', 'no_show'].indexOf(r.estado) === -1) ? 'block' : 'none';
 
       // Botón y bloque aprobar modificación
       var btnAprobar = document.getElementById('btn-aprobar-modificacion');
@@ -8150,6 +8163,40 @@ function retenerNoshow() {
         av.style.display = 'block';
       }
     });
+}
+
+// ─── Cancelar a petición del cliente (mismo proceso que el portal del cliente) ─
+function cancelarPeticionCliente() {
+  if (!reservaDetalleId) return;
+  if (!confirm('¿Cancelar esta reserva por petición telefónica del cliente?\n\nSe hará lo mismo que si cancelara él desde su portal: si está a tiempo se le devuelve el depósito y, si no, se retiene. Se avisa al cliente (email y WhatsApp) y al chofer. Esta acción no se puede deshacer.')) return;
+  enviarCancelacionPeticionCliente(reservaDetalleId, null);
+}
+
+function enviarCancelacionPeticionCliente(id, decision) {
+  var av = document.getElementById('aviso-cancelacion-manual');
+  fetch('/admin/reservas/' + id + '/cancelar-peticion-cliente', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decision: decision })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.necesita_decision) {
+        // El plazo ya venció: decide el equipo
+        var aTiempo = confirm('El plazo de cancelación ya ha vencido.\n\n¿El cliente pidió la cancelación ANTES de que venciera?\n\nAceptar = SÍ, lo pidió a tiempo → se le devuelve el depósito.\nCancelar = NO → se retiene el depósito.');
+        enviarCancelacionPeticionCliente(id, aTiempo ? 'dentro' : 'fuera');
+        return;
+      }
+      if (d.ok) {
+        alert(d.fuera_de_plazo ? 'Reserva cancelada (fuera de plazo: depósito retenido si estaba pagado).' : 'Reserva cancelada (a tiempo: depósito devuelto si estaba pagado).');
+        av.style.display = 'none';
+        cargarReservas(true);
+      } else {
+        av.textContent = d.error || 'Error al cancelar la reserva.';
+        av.style.display = 'block';
+      }
+    })
+    .catch(function() { av.textContent = 'Error al cancelar la reserva.'; av.style.display = 'block'; });
 }
 
 function cerrarDetalleReserva() {
