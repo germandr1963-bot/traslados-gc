@@ -2622,10 +2622,10 @@ Pulsa el botón para crear una nueva contraseña:
     { clave: 'frase_sin_enlace_pago', canal: 'email', orden: 20, contexto: 'Frase que sustituye al botón de pago cuando no se pudo generar el enlace de pago', es: 'Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.' },
     { clave: 'frase_boton_valorar', canal: 'email', orden: 30, contexto: 'Texto del botón que invita al cliente a valorar su traslado', es: 'Valorar mi traslado' },
     { clave: 'frase_cancel_email_fuera_plazo', canal: 'email', orden: 40, contexto: 'Aviso en el email de cancelación: cancelada fuera de plazo, depósito retenido', es: 'La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía ha sido retenido según nuestra política de cancelación.' },
-    { clave: 'frase_cancel_email_dentro_plazo_deposito', canal: 'email', orden: 50, contexto: 'Aviso en el email de cancelación: cancelada dentro de plazo, se devolverá el depósito', es: 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.' },
+    { clave: 'frase_cancel_email_dentro_plazo_deposito', canal: 'email', orden: 50, contexto: 'Aviso en el email de cancelación: cancelada dentro de plazo, se devolverá el depósito', es: 'La cancelación se ha realizado dentro del plazo establecido. Hemos liberado tu depósito de garantía; el importe llegará a tu tarjeta en un plazo de 5 a 10 días hábiles, según tu entidad bancaria.' },
     { clave: 'frase_cancel_email_dentro_plazo', canal: 'email', orden: 60, contexto: 'Aviso en el email de cancelación cuando no había depósito pagado', es: 'La cancelación se ha realizado dentro del plazo establecido.' },
     { clave: 'frase_cancel_wa_fuera_plazo', canal: 'wa', orden: 70, contexto: 'Aviso en el WhatsApp de cancelación: cancelada fuera de plazo, depósito retenido', es: 'La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido.' },
-    { clave: 'frase_cancel_wa_dentro_plazo', canal: 'wa', orden: 80, contexto: 'Aviso en el WhatsApp de cancelación: cancelada dentro de plazo, se devolverá el depósito', es: 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve.' },
+    { clave: 'frase_cancel_wa_dentro_plazo', canal: 'wa', orden: 80, contexto: 'Aviso en el WhatsApp de cancelación: cancelada dentro de plazo, se devolverá el depósito', es: 'La cancelación se ha realizado dentro del plazo establecido. Hemos liberado tu depósito de garantía; el importe llegará a tu tarjeta en un plazo de 5 a 10 días hábiles, según tu entidad bancaria.' },
     { clave: 'frase_extras_titulo', canal: 'ambos', orden: 90, contexto: 'Título del bloque de extras', es: 'Extras seleccionados:' },
     { clave: 'frase_extras_incluido', canal: 'ambos', orden: 100, contexto: 'Etiqueta junto a un extra gratuito', es: 'incluido' },
     { clave: 'frase_extras_a_pagar', canal: 'ambos', orden: 110, contexto: 'Etiqueta junto al precio de un extra de pago, ej: "5.00 € — a pagar al conductor"', es: 'a pagar al conductor' },
@@ -2655,6 +2655,27 @@ Pulsa el botón para crear una nueva contraseña:
       [f.clave, f.canal, f.contexto, f.es, f.orden]
     );
   }
+  // Cancelación a tiempo: el depósito se devuelve automáticamente (25/09/2026).
+  // Cambio único del español de 2 frases; solo si aún tienen el texto antiguo, así nunca pisa lo editado en el Admin.
+  // Sus traducciones pasan a "desactualizado" (rojo en Idiomas) para regenerarlas.
+  try {
+    const _cambiosFrases = [
+      { clave: 'frase_cancel_email_dentro_plazo_deposito', antiguo: 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.' },
+      { clave: 'frase_cancel_wa_dentro_plazo', antiguo: 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve.' }
+    ];
+    for (const cf of _cambiosFrases) {
+      const upd = await pool.query(
+        `UPDATE frases_comunicacion SET texto_es = $1, actualizado_en = NOW() WHERE clave = $2 AND texto_es = $3 RETURNING clave`,
+        ['La cancelación se ha realizado dentro del plazo establecido. Hemos liberado tu depósito de garantía; el importe llegará a tu tarjeta en un plazo de 5 a 10 días hábiles, según tu entidad bancaria.', cf.clave, cf.antiguo]
+      );
+      if (upd.rows.length) {
+        await pool.query(
+          `UPDATE frases_comunicacion_traducciones SET desactualizado = TRUE WHERE frase_clave = $1 AND texto IS NOT NULL AND texto <> ''`,
+          [cf.clave]
+        );
+      }
+    }
+  } catch (e) { console.warn('Cambio de frases de cancelación:', e.message); }
   // Marca "desactualizado": se activa cuando se cambia el español después de traducir.
   // El cliente sigue recibiendo la traducción aprobada; en Idiomas sale en rojo para ajustarla.
   await pool.query(`ALTER TABLE plantillas_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado_email BOOLEAN DEFAULT FALSE`);
@@ -13263,6 +13284,18 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
     await pool.query('UPDATE reservas SET deposito_retenido_noshow = TRUE WHERE id = $1', [r.id]);
   }
 
+  // Cancelación a tiempo con depósito pagado: devolución automática en Stripe.
+  // Si Stripe falla, queda como "devolución pendiente" en el Admin (como antes).
+  if (devolucionPendiente && r.stripe_payment_intent_id) {
+    try {
+      await stripe.refunds.create({ payment_intent: r.stripe_payment_intent_id });
+      await pool.query('UPDATE reservas SET deposito_liberado = TRUE, deposito_devolucion_pendiente = FALSE WHERE id = $1', [r.id]);
+      console.log(`[STRIPE] Devolución automática por cancelación a tiempo: ${r.numero_reserva}`);
+    } catch (stripeErr) {
+      console.warn(`[STRIPE] No se pudo devolver automáticamente (cancelación) ${r.numero_reserva}:`, stripeErr.message);
+    }
+  }
+
   if (r.conductor_id) {
     try {
       const choferQ = await pool.query('SELECT nombre, telefono FROM conductores WHERE id = $1', [r.conductor_id]);
@@ -13310,7 +13343,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
     const avisoDeposito = r.deposito_pagado
       ? (fueraDePlazo
           ? '<p style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:10px 14px;font-size:13px;color:#856404;">⚠️ ' + (await obtenerFrase('frase_cancel_email_fuera_plazo', _langCancel, 'La cancelación se ha realizado fuera del plazo permitido. El depósito de garantía ha sido retenido según nuestra política de cancelación.')) + '</p>'
-          : '<p style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:10px 14px;font-size:13px;color:#2e7d32;">✅ ' + (await obtenerFrase('frase_cancel_email_dentro_plazo_deposito', _langCancel, 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve. Recibirás una notificación cuando se procese la devolución.')) + '</p>')
+          : '<p style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:10px 14px;font-size:13px;color:#2e7d32;">✅ ' + (await obtenerFrase('frase_cancel_email_dentro_plazo_deposito', _langCancel, 'La cancelación se ha realizado dentro del plazo establecido. Hemos liberado tu depósito de garantía; el importe llegará a tu tarjeta en un plazo de 5 a 10 días hábiles, según tu entidad bancaria.')) + '</p>')
       : ''; // Sin depósito pagado: no hay nada que devolver ni retener, no se añade aviso
     const _pcancelE = await obtenerPlantilla('cliente_cancelacion', {
       nombre_cliente: r.nombre_cliente,
@@ -13348,7 +13381,7 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
         origen: r.origen || '—',
         destino: r.destino || '—',
         fecha: fechaTextoWa,
-        aviso_deposito: !r.deposito_pagado ? '' : fueraDePlazo ? '⚠️ ' + (await obtenerFrase('frase_cancel_wa_fuera_plazo', _langCancelWa, 'La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido.')) : '✅ ' + (await obtenerFrase('frase_cancel_wa_dentro_plazo', _langCancelWa, 'La cancelación se ha realizado dentro del plazo establecido. El depósito de garantía te será devuelto en breve.'))
+        aviso_deposito: !r.deposito_pagado ? '' : fueraDePlazo ? '⚠️ ' + (await obtenerFrase('frase_cancel_wa_fuera_plazo', _langCancelWa, 'La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido.')) : '✅ ' + (await obtenerFrase('frase_cancel_wa_dentro_plazo', _langCancelWa, 'La cancelación se ha realizado dentro del plazo establecido. Hemos liberado tu depósito de garantía; el importe llegará a tu tarjeta en un plazo de 5 a 10 días hábiles, según tu entidad bancaria.'))
       }, _langCancelWa);
       const textoWa = (_pcancelWa && _pcancelWa.whatsapp ? _pcancelWa.whatsapp.replace(/\n{3,}/g, '\n\n') : null) || (fueraDePlazo
         ? `Hola, ${r.nombre_cliente} 👋\n\nTu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) del ${fechaTextoWa} ha sido cancelada.\n\n⚠️ La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido según nuestra política de cancelación.\n\nSi tienes alguna duda, contáctanos. Un saludo 🙏`
