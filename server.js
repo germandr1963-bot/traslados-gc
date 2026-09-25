@@ -10048,7 +10048,18 @@ async function generarVoucherPDF(reservaId) {
     if (r.notas_cliente) lineas.push({ l: tv('vou_notas'), v: r.notas_cliente });
 
     const altoLinea = 18;
-    const altoExtrasEst = extrasReserva.length ? (20 + extrasReserva.length * 16) : 0;
+    // Altura real de los extras: cada uno puede ocupar una, dos o más líneas
+    let altoExtrasEst = 0;
+    if (extrasReserva.length) {
+      altoExtrasEst = 4 + doc.fontSize(11).font(FUENTE_NEGRITA).heightOfString(tv('vou_extras') + ':', { width: infoW - 16 }) + 2;
+      doc.fontSize(10).font(FUENTE);
+      extrasIncluidos.forEach(e => {
+        altoExtrasEst += doc.heightOfString('  \u00b7 ' + nombreExtra(e) + ' (' + tv('vou_incluido') + ')', { width: infoW - 16 }) + 2;
+      });
+      extrasACobrar.forEach(e => {
+        altoExtrasEst += doc.heightOfString('  \u00b7 ' + nombreExtra(e) + ' (' + parseFloat(e.precio_en_reserva).toFixed(2) + ' \u20ac \u2014 ' + tv('vou_a_pagar') + ')', { width: infoW - 16 }) + 2;
+      });
+    }
     const altoInfo = lineas.length * altoLinea + altoExtrasEst + 20;
 
     doc.rect(infoX, y, infoW, altoInfo).fill('#f5f0ea');
@@ -10062,15 +10073,15 @@ async function generarVoucherPDF(reservaId) {
 
     if (extrasReserva.length) {
       yInfo += 4;
-      doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815').text(tv('vou_extras') + ':', infoX + 8, yInfo);
+      doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815').text(tv('vou_extras') + ':', infoX + 8, yInfo, { width: infoW - 16 });
       yInfo = doc.y + 2;
       extrasIncluidos.forEach(e => {
-        doc.fontSize(10).font(FUENTE).fillColor('#1C1815').text('  \u00b7 ' + nombreExtra(e) + ' ', infoX + 8, yInfo, { continued: true });
+        doc.fontSize(10).font(FUENTE).fillColor('#1C1815').text('  \u00b7 ' + nombreExtra(e) + ' ', infoX + 8, yInfo, { continued: true, width: infoW - 16 });
         doc.fillColor('#2e7d32').text('(' + tv('vou_incluido') + ')');
         yInfo = doc.y + 2;
       });
       extrasACobrar.forEach(e => {
-        doc.fontSize(10).font(FUENTE).fillColor('#1C1815').text('  \u00b7 ' + nombreExtra(e) + ' ', infoX + 8, yInfo, { continued: true });
+        doc.fontSize(10).font(FUENTE).fillColor('#1C1815').text('  \u00b7 ' + nombreExtra(e) + ' ', infoX + 8, yInfo, { continued: true, width: infoW - 16 });
         doc.fillColor('#856404').text('(' + parseFloat(e.precio_en_reserva).toFixed(2) + ' \u20ac \u2014 ' + tv('vou_a_pagar') + ')');
         yInfo = doc.y + 2;
       });
