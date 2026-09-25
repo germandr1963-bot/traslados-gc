@@ -13857,6 +13857,29 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
   if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
   const r = reserva.rows[0];
 
+  // Devolución pendiente (Stripe falló antes): "🔄 Repetir devolución en Stripe".
+  // Solo se marca como devuelto si Stripe lo confirma (o si ya estaba devuelto). No se envía nada:
+  // el cliente y el chofer ya fueron avisados en su momento.
+  if (r.deposito_devolucion_pendiente && !r.deposito_liberado) {
+    if (r.stripe_payment_intent_id) {
+      try {
+        await stripe.refunds.create({ payment_intent: r.stripe_payment_intent_id });
+        console.log(`[STRIPE] Devolución repetida correctamente: ${r.numero_reserva}`);
+      } catch (stripeErr) {
+        if (stripeErr.code !== 'charge_already_refunded') {
+          console.warn(`[STRIPE] Repetir devolución falló ${r.numero_reserva}:`, stripeErr.message);
+          return res.status(400).json({ error: 'Stripe no ha podido hacer la devolución. Motivo: ' + stripeErr.message });
+        }
+        console.log(`[STRIPE] Ya estaba devuelto: ${r.numero_reserva}`);
+      }
+    }
+    await pool.query(
+      'UPDATE reservas SET deposito_liberado = TRUE, deposito_devolucion_pendiente = FALSE WHERE id = $1',
+      [r.id]
+    );
+    return res.json({ ok: true, sin_mensajes: true });
+  }
+
   // Intentar devolución en Stripe si hay payment_intent guardado (puede ya estar hecho automáticamente)
   if (r.stripe_payment_intent_id && !r.deposito_liberado) {
     try {
