@@ -13277,34 +13277,16 @@ app.post('/api/cliente/modificar-completo', asyncHandler(async (req, res) => {
 }));
 
 // ─── Portal cliente: cancelar reserva ────────────────────────────────────────
-app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
-  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
-
-  // Si la sesión es de cuenta permanente, el email está directo en la sesión
-  let emailCliente = req.session.clienteEmail || null;
-  if (!emailCliente) {
-    const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
-    if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
-    emailCliente = emailResult.rows[0].email_cliente;
-  }
-  if (!emailCliente) return res.status(401).json({ error: 'No autenticado.' });
-
-  const { reserva_id } = req.body;
-  const reservaQ = await pool.query(
-    'SELECT * FROM reservas WHERE id = $1 AND LOWER(email_cliente) = LOWER($2) AND archivada = FALSE',
-    [reserva_id, emailCliente]
-  );
-  if (!reservaQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
-  const r = reservaQ.rows[0];
-
-  if (['completada', 'cancelada'].includes(r.estado)) {
-    return res.status(400).json({ error: 'Esta reserva no se puede cancelar.' });
-  }
-
+// ─── Proceso de cancelación a petición del cliente ────────────────────────────
+// Lo usan el portal del cliente y el Admin ("📞 Cancelación manual").
+// A tiempo: se devuelve el depósito. Fuera de plazo: se retiene. Avisa al chofer, al equipo y al cliente (en su idioma).
+// decisionEquipo (solo Admin, cuando el plazo ya venció): 'dentro' = el cliente lo pidió a tiempo; 'fuera' = no.
+async function procesoCancelacionCliente(r, porEquipo, decisionEquipo) {
   // Verificar política de cancelación (no-show)
   const cfgNoshow = await obtenerConfigNoshow(r.fecha);
   const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
-  const fueraDePlazo = new Date() >= fechaCancelacion;
+  const plazoVencido = new Date() >= fechaCancelacion;
+  const fueraDePlazo = (porEquipo && plazoVencido && decisionEquipo === 'dentro') ? false : plazoVencido;
 
   await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', ['cancelada', r.id]);
 
@@ -13353,7 +13335,9 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
 
   await pool.query(
     'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
-    [r.id, 'admin', '❌ Reserva cancelada por el cliente.']
+    [r.id, 'admin', porEquipo
+      ? ('❌ Reserva cancelada por el equipo por petición telefónica del cliente.' + (plazoVencido ? (fueraDePlazo ? ' (solicitud fuera de plazo)' : ' (solicitud recibida dentro de plazo)') : ''))
+      : '❌ Reserva cancelada por el cliente.']
   );
 
   // Notificar al equipo
@@ -13424,6 +13408,54 @@ app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
       );
     } catch(e) { console.warn('Error encolando WhatsApp cancelación:', e.message); }
   }
+
+  return fueraDePlazo;
+}
+
+app.post('/admin/reservas/:id/cancelar-peticion-cliente', requireAdmin, asyncHandler(async (req, res) => {
+  const reservaQ = await pool.query('SELECT * FROM reservas WHERE id = $1 AND archivada = FALSE', [req.params.id]);
+  if (!reservaQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = reservaQ.rows[0];
+  if (['completada', 'cancelada', 'no_show'].includes(r.estado)) {
+    return res.status(400).json({ error: 'Esta reserva no se puede cancelar.' });
+  }
+  // Si el plazo ya venció, el equipo decide si el cliente lo pidió a tiempo (p. ej. llamó antes o el sistema no funcionaba)
+  const decision = (req.body && req.body.decision) || null;
+  const cfgNs = await obtenerConfigNoshow(r.fecha);
+  const plazoVencido = new Date() >= calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNs.horas_cancelacion);
+  if (plazoVencido && decision !== 'dentro' && decision !== 'fuera') {
+    return res.json({ ok: false, necesita_decision: true });
+  }
+  const fueraDePlazo = await procesoCancelacionCliente(r, true, decision);
+  res.json({ ok: true, fuera_de_plazo: fueraDePlazo });
+}));
+
+app.post('/api/cliente/cancelar', asyncHandler(async (req, res) => {
+  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
+
+  // Si la sesión es de cuenta permanente, el email está directo en la sesión
+  let emailCliente = req.session.clienteEmail || null;
+  if (!emailCliente) {
+    const emailResult = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+    if (!emailResult.rows.length) return res.status(401).json({ error: 'No autenticado.' });
+    emailCliente = emailResult.rows[0].email_cliente;
+  }
+  if (!emailCliente) return res.status(401).json({ error: 'No autenticado.' });
+
+  const { reserva_id } = req.body;
+  const reservaQ = await pool.query(
+    'SELECT * FROM reservas WHERE id = $1 AND LOWER(email_cliente) = LOWER($2) AND archivada = FALSE',
+    [reserva_id, emailCliente]
+  );
+  if (!reservaQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  const r = reservaQ.rows[0];
+
+  if (['completada', 'cancelada'].includes(r.estado)) {
+    return res.status(400).json({ error: 'Esta reserva no se puede cancelar.' });
+  }
+
+  // Mismo proceso para el portal del cliente y para el botón del Admin "Cancelar a petición del cliente"
+  const fueraDePlazo = await procesoCancelacionCliente(r, false, null);
 
   res.json({ ok: true, fuera_de_plazo: fueraDePlazo });
 }));
