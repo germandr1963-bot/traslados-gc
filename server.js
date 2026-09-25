@@ -8662,7 +8662,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
 app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req, res) => {
   const check = await pool.query(
     `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
-            r.origen, r.destino, r.fecha, r.deposito_pagado
+            r.origen, r.destino, r.fecha, r.deposito_pagado, r.lang_cliente
      FROM reservas r
      WHERE r.id = $1 AND r.conductor_id = $2 AND r.estado = 'confirmada'`,
     [req.params.id, req.session.choferId]
@@ -8679,17 +8679,22 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
   const fechaTexto = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
   const _cfgNs1 = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
   const importe = ((_cfgNs1.rows[0] && _cfgNs1.rows[0].importe_deposito) || 10).toString();
+  // Datos en el idioma del cliente (texto, ruta y fecha)
+  const _langNs = r.lang_cliente || 'es';
+  const _fechaNs = r.fecha ? fechaCliente(r.fecha, _langNs) : '—';
+  const _origenNs = (await traducirLugarCliente(r.origen, _langNs)) || r.origen || '—';
+  const _destinoNs = (await traducirLugarCliente(r.destino, _langNs)) || r.destino || '—';
 
   // Email al cliente
   try {
     const _pns1 = await obtenerPlantilla('cliente_deposito_noshow', {
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva,
-      origen: r.origen || '—',
-      destino: r.destino || '—',
-      fecha: fechaTexto,
+      origen: _origenNs,
+      destino: _destinoNs,
+      fecha: _fechaNs,
       importe: importe
-    });
+    }, _langNs);
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pns1 && _pns1.asunto) || ('🔒 Depósito retenido por no-show — ' + r.numero_reserva),
@@ -8716,11 +8721,11 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
       const _pns1wa = await obtenerPlantilla('cliente_deposito_noshow', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
-        origen: r.origen || '—',
-        destino: r.destino || '—',
-        fecha: fechaTexto,
+        origen: _origenNs,
+        destino: _destinoNs,
+        fecha: _fechaNs,
         importe: importe
-      });
+      }, _langNs);
       const textoWa = (_pns1wa && _pns1wa.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) no pudo realizarse al no presentarse en el punto de recogida. El depósito de garantía ha sido retenido según nuestra política de reservas.\n\nSi crees que ha habido un error, contáctanos. Un saludo 🙏`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
