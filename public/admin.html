@@ -7837,8 +7837,8 @@ function abrirDetalleReserva(id, sinScroll) {
         btnLiberar.style.display = 'none';
         if (btnNoshow) btnNoshow.style.display = 'none';
       } else if (r.deposito_devolucion_pendiente) {
-        depEl.innerHTML = '<span style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:6px 12px;font-size:13px;color:#856404;display:inline-block;">⚠️ Devolución pendiente. Procesa la devolución en Stripe y confirma aquí cuando esté hecha.</span>';
-        btnLiberar.innerHTML = '✅ Confirmar devolución a cliente';
+        depEl.innerHTML = '<span style="background:#fff3cd;border:1px solid #ffe083;border-radius:6px;padding:6px 12px;font-size:13px;color:#856404;display:inline-block;">⚠️ Stripe no pudo hacer la devolución automática. El cliente ya está avisado. Pulsa el botón para repetirla.</span>';
+        btnLiberar.innerHTML = '🔄 Repetir devolución en Stripe';
         btnLiberar.style.display = 'inline-block';
         if (btnNoshow) btnNoshow.style.display = 'none';
       } else if (r.deposito_pagado && r.estado === 'completada') {
@@ -8129,7 +8129,10 @@ function detenerRefrescoMensajes() {
 // ─── Liberar depósito (admin) ──────────────────────────────────────────────────
 function liberarDeposito() {
   if (!reservaDetalleId) return;
-  if (!confirm('¿Confirmas que el depósito ha sido liberado y quieres notificar al cliente?')) return;
+  var esRepetirStripe = document.getElementById('btn-liberar-deposito').textContent.indexOf('Repetir devolución en Stripe') !== -1;
+  if (!confirm(esRepetirStripe
+    ? '¿Repetir la devolución en Stripe?\n\nNo se enviará nada al cliente (ya fue avisado).'
+    : '¿Confirmas que el depósito ha sido liberado y quieres notificar al cliente?')) return;
   var av = document.getElementById('aviso-deposito-admin');
   fetch('/admin/reservas/' + reservaDetalleId + '/liberar-deposito', { method: 'POST' })
     .then(function(r) { return r.json(); })
