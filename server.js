@@ -3407,7 +3407,8 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     email_pasajero_otro,
     pasaporte_dni,
     extras,
-    lang_cliente
+    lang_cliente,
+    preferencias_viajero
   } = req.body;
 
   if (!origen || !destino || !categoria_id || !fecha || !nombre_cliente || !telefono_cliente || !email_cliente) {
@@ -3513,10 +3514,20 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     console.error('No se pudo guardar el cliente en clientes_datos:', e);
   }
 
+  // Reserva para otra persona (26/09/2026): NO se copian las preferencias del titular.
+  // Se guardan solo las "Preferencias del viajero" que se marquen en la página de reserva (si las hay).
+  if (es_para_otra_persona) {
+    try {
+      await guardarPreferenciasViaje(reservaId, preferencias_viajero);
+    } catch (e) {
+      console.error('No se pudieron guardar las preferencias del viajero:', e);
+    }
+  }
+
   // Copia de las preferencias del pasajero (Grupo G) en esta reserva:
   // instantánea de lo que el cliente tiene marcado en este momento.
   // Funciona tanto si la sesión es de portal (clienteEmail) como de reserva (clienteReservaId).
-  try {
+  if (!es_para_otra_persona) try {
     const emailPref = req.session && req.session.clienteEmail
       ? req.session.clienteEmail.toLowerCase()
       : await emailClienteSesion(req);
@@ -13072,6 +13083,81 @@ async function emailClienteSesion(req) {
   const r = await pool.query('SELECT LOWER(email_cliente) AS email FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
   return r.rows.length ? r.rows[0].email : null;
 }
+
+// ─── Preferencias de cada viaje (26/09/2026) ───────────────────────────────────
+// Cada reserva guarda sus propias preferencias (tabla preferencias_reserva, en español:
+// es lo que ve el chofer). Solo se aceptan preferencias activas del catálogo y opciones que existan.
+async function guardarPreferenciasViaje(reservaId, selecciones) {
+  await pool.query('DELETE FROM preferencias_reserva WHERE reserva_id = $1', [reservaId]);
+  if (!Array.isArray(selecciones) || !selecciones.length) return;
+  const cat = await pool.query('SELECT id, nombre, opciones FROM preferencias_catalogo WHERE activo = TRUE');
+  const porId = {};
+  cat.rows.forEach(function (c) { porId[String(c.id)] = c; });
+  const usadas = {};
+  for (const sel of selecciones) {
+    if (!sel) continue;
+    const c = porId[String(sel.preferencia_id)];
+    if (!c || usadas[c.id]) continue;
+    const opcion = String(sel.opcion || '').trim();
+    const opcionesValidas = c.opciones.split('/').map(function (o) { return o.trim(); });
+    if (opcionesValidas.indexOf(opcion) === -1) continue;
+    const detalle = (opcion.indexOf('(Especificar)') !== -1 && sel.detalle) ? String(sel.detalle).trim().slice(0, 200) : null;
+    await pool.query(
+      'INSERT INTO preferencias_reserva (reserva_id, nombre, opcion, detalle) VALUES ($1, $2, $3, $4)',
+      [reservaId, c.nombre, opcion, detalle]
+    );
+    usadas[c.id] = true;
+  }
+}
+
+// Reserva del cliente que se puede cambiar (suya, activa y sin haber pasado la hora del viaje)
+async function reservaViajeEditable(req, reservaId) {
+  const email = await emailClienteSesion(req);
+  if (!email) return null;
+  const q = await pool.query(
+    `SELECT id, fecha, hora, estado FROM reservas
+     WHERE id = $1 AND LOWER(email_cliente) = LOWER($2) AND archivada = FALSE`,
+    [reservaId, email]
+  );
+  if (!q.rows.length) return null;
+  const r = q.rows[0];
+  if (['cancelada', 'completada', 'no_show'].includes(r.estado)) return null;
+  if (new Date() >= calcularFechaCancelacion(new Date(r.fecha), r.hora, 0)) return null;
+  return r;
+}
+
+// Portal: preferencias de un viaje (lo marcado en esa reserva, con los textos en el idioma del portal)
+app.get('/api/cliente/viaje-preferencias', asyncHandler(async (req, res) => {
+  const r = await reservaViajeEditable(req, req.query.reserva_id);
+  if (!r) return res.status(404).json({ error: 'Reserva no disponible.' });
+  const cat = await pool.query('SELECT id, nombre, opciones FROM preferencias_catalogo WHERE activo = TRUE ORDER BY orden, id');
+  const viaje = await pool.query('SELECT nombre, opcion, detalle FROM preferencias_reserva WHERE reserva_id = $1', [r.id]);
+  const porNombre = {};
+  viaje.rows.forEach(function (v) { porNombre[v.nombre] = v; });
+  const langPref = await idiomaPortalCliente(req);
+  res.json({
+    preferencias: cat.rows.map(function (p) {
+      const n = langPref === 'es' ? p.nombre : obtenerTexto('pref_nombre_' + p.id, langPref);
+      const o = langPref === 'es' ? p.opciones : obtenerTexto('pref_opciones_' + p.id, langPref);
+      const v = porNombre[p.nombre];
+      return {
+        id: p.id, nombre: p.nombre, opciones: p.opciones,
+        nombre_cliente: (n && n.indexOf('[[') !== 0) ? n : p.nombre,
+        opciones_cliente: (o && o.indexOf('[[') !== 0 && o.split('/').length === p.opciones.split('/').length) ? o : p.opciones,
+        elegida: v ? v.opcion : null,
+        detalle: v ? v.detalle : null
+      };
+    })
+  });
+}));
+
+// Portal: guardar las preferencias de un viaje (sustituye las de esa reserva)
+app.post('/api/cliente/viaje-preferencias', asyncHandler(async (req, res) => {
+  const r = await reservaViajeEditable(req, req.body && req.body.reserva_id);
+  if (!r) return res.status(400).json({ error: 'Esta reserva ya no se puede cambiar.' });
+  await guardarPreferenciasViaje(r.id, req.body.selecciones);
+  res.json({ ok: true });
+}));
 
 app.get('/api/cliente/preferencias', asyncHandler(async (req, res) => {
   const email = await emailClienteSesion(req);
