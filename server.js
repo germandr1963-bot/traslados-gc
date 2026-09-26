@@ -1298,6 +1298,117 @@ async function initSchema() {
     );
   }
 
+  // Portal del cliente (/cliente/portal). ON CONFLICT DO NOTHING: se crean la primera vez
+  // y nunca sobrescriben lo editado en el Admin (26/09/2026).
+  const TEXTOS_PORTAL_CLIENTE = [
+    { clave: 'por_pestana', contexto: 'Título de la pestaña del navegador en el portal del cliente (el programa añade \" — Traslados GC\")', es: 'Mi Reserva' },
+    { clave: 'por_cerrar_sesion', contexto: 'Enlace arriba a la derecha para salir del portal', es: 'Cerrar sesión' },
+    { clave: 'por_titulo', contexto: 'Título grande arriba del portal', es: 'Portal del cliente' },
+    { clave: 'por_mis_reservas', contexto: 'Título mientras se carga el portal (luego se cambia por el saludo)', es: 'Mis reservas' },
+    { clave: 'por_hola', contexto: 'Saludo arriba del portal. {nombre} = nombre del cliente (no traducir la marca entre llaves)', es: 'Hola, {nombre}' },
+    { clave: 'por_nueva_reserva', contexto: 'Botón para hacer una reserva nueva', es: '+ Nueva reserva' },
+    { clave: 'por_actualizar', contexto: 'Botón para recargar el portal', es: '🔄 Actualizar' },
+    { clave: 'por_cargando', contexto: 'Texto mientras se cargan las reservas', es: 'Cargando...' },
+    { clave: 'por_reservas_una', contexto: 'Bajo el saludo, cuando hay 1 reserva. {n} = número', es: '{n} reserva encontrada' },
+    { clave: 'por_reservas_varias', contexto: 'Bajo el saludo, cuando hay varias reservas. {n} = número', es: '{n} reservas encontradas' },
+    { clave: 'por_sin_reservas', contexto: 'Aviso cuando el cliente no tiene reservas', es: 'No tienes reservas.' },
+    { clave: 'por_mis_datos', contexto: 'Título del recuadro de datos personales', es: 'Mis datos' },
+    { clave: 'por_aviso_idioma', contexto: 'Nota bajo \"Mis datos\" que indica dónde cambiar el idioma', es: '✱ Aquí puedes cambiar tu idioma de comunicación' },
+    { clave: 'por_mis_datos_intro', contexto: 'Explicación dentro de \"Mis datos\"', es: 'Con estos datos rellenamos tus reservas y te enviamos tus documentos. Mantenlos al día, con tu nombre y apellidos completos.' },
+    { clave: 'por_nombre', contexto: 'Etiqueta del campo nombre', es: 'Nombre y apellidos' },
+    { clave: 'por_telefono', contexto: 'Etiqueta del campo teléfono', es: 'Teléfono (con código de país)' },
+    { clave: 'por_email', contexto: 'Etiqueta del campo email', es: 'Email' },
+    { clave: 'por_email_nota', contexto: 'Nota bajo el email (no se puede cambiar)', es: 'Tu email es tu identificador de acceso y de tu historial — para cambiarlo, contáctanos.' },
+    { clave: 'por_idioma', contexto: 'Etiqueta del selector de idioma', es: 'Idioma de comunicación' },
+    { clave: 'por_cargando_idiomas', contexto: 'Texto del selector de idioma mientras carga', es: 'Cargando…' },
+    { clave: 'por_guardar_datos', contexto: 'Botón para guardar los datos personales', es: 'Guardar mis datos' },
+    { clave: 'por_nombre_obligatorio', contexto: 'Aviso si se guarda sin nombre', es: 'El nombre es obligatorio.' },
+    { clave: 'por_telefono_invalido', contexto: 'Aviso si el teléfono no es válido', es: 'Introduce un teléfono válido.' },
+    { clave: 'por_guardando', contexto: 'Texto mientras se guarda', es: 'Guardando…' },
+    { clave: 'por_datos_guardados', contexto: 'Aviso tras guardar los datos', es: '✓ Datos guardados' },
+    { clave: 'por_no_guardar', contexto: 'Aviso si no se pudo guardar', es: 'No se pudo guardar.' },
+    { clave: 'por_error_conexion', contexto: 'Aviso si falla la conexión', es: 'Error de conexión. Inténtalo de nuevo.' },
+    { clave: 'por_pref_titulo', contexto: 'Título del recuadro de preferencias', es: 'Preferencias del pasajero' },
+    { clave: 'por_pref_intro', contexto: 'Explicación dentro de las preferencias', es: 'Configúralas una sola vez: en cada viaje, tu conductor las verá y las tendrá en cuenta. Son siempre gratuitas y puedes cambiarlas cuando quieras. ¿Echas en falta alguna? Propónnosla abajo y la valoraremos para añadirla.' },
+    { clave: 'por_pref_mostrar', contexto: 'Interruptor para mostrar u ocultar las preferencias al conductor', es: 'Mostrar mis preferencias al conductor' },
+    { clave: 'por_pref_activado', contexto: 'Nota bajo el interruptor cuando está activado', es: 'Activado — el conductor verá lo que tengas marcado.' },
+    { clave: 'por_pref_desactivado', contexto: 'Nota bajo el interruptor cuando está desactivado', es: 'Desactivado — el conductor no verá ninguna. Quedan guardadas por si quieres activarlas más tarde.' },
+    { clave: 'por_pref_instruccion', contexto: 'Instrucción sobre la lista de preferencias', es: 'Toca una opción para marcarla y vuelve a tocarla para quitarla. El conductor solo ve lo que tengas marcado.' },
+    { clave: 'por_pref_guardar', contexto: 'Botón para guardar las preferencias', es: 'Guardar mis preferencias' },
+    { clave: 'por_pref_guardadas', contexto: 'Aviso tras guardar las preferencias', es: '✓ Preferencias guardadas' },
+    { clave: 'por_pref_ocultas', contexto: 'Resumen junto al título cuando están ocultas al conductor', es: 'Ocultas al conductor' },
+    { clave: 'por_pref_sin_marcar', contexto: 'Resumen junto al título cuando no hay ninguna marcada', es: 'Sin marcar' },
+    { clave: 'por_pref_una', contexto: 'Resumen junto al título con 1 marcada', es: '1 marcada' },
+    { clave: 'por_pref_varias', contexto: 'Resumen junto al título con varias marcadas. {n} = número', es: '{n} marcadas' },
+    { clave: 'por_pref_visibles_ok', contexto: 'Aviso al activar el interruptor', es: '✓ Preferencias visibles para el conductor' },
+    { clave: 'por_pref_ocultas_ok', contexto: 'Aviso al desactivar el interruptor', es: '✓ Preferencias ocultas al conductor' },
+    { clave: 'por_temp_elige', contexto: 'Primera opción del selector de temperatura', es: 'Elige la temperatura' },
+    { clave: 'por_especifica', contexto: 'Texto gris de ejemplo en el campo para especificar una preferencia', es: 'Especifica…' },
+    { clave: 'por_sug_titulo', contexto: 'Título del bloque para proponer una preferencia', es: '¿Quieres proponer una preferencia nueva?' },
+    { clave: 'por_sug_nota', contexto: 'Nota bajo el título de la propuesta', es: 'Nos llega solo a nosotros para valorarla — el conductor no lo ve. Si se aprueba, aparecerá para todos los clientes.' },
+    { clave: 'por_sug_placeholder', contexto: 'Texto gris de ejemplo en la caja de la propuesta', es: 'Escribe aquí la preferencia que te gustaría que existiera…' },
+    { clave: 'por_sug_enviar', contexto: 'Botón para enviar la propuesta', es: 'Enviar' },
+    { clave: 'por_sug_vacia', contexto: 'Aviso si se envía la propuesta vacía', es: 'Escribe tu sugerencia antes de enviarla.' },
+    { clave: 'por_enviando', contexto: 'Texto mientras se envía', es: 'Enviando…' },
+    { clave: 'por_no_enviar', contexto: 'Aviso si no se pudo enviar', es: 'No se pudo enviar.' },
+    { clave: 'por_sug_gracias', contexto: 'Agradecimiento tras enviar la propuesta', es: '✓ Tu sugerencia ha sido enviada. La analizaremos y la valoraremos para añadirla a la lista. Muchas gracias — siempre a tu servicio.' },
+    { clave: 'por_realizado', contexto: 'Etiqueta de una reserva ya realizada', es: 'Realizado' },
+    { clave: 'por_activo', contexto: 'Etiqueta de una reserva activa', es: 'Activo' },
+    { clave: 'por_estado_pendiente', contexto: 'Estado de la reserva', es: '🟡 Pendiente' },
+    { clave: 'por_estado_confirmada', contexto: 'Estado de la reserva', es: '🟢 Confirmada' },
+    { clave: 'por_estado_completada', contexto: 'Estado de la reserva', es: '✅ Completada' },
+    { clave: 'por_estado_cancelada', contexto: 'Estado de la reserva', es: '🔴 Cancelada' },
+    { clave: 'por_estado_modificacion', contexto: 'Estado de la reserva', es: '🟠 Modificación pendiente' },
+    { clave: 'por_estado', contexto: 'Etiqueta en los datos de la reserva', es: 'Estado:' },
+    { clave: 'por_categoria', contexto: 'Etiqueta en los datos de la reserva', es: 'Categoría:' },
+    { clave: 'por_pasajeros', contexto: 'Etiqueta en los datos de la reserva', es: 'Pasajeros:' },
+    { clave: 'por_precio_estimado', contexto: 'Etiqueta en los datos de la reserva', es: 'Precio estimado:' },
+    { clave: 'por_dir_recogida', contexto: 'Etiqueta en los datos de la reserva', es: 'Dirección de recogida:' },
+    { clave: 'por_dir_destino', contexto: 'Etiqueta en los datos de la reserva', es: 'Dirección de destino:' },
+    { clave: 'por_vuelo', contexto: 'Etiqueta en los datos de la reserva', es: 'Vuelo:' },
+    { clave: 'por_llegada', contexto: 'Palabra delante de la hora de llegada del vuelo', es: 'Llegada' },
+    { clave: 'por_barco', contexto: 'Etiqueta en los datos de la reserva', es: 'Barco:' },
+    { clave: 'por_atraque', contexto: 'Palabra delante de la hora de atraque del barco', es: 'Atraque' },
+    { clave: 'por_extras_solicitados', contexto: 'Etiqueta en los datos de la reserva', es: 'Extras solicitados:' },
+    { clave: 'por_extras_incluidos', contexto: 'Título de los extras incluidos', es: 'Incluidos en el precio:' },
+    { clave: 'por_extras_a_pagar', contexto: 'Título de los extras que se pagan al conductor', es: 'A pagar al conductor al final del servicio:' },
+    { clave: 'por_total_conductor', contexto: 'Total de extras a pagar al conductor. {importe} = cantidad con €', es: '💰 Total a pagar al conductor: {importe}' },
+    { clave: 'por_total_nota', contexto: 'Nota junto al total a pagar al conductor', es: 'a abonar directamente al conductor al final del servicio, aparte del precio del traslado según taxímetro.' },
+    { clave: 'por_tu_conductor', contexto: 'Título sobre el nombre del conductor asignado', es: 'Tu conductor' },
+    { clave: 'por_deposito_titulo', contexto: 'Título del bloque del depósito', es: 'Depósito de garantía' },
+    { clave: 'por_deposito_liberado', contexto: 'Estado del depósito', es: '✅ Depósito liberado.' },
+    { clave: 'por_deposito_retenido', contexto: 'Estado del depósito pagado. {importe} = cantidad con €', es: '🔒 Depósito retenido de {importe}. Se liberará al completar el servicio.' },
+    { clave: 'por_deposito_pendiente', contexto: 'Estado del depósito sin pagar', es: '⏳ Depósito pendiente de pago.' },
+    { clave: 'por_descargar_factura', contexto: 'Botón para descargar la factura', es: '📄 Descargar factura' },
+    { clave: 'por_gestionar', contexto: 'Título del bloque para modificar o cancelar', es: 'Gestionar reserva' },
+    { clave: 'por_modificar', contexto: 'Botón para modificar la reserva', es: 'Modificar reserva' },
+    { clave: 'por_modificar_nota', contexto: 'Nota bajo el botón Modificar reserva', es: 'Cambia fecha, extras, categoría…' },
+    { clave: 'por_cancelar', contexto: 'Botón para cancelar la reserva', es: 'Cancelar reserva' },
+    { clave: 'por_cancelar_nota', contexto: 'Nota bajo el botón Cancelar reserva', es: 'Anular esta reserva' },
+    { clave: 'por_cancelar_confirmar', contexto: 'Pregunta antes de cancelar. {pnr} = número de reserva', es: '¿Seguro que quieres cancelar la reserva {pnr}? Esta acción no se puede deshacer.' },
+    { clave: 'por_cancelada_ok', contexto: 'Aviso tras cancelar', es: '✅ Reserva cancelada. Recibirás un email de confirmación.' },
+    { clave: 'por_error_cancelar', contexto: 'Aviso si no se pudo cancelar', es: 'Error al cancelar.' },
+    { clave: 'por_mensajes_titulo', contexto: 'Título del recuadro de mensajes', es: '💬 Mensajes del equipo' },
+    { clave: 'por_mensajes_nuevos', contexto: 'Aviso rojo de mensajes sin leer. {n} = número', es: '{n} nuevos' },
+    { clave: 'por_sin_mensajes', contexto: 'Texto cuando no hay mensajes', es: 'Sin mensajes aún.' },
+    { clave: 'por_msg_placeholder', contexto: 'Texto gris de ejemplo en la caja para escribir al equipo', es: 'Escribe un mensaje al equipo…' },
+    { clave: 'por_msg_enviar', contexto: 'Botón para enviar un mensaje al equipo', es: 'Enviar mensaje' },
+    { clave: 'por_msg_equipo', contexto: 'Autor de los mensajes del equipo', es: '👨‍💼 Equipo' },
+    { clave: 'por_msg_tu', contexto: 'Autor de los mensajes del cliente', es: '👤 Tú' },
+    { clave: 'por_msg_enviado', contexto: 'Aviso tras enviar un mensaje', es: '✅ Mensaje enviado.' },
+    { clave: 'por_error_enviar', contexto: 'Aviso si no se pudo enviar un mensaje', es: 'Error al enviar.' },
+    { clave: 'por_franja_version', contexto: 'Franja arriba cuando hay una versión nueva de la página', es: '🔄 Hay una versión nueva. Pulsa aquí para actualizar' },
+  ];
+  for (const tx of TEXTOS_PORTAL_CLIENTE) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Portal del cliente', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
+
   // Factura en PDF que recibe el cliente, en su idioma. ON CONFLICT DO NOTHING:
   // se crean la primera vez y nunca sobrescriben lo editado en el Admin.
   const TEXTOS_FACTURA_PDF = [
@@ -12687,7 +12798,42 @@ app.post('/api/restablecer-password', asyncHandler(async (req, res) => {
 app.get('/cliente/portal', (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.redirect('/mi-reserva');
   res.set('Cache-Control', 'no-cache');
-  res.sendFile(path.join(__dirname, 'public', 'cliente-portal.html'));
+  // Portal en el idioma del cliente (26/09/2026): el que eligió en su portal y, si nunca
+  // lo cambió (sigue en 'es'), el de su primera reserva.
+  // Textos: Admin → Idiomas → Textos de interfaz → fila "Portal del cliente".
+  (async function () {
+    let lang = 'es';
+    try {
+      let emailCliente = req.session.clienteEmail || null;
+      if (!emailCliente) {
+        const em = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+        if (em.rows.length) emailCliente = em.rows[0].email_cliente;
+      }
+      if (emailCliente) {
+        const cd = await pool.query('SELECT idioma FROM clientes_datos WHERE LOWER(email_cliente) = LOWER($1)', [emailCliente]);
+        const elegido = cd.rows.length ? (cd.rows[0].idioma || 'es') : 'es';
+        if (elegido !== 'es') {
+          lang = elegido;
+        } else {
+          const pr = await pool.query(
+            'SELECT lang_cliente FROM reservas WHERE LOWER(email_cliente) = LOWER($1) ORDER BY creado_en ASC LIMIT 1',
+            [emailCliente]
+          );
+          if (pr.rows.length && pr.rows[0].lang_cliente) lang = pr.rows[0].lang_cliente;
+        }
+      }
+      if (!IDIOMAS_PERMITIDOS.includes(lang)) lang = 'es';
+    } catch (e) { console.warn('Portal cliente (idioma):', e.message); lang = 'es'; }
+    const t = function (clave) { return obtenerTexto(clave, lang); };
+    const textos = {};
+    Object.keys(TEXTOS_CACHE).forEach(function (clave) {
+      if (clave.indexOf('por_') === 0) textos[clave] = obtenerTexto(clave, lang);
+    });
+    res.render('cliente-portal', { lang, t, textos });
+  })().catch(function (e) {
+    console.warn('Portal cliente:', e.message);
+    res.sendFile(path.join(__dirname, 'public', 'cliente-portal.html'));
+  });
 });
 
 // Portal del cliente → "Nueva reserva" en el idioma del cliente (26/09/2026):
