@@ -365,6 +365,7 @@
           '</div>' +
           '<div class="reserva-cuerpo" id="cuerpo-' + r.id + '">' +
             (r.nombre_cliente ? '<div class="detalle-fila"><strong>Cliente:</strong> ' + r.nombre_cliente + '</div>' : '') +
+            '<div class="detalle-fila"><strong>Idioma del cliente:</strong> ' + ({ es: 'Español', en: 'Inglés (English)', de: 'Alemán (Deutsch)', sv: 'Sueco (Svenska)', no: 'Noruego (Norsk)', nl: 'Neerlandés (Nederlands)', it: 'Italiano', fr: 'Francés (Français)', fi: 'Finés (Suomi)', ru: 'Ruso (Русский)' }[r.lang_cliente || 'es'] || (r.lang_cliente || 'es')) + '</div>' +
             '<div class="detalle-fila"><strong>Fecha:</strong> ' + fecha + '</div>' +
             '<div class="detalle-fila"><strong>Ruta:</strong> ' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
             (r.direccion_recogida ? '<div class="detalle-fila"><strong>Dirección de recogida:</strong> ' + r.direccion_recogida + '</div>' : '') +
