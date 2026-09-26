@@ -149,7 +149,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px">
         <h1 id="saludo" style="margin:0">Mis reservas</h1>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <a href="/reserva" style="margin:0;padding:9px 20px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:var(--costa);color:#fff;border-radius:8px;font-size:14px;font-weight:600;">+ Nueva reserva</a>
+          <a href="/cliente/nueva-reserva" style="margin:0;padding:9px 20px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:var(--costa);color:#fff;border-radius:8px;font-size:14px;font-weight:600;">+ Nueva reserva</a>
           <button class="secundario" style="margin:0;padding:8px 18px" onclick="location.reload()">🔄 Actualizar</button>
         </div>
       </div>
@@ -776,5 +776,37 @@
       });
     }
   </script>
+
+<!-- Franja "Hay una versión nueva" (26/09/2026): comprueba cada 3 minutos si se ha subido una versión nueva -->
+<script>
+(function () {
+  var versionInicial = null;
+  function mostrarFranjaVersion() {
+    if (document.getElementById('franja-version')) return;
+    var f = document.createElement('div');
+    f.id = 'franja-version';
+    f.textContent = '🔄 Hay una versión nueva. Pulsa aquí para actualizar';
+    f.setAttribute('style', 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#C1502E;color:#fff;text-align:center;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.25);font-family:inherit;');
+    f.onclick = function () {
+      if (typeof window.recargarAdmin === 'function') window.recargarAdmin();
+      else location.reload();
+    };
+    document.body.appendChild(f);
+  }
+  function comprobarVersion() {
+    fetch('/api/version', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.version) return;
+        if (versionInicial === null) { versionInicial = d.version; return; }
+        if (d.version !== versionInicial) mostrarFranjaVersion();
+      })
+      .catch(function () {});
+  }
+  comprobarVersion();
+  setInterval(comprobarVersion, 180000);
+})();
+</script>
+
 </body>
 </html>

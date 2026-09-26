@@ -246,7 +246,7 @@ table.tabla-precios input {
       <h1>Conductores</h1>
       <p class="subtitulo">Alta y gestión de la flota de conductores. La categoría se elige entre las activas; la marca y el modelo se guardan en un catálogo propio que crece según se van añadiendo conductores.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-        <button class="boton-costa" onclick="cargarConductores()" style="font-size:0.85rem;">🔄 Actualizar</button>
+        <button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button>
         <button class="boton-costa" onclick="contactoGlobalConductores(true)">💬 Permitir contacto a TODOS</button>
         <button class="boton-peligro" onclick="contactoGlobalConductores(false)">🔇 Quitar contacto a TODOS</button>
       </div>
@@ -419,7 +419,7 @@ table.tabla-precios input {
         </label>
         <button class="boton-secundario" onclick="abrirPanelIdiomas()">🌐 Gestionar idiomas de la web</button>
         <button class="boton-secundario" onclick="abrirPanelPalabrasURL()">🔗 Palabras de URL por página</button>
-        <button class="boton-costa" onclick="cargarTextosInterfaz()" style="font-size:0.85rem;">🔄 Actualizar</button>
+        <button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button>
       </div>
 
       <div id="panel-gestion-idiomas" class="tarjeta oculto" style="margin-bottom:18px;"></div>
@@ -784,7 +784,7 @@ table.tabla-precios input {
     <div id="seccion-cotizaciones" class="oculto">
       <h1>Cotizaciones</h1>
       <p class="subtitulo">Solicitudes de precio recibidas desde el buscador. Carga los precios y envía la respuesta automáticamente al cliente.</p>
-      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="cargarCotizaciones()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
+      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
       <div id="aviso-cotizaciones" style="display:none;margin-bottom:1rem;"></div>
       <table class="tabla-admin">
         <thead>
@@ -851,7 +851,7 @@ table.tabla-precios input {
     <div id="seccion-reservas" class="oculto">
       <h1>Reservas</h1>
       <p class="subtitulo">Solicitudes de traslado recibidas. Gestiona el estado de cada una.</p>
-      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="cargarReservas(false)" style="font-size:0.85rem;">🔄 Actualizar</button></div>
+      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
 
       <!-- Fila de filtros: estado + periodo + archivo -->
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;align-items:center;">
@@ -1293,7 +1293,7 @@ table.tabla-precios input {
       <h1>Clientes</h1>
       <p class="subtitulo">Clientes registrados en la plataforma.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;">
-        <button class="boton-costa" onclick="cargarClientes()" style="font-size:0.85rem;">🔄 Actualizar</button>
+        <button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button>
         <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="exportarClientes()">⬇ Exportar CSV</button>
       </div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;">
@@ -1337,7 +1337,7 @@ table.tabla-precios input {
     <div id="seccion-equipo" class="oculto">
       <h1>Equipo</h1>
       <p class="subtitulo">Choferes registrados en la plataforma.</p>
-      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="cargarEquipo()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
+      <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;">
         <input type="text" id="filtro-equipo" class="campo" placeholder="Buscar por nombre, email o teléfono…" style="max-width:320px;" oninput="filtrarEquipo()">
         <button class="boton-primario" onclick="abrirComunicadoEquipo()">Enviar comunicado</button>
@@ -1381,7 +1381,7 @@ table.tabla-precios input {
       <h1>Valoraciones</h1>
       <p class="subtitulo">Opiniones de los clientes sobre sus traslados completados.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
-        <button class="boton-costa" onclick="cargarValoraciones()" style="font-size:0.85rem;">🔄 Actualizar</button>
+        <button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button>
         <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="exportarValoraciones()">⬇ Exportar CSV</button>
         <button class="boton-peligro" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="eliminarTodasValoraciones()">🗑 Eliminar todas</button>
       </div>
@@ -1874,7 +1874,7 @@ table.tabla-precios input {
           <h2 style="font-size:1rem;margin:0 0 4px 0;">Notas de retenci&#243;n de dep&#243;sito</h2>
           <p style="font-size:13px;color:var(--texto-muted);margin:0 0 16px;">Documentos internos que justifican los dep&#243;sitos retenidos. Sel&#233;ccionalos para enviarlos a la gestor&#237;a.</p>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-            <button class="boton-costa" style="font-size:0.85rem;" onclick="cargarNotasRetencion()">Actualizar</button>
+            <button class="boton-costa" style="font-size:0.85rem;" onclick="recargarAdmin()">Actualizar</button>
             <button class="boton-primario" style="font-size:0.85rem;" onclick="enviarNotasGestoria()">Enviar seleccionadas a gestor&#237;a</button>
             <button class="boton-secundario" style="font-size:0.85rem;margin-top:0;" onclick="seleccionarTodasNotas()">Seleccionar todas</button>
           </div>
@@ -1890,7 +1890,7 @@ table.tabla-precios input {
           <h2 style="font-size:1rem;margin:0 0 4px 0;">Facturas de comisi&#243;n emitidas a conductores</h2>
           <p style="font-size:13px;color:var(--texto-muted);margin:0 0 16px;">Selecciona las que quieras enviar a la gestor&#237;a.</p>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-            <button class="boton-costa" style="font-size:0.85rem;" onclick="cargarFacturasConductor()">Actualizar</button>
+            <button class="boton-costa" style="font-size:0.85rem;" onclick="recargarAdmin()">Actualizar</button>
             <button class="boton-primario" style="font-size:0.85rem;" onclick="enviarSeleccionadasGestoria()">Enviar seleccionadas a gestor&#237;a</button>
             <button class="boton-secundario" style="font-size:0.85rem;margin-top:0;" onclick="seleccionarTodasFacturas()">Seleccionar todas</button>
           </div>
@@ -1961,7 +1961,7 @@ table.tabla-precios input {
     <div id="seccion-pagina-rutas" class="oculto">
       <h1>🌍 Páginas Destino — SEO Destinos</h1>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-        <button class="boton-costa" onclick="cargarPaginaRutas()" style="font-size:0.85rem;">🔄 Actualizar</button>
+        <button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button>
         <button id="btn-migrar-cloudinary-destinos" class="boton-costa" onclick="migrarFotosDestinos()" style="font-size:0.85rem;background:#e67e22;color:#fff;">☁️ Migrar fotos a Cloudinary</button>
         <span id="msg-migrar-cloudinary-destinos" style="font-size:0.85rem;color:#666;align-self:center;"></span>
       </div>
@@ -2003,7 +2003,26 @@ function mostrarAdmin() {
   cargarPreciosGrid();
   // Badge de cotizaciones pendientes
   setTimeout(function() { cargarCotizaciones(); }, 500);
+  // Tras "🔄 Actualizar" (o la franja de versión nueva): volver a la sección en la que estaba
+  try {
+    var seccionGuardada = sessionStorage.getItem('adminSeccion');
+    sessionStorage.removeItem('adminSeccion');
+    if (seccionGuardada && seccionGuardada !== 'fondos') {
+      var botonSeccion = document.querySelector('.item-menu[data-seccion="' + seccionGuardada + '"]');
+      if (botonSeccion) botonSeccion.click();
+    }
+  } catch (e) {}
 }
+
+// "🔄 Actualizar": recarga la página completa (trae siempre la última versión) y vuelve a la misma sección
+function recargarAdmin() {
+  try {
+    var activo = document.querySelector('.item-menu.activo');
+    if (activo && activo.dataset.seccion) sessionStorage.setItem('adminSeccion', activo.dataset.seccion);
+  } catch (e) {}
+  location.reload();
+}
+window.recargarAdmin = recargarAdmin;
 
 function comprobarSesion() {
   fetch('/admin/sesion').then(function (r) { return r.json(); }).then(function (d) {
@@ -12191,6 +12210,38 @@ function generarIACat(catId, lang) {
   });
 }
 
+</script>
+
+
+<!-- Franja "Hay una versión nueva" (26/09/2026): comprueba cada 3 minutos si se ha subido una versión nueva -->
+<script>
+(function () {
+  var versionInicial = null;
+  function mostrarFranjaVersion() {
+    if (document.getElementById('franja-version')) return;
+    var f = document.createElement('div');
+    f.id = 'franja-version';
+    f.textContent = '🔄 Hay una versión nueva. Pulsa aquí para actualizar';
+    f.setAttribute('style', 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#C1502E;color:#fff;text-align:center;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.25);font-family:inherit;');
+    f.onclick = function () {
+      if (typeof window.recargarAdmin === 'function') window.recargarAdmin();
+      else location.reload();
+    };
+    document.body.appendChild(f);
+  }
+  function comprobarVersion() {
+    fetch('/api/version', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.version) return;
+        if (versionInicial === null) { versionInicial = d.version; return; }
+        if (d.version !== versionInicial) mostrarFranjaVersion();
+      })
+      .catch(function () {});
+  }
+  comprobarVersion();
+  setInterval(comprobarVersion, 180000);
+})();
 </script>
 
 </body>
