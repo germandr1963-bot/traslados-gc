@@ -1038,6 +1038,24 @@ async function initSchema() {
     { clave: 'reserva_ok_volver',           contexto: 'Botón para volver a la portada tras la confirmación', es: 'Volver al inicio', en: 'Back to home' },
     { clave: 'reserva_ok_volver_panel',     contexto: 'Botón para volver al panel tras la confirmación cuando hay sesión', es: 'Volver a mi panel', en: 'Back to my account' },
   ];
+  // Preferencias del viajero (reserva para otra persona, 26/09/2026). ON CONFLICT DO NOTHING:
+  // se crean la primera vez y nunca sobrescriben lo editado en el Admin.
+  const TEXTOS_RESERVA_PREF_VIAJERO = [
+    { clave: 'reserva_pref_viajero_titulo', contexto: 'Título del recuadro plegable de preferencias de la persona que viaja (solo si la reserva es para otra persona)', es: 'Preferencias del viajero (opcional)' },
+    { clave: 'reserva_pref_viajero_nota', contexto: 'Explicación dentro del recuadro de preferencias del viajero', es: 'Si lo deseas, marca las preferencias de la persona que viaja. Su conductor las verá. Si no marcas ninguna, el viaje irá sin preferencias; podrás añadirlas después desde tu portal.' },
+    { clave: 'reserva_pref_viajero_instruccion', contexto: 'Instrucción sobre la lista de preferencias del viajero', es: 'Toca una opción para marcarla y vuelve a tocarla para quitarla.' },
+    { clave: 'reserva_pref_temp_elige', contexto: 'Primera opción del selector de temperatura en las preferencias del viajero', es: 'Elige la temperatura' },
+    { clave: 'reserva_pref_especifica', contexto: 'Texto gris de ejemplo en el campo para especificar una preferencia del viajero', es: 'Especifica…' },
+  ];
+  for (const tx of TEXTOS_RESERVA_PREF_VIAJERO) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Página de reserva', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
   for (const tx of TEXTOS_RESERVA) {
     const fila = await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
@@ -8069,11 +8087,26 @@ async function renderReserva(req, res, lang) {
   const idiomas = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
   const rutaReserva = lang === 'es' ? '/reserva' : '/' + lang + '/' + (SECCIONES_RESERVA[lang] || 'reserva');
   const urlHome = lang === 'es' ? '/' : '/' + lang + '/';
+  // Preferencias del viajero (reserva para otra persona): se muestran en el idioma de la página;
+  // el valor que se guarda es el español (lo que ve el chofer).
+  let preferenciasViajero = [];
+  try {
+    const cat = await pool.query('SELECT id, nombre, opciones FROM preferencias_catalogo WHERE activo = TRUE ORDER BY orden, id');
+    preferenciasViajero = cat.rows.map(function (p) {
+      const n = lang === 'es' ? p.nombre : obtenerTexto('pref_nombre_' + p.id, lang);
+      const o = lang === 'es' ? p.opciones : obtenerTexto('pref_opciones_' + p.id, lang);
+      return {
+        id: p.id, nombre: p.nombre, opciones: p.opciones,
+        nombre_cliente: (n && n.indexOf('[[') !== 0) ? n : p.nombre,
+        opciones_cliente: (o && o.indexOf('[[') !== 0 && o.split('/').length === p.opciones.split('/').length) ? o : p.opciones
+      };
+    });
+  } catch (e) { console.warn('Preferencias del viajero:', e.message); }
   res.render('reserva', {
     lang, t, idiomas: idiomas.rows, BASE_URL,
     palabrasReserva: SECCIONES_RESERVA,
     palabrasPaginas: PALABRAS_PAGINAS[lang] || {},
-    rutaReserva, urlHome
+    rutaReserva, urlHome, preferenciasViajero
   });
 }
 
