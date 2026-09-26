@@ -1846,6 +1846,26 @@ async function initSchema() {
     WHERE NOT EXISTS (SELECT 1 FROM preferencias_catalogo p WHERE p.nombre = v.nombre);
   `);
 
+  // Sincronizar las preferencias activas como textos traducibles (26/09/2026), igual que los extras.
+  // Fila "Preferencias del pasajero" en Admin → Idiomas → Textos de interfaz. Se muestran traducidas
+  // solo en el portal del cliente; lo que se guarda y lo que ve el chofer sigue en español.
+  const preferenciasActivas = await pool.query('SELECT id, nombre, opciones FROM preferencias_catalogo WHERE activo = TRUE ORDER BY orden, id');
+  for (const pf of preferenciasActivas.rows) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Preferencias del pasajero', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+      ['pref_nombre_' + pf.id, 'Nombre de la preferencia del pasajero "' + pf.nombre + '" en el portal del cliente', pf.nombre]
+    );
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Preferencias del pasajero', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+      ['pref_opciones_' + pf.id, 'Opciones de la preferencia "' + pf.nombre + '", separadas por " / ". Traducir cada opción manteniendo el separador " / ", el mismo número de opciones, el mismo orden y los emojis', pf.opciones]
+    );
+  }
+  await cargarTextosCache();
+
   // Preferencias elegidas por cada cliente (anclado a su email, que es su
   // identidad entre reservas) y sugerencias de preferencias nuevas que envía
   // el cliente para que el admin las apruebe o no.
@@ -13067,13 +13087,24 @@ app.get('/api/cliente/preferencias', asyncHandler(async (req, res) => {
   );
   const elegidas = {};
   mias.rows.forEach(m => { elegidas[m.preferencia_id] = { opcion: m.opcion, detalle: m.detalle }; });
+  // Nombre y opciones en el idioma del portal del cliente. Si la traducción de las opciones
+  // no tiene el mismo número de opciones, se muestran en español para no romper nada.
+  const langPref = await idiomaPortalCliente(req);
+  const traducirPref = function (p) {
+    if (langPref === 'es') return { nombre_cliente: p.nombre, opciones_cliente: p.opciones };
+    const n = obtenerTexto('pref_nombre_' + p.id, langPref);
+    const o = obtenerTexto('pref_opciones_' + p.id, langPref);
+    const nombreOk = n && n.indexOf('[[') !== 0 ? n : p.nombre;
+    const opcionesOk = (o && o.indexOf('[[') !== 0 && o.split('/').length === p.opciones.split('/').length) ? o : p.opciones;
+    return { nombre_cliente: nombreOk, opciones_cliente: opcionesOk };
+  };
   res.json({
     visibles: vis.rows.length ? vis.rows[0].visibles : true,
-    preferencias: cat.rows.map(p => ({
+    preferencias: cat.rows.map(p => Object.assign({
       id: p.id, nombre: p.nombre, opciones: p.opciones,
       elegida: elegidas[p.id] ? elegidas[p.id].opcion : null,
       detalle: elegidas[p.id] ? elegidas[p.id].detalle : null
-    }))
+    }, traducirPref(p)))
   });
 }));
 
