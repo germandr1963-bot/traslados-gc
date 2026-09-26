@@ -890,6 +890,7 @@ table.tabla-precios input {
           <thead>
             <tr>
               <th style="width:32px;"><input type="checkbox" id="check-todas-reservas" onchange="toggleCheckTodasReservas(this)"></th>
+              <th>Idioma</th>
               <th>PNR</th>
               <th class="th-ordenable" data-col="fecha" onclick="ordenarPorColumna('fecha')" style="cursor:pointer;white-space:nowrap;">Fecha viaje<span class="icono-orden-col"> ↓</span></th>
               <th class="th-ordenable" data-col="creado_en" onclick="ordenarPorColumna('creado_en')" style="cursor:pointer;white-space:nowrap;">Fecha reserva<span class="icono-orden-col"> ↕</span></th>
@@ -7570,6 +7571,7 @@ function cargarReservas(mantenerDetalle) {
         var activa = reservaDetalleId === r.id;
         return '<tr' + (activa ? ' style="background:#fff8f0;"' : '') + '>' +
           '<td><input type="checkbox" class="check-reserva" data-id="' + r.id + '"></td>' +
+          '<td style="text-align:center;">' + (r.lang_cliente || 'es').toUpperCase() + '</td>' +
           '<td><strong>' + (r.numero_reserva || '—') + '</strong></td>' +
           '<td>' + fechaViaje + ' ' + (r.hora ? r.hora.slice(0,5) : '') + '</td>' +
           '<td>' + fechaReserva + '</td>' +
