@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= t('por_pestana') %> — Traslados GC</title>
+  <link rel="stylesheet" href="/estilos-chofer.css">
+  <style>
+    .pref-pill {
+      border: 1px solid var(--borde);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 13px;
+      background: transparent;
+      color: var(--tinta);
+      cursor: pointer;
+      font-family: inherit;
+      line-height: 1.4;
+    }
+    .switch-pref { position: relative; display: inline-block; width: 42px; height: 24px; flex-shrink: 0; }
+    .switch-pref input { opacity: 0; width: 0; height: 0; }
+    .switch-pref-bola { position: absolute; inset: 0; background: #cfc9bd; border-radius: 24px; transition: background 0.2s; cursor: pointer; }
+    .switch-pref-bola:before { content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: left 0.2s; }
+    .switch-pref input:checked + .switch-pref-bola { background: var(--costa); }
+    .switch-pref input:checked + .switch-pref-bola:before { left: 21px; }
+    .reserva-card {
+      border: 1px solid var(--borde);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .reserva-card.historial {
+      opacity: 0.75;
+    }
+    .reserva-resumen {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      cursor: pointer;
+      gap: 12px;
+    }
+    .reserva-resumen:hover { background: #fafaf8; }
+    .reserva-info { flex: 1; }
+    .reserva-pnr {
+      font-family: monospace;
+      font-size: 15px;
+      font-weight: 700;
+      color: #C1502E;
+      margin-bottom: 4px;
+    }
+    .reserva-ruta {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .reserva-fecha {
+      font-size: 13px;
+      color: #5a6c79;
+    }
+    .estado-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-activa { background: #4caf50; }
+    .dot-historial { background: #e53935; }
+    .dot-pendiente { background: #ff9800; }
+    .reserva-chevron {
+      font-size: 12px;
+      color: #999;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .reserva-chevron.abierto { transform: rotate(180deg); }
+    .reserva-detalle {
+      display: none;
+      border-top: 1px solid var(--borde);
+      padding: 20px;
+    }
+    .reserva-detalle.visible { display: block; }
+    .dato-fila {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    .dato-fila div strong { display: inline; font-size: 14px; color: #1C1815; font-weight: 700; text-transform: none; margin-bottom: 0; margin-right: 4px; }
+    .seccion-titulo {
+      font-size: 13px;
+      font-weight: 700;
+      color: #444;
+      margin: 20px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--borde);
+    }
+    .campo-mod {
+      width: 100%;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      margin-top: 4px;
+      margin-bottom: 10px;
+    }
+    .campo-mod:focus { outline: none; border-color: #C1502E; }
+    .label-mod { font-size: 12px; font-weight: 600; color: #444; display: block; }
+    .mensaje-burbuja {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      max-width: 85%;
+    }
+    .msg-cliente { background: #fff3e0; border: 1px solid #ffe0b2; margin-left: auto; }
+    .msg-equipo { background: #e8f5e9; border: 1px solid #c8e6c9; }
+    .msg-fecha { font-size: 11px; color: #999; margin-top: 4px; }
+    .etiqueta-seccion {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+    .etiqueta-activa { background: #e8f5e9; color: #2e7d32; }
+    .etiqueta-historial { background: #fbe9e7; color: #c62828; }
+  </style>
+</head>
+<body>
+  <header class="app">
+    <div style="display:flex;align-items:center;gap:10px"><span style="font-weight:700">TRASLADOS GC</span></div>
+    <a href="javascript:void(0)" onclick="cerrarSesion()"><%= t('por_cerrar_sesion') %></a>
+  </header>
+
+  <main>
+    <section id="zona-portal">
+      <div style="margin-bottom:32px;">
+        <div style="text-align:center;font-size:2rem;letter-spacing:2px;text-transform:uppercase;color:var(--costa);font-weight:700;margin-bottom:6px;"><%= t('por_titulo') %></div>
+        <div style="text-align:right;">
+          <button id="btn-idioma-cabecera" onclick="irAIdioma()" style="background:none;border:none;cursor:pointer;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--costa);font-weight:700;padding:0;font-family:inherit;">ESPAÑOL ✱</button>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+        <h1 id="saludo" style="margin:0"><%= t('por_mis_reservas') %></h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <a href="/cliente/nueva-reserva" style="margin:0;padding:9px 20px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;background:var(--costa);color:#fff;border-radius:8px;font-size:14px;font-weight:600;"><%= t('por_nueva_reserva') %></a>
+          <button class="secundario" style="margin:0;padding:8px 18px" onclick="location.reload()"><%= t('por_actualizar') %></button>
+        </div>
+      </div>
+      <p class="sub" id="subtitulo"></p>
+
+      <!-- Mis datos -->
+      <div id="seccion-mis-datos" style="background:#fff;border:1px solid var(--borde);border-radius:12px;margin-top:16px;overflow:hidden;">
+        <div onclick="toggleSeccionMisDatos()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;cursor:pointer;">
+          <div>
+            <h2 style="margin:0;font-size:17px;"><%= t('por_mis_datos') %></h2>
+            <div style="font-size:11px;color:var(--costa);margin-top:2px;"><%= t('por_aviso_idioma') %></div>
+          </div>
+          <span id="mis-datos-flecha" style="font-size:12px;opacity:0.6;">▼</span>
+        </div>
+        <div id="cuerpo-mis-datos" style="display:none;padding:0 20px 16px;">
+          <p style="margin:0 0 10px;font-size:13px;line-height:1.6;opacity:0.8;"><%= t('por_mis_datos_intro') %></p>
+          <div style="margin-bottom:10px;">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;"><%= t('por_nombre') %></label>
+            <input type="text" id="mis-datos-nombre" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;">
+          </div>
+          <div style="margin-bottom:10px;">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;"><%= t('por_telefono') %></label>
+            <input type="tel" id="mis-datos-telefono" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;">
+          </div>
+          <div style="margin-bottom:12px;">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;"><%= t('por_email') %></label>
+            <input type="email" id="mis-datos-email" readonly style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:var(--niebla);opacity:0.8;">
+            <div style="font-size:11px;opacity:0.55;margin-top:3px;"><%= t('por_email_nota') %></div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;"><%= t('por_idioma') %></label>
+            <select id="mis-datos-idioma" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;"><option value="es"><%= t('por_cargando_idiomas') %></option></select>
+          </div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span id="mis-datos-msg" style="font-size:12px;"></span>
+            <button onclick="guardarMisDatos()" style="background:var(--costa);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;"><%= t('por_guardar_datos') %></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preferencias del pasajero (Grupo G) -->
+      <div id="seccion-preferencias" style="display:none;background:#fff;border:1px solid var(--borde);border-radius:12px;margin-top:16px;overflow:hidden;">
+        <div onclick="toggleSeccionPreferencias()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;cursor:pointer;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h2 style="margin:0;font-size:17px;"><%= t('por_pref_titulo') %></h2>
+            <span id="preferencias-resumen" style="font-size:12px;background:var(--niebla);border:1px solid var(--borde);border-radius:20px;padding:3px 10px;"></span>
+          </div>
+          <span id="preferencias-flecha" style="font-size:12px;opacity:0.6;">▼</span>
+        </div>
+        <div id="cuerpo-preferencias" style="display:none;padding:0 20px 16px;">
+          <p style="margin:0 0 10px;font-size:13px;line-height:1.6;opacity:0.8;"><%= t('por_pref_intro') %></p>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;margin-bottom:8px;background:var(--niebla);">
+            <div style="flex:1;min-width:200px;">
+              <div style="font-size:13px;font-weight:600;"><%= t('por_pref_mostrar') %></div>
+              <div id="visibilidad-nota" style="font-size:11px;opacity:0.6;line-height:1.5;"></div>
+            </div>
+            <label class="switch-pref"><input type="checkbox" id="switch-visibilidad" onchange="cambiarVisibilidadPreferencias(this.checked)"><span class="switch-pref-bola"></span></label>
+          </div>
+
+          <p style="margin:0 0 2px;font-size:11.5px;opacity:0.6;"><%= t('por_pref_instruccion') %></p>
+          <div id="lista-preferencias-cliente"></div>
+          <div style="margin-top:10px;display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span id="preferencias-msg" style="font-size:12px;"></span>
+            <button onclick="guardarPreferenciasCliente()" style="background:var(--costa);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;"><%= t('por_pref_guardar') %></button>
+          </div>
+
+          <div id="bloque-sugerencia" style="margin-top:14px;border:1px solid var(--borde);border-radius:10px;background:var(--niebla);padding:12px 14px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px;"><%= t('por_sug_titulo') %></div>
+            <div style="font-size:11px;opacity:0.6;margin-bottom:8px;"><%= t('por_sug_nota') %></div>
+            <div id="sugerencia-formulario">
+              <textarea id="sugerencia-preferencia" rows="2" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;resize:vertical;background:#fff;" placeholder="<%= t('por_sug_placeholder') %>"></textarea>
+              <div style="margin-top:8px;display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span id="sugerencia-msg" style="font-size:12px;"></span>
+                <button class="secundario" style="margin:0;padding:6px 14px;font-size:12.5px;" onclick="enviarSugerenciaPreferencia()"><%= t('por_sug_enviar') %></button>
+              </div>
+            </div>
+            <div id="sugerencia-gracias" style="display:none;font-size:13px;line-height:1.6;color:var(--exito);"><%= t('por_sug_gracias') %></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="lista-reservas" style="margin-top:20px;"></div>
+    </section>
+  </main>
+
+  <script>
+    // Textos del portal en el idioma del cliente (Admin → Idiomas → Textos de interfaz → fila "Portal del cliente")
+    var TX = <%- JSON.stringify(textos).replace(/</g, '\\u003c') %>;
+    function tx(clave, datos) {
+      var s = TX[clave] || '';
+      if (datos) Object.keys(datos).forEach(function(k) { s = s.split('{' + k + '}').join(datos[k]); });
+      return s;
+    }
+    var reservasData = [];
+
+    async function cargarPortal() {
+      var lista = document.getElementById('lista-reservas');
+      lista.innerHTML = '<p style="color:#5a6c79;font-size:14px">' + tx('por_cargando') + '</p>';
+      var r = await fetch('/api/cliente/mi-reserva');
+      if (!r.ok) { window.location.href = '/mi-reserva'; return; }
+      var d = await r.json();
+      reservasData = d.reservas || [];
+      document.getElementById('saludo').textContent = tx('por_hola', { nombre: (d.nombre ? d.nombre.trim().split(/\s+/).slice(0,2).join(' ') : '') });
+      document.getElementById('subtitulo').textContent = tx(reservasData.length === 1 ? 'por_reservas_una' : 'por_reservas_varias', { n: reservasData.length });
+      renderLista();
+    }
+
+    function renderLista() {
+      var lista = document.getElementById('lista-reservas');
+      if (!reservasData.length) {
+        lista.innerHTML = '<p style="color:#5a6c79;font-size:14px;text-align:center;padding:30px 0">' + tx('por_sin_reservas') + '</p>';
+        return;
+      }
+      lista.innerHTML = reservasData.map(function(r, i) {
+        var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '—';
+        var hora = r.hora ? r.hora.slice(0,5) : '—';
+        var esHistorial = r.es_historial;
+        var dotClass = esHistorial ? 'dot-historial' : (r.estado === 'cancelada' ? 'dot-historial' : r.estado === 'pendiente' ? 'dot-pendiente' : r.estado === 'modificacion_pendiente' ? 'dot-pendiente' : 'dot-activa');
+        var dotHTML = r.estado === 'completada' ? '<span style="font-size:14px;line-height:1;flex-shrink:0;">✅</span>' : '<div class="estado-dot ' + dotClass + '"></div>';
+        var etiqueta = esHistorial ? '<span class="etiqueta-seccion etiqueta-historial">' + tx('por_realizado') + '</span>' : '<span class="etiqueta-seccion etiqueta-activa">' + tx('por_activo') + '</span>';
+        return '<div class="reserva-card' + (esHistorial ? ' historial' : '') + '" id="card-' + i + '">' +
+          '<div class="reserva-resumen" onclick="toggleDetalle(' + i + ')">' +
+            dotHTML +
+            '<div class="reserva-info">' +
+              '<div class="reserva-pnr">' + r.numero_reserva + '</div>' +
+              '<div class="reserva-ruta">' + (r.origen || '—') + ' → ' + (r.destino || '—') + '</div>' +
+              '<div class="reserva-fecha">📅 ' + fecha + ' · ' + hora + 'h</div>' +
+            '</div>' +
+            '<span class="reserva-chevron" id="chev-' + i + '">▼</span>' +
+          '</div>' +
+          '<div class="reserva-detalle" id="detalle-' + i + '">' +
+            etiqueta +
+            renderDetalle(r, i) +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function renderDetalle(r, i) {
+      var estadoBadge = { pendiente: tx('por_estado_pendiente'), confirmada: tx('por_estado_confirmada'), completada: tx('por_estado_completada'), cancelada: tx('por_estado_cancelada'), modificacion_pendiente: tx('por_estado_modificacion') };
+      var extrasIncluidos = (r.extras || []).filter(function(e) { return !parseFloat(e.precio_en_reserva) || parseFloat(e.precio_en_reserva) === 0; });
+      var extrasACobrar = (r.extras || []).filter(function(e) { return parseFloat(e.precio_en_reserva) > 0; });
+      var totalExtras = extrasACobrar.reduce(function(sum, e) { return sum + parseFloat(e.precio_en_reserva); }, 0);
+
+      var extrasHTML = '';
+      if (extrasIncluidos.length) {
+        extrasHTML += '<div style="margin:4px 0 2px 0;font-size:13px;font-weight:600;color:#2e7d32;">' + tx('por_extras_incluidos') + '</div>';
+        extrasHTML += extrasIncluidos.map(function(e) {
+          return '<div style="font-size:13px;margin:2px 0 2px 8px;">✅ ' + e.nombre + '</div>';
+        }).join('');
+      }
+      if (extrasACobrar.length) {
+        extrasHTML += '<div style="margin:8px 0 2px 0;font-size:13px;font-weight:600;color:#856404;">' + tx('por_extras_a_pagar') + '</div>';
+        extrasHTML += extrasACobrar.map(function(e) {
+          return '<div style="font-size:13px;margin:2px 0 2px 8px;">💰 ' + e.nombre + ' — <strong>' + parseFloat(e.precio_en_reserva).toFixed(2) + ' €</strong></div>';
+        }).join('');
+        extrasHTML += '<div style="margin-top:10px;padding:8px 14px;background:#fff8e1;border:1px solid #D9A441;border-radius:6px;font-size:13px;color:#1C1815;">' +
+          '<strong>' + tx('por_total_conductor', { importe: totalExtras.toFixed(2) + ' €' }) + '</strong> — ' +
+          '<span style="font-size:12px;color:#555;">' + tx('por_total_nota') + '</span>' +
+          '</div>';
+      }
+
+      var html = '<div class="dato-fila">' +
+        '<div><strong>' + tx('por_estado') + '</strong> ' + (estadoBadge[r.estado] || r.estado) + '</div>' +
+        '<div><strong>' + tx('por_categoria') + '</strong> ' + (r.categoria_nombre || '—') + '</div>' +
+        '<div><strong>' + tx('por_pasajeros') + '</strong> ' + (r.num_pasajeros || '—') + '</div>' +
+        '<div><strong>' + tx('por_precio_estimado') + '</strong> ' + (r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—') + '</div>' +
+        (r.direccion_recogida ? '<div><strong>' + tx('por_dir_recogida') + '</strong> ' + r.direccion_recogida + '</div>' : '') +
+        (r.direccion_destino ? '<div><strong>' + tx('por_dir_destino') + '</strong> ' + r.direccion_destino + '</div>' : '') +
+        (r.numero_vuelo ? '<div><strong>' + tx('por_vuelo') + '</strong> ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · ' + tx('por_llegada') + ' ' + r.hora_llegada_vuelo.slice(0,5) : '') + '</div>' : '') +
+        (r.nombre_barco ? '<div><strong>' + tx('por_barco') + '</strong> ' + r.nombre_barco + (r.hora_atraque ? ' · ' + tx('por_atraque') + ' ' + r.hora_atraque.slice(0,5) : '') + '</div>' : '') +
+        (r.extras && r.extras.length ? '<div><strong>' + tx('por_extras_solicitados') + '</strong><br>' + extrasHTML + '</div>' : '') +
+        '</div>';
+
+      // Conductor si está asignado y pagado
+      if (r.conductor_nombre && r.deposito_pagado) {
+        html += '<div style="padding:12px;background:#f5f0ea;border-radius:8px;display:flex;align-items:center;gap:14px;margin-bottom:16px;">' +
+          (r.conductor_foto && r.conductor_foto_estado === 'aprobada' ? '<img src="' + r.conductor_foto + '" style="width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid #C1502E;">' : '') +
+          '<div><strong style="font-size:12px;color:#5a6c79;text-transform:uppercase;">' + tx('por_tu_conductor') + '</strong><br>' + r.conductor_nombre + '</div></div>';
+      }
+
+      // Depósito
+      html += '<div class="seccion-titulo">' + tx('por_deposito_titulo') + '</div>';
+      if (r.deposito_liberado) {
+        html += '<p style="color:#2e7d32;font-size:14px;">' + tx('por_deposito_liberado') + '</p>';
+      } else if (r.deposito_pagado) {
+        html += '<p style="color:#856404;font-size:14px;">' + tx('por_deposito_retenido', { importe: '<strong>' + r.noshow.importe + ' €</strong>' }) + '</p>';
+      } else {
+        html += '<p style="color:#5a6c79;font-size:14px;">' + tx('por_deposito_pendiente') + '</p>';
+      }
+
+      // Factura disponible (también cuando el viaje ya ha pasado)
+      if (r.tiene_factura) {
+        html += '<div style="margin-bottom:12px;">' +
+          '<a href="/api/cliente/factura/' + r.id + '" download style="display:inline-flex;align-items:center;gap:8px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;color:#2e7d32;text-decoration:none;">' + tx('por_descargar_factura') + '</a>' +
+        '</div>';
+      }
+
+      // Solo si no es historial: modificar y mensajes
+      if (!r.es_historial) {
+        html += '<div class="seccion-titulo">' + tx('por_gestionar') + '</div>';
+        html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">' +
+          '<a href="/modificar-reserva?pnr=' + r.numero_reserva + '" style="text-decoration:none;flex:1;min-width:140px;">' +
+            '<div style="border:2px solid #1565c0;border-radius:10px;padding:12px 16px;text-align:center;background:#e3f2fd;cursor:pointer;">' +
+              '<div style="font-size:20px;margin-bottom:4px;">✏️</div>' +
+              '<div style="font-size:13px;font-weight:600;color:#1565c0;">' + tx('por_modificar') + '</div>' +
+              '<div style="font-size:11px;color:#888;margin-top:2px;">' + tx('por_modificar_nota') + '</div>' +
+            '</div>' +
+          '</a>' +
+          '<div style="flex:1;min-width:140px;cursor:pointer;" onclick="cancelarReserva(' + r.id + ', \'' + r.numero_reserva + '\', ' + i + ')">' +
+            '<div style="border:2px solid #c62828;border-radius:10px;padding:12px 16px;text-align:center;background:#fdf2f2;">' +
+              '<div style="font-size:20px;margin-bottom:4px;">❌</div>' +
+              '<div style="font-size:13px;font-weight:600;color:#c62828;">' + tx('por_cancelar') + '</div>' +
+              '<div style="font-size:11px;color:#888;margin-top:2px;">' + tx('por_cancelar_nota') + '</div>' +
+            '</div>' +
+          '</div>' +
+          '</div>';
+        html += '<div id="aviso-cancelar-' + i + '" style="display:none;font-size:13px;margin-bottom:12px;"></div>';
+
+        // Mensajes — colapsado por defecto
+        var numMsg = r.mensajes_sin_leer || 0;
+        html += '<div style="border:1px solid var(--borde-suave);border-radius:10px;overflow:hidden;margin-bottom:12px;">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:#f9f7f4;" onclick="toggleMensajes(' + i + ',' + r.id + ')">' +
+            '<span style="font-size:13px;font-weight:600;color:var(--texto-oscuro);">' + tx('por_mensajes_titulo') +
+              (numMsg > 0 ? ' <span id="badge-msg-' + i + '" style="background:#C1502E;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:6px;">' + tx('por_mensajes_nuevos', { n: numMsg }) + '</span>' : '') +
+            '</span>' +
+            '<span id="chev-msg-' + i + '" style="color:#aaa;font-size:13px;">▼</span>' +
+          '</div>' +
+          '<div id="bloque-mensajes-' + i + '" style="display:none;padding:14px 16px;border-top:1px solid var(--borde-suave);">' +
+            '<div id="hilo-cliente-' + i + '" style="display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto;margin-bottom:10px;"></div>' +
+            '<div id="sin-msg-' + i + '" style="font-size:13px;color:#aaa;text-align:center;padding:8px 0;display:none;">' + tx('por_sin_mensajes') + '</div>' +
+            '<textarea id="texto-msg-' + i + '" rows="2" placeholder="' + tx('por_msg_placeholder') + '" style="width:100%;border:1px solid var(--borde-suave);border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>' +
+            '<button onclick="enviarMensajeCliente(' + i + ',' + r.id + ')" style="margin-top:6px;background:#C1502E;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;">' + tx('por_msg_enviar') + '</button>' +
+            '<div id="aviso-msg-' + i + '" style="display:none;font-size:12px;margin-top:6px;"></div>' +
+          '</div>' +
+        '</div>';
+      }
+
+      return html;
+    }
+
+    function toggleDetalle(i) {
+      var detalle = document.getElementById('detalle-' + i);
+      var chev = document.getElementById('chev-' + i);
+      var abierto = detalle.classList.toggle('visible');
+      chev.classList.toggle('abierto', abierto);
+    }
+
+    function toggleMensajes(i, reservaId) {
+      var bloque = document.getElementById('bloque-mensajes-' + i);
+      var chev = document.getElementById('chev-msg-' + i);
+      var abierto = bloque.style.display !== 'none';
+      if (abierto) {
+        bloque.style.display = 'none';
+        chev.textContent = '▼';
+      } else {
+        bloque.style.display = 'block';
+        chev.textContent = '▲';
+        cargarMensajesCliente(i, reservaId);
+        // Al abrir, los mensajes quedan leídos: se quita el aviso "nuevos"
+        var badge = document.getElementById('badge-msg-' + i);
+        if (badge) badge.style.display = 'none';
+      }
+    }
+
+    function cargarMensajesCliente(i, reservaId) {
+      var hilo = document.getElementById('hilo-cliente-' + i);
+      var sinMsg = document.getElementById('sin-msg-' + i);
+      fetch('/api/cliente/mensajes?reserva_id=' + reservaId)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (!d.mensajes || !d.mensajes.length) {
+            hilo.innerHTML = '';
+            if (sinMsg) sinMsg.style.display = 'block';
+            return;
+          }
+          if (sinMsg) sinMsg.style.display = 'none';
+          hilo.innerHTML = d.mensajes.map(function(m) {
+            var fecha = new Date(m.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+            var esEquipo = m.autor === 'admin';
+            return '<div style="background:' + (esEquipo ? '#e8f5e9' : '#fff3e0') + ';border:1px solid ' + (esEquipo ? '#c8e6c9' : '#ffe0b2') + ';border-radius:8px;padding:9px 13px;font-size:13px;">' +
+              '<div style="font-weight:600;color:' + (esEquipo ? '#2e7d32' : '#e65100') + ';font-size:12px;margin-bottom:3px;">' +
+              (esEquipo ? tx('por_msg_equipo') : tx('por_msg_tu')) + ' · ' + fecha + '</div>' +
+              '<div>' + m.mensaje.replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n').join('<br>') + '</div>' +
+            '</div>';
+          }).join('');
+          hilo.scrollTop = hilo.scrollHeight;
+        });
+    }
+
+    async function enviarMensajeCliente(i, reservaId) {
+      var campo = document.getElementById('texto-msg-' + i);
+      var av = document.getElementById('aviso-msg-' + i);
+      var texto = campo ? campo.value.trim() : '';
+      if (!texto) return;
+      var r = await fetch('/api/cliente/mensaje', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reserva_id: reservaId, mensaje: texto })
+      });
+      var d = await r.json();
+      if (d.ok) {
+        campo.value = '';
+        if (av) { av.style.display = 'block'; av.style.color = '#2e7d32'; av.textContent = tx('por_msg_enviado'); setTimeout(function() { av.style.display = 'none'; }, 3000); }
+        cargarMensajesCliente(i, reservaId);
+      } else {
+        if (av) { av.style.display = 'block'; av.style.color = '#c62828'; av.textContent = d.error || tx('por_error_enviar'); }
+      }
+    }
+
+    async function cancelarReserva(reservaId, pnr, i) {
+      var av = document.getElementById('aviso-cancelar-' + i);
+      if (!confirm(tx('por_cancelar_confirmar', { pnr: pnr }))) return;
+      var r = await fetch('/api/cliente/cancelar', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reserva_id: reservaId })
+      });
+      var d = await r.json();
+      if (d.ok) {
+        av.style.display = 'block'; av.style.color = '#2e7d32';
+        av.textContent = tx('por_cancelada_ok');
+        // Cambiar el punto de color del resumen (cabecera cerrada) a rojo inmediatamente
+        var card = document.getElementById('card-' + i);
+        if (card) {
+          var dot = card.querySelector('.estado-dot');
+          if (dot) { dot.className = 'estado-dot dot-historial'; }
+        }
+        setTimeout(function() { cargarPortal(); }, 2500);
+      } else {
+        av.style.display = 'block'; av.style.color = '#842029';
+        av.textContent = d.error || tx('por_error_cancelar');
+      }
+    }
+
+    async function guardarModificaciones(i, reservaId) {
+      // Función mantenida por compatibilidad — ya no se usa en el nuevo flujo
+    }
+
+    async function cerrarSesion() {
+      await fetch('/api/cliente/logout', { method: 'POST' });
+      window.location.href = '/';
+    }
+
+    cargarPortal();
+    cargarPreferenciasCliente();
+    cargarMisDatos();
+
+    // ── Idioma cabecera ──
+    function actualizarBtnIdioma(codigo, nombre) {
+      var btn = document.getElementById('btn-idioma-cabecera');
+      if (btn) btn.textContent = (nombre || codigo || 'ESPAÑOL').toUpperCase() + ' ✱';
+    }
+
+    function irAIdioma() {
+      var cuerpo = document.getElementById('cuerpo-mis-datos');
+      if (cuerpo.style.display === 'none') {
+        cuerpo.style.display = 'block';
+        document.getElementById('mis-datos-flecha').textContent = '▲';
+      }
+      document.getElementById('seccion-mis-datos').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // ── Mis datos ──
+    function cargarMisDatos() {
+      // Cargar idiomas activos primero, luego los datos del cliente
+      fetch('/api/idiomas-activos')
+        .then(function(r){ return r.json(); })
+        .then(function(idiomas){
+          var sel = document.getElementById('mis-datos-idioma');
+          sel.innerHTML = idiomas.map(function(i){
+            return '<option value="' + i.codigo + '">' + i.nombre + '</option>';
+          }).join('');
+          // Ahora cargar datos del cliente y seleccionar su idioma guardado
+          return fetch('/api/cliente/mis-datos').then(function(r){ return r.json(); });
+        })
+        .then(function(d){
+          if (d.error) return;
+          document.getElementById('mis-datos-nombre').value = d.nombre_cliente || '';
+          document.getElementById('mis-datos-telefono').value = d.telefono_cliente || '';
+          document.getElementById('mis-datos-email').value = d.email_cliente || '';
+          var idiomaGuardado = d.idioma || 'es';
+          document.getElementById('mis-datos-idioma').value = idiomaGuardado;
+          // Actualizar botón cabecera con el nombre del idioma seleccionado
+          var selIdioma = document.getElementById('mis-datos-idioma');
+          var nombreIdioma = selIdioma.options[selIdioma.selectedIndex] ? selIdioma.options[selIdioma.selectedIndex].text : idiomaGuardado;
+          actualizarBtnIdioma(idiomaGuardado, nombreIdioma);
+        })
+        .catch(function(){});
+    }
+
+    function toggleSeccionMisDatos() {
+      var cuerpo = document.getElementById('cuerpo-mis-datos');
+      var abierto = cuerpo.style.display !== 'none';
+      cuerpo.style.display = abierto ? 'none' : 'block';
+      document.getElementById('mis-datos-flecha').textContent = abierto ? '▼' : '▲';
+    }
+
+    function guardarMisDatos() {
+      var msg = document.getElementById('mis-datos-msg');
+      var nombre = document.getElementById('mis-datos-nombre').value.trim();
+      var telefono = document.getElementById('mis-datos-telefono').value.trim();
+      if (!nombre) {
+        msg.textContent = tx('por_nombre_obligatorio');
+        msg.style.color = 'var(--peligro)';
+        return;
+      }
+      if (telefono.replace(/[^\d]/g, '').length < 7) {
+        msg.textContent = tx('por_telefono_invalido');
+        msg.style.color = 'var(--peligro)';
+        return;
+      }
+      msg.textContent = tx('por_guardando');
+      msg.style.color = '';
+      fetch('/api/cliente/mis-datos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombre, telefono: telefono, idioma: document.getElementById('mis-datos-idioma').value || 'es' })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.ok) {
+          msg.textContent = tx('por_datos_guardados');
+          msg.style.color = 'var(--exito)';
+          var selIdioma = document.getElementById('mis-datos-idioma');
+          var nombreIdioma = selIdioma.options[selIdioma.selectedIndex] ? selIdioma.options[selIdioma.selectedIndex].text : '';
+          actualizarBtnIdioma(selIdioma.value, nombreIdioma);
+        } else {
+          msg.textContent = d.error || tx('por_no_guardar');
+          msg.style.color = 'var(--peligro)';
+        }
+      })
+      .catch(function(){
+        msg.textContent = tx('por_error_conexion');
+        msg.style.color = 'var(--peligro)';
+      });
+    }
+
+    // ── Preferencias del pasajero (Grupo G) ──
+    var preferenciasSeleccion = {};
+    var preferenciasDetalle = {};
+
+    function cargarPreferenciasCliente() {
+      fetch('/api/cliente/preferencias')
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          if (!data.preferencias || !data.preferencias.length) return;
+          preferenciasSeleccion = {};
+          preferenciasDetalle = {};
+          var cont = document.getElementById('lista-preferencias-cliente');
+          cont.innerHTML = data.preferencias.map(function(p){
+            if (p.elegida) preferenciasSeleccion[p.id] = p.elegida;
+            if (p.detalle) preferenciasDetalle[p.id] = p.detalle;
+            var pills = p.opciones.split('/').map(function(op){
+              op = op.trim();
+              return '<button type="button" class="pref-pill" data-pref="' + p.id + '" data-opcion="' + op.replace(/"/g,'&quot;') + '" onclick="togglePreferencia(this)">' + op + '</button>';
+            }).join('');
+            var detalleHtml = '';
+            if (p.opciones.indexOf('(Especificar)') !== -1) {
+              var esTemperatura = p.nombre.indexOf('Temperatura') !== -1;
+              var controlHtml;
+              if (esTemperatura) {
+                var opts = '<option value="">' + tx('por_temp_elige') + '</option>';
+                for (var t = 16; t <= 28; t++) {
+                  var f = Math.round(t * 9 / 5 + 32);
+                  opts += '<option value="' + t + ' °C · ' + f + ' °F">' + t + ' °C · ' + f + ' °F</option>';
+                }
+                controlHtml = '<select onchange="guardarDetallePreferencia(' + p.id + ', this.value)" style="border:1px solid var(--borde);border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#fff;">' + opts + '</select>';
+              } else {
+                controlHtml = '<input type="text" onchange="guardarDetallePreferencia(' + p.id + ', this.value)" placeholder="' + tx('por_especifica') + '" style="border:1px solid var(--borde);border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;background:#fff;width:100%;max-width:280px;">';
+              }
+              detalleHtml = '<div id="detalle-pref-' + p.id + '" style="display:none;margin-top:6px;">' + controlHtml + '</div>';
+            }
+            return '<div style="border-top:1px solid var(--borde);padding:5px 0;">' +
+              '<div style="font-size:13.5px;font-weight:600;margin-bottom:2px;">' + p.nombre + '</div>' +
+              '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + pills + '</div>' +
+              detalleHtml +
+            '</div>';
+          }).join('');
+          // Restaurar los detalles guardados en sus controles
+          Object.keys(preferenciasDetalle).forEach(function(pid){
+            var el = document.querySelector('#detalle-pref-' + pid + ' select, #detalle-pref-' + pid + ' input');
+            if (el) el.value = preferenciasDetalle[pid];
+          });
+          document.getElementById('switch-visibilidad').checked = data.visibles !== false;
+          actualizarNotaVisibilidad();
+          pintarSeleccionPreferencias();
+          actualizarResumenPreferencias();
+          document.getElementById('seccion-preferencias').style.display = 'block';
+        })
+        .catch(function(){});
+    }
+
+    function guardarDetallePreferencia(pid, valor) {
+      preferenciasDetalle[pid] = valor.trim();
+    }
+
+    function toggleSeccionPreferencias() {
+      var cuerpo = document.getElementById('cuerpo-preferencias');
+      var abierto = cuerpo.style.display !== 'none';
+      cuerpo.style.display = abierto ? 'none' : 'block';
+      document.getElementById('preferencias-flecha').textContent = abierto ? '▼' : '▲';
+    }
+
+    function actualizarResumenPreferencias() {
+      var resumen = document.getElementById('preferencias-resumen');
+      if (!document.getElementById('switch-visibilidad').checked) {
+        resumen.textContent = tx('por_pref_ocultas');
+        return;
+      }
+      var n = Object.keys(preferenciasSeleccion).length;
+      resumen.textContent = n === 0 ? tx('por_pref_sin_marcar') : (n === 1 ? tx('por_pref_una') : tx('por_pref_varias', { n: n }));
+    }
+
+    function actualizarNotaVisibilidad() {
+      var activo = document.getElementById('switch-visibilidad').checked;
+      document.getElementById('visibilidad-nota').textContent = activo
+        ? tx('por_pref_activado')
+        : tx('por_pref_desactivado');
+    }
+
+    function cambiarVisibilidadPreferencias(visibles) {
+      actualizarNotaVisibilidad();
+      actualizarResumenPreferencias();
+      var msg = document.getElementById('preferencias-msg');
+      fetch('/api/cliente/preferencias/visibilidad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibles: visibles })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.ok) {
+          msg.textContent = visibles ? tx('por_pref_visibles_ok') : tx('por_pref_ocultas_ok');
+          msg.style.color = 'var(--exito)';
+        }
+      })
+      .catch(function(){
+        msg.textContent = tx('por_error_conexion');
+        msg.style.color = 'var(--peligro)';
+      });
+    }
+
+    function togglePreferencia(btn) {
+      var pid = btn.dataset.pref;
+      var op = btn.dataset.opcion;
+      if (preferenciasSeleccion[pid] === op) {
+        delete preferenciasSeleccion[pid];
+      } else {
+        preferenciasSeleccion[pid] = op;
+      }
+      pintarSeleccionPreferencias();
+      actualizarResumenPreferencias();
+    }
+
+    function pintarSeleccionPreferencias() {
+      document.querySelectorAll('.pref-pill').forEach(function(b){
+        var marcado = preferenciasSeleccion[b.dataset.pref] === b.dataset.opcion;
+        b.style.background = marcado ? 'var(--costa)' : 'transparent';
+        b.style.color = marcado ? '#fff' : '';
+        b.style.borderColor = marcado ? 'var(--costa)' : '';
+      });
+      // El campo "Especificar" solo se muestra si su opción está marcada
+      document.querySelectorAll('[id^="detalle-pref-"]').forEach(function(div){
+        var pid = div.id.replace('detalle-pref-', '');
+        var opcion = preferenciasSeleccion[pid] || '';
+        div.style.display = opcion.indexOf('(Especificar)') !== -1 ? 'block' : 'none';
+      });
+    }
+
+    function guardarPreferenciasCliente() {
+      var msg = document.getElementById('preferencias-msg');
+      msg.textContent = tx('por_guardando');
+      msg.style.color = '';
+      var selecciones = Object.keys(preferenciasSeleccion).map(function(pid){
+        var sel = { preferencia_id: pid, opcion: preferenciasSeleccion[pid] };
+        if (sel.opcion.indexOf('(Especificar)') !== -1 && preferenciasDetalle[pid]) {
+          sel.detalle = preferenciasDetalle[pid];
+        }
+        return sel;
+      });
+      fetch('/api/cliente/preferencias', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selecciones: selecciones })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d.ok) {
+          msg.textContent = d.error || tx('por_no_guardar');
+          msg.style.color = 'var(--peligro)';
+          return;
+        }
+        msg.textContent = tx('por_pref_guardadas');
+        msg.style.color = 'var(--exito)';
+      })
+      .catch(function(){
+        msg.textContent = tx('por_error_conexion');
+        msg.style.color = 'var(--peligro)';
+      });
+    }
+
+    function enviarSugerenciaPreferencia() {
+      var msg = document.getElementById('sugerencia-msg');
+      var texto = document.getElementById('sugerencia-preferencia').value.trim();
+      if (!texto) {
+        msg.textContent = tx('por_sug_vacia');
+        msg.style.color = 'var(--peligro)';
+        return;
+      }
+      msg.textContent = tx('por_enviando');
+      msg.style.color = '';
+      fetch('/api/cliente/preferencias/sugerencia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: texto })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.ok) {
+          document.getElementById('sugerencia-formulario').style.display = 'none';
+          document.getElementById('sugerencia-gracias').style.display = 'block';
+        } else {
+          msg.textContent = d.error || tx('por_no_enviar');
+          msg.style.color = 'var(--peligro)';
+        }
+      })
+      .catch(function(){
+        msg.textContent = tx('por_error_conexion');
+        msg.style.color = 'var(--peligro)';
+      });
+    }
+  </script>
+
+<!-- Franja "Hay una versión nueva" (26/09/2026): comprueba cada 3 minutos si se ha subido una versión nueva -->
+<script>
+(function () {
+  var versionInicial = null;
+  function mostrarFranjaVersion() {
+    if (document.getElementById('franja-version')) return;
+    var f = document.createElement('div');
+    f.id = 'franja-version';
+    f.textContent = <%- JSON.stringify(t('por_franja_version')).replace(/</g, '\\u003c') %>;
+    f.setAttribute('style', 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#C1502E;color:#fff;text-align:center;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.25);font-family:inherit;');
+    f.onclick = function () {
+      if (typeof window.recargarAdmin === 'function') window.recargarAdmin();
+      else location.reload();
+    };
+    document.body.appendChild(f);
+  }
+  function comprobarVersion() {
+    fetch('/api/version', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.version) return;
+        if (versionInicial === null) { versionInicial = d.version; return; }
+        if (d.version !== versionInicial) mostrarFranjaVersion();
+      })
+      .catch(function () {});
+  }
+  comprobarVersion();
+  setInterval(comprobarVersion, 180000);
+})();
+</script>
+
+</body>
+</html>
