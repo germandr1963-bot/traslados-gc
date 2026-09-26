@@ -265,7 +265,7 @@
         return;
       }
       lista.innerHTML = reservasData.map(function(r, i) {
-        var fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '—';
+        var fecha = r.fecha_cliente || (r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) : '—');
         var hora = r.hora ? r.hora.slice(0,5) : '—';
         var esHistorial = r.es_historial;
         var dotClass = esHistorial ? 'dot-historial' : (r.estado === 'cancelada' ? 'dot-historial' : r.estado === 'pendiente' ? 'dot-pendiente' : r.estado === 'modificacion_pendiente' ? 'dot-pendiente' : 'dot-activa');
@@ -276,7 +276,7 @@
             dotHTML +
             '<div class="reserva-info">' +
               '<div class="reserva-pnr">' + r.numero_reserva + '</div>' +
-              '<div class="reserva-ruta">' + (r.origen || '—') + ' → ' + (r.destino || '—') + '</div>' +
+              '<div class="reserva-ruta">' + (r.origen_cliente || r.origen || '—') + ' → ' + (r.destino_cliente || r.destino || '—') + '</div>' +
               '<div class="reserva-fecha">📅 ' + fecha + ' · ' + hora + 'h</div>' +
             '</div>' +
             '<span class="reserva-chevron" id="chev-' + i + '">▼</span>' +
@@ -315,7 +315,7 @@
 
       var html = '<div class="dato-fila">' +
         '<div><strong>' + tx('por_estado') + '</strong> ' + (estadoBadge[r.estado] || r.estado) + '</div>' +
-        '<div><strong>' + tx('por_categoria') + '</strong> ' + (r.categoria_nombre || '—') + '</div>' +
+        '<div><strong>' + tx('por_categoria') + '</strong> ' + (r.categoria_cliente || r.categoria_nombre || '—') + '</div>' +
         '<div><strong>' + tx('por_pasajeros') + '</strong> ' + (r.num_pasajeros || '—') + '</div>' +
         '<div><strong>' + tx('por_precio_estimado') + '</strong> ' + (r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—') + '</div>' +
         (r.direccion_recogida ? '<div><strong>' + tx('por_dir_recogida') + '</strong> ' + r.direccion_recogida + '</div>' : '') +
@@ -429,7 +429,7 @@
           }
           if (sinMsg) sinMsg.style.display = 'none';
           hilo.innerHTML = d.mensajes.map(function(m) {
-            var fecha = new Date(m.creado_en).toLocaleDateString('es-ES', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+            var fecha = new Date(m.creado_en).toLocaleDateString((reservasData[i] && reservasData[i].locale_cliente) || 'es-ES', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
             var esEquipo = m.autor === 'admin';
             return '<div style="background:' + (esEquipo ? '#e8f5e9' : '#fff3e0') + ';border:1px solid ' + (esEquipo ? '#c8e6c9' : '#ffe0b2') + ';border-radius:8px;padding:9px 13px;font-size:13px;">' +
               '<div style="font-weight:600;color:' + (esEquipo ? '#2e7d32' : '#e65100') + ';font-size:12px;margin-bottom:3px;">' +
