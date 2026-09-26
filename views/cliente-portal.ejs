@@ -516,7 +516,7 @@
     // ── Mis datos ──
     function cargarMisDatos() {
       // Cargar idiomas activos primero, luego los datos del cliente
-      fetch('/api/idiomas-activos')
+      fetch('/api/idiomas-activos?lang=<%= lang %>')
         .then(function(r){ return r.json(); })
         .then(function(idiomas){
           var sel = document.getElementById('mis-datos-idioma');
