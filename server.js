@@ -170,7 +170,22 @@ app.use(function (req, res, next) {
 // index:false evita que la carpeta public responda en la raíz por su cuenta.
 app.get('/index.html', function (req, res) { res.redirect(301, '/'); });
 app.get('/reserva.html', function (req, res) { res.redirect(301, '/reserva'); });
-app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+// Las páginas .html (Admin, portales…) nunca se usan desde una copia vieja del navegador:
+// en cada apertura o recarga se comprueba si hay versión nueva (26/09/2026).
+app.use(express.static(path.join(__dirname, 'public'), {
+  index: false,
+  setHeaders: function (res, filePath) {
+    if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+  }
+}));
+
+// Versión de la aplicación: cambia en cada despliegue. Las páginas internas la consultan
+// para mostrar la franja "Hay una versión nueva".
+const VERSION_APP = process.env.RENDER_GIT_COMMIT || String(Date.now());
+app.get('/api/version', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ version: VERSION_APP });
+});
 
 app.set('trust proxy', 1);
 app.use(session({
@@ -8171,6 +8186,7 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
 
 app.get('/chofer/portal', (req, res) => {
   if (!req.session || !req.session.choferId) return res.redirect('/chofer/acceso');
+  res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'chofer-portal.html'));
 });
 
@@ -12629,6 +12645,7 @@ app.get('/:lang([a-z]{2})/:palabra', asyncHandler(async (req, res, next) => {
 }));
 
 app.get('/restablecer-password', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'restablecer-password.html'));
 });
 
@@ -12669,8 +12686,39 @@ app.post('/api/restablecer-password', asyncHandler(async (req, res) => {
 
 app.get('/cliente/portal', (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.redirect('/mi-reserva');
+  res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'cliente-portal.html'));
 });
+
+// Portal del cliente → "Nueva reserva" en el idioma del cliente (26/09/2026):
+// el que eligió en su portal y, si no lo cambió (sigue en 'es'), el de su primera reserva.
+app.get('/cliente/nueva-reserva', asyncHandler(async (req, res) => {
+  let lang = 'es';
+  try {
+    if (req.session && req.session.clienteReservaId) {
+      let emailCliente = req.session.clienteEmail || null;
+      if (!emailCliente) {
+        const em = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+        if (em.rows.length) emailCliente = em.rows[0].email_cliente;
+      }
+      if (emailCliente) {
+        const cd = await pool.query('SELECT idioma FROM clientes_datos WHERE LOWER(email_cliente) = LOWER($1)', [emailCliente]);
+        const elegido = cd.rows.length ? (cd.rows[0].idioma || 'es') : 'es';
+        if (elegido !== 'es') {
+          lang = elegido;
+        } else {
+          const pr = await pool.query(
+            'SELECT lang_cliente FROM reservas WHERE LOWER(email_cliente) = LOWER($1) ORDER BY creado_en ASC LIMIT 1',
+            [emailCliente]
+          );
+          if (pr.rows.length && pr.rows[0].lang_cliente) lang = pr.rows[0].lang_cliente;
+        }
+      }
+    }
+  } catch (e) { console.warn('Nueva reserva (idioma):', e.message); }
+  if (lang === 'es' || !SECCIONES_RESERVA[lang]) return res.redirect('/reserva');
+  res.redirect('/' + lang + '/' + SECCIONES_RESERVA[lang]);
+}));
 
 // Verificar PNR + email y enviar contraseña provisional
 app.post('/api/cliente/solicitar-acceso', asyncHandler(async (req, res) => {
@@ -13152,6 +13200,7 @@ app.get('/api/cliente/mensajes', asyncHandler(async (req, res) => {
 
 // ─── Portal cliente: página de modificación ──────────────────────────────────
 app.get('/modificar-reserva', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
   res.sendFile('modificar-reserva.html', { root: path.join(__dirname, 'public') });
 });
 
