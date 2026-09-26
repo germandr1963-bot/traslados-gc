@@ -2186,14 +2186,15 @@ Un saludo cordial, 🙏
       cuerpo_email: `
 Hola, <strong>{nombre_cliente}</strong> 👋
 
-💬 El equipo de Traslados GC te ha enviado un mensaje sobre tu reserva <strong>{numero_reserva}</strong>:
-<blockquote>{mensaje}</blockquote>
-🔍 Accede a tu portal para ver el hilo completo y responder.
+💬 Has recibido un mensaje de Traslados GC sobre tu reserva <strong>{numero_reserva}</strong>.
+
+🔍 Accede a tu portal para leerlo y responder:
+<a href="{url_portal}" style="color:#C1502E;">{url_portal}</a>
 
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n💬 El equipo de Traslados GC te ha enviado un mensaje sobre tu reserva *{numero_reserva}*:\n\n_{mensaje}_\n\n🔍 Accede a tu portal para ver el hilo completo y responder.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n💬 Has recibido un mensaje de Traslados GC sobre tu reserva *{numero_reserva}*.\n\n🔍 Accede a tu portal para leerlo y responder:\n{url_portal}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_valoracion', nombre: 'Solicitud de valoraci\u00f3n (servicio terminado)', categoria: 'cliente',
       asunto_email: '\u00bfC\u00f3mo fue tu traslado {numero_reserva}?',
       cuerpo_email: `
@@ -2676,6 +2677,39 @@ Pulsa el botón para crear una nueva contraseña:
       }
     }
   } catch (e) { console.warn('Cambio de frases de cancelación:', e.message); }
+  // Mensaje del equipo al cliente: pasa a ser solo un AVISO (26/09/2026). El texto del equipo se lee en el portal.
+  // Cambio único: solo si la plantilla aún contiene {mensaje}; nunca pisa lo editado después en el Admin.
+  // Sus traducciones pasan a "desactualizado" (rojo en Idiomas) para retraducirlas.
+  try {
+    const updEm = await pool.query(
+      `UPDATE plantillas_comunicacion SET cuerpo_email = $1, actualizado_en = NOW()
+       WHERE clave = 'cliente_mensaje_admin' AND cuerpo_email LIKE '%{mensaje}%' RETURNING clave`,
+      [`
+Hola, <strong>{nombre_cliente}</strong> 👋
+
+💬 Has recibido un mensaje de Traslados GC sobre tu reserva <strong>{numero_reserva}</strong>.
+
+🔍 Accede a tu portal para leerlo y responder:
+<a href="{url_portal}" style="color:#C1502E;">{url_portal}</a>
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
+`]
+    );
+    if (updEm.rows.length) {
+      await pool.query(`UPDATE plantillas_comunicacion_traducciones SET desactualizado_email = TRUE
+                        WHERE plantilla_clave = 'cliente_mensaje_admin' AND cuerpo_email IS NOT NULL AND cuerpo_email <> ''`);
+    }
+    const updWa = await pool.query(
+      `UPDATE plantillas_comunicacion SET cuerpo_whatsapp = $1, actualizado_en = NOW()
+       WHERE clave = 'cliente_mensaje_admin' AND cuerpo_whatsapp LIKE '%{mensaje}%' RETURNING clave`,
+      ['Hola, *{nombre_cliente}* 👋\n\n💬 Has recibido un mensaje de Traslados GC sobre tu reserva *{numero_reserva}*.\n\n🔍 Accede a tu portal para leerlo y responder:\n{url_portal}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*']
+    );
+    if (updWa.rows.length) {
+      await pool.query(`UPDATE plantillas_comunicacion_traducciones SET desactualizado_wa = TRUE
+                        WHERE plantilla_clave = 'cliente_mensaje_admin' AND cuerpo_whatsapp IS NOT NULL AND cuerpo_whatsapp <> ''`);
+    }
+  } catch (e) { console.warn('Cambio plantilla mensaje del equipo:', e.message); }
   // Marca "desactualizado": se activa cuando se cambia el español después de traducir.
   // El cliente sigue recibiendo la traducción aprobada; en Idiomas sale en rojo para ajustarla.
   await pool.query(`ALTER TABLE plantillas_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado_email BOOLEAN DEFAULT FALSE`);
@@ -12964,7 +12998,9 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
             r.precio_estimado,
             r.email_confirmacion_enviado, r.email_voucher_enviado,
             cv.nombre AS categoria_nombre,
-            c.nombre AS conductor_nombre, c.foto AS conductor_foto, c.foto_estado AS conductor_foto_estado
+            c.nombre AS conductor_nombre, c.foto AS conductor_foto, c.foto_estado AS conductor_foto_estado,
+            (SELECT COUNT(*)::int FROM reservas_mensajes rm
+              WHERE rm.reserva_id = r.id AND rm.autor = 'admin' AND rm.leido = FALSE) AS mensajes_sin_leer
      FROM reservas r
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
      LEFT JOIN conductores c ON c.id = r.conductor_id
@@ -13108,6 +13144,8 @@ app.get('/api/cliente/mensajes', asyncHandler(async (req, res) => {
     'SELECT id, autor, mensaje, creado_en FROM reservas_mensajes WHERE reserva_id = $1 ORDER BY creado_en ASC',
     [reservaId]
   );
+  // El cliente ha abierto sus mensajes: los del equipo pasan a leídos (quita el aviso "nuevos" del portal)
+  await pool.query("UPDATE reservas_mensajes SET leido = TRUE WHERE reserva_id = $1 AND autor = 'admin' AND leido = FALSE", [reservaId]);
   res.json({ mensajes: result.rows });
 }));
 
@@ -13818,7 +13856,8 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
       const _pmsg = await obtenerPlantilla('cliente_mensaje_admin', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
-        mensaje: mensaje.trim().replace(/\n/g,'<br>')
+        mensaje: mensaje.trim().replace(/\n/g,'<br>'),
+        url_portal: BASE_URL + '/mi-reserva'
       }, _langMsg);
       // WhatsApp al cliente (misma plantilla, en su idioma; el texto del equipo va tal cual)
       if (r.telefono_cliente) {
@@ -13826,7 +13865,8 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
           const _pmsgWa = await obtenerPlantilla('cliente_mensaje_admin', {
             nombre_cliente: r.nombre_cliente,
             numero_reserva: r.numero_reserva,
-            mensaje: mensaje.trim()
+            mensaje: mensaje.trim(),
+            url_portal: BASE_URL + '/mi-reserva'
           }, _langMsg);
           if (_pmsgWa && _pmsgWa.whatsapp) {
             await pool.query(
