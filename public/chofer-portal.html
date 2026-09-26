@@ -355,7 +355,7 @@
             '<span title="' + semaforo.titulo + '" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + semaforo.color + ';margin-right:8px;vertical-align:middle;"></span>' +
             '<div style="display:flex;flex-direction:column;align-items:flex-start;">' +
               '<span class="reserva-pnr">' + r.numero_reserva + '</span>' +
-              '<span style="font-size:12px;font-weight:600;color:#6b5c44;margin-top:3px;">' + ({ es: 'Español', en: 'Inglés', de: 'Alemán', sv: 'Sueco', no: 'Noruego', nl: 'Neerlandés', it: 'Italiano', fr: 'Francés', fi: 'Finés', ru: 'Ruso' }[r.lang_cliente || 'es'] || (r.lang_cliente || 'es')) + '</span>' +
+              '<span style="font-size:12px;font-weight:600;color:#6b5c44;margin-top:3px;">' + (r.idioma_viajero_otro ? r.idioma_viajero_otro.replace(/</g,'&lt;') : ({ es: 'Español', en: 'Inglés', de: 'Alemán', sv: 'Sueco', no: 'Noruego', nl: 'Neerlandés', it: 'Italiano', fr: 'Francés', fi: 'Finés', ru: 'Ruso' }[r.lang_cliente || 'es'] || (r.lang_cliente || 'es'))) + '</span>' +
             '</div>' +
             '<div class="reserva-resumen">' +
               '<div class="reserva-ruta">' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
@@ -369,6 +369,7 @@
           '<div class="reserva-cuerpo" id="cuerpo-' + r.id + '">' +
             (r.nombre_cliente ? '<div class="detalle-fila"><strong>Cliente:</strong> ' + r.nombre_cliente + '</div>' : '') +
             '<div class="detalle-fila"><strong>Idioma del cliente:</strong> ' + ({ es: 'Español', en: 'Inglés (English)', de: 'Alemán (Deutsch)', sv: 'Sueco (Svenska)', no: 'Noruego (Norsk)', nl: 'Neerlandés (Nederlands)', it: 'Italiano', fr: 'Francés (Français)', fi: 'Finés (Suomi)', ru: 'Ruso (Русский)' }[r.lang_cliente || 'es'] || (r.lang_cliente || 'es')) + '</div>' +
+            (r.idioma_viajero_otro ? '<div class="detalle-fila"><strong>Idioma de quien viaja:</strong> ' + r.idioma_viajero_otro.replace(/</g,'&lt;') + '</div>' : '') +
             '<div class="detalle-fila"><strong>Fecha:</strong> ' + fecha + '</div>' +
             '<div class="detalle-fila"><strong>Ruta:</strong> ' + (r.origen||'—') + ' → ' + (r.destino||'—') + '</div>' +
             (r.direccion_recogida ? '<div class="detalle-fila"><strong>Dirección de recogida:</strong> ' + r.direccion_recogida + '</div>' : '') +
