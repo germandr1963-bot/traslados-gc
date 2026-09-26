@@ -13188,7 +13188,7 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
             r.fecha, r.hora, r.origen, r.destino, r.num_pasajeros,
             r.numero_vuelo, r.hora_llegada_vuelo, r.nombre_barco, r.hora_atraque,
             r.tipo_llegada, r.direccion_recogida, r.direccion_destino,
-            r.notas_cliente, r.pasaporte_dni,
+            r.notas_cliente, r.pasaporte_dni, r.lang_cliente,
             r.estado, r.deposito_pagado, r.deposito_liberado, r.deposito_devolucion_pendiente, r.deposito_retenido_noshow,
             r.precio_estimado,
             r.email_confirmacion_enviado, r.email_voucher_enviado,
@@ -13207,10 +13207,17 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
   // Para cada reserva obtener extras y noshow
   const reservas = await Promise.all(result.rows.map(async function(r) {
     const extras = await pool.query(
-      `SELECT e.nombre, re.precio_en_reserva FROM reservas_extras re
+      `SELECT e.nombre, re.extra_id, re.precio_en_reserva FROM reservas_extras re
        JOIN extras e ON e.id = re.extra_id WHERE re.reserva_id = $1`,
       [r.id]
     );
+    // Datos de la reserva en el idioma en que se hizo esa reserva (26/09/2026),
+    // con las mismas traducciones que los emails y el voucher.
+    let langR = r.lang_cliente || 'es';
+    if (!IDIOMAS_PERMITIDOS.includes(langR)) langR = 'es';
+    const idiomaR = await datosIdiomaVoucher({ lang_cliente: langR, origen: r.origen, destino: r.destino, categoria_nombre: r.categoria_nombre });
+    const localeR = LOCALE_CLIENTE[langR] || 'es-ES';
+    extras.rows.forEach(function(e) { e.nombre = idiomaR.nombreExtra(e); });
     const cfgNoshow = await obtenerConfigNoshow(r.fecha);
     const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
     const ahora = new Date();
@@ -13219,6 +13226,11 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
     const facturaQ = await pool.query('SELECT id FROM facturas WHERE reserva_id = $1 LIMIT 1', [r.id]);
     return Object.assign({}, r, {
       extras: extras.rows,
+      origen_cliente: r.origen ? idiomaR.origen : null,
+      destino_cliente: r.destino ? idiomaR.destino : null,
+      categoria_cliente: r.categoria_nombre ? idiomaR.categoria : null,
+      fecha_cliente: r.fecha ? new Date(r.fecha).toLocaleDateString(localeR, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : null,
+      locale_cliente: localeR,
       tiene_factura: facturaQ.rows.length > 0,
       noshow: {
         importe: parseFloat(cfgNoshow.importe_deposito).toFixed(2),
