@@ -605,9 +605,12 @@
           cont.innerHTML = data.preferencias.map(function(p){
             if (p.elegida) preferenciasSeleccion[p.id] = p.elegida;
             if (p.detalle) preferenciasDetalle[p.id] = p.detalle;
-            var pills = p.opciones.split('/').map(function(op){
+            // Se guarda la opción en español (la que ve el chofer); se muestra en el idioma del portal
+            var etiquetas = (p.opciones_cliente || p.opciones).split('/');
+            var pills = p.opciones.split('/').map(function(op, idx){
               op = op.trim();
-              return '<button type="button" class="pref-pill" data-pref="' + p.id + '" data-opcion="' + op.replace(/"/g,'&quot;') + '" onclick="togglePreferencia(this)">' + op + '</button>';
+              var etiqueta = (etiquetas[idx] || op).trim();
+              return '<button type="button" class="pref-pill" data-pref="' + p.id + '" data-opcion="' + op.replace(/"/g,'&quot;') + '" onclick="togglePreferencia(this)">' + etiqueta + '</button>';
             }).join('');
             var detalleHtml = '';
             if (p.opciones.indexOf('(Especificar)') !== -1) {
@@ -626,7 +629,7 @@
               detalleHtml = '<div id="detalle-pref-' + p.id + '" style="display:none;margin-top:6px;">' + controlHtml + '</div>';
             }
             return '<div style="border-top:1px solid var(--borde);padding:5px 0;">' +
-              '<div style="font-size:13.5px;font-weight:600;margin-bottom:2px;">' + p.nombre + '</div>' +
+              '<div style="font-size:13.5px;font-weight:600;margin-bottom:2px;">' + (p.nombre_cliente || p.nombre) + '</div>' +
               '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + pills + '</div>' +
               detalleHtml +
             '</div>';
