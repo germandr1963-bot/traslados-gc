@@ -1030,6 +1030,7 @@ table.tabla-precios input {
           <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">💬 Mensajes del cliente</p>
           <div id="hilo-mensajes-admin" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;max-height:200px;overflow-y:auto;"></div>
           <div id="aviso-sin-mensajes" style="font-size:0.82rem;color:var(--texto-muted);display:none;">Sin mensajes de este cliente.</div>
+          <div id="idioma-cliente-mensajes" style="font-size:0.82rem;margin-top:8px;"></div>
           <textarea id="campo-respuesta-admin" rows="2" placeholder="Escribe tu respuesta al cliente…" style="width:100%;border:1px solid var(--gris-borde);border-radius:6px;padding:8px 10px;font-size:0.82rem;font-family:inherit;resize:vertical;margin-top:8px;"></textarea>
           <button class="boton-costa" style="font-size:0.82rem;margin-top:6px;" onclick="enviarRespuestaCliente()">📨 Responder al cliente</button>
           <div id="aviso-respuesta-admin" style="display:none;font-size:0.82rem;margin-top:6px;"></div>
@@ -7858,6 +7859,13 @@ function abrirDetalleReserva(id, sinScroll) {
       }
       // "🔒 Cancelación tardía" sustituido por el bloque "📞 Cancelación manual" (25/09/2026)
       if (btnNoshow) btnNoshow.style.display = 'none';
+      // Idioma del cliente, encima del cuadro para escribirle
+      var idiomaCliEl = document.getElementById('idioma-cliente-mensajes');
+      if (idiomaCliEl) {
+        var nombresIdioma = { es: 'Español', en: 'Inglés (English)', de: 'Alemán (Deutsch)', sv: 'Sueco (Svenska)', no: 'Noruego (Norsk)', nl: 'Neerlandés (Nederlands)', it: 'Italiano', fr: 'Francés (Français)', fi: 'Finés (Suomi)', ru: 'Ruso (Русский)' };
+        var codIdioma = r.lang_cliente || 'es';
+        idiomaCliEl.innerHTML = '🌐 <strong>Idioma del cliente: ' + (nombresIdioma[codIdioma] || codIdioma) + '</strong> — escríbele en este idioma.';
+      }
       var bloqueCancManual = document.getElementById('bloque-cancelacion-manual');
       if (bloqueCancManual) bloqueCancManual.style.display = (['completada', 'cancelada', 'no_show'].indexOf(r.estado) === -1) ? 'block' : 'none';
 
