@@ -1046,6 +1046,11 @@ async function initSchema() {
     { clave: 'reserva_pref_viajero_instruccion', contexto: 'Instrucción sobre la lista de preferencias del viajero', es: 'Toca una opción para marcarla y vuelve a tocarla para quitarla.' },
     { clave: 'reserva_pref_temp_elige', contexto: 'Primera opción del selector de temperatura en las preferencias del viajero', es: 'Elige la temperatura' },
     { clave: 'reserva_pref_especifica', contexto: 'Texto gris de ejemplo en el campo para especificar una preferencia del viajero', es: 'Especifica…' },
+    { clave: 'reserva_label_idioma_viajero', contexto: 'Etiqueta del selector de idioma de la persona que viaja (reserva para otra persona)', es: 'Idioma de quien viaja' },
+    { clave: 'reserva_nota_idioma_viajero', contexto: 'Nota bajo el selector de idioma de quien viaja', es: 'La confirmación, el voucher y la factura de esta reserva se enviarán en este idioma.' },
+    { clave: 'reserva_opcion_otro_idioma', contexto: 'Última opción del selector de idioma de quien viaja, para escribir un idioma que no está en la lista', es: 'Otro idioma…' },
+    { clave: 'reserva_ph_otro_idioma', contexto: 'Texto gris de ejemplo en el campo para escribir otro idioma', es: 'Escribe el idioma (por ejemplo: chino)' },
+    { clave: 'reserva_nota_otro_idioma', contexto: 'Nota cuando se elige "Otro idioma"', es: 'Los documentos se enviarán en el idioma de esta página. El conductor sabrá el idioma de quien viaja.' },
   ];
   for (const tx of TEXTOS_RESERVA_PREF_VIAJERO) {
     await pool.query(
@@ -2023,6 +2028,8 @@ async function initSchema() {
   await pool.query(`ALTER TABLE clientes_datos ADD COLUMN IF NOT EXISTS idioma VARCHAR(5) DEFAULT 'es'`);
   // TRUE cuando el cliente elige él mismo el idioma de su portal en "Mis datos" (26/09/2026)
   await pool.query(`ALTER TABLE clientes_datos ADD COLUMN IF NOT EXISTS idioma_elegido BOOLEAN DEFAULT FALSE`);
+  // Idioma de quien viaja escrito a mano ("Otro idioma…") en una reserva para otra persona (26/09/2026)
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS idioma_viajero_otro TEXT`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_password_hash TEXT`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_primer_acceso BOOLEAN DEFAULT TRUE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
@@ -3414,6 +3421,11 @@ app.get('/api/marcas-vehiculos', asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/reservas', asyncHandler(async (req, res) => {
+  // Reserva para otra persona (26/09/2026): si se elige el idioma de quien viaja entre los de la web,
+  // la reserva pasa a ser de ese idioma (confirmación, voucher, factura y avisos en ese idioma).
+  if (req.body && req.body.es_para_otra_persona && req.body.idioma_viajero && IDIOMAS_PERMITIDOS.includes(req.body.idioma_viajero)) {
+    req.body.lang_cliente = req.body.idioma_viajero;
+  }
   const {
     numero_reserva_cliente,
     origen, destino, categoria_id, precio_estimado,
@@ -3530,6 +3542,13 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     );
   } catch (e) {
     console.error('No se pudo guardar el cliente en clientes_datos:', e);
+  }
+
+  // "Otro idioma…" escrito a mano para quien viaja: lo ven el Admin y el chofer
+  if (es_para_otra_persona && req.body.idioma_viajero === '__otro' && req.body.idioma_viajero_otro && String(req.body.idioma_viajero_otro).trim()) {
+    try {
+      await pool.query('UPDATE reservas SET idioma_viajero_otro = $1 WHERE id = $2', [String(req.body.idioma_viajero_otro).trim().slice(0, 60), reservaId]);
+    } catch (e) { console.warn('Idioma del viajero (otro):', e.message); }
   }
 
   // Reserva para otra persona (26/09/2026): NO se copian las preferencias del titular.
@@ -8084,7 +8103,7 @@ async function renderReserva(req, res, lang) {
     return res.status(404).send('Página no encontrada');
   }
   const t = function (clave) { return obtenerTexto(clave, lang); };
-  const idiomas = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
+  const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
   const rutaReserva = lang === 'es' ? '/reserva' : '/' + lang + '/' + (SECCIONES_RESERVA[lang] || 'reserva');
   const urlHome = lang === 'es' ? '/' : '/' + lang + '/';
   // Preferencias del viajero (reserva para otra persona): se muestran en el idioma de la página;
@@ -8567,7 +8586,7 @@ app.get('/chofer/mis-reservas', requireChofer, asyncHandler(async (req, res) => 
             CASE WHEN r.es_para_otra_persona THEN r.nombre_pasajero_otro ELSE r.nombre_cliente END AS nombre_cliente,
             r.num_pasajeros, r.estado, r.deposito_pagado,
             r.numero_vuelo, r.hora_llegada_vuelo, r.nombre_barco, r.hora_atraque,
-            r.direccion_recogida, r.direccion_destino, r.notas_cliente, r.lang_cliente,
+            r.direccion_recogida, r.direccion_destino, r.notas_cliente, r.lang_cliente, r.idioma_viajero_otro,
             cv.nombre AS categoria_nombre,
             (SELECT COUNT(*) FROM reservas_mensajes_chofer rmc
              WHERE rmc.reserva_id = r.id AND rmc.autor = 'admin' AND rmc.leido = FALSE) AS mensajes_nuevos
