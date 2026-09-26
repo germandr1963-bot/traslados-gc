@@ -1320,6 +1320,7 @@ async function initSchema() {
     { clave: 'por_email', contexto: 'Etiqueta del campo email', es: 'Email' },
     { clave: 'por_email_nota', contexto: 'Nota bajo el email (no se puede cambiar)', es: 'Tu email es tu identificador de acceso y de tu historial — para cambiarlo, contáctanos.' },
     { clave: 'por_idioma', contexto: 'Etiqueta del selector de idioma', es: 'Idioma de comunicación' },
+    { clave: 'por_idioma_portal', contexto: 'Etiqueta del selector de idioma en Mis datos (cambia el idioma del portal y de las reservas nuevas)', es: 'Idioma de tu portal y de tus nuevas reservas' },
     { clave: 'por_cargando_idiomas', contexto: 'Texto del selector de idioma mientras carga', es: 'Cargando…' },
     { clave: 'por_guardar_datos', contexto: 'Botón para guardar los datos personales', es: 'Guardar mis datos' },
     { clave: 'por_nombre_obligatorio', contexto: 'Aviso si se guarda sin nombre', es: 'El nombre es obligatorio.' },
@@ -1982,6 +1983,8 @@ async function initSchema() {
   // ─── Portal del cliente ───────────────────────────────────────────────────
   await pool.query(`ALTER TABLE clientes_datos ADD COLUMN IF NOT EXISTS password_hash TEXT`);
   await pool.query(`ALTER TABLE clientes_datos ADD COLUMN IF NOT EXISTS idioma VARCHAR(5) DEFAULT 'es'`);
+  // TRUE cuando el cliente elige él mismo el idioma de su portal en "Mis datos" (26/09/2026)
+  await pool.query(`ALTER TABLE clientes_datos ADD COLUMN IF NOT EXISTS idioma_elegido BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_password_hash TEXT`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_primer_acceso BOOLEAN DEFAULT TRUE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
@@ -12795,34 +12798,43 @@ app.post('/api/restablecer-password', asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Idioma del portal del cliente (26/09/2026): el que eligió él en "Mis datos";
+// si nunca lo eligió, el de su primera reserva. Lo usan el portal, "Mis datos" y "Nueva reserva".
+async function idiomaPortalCliente(req) {
+  let lang = 'es';
+  try {
+    if (!req.session || !req.session.clienteReservaId) return 'es';
+    let emailCliente = req.session.clienteEmail || null;
+    if (!emailCliente) {
+      const em = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
+      if (em.rows.length) emailCliente = em.rows[0].email_cliente;
+    }
+    if (!emailCliente) return 'es';
+    const cd = await pool.query('SELECT idioma, idioma_elegido FROM clientes_datos WHERE LOWER(email_cliente) = LOWER($1)', [emailCliente]);
+    if (cd.rows.length && cd.rows[0].idioma_elegido && cd.rows[0].idioma) {
+      lang = cd.rows[0].idioma;
+    } else {
+      const pr = await pool.query(
+        'SELECT lang_cliente FROM reservas WHERE LOWER(email_cliente) = LOWER($1) ORDER BY creado_en ASC LIMIT 1',
+        [emailCliente]
+      );
+      if (pr.rows.length && pr.rows[0].lang_cliente) lang = pr.rows[0].lang_cliente;
+    }
+  } catch (e) { console.warn('idiomaPortalCliente:', e.message); lang = 'es'; }
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) lang = 'es';
+  return lang;
+}
+
 app.get('/cliente/portal', (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.redirect('/mi-reserva');
   res.set('Cache-Control', 'no-cache');
-  // Portal en el idioma del cliente (26/09/2026): el que eligió en su portal y, si nunca
-  // lo cambió (sigue en 'es'), el de su primera reserva.
+  // Portal en el idioma del cliente (26/09/2026): el que eligió él en "Mis datos" y, si nunca
+  // lo eligió, el de su primera reserva (ver idiomaPortalCliente).
   // Textos: Admin → Idiomas → Textos de interfaz → fila "Portal del cliente".
   (async function () {
     let lang = 'es';
     try {
-      let emailCliente = req.session.clienteEmail || null;
-      if (!emailCliente) {
-        const em = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
-        if (em.rows.length) emailCliente = em.rows[0].email_cliente;
-      }
-      if (emailCliente) {
-        const cd = await pool.query('SELECT idioma FROM clientes_datos WHERE LOWER(email_cliente) = LOWER($1)', [emailCliente]);
-        const elegido = cd.rows.length ? (cd.rows[0].idioma || 'es') : 'es';
-        if (elegido !== 'es') {
-          lang = elegido;
-        } else {
-          const pr = await pool.query(
-            'SELECT lang_cliente FROM reservas WHERE LOWER(email_cliente) = LOWER($1) ORDER BY creado_en ASC LIMIT 1',
-            [emailCliente]
-          );
-          if (pr.rows.length && pr.rows[0].lang_cliente) lang = pr.rows[0].lang_cliente;
-        }
-      }
-      if (!IDIOMAS_PERMITIDOS.includes(lang)) lang = 'es';
+      lang = await idiomaPortalCliente(req);
     } catch (e) { console.warn('Portal cliente (idioma):', e.message); lang = 'es'; }
     const t = function (clave) { return obtenerTexto(clave, lang); };
     const textos = {};
@@ -12836,30 +12848,12 @@ app.get('/cliente/portal', (req, res) => {
   });
 });
 
-// Portal del cliente → "Nueva reserva" en el idioma del cliente (26/09/2026):
-// el que eligió en su portal y, si no lo cambió (sigue en 'es'), el de su primera reserva.
+// Portal del cliente → "Nueva reserva" en el idioma de su portal (ver idiomaPortalCliente).
 app.get('/cliente/nueva-reserva', asyncHandler(async (req, res) => {
   let lang = 'es';
   try {
     if (req.session && req.session.clienteReservaId) {
-      let emailCliente = req.session.clienteEmail || null;
-      if (!emailCliente) {
-        const em = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
-        if (em.rows.length) emailCliente = em.rows[0].email_cliente;
-      }
-      if (emailCliente) {
-        const cd = await pool.query('SELECT idioma FROM clientes_datos WHERE LOWER(email_cliente) = LOWER($1)', [emailCliente]);
-        const elegido = cd.rows.length ? (cd.rows[0].idioma || 'es') : 'es';
-        if (elegido !== 'es') {
-          lang = elegido;
-        } else {
-          const pr = await pool.query(
-            'SELECT lang_cliente FROM reservas WHERE LOWER(email_cliente) = LOWER($1) ORDER BY creado_en ASC LIMIT 1',
-            [emailCliente]
-          );
-          if (pr.rows.length && pr.rows[0].lang_cliente) lang = pr.rows[0].lang_cliente;
-        }
-      }
+      lang = await idiomaPortalCliente(req);
     }
   } catch (e) { console.warn('Nueva reserva (idioma):', e.message); }
   if (lang === 'es' || !SECCIONES_RESERVA[lang]) return res.redirect('/reserva');
@@ -13152,7 +13146,7 @@ app.get('/api/cliente/mis-datos', asyncHandler(async (req, res) => {
     nombre_cliente: nombreFinal,
     telefono_cliente: (propios.rows.length && propios.rows[0].telefono) || (result.rows.length ? result.rows[0].telefono_cliente : ''),
     email_cliente: result.rows.length ? result.rows[0].email_cliente : emailNorm,
-    idioma: (propios.rows.length && propios.rows[0].idioma) || 'es'
+    idioma: await idiomaPortalCliente(req)
   });
 }));
 
@@ -13165,12 +13159,23 @@ app.post('/api/cliente/mis-datos', asyncHandler(async (req, res) => {
   const idioma = (req.body.idioma || 'es').trim().slice(0, 5);
   if (!nombre) return res.status(400).json({ error: 'El nombre es obligatorio.' });
   if (telefono.replace(/[^\d]/g, '').length < 7) return res.status(400).json({ error: 'Introduce un teléfono válido.' });
-  await pool.query(
-    `INSERT INTO clientes_datos (email_cliente, nombre, telefono, idioma) VALUES ($1, $2, $3, $4)
-     ON CONFLICT (email_cliente) DO UPDATE SET nombre = $2, telefono = $3, idioma = $4, actualizado_en = NOW()`,
-    [emailCliente, nombre, telefono, idioma]
-  );
-  res.json({ ok: true });
+  // El idioma del portal solo cambia si el cliente cambia concretamente el idioma (26/09/2026)
+  const idiomaActual = await idiomaPortalCliente(req);
+  const idiomaCambiado = IDIOMAS_PERMITIDOS.includes(idioma) && idioma !== idiomaActual;
+  if (idiomaCambiado) {
+    await pool.query(
+      `INSERT INTO clientes_datos (email_cliente, nombre, telefono, idioma, idioma_elegido) VALUES ($1, $2, $3, $4, TRUE)
+       ON CONFLICT (email_cliente) DO UPDATE SET nombre = $2, telefono = $3, idioma = $4, idioma_elegido = TRUE, actualizado_en = NOW()`,
+      [emailCliente, nombre, telefono, idioma]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO clientes_datos (email_cliente, nombre, telefono) VALUES ($1, $2, $3)
+       ON CONFLICT (email_cliente) DO UPDATE SET nombre = $2, telefono = $3, actualizado_en = NOW()`,
+      [emailCliente, nombre, telefono]
+    );
+  }
+  res.json({ ok: true, idioma_cambiado: idiomaCambiado });
 }));
 
 // Datos completos de las reservas para el portal
