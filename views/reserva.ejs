@@ -676,6 +676,35 @@ footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13
           <input type="email" id="otra-persona-email" placeholder="<%= t('reserva_ph_otra_email') %>">
           <div class="aviso-campo" id="err-otra-persona-email"><%= t('reserva_err_email') %></div>
         </div>
+
+        <!-- Idioma de quien viaja (26/09/2026) -->
+        <div class="campo-grupo">
+          <label><%= t('reserva_label_idioma_viajero') %></label>
+          <select id="idioma-viajero" onchange="cambioIdiomaViajero(this.value)" style="width:100%;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 12px;font-family:inherit;font-size:14px;">
+            <% idiomas.forEach(function(idi) { %>
+              <option value="<%= idi.codigo %>"<%= idi.codigo === lang ? ' selected' : '' %>><%= idi.nombre || idi.codigo.toUpperCase() %></option>
+            <% }); %>
+            <option value="__otro"><%= t('reserva_opcion_otro_idioma') %></option>
+          </select>
+          <input type="text" id="idioma-viajero-otro" maxlength="60" placeholder="<%= t('reserva_ph_otro_idioma') %>" style="display:none;margin-top:8px;">
+          <div id="nota-idioma-viajero" style="font-size:12px;color:var(--texto-muted);margin-top:4px;"><%= t('reserva_nota_idioma_viajero') %></div>
+          <div id="nota-otro-idioma" style="display:none;font-size:12px;color:var(--texto-muted);margin-top:4px;"><%= t('reserva_nota_otro_idioma') %></div>
+        </div>
+
+        <!-- Preferencias del viajero (opcional, 26/09/2026) -->
+        <% if (typeof preferenciasViajero !== 'undefined' && preferenciasViajero.length) { %>
+        <div id="bloque-pref-viajero" style="border:1px solid var(--piedra-borde);border-radius:8px;background:#fff;margin:4px 0 14px;overflow:hidden;">
+          <div onclick="togglePrefViajero()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;">
+            <span style="font-size:14px;font-weight:600;color:var(--texto-oscuro);"><%= t('reserva_pref_viajero_titulo') %></span>
+            <span id="pref-viajero-flecha" style="font-size:12px;opacity:0.6;">▼</span>
+          </div>
+          <div id="pref-viajero-cuerpo" style="display:none;padding:0 14px 12px;">
+            <p style="margin:0 0 8px;font-size:12.5px;line-height:1.5;color:var(--texto-muted);"><%= t('reserva_pref_viajero_nota') %></p>
+            <p style="margin:0 0 4px;font-size:11.5px;color:var(--texto-muted);"><%= t('reserva_pref_viajero_instruccion') %></p>
+            <div id="pref-viajero-lista"></div>
+          </div>
+        </div>
+        <% } %>
       </div>
 
       <div class="campo-grupo">
@@ -1424,8 +1453,90 @@ function validarPaso2() {
   return ok;
 }
 
+// ── Preferencias del viajero (reserva para otra persona) ──
+var PREFS_VIAJERO = <%- JSON.stringify(typeof preferenciasViajero !== 'undefined' ? preferenciasViajero : []).replace(/</g, '\\u003c') %>;
+var PREF_VIAJERO_TEXTOS = {
+  temp: <%- JSON.stringify(t('reserva_pref_temp_elige')).replace(/</g, '\\u003c') %>,
+  especifica: <%- JSON.stringify(t('reserva_pref_especifica')).replace(/</g, '\\u003c') %>
+};
+var prefViajeroSel = {};
+var prefViajeroDetalle = {};
+
+function togglePrefViajero() {
+  var cuerpo = document.getElementById('pref-viajero-cuerpo');
+  if (!cuerpo) return;
+  var abierto = cuerpo.style.display !== 'none';
+  cuerpo.style.display = abierto ? 'none' : 'block';
+  document.getElementById('pref-viajero-flecha').textContent = abierto ? '▼' : '▲';
+  if (!abierto) pintarPrefViajero();
+}
+
+function pintarPrefViajero() {
+  var cont = document.getElementById('pref-viajero-lista');
+  if (!cont) return;
+  cont.innerHTML = PREFS_VIAJERO.map(function(p) {
+    var etiquetas = (p.opciones_cliente || p.opciones).split('/');
+    var pills = p.opciones.split('/').map(function(op, idx) {
+      op = op.trim();
+      var marcado = prefViajeroSel[p.id] === op;
+      return '<button type="button" class="pref-viajero-pill" data-pref="' + p.id + '" data-opcion="' + op.replace(/"/g, '&quot;') + '" onclick="togglePrefViajeroOpcion(this)" style="border:1px solid ' + (marcado ? 'var(--terracota, #C1502E)' : 'var(--piedra-borde)') + ';border-radius:20px;padding:5px 12px;font-size:13px;background:' + (marcado ? 'var(--terracota, #C1502E)' : 'transparent') + ';color:' + (marcado ? '#fff' : 'var(--texto-oscuro)') + ';cursor:pointer;font-family:inherit;line-height:1.4;">' + (etiquetas[idx] || op).trim() + '</button>';
+    }).join('');
+    var detalle = '';
+    if (p.opciones.indexOf('(Especificar)') !== -1 && (prefViajeroSel[p.id] || '').indexOf('(Especificar)') !== -1) {
+      if (p.nombre.indexOf('Temperatura') !== -1) {
+        var opts = '<option value="">' + PREF_VIAJERO_TEXTOS.temp + '</option>';
+        for (var tc = 16; tc <= 28; tc++) {
+          var tf = Math.round(tc * 9 / 5 + 32);
+          var val = tc + ' °C · ' + tf + ' °F';
+          opts += '<option value="' + val + '"' + (prefViajeroDetalle[p.id] === val ? ' selected' : '') + '>' + val + '</option>';
+        }
+        detalle = '<div style="margin-top:6px;"><select onchange="prefViajeroDetalle[' + p.id + '] = this.value" style="border:1px solid var(--piedra-borde);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;background:#fff;">' + opts + '</select></div>';
+      } else {
+        detalle = '<div style="margin-top:6px;"><input type="text" value="' + (prefViajeroDetalle[p.id] || '').replace(/"/g, '&quot;') + '" onchange="prefViajeroDetalle[' + p.id + '] = this.value" placeholder="' + PREF_VIAJERO_TEXTOS.especifica + '" style="border:1px solid var(--piedra-borde);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;background:#fff;width:100%;max-width:280px;"></div>';
+      }
+    }
+    return '<div style="border-top:1px solid var(--piedra-borde);padding:6px 0;">' +
+      '<div style="font-size:13.5px;font-weight:600;margin-bottom:3px;">' + (p.nombre_cliente || p.nombre) + '</div>' +
+      '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + pills + '</div>' + detalle +
+    '</div>';
+  }).join('');
+}
+
+function togglePrefViajeroOpcion(btn) {
+  var pid = btn.dataset.pref, op = btn.dataset.opcion;
+  if (prefViajeroSel[pid] === op) { delete prefViajeroSel[pid]; } else { prefViajeroSel[pid] = op; }
+  pintarPrefViajero();
+}
+
+function preferenciasViajeroParaEnviar() {
+  return Object.keys(prefViajeroSel).map(function(pid) {
+    var sel = { preferencia_id: pid, opcion: prefViajeroSel[pid] };
+    if (sel.opcion.indexOf('(Especificar)') !== -1 && prefViajeroDetalle[pid]) sel.detalle = String(prefViajeroDetalle[pid]).trim();
+    return sel;
+  });
+}
+
+function cambioIdiomaViajero(valor) {
+  var otro = valor === '__otro';
+  document.getElementById('idioma-viajero-otro').style.display = otro ? 'block' : 'none';
+  document.getElementById('nota-otro-idioma').style.display = otro ? 'block' : 'none';
+  document.getElementById('nota-idioma-viajero').style.display = otro ? 'none' : 'block';
+  if (!otro) document.getElementById('idioma-viajero-otro').value = '';
+}
+
 function toggleOtraPersona(marcado) {
   document.getElementById('bloque-otra-persona').classList.toggle('bloque-oculto', !marcado);
+  // Al desmarcar "Yo no viajo", el idioma de quien viaja vuelve al de la página
+  if (!marcado && document.getElementById('idioma-viajero')) {
+    document.getElementById('idioma-viajero').value = LANG;
+    cambioIdiomaViajero(LANG);
+  }
+  // Al desmarcar "Yo no viajo", se borran las preferencias del viajero
+  if (!marcado) {
+    prefViajeroSel = {}; prefViajeroDetalle = {};
+    var cuerpoPV = document.getElementById('pref-viajero-cuerpo');
+    if (cuerpoPV) { cuerpoPV.style.display = 'none'; document.getElementById('pref-viajero-flecha').textContent = '▼'; }
+  }
   // El pasaporte del cliente solo se muestra si viaja él (y la recogida es en aeropuerto/puerto)
   if (origenEsAero || origenEsPuerto) {
     document.getElementById('bloque-pasaporte').style.display = marcado ? 'none' : 'block';
@@ -1541,7 +1652,10 @@ function confirmarEnvio() {
       : '',
     email_pasajero_otro: document.getElementById('otra-persona-email').value.trim(),
     extras: extrasSeleccionados.map(function(e){ return { id: e.extra_id, precio: e.precio }; }),
-    lang_cliente: LANG
+    lang_cliente: LANG,
+    preferencias_viajero: document.getElementById('es-para-otra-persona').checked ? preferenciasViajeroParaEnviar() : [],
+    idioma_viajero: (document.getElementById('es-para-otra-persona').checked && document.getElementById('idioma-viajero')) ? document.getElementById('idioma-viajero').value : '',
+    idioma_viajero_otro: (document.getElementById('es-para-otra-persona').checked && document.getElementById('idioma-viajero-otro')) ? document.getElementById('idioma-viajero-otro').value.trim() : ''
   };
 
   fetch('/api/reservas', {
