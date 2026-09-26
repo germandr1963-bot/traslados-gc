@@ -1562,6 +1562,19 @@ async function initSchema() {
     );
   }
 
+  // Nombres de los idiomas como textos traducibles (26/09/2026), igual que los extras.
+  // Fila "Nombres de idiomas" en Admin → Idiomas → Textos de interfaz. Los usan los selectores
+  // de idioma de la página de reserva y del portal del cliente, en el idioma de la página.
+  const idiomasParaNombres = await pool.query('SELECT codigo, nombre FROM idiomas_web');
+  for (const idn of idiomasParaNombres.rows) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Nombres de idiomas', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
+      ['idioma_nombre_' + idn.codigo, 'Nombre del idioma "' + idn.nombre + '" en los selectores de idioma de la web (ej. en inglés: Spanish, English, German…)', idn.nombre]
+    );
+  }
+
   // Palabra de la página de reserva en la URL, por idioma. Editable desde el
   // admin (panel de Idiomas); la siembra solo rellena las que estén vacías,
   // nunca pisa un valor ya guardado o editado.
@@ -3208,6 +3221,14 @@ app.get('/api/idiomas-activos', asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo'
   );
+  // ?lang=xx → nombres de los idiomas en ese idioma (fila "Nombres de idiomas"); sin lang, como antes
+  const langNombres = req.query.lang && IDIOMAS_PERMITIDOS.includes(req.query.lang) ? req.query.lang : null;
+  if (langNombres && langNombres !== 'es') {
+    return res.json(result.rows.map(function (i) {
+      const tn = obtenerTexto('idioma_nombre_' + i.codigo, langNombres);
+      return { codigo: i.codigo, nombre: (tn && tn.indexOf('[[') !== 0) ? tn : i.nombre };
+    }));
+  }
   res.json(result.rows);
 }));
 
@@ -8104,6 +8125,13 @@ async function renderReserva(req, res, lang) {
   }
   const t = function (clave) { return obtenerTexto(clave, lang); };
   const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
+  // Nombres de los idiomas en el idioma de la página (fila "Nombres de idiomas")
+  if (lang !== 'es') {
+    idiomas.rows.forEach(function (i) {
+      const tn = obtenerTexto('idioma_nombre_' + i.codigo, lang);
+      if (tn && tn.indexOf('[[') !== 0) i.nombre = tn;
+    });
+  }
   const rutaReserva = lang === 'es' ? '/reserva' : '/' + lang + '/' + (SECCIONES_RESERVA[lang] || 'reserva');
   const urlHome = lang === 'es' ? '/' : '/' + lang + '/';
   // Preferencias del viajero (reserva para otra persona): se muestran en el idioma de la página;
