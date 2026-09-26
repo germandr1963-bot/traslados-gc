@@ -180,7 +180,7 @@
             <div style="font-size:11px;opacity:0.55;margin-top:3px;"><%= t('por_email_nota') %></div>
           </div>
           <div style="margin-bottom:12px;">
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;"><%= t('por_idioma') %></label>
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;"><%= t('por_idioma_portal') %></label>
             <select id="mis-datos-idioma" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;"><option value="es"><%= t('por_cargando_idiomas') %></option></select>
           </div>
           <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -574,6 +574,8 @@
         if (d.ok) {
           msg.textContent = tx('por_datos_guardados');
           msg.style.color = 'var(--exito)';
+          // Si ha cambiado el idioma, el portal se recarga al momento en el idioma nuevo
+          if (d.idioma_cambiado) { setTimeout(function() { location.reload(); }, 800); return; }
           var selIdioma = document.getElementById('mis-datos-idioma');
           var nombreIdioma = selIdioma.options[selIdioma.selectedIndex] ? selIdioma.options[selIdioma.selectedIndex].text : '';
           actualizarBtnIdioma(selIdioma.value, nombreIdioma);
