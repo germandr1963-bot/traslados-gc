@@ -8389,7 +8389,7 @@ app.get('/chofer/mis-reservas', requireChofer, asyncHandler(async (req, res) => 
             CASE WHEN r.es_para_otra_persona THEN r.nombre_pasajero_otro ELSE r.nombre_cliente END AS nombre_cliente,
             r.num_pasajeros, r.estado, r.deposito_pagado,
             r.numero_vuelo, r.hora_llegada_vuelo, r.nombre_barco, r.hora_atraque,
-            r.direccion_recogida, r.direccion_destino, r.notas_cliente,
+            r.direccion_recogida, r.direccion_destino, r.notas_cliente, r.lang_cliente,
             cv.nombre AS categoria_nombre,
             (SELECT COUNT(*) FROM reservas_mensajes_chofer rmc
              WHERE rmc.reserva_id = r.id AND rmc.autor = 'admin' AND rmc.leido = FALSE) AS mensajes_nuevos
