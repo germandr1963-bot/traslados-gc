@@ -7884,8 +7884,10 @@ function abrirDetalleReserva(id, sinScroll) {
       var idiomaCliEl = document.getElementById('idioma-cliente-mensajes');
       if (idiomaCliEl) {
         var nombresIdioma = { es: 'Español', en: 'Inglés (English)', de: 'Alemán (Deutsch)', sv: 'Sueco (Svenska)', no: 'Noruego (Norsk)', nl: 'Neerlandés (Nederlands)', it: 'Italiano', fr: 'Francés (Français)', fi: 'Finés (Suomi)', ru: 'Ruso (Русский)' };
-        var codIdioma = r.lang_cliente || 'es';
+        var codIdioma = r.idioma_portal || r.lang_cliente || 'es';
+        var codReserva = r.lang_cliente || 'es';
         idiomaCliEl.innerHTML = '🌐 <strong>Idioma del cliente: ' + (nombresIdioma[codIdioma] || codIdioma) + '</strong> — escríbele en este idioma.' +
+          (codReserva !== codIdioma ? '<br>📄 Idioma de la reserva: ' + (nombresIdioma[codReserva] || codReserva) + ' — documentos y chofer.' : '') +
           (r.idioma_viajero_otro ? '<br>🧳 Idioma de quien viaja: <strong>' + String(r.idioma_viajero_otro).replace(/</g,'&lt;') + '</strong>' : '');
       }
       var bloqueCancManual = document.getElementById('bloque-cancelacion-manual');
