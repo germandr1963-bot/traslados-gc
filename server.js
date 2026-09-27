@@ -1422,6 +1422,10 @@ async function initSchema() {
     { clave: 'por_msg_enviado', contexto: 'Aviso tras enviar un mensaje', es: '✅ Mensaje enviado.' },
     { clave: 'por_error_enviar', contexto: 'Aviso si no se pudo enviar un mensaje', es: 'Error al enviar.' },
     { clave: 'por_franja_version', contexto: 'Franja arriba cuando hay una versión nueva de la página', es: '🔄 Hay una versión nueva. Pulsa aquí para actualizar' },
+    { clave: 'por_viaje_pref_titulo', contexto: 'Título del recuadro plegable con las preferencias de un viaje concreto (dentro de cada reserva activa)', es: '🧳 Preferencias de este viaje' },
+    { clave: 'por_viaje_pref_nota', contexto: 'Explicación dentro del recuadro de preferencias de un viaje', es: 'Solo para este viaje: tu conductor verá estas preferencias. Tus preferencias generales ("Mis preferencias") no cambian.' },
+    { clave: 'por_viaje_pref_guardar', contexto: 'Botón para guardar las preferencias de un viaje', es: 'Guardar las preferencias de este viaje' },
+    { clave: 'por_viaje_pref_guardadas', contexto: 'Aviso tras guardar las preferencias de un viaje', es: '✓ Preferencias de este viaje guardadas' },
   ];
   for (const tx of TEXTOS_PORTAL_CLIENTE) {
     await pool.query(
