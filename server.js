@@ -1051,6 +1051,8 @@ async function initSchema() {
     { clave: 'reserva_opcion_otro_idioma', contexto: 'Última opción del selector de idioma de quien viaja, para escribir un idioma que no está en la lista', es: 'Otro idioma…' },
     { clave: 'reserva_ph_otro_idioma', contexto: 'Texto gris de ejemplo en el campo para escribir otro idioma', es: 'Escribe el idioma (por ejemplo: chino)' },
     { clave: 'reserva_nota_otro_idioma', contexto: 'Nota cuando se elige "Otro idioma"', es: 'Los documentos se enviarán en el idioma de esta página. El conductor sabrá el idioma de quien viaja.' },
+    { clave: 'reserva_label_indicaciones', contexto: 'Etiqueta del campo de texto libre con indicaciones para el conductor (sustituye a Comentarios o información adicional)', es: 'Indicaciones para el conductor (opcional)' },
+    { clave: 'reserva_ph_indicaciones', contexto: 'Texto gris de ejemplo en el campo de indicaciones para el conductor', es: 'Por ejemplo: punto exacto de recogida, cómo reconocerte, referencias de la dirección…' },
   ];
   for (const tx of TEXTOS_RESERVA_PREF_VIAJERO) {
     await pool.query(
