@@ -370,6 +370,21 @@
           '</div>';
         html += '<div id="aviso-cancelar-' + i + '" style="display:none;font-size:13px;margin-bottom:12px;"></div>';
 
+        // Preferencias de este viaje — colapsado por defecto (26/09/2026)
+        html += '<div style="border:1px solid var(--borde-suave);border-radius:10px;overflow:hidden;margin-bottom:12px;">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:#f9f7f4;" onclick="toggleViajePref(' + i + ',' + r.id + ')">' +
+            '<span style="font-size:13px;font-weight:600;color:var(--texto-oscuro);">' + tx('por_viaje_pref_titulo') + '</span>' +
+            '<span id="chev-viaje-' + i + '" style="color:#aaa;font-size:13px;">▼</span>' +
+          '</div>' +
+          '<div id="bloque-viaje-' + i + '" style="display:none;padding:14px 16px;border-top:1px solid var(--borde-suave);">' +
+            '<p style="margin:0 0 8px;font-size:12.5px;line-height:1.5;color:#5a6c79;">' + tx('por_viaje_pref_nota') + '</p>' +
+            '<p style="margin:0 0 4px;font-size:11.5px;color:#5a6c79;opacity:0.8;">' + tx('por_pref_instruccion') + '</p>' +
+            '<div id="lista-viaje-' + i + '"><p style="font-size:13px;color:#5a6c79;">' + tx('por_cargando') + '</p></div>' +
+            '<button onclick="guardarViajePref(' + i + ',' + r.id + ')" style="margin-top:10px;background:#C1502E;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;">' + tx('por_viaje_pref_guardar') + '</button>' +
+            '<div id="aviso-viaje-' + i + '" style="display:none;font-size:12px;margin-top:6px;"></div>' +
+          '</div>' +
+        '</div>';
+
         // Mensajes — colapsado por defecto
         var numMsg = r.mensajes_sin_leer || 0;
         html += '<div style="border:1px solid var(--borde-suave);border-radius:10px;overflow:hidden;margin-bottom:12px;">' +
@@ -397,6 +412,85 @@
       var chev = document.getElementById('chev-' + i);
       var abierto = detalle.classList.toggle('visible');
       chev.classList.toggle('abierto', abierto);
+    }
+
+    // ── Preferencias de este viaje (26/09/2026) ──
+    // Se muestran en el idioma del portal; lo que se guarda es el español (lo que ve el chofer).
+    var viajePref = {};
+
+    function toggleViajePref(i, reservaId) {
+      var bloque = document.getElementById('bloque-viaje-' + i);
+      var chev = document.getElementById('chev-viaje-' + i);
+      if (bloque.style.display !== 'none') { bloque.style.display = 'none'; chev.textContent = '▼'; return; }
+      bloque.style.display = 'block'; chev.textContent = '▲';
+      fetch('/api/cliente/viaje-preferencias?reserva_id=' + reservaId)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (!d.preferencias) { document.getElementById('lista-viaje-' + i).innerHTML = '<p style="font-size:13px;color:#c62828;">' + (d.error || tx('por_error_conexion')) + '</p>'; return; }
+          var sel = {}, det = {};
+          d.preferencias.forEach(function(p) { if (p.elegida) { sel[p.id] = p.elegida; if (p.detalle) det[p.id] = p.detalle; } });
+          viajePref[i] = { lista: d.preferencias, sel: sel, det: det };
+          pintarViajePref(i);
+        })
+        .catch(function() { document.getElementById('lista-viaje-' + i).innerHTML = '<p style="font-size:13px;color:#c62828;">' + tx('por_error_conexion') + '</p>'; });
+    }
+
+    function pintarViajePref(i) {
+      var vp = viajePref[i]; if (!vp) return;
+      document.getElementById('lista-viaje-' + i).innerHTML = vp.lista.map(function(p) {
+        var etiquetas = (p.opciones_cliente || p.opciones).split('/');
+        var pills = p.opciones.split('/').map(function(op, idx) {
+          op = op.trim();
+          var marcado = vp.sel[p.id] === op;
+          return '<button type="button" class="viaje-pill" data-i="' + i + '" data-pref="' + p.id + '" data-opcion="' + op.replace(/"/g, '&quot;') + '" onclick="toggleViajeOpcion(this)" style="border:1px solid ' + (marcado ? 'var(--costa)' : '#d4c4b0') + ';border-radius:20px;padding:5px 12px;font-size:13px;background:' + (marcado ? 'var(--costa)' : 'transparent') + ';color:' + (marcado ? '#fff' : '#1C1815') + ';cursor:pointer;font-family:inherit;line-height:1.4;">' + (etiquetas[idx] || op).trim() + '</button>';
+        }).join('');
+        var detalle = '';
+        if ((vp.sel[p.id] || '').indexOf('(Especificar)') !== -1) {
+          if (p.nombre.indexOf('Temperatura') !== -1) {
+            var opts = '<option value="">' + tx('por_temp_elige') + '</option>';
+            for (var tc = 16; tc <= 28; tc++) {
+              var tf = Math.round(tc * 9 / 5 + 32);
+              var val = tc + ' °C · ' + tf + ' °F';
+              opts += '<option value="' + val + '"' + (vp.det[p.id] === val ? ' selected' : '') + '>' + val + '</option>';
+            }
+            detalle = '<div style="margin-top:6px;"><select onchange="viajePref[' + i + '].det[' + p.id + '] = this.value" style="border:1px solid #d4c4b0;border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;background:#fff;">' + opts + '</select></div>';
+          } else {
+            detalle = '<div style="margin-top:6px;"><input type="text" maxlength="200" value="' + (vp.det[p.id] || '').replace(/"/g, '&quot;') + '" onchange="viajePref[' + i + '].det[' + p.id + '] = this.value" placeholder="' + tx('por_especifica') + '" style="border:1px solid #d4c4b0;border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;width:100%;max-width:280px;box-sizing:border-box;"></div>';
+          }
+        }
+        return '<div style="border-top:1px solid #ece4d8;padding:6px 0;">' +
+          '<div style="font-size:13.5px;font-weight:600;margin-bottom:3px;">' + (p.nombre_cliente || p.nombre) + '</div>' +
+          '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + pills + '</div>' + detalle +
+        '</div>';
+      }).join('');
+    }
+
+    function toggleViajeOpcion(btn) {
+      var i = btn.dataset.i, pid = btn.dataset.pref, op = btn.dataset.opcion;
+      var vp = viajePref[i]; if (!vp) return;
+      if (vp.sel[pid] === op) { delete vp.sel[pid]; } else { vp.sel[pid] = op; }
+      pintarViajePref(i);
+    }
+
+    function guardarViajePref(i, reservaId) {
+      var vp = viajePref[i]; var av = document.getElementById('aviso-viaje-' + i);
+      if (!vp) return;
+      var selecciones = Object.keys(vp.sel).map(function(pid) {
+        var s = { preferencia_id: pid, opcion: vp.sel[pid] };
+        if (s.opcion.indexOf('(Especificar)') !== -1 && vp.det[pid]) s.detalle = String(vp.det[pid]).trim();
+        return s;
+      });
+      av.style.display = 'block'; av.style.color = '#5a6c79'; av.textContent = tx('por_guardando');
+      fetch('/api/cliente/viaje-preferencias', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reserva_id: reservaId, selecciones: selecciones })
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.ok) { av.style.color = 'var(--exito)'; av.textContent = tx('por_viaje_pref_guardadas'); }
+          else { av.style.color = '#c62828'; av.textContent = d.error || tx('por_no_guardar'); }
+        })
+        .catch(function() { av.style.color = '#c62828'; av.textContent = tx('por_error_conexion'); });
     }
 
     function toggleMensajes(i, reservaId) {
