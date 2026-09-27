@@ -4555,7 +4555,7 @@ function cargarTablaCategoriasIA() {
       var traducidos = cats.reduce(function(sum, c) {
         return sum + idiomas.filter(function(l) { return c.estado[l]; }).length;
       }, 0);
-      var pct = total > 0 ? Math.round(traducidos / total * 100) : 0;
+      var pct = total > 0 ? Math.floor(traducidos / total * 100) : 0;
       var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
       var elPct = document.getElementById('bloque2-flota-pct');
       if (elPct) elPct.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
@@ -4696,7 +4696,7 @@ function renderizarTablaTextos(datos) {
       return sum + IDIOMAS_TEXTOS.filter(function(l) { return t.estado[l]; }).length;
     }, 0);
     var total = textos.length * IDIOMAS_TEXTOS.length;
-    var pct = total > 0 ? Math.round(traducidos / total * 100) : 0;
+    var pct = total > 0 ? Math.floor(traducidos / total * 100) : 0;
     var colorPct = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
     var seccionId = 'modulo-sec-' + idx;
 
@@ -4744,7 +4744,7 @@ function renderizarTablaTextos(datos) {
           depTotal += IDIOMAS_TEXTOS.length;
           depTraducidos += IDIOMAS_TEXTOS.filter(function(l) { return !!tWeb.estado[l]; }).length;
         });
-        var depPct = depTotal > 0 ? Math.round(depTraducidos / depTotal * 100) : 0;
+        var depPct = depTotal > 0 ? Math.floor(depTraducidos / depTotal * 100) : 0;
         var depColor = depPct === 100 ? '#2e7d32' : depPct > 50 ? '#b45309' : 'var(--rojo-error)';
         // Cabecera de departamento — colapsable
         html += '<tr class="' + seccionId + '" style="display:none;background:#e8f0fe;cursor:pointer;" onclick="toggleSeccionTextos(\'' + depSecId + '\', this)">' +
@@ -4970,7 +4970,7 @@ function cargarComunicacionesCliente() {
         return sum + idiomas.filter(function(l) { return p.estado_wa[l] === 'ok'; }).length;
       }, 0);
       var totalCeldas = plantillas.length * idiomas.length;
-      var pct = totalCeldas > 0 ? Math.round((aprobEmail + aprobWa) / (totalCeldas * 2) * 100) : 0;
+      var pct = totalCeldas > 0 ? Math.floor((aprobEmail + aprobWa) / (totalCeldas * 2) * 100) : 0;
       var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
       var el = document.getElementById('bloque-com-cliente-pct');
       if (el) el.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
@@ -5008,7 +5008,7 @@ function renderizarComunicacionesCliente(data) {
     return sum + idiomas.filter(function(l) { return p.estado_email[l] === 'ok'; }).length;
   }, 0);
   var totalEmail = plantillas.length * idiomas.length;
-  var pctEmail = totalEmail > 0 ? Math.round(aprobadosEmail / totalEmail * 100) : 0;
+  var pctEmail = totalEmail > 0 ? Math.floor(aprobadosEmail / totalEmail * 100) : 0;
   var colorEmail = pctEmail === 100 ? '#2e7d32' : pctEmail > 50 ? '#b45309' : 'var(--rojo-error)';
   var elEmail = document.getElementById('com-email-pct');
   if (elEmail) elEmail.innerHTML = '<span style="color:' + colorEmail + ';">' + pctEmail + '% traducido</span>';
@@ -5018,7 +5018,7 @@ function renderizarComunicacionesCliente(data) {
     return sum + idiomas.filter(function(l) { return p.estado_wa[l] === 'ok'; }).length;
   }, 0);
   var totalWa = plantillas.length * idiomas.length;
-  var pctWa = totalWa > 0 ? Math.round(aprobadosWa / totalWa * 100) : 0;
+  var pctWa = totalWa > 0 ? Math.floor(aprobadosWa / totalWa * 100) : 0;
   var colorWa = pctWa === 100 ? '#2e7d32' : pctWa > 50 ? '#b45309' : 'var(--rojo-error)';
   var elWa = document.getElementById('com-wa-pct');
   if (elWa) elWa.innerHTML = '<span style="color:' + colorWa + ';">' + pctWa + '% traducido</span>';
@@ -5401,7 +5401,7 @@ function actualizarPctGlobalComCliente() {
     return sum + idiomasF.filter(function(l) { return f.estado[l] === 'ok'; }).length;
   }, 0);
   var total = plantillas.length * idiomas.length * 2 + frases.length * idiomasF.length;
-  var pct = total > 0 ? Math.round(aprob / total * 100) : 0;
+  var pct = total > 0 ? Math.floor(aprob / total * 100) : 0;
   var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
   var elNum = document.getElementById('bloque-com-cliente-num');
   if (elNum) elNum.textContent = '(' + (plantillas.length * 2 + frases.length) + ' textos)';
@@ -5426,7 +5426,7 @@ function renderizarComFrases(data) {
     return sum + idiomas.filter(function(l) { return f.estado[l] === 'ok'; }).length;
   }, 0);
   var total = frases.length * idiomas.length;
-  var pct = total > 0 ? Math.round(aprobados / total * 100) : 0;
+  var pct = total > 0 ? Math.floor(aprobados / total * 100) : 0;
   var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
   var elPct = document.getElementById('com-frases-pct');
   if (elPct) elPct.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
