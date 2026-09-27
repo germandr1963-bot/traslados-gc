@@ -9874,6 +9874,8 @@ app.get('/admin/reservas/:id', requireAdmin, asyncHandler(async (req, res) => {
   reserva.extras = extras.rows;
   const totalExtras = extras.rows.reduce(function(s, e) { return s + parseFloat(e.precio_en_reserva); }, 0);
   reserva.total_estimado = (parseFloat(reserva.precio_estimado) || 0) + totalExtras;
+  // Idioma del portal del cliente (en el que se le escribe desde el Admin)
+  try { reserva.idioma_portal = await idiomaPortalPorEmail(reserva.email_cliente); } catch (e) { reserva.idioma_portal = null; }
   res.json({ reserva });
 }));
 
@@ -12918,7 +12920,6 @@ app.post('/api/restablecer-password', asyncHandler(async (req, res) => {
 // Idioma del portal del cliente (26/09/2026): el que eligió él en "Mis datos";
 // si nunca lo eligió, el de su primera reserva. Lo usan el portal, "Mis datos" y "Nueva reserva".
 async function idiomaPortalCliente(req) {
-  let lang = 'es';
   try {
     if (!req.session || !req.session.clienteReservaId) return 'es';
     let emailCliente = req.session.clienteEmail || null;
@@ -12926,6 +12927,16 @@ async function idiomaPortalCliente(req) {
       const em = await pool.query('SELECT email_cliente FROM reservas WHERE id = $1', [req.session.clienteReservaId]);
       if (em.rows.length) emailCliente = em.rows[0].email_cliente;
     }
+    return await idiomaPortalPorEmail(emailCliente);
+  } catch (e) { console.warn('idiomaPortalCliente:', e.message); return 'es'; }
+}
+
+// Idioma del portal de un cliente a partir de su email (mismo criterio que idiomaPortalCliente).
+// Lo usan también el Admin (ficha de la reserva) y el aviso "Has recibido un mensaje" (26/09/2026):
+// la conversación cliente ↔ equipo va en el idioma del portal, no en el de la reserva.
+async function idiomaPortalPorEmail(emailCliente) {
+  let lang = 'es';
+  try {
     if (!emailCliente) return 'es';
     const cd = await pool.query('SELECT idioma, idioma_elegido FROM clientes_datos WHERE LOWER(email_cliente) = LOWER($1)', [emailCliente]);
     if (cd.rows.length && cd.rows[0].idioma_elegido && cd.rows[0].idioma) {
@@ -12937,7 +12948,7 @@ async function idiomaPortalCliente(req) {
       );
       if (pr.rows.length && pr.rows[0].lang_cliente) lang = pr.rows[0].lang_cliente;
     }
-  } catch (e) { console.warn('idiomaPortalCliente:', e.message); lang = 'es'; }
+  } catch (e) { console.warn('idiomaPortalPorEmail:', e.message); lang = 'es'; }
   if (!IDIOMAS_PERMITIDOS.includes(lang)) lang = 'es';
   return lang;
 }
@@ -14268,7 +14279,8 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
     );
     if (reserva.rows.length) {
       const r = reserva.rows[0];
-      const _langMsg = r.lang_cliente || 'es';
+      // El aviso va en el idioma del portal del cliente (la conversación cliente ↔ equipo), no en el de la reserva
+      const _langMsg = await idiomaPortalPorEmail(r.email_cliente);
       const _pmsg = await obtenerPlantilla('cliente_mensaje_admin', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
