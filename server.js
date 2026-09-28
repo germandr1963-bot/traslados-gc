@@ -2875,6 +2875,8 @@ Pulsa el botón para crear una nueva contraseña:
     { clave: 'frase_enlace_cancelada', canal: 'wa', orden: 320, contexto: 'Respuesta automática por WhatsApp: la reserva está cancelada', es: 'La reserva {numero_reserva} está cancelada.' },
     { clave: 'frase_enlace_realizada', canal: 'wa', orden: 330, contexto: 'Respuesta automática por WhatsApp: el viaje ya se realizó', es: 'La reserva {numero_reserva} ya se realizó. ¡Gracias por viajar con Traslados GC!' },
     { clave: 'frase_enlace_sin_chofer', canal: 'wa', orden: 340, contexto: 'Respuesta automática por WhatsApp: la reserva aún no tiene conductor asignado', es: 'Tu reserva {numero_reserva} todavía no tiene conductor asignado. Te avisaremos en cuanto lo tenga.' },
+    { clave: 'frase_enlace_enviado_conductor', canal: 'wa', orden: 360, contexto: 'Confirmación por WhatsApp al cliente: su mensaje se ha enviado a su conductor', es: '✅ Mensaje enviado a tu conductor.' },
+    { clave: 'frase_enlace_mensaje_conductor', canal: 'wa', orden: 370, contexto: 'Cabecera del mensaje del conductor que recibe el cliente por WhatsApp. {nombre} = nombre del conductor; debajo va el mensaje traducido', es: '💬 Mensaje de tu conductor ({nombre}):' },
     { clave: 'frase_enlace_sin_numero', canal: 'wa', orden: 350, contexto: 'Respuesta automática por WhatsApp (una vez al día) cuando el mensaje no empieza por un número de reserva. El ejemplo ABC123 se deja tal cual', es: 'Hola 👋 Para contactar con tu conductor el día del viaje, empieza tu mensaje con tu número de reserva, por ejemplo: ABC123 No encuentro a mi conductor.' }
   ];
   // ON CONFLICT DO NOTHING: nunca sobreescribe lo que se edite desde el Admin
@@ -15069,9 +15071,6 @@ app.post('/api/whatsapp/entrante', async (req, res) => {
   }
   let evento;
   try { evento = JSON.parse(cuerpo.toString('utf8')); } catch (e) { return res.status(400).send('JSON no válido'); }
-  // TEMPORAL (pruebas del enlace chofer ↔ cliente, 28/09/2026): contenido completo del aviso en los Logs,
-  // para localizar el número real de quien escribe. QUITAR cuando esté identificado.
-  console.log('🔎 [WhatsApp entrante · contenido completo] evento=' + (req.get('X-OpenWA-Event') || '') + ' → ' + cuerpo.toString('utf8').slice(0, 3000));
 
   const nombreEvento = req.get('X-OpenWA-Event') || evento.event || '';
   const d = evento.data || evento.payload || evento;
@@ -15158,6 +15157,33 @@ async function fraseEnlace(clave, lang, datos) {
   return (en && en !== es) ? es + '\n\n' + en : es;
 }
 
+// Nombres de los idiomas en español (para el chofer y para la IA)
+const NOMBRES_IDIOMA_ES = { es: 'español', en: 'inglés', de: 'alemán', sv: 'sueco', no: 'noruego', nl: 'neerlandés', it: 'italiano', fr: 'francés', fi: 'finés', ru: 'ruso' };
+
+// Traduce un mensaje corto de WhatsApp con la IA. Si falla, devuelve null (se envía el original).
+async function traducirEnlace(texto, lang) {
+  try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey || !texto) return null;
+    const idioma = NOMBRES_IDIOMA_ES[lang] || lang;
+    const prompt = 'Traduce al ' + idioma + ' este mensaje de WhatsApp entre un cliente y su conductor de un traslado. ' +
+      'Devuelve SOLO la traducción, sin comillas ni explicaciones. Mantén números, horas, nombres propios y emojis tal cual. ' +
+      'Si ya está en ' + idioma + ', devuélvelo igual.\n\nMensaje:\n' + texto;
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 500, messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!response.ok) { console.warn('[Enlace] La IA no respondió: ' + response.status); return null; }
+    const data = await response.json();
+    const salida = (data.content || []).map(function (c) { return c.type === 'text' ? c.text : ''; }).join('').trim();
+    return salida || null;
+  } catch (e) {
+    console.warn('[Enlace] Error traduciendo:', e.message);
+    return null;
+  }
+}
+
 // Idioma del portal si este móvil ya es de un cliente con reservas; si no, null (español e inglés)
 async function idiomaPorTelefonoCliente(tel) {
   const cli = await pool.query(
@@ -15208,6 +15234,7 @@ async function procesarEntrante(entranteId) {
     const pnr = encaje[1].toUpperCase();
     const rq = await pool.query(
       `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.estado, r.lang_cliente, r.conductor_id,
+              r.nombre_cliente, r.telefono_cliente, r.es_para_otra_persona, r.nombre_pasajero_otro,
               c.telefono AS telefono_chofer, c.nombre AS nombre_chofer
        FROM reservas r LEFT JOIN conductores c ON c.id = r.conductor_id
        WHERE UPPER(r.numero_reserva) = $1 AND r.archivada = FALSE LIMIT 1`, [pnr]
@@ -15249,9 +15276,47 @@ async function procesarEntrante(entranteId) {
         'La reserva ' + pnr + ' es para el ' + fechaCliente(r.fecha, 'es') + ' a las ' + horaTxt + '. El enlace con el cliente se abre 2 horas antes.',
         'fuera de ventana', { fecha: fechaCliente(r.fecha, langR), hora: horaTxt });
     }
-    // Todo correcto: el reenvío con traducción es el paso 4
-    await anotar('listo para reenviar ' + pnr + (esSuChofer ? ' (chofer → cliente)' : ' (cliente → chofer)'));
-    console.log('   ✅ ' + pnr + ': listo para reenviar ' + (esSuChofer ? 'al CLIENTE' : 'al CHOFER (' + r.nombre_chofer + ')') + ' — paso 4');
+    // Todo correcto → paso 4: reenvío con traducción
+    const cuerpo = texto.replace(/^\s*[A-Za-z]{3}\d{3}\b[\s:,.\-]*/, '').trim();
+    if (!cuerpo) { await anotar('solo el numero ' + pnr); return; }
+    const telChofer = String(r.telefono_chofer || '').replace(/[^0-9]/g, '');
+    if (!esSuChofer) {
+      // CLIENTE → CHOFER (en español)
+      const traduccion = await traducirEnlace(cuerpo, 'es');
+      const nombreViajero = (r.es_para_otra_persona && r.nombre_pasajero_otro) ? r.nombre_pasajero_otro : (r.nombre_cliente || '—');
+      const idiomaNombre = NOMBRES_IDIOMA_ES[langR] || langR;
+      let paraChofer = '📩 ' + r.numero_reserva + ' · Cliente: ' + nombreViajero + ' (' + idiomaNombre + ')\n';
+      if (traduccion && traduccion !== cuerpo) paraChofer += '«' + traduccion + '»\n(Original: ' + cuerpo + ')';
+      else paraChofer += '«' + cuerpo + '»' + (traduccion ? '' : '\n(sin traducir)');
+      paraChofer += '\n\nPara responder, empieza por ' + r.numero_reserva;
+      await enviarWhatsappEnlace(telChofer, paraChofer);
+      await enviarWhatsappEnlace(tel, await fraseEnlace('frase_enlace_enviado_conductor', langR, {}));
+      await anotar('reenviado ' + r.numero_reserva + ' (cliente → chofer)');
+      console.log('   📨 ' + r.numero_reserva + ': mensaje del cliente reenviado al CHOFER (' + r.nombre_chofer + ')');
+    } else {
+      // CHOFER → CLIENTE (en el idioma de la reserva). Le llega al cliente de la reserva y a
+      // cualquier otro móvil que haya escrito por esta reserva en las últimas horas (p. ej. el viajero).
+      const traduccion = langR === 'es' ? cuerpo : await traducirEnlace(cuerpo, langR);
+      const nombreChofer = String(r.nombre_chofer || '').trim().split(/\s+/)[0] || '—';
+      const cabecera = await fraseEnlace('frase_enlace_mensaje_conductor', langR, { nombre: nombreChofer });
+      const paraCliente = cabecera + '\n«' + (traduccion || cuerpo) + '»';
+      const destinos = [];
+      const añadir = function (t) {
+        const d = String(t || '').replace(/[^0-9]/g, '');
+        if (d.length >= 9 && !mismoTelefono(d, telChofer) && !destinos.some(function (x) { return mismoTelefono(x, d); })) destinos.push(d);
+      };
+      añadir(r.telefono_cliente);
+      const otros = await pool.query(
+        `SELECT DISTINCT telefono_real FROM whatsapp_entrantes
+         WHERE respuesta = $1 AND recibido_en > NOW() - INTERVAL '12 hours'`,
+        ['reenviado ' + r.numero_reserva + ' (cliente → chofer)']
+      );
+      otros.rows.forEach(function (o) { añadir(o.telefono_real); });
+      for (const d of destinos) await enviarWhatsappEnlace(d, paraCliente);
+      await enviarWhatsappEnlace(tel, destinos.length ? '✅ Enviado al cliente.' : 'No hay ningún móvil del cliente para esta reserva.');
+      await anotar('reenviado ' + r.numero_reserva + ' (chofer → cliente)');
+      console.log('   📨 ' + r.numero_reserva + ': mensaje del CHOFER reenviado a ' + destinos.length + ' móvil(es) del cliente');
+    }
   } catch (e) {
     console.error('[WhatsApp entrante] Error procesando el mensaje:', e.message);
   }
