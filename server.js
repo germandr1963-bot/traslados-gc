@@ -3100,11 +3100,38 @@ async function obtenerConfigNoshow(fechaViaje) {
 }
 
 // ─── Helper: calcular fecha límite de cancelación gratuita ───────────────────
+// Hora de Canarias (28/09/2026): la fecha y la hora de cada reserva son hora LOCAL de Canarias
+// (WET +0 en invierno, WEST +1 en verano). El servidor funciona con la hora universal, así que
+// se convierte teniendo en cuenta el cambio de hora. Antes se interpretaba como hora universal
+// y en verano todos los cálculos iban 1 hora tarde.
+const ZONA_HORARIA = 'Atlantic/Canary';
+
+// Diferencia en milisegundos entre la hora de Canarias y la universal en un instante dado
+function desfaseCanarias(instante) {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: ZONA_HORARIA, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+  }).formatToParts(instante);
+  const v = {};
+  partes.forEach(function (p) { v[p.type] = p.value; });
+  const comoUTC = Date.UTC(+v.year, +v.month - 1, +v.day, +v.hour, +v.minute, +v.second);
+  return comoUTC - Math.floor(instante.getTime() / 1000) * 1000;
+}
+
+// Instante real de una fecha (AAAA-MM-DD) y una hora (HH:MM[:SS]) de Canarias
+function instanteCanarias(ymd, hms) {
+  const f = String(ymd).split('-').map(Number);
+  const h = String(hms || '00:00:00').split(':').map(Number);
+  const comoUTC = Date.UTC(f[0], f[1] - 1, f[2], h[0] || 0, h[1] || 0, h[2] || 0);
+  let t = comoUTC - desfaseCanarias(new Date(comoUTC));
+  const t2 = comoUTC - desfaseCanarias(new Date(t));
+  if (t2 !== t) t = t2;
+  return new Date(t);
+}
+
 function calcularFechaCancelacion(fechaViaje, horaViaje, horasCancelacion) {
-  const fechaHoraStr = fechaViaje.toISOString().slice(0, 10) + 'T' + (horaViaje || '00:00:00');
-  const fechaHora = new Date(fechaHoraStr);
-  fechaHora.setHours(fechaHora.getHours() - horasCancelacion);
-  return fechaHora;
+  const recogida = instanteCanarias(fechaViaje.toISOString().slice(0, 10), horaViaje || '00:00:00');
+  return new Date(recogida.getTime() - (horasCancelacion || 0) * 3600000);
 }
 
 // ─── Helper: obtener emails de notificación del admin ────────────────────────
@@ -11319,10 +11346,11 @@ function fechaCliente(fecha, lang) {
   return new Date(fecha).toLocaleDateString(LOCALE_CLIENTE[lang] || 'es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 function fechaHoraCliente(d, lang) {
+  // Siempre en hora de Canarias (el instante ya es el real, ver instanteCanarias)
   if (!lang || lang === 'es' || !LOCALE_CLIENTE[lang]) {
-    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) + ' a las ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric', timeZone: ZONA_HORARIA }) + ' a las ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: ZONA_HORARIA });
   }
-  return d.toLocaleString(LOCALE_CLIENTE[lang], { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString(LOCALE_CLIENTE[lang], { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: ZONA_HORARIA });
 }
 
 // Frase (🧩) en el idioma del cliente: traducción aprobada; si no hay, el español
