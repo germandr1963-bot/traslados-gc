@@ -15206,7 +15206,13 @@ async function reservasEnCurso(tel, conductorId) {
          WHERE archivada = FALSE AND conductor_id IS NOT NULL AND estado NOT IN ('cancelada', 'completada', 'no_show')
            AND fecha BETWEEN CURRENT_DATE - 1 AND CURRENT_DATE + 1
            AND (RIGHT(regexp_replace(COALESCE(telefono_cliente, ''), '[^0-9]', '', 'g'), 9) = RIGHT($1, 9)
-             OR RIGHT(regexp_replace(COALESCE(telefono_pasajero_otro, ''), '[^0-9]', '', 'g'), 9) = RIGHT($1, 9))`, [tel]);
+             OR RIGHT(regexp_replace(COALESCE(telefono_pasajero_otro, ''), '[^0-9]', '', 'g'), 9) = RIGHT($1, 9)
+             -- Móvil nuevo (tarjeta local, eSIM, acompañante…) que ya escribió CON número de reserva
+             -- en las últimas 12 horas: se recuerda para esa reserva y ya no necesita el número.
+             OR numero_reserva IN (
+               SELECT substring(respuesta from 'reenviado ([A-Z]{3}[0-9]{3}) ') FROM whatsapp_entrantes
+               WHERE telefono_real = $1 AND respuesta LIKE 'reenviado % (cliente → chofer)'
+                 AND recibido_en > NOW() - INTERVAL '12 hours'))`, [tel]);
   return q.rows.filter(reservaEnVentana);
 }
 
