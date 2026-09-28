@@ -2069,6 +2069,8 @@ async function initSchema() {
   await pool.query(`ALTER TABLE whatsapp_entrantes ADD COLUMN IF NOT EXISTS telefono_real TEXT`);
   await pool.query(`ALTER TABLE whatsapp_entrantes ADD COLUMN IF NOT EXISTS conductor_id INTEGER`);
   await pool.query(`ALTER TABLE whatsapp_entrantes ADD COLUMN IF NOT EXISTS identificado BOOLEAN DEFAULT FALSE`);
+  // Paso 3: qué se hizo con el mensaje (respuesta automática enviada, o "listo para reenviar")
+  await pool.query(`ALTER TABLE whatsapp_entrantes ADD COLUMN IF NOT EXISTS respuesta TEXT`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS whatsapp_lid_telefono (
       lid TEXT PRIMARY KEY,
@@ -2866,7 +2868,14 @@ Pulsa el botón para crear una nueva contraseña:
     { clave: 'frase_resumen_barco', canal: 'email', orden: 240, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Barco' },
     { clave: 'frase_resumen_atraque', canal: 'email', orden: 250, contexto: 'Palabra tras el nombre del barco, ej: "Volcán de Tijarafe · Atraque 10:30"', es: 'Atraque' },
     { clave: 'frase_resumen_extras', canal: 'email', orden: 260, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Extras' },
-    { clave: 'frase_resumen_notas', canal: 'email', orden: 270, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Notas' }
+    { clave: 'frase_resumen_notas', canal: 'email', orden: 270, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Notas' },
+    // Enlace chofer ↔ cliente por WhatsApp (28/09/2026): respuestas automáticas cuando no se puede reenviar
+    { clave: 'frase_enlace_no_existe', canal: 'wa', orden: 300, contexto: 'Respuesta automática por WhatsApp: el número de reserva que escribió el cliente no existe. {numero_reserva} = lo que escribió', es: 'No encontramos ninguna reserva con el número {numero_reserva}. Revisa el número en tu voucher y vuelve a escribirnos.' },
+    { clave: 'frase_enlace_fuera_ventana', canal: 'wa', orden: 310, contexto: 'Respuesta automática por WhatsApp: el viaje no es ahora. {numero_reserva}, {fecha} y {hora} los pone el programa', es: 'Tu reserva {numero_reserva} es para el {fecha} a las {hora}. El contacto con tu conductor por este WhatsApp se abre 2 horas antes del viaje.' },
+    { clave: 'frase_enlace_cancelada', canal: 'wa', orden: 320, contexto: 'Respuesta automática por WhatsApp: la reserva está cancelada', es: 'La reserva {numero_reserva} está cancelada.' },
+    { clave: 'frase_enlace_realizada', canal: 'wa', orden: 330, contexto: 'Respuesta automática por WhatsApp: el viaje ya se realizó', es: 'La reserva {numero_reserva} ya se realizó. ¡Gracias por viajar con Traslados GC!' },
+    { clave: 'frase_enlace_sin_chofer', canal: 'wa', orden: 340, contexto: 'Respuesta automática por WhatsApp: la reserva aún no tiene conductor asignado', es: 'Tu reserva {numero_reserva} todavía no tiene conductor asignado. Te avisaremos en cuanto lo tenga.' },
+    { clave: 'frase_enlace_sin_numero', canal: 'wa', orden: 350, contexto: 'Respuesta automática por WhatsApp (una vez al día) cuando el mensaje no empieza por un número de reserva. El ejemplo ABC123 se deja tal cual', es: 'Hola 👋 Para contactar con tu conductor el día del viaje, empieza tu mensaje con tu número de reserva, por ejemplo: ABC123 No encuentro a mi conductor.' }
   ];
   // ON CONFLICT DO NOTHING: nunca sobreescribe lo que se edite desde el Admin
   for (const f of frasesBase) {
@@ -15109,7 +15118,8 @@ function mismoTelefono(a, b) {
 // Paso 2: solo se anota; todavía no se responde ni se reenvía nada.
 async function identificarEntrante(entranteId, telefonoReal) {
   try {
-    const conductores = await pool.query('SELECT id, nombre, telefono FROM conductores WHERE telefono IS NOT NULL');
+    // Solo cuentan los choferes activos (un chofer suspendido no cuenta)
+    const conductores = await pool.query("SELECT id, nombre, telefono FROM conductores WHERE telefono IS NOT NULL AND estado = 'aprobado'");
     const chofer = conductores.rows.find(function (c) { return mismoTelefono(c.telefono, telefonoReal); });
     await pool.query(
       'UPDATE whatsapp_entrantes SET telefono_real = $1, conductor_id = $2, identificado = TRUE WHERE id = $3',
@@ -15118,6 +15128,132 @@ async function identificarEntrante(entranteId, telefonoReal) {
     console.log('   👤 +' + telefonoReal + ' es ' + (chofer ? 'CHOFER (' + chofer.nombre + ')' : 'CLIENTE u otra persona'));
   } catch (e) {
     console.error('[WhatsApp entrante] Error identificando el mensaje:', e.message);
+    return;
+  }
+  await procesarEntrante(entranteId);
+}
+
+// ─── Paso 3: comprobar cada mensaje y responder automáticamente si no se puede reenviar ───
+// Regla: el mensaje "ABC123 texto" va del cliente al CHOFER ASIGNADO a ABC123, o de ese chofer al
+// cliente. Si no se puede (número inexistente, viaje fuera de la ventana, sin chofer, cancelada…),
+// se responde automáticamente. El reenvío con traducción es el paso 4: aquí solo se anota "listo".
+// Los "SI"/"NO" de los choferes no se tocan (los gestiona puente.js).
+const VENTANA_ENLACE_HORAS = 2;
+
+async function enviarWhatsappEnlace(telefono, texto) {
+  await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [telefono, texto]);
+}
+
+function rellenarFrase(texto, datos) {
+  let t = texto || '';
+  Object.keys(datos || {}).forEach(function (k) { t = t.split('{' + k + '}').join(datos[k]); });
+  return t;
+}
+
+// Frase en el idioma indicado; si no se sabe el idioma, en español y en inglés
+async function fraseEnlace(clave, lang, datos) {
+  if (lang) return rellenarFrase(await obtenerFrase(clave, lang, ''), datos);
+  const es = rellenarFrase(await obtenerFrase(clave, 'es', ''), datos);
+  const en = rellenarFrase(await obtenerFrase(clave, 'en', ''), datos);
+  return (en && en !== es) ? es + '\n\n' + en : es;
+}
+
+// Idioma del portal si este móvil ya es de un cliente con reservas; si no, null (español e inglés)
+async function idiomaPorTelefonoCliente(tel) {
+  const cli = await pool.query(
+    `SELECT email_cliente FROM reservas
+     WHERE RIGHT(regexp_replace(COALESCE(telefono_cliente, ''), '[^0-9]', '', 'g'), 9) = RIGHT($1, 9)
+     ORDER BY creado_en DESC LIMIT 1`, [tel]
+  );
+  if (cli.rows.length && cli.rows[0].email_cliente) return await idiomaPortalPorEmail(cli.rows[0].email_cliente);
+  return null;
+}
+
+async function procesarEntrante(entranteId) {
+  try {
+    const q = await pool.query('SELECT id, telefono_real, texto, conductor_id FROM whatsapp_entrantes WHERE id = $1', [entranteId]);
+    if (!q.rows.length) return;
+    const m = q.rows[0];
+    const tel = m.telefono_real;
+    const texto = String(m.texto || '').trim();
+    const anotar = async function (resp) { await pool.query('UPDATE whatsapp_entrantes SET respuesta = $1 WHERE id = $2', [resp, entranteId]); };
+    if (!tel || !texto) return;
+
+    // Los "SI"/"NO" (y respuestas muy cortas) de un chofer activo son para puente.js: no se tocan
+    const corto = texto.toUpperCase().replace(/[^A-ZÁÉÍÓÚÑ]/g, '');
+    if (m.conductor_id && (['SI', 'SÍ', 'NO', 'OK'].indexOf(corto) !== -1 || texto.length <= 3)) {
+      await anotar('puente (SI/NO)');
+      return;
+    }
+
+    // ¿Empieza por un número de reserva? (3 letras + 3 cifras)
+    const encaje = texto.match(/^\s*([A-Za-z]{3}\d{3})\b/);
+    if (!encaje) {
+      // Aviso de cómo usar el enlace: como mucho una vez al día por persona
+      const reciente = await pool.query(
+        `SELECT 1 FROM whatsapp_entrantes WHERE telefono_real = $1 AND respuesta = 'aviso sin numero'
+         AND recibido_en > NOW() - INTERVAL '24 hours' LIMIT 1`, [tel]
+      );
+      if (reciente.rows.length) { await anotar('sin numero (ya avisado hoy)'); return; }
+      if (m.conductor_id) {
+        await enviarWhatsappEnlace(tel, 'Para escribir a un cliente, empieza tu mensaje con el número de reserva, por ejemplo: ABC123 Estoy en la puerta 2.');
+      } else {
+        await enviarWhatsappEnlace(tel, await fraseEnlace('frase_enlace_sin_numero', await idiomaPorTelefonoCliente(tel), {}));
+      }
+      await anotar('aviso sin numero');
+      console.log('   ↩️ Respuesta automática a +' + tel + ': falta el número de reserva');
+      return;
+    }
+
+    const pnr = encaje[1].toUpperCase();
+    const rq = await pool.query(
+      `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.estado, r.lang_cliente, r.conductor_id,
+              c.telefono AS telefono_chofer, c.nombre AS nombre_chofer
+       FROM reservas r LEFT JOIN conductores c ON c.id = r.conductor_id
+       WHERE UPPER(r.numero_reserva) = $1 AND r.archivada = FALSE LIMIT 1`, [pnr]
+    );
+    const esChofer = !!m.conductor_id;
+    if (!rq.rows.length) {
+      if (esChofer) await enviarWhatsappEnlace(tel, 'No existe ninguna reserva con el número ' + pnr + '. Revisa el número.');
+      else await enviarWhatsappEnlace(tel, await fraseEnlace('frase_enlace_no_existe', await idiomaPorTelefonoCliente(tel), { numero_reserva: pnr }));
+      await anotar('no existe ' + pnr);
+      console.log('   ↩️ Respuesta automática a +' + tel + ': la reserva ' + pnr + ' no existe');
+      return;
+    }
+    const r = rq.rows[0];
+    const langR = r.lang_cliente || 'es';
+    // ¿Lo escribe el chofer asignado a esta reserva?
+    const esSuChofer = !!(r.telefono_chofer && mismoTelefono(r.telefono_chofer, tel));
+    if (esChofer && !esSuChofer) {
+      await enviarWhatsappEnlace(tel, 'La reserva ' + pnr + ' no está asignada a ti.');
+      await anotar('chofer no asignado ' + pnr);
+      console.log('   ↩️ Respuesta automática a +' + tel + ': la reserva ' + pnr + ' no es suya');
+      return;
+    }
+    const aviso = async function (claveFrase, textoChofer, etiqueta, datosExtra) {
+      if (esSuChofer) await enviarWhatsappEnlace(tel, textoChofer);
+      else await enviarWhatsappEnlace(tel, await fraseEnlace(claveFrase, langR, Object.assign({ numero_reserva: r.numero_reserva }, datosExtra || {})));
+      await anotar(etiqueta + ' ' + pnr);
+      console.log('   ↩️ Respuesta automática a +' + tel + ': ' + etiqueta + ' (' + pnr + ')');
+    };
+    if (r.estado === 'cancelada') return aviso('frase_enlace_cancelada', 'La reserva ' + pnr + ' está cancelada.', 'cancelada');
+    if (r.estado === 'completada' || r.estado === 'no_show') return aviso('frase_enlace_realizada', 'La reserva ' + pnr + ' ya está cerrada.', 'realizada');
+    if (!r.conductor_id) return aviso('frase_enlace_sin_chofer', 'La reserva ' + pnr + ' no tiene chofer asignado.', 'sin chofer');
+    const recogida = calcularFechaCancelacion(new Date(r.fecha), r.hora, 0);
+    const ahora = new Date();
+    const dentro = ahora >= new Date(recogida.getTime() - VENTANA_ENLACE_HORAS * 3600000) &&
+                   ahora <= new Date(recogida.getTime() + VENTANA_ENLACE_HORAS * 3600000);
+    if (!dentro) {
+      const horaTxt = r.hora ? String(r.hora).slice(0, 5) : '—';
+      return aviso('frase_enlace_fuera_ventana',
+        'La reserva ' + pnr + ' es para el ' + fechaCliente(r.fecha, 'es') + ' a las ' + horaTxt + '. El enlace con el cliente se abre 2 horas antes.',
+        'fuera de ventana', { fecha: fechaCliente(r.fecha, langR), hora: horaTxt });
+    }
+    // Todo correcto: el reenvío con traducción es el paso 4
+    await anotar('listo para reenviar ' + pnr + (esSuChofer ? ' (chofer → cliente)' : ' (cliente → chofer)'));
+    console.log('   ✅ ' + pnr + ': listo para reenviar ' + (esSuChofer ? 'al CLIENTE' : 'al CHOFER (' + r.nombre_chofer + ')') + ' — paso 4');
+  } catch (e) {
+    console.error('[WhatsApp entrante] Error procesando el mensaje:', e.message);
   }
 }
 
