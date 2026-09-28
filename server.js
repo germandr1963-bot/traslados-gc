@@ -1507,6 +1507,8 @@ async function initSchema() {
     { clave: 'vou_nota_pie',          contexto: 'Nota al final del voucher', es: 'Muestra este voucher a tu conductor al inicio del servicio. El precio final será el que marque el taxímetro.' },
     { clave: 'vou_cancelacion',       contexto: 'Aviso de cancelación en el voucher. Mantén {fecha} EXACTAMENTE así, sin traducir: el programa pone ahí la fecha y la hora límite', es: 'Cancelación gratuita hasta el {fecha}.' },
     { clave: 'vou_cancelacion_despues', contexto: 'Frase tras el aviso de cancelación en el voucher. Mantén {importe} EXACTAMENTE así, sin traducir: el programa pone ahí el importe del depósito', es: 'Después de esa fecha, el depósito de {importe} € no será reembolsado.' },
+    { clave: 'vou_enlace_titulo',     contexto: 'Título del recuadro del voucher que explica cómo contactar con el conductor por WhatsApp el día del viaje (sin emojis: el PDF no los muestra)', es: 'Contacto con tu conductor el día del viaje' },
+    { clave: 'vou_enlace_texto',      contexto: 'Texto del recuadro de contacto con el conductor en el voucher. Mantén {whatsapp} y {numero_reserva} EXACTAMENTE así, sin traducir: el programa pone ahí el número de WhatsApp y el número de reserva. Sin emojis', es: 'Desde 2 horas antes de tu recogida, escríbenos por WhatsApp al {whatsapp} (el número del que recibes nuestros avisos) y tu mensaje llegará directamente a tu conductor, traducido a su idioma. Si escribes desde otro móvil, empieza tu mensaje con tu número de reserva: {numero_reserva}.' },
     { clave: 'vou_nombre_archivo',    contexto: 'Palabra con la que empieza el nombre del archivo PDF del voucher (ej: voucher-ABC123.pdf). Una sola palabra, en minúsculas, sin acentos', es: 'voucher' },
   ];
   for (const tx of TEXTOS_VOUCHER) {
@@ -10329,6 +10331,24 @@ async function generarHtmlVoucher(reservaId) {
   </div></body></html>`;
 }
 
+// Número de WhatsApp del enlace chofer ↔ cliente: el de OpenWA, que es el que recibe los mensajes.
+// Se toma del último mensaje recibido (campo "to"). Formato +34 614 775 026. Si no se conoce, null.
+async function numeroWhatsappEnlace() {
+  try {
+    const q = await pool.query(
+      `SELECT datos->'data'->>'to' AS para FROM whatsapp_entrantes
+       WHERE datos->'data'->>'to' IS NOT NULL ORDER BY id DESC LIMIT 1`
+    );
+    if (!q.rows.length) return null;
+    const d = String(q.rows[0].para || '').split('@')[0].replace(/[^0-9]/g, '');
+    if (d.length < 9) return null;
+    if (d.length === 11 && d.indexOf('34') === 0) return '+34 ' + d.slice(2, 5) + ' ' + d.slice(5, 8) + ' ' + d.slice(8);
+    return '+' + d;
+  } catch (e) {
+    return null;
+  }
+}
+
 // ─── Helper: generar voucher PDF para el cliente ─────────────────────────────
 async function generarVoucherPDF(reservaId) {
   const result = await pool.query(
@@ -10361,6 +10381,8 @@ async function generarVoucherPDF(reservaId) {
   const _fechaLimite = calcularFechaCancelacion(new Date(r.fecha), r.hora, _cfgNoshow.horas_cancelacion);
   const _importe = parseFloat(_cfgNoshow.importe_deposito).toFixed(2);
   const _textoLimite = fechaHoraCliente(_fechaLimite, _lv);
+  // Número de WhatsApp del enlace chofer ↔ cliente (el de OpenWA, tomado de los mensajes recibidos)
+  const _waEnlace = await numeroWhatsappEnlace();
 
   let fotoChoferBuffer = null;
   if (r.conductor_foto && r.conductor_foto_estado === 'aprobada' && r.conductor_foto.startsWith('data:image/')) {
@@ -10523,6 +10545,23 @@ async function generarVoucherPDF(reservaId) {
     doc.fontSize(10).font(FUENTE).fillColor('#888888')
       .text(tv('vou_nota_pie'), ML, y, { width: W });
     y = doc.y + 10;
+
+    // Caja "Contacto con tu conductor el día del viaje" (enlace por WhatsApp, 28/09/2026).
+    // Solo si ya se conoce el número de WhatsApp de OpenWA.
+    if (_waEnlace) {
+      const _txtEnl1 = tv('vou_enlace_titulo');
+      const _txtEnl2 = tv('vou_enlace_texto').split('{whatsapp}').join(_waEnlace).split('{numero_reserva}').join(r.numero_reserva || '');
+      const _hEnl1 = doc.fontSize(10).font(FUENTE_NEGRITA).heightOfString(_txtEnl1, { width: W - 20 });
+      const _hEnl2 = doc.fontSize(10).font(FUENTE).heightOfString(_txtEnl2, { width: W - 20 });
+      const altoEnlace = 8 + _hEnl1 + 4 + _hEnl2 + 8;
+      if (y + altoEnlace > PH - 120) { doc.addPage(); y = 50; }
+      doc.rect(ML, y, W, altoEnlace).fill('#e6f0f7');
+      doc.fontSize(10).font(FUENTE_NEGRITA).fillColor('#1B4F72')
+        .text(_txtEnl1, ML + 10, y + 8, { width: W - 20 });
+      doc.fontSize(10).font(FUENTE).fillColor('#1B4F72')
+        .text(_txtEnl2, ML + 10, y + 8 + _hEnl1 + 4, { width: W - 20 });
+      y += altoEnlace + 12;
+    }
 
     // Caja cancelaci\u00f3n
     // La caja crece si el texto traducido ocupa más de una línea
