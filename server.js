@@ -15046,6 +15046,9 @@ app.post('/api/whatsapp/entrante', async (req, res) => {
   }
   let evento;
   try { evento = JSON.parse(cuerpo.toString('utf8')); } catch (e) { return res.status(400).send('JSON no válido'); }
+  // TEMPORAL (pruebas del enlace chofer ↔ cliente, 28/09/2026): contenido completo del aviso en los Logs,
+  // para localizar el número real de quien escribe. QUITAR cuando esté identificado.
+  console.log('🔎 [WhatsApp entrante · contenido completo] evento=' + (req.get('X-OpenWA-Event') || '') + ' → ' + cuerpo.toString('utf8').slice(0, 3000));
 
   const nombreEvento = req.get('X-OpenWA-Event') || evento.event || '';
   const d = evento.data || evento.payload || evento;
