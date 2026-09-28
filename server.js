@@ -155,6 +155,8 @@ const upload = multer({
 
 // El webhook de Stripe necesita el body sin parsear — va ANTES del JSON middleware
 app.use('/webhook/stripe', express.raw({ type: 'application/json' }));
+// Igual para los mensajes de WhatsApp que envía OpenWA (la firma se comprueba sobre el body sin parsear)
+app.use('/api/whatsapp/entrante', express.raw({ type: '*/*', limit: '2mb' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // ─── MODO PRIVADO: web cerrada a buscadores ──────────────────────────────
@@ -2049,6 +2051,18 @@ async function initSchema() {
   await pool.query(`ALTER TABLE clientes_datos ADD COLUMN IF NOT EXISTS idioma_elegido BOOLEAN DEFAULT FALSE`);
   // Idioma de quien viaja escrito a mano ("Otro idioma…") en una reserva para otra persona (26/09/2026)
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS idioma_viajero_otro TEXT`);
+  // Mensajes de WhatsApp recibidos en el número de OpenWA (28/09/2026). Paso 1: solo se guardan.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS whatsapp_entrantes (
+      id SERIAL PRIMARY KEY,
+      recibido_en TIMESTAMP DEFAULT NOW(),
+      telefono TEXT,
+      texto TEXT,
+      evento TEXT,
+      clave_unica TEXT UNIQUE,
+      datos JSONB
+    )
+  `);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_password_hash TEXT`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_primer_acceso BOOLEAN DEFAULT TRUE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
@@ -15011,6 +15025,50 @@ app.get('/api/whatsapp/choferes-disponibles', requierePuenteWhatsapp, asyncHandl
   );
   res.json(result.rows);
 }));
+
+// ─── WhatsApp entrante (webhook de OpenWA) — paso 1, 28/09/2026 ─────────────────
+// OpenWA avisa aquí de cada mensaje que llega al número de OpenWA. Solo se aceptan avisos
+// firmados con la clave secreta OPENWA_WEBHOOK_SECRET (variable de Render). En este paso
+// el mensaje solo se guarda en whatsapp_entrantes y se anota en los registros: no se responde nada.
+app.post('/api/whatsapp/entrante', async (req, res) => {
+  const secreto = process.env.OPENWA_WEBHOOK_SECRET;
+  if (!secreto) {
+    console.warn('[WhatsApp entrante] Falta OPENWA_WEBHOOK_SECRET en Render: aviso rechazado.');
+    return res.status(503).send('No configurado');
+  }
+  const cuerpo = Buffer.isBuffer(req.body) ? req.body : Buffer.from(typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}));
+  const firma = req.get('X-OpenWA-Signature') || '';
+  const esperada = 'sha256=' + crypto.createHmac('sha256', secreto).update(cuerpo).digest('hex');
+  const bFirma = Buffer.from(firma), bEsperada = Buffer.from(esperada);
+  if (bFirma.length !== bEsperada.length || !crypto.timingSafeEqual(bFirma, bEsperada)) {
+    console.warn('[WhatsApp entrante] Firma no válida: aviso rechazado.');
+    return res.status(401).send('Firma no válida');
+  }
+  let evento;
+  try { evento = JSON.parse(cuerpo.toString('utf8')); } catch (e) { return res.status(400).send('JSON no válido'); }
+
+  const nombreEvento = req.get('X-OpenWA-Event') || evento.event || '';
+  const d = evento.data || evento.payload || evento;
+  const deMi = d.fromMe === true || (d.message && d.message.fromMe === true);
+  const remitente = String(d.from || d.sender || (d.message && d.message.from) || d.chatId || '');
+  const telefono = remitente.split('@')[0].replace(/[^0-9]/g, '');
+  const texto = String(d.body || d.text || (d.message && (d.message.body || d.message.text)) || '');
+  const claveUnica = req.get('X-OpenWA-Idempotency-Key') || req.get('X-OpenWA-Delivery-Id') || null;
+
+  if (deMi) return res.status(200).send('OK'); // mensajes enviados por nosotros: no interesan
+  try {
+    await pool.query(
+      `INSERT INTO whatsapp_entrantes (telefono, texto, evento, clave_unica, datos)
+       VALUES ($1, $2, $3, $4, $5) ON CONFLICT (clave_unica) DO NOTHING`,
+      [telefono || null, texto, nombreEvento, claveUnica, evento]
+    );
+    console.log('📥 WhatsApp recibido de +' + (telefono || '?') + ': ' + texto.slice(0, 200));
+  } catch (e) {
+    console.error('[WhatsApp entrante] Error guardando el mensaje:', e.message);
+    return res.status(500).send('Error');
+  }
+  res.status(200).send('OK');
+});
 
 app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
