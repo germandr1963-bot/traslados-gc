@@ -2877,6 +2877,7 @@ Pulsa el botón para crear una nueva contraseña:
     { clave: 'frase_enlace_sin_chofer', canal: 'wa', orden: 340, contexto: 'Respuesta automática por WhatsApp: la reserva aún no tiene conductor asignado', es: 'Tu reserva {numero_reserva} todavía no tiene conductor asignado. Te avisaremos en cuanto lo tenga.' },
     { clave: 'frase_enlace_enviado_conductor', canal: 'wa', orden: 360, contexto: 'Confirmación por WhatsApp al cliente: su mensaje se ha enviado a su conductor', es: '✅ Mensaje enviado a tu conductor.' },
     { clave: 'frase_enlace_mensaje_conductor', canal: 'wa', orden: 370, contexto: 'Cabecera del mensaje del conductor que recibe el cliente por WhatsApp. {nombre} = nombre del conductor; debajo va el mensaje traducido', es: '💬 Mensaje de tu conductor ({nombre}):' },
+    { clave: 'frase_enlace_no_encontrada', canal: 'wa', orden: 355, contexto: 'Respuesta automática por WhatsApp (una vez al día) cuando no se encuentra ninguna reserva en curso de quien escribe y no ha puesto número de reserva. El ejemplo ABC123 se deja tal cual', es: 'No encontramos tu reserva en curso. Por favor, escribe tu número de reserva (lo tienes en tu voucher) seguido de tu mensaje, por ejemplo: ABC123 No encuentro a mi conductor. Este servicio funciona desde 2 horas antes hasta 2 horas después de tu viaje.' },
     { clave: 'frase_enlace_sin_numero', canal: 'wa', orden: 350, contexto: 'Respuesta automática por WhatsApp (una vez al día) cuando el mensaje no empieza por un número de reserva. El ejemplo ABC123 se deja tal cual', es: 'Hola 👋 Para contactar con tu conductor el día del viaje, empieza tu mensaje con tu número de reserva, por ejemplo: ABC123 No encuentro a mi conductor.' }
   ];
   // ON CONFLICT DO NOTHING: nunca sobreescribe lo que se edite desde el Admin
@@ -15184,6 +15185,31 @@ async function traducirEnlace(texto, lang) {
   }
 }
 
+// ¿Está ahora la reserva dentro de la ventana del enlace (2 h antes y 2 h después de la recogida)?
+function reservaEnVentana(r) {
+  const recogida = calcularFechaCancelacion(new Date(r.fecha), r.hora, 0);
+  const ahora = new Date();
+  return ahora >= new Date(recogida.getTime() - VENTANA_ENLACE_HORAS * 3600000) &&
+         ahora <= new Date(recogida.getTime() + VENTANA_ENLACE_HORAS * 3600000);
+}
+
+// Reservas en curso de quien escribe: si es un chofer activo, sus servicios asignados; si no,
+// las reservas en las que su móvil es el del cliente o el del viajero. Solo con chofer y sin cancelar.
+async function reservasEnCurso(tel, conductorId) {
+  const q = conductorId
+    ? await pool.query(
+        `SELECT numero_reserva, fecha, hora FROM reservas
+         WHERE conductor_id = $1 AND archivada = FALSE AND estado NOT IN ('cancelada', 'completada', 'no_show')
+           AND fecha BETWEEN CURRENT_DATE - 1 AND CURRENT_DATE + 1`, [conductorId])
+    : await pool.query(
+        `SELECT numero_reserva, fecha, hora FROM reservas
+         WHERE archivada = FALSE AND conductor_id IS NOT NULL AND estado NOT IN ('cancelada', 'completada', 'no_show')
+           AND fecha BETWEEN CURRENT_DATE - 1 AND CURRENT_DATE + 1
+           AND (RIGHT(regexp_replace(COALESCE(telefono_cliente, ''), '[^0-9]', '', 'g'), 9) = RIGHT($1, 9)
+             OR RIGHT(regexp_replace(COALESCE(telefono_pasajero_otro, ''), '[^0-9]', '', 'g'), 9) = RIGHT($1, 9))`, [tel]);
+  return q.rows.filter(reservaEnVentana);
+}
+
 // Idioma del portal si este móvil ya es de un cliente con reservas; si no, null (español e inglés)
 async function idiomaPorTelefonoCliente(tel) {
   const cli = await pool.query(
@@ -15201,7 +15227,7 @@ async function procesarEntrante(entranteId) {
     if (!q.rows.length) return;
     const m = q.rows[0];
     const tel = m.telefono_real;
-    const texto = String(m.texto || '').trim();
+    let texto = String(m.texto || '').trim();
     const anotar = async function (resp) { await pool.query('UPDATE whatsapp_entrantes SET respuesta = $1 WHERE id = $2', [resp, entranteId]); };
     if (!tel || !texto) return;
 
@@ -15213,7 +15239,19 @@ async function procesarEntrante(entranteId) {
     }
 
     // ¿Empieza por un número de reserva? (3 letras + 3 cifras)
-    const encaje = texto.match(/^\s*([A-Za-z]{3}\d{3})\b/);
+    let encaje = texto.match(/^\s*([A-Za-z]{3}\d{3})\b/);
+    // Sin número de reserva: si quien escribe tiene UNA SOLA reserva en curso (ventana de 2 h, con
+    // chofer y sin cancelar), se usa esa. Si hay ninguna o varias, se le pide el número, como antes.
+    if (!encaje) {
+      const enCurso = await reservasEnCurso(tel, m.conductor_id);
+      if (enCurso.length === 1) {
+        texto = enCurso[0].numero_reserva + ' ' + texto;
+        encaje = texto.match(/^\s*([A-Za-z]{3}\d{3})\b/);
+        console.log('   🔎 Sin número de reserva: se usa ' + enCurso[0].numero_reserva + ' (única en curso)');
+      } else if (enCurso.length > 1) {
+        console.log('   🔎 Sin número de reserva y ' + enCurso.length + ' reservas en curso: se pide el número');
+      }
+    }
     if (!encaje) {
       // Aviso de cómo usar el enlace: como mucho una vez al día por persona
       const reciente = await pool.query(
@@ -15222,9 +15260,9 @@ async function procesarEntrante(entranteId) {
       );
       if (reciente.rows.length) { await anotar('sin numero (ya avisado hoy)'); return; }
       if (m.conductor_id) {
-        await enviarWhatsappEnlace(tel, 'Para escribir a un cliente, empieza tu mensaje con el número de reserva, por ejemplo: ABC123 Estoy en la puerta 2.');
+        await enviarWhatsappEnlace(tel, 'No encuentro ningún servicio tuyo en curso. Para escribir a un cliente, empieza tu mensaje con el número de reserva, por ejemplo: ABC123 Estoy en la puerta 2. El enlace funciona desde 2 horas antes hasta 2 horas después del servicio.');
       } else {
-        await enviarWhatsappEnlace(tel, await fraseEnlace('frase_enlace_sin_numero', await idiomaPorTelefonoCliente(tel), {}));
+        await enviarWhatsappEnlace(tel, await fraseEnlace('frase_enlace_no_encontrada', await idiomaPorTelefonoCliente(tel), {}));
       }
       await anotar('aviso sin numero');
       console.log('   ↩️ Respuesta automática a +' + tel + ': falta el número de reserva');
@@ -15290,7 +15328,8 @@ async function procesarEntrante(entranteId) {
       else paraChofer += '«' + cuerpo + '»' + (traduccion ? '' : '\n(sin traducir)');
       paraChofer += '\n\nPara responder, empieza por ' + r.numero_reserva;
       await enviarWhatsappEnlace(telChofer, paraChofer);
-      await enviarWhatsappEnlace(tel, await fraseEnlace('frase_enlace_enviado_conductor', langR, {}));
+      // La confirmación lleva el número de reserva, para que se vea a qué reserva ha ido
+      await enviarWhatsappEnlace(tel, (await fraseEnlace('frase_enlace_enviado_conductor', langR, {})).replace(/\.\s*$/, '') + ' · ' + r.numero_reserva);
       await anotar('reenviado ' + r.numero_reserva + ' (cliente → chofer)');
       console.log('   📨 ' + r.numero_reserva + ': mensaje del cliente reenviado al CHOFER (' + r.nombre_chofer + ')');
     } else {
@@ -15313,7 +15352,7 @@ async function procesarEntrante(entranteId) {
       );
       otros.rows.forEach(function (o) { añadir(o.telefono_real); });
       for (const d of destinos) await enviarWhatsappEnlace(d, paraCliente);
-      await enviarWhatsappEnlace(tel, destinos.length ? '✅ Enviado al cliente.' : 'No hay ningún móvil del cliente para esta reserva.');
+      await enviarWhatsappEnlace(tel, destinos.length ? '✅ Enviado al cliente · ' + r.numero_reserva : 'No hay ningún móvil del cliente para la reserva ' + r.numero_reserva + '.');
       await anotar('reenviado ' + r.numero_reserva + ' (chofer → cliente)');
       console.log('   📨 ' + r.numero_reserva + ': mensaje del CHOFER reenviado a ' + destinos.length + ' móvil(es) del cliente');
     }
