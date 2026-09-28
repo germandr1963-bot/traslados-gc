@@ -2063,6 +2063,20 @@ async function initSchema() {
       datos JSONB
     )
   `);
+  // Paso 2 (28/09/2026): quién escribe. WhatsApp a veces oculta el número ("@lid"); puente.js lo
+  // traduce con OpenWA y lo guarda aquí para no volver a preguntarlo.
+  await pool.query(`ALTER TABLE whatsapp_entrantes ADD COLUMN IF NOT EXISTS lid TEXT`);
+  await pool.query(`ALTER TABLE whatsapp_entrantes ADD COLUMN IF NOT EXISTS telefono_real TEXT`);
+  await pool.query(`ALTER TABLE whatsapp_entrantes ADD COLUMN IF NOT EXISTS conductor_id INTEGER`);
+  await pool.query(`ALTER TABLE whatsapp_entrantes ADD COLUMN IF NOT EXISTS identificado BOOLEAN DEFAULT FALSE`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS whatsapp_lid_telefono (
+      lid TEXT PRIMARY KEY,
+      telefono TEXT,
+      intentos INTEGER DEFAULT 0,
+      actualizado_en TIMESTAMP DEFAULT NOW()
+    )
+  `);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_password_hash TEXT`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cliente_primer_acceso BOOLEAN DEFAULT TRUE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS deposito_liberado BOOLEAN DEFAULT FALSE`);
@@ -15060,18 +15074,84 @@ app.post('/api/whatsapp/entrante', async (req, res) => {
 
   if (deMi) return res.status(200).send('OK'); // mensajes enviados por nosotros: no interesan
   try {
-    await pool.query(
-      `INSERT INTO whatsapp_entrantes (telefono, texto, evento, clave_unica, datos)
-       VALUES ($1, $2, $3, $4, $5) ON CONFLICT (clave_unica) DO NOTHING`,
-      [telefono || null, texto, nombreEvento, claveUnica, evento]
+    // ¿Número real o identificador oculto (@lid)?
+    const esLid = remitente.indexOf('@lid') !== -1 || d.isLidSender === true;
+    const lid = esLid ? remitente : null;
+    let telefonoReal = esLid ? null : (telefono || null);
+    if (esLid && d.senderPhone) telefonoReal = String(d.senderPhone).replace(/[^0-9]/g, '') || null;
+    if (esLid && !telefonoReal) {
+      const conocido = await pool.query('SELECT telefono FROM whatsapp_lid_telefono WHERE lid = $1 AND telefono IS NOT NULL', [lid]);
+      if (conocido.rows.length) telefonoReal = conocido.rows[0].telefono;
+    }
+    const ins = await pool.query(
+      `INSERT INTO whatsapp_entrantes (telefono, texto, evento, clave_unica, datos, lid, telefono_real)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (clave_unica) DO NOTHING RETURNING id`,
+      [telefono || null, texto, nombreEvento, claveUnica, evento, lid, telefonoReal]
     );
-    console.log('📥 WhatsApp recibido de +' + (telefono || '?') + ': ' + texto.slice(0, 200));
+    console.log('📥 WhatsApp recibido de ' + (telefonoReal ? '+' + telefonoReal : (lid || '?')) + ': ' + texto.slice(0, 200));
+    if (ins.rows.length && telefonoReal) await identificarEntrante(ins.rows[0].id, telefonoReal);
+    else if (ins.rows.length) console.log('   ⏳ Pendiente de identificar (puente.js traducirá ' + lid + ')');
   } catch (e) {
     console.error('[WhatsApp entrante] Error guardando el mensaje:', e.message);
     return res.status(500).send('Error');
   }
   res.status(200).send('OK');
 });
+
+// Mismo móvil, aunque uno lleve prefijo de país y el otro no (se comparan las últimas 9 cifras)
+function mismoTelefono(a, b) {
+  const x = String(a || '').replace(/[^0-9]/g, ''), y = String(b || '').replace(/[^0-9]/g, '');
+  if (x.length < 9 || y.length < 9) return false;
+  return x.slice(-9) === y.slice(-9);
+}
+
+// Marca un mensaje recibido como de CHOFER (si el móvil coincide con el de un conductor) o de CLIENTE.
+// Paso 2: solo se anota; todavía no se responde ni se reenvía nada.
+async function identificarEntrante(entranteId, telefonoReal) {
+  try {
+    const conductores = await pool.query('SELECT id, nombre, telefono FROM conductores WHERE telefono IS NOT NULL');
+    const chofer = conductores.rows.find(function (c) { return mismoTelefono(c.telefono, telefonoReal); });
+    await pool.query(
+      'UPDATE whatsapp_entrantes SET telefono_real = $1, conductor_id = $2, identificado = TRUE WHERE id = $3',
+      [telefonoReal, chofer ? chofer.id : null, entranteId]
+    );
+    console.log('   👤 +' + telefonoReal + ' es ' + (chofer ? 'CHOFER (' + chofer.nombre + ')' : 'CLIENTE u otra persona'));
+  } catch (e) {
+    console.error('[WhatsApp entrante] Error identificando el mensaje:', e.message);
+  }
+}
+
+// puente.js: identificadores ocultos (@lid) pendientes de traducir a número real
+app.get('/api/whatsapp/lids-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const r = await pool.query(
+    `SELECT DISTINCT e.lid FROM whatsapp_entrantes e
+     LEFT JOIN whatsapp_lid_telefono m ON m.lid = e.lid
+     WHERE e.lid IS NOT NULL AND e.identificado = FALSE AND e.recibido_en > NOW() - INTERVAL '2 days'
+       AND (m.lid IS NULL OR (m.telefono IS NULL AND m.intentos < 5))
+     LIMIT 20`
+  );
+  res.json(r.rows.map(function (x) { return x.lid; }));
+}));
+
+// puente.js: resultado de la traducción (telefono = null si OpenWA no lo sabe)
+app.post('/api/whatsapp/lid-resuelto', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const lid = String((req.body && req.body.lid) || '');
+  const tel = req.body && req.body.telefono ? String(req.body.telefono).replace(/[^0-9]/g, '') : null;
+  if (!lid) return res.status(400).json({ error: 'Falta lid.' });
+  await pool.query(
+    `INSERT INTO whatsapp_lid_telefono (lid, telefono, intentos, actualizado_en) VALUES ($1, $2, 1, NOW())
+     ON CONFLICT (lid) DO UPDATE SET telefono = COALESCE($2, whatsapp_lid_telefono.telefono),
+       intentos = whatsapp_lid_telefono.intentos + 1, actualizado_en = NOW()`,
+    [lid, tel]
+  );
+  if (tel) {
+    const pend = await pool.query('SELECT id FROM whatsapp_entrantes WHERE lid = $1 AND identificado = FALSE', [lid]);
+    for (const p of pend.rows) await identificarEntrante(p.id, tel);
+  } else {
+    console.log('   ⚠️ OpenWA no sabe el número de ' + lid);
+  }
+  res.json({ ok: true });
+}));
 
 app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
