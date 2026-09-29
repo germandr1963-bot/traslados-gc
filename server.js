@@ -728,7 +728,7 @@ async function initSchema() {
     { clave: 'email_cotiz_positivo_p2',       modulo: 'Email cotización', contexto: 'Segundo párrafo del email positivo, antes de la tabla de precios', es: 'Aquí tienes los precios disponibles para tu ruta:' },
     { clave: 'email_cotiz_positivo_p3',       modulo: 'Email cotización', contexto: 'Párrafo antes del botón de reserva', es: 'Pulsa el botón para ver todos los detalles y hacer tu reserva.' },
     { clave: 'email_cotiz_boton_reservar',    modulo: 'Email cotización', contexto: 'Texto del botón de reserva en el email positivo', es: 'Ver ruta y reservar' },
-    { clave: 'email_cotiz_nota_precio',       modulo: 'Email cotización', contexto: 'Nota final sobre el precio estimado en el email positivo', es: 'El precio es una estimación basada en los km de distancia. El precio final es lo que marca el taxímetro. El cobro lo realiza el conductor directamente.' },
+    { clave: 'email_cotiz_nota_precio',       modulo: 'Email cotización', contexto: 'Nota final sobre el precio estimado en el email positivo', es: 'El precio es una estimación basada en los km de distancia. El precio final es lo que marca el taxímetro. El cobro lo realiza el chofer directamente.' },
     { clave: 'email_cotiz_negativo_p1',       modulo: 'Email cotización', contexto: 'Primer párrafo del email negativo', es: 'Gracias por contactar con Traslados GC.' },
     { clave: 'email_cotiz_negativo_p2',       modulo: 'Email cotización', contexto: 'Segundo párrafo del email negativo, antes de mostrar la ruta', es: 'Lamentablemente, en este momento no podemos asumir el traslado que nos solicitaste:' },
     { clave: 'email_cotiz_negativo_p3',       modulo: 'Email cotización', contexto: 'Párrafo final del email negativo', es: 'Si tienes otras necesidades de transporte en Gran Canaria, no dudes en contactarnos.' },
@@ -825,7 +825,7 @@ async function initSchema() {
     { clave: 'home_modal_error_email',   contexto: 'Error de validación cuando el email no es válido', es: 'El email no es válido.', en: 'The email address is not valid.' },
     { clave: 'home_modal_error_conexion',contexto: 'Error cuando falla la conexión al enviar la solicitud', es: 'Error de conexión. Inténtalo de nuevo.', en: 'Connection error. Please try again.' },
     { clave: 'home_badge_precio_aprox',  contexto: 'Badge junto al precio en el resultado del buscador', es: 'precio aproximado', en: 'estimated price' },
-    { clave: 'home_nota_taximetro',      contexto: 'Nota bajo el precio en el resultado del buscador', es: 'El precio final lo determina el taxímetro del conductor.', en: 'The final price is determined by the driver\'s meter.' },
+    { clave: 'home_nota_taximetro',      contexto: 'Nota bajo el precio en el resultado del buscador', es: 'El precio final lo determina el taxímetro del chofer.', en: 'The final price is determined by the driver\'s meter.' },
     { clave: 'home_texto_a_consultar',   contexto: 'Texto cuando no hay precio disponible para esa combinación de ruta y categoría', es: 'A consultar', en: 'On request' },
     { clave: 'home_boton_reservar',      contexto: 'Botón de reserva en el resultado del buscador', es: 'Reservar este traslado →', en: 'Book this transfer →' },
     { clave: 'home_texto_ver_otras_cats',contexto: 'Nota bajo el resultado del buscador para ver otras categorías', es: 'Para ver el precio de otras categorías, selecciónala y pulsa Ver precio.', en: 'To see prices for other categories, select one and press See price.' },
@@ -996,7 +996,7 @@ async function initSchema() {
     { clave: 'reserva_ph_otra_nombre',      contexto: 'Placeholder del campo nombre de quien viaja', es: 'Nombre', en: 'First name' },
     { clave: 'reserva_label_otra_apellidos',contexto: 'Etiqueta del campo apellidos de quien viaja', es: 'Apellidos de quien viaja *', en: 'Traveller last name *' },
     { clave: 'reserva_ph_otra_apellidos',   contexto: 'Placeholder del campo apellidos de quien viaja', es: 'Apellidos', en: 'Last name' },
-    { clave: 'reserva_nota_cartel',         contexto: 'Nota bajo el nombre de quien viaja sobre el cartel del conductor', es: 'El cartel del conductor llevará este nombre.', en: 'The driver\u2019s pick-up sign will show this name.' },
+    { clave: 'reserva_nota_cartel',         contexto: 'Nota bajo el nombre de quien viaja sobre el cartel del conductor', es: 'El cartel del chofer llevará este nombre.', en: 'The driver\u2019s pick-up sign will show this name.' },
     { clave: 'reserva_label_otra_pasaporte',contexto: 'Etiqueta del campo pasaporte o DNI de quien viaja', es: 'Número de pasaporte o DNI de quien viaja *', en: 'Traveller passport or ID number *' },
     { clave: 'reserva_label_otra_telefono', contexto: 'Etiqueta del campo teléfono de quien viaja', es: 'Teléfono de quien viaja (con código de país) *', en: 'Traveller phone (with country code) *' },
     { clave: 'reserva_err_otra_telefono',   contexto: 'Error de teléfono de quien viaja no válido', es: 'Introduce un número válido', en: 'Enter a valid number' },
@@ -1008,10 +1008,10 @@ async function initSchema() {
     { clave: 'reserva_paso3_resumen',       contexto: 'Subtítulo del paso 3', es: 'Servicios adicionales opcionales', en: 'Optional additional services' },
     { clave: 'reserva_sin_extras',          contexto: 'Aviso cuando no hay extras disponibles', es: 'No hay extras disponibles.', en: 'No extras available.' },
     { clave: 'reserva_total_extras',        contexto: 'Etiqueta del total de extras seleccionados', es: 'Total extras', en: 'Extras total' },
-    { clave: 'reserva_total_extras_nota',   contexto: 'Nota corta bajo el total de extras', es: 'Se abonan directamente al conductor', en: 'Paid directly to the driver' },
-    { clave: 'reserva_nota_extras',         contexto: 'Nota larga sobre el pago de los extras', es: 'Los extras se abonan directamente al conductor junto con el precio del taxímetro. No forman parte de ningún cargo online.', en: 'Extras are paid directly to the driver together with the meter fare. They are not part of any online charge.' },
+    { clave: 'reserva_total_extras_nota',   contexto: 'Nota corta bajo el total de extras', es: 'Se abonan directamente al chofer', en: 'Paid directly to the driver' },
+    { clave: 'reserva_nota_extras',         contexto: 'Nota larga sobre el pago de los extras', es: 'Los extras se abonan directamente al chofer junto con el precio del taxímetro. No forman parte de ningún cargo online.', en: 'Extras are paid directly to the driver together with the meter fare. They are not part of any online charge.' },
     { clave: 'reserva_resumen_titulo',      contexto: 'Título del resumen final de la reserva', es: 'Resumen de la reserva', en: 'Booking summary' },
-    { clave: 'reserva_resumen_aviso',       contexto: 'Aviso bajo el resumen final. Mantener las etiquetas <strong> alrededor de Pre-reserva', es: 'Revise que toda la información sea correcta antes de confirmar. Una vez enviada, recibirá su documento de <strong>Pre-reserva</strong> con los datos de su solicitud de traslado. El voucher definitivo con el nombre del conductor asignado se enviará una vez confirmada la disponibilidad y completado el pago de la pre-reserva.', en: 'Please check that all the information is correct before confirming. Once submitted, you will receive your <strong>Pre-booking</strong> document with the details of your transfer request. The final voucher with the assigned driver\u2019s name will be sent once availability is confirmed and the pre-booking payment is completed.' },
+    { clave: 'reserva_resumen_aviso',       contexto: 'Aviso bajo el resumen final. Mantener las etiquetas <strong> alrededor de Pre-reserva', es: 'Revise que toda la información sea correcta antes de confirmar. Una vez enviada, recibirá su documento de <strong>Pre-reserva</strong> con los datos de su solicitud de traslado. El voucher definitivo con el nombre del chofer asignado se enviará una vez confirmada la disponibilidad y completado el pago de la pre-reserva.', en: 'Please check that all the information is correct before confirming. Once submitted, you will receive your <strong>Pre-booking</strong> document with the details of your transfer request. The final voucher with the assigned driver\u2019s name will be sent once availability is confirmed and the pre-booking payment is completed.' },
     { clave: 'reserva_boton_revisar',       contexto: 'Botón para revisar y enviar la solicitud', es: 'Revisar y enviar solicitud', en: 'Review and send request' },
     { clave: 'reserva_boton_confirmar',     contexto: 'Botón de confirmación final del envío', es: 'Confirmar y enviar solicitud', en: 'Confirm and send request' },
     { clave: 'reserva_err_envio',           contexto: 'Error genérico al enviar la reserva', es: 'Error al enviar. Inténtalo de nuevo.', en: 'Error sending. Please try again.' },
@@ -1034,7 +1034,7 @@ async function initSchema() {
     { clave: 'reserva_res_vuelo',           contexto: 'Etiqueta Vuelo llegada en el resumen del permiso', es: 'Vuelo llegada:', en: 'Arrival flight:' },
     { clave: 'reserva_res_barco',           contexto: 'Etiqueta Barco en el resumen del permiso', es: 'Barco:', en: 'Ship:' },
     { clave: 'reserva_ok_titulo',           contexto: 'Título de la pantalla de confirmación tras enviar', es: 'Solicitud recibida', en: 'Request received' },
-    { clave: 'reserva_ok_texto',            contexto: 'Texto de la pantalla de confirmación tras enviar', es: 'Hemos recibido tu solicitud de traslado. Recibirás en breve tu documento de Pre-reserva con todos los detalles. El voucher definitivo con el conductor asignado se enviará una vez confirmada la disponibilidad.', en: 'We have received your transfer request. You will shortly receive your Pre-booking document with all the details. The final voucher with the assigned driver will be sent once availability is confirmed.' },
+    { clave: 'reserva_ok_texto',            contexto: 'Texto de la pantalla de confirmación tras enviar', es: 'Hemos recibido tu solicitud de traslado. Recibirás en breve tu documento de Pre-reserva con todos los detalles. El voucher definitivo con el chofer asignado se enviará una vez confirmada la disponibilidad.', en: 'We have received your transfer request. You will shortly receive your Pre-booking document with all the details. The final voucher with the assigned driver will be sent once availability is confirmed.' },
     { clave: 'reserva_ok_numero_label',     contexto: 'Rótulo sobre el número de reserva en la confirmación (en mayúsculas)', es: 'TU NÚMERO DE RESERVA', en: 'YOUR BOOKING NUMBER' },
     { clave: 'reserva_ok_guarda',           contexto: 'Nota bajo el número de reserva en la confirmación', es: 'Guarda este número — lo recibirás también por email', en: 'Keep this number — you will also receive it by email' },
     { clave: 'reserva_ok_volver',           contexto: 'Botón para volver a la portada tras la confirmación', es: 'Volver al inicio', en: 'Back to home' },
@@ -1044,7 +1044,7 @@ async function initSchema() {
   // se crean la primera vez y nunca sobrescriben lo editado en el Admin.
   const TEXTOS_RESERVA_PREF_VIAJERO = [
     { clave: 'reserva_pref_viajero_titulo', contexto: 'Título del recuadro plegable de preferencias de la persona que viaja (solo si la reserva es para otra persona)', es: 'Preferencias del viajero (opcional)' },
-    { clave: 'reserva_pref_viajero_nota', contexto: 'Explicación dentro del recuadro de preferencias del viajero', es: 'Si lo deseas, marca las preferencias de la persona que viaja. Su conductor las verá. Si no marcas ninguna, el viaje irá sin preferencias; podrás añadirlas después desde tu portal.' },
+    { clave: 'reserva_pref_viajero_nota', contexto: 'Explicación dentro del recuadro de preferencias del viajero', es: 'Si lo deseas, marca las preferencias de la persona que viaja. Su chofer las verá. Si no marcas ninguna, el viaje irá sin preferencias; podrás añadirlas después desde tu portal.' },
     { clave: 'reserva_pref_viajero_instruccion', contexto: 'Instrucción sobre la lista de preferencias del viajero', es: 'Toca una opción para marcarla y vuelve a tocarla para quitarla.' },
     { clave: 'reserva_pref_temp_elige', contexto: 'Primera opción del selector de temperatura en las preferencias del viajero', es: 'Elige la temperatura' },
     { clave: 'reserva_pref_especifica', contexto: 'Texto gris de ejemplo en el campo para especificar una preferencia del viajero', es: 'Especifica…' },
@@ -1052,8 +1052,8 @@ async function initSchema() {
     { clave: 'reserva_nota_idioma_viajero', contexto: 'Nota bajo el selector de idioma de quien viaja', es: 'La confirmación, el voucher y la factura de esta reserva se enviarán en este idioma.' },
     { clave: 'reserva_opcion_otro_idioma', contexto: 'Última opción del selector de idioma de quien viaja, para escribir un idioma que no está en la lista', es: 'Otro idioma…' },
     { clave: 'reserva_ph_otro_idioma', contexto: 'Texto gris de ejemplo en el campo para escribir otro idioma', es: 'Escribe el idioma (por ejemplo: chino)' },
-    { clave: 'reserva_nota_otro_idioma', contexto: 'Nota cuando se elige "Otro idioma"', es: 'Los documentos se enviarán en el idioma de esta página. El conductor sabrá el idioma de quien viaja.' },
-    { clave: 'reserva_label_indicaciones', contexto: 'Etiqueta del campo de texto libre con indicaciones para el conductor (sustituye a Comentarios o información adicional)', es: 'Indicaciones para el conductor (opcional)' },
+    { clave: 'reserva_nota_otro_idioma', contexto: 'Nota cuando se elige "Otro idioma"', es: 'Los documentos se enviarán en el idioma de esta página. El chofer sabrá el idioma de quien viaja.' },
+    { clave: 'reserva_label_indicaciones', contexto: 'Etiqueta del campo de texto libre con indicaciones para el conductor (sustituye a Comentarios o información adicional)', es: 'Indicaciones para el chofer (opcional)' },
     { clave: 'reserva_ph_indicaciones', contexto: 'Texto gris de ejemplo en el campo de indicaciones para el conductor', es: 'Por ejemplo: punto exacto de recogida, cómo reconocerte, referencias de la dirección…' },
   ];
   for (const tx of TEXTOS_RESERVA_PREF_VIAJERO) {
@@ -1301,7 +1301,7 @@ async function initSchema() {
     { clave: 'val_titulo',               contexto: 'Título grande de la página de valoración (el programa añade el emoji del taxi detrás)', es: '¿Qué tal tu traslado?' },
     { clave: 'val_subtitulo',            contexto: 'Frase bajo el título de la página de valoración', es: 'Tu valoración es opcional y nos ayuda a mejorar.' },
     { clave: 'val_etiqueta_reserva',     contexto: 'Palabra delante del número de reserva, bajo la ruta (ej: Reserva ABC123)', es: 'Reserva' },
-    { clave: 'val_etiqueta_conductor',   contexto: 'Etiqueta sobre las estrellas para valorar al conductor', es: 'Tu conductor' },
+    { clave: 'val_etiqueta_conductor',   contexto: 'Etiqueta sobre las estrellas para valorar al conductor', es: 'Tu chofer' },
     { clave: 'val_etiqueta_servicio',    contexto: 'Etiqueta sobre las estrellas para valorar el servicio', es: 'El servicio' },
     { clave: 'val_etiqueta_comentario',  contexto: 'Etiqueta sobre la caja de comentario', es: 'Comentario (opcional)' },
     { clave: 'val_placeholder_comentario', contexto: 'Texto gris de ejemplo dentro de la caja de comentario vacía', es: 'Cuéntanos tu experiencia' },
@@ -1312,7 +1312,7 @@ async function initSchema() {
     { clave: 'val_gracias_texto',        contexto: 'Texto tras enviar u omitir la valoración', es: 'Tu opinión nos ayuda a seguir mejorando el servicio.' },
     { clave: 'val_btn_inicio',           contexto: 'Botón para ir a la portada tras valorar', es: 'Ir al inicio' },
     { clave: 'val_error_enlace',         contexto: 'Aviso cuando el enlace de valoración no es válido', es: 'Este enlace no es válido o ya ha sido utilizado.' },
-    { clave: 'val_error_estrellas',      contexto: 'Aviso si se pulsa Enviar sin marcar las estrellas', es: 'Marca las estrellas del conductor y del servicio (o pulsa Omitir).' },
+    { clave: 'val_error_estrellas',      contexto: 'Aviso si se pulsa Enviar sin marcar las estrellas', es: 'Marca las estrellas del chofer y del servicio (o pulsa Omitir).' },
     { clave: 'val_error_enviar',         contexto: 'Aviso si la valoración no se ha podido guardar', es: 'Error al enviar la valoración.' },
     { clave: 'val_error_conexion',       contexto: 'Aviso si falla la conexión al enviar la valoración', es: 'Error de conexión. Inténtalo de nuevo.' },
   ];
@@ -1357,23 +1357,23 @@ async function initSchema() {
     { clave: 'por_no_guardar', contexto: 'Aviso si no se pudo guardar', es: 'No se pudo guardar.' },
     { clave: 'por_error_conexion', contexto: 'Aviso si falla la conexión', es: 'Error de conexión. Inténtalo de nuevo.' },
     { clave: 'por_pref_titulo', contexto: 'Título del recuadro de preferencias', es: 'Preferencias del pasajero' },
-    { clave: 'por_pref_intro', contexto: 'Explicación dentro de las preferencias', es: 'Configúralas una sola vez: en cada viaje, tu conductor las verá y las tendrá en cuenta. Son siempre gratuitas y puedes cambiarlas cuando quieras. ¿Echas en falta alguna? Propónnosla abajo y la valoraremos para añadirla.' },
-    { clave: 'por_pref_mostrar', contexto: 'Interruptor para mostrar u ocultar las preferencias al conductor', es: 'Mostrar mis preferencias al conductor' },
-    { clave: 'por_pref_activado', contexto: 'Nota bajo el interruptor cuando está activado', es: 'Activado — el conductor verá lo que tengas marcado.' },
-    { clave: 'por_pref_desactivado', contexto: 'Nota bajo el interruptor cuando está desactivado', es: 'Desactivado — el conductor no verá ninguna. Quedan guardadas por si quieres activarlas más tarde.' },
-    { clave: 'por_pref_instruccion', contexto: 'Instrucción sobre la lista de preferencias', es: 'Toca una opción para marcarla y vuelve a tocarla para quitarla. El conductor solo ve lo que tengas marcado.' },
+    { clave: 'por_pref_intro', contexto: 'Explicación dentro de las preferencias', es: 'Configúralas una sola vez: en cada viaje, tu chofer las verá y las tendrá en cuenta. Son siempre gratuitas y puedes cambiarlas cuando quieras. ¿Echas en falta alguna? Propónnosla abajo y la valoraremos para añadirla.' },
+    { clave: 'por_pref_mostrar', contexto: 'Interruptor para mostrar u ocultar las preferencias al conductor', es: 'Mostrar mis preferencias al chofer' },
+    { clave: 'por_pref_activado', contexto: 'Nota bajo el interruptor cuando está activado', es: 'Activado — el chofer verá lo que tengas marcado.' },
+    { clave: 'por_pref_desactivado', contexto: 'Nota bajo el interruptor cuando está desactivado', es: 'Desactivado — el chofer no verá ninguna. Quedan guardadas por si quieres activarlas más tarde.' },
+    { clave: 'por_pref_instruccion', contexto: 'Instrucción sobre la lista de preferencias', es: 'Toca una opción para marcarla y vuelve a tocarla para quitarla. El chofer solo ve lo que tengas marcado.' },
     { clave: 'por_pref_guardar', contexto: 'Botón para guardar las preferencias', es: 'Guardar mis preferencias' },
     { clave: 'por_pref_guardadas', contexto: 'Aviso tras guardar las preferencias', es: '✓ Preferencias guardadas' },
-    { clave: 'por_pref_ocultas', contexto: 'Resumen junto al título cuando están ocultas al conductor', es: 'Ocultas al conductor' },
+    { clave: 'por_pref_ocultas', contexto: 'Resumen junto al título cuando están ocultas al conductor', es: 'Ocultas al chofer' },
     { clave: 'por_pref_sin_marcar', contexto: 'Resumen junto al título cuando no hay ninguna marcada', es: 'Sin marcar' },
     { clave: 'por_pref_una', contexto: 'Resumen junto al título con 1 marcada', es: '1 marcada' },
     { clave: 'por_pref_varias', contexto: 'Resumen junto al título con varias marcadas. {n} = número', es: '{n} marcadas' },
-    { clave: 'por_pref_visibles_ok', contexto: 'Aviso al activar el interruptor', es: '✓ Preferencias visibles para el conductor' },
-    { clave: 'por_pref_ocultas_ok', contexto: 'Aviso al desactivar el interruptor', es: '✓ Preferencias ocultas al conductor' },
+    { clave: 'por_pref_visibles_ok', contexto: 'Aviso al activar el interruptor', es: '✓ Preferencias visibles para el chofer' },
+    { clave: 'por_pref_ocultas_ok', contexto: 'Aviso al desactivar el interruptor', es: '✓ Preferencias ocultas al chofer' },
     { clave: 'por_temp_elige', contexto: 'Primera opción del selector de temperatura', es: 'Elige la temperatura' },
     { clave: 'por_especifica', contexto: 'Texto gris de ejemplo en el campo para especificar una preferencia', es: 'Especifica…' },
     { clave: 'por_sug_titulo', contexto: 'Título del bloque para proponer una preferencia', es: '¿Quieres proponer una preferencia nueva?' },
-    { clave: 'por_sug_nota', contexto: 'Nota bajo el título de la propuesta', es: 'Nos llega solo a nosotros para valorarla — el conductor no lo ve. Si se aprueba, aparecerá para todos los clientes.' },
+    { clave: 'por_sug_nota', contexto: 'Nota bajo el título de la propuesta', es: 'Nos llega solo a nosotros para valorarla — el chofer no lo ve. Si se aprueba, aparecerá para todos los clientes.' },
     { clave: 'por_sug_placeholder', contexto: 'Texto gris de ejemplo en la caja de la propuesta', es: 'Escribe aquí la preferencia que te gustaría que existiera…' },
     { clave: 'por_sug_enviar', contexto: 'Botón para enviar la propuesta', es: 'Enviar' },
     { clave: 'por_sug_vacia', contexto: 'Aviso si se envía la propuesta vacía', es: 'Escribe tu sugerencia antes de enviarla.' },
@@ -1399,10 +1399,10 @@ async function initSchema() {
     { clave: 'por_atraque', contexto: 'Palabra delante de la hora de atraque del barco', es: 'Atraque' },
     { clave: 'por_extras_solicitados', contexto: 'Etiqueta en los datos de la reserva', es: 'Extras solicitados:' },
     { clave: 'por_extras_incluidos', contexto: 'Título de los extras incluidos', es: 'Incluidos en el precio:' },
-    { clave: 'por_extras_a_pagar', contexto: 'Título de los extras que se pagan al conductor', es: 'A pagar al conductor al final del servicio:' },
-    { clave: 'por_total_conductor', contexto: 'Total de extras a pagar al conductor. {importe} = cantidad con €', es: '💰 Total a pagar al conductor: {importe}' },
-    { clave: 'por_total_nota', contexto: 'Nota junto al total a pagar al conductor', es: 'a abonar directamente al conductor al final del servicio, aparte del precio del traslado según taxímetro.' },
-    { clave: 'por_tu_conductor', contexto: 'Título sobre el nombre del conductor asignado', es: 'Tu conductor' },
+    { clave: 'por_extras_a_pagar', contexto: 'Título de los extras que se pagan al conductor', es: 'A pagar al chofer al final del servicio:' },
+    { clave: 'por_total_conductor', contexto: 'Total de extras a pagar al conductor. {importe} = cantidad con €', es: '💰 Total a pagar al chofer: {importe}' },
+    { clave: 'por_total_nota', contexto: 'Nota junto al total a pagar al conductor', es: 'a abonar directamente al chofer al final del servicio, aparte del precio del traslado según taxímetro.' },
+    { clave: 'por_tu_conductor', contexto: 'Título sobre el nombre del conductor asignado', es: 'Tu chofer' },
     { clave: 'por_deposito_titulo', contexto: 'Título del bloque del depósito', es: 'Depósito de garantía' },
     { clave: 'por_deposito_liberado', contexto: 'Estado del depósito', es: '✅ Depósito liberado.' },
     { clave: 'por_deposito_retenido', contexto: 'Estado del depósito pagado. {importe} = cantidad con €', es: '🔒 Depósito retenido de {importe}. Se liberará al completar el servicio.' },
@@ -1427,7 +1427,7 @@ async function initSchema() {
     { clave: 'por_error_enviar', contexto: 'Aviso si no se pudo enviar un mensaje', es: 'Error al enviar.' },
     { clave: 'por_franja_version', contexto: 'Franja arriba cuando hay una versión nueva de la página', es: '🔄 Hay una versión nueva. Pulsa aquí para actualizar' },
     { clave: 'por_viaje_pref_titulo', contexto: 'Título del recuadro plegable con las preferencias de un viaje concreto (dentro de cada reserva activa)', es: '🧳 Preferencias de este viaje' },
-    { clave: 'por_viaje_pref_nota', contexto: 'Explicación dentro del recuadro de preferencias de un viaje', es: 'Solo para este viaje: tu conductor verá estas preferencias. Tus preferencias generales ("Mis preferencias") no cambian.' },
+    { clave: 'por_viaje_pref_nota', contexto: 'Explicación dentro del recuadro de preferencias de un viaje', es: 'Solo para este viaje: tu chofer verá estas preferencias. Tus preferencias generales ("Mis preferencias") no cambian.' },
     { clave: 'por_viaje_pref_guardar', contexto: 'Botón para guardar las preferencias de un viaje', es: 'Guardar las preferencias de este viaje' },
     { clave: 'por_viaje_pref_guardadas', contexto: 'Aviso tras guardar las preferencias de un viaje', es: '✓ Preferencias de este viaje guardadas' },
   ];
@@ -1483,9 +1483,9 @@ async function initSchema() {
     { clave: 'vou_confirmado',        contexto: 'Aviso verde arriba del voucher', es: 'Depósito recibido. Tu traslado está confirmado.' },
     { clave: 'vou_titulo',            contexto: 'Título pequeño del voucher, encima del número de reserva', es: 'Voucher de Traslado' },
     { clave: 'vou_numero',            contexto: 'Abreviatura de "número" delante del número de reserva (ej: Nº ABC123)', es: 'Nº' },
-    { clave: 'vou_tu_conductor',      contexto: 'Texto pequeño bajo la foto y el nombre del conductor', es: 'Tu conductor' },
-    { clave: 'vou_conductor',         contexto: 'Etiqueta delante del nombre del conductor cuando no hay foto (ej: Conductor: Juan)', es: 'Conductor' },
-    { clave: 'vou_foto_alt',          contexto: 'Descripción de la foto del conductor (no se ve, la leen los lectores de pantalla)', es: 'Foto del conductor' },
+    { clave: 'vou_tu_conductor',      contexto: 'Texto pequeño bajo la foto y el nombre del conductor', es: 'Tu chofer' },
+    { clave: 'vou_conductor',         contexto: 'Etiqueta delante del nombre del conductor cuando no hay foto (ej: Conductor: Juan)', es: 'Chofer' },
+    { clave: 'vou_foto_alt',          contexto: 'Descripción de la foto del conductor (no se ve, la leen los lectores de pantalla)', es: 'Foto del chofer' },
     { clave: 'vou_origen',            contexto: 'Etiqueta del lugar de recogida en el voucher', es: 'Origen' },
     { clave: 'vou_destino',           contexto: 'Etiqueta del lugar de destino en el voucher', es: 'Destino' },
     { clave: 'vou_fecha',             contexto: 'Etiqueta de la fecha del viaje en el voucher', es: 'Fecha' },
@@ -1501,14 +1501,14 @@ async function initSchema() {
     { clave: 'vou_notas',             contexto: 'Etiqueta de las notas del cliente en el voucher', es: 'Notas' },
     { clave: 'vou_extras',            contexto: 'Título de la lista de extras en el voucher', es: 'Extras' },
     { clave: 'vou_incluido',          contexto: 'Palabra entre paréntesis detrás de un extra gratuito (ej: Agua a bordo (incluido))', es: 'incluido' },
-    { clave: 'vou_a_pagar',           contexto: 'Texto entre paréntesis detrás de un extra de pago, tras el precio (ej: 5.00 € — a pagar al conductor al final del servicio)', es: 'a pagar al conductor al final del servicio' },
-    { clave: 'vou_total_extras',      contexto: 'Texto de la caja amarilla del voucher; el programa añade detrás el importe (ej: ... conductor: 5.00 €)', es: 'Total de extras a pagar al conductor:' },
-    { clave: 'vou_total_extras_nota', contexto: 'Frase pequeña bajo el total de extras en el voucher', es: 'Este importe se abona directamente al conductor al final del servicio, aparte del precio del traslado.' },
-    { clave: 'vou_nota_pie',          contexto: 'Nota al final del voucher', es: 'Muestra este voucher a tu conductor al inicio del servicio. El precio final será el que marque el taxímetro.' },
+    { clave: 'vou_a_pagar',           contexto: 'Texto entre paréntesis detrás de un extra de pago, tras el precio (ej: 5.00 € — a pagar al conductor al final del servicio)', es: 'a pagar al chofer al final del servicio' },
+    { clave: 'vou_total_extras',      contexto: 'Texto de la caja amarilla del voucher; el programa añade detrás el importe (ej: ... conductor: 5.00 €)', es: 'Total de extras a pagar al chofer:' },
+    { clave: 'vou_total_extras_nota', contexto: 'Frase pequeña bajo el total de extras en el voucher', es: 'Este importe se abona directamente al chofer al final del servicio, aparte del precio del traslado.' },
+    { clave: 'vou_nota_pie',          contexto: 'Nota al final del voucher', es: 'Muestra este voucher a tu chofer al inicio del servicio. El precio final será el que marque el taxímetro.' },
     { clave: 'vou_cancelacion',       contexto: 'Aviso de cancelación en el voucher. Mantén {fecha} EXACTAMENTE así, sin traducir: el programa pone ahí la fecha y la hora límite', es: 'Cancelación gratuita hasta el {fecha}.' },
     { clave: 'vou_cancelacion_despues', contexto: 'Frase tras el aviso de cancelación en el voucher. Mantén {importe} EXACTAMENTE así, sin traducir: el programa pone ahí el importe del depósito', es: 'Después de esa fecha, el depósito de {importe} € no será reembolsado.' },
-    { clave: 'vou_enlace_titulo',     contexto: 'Título del recuadro del voucher que explica cómo contactar con el conductor por WhatsApp el día del viaje (sin emojis: el PDF no los muestra)', es: 'Contacto con tu conductor el día del viaje' },
-    { clave: 'vou_enlace_texto',      contexto: 'Texto del recuadro de contacto con el conductor en el voucher. Mantén {whatsapp} y {numero_reserva} EXACTAMENTE así, sin traducir: el programa pone ahí el número de WhatsApp y el número de reserva. Sin emojis', es: 'Desde 2 horas antes de tu recogida, escríbenos por WhatsApp al {whatsapp} (el número del que recibes nuestros avisos) y tu mensaje llegará directamente a tu conductor, traducido a su idioma. Si escribes desde otro móvil, empieza tu mensaje con tu número de reserva: {numero_reserva}.' },
+    { clave: 'vou_enlace_titulo',     contexto: 'Título del recuadro del voucher que explica cómo contactar con el conductor por WhatsApp el día del viaje (sin emojis: el PDF no los muestra)', es: 'Contacto con tu chofer el día del viaje' },
+    { clave: 'vou_enlace_texto',      contexto: 'Texto del recuadro de contacto con el conductor en el voucher. Mantén {whatsapp} y {numero_reserva} EXACTAMENTE así, sin traducir: el programa pone ahí el número de WhatsApp y el número de reserva. Sin emojis', es: 'Desde 2 horas antes de tu recogida, escríbenos por WhatsApp al {whatsapp} (el número del que recibes nuestros avisos) y tu mensaje llegará directamente a tu chofer, traducido a su idioma. Si escribes desde otro móvil, empieza tu mensaje con tu número de reserva: {numero_reserva}.' },
     { clave: 'vou_nombre_archivo',    contexto: 'Palabra con la que empieza el nombre del archivo PDF del voucher (ej: voucher-ABC123.pdf). Una sola palabra, en minúsculas, sin acentos', es: 'voucher' },
   ];
   for (const tx of TEXTOS_VOUCHER) {
@@ -1868,7 +1868,7 @@ async function initSchema() {
   // Migración única a los textos definitivos con iconos (solo actúa si la
   // preferencia aún tiene el texto antiguo, para no pisar ediciones del admin)
   await pool.query(`UPDATE preferencias_catalogo SET opciones = '❄️ Fresco (20–21 °C · 68–70 °F) / 🍃 Normal (22–23 °C · 71–74 °F) / 🔥 Cálido (24–25 °C · 75–77 °F) / ⚙️ Otra (Especificar)' WHERE nombre = 'Temperatura en el vehículo' AND opciones = 'Fresco / Normal / Caliente'`);
-  await pool.query(`UPDATE preferencias_catalogo SET nombre = 'Ambiente musical', opciones = '🔇 Viajar en silencio / 🎵 Música suave de fondo / 📻 Lo que el conductor prefiera / 🎸 Prefiero poner mi propia música' WHERE nombre = 'Música'`);
+  await pool.query(`UPDATE preferencias_catalogo SET nombre = 'Ambiente musical', opciones = '🔇 Viajar en silencio / 🎵 Música suave de fondo / 📻 Lo que el chofer prefiera / 🎸 Prefiero poner mi propia música' WHERE nombre = 'Música'`);
   await pool.query(`UPDATE preferencias_catalogo SET opciones = '🤫 Prefiero viajar en silencio y descansar / 💬 Abierto a conversar / 🤷‍♂️ Sin preferencia · Lo que surja' WHERE nombre = 'Conversación' AND opciones = 'Viaje en silencio / Conversación bienvenida / Sin preferencia'`);
   await pool.query(`UPDATE preferencias_catalogo SET opciones = '🐢 Conducción suave y relajada / ⚡ Eficiente y ágil (respetando las normas) / 🤷‍♂️ Sin preferencia' WHERE nombre = 'Estilo de conducción' AND opciones = 'Tranquila / Normal / Sin preferencia'`);
   await pool.query(`UPDATE preferencias_catalogo SET nombre = 'Sensibilidad al movimiento', opciones = '🤢 Me mareo con facilidad (Conducción extra suave) / 👍 No suelo marearme' WHERE nombre = 'Me mareo con facilidad'`);
@@ -1882,7 +1882,7 @@ async function initSchema() {
     SELECT v.nombre, v.opciones, v.orden, FALSE
     FROM (VALUES
       ('Temperatura en el vehículo', '❄️ Fresco (20–21 °C · 68–70 °F) / 🍃 Normal (22–23 °C · 71–74 °F) / 🔥 Cálido (24–25 °C · 75–77 °F) / ⚙️ Otra (Especificar)', 1),
-      ('Ambiente musical', '🔇 Viajar en silencio / 🎵 Música suave de fondo / 📻 Lo que el conductor prefiera / 🎸 Prefiero poner mi propia música', 2),
+      ('Ambiente musical', '🔇 Viajar en silencio / 🎵 Música suave de fondo / 📻 Lo que el chofer prefiera / 🎸 Prefiero poner mi propia música', 2),
       ('Conversación', '🤫 Prefiero viajar en silencio y descansar / 💬 Abierto a conversar / 🤷‍♂️ Sin preferencia · Lo que surja', 3),
       ('Estilo de conducción', '🐢 Conducción suave y relajada / ⚡ Eficiente y ágil (respetando las normas) / 🤷‍♂️ Sin preferencia', 4),
       ('Sensibilidad al movimiento', '🤢 Me mareo con facilidad (Conducción extra suave) / 👍 No suelo marearme', 5),
@@ -2282,18 +2282,18 @@ Hola, <strong>{nombre_cliente}</strong> 👋
 {extras}
 <span style="font-size:13px;color:#888;">💾 Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.</span>
 
-<span style="font-size:13px;color:#888;">⏱️ El plazo máximo para confirmarte un conductor es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.</span>
+<span style="font-size:13px;color:#888;">⏱️ El plazo máximo para confirmarte un chofer es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.</span>
 
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n📨 Hemos recibido tu solicitud de traslado. Estamos trabajando en ella y en breve recibirás confirmación.\n\n🔖 *Tu número de reserva es:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n{extras}\n💾 Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.\n\n⏱️ El plazo máximo para confirmarte un conductor es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n📨 Hemos recibido tu solicitud de traslado. Estamos trabajando en ella y en breve recibirás confirmación.\n\n🔖 *Tu número de reserva es:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n{extras}\n💾 Guarda este número — lo necesitarás para consultar el estado de tu reserva. Nos pondremos en contacto contigo a través del WhatsApp o email que nos has facilitado.\n\n⏱️ El plazo máximo para confirmarte un chofer es de 15 minutos. Te avisaremos en cuanto tengamos una respuesta.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_confirmacion', nombre: 'Traslado confirmado (al cliente)', categoria: 'cliente',
       asunto_email: 'Traslado confirmado \u2014 {numero_reserva}',
       cuerpo_email: `
 Hola, <strong>{nombre_cliente}</strong> 👋
 
-✅ <strong>¡Tu traslado está confirmado!</strong> Hemos asignado un conductor para tu servicio.
+✅ <strong>¡Tu traslado está confirmado!</strong> Hemos asignado un chofer para tu servicio.
 <p style="text-align:center;margin:10px 0;">
   Reserva <span class="pnr">{numero_reserva}</span>
 </p>
@@ -2303,7 +2303,7 @@ Hola, <strong>{nombre_cliente}</strong> 👋
   🏁 Destino: {destino}
   📅 Fecha: {fecha} · {hora}
   🚗 Categoría: {categoria}
-  🧭 Conductor: {conductor}
+  🧭 Chofer: {chofer}
 </div>
 {extras}
 <div class="caja-verde">
@@ -2319,7 +2319,7 @@ Hola, <strong>{nombre_cliente}</strong> 👋
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n✅ *¡Tu traslado está confirmado! Hemos asignado un conductor para tu servicio.*\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n{extras}\n💳 *Depósito de garantía — {importe_deposito} €*\nPara garantizar tu plaza, realiza el pago del depósito de {importe_deposito} €. El voucher de tu traslado te llegará automáticamente al confirmar el pago.\n\n⚠️ *Importante:* Si no recibimos el pago {horas_cancelacion} horas antes de tu traslado, la reserva será cancelada.\n\n✔️ El depósito te será devuelto íntegramente una vez completado el servicio.\n\n🗓️ *Cancelación gratuita hasta el {fecha_limite_cancelacion}.* Después de esa fecha, el depósito de {importe_deposito} € no será reembolsable.\n\n👉 {url_pago}\n\n📲 Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n✅ *¡Tu traslado está confirmado! Hemos asignado un chofer para tu servicio.*\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n{extras}\n💳 *Depósito de garantía — {importe_deposito} €*\nPara garantizar tu plaza, realiza el pago del depósito de {importe_deposito} €. El voucher de tu traslado te llegará automáticamente al confirmar el pago.\n\n⚠️ *Importante:* Si no recibimos el pago {horas_cancelacion} horas antes de tu traslado, la reserva será cancelada.\n\n✔️ El depósito te será devuelto íntegramente una vez completado el servicio.\n\n🗓️ *Cancelación gratuita hasta el {fecha_limite_cancelacion}.* Después de esa fecha, el depósito de {importe_deposito} € no será reembolsable.\n\n👉 {url_pago}\n\n📲 Nos pondremos en contacto contigo por WhatsApp para coordinar todos los detalles del servicio.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_enlace_pago', nombre: 'Enlace de pago (dep\u00f3sito)', categoria: 'cliente',
       asunto_email: 'Enlace de pago \u2014 Reserva {numero_reserva}',
       cuerpo_email: `
@@ -2333,21 +2333,21 @@ Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n💳 Te reenviamos el enlace de pago para confirmar tu reserva *{numero_reserva}*.\n\n👉 {url_pago}\n\n❓ Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
-    { clave: 'cliente_cambio_conductor', nombre: 'Cambio de conductor (al cliente)', categoria: 'cliente',
-      asunto_email: '\ud83d\udd04 Cambio de conductor en tu reserva {numero_reserva}',
+    { clave: 'cliente_cambio_conductor', nombre: 'Cambio de chofer (al cliente)', categoria: 'cliente',
+      asunto_email: '\ud83d\udd04 Cambio de chofer en tu reserva {numero_reserva}',
       cuerpo_email: `
 Hola, <strong>{nombre_cliente}</strong> 👋
 
-🔄 Hemos cambiado el conductor de tu reserva <strong>{numero_reserva}</strong>.
+🔄 Hemos cambiado el chofer de tu reserva <strong>{numero_reserva}</strong>.
 
-🚖 Tu nuevo conductor es <strong>{nombre_conductor}</strong>. Todo lo demás sigue igual: fecha, hora, recogida y precio.
+🚖 Tu nuevo chofer es <strong>{nombre_conductor}</strong>. Todo lo demás sigue igual: fecha, hora, recogida y precio.
 
 📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado.
 
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n🔄 Hemos cambiado el conductor de tu reserva *{numero_reserva}*.\n\n🚖 Tu nuevo conductor es *{nombre_conductor}*. Todo lo demás sigue igual: fecha, hora, recogida y precio.\n\n📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n🔄 Hemos cambiado el chofer de tu reserva *{numero_reserva}*.\n\n🚖 Tu nuevo chofer es *{nombre_conductor}*. Todo lo demás sigue igual: fecha, hora, recogida y precio.\n\n📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_voucher', nombre: 'Voucher de traslado', categoria: 'cliente',
       asunto_email: '\u2714 Voucher de traslado \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -2495,20 +2495,20 @@ Un saludo cordial, 🙏
       cuerpo_email: `
 Hola, <strong>{nombre_cliente}</strong> 👋
 
-🔄 Seguimos trabajando en tu solicitud de traslado <span class="pnr">{numero_reserva}</span>. Aún no hemos podido confirmar conductor, pero continuamos buscando disponibilidad.
+🔄 Seguimos trabajando en tu solicitud de traslado <span class="pnr">{numero_reserva}</span>. Aún no hemos podido confirmar chofer, pero continuamos buscando disponibilidad.
 <div class="info-box">
   ⏱️ Te avisaremos en cuanto tengamos una respuesta. El plazo habitual de gestión es de 15 minutos.
 </div>
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n🔄 Seguimos trabajando en tu solicitud de traslado *{numero_reserva}*. Aún no hemos podido confirmar conductor, pero continuamos buscando disponibilidad.\n\n⏱️ Te avisaremos en cuanto tengamos una respuesta. El plazo habitual de gestión es de 15 minutos.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n🔄 Seguimos trabajando en tu solicitud de traslado *{numero_reserva}*. Aún no hemos podido confirmar chofer, pero continuamos buscando disponibilidad.\n\n⏱️ Te avisaremos en cuanto tengamos una respuesta. El plazo habitual de gestión es de 15 minutos.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_reserva_anulada', nombre: 'Reserva anulada (sin chofer disponible)', categoria: 'cliente',
       asunto_email: 'Tu reserva {numero_reserva} ha sido anulada',
       cuerpo_email: `
 Hola, <strong>{nombre_cliente}</strong> 👋
 
-😔 Lamentamos informarte que no hemos podido confirmar un conductor disponible para tu traslado en la fecha solicitada, por lo que hemos anulado la reserva <span class="pnr">{numero_reserva}</span>.
+😔 Lamentamos informarte que no hemos podido confirmar un chofer disponible para tu traslado en la fecha solicitada, por lo que hemos anulado la reserva <span class="pnr">{numero_reserva}</span>.
 <div class="info-box">
   🔄 Puedes enviarnos una nueva solicitud más adelante; con gusto intentaremos ayudarte si tenemos disponibilidad.
 </div>
@@ -2517,7 +2517,7 @@ Lamentamos los inconvenientes causados.
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n😔 Lamentamos informarte que no hemos podido confirmar un conductor disponible para tu traslado en la fecha solicitada, por lo que hemos anulado la reserva *{numero_reserva}*.\n\n🔄 Puedes enviarnos una nueva solicitud más adelante; con gusto intentaremos ayudarte si tenemos disponibilidad.\n\nLamentamos los inconvenientes causados.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n😔 Lamentamos informarte que no hemos podido confirmar un chofer disponible para tu traslado en la fecha solicitada, por lo que hemos anulado la reserva *{numero_reserva}*.\n\n🔄 Puedes enviarnos una nueva solicitud más adelante; con gusto intentaremos ayudarte si tenemos disponibilidad.\n\nLamentamos los inconvenientes causados.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_acceso_reserva', nombre: 'Acceso a reserva (contrase\u00f1a provisional)', categoria: 'cliente',
       asunto_email: 'Acceso a tu reserva {numero_reserva} \u2014 Traslados GC',
       cuerpo_email: `
@@ -2869,9 +2869,9 @@ Pulsa el botón para crear una nueva contraseña:
     { clave: 'frase_cancel_wa_dentro_plazo', canal: 'wa', orden: 80, contexto: 'Aviso en el WhatsApp de cancelación: cancelada dentro de plazo, se devolverá el depósito', es: 'La cancelación se ha realizado dentro del plazo establecido. Hemos liberado tu depósito de garantía; el importe llegará a tu tarjeta en un plazo de 5 a 10 días hábiles, según tu entidad bancaria.' },
     { clave: 'frase_extras_titulo', canal: 'ambos', orden: 90, contexto: 'Título del bloque de extras', es: 'Extras seleccionados:' },
     { clave: 'frase_extras_incluido', canal: 'ambos', orden: 100, contexto: 'Etiqueta junto a un extra gratuito', es: 'incluido' },
-    { clave: 'frase_extras_a_pagar', canal: 'ambos', orden: 110, contexto: 'Etiqueta junto al precio de un extra de pago, ej: "5.00 € — a pagar al conductor"', es: 'a pagar al conductor' },
-    { clave: 'frase_extras_total', canal: 'ambos', orden: 120, contexto: 'Línea del total de extras de pago. Mantener {total} tal cual', es: 'Total extras a pagar al conductor: {total} €' },
-    { clave: 'frase_extras_nota', canal: 'email', orden: 130, contexto: 'Nota bajo el total de extras', es: 'Este importe se abona directamente al conductor al finalizar el servicio.' },
+    { clave: 'frase_extras_a_pagar', canal: 'ambos', orden: 110, contexto: 'Etiqueta junto al precio de un extra de pago, ej: "5.00 € — a pagar al conductor"', es: 'a pagar al chofer' },
+    { clave: 'frase_extras_total', canal: 'ambos', orden: 120, contexto: 'Línea del total de extras de pago. Mantener {total} tal cual', es: 'Total extras a pagar al chofer: {total} €' },
+    { clave: 'frase_extras_nota', canal: 'email', orden: 130, contexto: 'Nota bajo el total de extras', es: 'Este importe se abona directamente al chofer al finalizar el servicio.' },
     { clave: 'frase_resumen_ruta', canal: 'email', orden: 140, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Ruta' },
     { clave: 'frase_resumen_fecha', canal: 'email', orden: 150, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Fecha' },
     { clave: 'frase_resumen_hora_recogida', canal: 'email', orden: 160, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Hora de recogida' },
@@ -2888,14 +2888,14 @@ Pulsa el botón para crear una nueva contraseña:
     { clave: 'frase_resumen_notas', canal: 'email', orden: 270, contexto: 'Etiqueta del resumen en el email de reserva actualizada', es: 'Notas' },
     // Enlace chofer ↔ cliente por WhatsApp (28/09/2026): respuestas automáticas cuando no se puede reenviar
     { clave: 'frase_enlace_no_existe', canal: 'wa', orden: 300, contexto: 'Respuesta automática por WhatsApp: el número de reserva que escribió el cliente no existe. {numero_reserva} = lo que escribió', es: 'No encontramos ninguna reserva con el número {numero_reserva}. Revisa el número en tu voucher y vuelve a escribirnos.' },
-    { clave: 'frase_enlace_fuera_ventana', canal: 'wa', orden: 310, contexto: 'Respuesta automática por WhatsApp: el viaje no es ahora. {numero_reserva}, {fecha} y {hora} los pone el programa', es: 'Tu reserva {numero_reserva} es para el {fecha} a las {hora}. El contacto con tu conductor por este WhatsApp se abre 2 horas antes del viaje.' },
+    { clave: 'frase_enlace_fuera_ventana', canal: 'wa', orden: 310, contexto: 'Respuesta automática por WhatsApp: el viaje no es ahora. {numero_reserva}, {fecha} y {hora} los pone el programa', es: 'Tu reserva {numero_reserva} es para el {fecha} a las {hora}. El contacto con tu chofer por este WhatsApp se abre 2 horas antes del viaje.' },
     { clave: 'frase_enlace_cancelada', canal: 'wa', orden: 320, contexto: 'Respuesta automática por WhatsApp: la reserva está cancelada', es: 'La reserva {numero_reserva} está cancelada.' },
     { clave: 'frase_enlace_realizada', canal: 'wa', orden: 330, contexto: 'Respuesta automática por WhatsApp: el viaje ya se realizó', es: 'La reserva {numero_reserva} ya se realizó. ¡Gracias por viajar con Traslados GC!' },
-    { clave: 'frase_enlace_sin_chofer', canal: 'wa', orden: 340, contexto: 'Respuesta automática por WhatsApp: la reserva aún no tiene conductor asignado', es: 'Tu reserva {numero_reserva} todavía no tiene conductor asignado. Te avisaremos en cuanto lo tenga.' },
-    { clave: 'frase_enlace_enviado_conductor', canal: 'wa', orden: 360, contexto: 'Confirmación por WhatsApp al cliente: su mensaje se ha enviado a su conductor', es: '✅ Mensaje enviado a tu conductor.' },
-    { clave: 'frase_enlace_mensaje_conductor', canal: 'wa', orden: 370, contexto: 'Cabecera del mensaje del conductor que recibe el cliente por WhatsApp. {nombre} = nombre del conductor; debajo va el mensaje traducido', es: '💬 Mensaje de tu conductor ({nombre}):' },
-    { clave: 'frase_enlace_no_encontrada', canal: 'wa', orden: 355, contexto: 'Respuesta automática por WhatsApp (una vez al día) cuando no se encuentra ninguna reserva en curso de quien escribe y no ha puesto número de reserva. El ejemplo ABC123 se deja tal cual', es: 'No encontramos tu reserva en curso. Por favor, escribe tu número de reserva (lo tienes en tu voucher) seguido de tu mensaje, por ejemplo: ABC123 No encuentro a mi conductor. Este servicio funciona desde 2 horas antes hasta 2 horas después de tu viaje.' },
-    { clave: 'frase_enlace_sin_numero', canal: 'wa', orden: 350, contexto: 'Respuesta automática por WhatsApp (una vez al día) cuando el mensaje no empieza por un número de reserva. El ejemplo ABC123 se deja tal cual', es: 'Hola 👋 Para contactar con tu conductor el día del viaje, empieza tu mensaje con tu número de reserva, por ejemplo: ABC123 No encuentro a mi conductor.' }
+    { clave: 'frase_enlace_sin_chofer', canal: 'wa', orden: 340, contexto: 'Respuesta automática por WhatsApp: la reserva aún no tiene conductor asignado', es: 'Tu reserva {numero_reserva} todavía no tiene chofer asignado. Te avisaremos en cuanto lo tenga.' },
+    { clave: 'frase_enlace_enviado_conductor', canal: 'wa', orden: 360, contexto: 'Confirmación por WhatsApp al cliente: su mensaje se ha enviado a su conductor', es: '✅ Mensaje enviado a tu chofer.' },
+    { clave: 'frase_enlace_mensaje_conductor', canal: 'wa', orden: 370, contexto: 'Cabecera del mensaje del conductor que recibe el cliente por WhatsApp. {nombre} = nombre del conductor; debajo va el mensaje traducido', es: '💬 Mensaje de tu chofer ({nombre}):' },
+    { clave: 'frase_enlace_no_encontrada', canal: 'wa', orden: 355, contexto: 'Respuesta automática por WhatsApp (una vez al día) cuando no se encuentra ninguna reserva en curso de quien escribe y no ha puesto número de reserva. El ejemplo ABC123 se deja tal cual', es: 'No encontramos tu reserva en curso. Por favor, escribe tu número de reserva (lo tienes en tu voucher) seguido de tu mensaje, por ejemplo: ABC123 No encuentro a mi chofer. Este servicio funciona desde 2 horas antes hasta 2 horas después de tu viaje.' },
+    { clave: 'frase_enlace_sin_numero', canal: 'wa', orden: 350, contexto: 'Respuesta automática por WhatsApp (una vez al día) cuando el mensaje no empieza por un número de reserva. El ejemplo ABC123 se deja tal cual', es: 'Hola 👋 Para contactar con tu chofer el día del viaje, empieza tu mensaje con tu número de reserva, por ejemplo: ABC123 No encuentro a mi chofer.' }
   ];
   // ON CONFLICT DO NOTHING: nunca sobreescribe lo que se edite desde el Admin
   for (const f of frasesBase) {
@@ -2966,6 +2966,72 @@ Un saludo cordial, 🙏
   await pool.query(`ALTER TABLE plantillas_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado_wa BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE frases_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado BOOLEAN DEFAULT FALSE`);
   console.log('Frases de comunicaci\u00f3n cargadas.');
+
+  // ─── "conductor" → "chofer" en todo lo que ve el cliente (29/09/2026) ─────────────────────
+  // Decisión de Germán: una sola palabra, "chofer" (se traduce igual en todos los idiomas).
+  // Cambio ÚNICO sobre lo ya guardado (se anota en migraciones_datos para no repetirlo):
+  //  · Textos de interfaz: se cambia el español y se BORRAN sus traducciones → "Generar lo que falta".
+  //  · 🧩 Frases y plantillas al cliente: se cambia el español y sus traducciones pasan a rojo.
+  //  · Preferencias: la opción "Lo que el conductor prefiera" también en lo guardado de clientes y reservas.
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_datos (clave TEXT PRIMARY KEY, hecho_en TIMESTAMP DEFAULT NOW())`);
+    const hecha = await pool.query(`SELECT 1 FROM migraciones_datos WHERE clave = 'conductor_a_chofer_20260929'`);
+    if (!hecha.rows.length) {
+      const aChofer = function (t) {
+        if (!t) return t;
+        return String(t)
+          .replace(/\bCONDUCTOR(ES)?\b/g, function (m, pl) { return 'CHOFER' + (pl ? 'ES' : ''); })
+          .replace(/\b([Cc])onductor(es)?\b/g, function (m, c, pl) { return (c === 'C' ? 'Chofer' : 'chofer') + (pl ? 'es' : ''); });
+      };
+      const tiene = `~* '\\mconductor(es)?\\M'`;
+      let nTextos = 0, nFrases = 0, nPlantillas = 0;
+      // Textos de interfaz
+      const tx = await pool.query(`SELECT id, texto_es FROM textos_interfaz WHERE texto_es ${tiene}`);
+      for (const t of tx.rows) {
+        await pool.query('UPDATE textos_interfaz SET texto_es = $1 WHERE id = $2', [aChofer(t.texto_es), t.id]);
+        await pool.query('DELETE FROM textos_interfaz_traducciones WHERE texto_id = $1', [t.id]);
+        nTextos++;
+      }
+      // 🧩 Frases
+      const fr = await pool.query(`SELECT clave, texto_es FROM frases_comunicacion WHERE texto_es ${tiene}`);
+      for (const f of fr.rows) {
+        await pool.query('UPDATE frases_comunicacion SET texto_es = $1, actualizado_en = NOW() WHERE clave = $2', [aChofer(f.texto_es), f.clave]);
+        await pool.query(`UPDATE frases_comunicacion_traducciones SET desactualizado = TRUE WHERE frase_clave = $1 AND texto IS NOT NULL AND texto <> ''`, [f.clave]);
+        nFrases++;
+      }
+      // Plantillas al cliente
+      const pl = await pool.query(
+        `SELECT clave, nombre, asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion
+         WHERE categoria = 'cliente' AND (nombre ${tiene} OR asunto_email ${tiene} OR cuerpo_email ${tiene} OR cuerpo_whatsapp ${tiene})`);
+      for (const x of pl.rows) {
+        const aE = aChofer(x.asunto_email), cE = aChofer(x.cuerpo_email), cW = aChofer(x.cuerpo_whatsapp);
+        await pool.query(
+          'UPDATE plantillas_comunicacion SET nombre = $5, asunto_email = $1, cuerpo_email = $2, cuerpo_whatsapp = $3, actualizado_en = NOW() WHERE clave = $4',
+          [aE, cE, cW, x.clave, aChofer(x.nombre)]);
+        if (aE !== x.asunto_email || cE !== x.cuerpo_email) {
+          await pool.query(`UPDATE plantillas_comunicacion_traducciones SET desactualizado_email = TRUE
+                            WHERE plantilla_clave = $1 AND cuerpo_email IS NOT NULL AND cuerpo_email <> ''`, [x.clave]);
+        }
+        if (cW !== x.cuerpo_whatsapp) {
+          await pool.query(`UPDATE plantillas_comunicacion_traducciones SET desactualizado_wa = TRUE
+                            WHERE plantilla_clave = $1 AND cuerpo_whatsapp IS NOT NULL AND cuerpo_whatsapp <> ''`, [x.clave]);
+        }
+        nPlantillas++;
+      }
+      // Preferencias: catálogo y lo ya guardado (misma opción en español)
+      await pool.query(`UPDATE preferencias_catalogo SET opciones = replace(opciones, 'Lo que el conductor prefiera', 'Lo que el chofer prefiera') WHERE opciones LIKE '%Lo que el conductor prefiera%'`);
+      await pool.query(`UPDATE preferencias_cliente SET opcion = replace(opcion, 'Lo que el conductor prefiera', 'Lo que el chofer prefiera') WHERE opcion LIKE '%Lo que el conductor prefiera%'`);
+      await pool.query(`UPDATE preferencias_reserva SET opcion = replace(opcion, 'Lo que el conductor prefiera', 'Lo que el chofer prefiera') WHERE opcion LIKE '%Lo que el conductor prefiera%'`);
+      const po = await pool.query(`SELECT id, texto_es FROM textos_interfaz WHERE clave LIKE 'pref_opciones_%' AND texto_es LIKE '%Lo que el conductor prefiera%'`);
+      for (const t of po.rows) {
+        await pool.query('UPDATE textos_interfaz SET texto_es = $1 WHERE id = $2', [t.texto_es.replace('Lo que el conductor prefiera', 'Lo que el chofer prefiera'), t.id]);
+        await pool.query('DELETE FROM textos_interfaz_traducciones WHERE texto_id = $1', [t.id]);
+      }
+      await pool.query(`INSERT INTO migraciones_datos (clave) VALUES ('conductor_a_chofer_20260929') ON CONFLICT DO NOTHING`);
+      await cargarTextosCache();
+      console.log('🔁 "conductor" → "chofer": ' + nTextos + ' textos de interfaz, ' + nFrases + ' frases y ' + nPlantillas + ' plantillas actualizados. Pendientes de traducir de nuevo.');
+    }
+  } catch (e) { console.warn('Cambio conductor → chofer:', e.message); }
 
 
   // ─── Destinos: columnas para página pública de rutas ─────────────────────
