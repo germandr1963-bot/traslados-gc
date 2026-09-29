@@ -73,12 +73,6 @@
       padding:10px 20px; font-size:13px; font-weight:700; cursor:pointer; flex:1;
     }
     .boton-noshow:disabled { opacity:0.5; cursor:not-allowed; }
-    .boton-liberar {
-      background:#fff; color:#8a5a00; border:1px solid #e0b25a; border-radius:8px;
-      padding:9px 16px; font-size:13px; font-weight:700; cursor:pointer; width:100%; margin-top:10px;
-    }
-    .caja-liberar { display:none; margin-top:10px; padding:12px; border:1px solid #e0b25a; border-radius:8px; background:#fff8e6; }
-    .caja-liberar select, .caja-liberar input { width:100%; box-sizing:border-box; margin-top:6px; padding:8px; border:1px solid #d4c4b0; border-radius:6px; font-size:14px; font-family:inherit; }
   </style>
 </head>
 <body>
@@ -425,23 +419,6 @@
                   '<button class="boton-noshow" id="btn-noshow-' + r.id + '" onclick="reportarNoShow(' + r.id + ')">🚫 No se presentó</button>'
                 : '') +
             '</div>' +
-            // R2 (29/09/2026): el chofer avisa de que no puede hacer el servicio
-            (['cancelada', 'completada', 'no_show'].indexOf(r.estado) === -1
-              ? '<button class="boton-liberar" id="btn-liberar-' + r.id + '" onclick="mostrarLiberar(' + r.id + ')">⚠️ No puedo hacer este servicio</button>' +
-                '<div class="caja-liberar" id="caja-liberar-' + r.id + '">' +
-                  '<div style="font-size:13px;font-weight:700;">¿Por qué no puedes hacerlo?</div>' +
-                  '<select id="causa-liberar-' + r.id + '">' +
-                    '<option value="">— Elige la causa —</option>' +
-                    '<option value="Enfermedad">Enfermedad</option>' +
-                    '<option value="Avería del vehículo">Avería del vehículo</option>' +
-                    '<option value="Imprevisto">Imprevisto</option>' +
-                    '<option value="Otra">Otra</option>' +
-                  '</select>' +
-                  '<input type="text" id="detalle-liberar-' + r.id + '" maxlength="150" placeholder="Detalle (obligatorio si es «Otra»)">' +
-                  '<div style="font-size:12px;color:#8a5a00;margin-top:8px;">El servicio se ofrecerá a otros choferes y el equipo recibirá un aviso.</div>' +
-                  '<button class="boton-noshow" style="width:100%;margin-top:8px;" onclick="liberarServicio(' + r.id + ')">Confirmar: no puedo hacerlo</button>' +
-                '</div>'
-              : '') +
           '</div>' +
         '</div>';
       }).join('');
@@ -508,39 +485,6 @@
         .catch(function() {
           alert('Error de conexión.');
           btn.textContent = '🏁 Servicio terminado'; btn.disabled = false;
-        });
-    }
-
-    function mostrarLiberar(reservaId) {
-      var caja = document.getElementById('caja-liberar-' + reservaId);
-      caja.style.display = caja.style.display === 'block' ? 'none' : 'block';
-    }
-
-    function liberarServicio(reservaId) {
-      var causa = document.getElementById('causa-liberar-' + reservaId).value;
-      var detalle = document.getElementById('detalle-liberar-' + reservaId).value.trim();
-      if (!causa) { alert('Elige la causa.'); return; }
-      if (causa === 'Otra' && !detalle) { alert('Escribe el detalle.'); return; }
-      if (!confirm('¿Confirmas que NO puedes hacer este servicio?\n\nSe te quitará y se ofrecerá a otros choferes.')) return;
-      var btn = document.getElementById('btn-liberar-' + reservaId);
-      btn.textContent = 'Procesando...'; btn.disabled = true;
-      fetch('/chofer/reservas/' + reservaId + '/liberar', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ causa: causa + (detalle ? ' — ' + detalle : '') })
-      })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          if (d.ok) {
-            document.getElementById('caja-liberar-' + reservaId).style.display = 'none';
-            btn.textContent = '✅ Servicio liberado. Estamos buscando otro chofer.';
-          } else {
-            alert(d.error || 'No se pudo liberar el servicio.');
-            btn.textContent = '⚠️ No puedo hacer este servicio'; btn.disabled = false;
-          }
-        })
-        .catch(function() {
-          alert('Error de conexión.');
-          btn.textContent = '⚠️ No puedo hacer este servicio'; btn.disabled = false;
         });
     }
 
