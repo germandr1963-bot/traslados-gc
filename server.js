@@ -10319,7 +10319,8 @@ async function reasignarChofer(reservaId, nuevoConductorId, causa) {
   const nombreConductor = String(nuevo.nombre || '').trim().split(/\s+/)[0] || '—';
   try {
     const p = await obtenerPlantilla('cliente_cambio_conductor', {
-      nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva, nombre_conductor: nombreConductor
+      // Las dos marcas: la plantilla usa {nombre_conductor}, pero una traducción puede traer {nombre_chofer}
+      nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva, nombre_conductor: nombreConductor, nombre_chofer: nombreConductor
     }, langR);
     if (p && p.email && r.email_cliente) {
       await enviarEmail({ to: r.email_cliente, subject: p.asunto || ('🔄 ' + r.numero_reserva), html: plantillaEmail(p.email) });
