@@ -2053,6 +2053,14 @@ async function initSchema() {
   await pool.query(`ALTER TABLE clientes_datos ADD COLUMN IF NOT EXISTS idioma_elegido BOOLEAN DEFAULT FALSE`);
   // Idioma de quien viaja escrito a mano ("Otro idioma…") en una reserva para otra persona (26/09/2026)
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS idioma_viajero_otro TEXT`);
+  // Reasignación cuando el chofer libera el servicio desde su panel (R2, 29/09/2026)
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS reasignacion_en_curso BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS reasignacion_excluir_id INTEGER`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS reasignacion_ronda INTEGER DEFAULT 0`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS reasignacion_inicio TIMESTAMP`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS reasignacion_alerta_3h BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS reasignacion_alerta_30m BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS reasignacion_chofer_anterior TEXT`);
   // Mensajes de WhatsApp recibidos en el número de OpenWA (28/09/2026). Paso 1: solo se guardan.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS whatsapp_entrantes (
@@ -9090,6 +9098,104 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
 }));
 
 // ─── Chofer: reportar no-show ─────────────────────────────────────────────────
+// ─── R2: el chofer libera un servicio desde su panel (29/09/2026) ─────────────────────────
+// Se le quita el servicio, queda "en reasignación" y se ofrece por WhatsApp a los demás choferes.
+// Al cliente NO se le avisa todavía (puede ir volando): solo recibirá el cambio de chofer cuando
+// alguien acepte. Al equipo se le avisa por email y, si es urgente, también por WhatsApp.
+async function avisarEquipo(asunto, texto, urgente) {
+  try {
+    const emails = await obtenerEmailsNotificacion();
+    for (const e of emails) {
+      try { await enviarEmail({ to: e, subject: asunto, html: plantillaEmail('<p>' + String(texto).replace(/\n/g, '<br>') + '</p>') }); }
+      catch (err) { console.warn('Aviso al equipo (email ' + e + '):', err.message); }
+    }
+    if (urgente) {
+      const c = await pool.query('SELECT telefono, whatsapp FROM configuracion_contacto WHERE id = 1');
+      const tel = c.rows.length ? (c.rows[0].telefono || c.rows[0].whatsapp) : null;
+      if (tel) await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [tel, asunto + '\n\n' + texto]);
+    }
+    console.log('📣 Aviso al equipo' + (urgente ? ' (URGENTE)' : '') + ': ' + asunto);
+  } catch (e) { console.warn('Aviso al equipo:', e.message); }
+}
+
+function minutosHastaRecogida(r) {
+  return (calcularFechaCancelacion(new Date(r.fecha), r.hora, 0).getTime() - Date.now()) / 60000;
+}
+
+app.post('/chofer/reservas/:id/liberar', requireChofer, asyncHandler(async (req, res) => {
+  const causa = String((req.body && req.body.causa) || '').trim().slice(0, 200);
+  if (!causa) return res.status(400).json({ error: 'Indica la causa.' });
+  const check = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino, c.nombre AS chofer_nombre
+     FROM reservas r JOIN conductores c ON c.id = r.conductor_id
+     WHERE r.id = $1 AND r.conductor_id = $2 AND r.archivada = FALSE
+       AND r.estado NOT IN ('cancelada', 'completada', 'no_show')`,
+    [req.params.id, req.session.choferId]
+  );
+  if (!check.rows.length) return res.status(400).json({ error: 'No se puede liberar este servicio.' });
+  const r = check.rows[0];
+  const minutos = minutosHastaRecogida(r);
+  const urgente = minutos < 180;
+
+  await pool.query(
+    `UPDATE reservas SET conductor_id = NULL, reasignacion_en_curso = TRUE, reasignacion_excluir_id = $1,
+       reasignacion_ronda = 1, reasignacion_inicio = NOW(), reasignacion_alerta_3h = $2,
+       reasignacion_alerta_30m = FALSE, reasignacion_chofer_anterior = $3, estado_aviso_whatsapp = 'pendiente'
+     WHERE id = $4`,
+    [req.session.choferId, urgente, r.chofer_nombre, r.id]
+  );
+  await pool.query(
+    'INSERT INTO reservas_historial_chofer (reserva_id, conductor_id, motivo) VALUES ($1, $2, $3)',
+    [r.id, req.session.choferId, 'Liberado por el chofer ' + r.chofer_nombre + '. Causa: ' + causa]
+  );
+  console.log('⚠️ ' + r.numero_reserva + ' liberado por ' + r.chofer_nombre + ' (' + causa + ')' + (urgente ? ' — URGENTE' : ''));
+
+  const cuando = (r.fecha ? fechaCliente(r.fecha, 'es') : '—') + ' a las ' + (r.hora ? String(r.hora).slice(0, 5) : '—');
+  await avisarEquipo(
+    (urgente ? '🚨 URGENTE: ' : '⚠️ ') + r.numero_reserva + ' liberado por su chofer',
+    'El chofer ' + r.chofer_nombre + ' ha liberado el servicio ' + r.numero_reserva + ' (' + cuando + ', ' +
+    (r.origen || '—') + ' → ' + (r.destino || '—') + ').\nCausa: ' + causa +
+    '\nSe está ofreciendo por WhatsApp a los demás choferes aprobados. Faltan ' + Math.max(0, Math.round(minutos)) + ' minutos para la recogida.',
+    urgente
+  );
+  res.json({ ok: true });
+}));
+
+// Vigilancia de las reasignaciones (cada minuto): segundo envío (también a suspendidos) si nadie
+// responde en 5 min (urgente) o 15 min (normal), alerta a 3 h y ALARMA TOTAL a 30 min sin chofer.
+async function vigilarReasignaciones() {
+  try {
+    const q = await pool.query(
+      `SELECT id, numero_reserva, fecha, hora, origen, destino, reasignacion_ronda, reasignacion_inicio,
+              reasignacion_alerta_3h, reasignacion_alerta_30m, estado_aviso_whatsapp
+       FROM reservas WHERE reasignacion_en_curso = TRUE AND conductor_id IS NULL
+         AND estado NOT IN ('cancelada', 'completada', 'no_show')`
+    );
+    for (const r of q.rows) {
+      const minutos = minutosHastaRecogida(r);
+      const desdeInicio = (Date.now() - new Date(r.reasignacion_inicio).getTime()) / 60000;
+      const espera = minutos < 180 ? 5 : 15;
+      const cuando = (r.fecha ? fechaCliente(r.fecha, 'es') : '—') + ' a las ' + (r.hora ? String(r.hora).slice(0, 5) : '—');
+      if (r.reasignacion_ronda < 2 && r.estado_aviso_whatsapp !== 'pendiente' && desdeInicio >= espera) {
+        await pool.query(`UPDATE reservas SET reasignacion_ronda = 2, estado_aviso_whatsapp = 'pendiente' WHERE id = $1`, [r.id]);
+        await avisarEquipo('⚠️ ' + r.numero_reserva + ': segundo envío',
+          'Nadie ha aceptado todavía ' + r.numero_reserva + ' (' + cuando + '). Se ofrece ahora también a los choferes suspendidos.', minutos < 180);
+      }
+      if (minutos <= 180 && !r.reasignacion_alerta_3h) {
+        await pool.query('UPDATE reservas SET reasignacion_alerta_3h = TRUE WHERE id = $1', [r.id]);
+        await avisarEquipo('🚨 URGENTE: ' + r.numero_reserva + ' sin chofer a 3 horas',
+          'El servicio ' + r.numero_reserva + ' (' + cuando + ', ' + (r.origen || '—') + ' → ' + (r.destino || '—') + ') sigue sin chofer.', true);
+      }
+      if (minutos <= 30 && !r.reasignacion_alerta_30m) {
+        await pool.query('UPDATE reservas SET reasignacion_alerta_30m = TRUE WHERE id = $1', [r.id]);
+        await avisarEquipo('🚨🚨 ALARMA TOTAL: ' + r.numero_reserva + ' sin chofer a 30 minutos',
+          'El servicio ' + r.numero_reserva + ' (' + cuando + ', ' + (r.origen || '—') + ' → ' + (r.destino || '—') + ') SIGUE SIN CHOFER. Pide el servicio a otra compañía.', true);
+      }
+    }
+  } catch (e) { console.warn('Vigilancia de reasignaciones:', e.message); }
+}
+setInterval(vigilarReasignaciones, 60 * 1000);
+
 app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req, res) => {
   const check = await pool.query(
     `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
@@ -15646,12 +15752,26 @@ app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandle
   const result = await pool.query(
     `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino,
             r.nombre_cliente, r.telefono_cliente, r.lang_cliente,
-            cv.nombre AS categoria_nombre
+            cv.nombre AS categoria_nombre,
+            COALESCE(r.reasignacion_en_curso, FALSE) AS reasignacion,
+            r.reasignacion_excluir_id, r.reasignacion_ronda
      FROM reservas r
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
      WHERE r.estado_aviso_whatsapp = 'pendiente'
      ORDER BY r.id ASC`
   );
+  // Reasignación (R2): se ofrece a todos los choferes APROBADOS (estén o no disponibles hoy) y, en
+  // la segunda ronda, también a los SUSPENDIDOS. Nunca al chofer que la liberó.
+  for (const r of result.rows) {
+    if (!r.reasignacion) continue;
+    const estados = r.reasignacion_ronda >= 2 ? ['aprobado', 'suspendido'] : ['aprobado'];
+    const ch = await pool.query(
+      `SELECT id, nombre, telefono FROM conductores
+       WHERE estado = ANY($1) AND telefono IS NOT NULL AND telefono <> '' AND id <> COALESCE($2, 0)
+       ORDER BY nombre`, [estados, r.reasignacion_excluir_id]
+    );
+    r.choferes_reasignacion = ch.rows;
+  }
   res.json(result.rows);
 }));
 
@@ -15680,6 +15800,7 @@ app.get('/api/whatsapp/reservas-24h-sin-respuesta', requierePuenteWhatsapp, asyn
      WHERE r.estado_aviso_whatsapp IN ('enviado', 'sin_respuesta')
        AND r.creado_en <= NOW() - INTERVAL '24 hours'
        AND r.estado NOT IN ('cancelada', 'completada')
+       AND COALESCE(r.reasignacion_en_curso, FALSE) = FALSE
      ORDER BY r.id ASC`
   );
   res.json(result.rows);
@@ -15785,6 +15906,20 @@ app.post('/api/whatsapp/asignar/:id', requierePuenteWhatsapp, asyncHandler(async
   const { conductor_id } = req.body;
   if (!conductor_id) return res.status(400).json({ error: 'Falta conductor_id.' });
 
+  // Reasignación (R2): el servicio lo había liberado su chofer → se avisa como un cambio de chofer
+  // (chofer nuevo con cartel, cliente con "Cambio de chofer" y voucher), sin enlace de pago nuevo.
+  const enReas = await pool.query('SELECT numero_reserva, reasignacion_en_curso FROM reservas WHERE id = $1', [req.params.id]);
+  if (enReas.rows.length && enReas.rows[0].reasignacion_en_curso) {
+    await reasignarChofer(req.params.id, Number(conductor_id), 'Aceptado por WhatsApp tras ser liberado por su chofer');
+    await pool.query(
+      `UPDATE reservas SET estado_aviso_whatsapp = 'asignado', reasignacion_en_curso = FALSE WHERE id = $1`,
+      [req.params.id]
+    );
+    const nq = await pool.query('SELECT nombre FROM conductores WHERE id = $1', [conductor_id]);
+    await avisarEquipo('✅ ' + enReas.rows[0].numero_reserva + ': nuevo chofer asignado',
+      'El servicio ' + enReas.rows[0].numero_reserva + ' que se estaba reasignando lo ha aceptado ' + (nq.rows.length ? nq.rows[0].nombre : 'un chofer') + '. Ya está avisado el cliente.', false);
+    return res.json({ ok: true });
+  }
   await asignarChoferAReserva(req.params.id, conductor_id, 'Asignado automáticamente por WhatsApp');
   await pool.query(
     `UPDATE reservas SET estado_aviso_whatsapp = 'asignado' WHERE id = $1`,
