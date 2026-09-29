@@ -2102,6 +2102,15 @@ async function initSchema() {
   await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ADD COLUMN IF NOT EXISTS nombre_documento TEXT`);
   await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ALTER COLUMN texto DROP NOT NULL`);
   await pool.query(`ALTER TABLE whatsapp_mensajes_pendientes ADD COLUMN IF NOT EXISTS documento_base64 TEXT`);
+  // (29/09/2026) Quitar de la cola los avisos que se enviaron por error al teléfono fijo de la
+  // oficina (no tiene WhatsApp y puente.js los reintentaba sin parar).
+  try {
+    const borrados = await pool.query(
+      `DELETE FROM whatsapp_mensajes_pendientes
+       WHERE enviado = FALSE AND regexp_replace(telefono, '[^0-9]', '', 'g') = '34928568874'`
+    );
+    if (borrados.rowCount) console.log('🧹 Quitados ' + borrados.rowCount + ' mensajes atascados hacia el teléfono fijo de la oficina.');
+  } catch (e) { console.warn('Limpieza de la cola de WhatsApp:', e.message); }
   await pool.query(`
     CREATE TABLE IF NOT EXISTS reservas_mensajes (
       id SERIAL PRIMARY KEY,
