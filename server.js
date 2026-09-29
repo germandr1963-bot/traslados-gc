@@ -2333,6 +2333,21 @@ Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n💳 Te reenviamos el enlace de pago para confirmar tu reserva *{numero_reserva}*.\n\n👉 {url_pago}\n\n❓ Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+    { clave: 'cliente_cambio_conductor', nombre: 'Cambio de conductor (al cliente)', categoria: 'cliente',
+      asunto_email: '\ud83d\udd04 Cambio de conductor en tu reserva {numero_reserva}',
+      cuerpo_email: `
+Hola, <strong>{nombre_cliente}</strong> 👋
+
+🔄 Hemos cambiado el conductor de tu reserva <strong>{numero_reserva}</strong>.
+
+🚖 Tu nuevo conductor es <strong>{nombre_conductor}</strong>. Todo lo demás sigue igual: fecha, hora, recogida y precio.
+
+📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado.
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
+`,
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n🔄 Hemos cambiado el conductor de tu reserva *{numero_reserva}*.\n\n🚖 Tu nuevo conductor es *{nombre_conductor}*. Todo lo demás sigue igual: fecha, hora, recogida y precio.\n\n📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_voucher', nombre: 'Voucher de traslado', categoria: 'cliente',
       asunto_email: '\u2714 Voucher de traslado \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -10173,11 +10188,106 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
   }
 }
 
+// ─── Reasignación de chofer (28/09/2026) ──────────────────────────────────────
+// Cambia el chofer de una reserva que YA tenía uno, sin tocar nada más (estado, depósito, pago).
+// Avisa al chofer anterior y al nuevo (WhatsApp, en español), envía el cartel al nuevo, y al
+// cliente la plantilla "Cambio de conductor" (email + WhatsApp, en su idioma) y, si ya pagó,
+// el voucher actualizado. El enlace de WhatsApp pasa solo al nuevo chofer.
+async function reasignarChofer(reservaId, nuevoConductorId, causa) {
+  const rq = await pool.query(
+    `SELECT r.*, ca.nombre AS chofer_anterior_nombre, ca.telefono AS chofer_anterior_telefono
+     FROM reservas r LEFT JOIN conductores ca ON ca.id = r.conductor_id WHERE r.id = $1`, [reservaId]);
+  if (!rq.rows.length) throw new Error('Reserva no encontrada');
+  const r = rq.rows[0];
+  const nq = await pool.query('SELECT id, nombre, telefono FROM conductores WHERE id = $1', [nuevoConductorId]);
+  if (!nq.rows.length) throw new Error('Chofer no encontrado');
+  const nuevo = nq.rows[0];
+
+  await pool.query('UPDATE reservas SET conductor_id = $1 WHERE id = $2', [nuevoConductorId, reservaId]);
+  await pool.query(
+    'INSERT INTO reservas_historial_chofer (reserva_id, conductor_id, motivo) VALUES ($1, $2, $3)',
+    [reservaId, nuevoConductorId, 'Reasignación (antes: ' + (r.chofer_anterior_nombre || '—') + '). Causa: ' + causa]
+  );
+  console.log('🔄 Reserva ' + r.numero_reserva + ' reasignada de ' + (r.chofer_anterior_nombre || '—') + ' a ' + nuevo.nombre + '. Causa: ' + causa);
+
+  const fechaTxt = r.fecha ? fechaCliente(r.fecha, 'es') : '—';
+  const horaTxt = r.hora ? String(r.hora).slice(0, 5) : '—';
+  const ruta = (r.origen || '—') + ' → ' + (r.destino || '—');
+
+  // Chofer anterior (español)
+  if (r.chofer_anterior_telefono) {
+    try {
+      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [r.chofer_anterior_telefono,
+        '⚠️ La reserva ' + r.numero_reserva + ' del ' + fechaTxt + ' a las ' + horaTxt + ' (' + ruta + ') se ha asignado a otro chofer. Ya no tienes que hacer este servicio.']);
+    } catch (e) { console.warn('Reasignación: aviso al chofer anterior:', e.message); }
+  }
+  // Chofer nuevo (español)
+  if (nuevo.telefono) {
+    try {
+      const idioma = NOMBRES_IDIOMA_ES[r.lang_cliente || 'es'] || (r.lang_cliente || 'es');
+      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [nuevo.telefono,
+        '🚖 Se te ha asignado el servicio ' + r.numero_reserva + ': ' + fechaTxt + ' a las ' + horaTxt + ', ' + ruta + ', ' +
+        (r.num_pasajeros || '—') + ' pasajero(s), cliente de idioma ' + idioma + '. Revisa todos los detalles en tu panel.']);
+    } catch (e) { console.warn('Reasignación: aviso al chofer nuevo:', e.message); }
+    // Cartel de recogida al chofer nuevo
+    try {
+      const firma = firmarCartel(reservaId);
+      const nombreDoc = 'cartel-' + r.numero_reserva + '.pdf';
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+        [nuevo.telefono, 'Cartel de recogida del servicio ' + r.numero_reserva + '.', BASE_URL + '/cartel-descarga/' + reservaId + '/' + firma + '/' + nombreDoc, nombreDoc]
+      );
+    } catch (e) { console.warn('Reasignación: cartel al chofer nuevo:', e.message); }
+  }
+  // Cliente (idioma de la reserva)
+  const langR = r.lang_cliente || 'es';
+  const nombreConductor = String(nuevo.nombre || '').trim().split(/\s+/)[0] || '—';
+  try {
+    const p = await obtenerPlantilla('cliente_cambio_conductor', {
+      nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva, nombre_conductor: nombreConductor
+    }, langR);
+    if (p && p.email && r.email_cliente) {
+      await enviarEmail({ to: r.email_cliente, subject: p.asunto || ('🔄 ' + r.numero_reserva), html: plantillaEmail(p.email) });
+    }
+    if (p && p.whatsapp && r.telefono_cliente) {
+      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [r.telefono_cliente, p.whatsapp]);
+    }
+  } catch (e) { console.warn('Reasignación: aviso al cliente:', e.message); }
+  // Voucher actualizado (solo si ya pagó el depósito), igual que "Reenviar voucher" del Admin
+  if (r.deposito_pagado) {
+    try {
+      const html = await generarHtmlVoucher(reservaId);
+      const pv = await obtenerPlantilla('cliente_voucher', { nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva }, langR);
+      if (html && r.email_cliente) {
+        await enviarEmail({ to: r.email_cliente, subject: (pv && pv.asunto) || ('Voucher — ' + r.numero_reserva), html });
+      }
+      if (r.telefono_cliente) {
+        const firmaV = firmarVoucher(reservaId);
+        const nombreDocV = palabraArchivoVoucher(langR) + '-' + r.numero_reserva + '.pdf';
+        await pool.query(
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+          [r.telefono_cliente, (pv && pv.whatsapp) || r.numero_reserva, BASE_URL + '/voucher-descarga/' + reservaId + '/' + firmaV + '/' + nombreDocV, nombreDocV]
+        );
+      }
+    } catch (e) { console.warn('Reasignación: voucher al cliente:', e.message); }
+  }
+}
+
 // Asignar chofer manualmente a una reserva
 app.post('/admin/reservas/:id/chofer', requireAdmin, asyncHandler(async (req, res) => {
   const { conductor_id, motivo } = req.body;
 
+  // Reasignación (28/09/2026): si la reserva YA tenía otro chofer, no se repite la primera
+  // asignación (no se reenvía la confirmación con enlace de pago). Causa obligatoria.
   if (conductor_id) {
+    const actual = await pool.query('SELECT conductor_id FROM reservas WHERE id = $1', [req.params.id]);
+    const anterior = actual.rows.length ? actual.rows[0].conductor_id : null;
+    if (anterior && Number(anterior) !== Number(conductor_id)) {
+      if (!motivo || !String(motivo).trim()) return res.status(400).json({ error: 'Indica la causa del cambio de chofer.' });
+      await reasignarChofer(req.params.id, Number(conductor_id), String(motivo).trim());
+      return res.json({ ok: true, reasignado: true });
+    }
+    if (anterior && Number(anterior) === Number(conductor_id)) return res.json({ ok: true, sin_cambios: true });
     await asignarChoferAReserva(req.params.id, conductor_id, motivo);
   } else {
     // Si se quita el chofer → vuelve a Pendiente
