@@ -942,7 +942,17 @@ table.tabla-precios input {
               <button class="boton-primario" style="font-size:0.82rem;height:36px;" onclick="guardarChoferReserva()">Guardar y confirmar</button>
             </div>
             <div id="motivo-cambio-chofer" style="display:none;margin-top:0.5rem;">
-              <input type="text" id="input-motivo-chofer" class="campo" style="height:32px;font-size:0.82rem;" placeholder="Motivo del cambio (opcional)">
+              <!-- Reasignación (28/09/2026): causa obligatoria al cambiar un chofer ya asignado -->
+              <select id="select-causa-chofer" class="campo" style="width:260px;height:32px;font-size:0.82rem;margin-bottom:0.4rem;">
+                <option value="">— Causa del cambio (obligatoria) —</option>
+                <option value="Enfermedad del chofer">Enfermedad del chofer</option>
+                <option value="Avería del vehículo">Avería del vehículo</option>
+                <option value="Imprevisto del chofer">Imprevisto del chofer</option>
+                <option value="Petición del cliente">Petición del cliente</option>
+                <option value="Otra">Otra</option>
+              </select>
+              <input type="text" id="input-motivo-chofer" class="campo" style="height:32px;font-size:0.82rem;" placeholder="Detalle (opcional; obligatorio si la causa es «Otra»)">
+              <p style="font-size:0.78rem;color:#888;margin:0.4rem 0 0 0;">🔄 Al guardar se avisará al chofer anterior y al nuevo (con el cartel), y al cliente (con el voucher actualizado si ya pagó). No se envía un enlace de pago nuevo. La causa no la ve el cliente.</p>
             </div>
           </div>
 
@@ -8267,6 +8277,8 @@ function cargarConductoresEnDetalle(conductorActualId, conductorNombre) {
     boxAsignado.style.display = 'none';
     boxSelector.style.display = 'block';
     if (notaEmail) notaEmail.style.display = 'block';
+    // Primera asignación: sin causa (el bloque de causa es solo para cambiar un chofer ya asignado)
+    if (motivoBox) motivoBox.style.display = 'none';
   }
 
   fetch('/admin/conductores-aprobados')
@@ -8295,15 +8307,28 @@ function guardarChoferReserva() {
   var motivoInput = document.getElementById('input-motivo-chofer');
   var motivo = motivoInput ? motivoInput.value.trim() : '';
   var av = document.getElementById('aviso-chofer-detalle');
+  // Reasignación: si se está cambiando un chofer ya asignado, la causa es obligatoria
+  var esCambio = document.getElementById('motivo-cambio-chofer').style.display === 'block';
+  if (esCambio && conductorId) {
+    var causa = document.getElementById('select-causa-chofer').value;
+    av.style.display = 'block';
+    if (!causa) { av.innerHTML = '<span style="color:#e07b5a;">❌ Elige la causa del cambio.</span>'; return; }
+    if (causa === 'Otra' && !motivo) { av.innerHTML = '<span style="color:#e07b5a;">❌ Escribe el detalle de la causa.</span>'; return; }
+    motivo = causa + (motivo ? ' — ' + motivo : '');
+  }
   av.style.display = 'block';
-  av.innerHTML = '<span style="color:#888;">Guardando y enviando confirmación al cliente...</span>';
+  av.innerHTML = '<span style="color:#888;">' + (esCambio && conductorId ? 'Cambiando el chofer y enviando los avisos...' : 'Guardando y enviando confirmación al cliente...') + '</span>';
 
   fetch('/admin/reservas/' + reservaDetalleId + '/chofer', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conductor_id: conductorId ? Number(conductorId) : null, motivo: motivo })
-  }).then(function(r) { return r.json(); }).then(function() {
-    av.innerHTML = '<span style="color:#2d7a4f;">✔ Chofer asignado. Email de confirmación enviado al cliente.</span>';
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d && d.error) { av.innerHTML = '<span style="color:#e07b5a;">❌ ' + d.error + '</span>'; return; }
+    av.innerHTML = '<span style="color:#2d7a4f;">' + (d && d.reasignado
+      ? '✔ Chofer cambiado. Avisos enviados al chofer anterior, al nuevo y al cliente.'
+      : (d && d.sin_cambios ? 'Es el mismo chofer: no se ha cambiado nada.' : '✔ Chofer asignado. Email de confirmación enviado al cliente.')) + '</span>';
     if (motivoInput) motivoInput.value = '';
+    var selCausa = document.getElementById('select-causa-chofer'); if (selCausa) selCausa.value = '';
     setTimeout(function() { av.style.display = 'none'; }, 4000);
     cargarReservas(true);
   }).catch(function() {
