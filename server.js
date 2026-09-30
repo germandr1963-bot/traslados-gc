@@ -11859,6 +11859,12 @@ async function formatearExtrasWhatsapp(reservaId, lang) {
 }
 
 async function obtenerPlantilla(clave, vars, lang) {
+  // (29/09/2026) Tras unificar "conductor" → "chofer", una marca puede venir con cualquiera de las
+  // dos palabras (en español o en una traducción). Se rellenan las dos formas con el mismo dato.
+  vars = Object.assign({}, vars || {});
+  if (vars.conductor !== undefined && vars.chofer === undefined) vars.chofer = vars.conductor;
+  if (vars.chofer !== undefined && vars.conductor === undefined) vars.conductor = vars.chofer;
+  if (vars.nombre_conductor !== undefined && vars.nombre_chofer === undefined) vars.nombre_chofer = vars.nombre_conductor;
   try {
     const r = await pool.query(
       'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion WHERE clave = $1',
