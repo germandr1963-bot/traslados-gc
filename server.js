@@ -2352,16 +2352,23 @@ Un saludo cordial, 🙏
       cuerpo_email: `
 Hola, <strong>{nombre_cliente}</strong> 👋
 
-🔄 Hemos cambiado el chofer de tu reserva <strong>{numero_reserva}</strong>.
-
-🚖 Tu nuevo chofer es <strong>{nombre_conductor}</strong>. Todo lo demás sigue igual: fecha, hora, recogida y precio.
-
-📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado.
+🔄 <strong>Hemos cambiado el chofer de tu traslado.</strong> Todo lo demás sigue igual.
+<p style="text-align:center;margin:10px 0;">
+  Reserva <span class="pnr">{numero_reserva}</span>
+</p>
+<div class="info-box">
+  <strong>Detalles del traslado:</strong>
+  📍 Origen: {origen}
+  🏁 Destino: {destino}
+  📅 Fecha: {fecha} · {hora}
+  🧭 Chofer: {nombre_conductor}
+</div>
+📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado con los datos de tu nuevo chofer.
 
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n🔄 Hemos cambiado el chofer de tu reserva *{numero_reserva}*.\n\n🚖 Tu nuevo chofer es *{nombre_conductor}*. Todo lo demás sigue igual: fecha, hora, recogida y precio.\n\n📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n🔄 *Hemos cambiado el chofer de tu traslado.* Todo lo demás sigue igual.\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🧭 *Chofer:* {nombre_conductor}\n\n📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado con los datos de tu nuevo chofer.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_voucher', nombre: 'Voucher de traslado', categoria: 'cliente',
       asunto_email: '\u2714 Voucher de traslado \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -2836,8 +2843,8 @@ Pulsa el botón para crear una nueva contraseña:
       cuerpo_email: '{"nombre":"Traslados GC","subtitulo":"Gran Canaria","colorCabecera":"#2c2c2c","colorNombre":"#d4956a","pie":"Traslados GC \u00b7 Gran Canaria"}',
       cuerpo_whatsapp: null },
     // ── Mensajes al chofer e internos (30/09/2026): antes estaban fijos en el programa. Solo en español. ──
-    { clave: 'chofer_aviso_reserva', nombre: 'Aviso de servicio nuevo (a los choferes)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '🚖 *Nuevo traslado disponible*\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚘 *Categoría:* {categoria}\n\nResponde *SI* para aceptar o *NO* para rechazar.' },
-    { clave: 'chofer_aviso_reasignacion', nombre: 'Servicio a reasignar (a los choferes)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '🔄 *SERVICIO A REASIGNAR*\n_Un compañero no puede hacer este servicio._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚘 *Categoría:* {categoria}\n\nResponde *SI* para aceptar o *NO* para rechazar.' },
+    { clave: 'chofer_aviso_reserva', nombre: 'Aviso de servicio nuevo (a los choferes)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '🚖 *Nuevo traslado disponible*\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n\nResponde *SI* para aceptar o *NO* para rechazar.' },
+    { clave: 'chofer_aviso_reasignacion', nombre: 'Servicio a reasignar (a los choferes)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '🔄 *SERVICIO A REASIGNAR*\n_Un compañero no puede hacer este servicio._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n\nResponde *SI* para aceptar o *NO* para rechazar.' },
     { clave: 'chofer_servicio_asignado', nombre: 'Servicio asignado en sustitución (al chofer nuevo)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n✅ *Servicio asignado*\n_Se te asigna este servicio en sustitución de un compañero._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n👥 *Pasajeros:* {pasajeros}\n🌐 *Idioma del cliente:* {idioma}\n\nRevisa todos los detalles en tu panel. El cartel de recogida te llegará cuando el cliente haya pagado el depósito.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_servicio_reasignado', nombre: 'Servicio reasignado a otro compañero (al chofer anterior)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\nℹ️ *Servicio reasignado*\n_Este servicio se ha asignado a otro compañero. Ya no tienes que hacerlo._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nQueda liberado de tu agenda. Gracias.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_respuesta_confirmado', nombre: 'Respuesta al SI: servicio confirmado', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '✅ *Servicio confirmado*\nLa reserva *{numero_reserva}* es tuya. Revisa todos los detalles en tu panel.' },
@@ -2861,7 +2868,7 @@ Pulsa el botón para crear una nueva contraseña:
   🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span>
   📅 <strong>Fecha:</strong> {fecha} · {hora}
   📍 <strong>Ruta:</strong> {origen} → {destino}
-  👤 <strong>Chofer que lo libera:</strong> {chofer_anterior}
+  🧭 <strong>Chofer que lo libera:</strong> {chofer_anterior}
   📝 <strong>Causa:</strong> {causa}
 </div>
 Se está ofreciendo por WhatsApp a los demás choferes aprobados. Revisa la reserva en el Admin.
@@ -2874,7 +2881,7 @@ Se está ofreciendo por WhatsApp a los demás choferes aprobados. Revisa la rese
 <div class="info-box">
   🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span>
   📅 <strong>Fecha:</strong> {fecha} · {hora}
-  👤 <strong>Nuevo chofer:</strong> {nombre_chofer}
+  🧭 <strong>Nuevo chofer:</strong> {nombre_chofer}
 </div>
 El cliente ya ha recibido el aviso del cambio de chofer.
 `,
@@ -3024,6 +3031,52 @@ Un saludo cordial, 🙏
   await pool.query(`ALTER TABLE plantillas_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado_wa BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE frases_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado BOOLEAN DEFAULT FALSE`);
   console.log('Frases de comunicaci\u00f3n cargadas.');
+
+  // ─── Guía de iconos (30/09/2026): 🚗 Categoría, 🧭 Chofer. Cambio ÚNICO sobre lo ya guardado ───
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_datos (clave TEXT PRIMARY KEY, hecho_en TIMESTAMP DEFAULT NOW())`);
+    const hechaIconos = await pool.query(`SELECT 1 FROM migraciones_datos WHERE clave = 'iconos_20260930'`);
+    if (!hechaIconos.rows.length) {
+      await pool.query(`UPDATE plantillas_comunicacion SET cuerpo_whatsapp = replace(cuerpo_whatsapp, '🚘 *Categoría:*', '🚗 *Categoría:*')
+                        WHERE clave IN ('chofer_aviso_reserva', 'chofer_aviso_reasignacion')`);
+      await pool.query(`UPDATE plantillas_comunicacion SET cuerpo_email = replace(replace(cuerpo_email,
+                          '👤 <strong>Chofer que lo libera:</strong>', '🧭 <strong>Chofer que lo libera:</strong>'),
+                          '👤 <strong>Nuevo chofer:</strong>', '🧭 <strong>Nuevo chofer:</strong>')
+                        WHERE clave IN ('interno_servicio_liberado', 'interno_nuevo_chofer')`);
+      // "Cambio de chofer": formato nuevo (solo si todavía tiene el texto anterior) y traducciones a rojo
+      const cc = await pool.query(
+        `UPDATE plantillas_comunicacion SET cuerpo_email = $1, cuerpo_whatsapp = $2, actualizado_en = NOW()
+         WHERE clave = 'cliente_cambio_conductor' AND cuerpo_whatsapp LIKE '%Tu nuevo chofer es%' RETURNING clave`,
+        [`
+Hola, <strong>{nombre_cliente}</strong> 👋
+
+🔄 <strong>Hemos cambiado el chofer de tu traslado.</strong> Todo lo demás sigue igual.
+<p style="text-align:center;margin:10px 0;">
+  Reserva <span class="pnr">{numero_reserva}</span>
+</p>
+<div class="info-box">
+  <strong>Detalles del traslado:</strong>
+  📍 Origen: {origen}
+  🏁 Destino: {destino}
+  📅 Fecha: {fecha} · {hora}
+  🧭 Chofer: {nombre_conductor}
+</div>
+📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado con los datos de tu nuevo chofer.
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
+`, 'Hola, *{nombre_cliente}* 👋\n\n🔄 *Hemos cambiado el chofer de tu traslado.* Todo lo demás sigue igual.\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🧭 *Chofer:* {nombre_conductor}\n\n📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado con los datos de tu nuevo chofer.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*']
+      );
+      if (cc.rows.length) {
+        await pool.query(`UPDATE plantillas_comunicacion_traducciones SET desactualizado_email = TRUE
+                          WHERE plantilla_clave = 'cliente_cambio_conductor' AND cuerpo_email IS NOT NULL AND cuerpo_email <> ''`);
+        await pool.query(`UPDATE plantillas_comunicacion_traducciones SET desactualizado_wa = TRUE
+                          WHERE plantilla_clave = 'cliente_cambio_conductor' AND cuerpo_whatsapp IS NOT NULL AND cuerpo_whatsapp <> ''`);
+      }
+      await pool.query(`INSERT INTO migraciones_datos (clave) VALUES ('iconos_20260930') ON CONFLICT DO NOTHING`);
+      console.log('🎨 Guía de iconos aplicada' + (cc.rows.length ? ' ("Cambio de chofer" con formato nuevo; traducciones a rojo).' : '.'));
+    }
+  } catch (e) { console.warn('Guía de iconos:', e.message); }
 
   // ─── "conductor" → "chofer" en todo lo que ve el cliente (29/09/2026) ─────────────────────
   // Decisión de Germán: una sola palabra, "chofer" (se traduce igual en todos los idiomas).
@@ -10477,7 +10530,9 @@ async function reasignarChofer(reservaId, nuevoConductorId, causa, desdeAdmin) {
   try {
     const p = await obtenerPlantilla('cliente_cambio_conductor', {
       // Las dos marcas: la plantilla usa {nombre_conductor}, pero una traducción puede traer {nombre_chofer}
-      nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva, nombre_conductor: nombreConductor, nombre_chofer: nombreConductor
+      nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva, nombre_conductor: nombreConductor, nombre_chofer: nombreConductor,
+      origen: r.origen || '—', destino: r.destino || '—',
+      fecha: r.fecha ? fechaCliente(r.fecha, langR) : '—', hora: r.hora ? String(r.hora).slice(0, 5) : '—'
     }, langR);
     if (p && p.email && r.email_cliente) {
       await enviarEmail({ to: r.email_cliente, subject: p.asunto || ('🔄 ' + r.numero_reserva), html: plantillaEmail(p.email) });
