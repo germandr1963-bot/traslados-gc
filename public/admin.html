@@ -1429,13 +1429,13 @@ table.tabla-precios input {
           <div class="tabla-envoltura"><table class="tabla-admin" style="font-size:0.85rem;width:100%;table-layout:fixed;">
             <thead><tr><th style="width:80px;">Icono</th><th>Qué significa</th><th>Dónde se usa</th><th style="width:170px;"></th></tr></thead>
             <tbody id="guia-iconos-lista"></tbody>
+            <tfoot><tr>
+              <td><input type="text" id="guia-nuevo-icono" class="campo" placeholder="Icono" style="width:60px;height:30px;font-size:1.1rem;text-align:center;"></td>
+              <td><input type="text" id="guia-nuevo-significado" class="campo" placeholder="Qué significa" style="width:100%;height:30px;"></td>
+              <td><input type="text" id="guia-nuevo-donde" class="campo" placeholder="Dónde se usa" style="width:100%;height:30px;"></td>
+              <td style="text-align:right;"><button class="boton-primario" style="margin-top:0;font-size:0.75rem;padding:5px 10px;" onclick="anadirGuiaIcono()">+ Añadir</button></td>
+            </tr></tfoot>
           </table></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;">
-            <input type="text" id="guia-nuevo-icono" class="campo" placeholder="Icono" style="width:70px;height:32px;">
-            <input type="text" id="guia-nuevo-significado" class="campo" placeholder="Qué significa" style="flex:1;min-width:160px;height:32px;">
-            <input type="text" id="guia-nuevo-donde" class="campo" placeholder="Dónde se usa" style="flex:1;min-width:160px;height:32px;">
-            <button class="boton-primario" style="margin-top:0;font-size:0.8rem;padding:6px 12px;" onclick="anadirGuiaIcono()">+ Añadir</button>
-          </div>
           <div id="guia-iconos-aviso" style="display:none;font-size:0.8rem;margin-top:6px;"></div>
         </div>
       </div>
@@ -9157,7 +9157,7 @@ function cargarGuiaIconos() {
   fetch('/admin/guia-iconos').then(function(r) { return r.json(); }).then(function(filas) {
     document.getElementById('guia-iconos-lista').innerHTML = filas.map(function(f) {
       return '<tr>' +
-        '<td><input type="text" class="campo" id="guia-i-' + f.id + '" value="' + escGuia(f.icono) + '" style="width:60px;height:30px;font-size:1.1rem;text-align:center;"></td>' +
+        '<td><input type="text" class="campo" id="guia-i-' + f.id + '" data-original="' + escGuia(f.icono) + '" value="' + escGuia(f.icono) + '" style="width:60px;height:30px;font-size:1.1rem;text-align:center;"></td>' +
         '<td><input type="text" class="campo" id="guia-s-' + f.id + '" value="' + escGuia(f.significado) + '" style="width:100%;height:30px;"></td>' +
         '<td><input type="text" class="campo" id="guia-d-' + f.id + '" value="' + escGuia(f.donde) + '" style="width:100%;height:30px;"></td>' +
         '<td style="text-align:right;">' +
@@ -9177,7 +9177,24 @@ function guardarGuiaIcono(id) {
       donde: document.getElementById('guia-d-' + id).value
     })
   }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.ok) avisoGuia('✔ Guardado.', true); else avisoGuia(d.error || 'No se pudo guardar.', false);
+    if (!d.ok) { avisoGuia(d.error || 'No se pudo guardar.', false); return; }
+    var campo = document.getElementById('guia-i-' + id);
+    var viejo = campo.getAttribute('data-original'), nuevo = campo.value.trim();
+    if (viejo && nuevo && viejo !== nuevo &&
+        confirm('Has cambiado ' + viejo + ' por ' + nuevo + '.\n\n¿Quieres cambiarlo también en todos los mensajes (plantillas, frases, textos de la web y sus traducciones)?\n\nSe cambiará en todos los sitios donde aparezca ' + viejo + '.')) {
+      fetch('/admin/guia-iconos/aplicar', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ viejo: viejo, nuevo: nuevo })
+      }).then(function(r) { return r.json(); }).then(function(a) {
+        if (a.ok) {
+          campo.setAttribute('data-original', nuevo);
+          avisoGuia('✔ Guardado y cambiado en todos los mensajes: ' + a.plantillas + ' plantillas, ' + a.frases + ' frases y ' + a.textos + ' textos (con sus traducciones).', true);
+        } else { avisoGuia(a.error || 'No se pudo cambiar en los mensajes.', false); }
+      });
+      return;
+    }
+    campo.setAttribute('data-original', nuevo);
+    avisoGuia('✔ Guardado (solo en la guía).', true);
   });
 }
 
