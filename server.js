@@ -2053,6 +2053,44 @@ async function initSchema() {
   await pool.query(`ALTER TABLE clientes_datos ADD COLUMN IF NOT EXISTS idioma_elegido BOOLEAN DEFAULT FALSE`);
   // Idioma de quien viaja escrito a mano ("Otro idioma…") en una reserva para otra persona (26/09/2026)
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS idioma_viajero_otro TEXT`);
+  // Guía de iconos (30/09/2026): tabla editable desde Admin → Comunicaciones. Se rellena solo si está vacía.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS guia_iconos (
+      id SERIAL PRIMARY KEY,
+      icono TEXT NOT NULL,
+      significado TEXT NOT NULL,
+      donde TEXT,
+      orden INTEGER DEFAULT 0
+    )
+  `);
+  const guiaVacia = await pool.query('SELECT COUNT(*)::int AS n FROM guia_iconos');
+  if (!guiaVacia.rows[0].n) {
+    const filasGuia = [
+      ['🔖', 'Número de reserva', 'Clientes, choferes, equipo'],
+      ['📍', 'Origen / ruta', 'Clientes, choferes, equipo'],
+      ['🏁', 'Destino', 'Clientes, choferes, equipo'],
+      ['📅', 'Fecha y hora', 'Clientes, choferes, equipo'],
+      ['🚗', 'Categoría del vehículo', 'Clientes, choferes'],
+      ['🧑‍✈️', 'Chofer', 'Clientes, choferes, equipo'],
+      ['👤', 'Cliente / persona', 'Choferes, portal'],
+      ['👥', 'Pasajeros', 'Choferes'],
+      ['🌐', 'Idioma', 'Choferes'],
+      ['🔄', 'Cambio o reasignación', 'Clientes, choferes'],
+      ['✅', 'Confirmado / terminado', 'Todos'],
+      ['❌', 'Cancelado', 'Todos'],
+      ['🚫', 'Cliente no se presentó', 'Choferes, clientes'],
+      ['⚠️', 'Aviso importante', 'Choferes, equipo'],
+      ['ℹ️', 'Información', 'Choferes'],
+      ['📩', 'Mensaje recibido', 'Enlace de WhatsApp'],
+      ['💬', 'Mensaje del chofer o del equipo', 'Enlace de WhatsApp, portal'],
+      ['📄', 'Documento (voucher, factura)', 'Clientes'],
+      ['👋', 'Saludo', 'Todos'],
+      ['🙏', 'Despedida', 'Todos']
+    ];
+    for (let k = 0; k < filasGuia.length; k++) {
+      await pool.query('INSERT INTO guia_iconos (icono, significado, donde, orden) VALUES ($1, $2, $3, $4)', [filasGuia[k][0], filasGuia[k][1], filasGuia[k][2], (k + 1) * 10]);
+    }
+  }
   // R2-A (29/09/2026): el chofer libera un servicio desde su panel y se reofrece a los demás choferes
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS reasignacion_en_curso BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS reasignacion_excluir_id INTEGER`);
@@ -15488,6 +15526,33 @@ function requierePuenteWhatsapp(req, res, next) {
 }
 
 // Endpoint para que puente.js pueda leer plantillas de comunicacion
+// ─── Guía de iconos (Admin → Comunicaciones) ───────────────────────────────────
+app.get('/admin/guia-iconos', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query('SELECT id, icono, significado, donde, orden FROM guia_iconos ORDER BY orden, id');
+  res.json(r.rows);
+}));
+app.post('/admin/guia-iconos', requireAdmin, asyncHandler(async (req, res) => {
+  const icono = String((req.body && req.body.icono) || '').trim().slice(0, 20);
+  const significado = String((req.body && req.body.significado) || '').trim().slice(0, 150);
+  const donde = String((req.body && req.body.donde) || '').trim().slice(0, 150);
+  if (!icono || !significado) return res.status(400).json({ error: 'Pon el icono y qué significa.' });
+  const mx = await pool.query('SELECT COALESCE(MAX(orden), 0) + 10 AS o FROM guia_iconos');
+  await pool.query('INSERT INTO guia_iconos (icono, significado, donde, orden) VALUES ($1, $2, $3, $4)', [icono, significado, donde, mx.rows[0].o]);
+  res.json({ ok: true });
+}));
+app.put('/admin/guia-iconos/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const icono = String((req.body && req.body.icono) || '').trim().slice(0, 20);
+  const significado = String((req.body && req.body.significado) || '').trim().slice(0, 150);
+  const donde = String((req.body && req.body.donde) || '').trim().slice(0, 150);
+  if (!icono || !significado) return res.status(400).json({ error: 'Pon el icono y qué significa.' });
+  await pool.query('UPDATE guia_iconos SET icono = $1, significado = $2, donde = $3 WHERE id = $4', [icono, significado, donde, req.params.id]);
+  res.json({ ok: true });
+}));
+app.delete('/admin/guia-iconos/:id', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM guia_iconos WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
 app.get('/api/whatsapp/plantilla/:clave', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   // 'lang' (opcional) = idioma del cliente; no se usa como variable del texto
   let { lang, ...varsPlantilla } = req.query;
