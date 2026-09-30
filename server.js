@@ -2317,7 +2317,7 @@ Hola, <strong>{nombre_cliente}</strong> 👋
   🏁 Destino: {destino}
   📅 Fecha: {fecha} · {hora}
   🚗 Categoría: {categoria}
-  🧭 Chofer: {chofer}
+  🧑‍✈️ Chofer: {chofer}
 </div>
 {extras}
 <div class="caja-verde">
@@ -2361,14 +2361,14 @@ Hola, <strong>{nombre_cliente}</strong> 👋
   📍 Origen: {origen}
   🏁 Destino: {destino}
   📅 Fecha: {fecha} · {hora}
-  🧭 Chofer: {nombre_conductor}
+  🧑‍✈️ Chofer: {nombre_conductor}
 </div>
 📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado con los datos de tu nuevo chofer.
 
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n🔄 *Hemos cambiado el chofer de tu traslado.* Todo lo demás sigue igual.\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🧭 *Chofer:* {nombre_conductor}\n\n📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado con los datos de tu nuevo chofer.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n🔄 *Hemos cambiado el chofer de tu traslado.* Todo lo demás sigue igual.\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🧑‍✈️ *Chofer:* {nombre_conductor}\n\n📄 Si ya pagaste el depósito, te enviamos a continuación el voucher actualizado con los datos de tu nuevo chofer.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_voucher', nombre: 'Voucher de traslado', categoria: 'cliente',
       asunto_email: '\u2714 Voucher de traslado \u2014 {numero_reserva}',
       cuerpo_email: `
@@ -2868,7 +2868,7 @@ Pulsa el botón para crear una nueva contraseña:
   🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span>
   📅 <strong>Fecha:</strong> {fecha} · {hora}
   📍 <strong>Ruta:</strong> {origen} → {destino}
-  🧭 <strong>Chofer que lo libera:</strong> {chofer_anterior}
+  🧑‍✈️ <strong>Chofer que lo libera:</strong> {chofer_anterior}
   📝 <strong>Causa:</strong> {causa}
 </div>
 Se está ofreciendo por WhatsApp a los demás choferes aprobados. Revisa la reserva en el Admin.
@@ -2881,7 +2881,7 @@ Se está ofreciendo por WhatsApp a los demás choferes aprobados. Revisa la rese
 <div class="info-box">
   🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span>
   📅 <strong>Fecha:</strong> {fecha} · {hora}
-  🧭 <strong>Nuevo chofer:</strong> {nombre_chofer}
+  🧑‍✈️ <strong>Nuevo chofer:</strong> {nombre_chofer}
 </div>
 El cliente ya ha recibido el aviso del cambio de chofer.
 `,
@@ -3077,6 +3077,22 @@ Un saludo cordial, 🙏
       console.log('🎨 Guía de iconos aplicada' + (cc.rows.length ? ' ("Cambio de chofer" con formato nuevo; traducciones a rojo).' : '.'));
     }
   } catch (e) { console.warn('Guía de iconos:', e.message); }
+
+  // ─── Icono del chofer 🧑‍✈️ (30/09/2026): sustituye a la brújula 🧭 en plantillas y traducciones.
+  // Un emoji no se traduce, así que las traducciones se corrigen directamente (no pasan a rojo).
+  try {
+    const hechaIcono = await pool.query(`SELECT 1 FROM migraciones_datos WHERE clave = 'icono_chofer_20260930'`);
+    if (!hechaIcono.rows.length) {
+      const a = await pool.query(`UPDATE plantillas_comunicacion SET cuerpo_email = replace(cuerpo_email, '🧭', $1),
+                                    cuerpo_whatsapp = replace(cuerpo_whatsapp, '🧭', $1)
+                                  WHERE cuerpo_email LIKE '%🧭%' OR cuerpo_whatsapp LIKE '%🧭%'`, ['🧑‍✈️']);
+      const b = await pool.query(`UPDATE plantillas_comunicacion_traducciones SET cuerpo_email = replace(cuerpo_email, '🧭', $1),
+                                    cuerpo_whatsapp = replace(cuerpo_whatsapp, '🧭', $1)
+                                  WHERE cuerpo_email LIKE '%🧭%' OR cuerpo_whatsapp LIKE '%🧭%'`, ['🧑‍✈️']);
+      await pool.query(`INSERT INTO migraciones_datos (clave) VALUES ('icono_chofer_20260930') ON CONFLICT DO NOTHING`);
+      console.log('🧑‍✈️ Icono del chofer aplicado: ' + a.rowCount + ' plantillas y ' + b.rowCount + ' traducciones.');
+    }
+  } catch (e) { console.warn('Icono del chofer:', e.message); }
 
   // ─── "conductor" → "chofer" en todo lo que ve el cliente (29/09/2026) ─────────────────────
   // Decisión de Germán: una sola palabra, "chofer" (se traduce igual en todos los idiomas).
