@@ -9164,13 +9164,14 @@ function renderPlantillasCom() {
   ['cliente','chofer','interno'].forEach(function(cat) {
     if (!grupos[cat] || !grupos[cat].length) return;
     html += '<h2 style="margin-top:24px;margin-bottom:8px;font-size:1rem;">' + labelsCat[cat] + '</h2>';
-    html += '<div class="tabla-envoltura"><table class="tabla-admin" style="font-size:0.85rem;width:100%;">';
-    html += '<thead><tr><th style="text-align:left;width:280px;">Plantilla</th><th style="text-align:center;width:80px;">Email</th><th style="text-align:center;width:80px;">WhatsApp</th><th style="text-align:right;width:100px;"></th></tr></thead><tbody>';
+    // (30/09/2026) Columnas fijas: los nombres largos pasan a varias líneas y Email/WhatsApp/Editar quedan alineados
+    html += '<div class="tabla-envoltura"><table class="tabla-admin" style="font-size:0.85rem;width:100%;table-layout:fixed;">';
+    html += '<thead><tr><th style="text-align:left;">Plantilla</th><th style="text-align:center;width:80px;">Email</th><th style="text-align:center;width:90px;">WhatsApp</th><th style="text-align:right;width:110px;"></th></tr></thead><tbody>';
     grupos[cat].forEach(function(p) {
       var tieneEmail = p.cuerpo_email && p.cuerpo_email.trim();
       var tieneWa = p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim();
       html += '<tr>';
-      html += '<td><strong>' + p.nombre + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + p.clave + '</span></td>';
+      html += '<td style="white-space:normal;word-break:break-word;"><strong>' + p.nombre + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + p.clave + '</span></td>';
       html += '<td style="text-align:center;">' + (tieneEmail ? '<span style="color:green;">&#10003;</span>' : '<span style="color:#ccc;">\u2014</span>') + '</td>';
       html += '<td style="text-align:center;">' + (tieneWa ? '<span style="color:green;">&#10003;</span>' : '<span style="color:#ccc;">\u2014</span>') + '</td>';
       html += '<td style="text-align:right;"><button class="boton-primario" style="font-size:0.8rem;padding:6px 12px;" onclick="abrirModalPlantilla(\'' + p.clave + '\')">&#9998; Editar</button></td>';
@@ -9215,11 +9216,11 @@ function renderFrasesCom() {
   function canalTxt(c) { return c === 'wa' ? '&#128241; WhatsApp' : c === 'ambos' ? '&#128231;&#128241; Email y WhatsApp' : '&#128231; Email'; }
   var html = '<h2 style="margin-top:20px;margin-bottom:4px;font-size:0.95rem;">&#129513; Frases dentro de los mensajes al cliente <span style="font-size:12px;font-weight:400;color:var(--texto-muted);">(' + _frasesCom.length + ' frases)</span></h2>';
   html += '<p style="font-size:12px;color:var(--texto-muted);margin:0 0 8px;">Botones, avisos y etiquetas que el sistema coloca dentro de los emails y WhatsApp.</p>';
-  html += '<div class="tabla-envoltura"><table class="tabla-admin" style="font-size:0.85rem;width:100%;">';
-  html += '<thead><tr><th style="text-align:left;">Frase</th><th style="text-align:center;width:170px;">Dónde se usa</th><th style="text-align:right;width:100px;"></th></tr></thead><tbody>';
+  html += '<div class="tabla-envoltura"><table class="tabla-admin" style="font-size:0.85rem;width:100%;table-layout:fixed;">';
+  html += '<thead><tr><th style="text-align:left;">Frase</th><th style="text-align:center;width:170px;">Dónde se usa</th><th style="text-align:right;width:110px;"></th></tr></thead><tbody>';
   _frasesCom.forEach(function(f) {
     html += '<tr>';
-    html += '<td><strong>' + esc(f.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + f.clave + '</span></td>';
+    html += '<td style="white-space:normal;word-break:break-word;"><strong>' + esc(f.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + f.clave + '</span></td>';
     html += '<td style="text-align:center;font-size:12px;">' + canalTxt(f.canal) + '</td>';
     html += '<td style="text-align:right;"><button class="boton-primario" style="font-size:0.8rem;padding:6px 12px;" data-clave="' + f.clave + '" onclick="abrirModalFraseCom(this.dataset.clave)">&#9998; Editar</button></td>';
     html += '</tr>';
