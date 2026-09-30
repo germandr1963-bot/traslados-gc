@@ -2834,7 +2834,51 @@ Pulsa el botón para crear una nueva contraseña:
     { clave: 'marca_base', nombre: 'Plantilla base de marca', categoria: 'interno',
       asunto_email: 'marca_base',
       cuerpo_email: '{"nombre":"Traslados GC","subtitulo":"Gran Canaria","colorCabecera":"#2c2c2c","colorNombre":"#d4956a","pie":"Traslados GC \u00b7 Gran Canaria"}',
-      cuerpo_whatsapp: null }
+      cuerpo_whatsapp: null },
+    // ── Mensajes al chofer e internos (30/09/2026): antes estaban fijos en el programa. Solo en español. ──
+    { clave: 'chofer_aviso_reserva', nombre: 'Aviso de servicio nuevo (a los choferes)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '🚖 *Nuevo traslado disponible*\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚘 *Categoría:* {categoria}\n\nResponde *SI* para aceptar o *NO* para rechazar.' },
+    { clave: 'chofer_aviso_reasignacion', nombre: 'Servicio a reasignar (a los choferes)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '🔄 *SERVICIO A REASIGNAR*\n_Un compañero no puede hacer este servicio._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚘 *Categoría:* {categoria}\n\nResponde *SI* para aceptar o *NO* para rechazar.' },
+    { clave: 'chofer_servicio_asignado', nombre: 'Servicio asignado en sustitución (al chofer nuevo)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n✅ *Servicio asignado*\n_Se te asigna este servicio en sustitución de un compañero._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n👥 *Pasajeros:* {pasajeros}\n🌐 *Idioma del cliente:* {idioma}\n\nRevisa todos los detalles en tu panel. El cartel de recogida te llegará cuando el cliente haya pagado el depósito.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+    { clave: 'chofer_servicio_reasignado', nombre: 'Servicio reasignado a otro compañero (al chofer anterior)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\nℹ️ *Servicio reasignado*\n_Este servicio se ha asignado a otro compañero. Ya no tienes que hacerlo._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nQueda liberado de tu agenda. Gracias.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+    { clave: 'chofer_respuesta_confirmado', nombre: 'Respuesta al SI: servicio confirmado', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '✅ *Servicio confirmado*\nLa reserva *{numero_reserva}* es tuya. Revisa todos los detalles en tu panel.' },
+    { clave: 'chofer_respuesta_ya_asignada', nombre: 'Respuesta al SI: ya asignada a otro compañero', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'ℹ️ La reserva *{numero_reserva}* ya ha sido asignada a otro compañero. Gracias por tu disponibilidad.' },
+    { clave: 'chofer_respuesta_rechazo', nombre: 'Respuesta al NO: rechazo recibido', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '👍 Recibido, gracias por avisar.' },
+    { clave: 'chofer_enlace_mensaje_cliente', nombre: 'Enlace: mensaje del cliente (al chofer)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '📩 *Mensaje del cliente*\n🔖 *Reserva:* {numero_reserva}\n👤 *Cliente:* {nombre_cliente} ({idioma})\n\n«{mensaje}»\n{original}\n\nPara responder, escribe aquí tu mensaje. Si tienes varios servicios a la vez, empieza por *{numero_reserva}*.' },
+    { clave: 'chofer_enlace_enviado', nombre: 'Enlace: enviado al cliente', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '✅ Enviado al cliente · *{numero_reserva}*' },
+    { clave: 'chofer_enlace_sin_servicio', nombre: 'Enlace: no encuentro servicio en curso', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'ℹ️ No encuentro ningún servicio tuyo en curso. Para escribir a un cliente, empieza tu mensaje con el número de reserva, por ejemplo: *ABC123* Estoy en la puerta 2. El enlace funciona desde 2 horas antes hasta 2 horas después del servicio.' },
+    { clave: 'chofer_enlace_no_existe', nombre: 'Enlace: la reserva no existe', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '⚠️ No existe ninguna reserva con el número *{numero_reserva}*. Revisa el número.' },
+    { clave: 'chofer_enlace_no_asignada', nombre: 'Enlace: la reserva no es suya', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '⚠️ La reserva *{numero_reserva}* no está asignada a ti.' },
+    { clave: 'chofer_enlace_terminado', nombre: 'Enlace: viaje terminado', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '✅ Reserva *{numero_reserva}*: *viaje terminado*.' },
+    { clave: 'chofer_enlace_no_presentado', nombre: 'Enlace: cliente no se presentó', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '🚫 Reserva *{numero_reserva}*: *cliente no se presentó*.' },
+    { clave: 'chofer_enlace_cancelada', nombre: 'Enlace: viaje cancelado', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '❌ Reserva *{numero_reserva}*: *viaje cancelado*.' },
+    { clave: 'chofer_enlace_sin_chofer', nombre: 'Enlace: sin chofer asignado', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'ℹ️ La reserva *{numero_reserva}* no tiene chofer asignado.' },
+    { clave: 'chofer_enlace_fuera_ventana', nombre: 'Enlace: fuera del horario del enlace', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '🕐 La reserva *{numero_reserva}* es para el *{fecha}* a las *{hora}*. El enlace con el cliente se abre 2 horas antes.' },
+    { clave: 'interno_servicio_liberado', nombre: 'Servicio liberado por su chofer (al equipo)', categoria: 'interno',
+      asunto_email: '⚠️ {numero_reserva}: servicio liberado por su chofer',
+      cuerpo_email: `
+⚠️ <strong>Servicio liberado por su chofer</strong>
+<div class="info-box">
+  🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span>
+  📅 <strong>Fecha:</strong> {fecha} · {hora}
+  📍 <strong>Ruta:</strong> {origen} → {destino}
+  👤 <strong>Chofer que lo libera:</strong> {chofer_anterior}
+  📝 <strong>Causa:</strong> {causa}
+</div>
+Se está ofreciendo por WhatsApp a los demás choferes aprobados. Revisa la reserva en el Admin.
+`,
+      cuerpo_whatsapp: '' },
+    { clave: 'interno_nuevo_chofer', nombre: 'Nuevo chofer asignado (al equipo)', categoria: 'interno',
+      asunto_email: '✅ {numero_reserva}: nuevo chofer asignado',
+      cuerpo_email: `
+✅ <strong>Nuevo chofer asignado</strong>
+<div class="info-box">
+  🔖 <strong>Reserva:</strong> <span class="pnr">{numero_reserva}</span>
+  📅 <strong>Fecha:</strong> {fecha} · {hora}
+  👤 <strong>Nuevo chofer:</strong> {nombre_chofer}
+</div>
+El cliente ya ha recibido el aviso del cambio de chofer.
+`,
+      cuerpo_whatsapp: '' },
   ];
 
   for (const p of plantillasBase) {
@@ -9118,6 +9162,19 @@ async function avisarEquipoEmail(asunto, texto) {
   } catch (e) { console.warn('Aviso al equipo:', e.message); }
 }
 
+// Aviso al equipo con una plantilla "Interna" de Comunicaciones (email a Admin → Notificaciones)
+async function avisarEquipoPlantilla(clave, vars) {
+  try {
+    const p = await obtenerPlantilla(clave, vars, 'es');
+    if (!p || !p.email) { console.warn('Plantilla interna ' + clave + ' no disponible'); return; }
+    const emails = await obtenerEmailsNotificacion();
+    for (const e of emails) {
+      try { await enviarEmail({ to: e, subject: p.asunto || clave, html: plantillaEmail(p.email) }); }
+      catch (err) { console.warn('Aviso al equipo (email ' + e + '):', err.message); }
+    }
+  } catch (e) { console.warn('Aviso al equipo:', e.message); }
+}
+
 app.post('/chofer/reservas/:id/liberar', requireChofer, asyncHandler(async (req, res) => {
   const causa = String((req.body && req.body.causa) || '').trim().slice(0, 200);
   if (!causa) return res.status(400).json({ error: 'Indica la causa.' });
@@ -9142,11 +9199,13 @@ app.post('/chofer/reservas/:id/liberar', requireChofer, asyncHandler(async (req,
     [r.id, req.session.choferId, 'Liberado por el chofer ' + r.chofer_nombre + '. Causa: ' + causa]
   );
   console.log('⚠️ ' + r.numero_reserva + ' liberado por ' + r.chofer_nombre + ' (' + causa + '). Se ofrece a los demás choferes.');
-  const cuando = (r.fecha ? fechaCliente(r.fecha, 'es') : '—') + ' a las ' + (r.hora ? String(r.hora).slice(0, 5) : '—');
-  await avisarEquipoEmail('⚠️ ' + r.numero_reserva + ' liberado por su chofer',
-    'El chofer ' + r.chofer_nombre + ' ha liberado el servicio ' + r.numero_reserva + ' (' + cuando + ', ' +
-    (r.origen || '—') + ' → ' + (r.destino || '—') + ').\nCausa: ' + causa +
-    '\nSe está ofreciendo por WhatsApp a los demás choferes aprobados.');
+  await avisarEquipoPlantilla('interno_servicio_liberado', {
+    numero_reserva: r.numero_reserva,
+    fecha: r.fecha ? fechaCliente(r.fecha, 'es') : '—',
+    hora: r.hora ? String(r.hora).slice(0, 5) : '—',
+    origen: r.origen || '—', destino: r.destino || '—',
+    chofer_anterior: r.chofer_nombre, causa: causa
+  });
   res.json({ ok: true });
 }));
 
@@ -10319,7 +10378,52 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
 // Avisa al chofer anterior y al nuevo (WhatsApp, en español), envía el cartel al nuevo, y al
 // cliente la plantilla "Cambio de conductor" (email + WhatsApp, en su idioma) y, si ya pagó,
 // el voucher actualizado. El enlace de WhatsApp pasa solo al nuevo chofer.
-async function reasignarChofer(reservaId, nuevoConductorId, causa) {
+// Texto de una plantilla de chofer (WhatsApp, español). Si no existe o está inactiva, el texto de respaldo.
+async function plantillaChoferWa(clave, vars, respaldo) {
+  try {
+    const p = await obtenerPlantilla(clave, vars || {}, 'es');
+    if (p && p.whatsapp) return p.whatsapp;
+  } catch (e) { console.warn('Plantilla ' + clave + ':', e.message); }
+  return respaldo;
+}
+
+// Cartel de recogida al chofer asignado: email con el PDF y WhatsApp, con la plantilla "Cartel de
+// recogida". Es lo mismo que hace "Reenviar cartel" del Admin y el pago del depósito.
+async function enviarCartelChofer(reservaId) {
+  const q = await pool.query('SELECT * FROM reservas WHERE id = $1', [reservaId]);
+  if (!q.rows.length || !q.rows[0].conductor_id) return;
+  const r = q.rows[0];
+  const cartel = await generarCartelPDF(reservaId);
+  if (!cartel) return;
+  const fechaCartel = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+  const pcc = await obtenerPlantilla('chofer_cartel', {
+    nombre_chofer: cartel.conductor_nombre || '', numero_reserva: r.numero_reserva,
+    origen: r.origen || '—', destino: r.destino || '—', fecha: fechaCartel, hora: r.hora ? String(r.hora).slice(0, 5) : '—'
+  });
+  if (cartel.conductor_email) {
+    try {
+      await enviarEmailConAdjunto({
+        to: cartel.conductor_email,
+        subject: (pcc && pcc.asunto) || ('Cartel de recogida — ' + r.numero_reserva),
+        html: plantillaEmail((pcc && pcc.email) || ('<p>Adjuntamos el cartel de recogida para la reserva <strong>' + r.numero_reserva + '</strong>.</p>')),
+        adjunto: { filename: 'cartel-' + r.numero_reserva + '.pdf', content: cartel.buffer }
+      });
+    } catch (e) { console.warn('Cartel por email:', e.message); }
+  }
+  const ch = await pool.query('SELECT telefono FROM conductores WHERE id = $1', [r.conductor_id]);
+  if (ch.rows.length && ch.rows[0].telefono) {
+    const firma = firmarCartel(reservaId);
+    const nombreDoc = 'cartel-' + r.numero_reserva + '.pdf';
+    await pool.query(
+      'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+      [ch.rows[0].telefono, (pcc && pcc.whatsapp) || ('Cartel de recogida de la reserva ' + r.numero_reserva + '.'),
+       BASE_URL + '/cartel-descarga/' + reservaId + '/' + firma + '/' + nombreDoc, nombreDoc]
+    );
+  }
+}
+
+async function reasignarChofer(reservaId, nuevoConductorId, causa, desdeAdmin) {
+  if (desdeAdmin === undefined) desdeAdmin = true;
   const rq = await pool.query(
     `SELECT r.*, ca.nombre AS chofer_anterior_nombre, ca.telefono AS chofer_anterior_telefono
      FROM reservas r LEFT JOIN conductores ca ON ca.id = r.conductor_id WHERE r.id = $1`, [reservaId]);
@@ -10340,30 +10444,32 @@ async function reasignarChofer(reservaId, nuevoConductorId, causa) {
   const horaTxt = r.hora ? String(r.hora).slice(0, 5) : '—';
   const ruta = (r.origen || '—') + ' → ' + (r.destino || '—');
 
-  // Chofer anterior (español)
+  // Chofer anterior (plantilla "Servicio reasignado a otro compañero")
   if (r.chofer_anterior_telefono) {
     try {
-      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [r.chofer_anterior_telefono,
-        '⚠️ La reserva ' + r.numero_reserva + ' del ' + fechaTxt + ' a las ' + horaTxt + ' (' + ruta + ') se ha asignado a otro chofer. Ya no tienes que hacer este servicio.']);
+      const txt = await plantillaChoferWa('chofer_servicio_reasignado', {
+        nombre_chofer: String(r.chofer_anterior_nombre || '').trim().split(/\s+/)[0], numero_reserva: r.numero_reserva,
+        origen: r.origen || '—', destino: r.destino || '—', fecha: fechaTxt, hora: horaTxt
+      }, 'La reserva ' + r.numero_reserva + ' del ' + fechaTxt + ' a las ' + horaTxt + ' (' + ruta + ') se ha asignado a otro chofer. Ya no tienes que hacer este servicio.');
+      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [r.chofer_anterior_telefono, txt]);
     } catch (e) { console.warn('Reasignación: aviso al chofer anterior:', e.message); }
   }
-  // Chofer nuevo (español)
-  if (nuevo.telefono) {
+  // Chofer nuevo: el mensaje "Servicio asignado" solo cuando el cambio lo hace el Admin (si aceptó con
+  // "SI" ya vio el servicio y recibe la confirmación de siempre). El cartel, con las mismas reglas que
+  // cualquier servicio: solo si el cliente ya pagó el depósito (si no, le llegará al pagar).
+  if (desdeAdmin && nuevo.telefono) {
     try {
       const idioma = NOMBRES_IDIOMA_ES[r.lang_cliente || 'es'] || (r.lang_cliente || 'es');
-      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [nuevo.telefono,
-        '🚖 Se te ha asignado el servicio ' + r.numero_reserva + ': ' + fechaTxt + ' a las ' + horaTxt + ', ' + ruta + ', ' +
-        (r.num_pasajeros || '—') + ' pasajero(s), cliente de idioma ' + idioma + '. Revisa todos los detalles en tu panel.']);
+      const txt = await plantillaChoferWa('chofer_servicio_asignado', {
+        nombre_chofer: String(nuevo.nombre || '').trim().split(/\s+/)[0], numero_reserva: r.numero_reserva,
+        origen: r.origen || '—', destino: r.destino || '—', fecha: fechaTxt, hora: horaTxt,
+        pasajeros: r.num_pasajeros || '—', idioma: idioma
+      }, 'Se te ha asignado el servicio ' + r.numero_reserva + ': ' + fechaTxt + ' a las ' + horaTxt + ', ' + ruta + '. Revisa los detalles en tu panel.');
+      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [nuevo.telefono, txt]);
     } catch (e) { console.warn('Reasignación: aviso al chofer nuevo:', e.message); }
-    // Cartel de recogida al chofer nuevo
-    try {
-      const firma = firmarCartel(reservaId);
-      const nombreDoc = 'cartel-' + r.numero_reserva + '.pdf';
-      await pool.query(
-        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-        [nuevo.telefono, 'Cartel de recogida del servicio ' + r.numero_reserva + '.', BASE_URL + '/cartel-descarga/' + reservaId + '/' + firma + '/' + nombreDoc, nombreDoc]
-      );
-    } catch (e) { console.warn('Reasignación: cartel al chofer nuevo:', e.message); }
+  }
+  if (r.deposito_pagado) {
+    try { await enviarCartelChofer(reservaId); } catch (e) { console.warn('Reasignación: cartel al chofer nuevo:', e.message); }
   }
   // Cliente (idioma de la reserva)
   const langR = r.lang_cliente || 'es';
@@ -15576,7 +15682,8 @@ async function procesarEntrante(entranteId) {
       );
       if (reciente.rows.length) { await anotar('sin numero (ya avisado hoy)'); return; }
       if (m.conductor_id) {
-        await enviarWhatsappEnlace(tel, 'No encuentro ningún servicio tuyo en curso. Para escribir a un cliente, empieza tu mensaje con el número de reserva, por ejemplo: ABC123 Estoy en la puerta 2. El enlace funciona desde 2 horas antes hasta 2 horas después del servicio.');
+        await enviarWhatsappEnlace(tel, await plantillaChoferWa('chofer_enlace_sin_servicio', {},
+          'No encuentro ningún servicio tuyo en curso. Para escribir a un cliente, empieza tu mensaje con el número de reserva, por ejemplo: ABC123 Estoy en la puerta 2. El enlace funciona desde 2 horas antes hasta 2 horas después del servicio.'));
       } else {
         await enviarWhatsappEnlace(tel, await fraseEnlace('frase_enlace_no_encontrada', await idiomaPorTelefonoCliente(tel), {}));
       }
@@ -15595,7 +15702,8 @@ async function procesarEntrante(entranteId) {
     );
     const esChofer = !!m.conductor_id;
     if (!rq.rows.length) {
-      if (esChofer) await enviarWhatsappEnlace(tel, 'No existe ninguna reserva con el número ' + pnr + '. Revisa el número.');
+      if (esChofer) await enviarWhatsappEnlace(tel, await plantillaChoferWa('chofer_enlace_no_existe', { numero_reserva: pnr },
+        'No existe ninguna reserva con el número ' + pnr + '. Revisa el número.'));
       else await enviarWhatsappEnlace(tel, await fraseEnlace('frase_enlace_no_existe', await idiomaPorTelefonoCliente(tel), { numero_reserva: pnr }));
       await anotar('no existe ' + pnr);
       console.log('   ↩️ Respuesta automática a +' + tel + ': la reserva ' + pnr + ' no existe');
@@ -15606,29 +15714,33 @@ async function procesarEntrante(entranteId) {
     // ¿Lo escribe el chofer asignado a esta reserva?
     const esSuChofer = !!(r.telefono_chofer && mismoTelefono(r.telefono_chofer, tel));
     if (esChofer && !esSuChofer) {
-      await enviarWhatsappEnlace(tel, 'La reserva ' + pnr + ' no está asignada a ti.');
+      await enviarWhatsappEnlace(tel, await plantillaChoferWa('chofer_enlace_no_asignada', { numero_reserva: pnr },
+        'La reserva ' + pnr + ' no está asignada a ti.'));
       await anotar('chofer no asignado ' + pnr);
       console.log('   ↩️ Respuesta automática a +' + tel + ': la reserva ' + pnr + ' no es suya');
       return;
     }
-    const aviso = async function (claveFrase, textoChofer, etiqueta, datosExtra) {
-      if (esSuChofer) await enviarWhatsappEnlace(tel, textoChofer);
+    // Aviso al cliente (🧩 frase traducida) o al chofer (plantilla de chofer, en español)
+    const aviso = async function (claveFrase, claveChofer, respaldoChofer, etiqueta, datosExtra, datosChofer) {
+      if (esSuChofer) await enviarWhatsappEnlace(tel, await plantillaChoferWa(claveChofer,
+        Object.assign({ numero_reserva: r.numero_reserva }, datosChofer || {}), respaldoChofer));
       else await enviarWhatsappEnlace(tel, await fraseEnlace(claveFrase, langR, Object.assign({ numero_reserva: r.numero_reserva }, datosExtra || {})));
       await anotar(etiqueta + ' ' + pnr);
       console.log('   ↩️ Respuesta automática a +' + tel + ': ' + etiqueta + ' (' + pnr + ')');
     };
-    if (r.estado === 'cancelada') return aviso('frase_enlace_cancelada', 'La reserva ' + pnr + ' está cancelada.', 'cancelada');
-    if (r.estado === 'completada' || r.estado === 'no_show') return aviso('frase_enlace_realizada', 'La reserva ' + pnr + ' ya está cerrada.', 'realizada');
-    if (!r.conductor_id) return aviso('frase_enlace_sin_chofer', 'La reserva ' + pnr + ' no tiene chofer asignado.', 'sin chofer');
+    if (r.estado === 'cancelada') return aviso('frase_enlace_cancelada', 'chofer_enlace_cancelada', 'Reserva ' + pnr + ': viaje cancelado.', 'cancelada');
+    if (r.estado === 'completada') return aviso('frase_enlace_realizada', 'chofer_enlace_terminado', 'Reserva ' + pnr + ': viaje terminado.', 'realizada');
+    if (r.estado === 'no_show') return aviso('frase_enlace_realizada', 'chofer_enlace_no_presentado', 'Reserva ' + pnr + ': cliente no se presentó.', 'realizada');
+    if (!r.conductor_id) return aviso('frase_enlace_sin_chofer', 'chofer_enlace_sin_chofer', 'La reserva ' + pnr + ' no tiene chofer asignado.', 'sin chofer');
     const recogida = calcularFechaCancelacion(new Date(r.fecha), r.hora, 0);
     const ahora = new Date();
     const dentro = ahora >= new Date(recogida.getTime() - VENTANA_ENLACE_HORAS * 3600000) &&
                    ahora <= new Date(recogida.getTime() + VENTANA_ENLACE_HORAS * 3600000);
     if (!dentro) {
       const horaTxt = r.hora ? String(r.hora).slice(0, 5) : '—';
-      return aviso('frase_enlace_fuera_ventana',
+      return aviso('frase_enlace_fuera_ventana', 'chofer_enlace_fuera_ventana',
         'La reserva ' + pnr + ' es para el ' + fechaCliente(r.fecha, 'es') + ' a las ' + horaTxt + '. El enlace con el cliente se abre 2 horas antes.',
-        'fuera de ventana', { fecha: fechaCliente(r.fecha, langR), hora: horaTxt });
+        'fuera de ventana', { fecha: fechaCliente(r.fecha, langR), hora: horaTxt }, { fecha: fechaCliente(r.fecha, 'es'), hora: horaTxt });
     }
     // Todo correcto → paso 4: reenvío con traducción
     const cuerpo = texto.replace(/^\s*[A-Za-z]{3}\d{3}\b[\s:,.\-]*/, '').trim();
@@ -15639,10 +15751,14 @@ async function procesarEntrante(entranteId) {
       const traduccion = await traducirEnlace(cuerpo, 'es');
       const nombreViajero = (r.es_para_otra_persona && r.nombre_pasajero_otro) ? r.nombre_pasajero_otro : (r.nombre_cliente || '—');
       const idiomaNombre = NOMBRES_IDIOMA_ES[langR] || langR;
-      let paraChofer = '📩 ' + r.numero_reserva + ' · Cliente: ' + nombreViajero + ' (' + idiomaNombre + ')\n';
-      if (traduccion && traduccion !== cuerpo) paraChofer += '«' + traduccion + '»\n(Original: ' + cuerpo + ')';
-      else paraChofer += '«' + cuerpo + '»' + (traduccion ? '' : '\n(sin traducir)');
-      paraChofer += '\n\nPara responder, empieza por ' + r.numero_reserva;
+      // Plantilla "Enlace: mensaje del cliente". {original} lleva el texto original solo si se tradujo.
+      const hayTraduccion = traduccion && traduccion !== cuerpo;
+      const paraChofer = await plantillaChoferWa('chofer_enlace_mensaje_cliente', {
+        numero_reserva: r.numero_reserva, nombre_cliente: nombreViajero, idioma: idiomaNombre,
+        mensaje: hayTraduccion ? traduccion : cuerpo,
+        original: hayTraduccion ? '_(Original: ' + cuerpo + ')_' : (traduccion ? '' : '_(sin traducir)_')
+      }, '📩 ' + r.numero_reserva + ' · Cliente: ' + nombreViajero + ' (' + idiomaNombre + ')\n«' + (hayTraduccion ? traduccion : cuerpo) + '»' +
+         (hayTraduccion ? '\n(Original: ' + cuerpo + ')' : '') + '\n\nPara responder, empieza por ' + r.numero_reserva);
       await enviarWhatsappEnlace(telChofer, paraChofer);
       // La confirmación lleva el número de reserva, para que se vea a qué reserva ha ido
       await enviarWhatsappEnlace(tel, (await fraseEnlace('frase_enlace_enviado_conductor', langR, {})).replace(/\.\s*$/, '') + ' · ' + r.numero_reserva);
@@ -15668,7 +15784,9 @@ async function procesarEntrante(entranteId) {
       );
       otros.rows.forEach(function (o) { añadir(o.telefono_real); });
       for (const d of destinos) await enviarWhatsappEnlace(d, paraCliente);
-      await enviarWhatsappEnlace(tel, destinos.length ? '✅ Enviado al cliente · ' + r.numero_reserva : 'No hay ningún móvil del cliente para la reserva ' + r.numero_reserva + '.');
+      await enviarWhatsappEnlace(tel, destinos.length
+        ? await plantillaChoferWa('chofer_enlace_enviado', { numero_reserva: r.numero_reserva }, '✅ Enviado al cliente · ' + r.numero_reserva)
+        : 'No hay ningún móvil del cliente para la reserva ' + r.numero_reserva + '.');
       await anotar('reenviado ' + r.numero_reserva + ' (chofer → cliente)');
       console.log('   📨 ' + r.numero_reserva + ': mensaje del CHOFER reenviado a ' + destinos.length + ' móvil(es) del cliente');
     }
@@ -15870,15 +15988,19 @@ app.post('/api/whatsapp/asignar/:id', requierePuenteWhatsapp, asyncHandler(async
   // con datos y cartel; cliente con "Cambio de chofer" y voucher), sin repetir la primera asignación.
   const enReas = await pool.query('SELECT numero_reserva, reasignacion_en_curso FROM reservas WHERE id = $1', [req.params.id]);
   if (enReas.rows.length && enReas.rows[0].reasignacion_en_curso) {
-    await reasignarChofer(req.params.id, Number(conductor_id), 'Aceptado por WhatsApp tras ser liberado por su chofer');
+    await reasignarChofer(req.params.id, Number(conductor_id), 'Aceptado por WhatsApp tras ser liberado por su chofer', false);
     await pool.query(
       `UPDATE reservas SET estado_aviso_whatsapp = 'asignado', reasignacion_en_curso = FALSE WHERE id = $1`,
       [req.params.id]
     );
     const nq = await pool.query('SELECT nombre FROM conductores WHERE id = $1', [conductor_id]);
-    await avisarEquipoEmail('✅ ' + enReas.rows[0].numero_reserva + ': nuevo chofer asignado',
-      'El servicio ' + enReas.rows[0].numero_reserva + ', que se estaba reasignando, lo ha aceptado ' +
-      (nq.rows.length ? nq.rows[0].nombre : 'un chofer') + '. El cliente ya ha recibido el cambio de chofer.');
+    const rq2 = await pool.query('SELECT fecha, hora FROM reservas WHERE id = $1', [req.params.id]);
+    await avisarEquipoPlantilla('interno_nuevo_chofer', {
+      numero_reserva: enReas.rows[0].numero_reserva,
+      fecha: rq2.rows.length && rq2.rows[0].fecha ? fechaCliente(rq2.rows[0].fecha, 'es') : '—',
+      hora: rq2.rows.length && rq2.rows[0].hora ? String(rq2.rows[0].hora).slice(0, 5) : '—',
+      nombre_chofer: nq.rows.length ? nq.rows[0].nombre : '—'
+    });
     console.log('🔄 ' + enReas.rows[0].numero_reserva + ': reasignación aceptada por ' + (nq.rows.length ? nq.rows[0].nombre : conductor_id));
     return res.json({ ok: true });
   }
