@@ -1418,11 +1418,33 @@ table.tabla-precios input {
       <h1>Comunicaciones</h1>
       <p class="subtitulo">Plantillas de email y WhatsApp. Edita el texto, guarda los cambios y se aplican desde ese momento en todos los envíos automáticos.</p>
 
+      <!-- Guía de iconos (30/09/2026): consulta y edición -->
+      <div style="border:1px solid var(--gris-borde);border-radius:10px;margin-bottom:20px;overflow:hidden;">
+        <div onclick="toggleGuiaIconos()" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:#f9f7f4;">
+          <strong style="font-size:0.95rem;">🎨 Guía de iconos</strong>
+          <span id="guia-iconos-flecha" style="color:#999;">▼</span>
+        </div>
+        <div id="guia-iconos-cuerpo" style="display:none;padding:12px 16px;">
+          <p style="font-size:0.8rem;color:var(--texto-muted);margin:0 0 10px 0;">Usa siempre el mismo icono para el mismo dato, en todos los mensajes a clientes, choferes y equipo. Puedes cambiar, añadir o borrar filas.</p>
+          <div class="tabla-envoltura"><table class="tabla-admin" style="font-size:0.85rem;width:100%;table-layout:fixed;">
+            <thead><tr><th style="width:80px;">Icono</th><th>Qué significa</th><th>Dónde se usa</th><th style="width:170px;"></th></tr></thead>
+            <tbody id="guia-iconos-lista"></tbody>
+          </table></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;">
+            <input type="text" id="guia-nuevo-icono" class="campo" placeholder="Icono" style="width:70px;height:32px;">
+            <input type="text" id="guia-nuevo-significado" class="campo" placeholder="Qué significa" style="flex:1;min-width:160px;height:32px;">
+            <input type="text" id="guia-nuevo-donde" class="campo" placeholder="Dónde se usa" style="flex:1;min-width:160px;height:32px;">
+            <button class="boton-primario" style="margin-top:0;font-size:0.8rem;padding:6px 12px;" onclick="anadirGuiaIcono()">+ Añadir</button>
+          </div>
+          <div id="guia-iconos-aviso" style="display:none;font-size:0.8rem;margin-top:6px;"></div>
+        </div>
+      </div>
+
       <!-- Filtro de categoría + selector de idioma -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;align-items:center;">
         <button class="boton-costa" style="font-size:0.85rem;" onclick="filtrarPlantillas('todas')" id="filtro-todas">Todas</button>
         <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="filtrarPlantillas('cliente')" id="filtro-cliente">&#128100; Cliente</button>
-        <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="filtrarPlantillas('chofer')" id="filtro-chofer">&#128663; Chofer</button>
+        <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="filtrarPlantillas('chofer')" id="filtro-chofer">🧑‍✈️ Chofer</button>
         <button class="boton-secundario" style="margin-top:0;padding:8px 14px;font-size:0.85rem;" onclick="filtrarPlantillas('interno')" id="filtro-interno">&#128274; Interno</button>
         <span style="font-size:13px;color:var(--texto-muted);margin-left:8px;" id="com-total-info"></span>
 
@@ -9114,6 +9136,70 @@ var _plantillasCom = [];
 var _plantillaComActual = null;
 var _filtroCom = 'todas';
 
+
+// ─── Guía de iconos ──────────────────────────────────────────────────────────
+function toggleGuiaIconos() {
+  var c = document.getElementById('guia-iconos-cuerpo');
+  var abierto = c.style.display !== 'none';
+  c.style.display = abierto ? 'none' : 'block';
+  document.getElementById('guia-iconos-flecha').textContent = abierto ? '▼' : '▲';
+  if (!abierto) cargarGuiaIconos();
+}
+
+function avisoGuia(texto, ok) {
+  var av = document.getElementById('guia-iconos-aviso');
+  av.style.display = 'block'; av.style.color = ok ? '#2d7a4f' : '#e07b5a'; av.textContent = texto;
+}
+
+function escGuia(t) { return String(t || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+function cargarGuiaIconos() {
+  fetch('/admin/guia-iconos').then(function(r) { return r.json(); }).then(function(filas) {
+    document.getElementById('guia-iconos-lista').innerHTML = filas.map(function(f) {
+      return '<tr>' +
+        '<td><input type="text" class="campo" id="guia-i-' + f.id + '" value="' + escGuia(f.icono) + '" style="width:60px;height:30px;font-size:1.1rem;text-align:center;"></td>' +
+        '<td><input type="text" class="campo" id="guia-s-' + f.id + '" value="' + escGuia(f.significado) + '" style="width:100%;height:30px;"></td>' +
+        '<td><input type="text" class="campo" id="guia-d-' + f.id + '" value="' + escGuia(f.donde) + '" style="width:100%;height:30px;"></td>' +
+        '<td style="text-align:right;">' +
+          '<button class="boton-primario" style="margin-top:0;font-size:0.75rem;padding:5px 10px;" onclick="guardarGuiaIcono(' + f.id + ')">Guardar</button> ' +
+          '<button class="boton-secundario" style="margin-top:0;font-size:0.75rem;padding:5px 10px;" onclick="borrarGuiaIcono(' + f.id + ')">Borrar</button>' +
+        '</td></tr>';
+    }).join('');
+  }).catch(function() { avisoGuia('No se pudo cargar la guía.', false); });
+}
+
+function guardarGuiaIcono(id) {
+  fetch('/admin/guia-iconos/' + id, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      icono: document.getElementById('guia-i-' + id).value,
+      significado: document.getElementById('guia-s-' + id).value,
+      donde: document.getElementById('guia-d-' + id).value
+    })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.ok) avisoGuia('✔ Guardado.', true); else avisoGuia(d.error || 'No se pudo guardar.', false);
+  });
+}
+
+function borrarGuiaIcono(id) {
+  if (!confirm('¿Borrar esta fila de la guía?')) return;
+  fetch('/admin/guia-iconos/' + id, { method: 'DELETE' }).then(function(r) { return r.json(); }).then(function() { cargarGuiaIconos(); });
+}
+
+function anadirGuiaIcono() {
+  fetch('/admin/guia-iconos', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      icono: document.getElementById('guia-nuevo-icono').value,
+      significado: document.getElementById('guia-nuevo-significado').value,
+      donde: document.getElementById('guia-nuevo-donde').value
+    })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.ok) { avisoGuia(d.error || 'No se pudo añadir.', false); return; }
+    ['guia-nuevo-icono', 'guia-nuevo-significado', 'guia-nuevo-donde'].forEach(function(x) { document.getElementById(x).value = ''; });
+    avisoGuia('✔ Añadido.', true); cargarGuiaIconos();
+  });
+}
 
 function cargarPlantillasCom() {
   fetch('/admin/plantillas-comunicacion')
