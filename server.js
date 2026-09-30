@@ -15548,6 +15548,32 @@ app.put('/admin/guia-iconos/:id', requireAdmin, asyncHandler(async (req, res) =>
   await pool.query('UPDATE guia_iconos SET icono = $1, significado = $2, donde = $3 WHERE id = $4', [icono, significado, donde, req.params.id]);
   res.json({ ok: true });
 }));
+// Cambiar un icono en TODOS los mensajes (plantillas, 🧩 frases, textos de la web y sus traducciones).
+// Un emoji no se traduce: las traducciones se corrigen directamente, sin pasar a rojo.
+app.post('/admin/guia-iconos/aplicar', requireAdmin, asyncHandler(async (req, res) => {
+  const viejo = String((req.body && req.body.viejo) || '').trim();
+  const nuevo = String((req.body && req.body.nuevo) || '').trim();
+  if (!viejo || !nuevo || viejo === nuevo || viejo.length > 20 || nuevo.length > 20) {
+    return res.status(400).json({ error: 'Iconos no válidos.' });
+  }
+  const contar = function (r) { return r.rowCount || 0; };
+  const p = await pool.query(
+    `UPDATE plantillas_comunicacion SET asunto_email = replace(asunto_email, $1, $2), cuerpo_email = replace(cuerpo_email, $1, $2),
+       cuerpo_whatsapp = replace(cuerpo_whatsapp, $1, $2)
+     WHERE position($1 in COALESCE(asunto_email, '') || COALESCE(cuerpo_email, '') || COALESCE(cuerpo_whatsapp, '')) > 0`, [viejo, nuevo]);
+  const pt = await pool.query(
+    `UPDATE plantillas_comunicacion_traducciones SET asunto_email = replace(asunto_email, $1, $2), cuerpo_email = replace(cuerpo_email, $1, $2),
+       cuerpo_whatsapp = replace(cuerpo_whatsapp, $1, $2)
+     WHERE position($1 in COALESCE(asunto_email, '') || COALESCE(cuerpo_email, '') || COALESCE(cuerpo_whatsapp, '')) > 0`, [viejo, nuevo]);
+  const f = await pool.query(`UPDATE frases_comunicacion SET texto_es = replace(texto_es, $1, $2) WHERE position($1 in texto_es) > 0`, [viejo, nuevo]);
+  const ft = await pool.query(`UPDATE frases_comunicacion_traducciones SET texto = replace(texto, $1, $2) WHERE position($1 in COALESCE(texto, '')) > 0`, [viejo, nuevo]);
+  const t = await pool.query(`UPDATE textos_interfaz SET texto_es = replace(texto_es, $1, $2) WHERE position($1 in texto_es) > 0`, [viejo, nuevo]);
+  const tt = await pool.query(`UPDATE textos_interfaz_traducciones SET texto = replace(texto, $1, $2) WHERE position($1 in COALESCE(texto, '')) > 0`, [viejo, nuevo]);
+  await cargarTextosCache();
+  console.log('🎨 Icono ' + viejo + ' → ' + nuevo + ': ' + contar(p) + ' plantillas, ' + contar(f) + ' frases, ' + contar(t) + ' textos (y traducciones).');
+  res.json({ ok: true, plantillas: contar(p) + contar(pt), frases: contar(f) + contar(ft), textos: contar(t) + contar(tt) });
+}));
+
 app.delete('/admin/guia-iconos/:id', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM guia_iconos WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
