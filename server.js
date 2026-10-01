@@ -9176,7 +9176,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   const fechaTextoCliente = r.fecha ? fechaCliente(r.fecha, _langVal) : '—';
   const _txtBotonValorar = await obtenerFrase('frase_boton_valorar', _langVal, 'Valorar mi traslado');
   const botonValoracion = `<div style="text-align:center;margin:12px 0;">
-    <a href="${enlaceCorto}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">⭐ ${_txtBotonValorar}</a>
+    <a href="${enlaceCorto}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">⭐ ${_txtBotonValorar}</a>
   </div>`;
   const _pval = await obtenerPlantilla('cliente_valoracion', {
     nombre_cliente: r.nombre_cliente,
@@ -10450,7 +10450,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
       const _txtSinEnlace1 = await obtenerFrase('frase_sin_enlace_pago', _langConf1, 'Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.');
       const botonPago = urlPago
         ? `<div style="text-align:center;margin:12px 0;">
-            <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 ${_txtBotonPago1}</a>
+            <a href="${urlPago}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 ${_txtBotonPago1}</a>
            </div>`
         : `<p style="color:#888;font-size:13px;">${_txtSinEnlace1}</p>`;
 
@@ -11532,7 +11532,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
   const _txtSinEnlace2 = await obtenerFrase('frase_sin_enlace_pago', _langConf2, 'Para completar la reserva, contacta con nosotros por WhatsApp para realizar el pago del depósito.');
   const botonPago = urlPago
     ? `<div style="text-align:center;margin:24px 0;">
-        <a href="${urlPago}" style="background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 ${_txtBotonPago2}</a>
+        <a href="${urlPago}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 ${_txtBotonPago2}</a>
        </div>`
     : `<p style="color:#888;font-size:13px;">${_txtSinEnlace2}</p>`;
 
@@ -12165,6 +12165,17 @@ async function formatearExtrasWhatsapp(reservaId, lang) {
   }
 }
 
+// Saltos de línea de las plantillas de email → <br> (01/10/2026).
+// Un salto pegado a la apertura o al cierre de un bloque (<p>, <div>, <blockquote>) no se convierte:
+// el bloque ya trae su propio margen y la línea en blanco extra dejaba huecos dobles
+// (número de reserva centrado, recuadros, botones). El resto de saltos, igual que siempre.
+function saltosEmailAHtml(txt) {
+  return String(txt)
+    .replace(/[ \t]*\n\s*(<\/?(?:p|div|blockquote)\b[^>]*>)/gi, '$1')
+    .replace(/(<\/?(?:p|div|blockquote)\b[^>]*>)[ \t]*\n/gi, '$1')
+    .replace(/\n/g, '<br>');
+}
+
 async function obtenerPlantilla(clave, vars, lang) {
   // (29/09/2026) Tras unificar "conductor" → "chofer", una marca puede venir con cualquiera de las
   // dos palabras (en español o en una traducción). Se rellenan las dos formas con el mismo dato.
@@ -12219,7 +12230,7 @@ async function obtenerPlantilla(clave, vars, lang) {
     const emailTexto = sustituir(p.cuerpo_email);
     return {
       asunto: sustituir(p.asunto_email),
-      email: emailTexto ? emailTexto.replace(/\n/g, '<br>') : emailTexto,
+      email: emailTexto ? saltosEmailAHtml(emailTexto) : emailTexto,
       whatsapp: sustituir(p.cuerpo_whatsapp)
     };
   } catch(e) {
