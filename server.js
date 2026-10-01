@@ -2498,15 +2498,23 @@ Un saludo cordial, 🙏
       cuerpo_email: `
 Hola, <strong>{nombre_cliente}</strong> 👋
 
-💬 Has recibido un mensaje de Traslados GC sobre tu reserva <strong>{numero_reserva}</strong>.
-
-🔍 Accede a tu portal para leerlo y responder:
+💬 <strong>Tienes un mensaje nuevo de nuestro equipo.</strong>
+<p style="text-align:center;margin:10px 0;">
+  Reserva <span class="pnr">{numero_reserva}</span>
+</p>
+<div class="info-box">
+  <strong>Detalles del traslado:</strong>
+  📍 Origen: {origen}
+  🏁 Destino: {destino}
+  📅 Fecha: {fecha} · {hora}
+</div>
+🔍 Para leerlo y responder, entra en tu portal:
 <a href="{url_portal}" style="color:#C1502E;">{url_portal}</a>
 
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n💬 Has recibido un mensaje de Traslados GC sobre tu reserva *{numero_reserva}*.\n\n🔍 Accede a tu portal para leerlo y responder:\n{url_portal}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n💬 *Tienes un mensaje nuevo de nuestro equipo.*\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\n🔍 Para leerlo y responder, entra en tu portal:\n{url_portal}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_valoracion', nombre: 'Solicitud de valoraci\u00f3n (servicio terminado)', categoria: 'cliente',
       asunto_email: '\u00bfC\u00f3mo fue tu traslado {numero_reserva}?',
       cuerpo_email: `
@@ -3076,6 +3084,53 @@ Un saludo cordial, 🙏
                         WHERE plantilla_clave = 'cliente_mensaje_admin' AND cuerpo_whatsapp IS NOT NULL AND cuerpo_whatsapp <> ''`);
     }
   } catch (e) { console.warn('Cambio plantilla mensaje del equipo:', e.message); }
+  // Aviso "Tienes un mensaje nuevo" (01/10/2026): formato de la confirmación (número destacado y
+  // origen, destino, fecha y hora). Cambio ÚNICO: solo si aún tiene la frase anterior; nunca pisa lo
+  // editado después en el Admin. Sus traducciones pasan a "desactualizado" (rojo en Idiomas).
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_datos (clave TEXT PRIMARY KEY, hecho_en TIMESTAMP DEFAULT NOW())`);
+    const hechaMsg = await pool.query(`SELECT 1 FROM migraciones_datos WHERE clave = 'aviso_mensaje_formato_20261001'`);
+    if (!hechaMsg.rows.length) {
+      const nEm = await pool.query(
+        `UPDATE plantillas_comunicacion SET cuerpo_email = $1, actualizado_en = NOW()
+         WHERE clave = 'cliente_mensaje_admin' AND cuerpo_email LIKE '%Has recibido un mensaje de Traslados GC%' RETURNING clave`,
+        [`
+Hola, <strong>{nombre_cliente}</strong> 👋
+
+💬 <strong>Tienes un mensaje nuevo de nuestro equipo.</strong>
+<p style="text-align:center;margin:10px 0;">
+  Reserva <span class="pnr">{numero_reserva}</span>
+</p>
+<div class="info-box">
+  <strong>Detalles del traslado:</strong>
+  📍 Origen: {origen}
+  🏁 Destino: {destino}
+  📅 Fecha: {fecha} · {hora}
+</div>
+🔍 Para leerlo y responder, entra en tu portal:
+<a href="{url_portal}" style="color:#C1502E;">{url_portal}</a>
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>
+`]
+      );
+      if (nEm.rows.length) {
+        await pool.query(`UPDATE plantillas_comunicacion_traducciones SET desactualizado_email = TRUE
+                          WHERE plantilla_clave = 'cliente_mensaje_admin' AND cuerpo_email IS NOT NULL AND cuerpo_email <> ''`);
+      }
+      const nWa = await pool.query(
+        `UPDATE plantillas_comunicacion SET cuerpo_whatsapp = $1, actualizado_en = NOW()
+         WHERE clave = 'cliente_mensaje_admin' AND cuerpo_whatsapp LIKE '%Has recibido un mensaje de Traslados GC%' RETURNING clave`,
+        ['Hola, *{nombre_cliente}* 👋\n\n💬 *Tienes un mensaje nuevo de nuestro equipo.*\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\n🔍 Para leerlo y responder, entra en tu portal:\n{url_portal}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*']
+      );
+      if (nWa.rows.length) {
+        await pool.query(`UPDATE plantillas_comunicacion_traducciones SET desactualizado_wa = TRUE
+                          WHERE plantilla_clave = 'cliente_mensaje_admin' AND cuerpo_whatsapp IS NOT NULL AND cuerpo_whatsapp <> ''`);
+      }
+      await pool.query(`INSERT INTO migraciones_datos (clave) VALUES ('aviso_mensaje_formato_20261001') ON CONFLICT DO NOTHING`);
+      console.log('💬 Aviso de mensaje del equipo: formato nuevo (email: ' + nEm.rows.length + ', WhatsApp: ' + nWa.rows.length + ').');
+    }
+  } catch (e) { console.warn('Formato aviso mensaje del equipo:', e.message); }
   // Marca "desactualizado": se activa cuando se cambia el español después de traducir.
   // El cliente sigue recibiendo la traducción aprobada; en Idiomas sale en rojo para ajustarla.
   await pool.query(`ALTER TABLE plantillas_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado_email BOOLEAN DEFAULT FALSE`);
@@ -14876,7 +14931,7 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
   // Notificar al cliente por email
   try {
     const reserva = await pool.query(
-      'SELECT nombre_cliente, email_cliente, telefono_cliente, numero_reserva, lang_cliente FROM reservas WHERE id = $1',
+      'SELECT nombre_cliente, email_cliente, telefono_cliente, numero_reserva, lang_cliente, origen, destino, fecha, hora FROM reservas WHERE id = $1',
       [req.params.id]
     );
     if (reserva.rows.length) {
@@ -14887,7 +14942,9 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
         mensaje: mensaje.trim().replace(/\n/g,'<br>'),
-        url_portal: BASE_URL + '/mi-reserva'
+        url_portal: BASE_URL + '/mi-reserva',
+        origen: r.origen || '—', destino: r.destino || '—',
+        fecha: r.fecha ? fechaCliente(r.fecha, _langMsg) : '—', hora: r.hora ? String(r.hora).slice(0, 5) : '—'
       }, _langMsg);
       // WhatsApp al cliente (misma plantilla, en su idioma; el texto del equipo va tal cual)
       if (r.telefono_cliente) {
@@ -14896,7 +14953,9 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
             nombre_cliente: r.nombre_cliente,
             numero_reserva: r.numero_reserva,
             mensaje: mensaje.trim(),
-            url_portal: BASE_URL + '/mi-reserva'
+            url_portal: BASE_URL + '/mi-reserva',
+            origen: r.origen || '—', destino: r.destino || '—',
+            fecha: r.fecha ? fechaCliente(r.fecha, _langMsg) : '—', hora: r.hora ? String(r.hora).slice(0, 5) : '—'
           }, _langMsg);
           if (_pmsgWa && _pmsgWa.whatsapp) {
             await pool.query(
