@@ -92,7 +92,29 @@ async function enviarEmailConAdjunto({ to, subject, html, adjunto }) {
 // ─── Plantilla corporativa universal para todos los emails ────────────────────
 // Usar siempre esta función — nunca HTML inline con cabecera/pie propios.
 // contenidoHtml: el cuerpo del email (sin cabecera ni pie).
+// (01/10/2026) Textos de la marca en los emails (cabecera y pie): salen de
+// Admin → Idiomas → Textos de interfaz → "Email — marca", en el idioma del email.
+// Si el texto no existe, se usa el de siempre.
+function textoMarcaEmail(clave, lang, porDefecto) {
+  const entrada = TEXTOS_CACHE[clave];
+  if (!entrada || !entrada.texto_es) return porDefecto;
+  if (lang && lang !== 'es' && entrada.traducciones[lang]) return entrada.traducciones[lang];
+  return entrada.texto_es;
+}
+
 function plantillaEmail(contenidoHtml) {
+  // obtenerPlantilla deja una marca invisible con el idioma del email (<!--lang:xx-->).
+  // Sin marca (avisos al chofer, internos o emails escritos en el programa) → español.
+  let _langMarca = 'es';
+  if (typeof contenidoHtml === 'string') {
+    contenidoHtml = contenidoHtml.replace(/<!--lang:([a-z]{2})-->/g, function (_, l) {
+      _langMarca = l;
+      return '';
+    });
+  }
+  const _marcaNombre = textoMarcaEmail('email_marca_1_nombre', _langMarca, 'Traslados GC');
+  const _marcaSubtitulo = textoMarcaEmail('email_marca_2_subtitulo', _langMarca, 'Gran Canaria');
+  const _marcaPie = textoMarcaEmail('email_marca_3_pie', _langMarca, 'Traslados GC · Gran Canaria');
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <style>
@@ -112,11 +134,11 @@ function plantillaEmail(contenidoHtml) {
   </style></head><body>
   <div class="wrapper">
     <div class="header">
-      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
-      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+      <h1 style="color:#d4956a;margin:0;font-size:20px;">${_marcaNombre}</h1>
+      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">${_marcaSubtitulo}</p>
     </div>
     <div class="body">${contenidoHtml}</div>
-    <div class="footer">Traslados GC · Gran Canaria</div>
+    <div class="footer">${_marcaPie}</div>
   </div></body></html>`;
 }
 
@@ -744,6 +766,22 @@ async function initSchema() {
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (clave) DO UPDATE SET modulo = $2, contexto = $3, texto_es = $4`,
       [t.clave, t.modulo, t.contexto, t.es]
+    );
+  }
+
+  // (01/10/2026) Textos de la marca en la cabecera y el pie de los emails.
+  // Se crean una sola vez (DO NOTHING): lo que se edite en el Admin no se pisa al reiniciar.
+  const TEXTOS_EMAIL_MARCA = [
+    { clave: 'email_marca_1_nombre',    contexto: 'Nombre de la marca en la cabecera de todos los emails (arriba, en grande)', es: 'Traslados GC' },
+    { clave: 'email_marca_2_subtitulo', contexto: 'Subtítulo bajo el nombre, en la cabecera de todos los emails', es: 'Gran Canaria' },
+    { clave: 'email_marca_3_pie',       contexto: 'Texto del pie, al final de todos los emails', es: 'Traslados GC · Gran Canaria' }
+  ];
+  for (const t of TEXTOS_EMAIL_MARCA) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Email — marca', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      [t.clave, t.contexto, t.es]
     );
   }
 
@@ -7819,7 +7857,7 @@ app.post('/admin/idiomas/:codigo/activo', requireAdmin, asyncHandler(async (req,
 
 app.get('/admin/textos', requireAdmin, asyncHandler(async (req, res) => {
   const textos = await pool.query(
-    `SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY modulo, (regexp_replace(clave, '[^0-9]', '', 'g') || '0')::int, clave`
+    `SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY (modulo = 'Email — marca') DESC, modulo, (regexp_replace(clave, '[^0-9]', '', 'g') || '0')::int, clave`
   );
   const traducciones = await pool.query(
     `SELECT texto_id, lang_code, texto FROM textos_interfaz_traducciones`
@@ -10846,8 +10884,8 @@ async function generarHtmlVoucher(reservaId) {
   </style></head><body>
   <div class="wrapper">
     <div class="header">
-      <h1 style="color:#d4956a;margin:0;font-size:20px;">Traslados GC</h1>
-      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">Gran Canaria</p>
+      <h1 style="color:#d4956a;margin:0;font-size:20px;">${textoMarcaEmail('email_marca_1_nombre', _lv, 'Traslados GC')}</h1>
+      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">${textoMarcaEmail('email_marca_2_subtitulo', _lv, 'Gran Canaria')}</p>
     </div>
     <div class="body">
       <p>${tv('vou_hola')} <strong>${r.nombre_cliente}</strong>,</p>
@@ -10871,7 +10909,7 @@ async function generarHtmlVoucher(reservaId) {
         <strong>⚠️ ${textoVoucherConDato('vou_cancelacion', _lv, '{fecha}', _textoLimiteVoucher)}</strong> ${textoVoucherConDato('vou_cancelacion_despues', _lv, '{importe}', _importeVoucher)}
       </div>
     </div>
-    <div class="footer">Traslados GC · Gran Canaria</div>
+    <div class="footer">${textoMarcaEmail('email_marca_3_pie', _lv, 'Traslados GC · Gran Canaria')}</div>
   </div></body></html>`;
 }
 
@@ -12230,7 +12268,8 @@ async function obtenerPlantilla(clave, vars, lang) {
     const emailTexto = sustituir(p.cuerpo_email);
     return {
       asunto: sustituir(p.asunto_email),
-      email: emailTexto ? saltosEmailAHtml(emailTexto) : emailTexto,
+      // (01/10/2026) Marca invisible con el idioma, para que plantillaEmail ponga la cabecera y el pie en ese idioma.
+      email: emailTexto ? ((lang ? '<!--lang:' + lang + '-->' : '') + saltosEmailAHtml(emailTexto)) : emailTexto,
       whatsapp: sustituir(p.cuerpo_whatsapp)
     };
   } catch(e) {
