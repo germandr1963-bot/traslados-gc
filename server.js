@@ -9924,8 +9924,9 @@ app.post('/admin/cotizaciones/:id/respuesta-negativa', requireAdmin, asyncHandle
 
   const fechaViaje = c.fecha_aproximada ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES') : null;
 
+  // (01/10/2026) <!--lang:..--> = cabecera y pie de la marca en el idioma del cliente
   const html = plantillaEmail(
-    `<p>${textoNegativo.saludo}</p>
+    `<!--lang:${lang}--><p>${textoNegativo.saludo}</p>
      <p>${textoNegativo.parrafo1}</p>
      <p>${textoNegativo.parrafo2}</p>
      <div class="info-box">
@@ -10038,8 +10039,9 @@ app.post('/admin/cotizaciones/:id/respuesta-positiva', requireAdmin, asyncHandle
     '</tr>';
   }).join('');
 
+  // (01/10/2026) <!--lang:..--> = cabecera y pie de la marca en el idioma del cliente
   const html = plantillaEmail(
-    `<p>${textos.saludo}</p>
+    `<!--lang:${lang}--><p>${textos.saludo}</p>
      <p>${textos.parrafo1}</p>
      <div class="info-box">
        <strong>${seo.origen} → ${seo.destino}</strong>
