@@ -2063,6 +2063,18 @@ async function initSchema() {
       orden INTEGER DEFAULT 0
     )
   `);
+  // 🚖 = "Nuevo traslado" (30/09/2026): se añade una sola vez si no está
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_datos (clave TEXT PRIMARY KEY, hecho_en TIMESTAMP DEFAULT NOW())`);
+    const hecha = await pool.query(`SELECT 1 FROM migraciones_datos WHERE clave = 'guia_taxi_20260930'`);
+    const hayFilas = await pool.query('SELECT COUNT(*)::int AS n FROM guia_iconos');
+    if (!hecha.rows.length && hayFilas.rows[0].n) {
+      await pool.query(`INSERT INTO guia_iconos (icono, significado, donde, orden)
+                        SELECT '🚖', 'Nuevo traslado disponible', 'Choferes', 45
+                        WHERE NOT EXISTS (SELECT 1 FROM guia_iconos WHERE icono = '🚖')`);
+      await pool.query(`INSERT INTO migraciones_datos (clave) VALUES ('guia_taxi_20260930') ON CONFLICT DO NOTHING`);
+    }
+  } catch (e) { console.warn('Guía de iconos (🚖):', e.message); }
   const guiaVacia = await pool.query('SELECT COUNT(*)::int AS n FROM guia_iconos');
   if (!guiaVacia.rows[0].n) {
     const filasGuia = [
@@ -2070,6 +2082,7 @@ async function initSchema() {
       ['📍', 'Origen / ruta', 'Clientes, choferes, equipo'],
       ['🏁', 'Destino', 'Clientes, choferes, equipo'],
       ['📅', 'Fecha y hora', 'Clientes, choferes, equipo'],
+      ['🚖', 'Nuevo traslado disponible', 'Choferes'],
       ['🚗', 'Categoría del vehículo', 'Clientes, choferes'],
       ['🧑‍✈️', 'Chofer', 'Clientes, choferes, equipo'],
       ['👤', 'Cliente / persona', 'Choferes, portal'],
@@ -10485,12 +10498,36 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
 // Avisa al chofer anterior y al nuevo (WhatsApp, en español), envía el cartel al nuevo, y al
 // cliente la plantilla "Cambio de conductor" (email + WhatsApp, en su idioma) y, si ya pagó,
 // el voucher actualizado. El enlace de WhatsApp pasa solo al nuevo chofer.
-// Texto de una plantilla de chofer (WhatsApp, español). Si no existe o está inactiva, el texto de respaldo.
+// Respaldo de las plantillas de chofer (30/09/2026): el MISMO texto y los mismos iconos que en
+// Admin → Comunicaciones → Chofer. Solo se usa si la plantilla no existe o está desactivada.
+const RESPALDO_PLANTILLAS_CHOFER = {
+  chofer_aviso_reserva: '🚖 *Nuevo traslado disponible*\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n\nResponde *SI* para aceptar o *NO* para rechazar.',
+  chofer_aviso_reasignacion: '🔄 *SERVICIO A REASIGNAR*\n_Un compañero no puede hacer este servicio._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n\nResponde *SI* para aceptar o *NO* para rechazar.',
+  chofer_servicio_asignado: 'Hola, *{nombre_chofer}* 👋\n\n✅ *Servicio asignado*\n_Se te asigna este servicio en sustitución de un compañero._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n👥 *Pasajeros:* {pasajeros}\n🌐 *Idioma del cliente:* {idioma}\n\nRevisa todos los detalles en tu panel. El cartel de recogida te llegará cuando el cliente haya pagado el depósito.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*',
+  chofer_servicio_reasignado: 'Hola, *{nombre_chofer}* 👋\n\nℹ️ *Servicio reasignado*\n_Este servicio se ha asignado a otro compañero. Ya no tienes que hacerlo._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nQueda liberado de tu agenda. Gracias.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*',
+  chofer_respuesta_confirmado: '✅ *Servicio confirmado*\nLa reserva *{numero_reserva}* es tuya. Revisa todos los detalles en tu panel.',
+  chofer_respuesta_ya_asignada: 'ℹ️ La reserva *{numero_reserva}* ya ha sido asignada a otro compañero. Gracias por tu disponibilidad.',
+  chofer_respuesta_rechazo: '👍 Recibido, gracias por avisar.',
+  chofer_enlace_mensaje_cliente: '📩 *Mensaje del cliente*\n🔖 *Reserva:* {numero_reserva}\n👤 *Cliente:* {nombre_cliente} ({idioma})\n\n«{mensaje}»\n{original}\n\nPara responder, escribe aquí tu mensaje. Si tienes varios servicios a la vez, empieza por *{numero_reserva}*.',
+  chofer_enlace_enviado: '✅ Enviado al cliente · *{numero_reserva}*',
+  chofer_enlace_sin_servicio: 'ℹ️ No encuentro ningún servicio tuyo en curso. Para escribir a un cliente, empieza tu mensaje con el número de reserva, por ejemplo: *ABC123* Estoy en la puerta 2. El enlace funciona desde 2 horas antes hasta 2 horas después del servicio.',
+  chofer_enlace_no_existe: '⚠️ No existe ninguna reserva con el número *{numero_reserva}*. Revisa el número.',
+  chofer_enlace_no_asignada: '⚠️ La reserva *{numero_reserva}* no está asignada a ti.',
+  chofer_enlace_terminado: '✅ Reserva *{numero_reserva}*: *viaje terminado*.',
+  chofer_enlace_no_presentado: '🚫 Reserva *{numero_reserva}*: *cliente no se presentó*.',
+  chofer_enlace_cancelada: '❌ Reserva *{numero_reserva}*: *viaje cancelado*.',
+  chofer_enlace_sin_chofer: 'ℹ️ La reserva *{numero_reserva}* no tiene chofer asignado.',
+  chofer_enlace_fuera_ventana: '🕐 La reserva *{numero_reserva}* es para el *{fecha}* a las *{hora}*. El enlace con el cliente se abre 2 horas antes.'
+};
+
+// Texto de una plantilla de chofer (WhatsApp, español). Si no existe o está inactiva, su respaldo.
 async function plantillaChoferWa(clave, vars, respaldo) {
   try {
     const p = await obtenerPlantilla(clave, vars || {}, 'es');
     if (p && p.whatsapp) return p.whatsapp;
   } catch (e) { console.warn('Plantilla ' + clave + ':', e.message); }
+  const base = RESPALDO_PLANTILLAS_CHOFER[clave];
+  if (base) return base.replace(/\{([^}]+)\}/g, function (m, k) { return (vars && vars[k] !== undefined && vars[k] !== null) ? String(vars[k]) : ''; });
   return respaldo;
 }
 
