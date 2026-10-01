@@ -13709,7 +13709,7 @@ app.post('/api/cliente/solicitar-acceso', asyncHandler(async (req, res) => {
   if (!pnr || !email) return res.status(400).json({ error: 'PNR y email son obligatorios.' });
 
   const result = await pool.query(
-    'SELECT id, nombre_cliente, email_cliente, cliente_password_hash, cliente_primer_acceso, lang_cliente FROM reservas WHERE UPPER(numero_reserva) = UPPER($1)',
+    'SELECT id, nombre_cliente, email_cliente, cliente_password_hash, cliente_primer_acceso, lang_cliente, telefono_cliente FROM reservas WHERE UPPER(numero_reserva) = UPPER($1)',
     [pnr.trim()]
   );
   if (!result.rows.length) return res.status(404).json({ error: 'No encontramos una reserva con ese número.' });
@@ -13733,10 +13733,33 @@ app.post('/api/cliente/solicitar-acceso', asyncHandler(async (req, res) => {
 
   // Enviar email con contraseña provisional
   const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+  // (01/10/2026) Email y WhatsApp desde la plantilla de Comunicaciones "Acceso a reserva (contraseña provisional)",
+  // en el idioma de la reserva. {url_portal} = página "Mi reserva" en ese idioma (Admin → Palabras de URL).
+  // Si la plantilla no está disponible, el email sale con el texto de siempre.
+  const _langAcc = (reserva.lang_cliente && IDIOMAS_PERMITIDOS.includes(reserva.lang_cliente)) ? reserva.lang_cliente : 'es';
+  const _palabraMiReservaAcc = PALABRAS_PAGINAS[_langAcc] && PALABRAS_PAGINAS[_langAcc]['mi-reserva'];
+  const _urlPortalAcc = (_langAcc === 'es' || !_palabraMiReservaAcc)
+    ? BASE_URL + '/mi-reserva'
+    : BASE_URL + '/' + _langAcc + '/' + _palabraMiReservaAcc;
+  const _varsAcc = {
+    nombre_cliente: reserva.nombre_cliente,
+    numero_reserva: pnr.toUpperCase(),
+    password_temporal: pwd,
+    url_portal: _urlPortalAcc
+  };
+  const _pAcc = await obtenerPlantilla('cliente_acceso_reserva', _varsAcc, _langAcc);
+  if (reserva.telefono_cliente && _pAcc && _pAcc.whatsapp) {
+    try {
+      await pool.query(
+        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [reserva.telefono_cliente, _pAcc.whatsapp]
+      );
+    } catch (e) { console.warn('Error encolando WhatsApp acceso a reserva:', e.message); }
+  }
   await enviarEmail({
     to: reserva.email_cliente,
-    subject: 'Acceso a tu reserva ' + pnr.toUpperCase() + ' — Traslados GC',
-    html: plantillaEmailEnIdioma(reserva.lang_cliente,
+    subject: (_pAcc && _pAcc.email && _pAcc.asunto) || ('Acceso a tu reserva ' + pnr.toUpperCase() + ' — Traslados GC'),
+    html: (_pAcc && _pAcc.email) ? plantillaEmail(_pAcc.email) : plantillaEmailEnIdioma(reserva.lang_cliente,
       `<p>Hola <strong>${reserva.nombre_cliente}</strong>,</p>
        <p>Aquí tienes tu contraseña provisional para acceder al seguimiento de tu reserva <span class="pnr">${pnr.toUpperCase()}</span>.</p>
        <div class="info-box" style="text-align:center;">
