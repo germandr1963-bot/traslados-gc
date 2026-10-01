@@ -142,6 +142,12 @@ function plantillaEmail(contenidoHtml) {
   </div></body></html>`;
 }
 
+// (01/10/2026) Igual que plantillaEmail, pero con la cabecera y el pie de "Email — marca"
+// en el idioma indicado. El contenido del email no se toca.
+function plantillaEmailEnIdioma(lang, contenidoHtml) {
+  return plantillaEmail('<!--lang:' + (lang || 'es') + '-->' + (contenidoHtml == null ? '' : contenidoHtml));
+}
+
 // Alias para compatibilidad con llamadas existentes
 function plantillaEmailSimple(nombreCliente, mensaje, numeroReserva) {
   return plantillaEmail(
@@ -9848,7 +9854,7 @@ app.post('/admin/cotizaciones/:id/enviar', requireAdmin, asyncHandler(async (req
     </tr>`;
   }).join('');
 
-  const html = plantillaEmail(
+  const html = plantillaEmailEnIdioma(c.lang_cliente,
     `<p>Hola <strong>${c.nombre_cliente || ''}</strong>,</p>
      <p>Gracias por contactarnos. Aquí tienes los precios disponibles para tu traslado:</p>
      <div class="info-box">
@@ -13499,7 +13505,7 @@ app.post('/admin/comunicado/clientes', requireAdmin, asyncHandler(async (req, re
         await enviarEmail({
           to: cliente.email_cliente,
           subject: asunto,
-          html: plantillaEmail(`<p>Hola <strong>${cliente.nombre || ''}</strong>,</p><p style="white-space:pre-wrap;">${mensaje}</p>`)
+          html: plantillaEmailEnIdioma(await idiomaPortalPorEmail(cliente.email_cliente), `<p>Hola <strong>${cliente.nombre || ''}</strong>,</p><p style="white-space:pre-wrap;">${mensaje}</p>`)
         });
       } catch(e) { errores.push(cliente.email_cliente); }
     }
@@ -13703,7 +13709,7 @@ app.post('/api/cliente/solicitar-acceso', asyncHandler(async (req, res) => {
   if (!pnr || !email) return res.status(400).json({ error: 'PNR y email son obligatorios.' });
 
   const result = await pool.query(
-    'SELECT id, nombre_cliente, email_cliente, cliente_password_hash, cliente_primer_acceso FROM reservas WHERE UPPER(numero_reserva) = UPPER($1)',
+    'SELECT id, nombre_cliente, email_cliente, cliente_password_hash, cliente_primer_acceso, lang_cliente FROM reservas WHERE UPPER(numero_reserva) = UPPER($1)',
     [pnr.trim()]
   );
   if (!result.rows.length) return res.status(404).json({ error: 'No encontramos una reserva con ese número.' });
@@ -13730,7 +13736,7 @@ app.post('/api/cliente/solicitar-acceso', asyncHandler(async (req, res) => {
   await enviarEmail({
     to: reserva.email_cliente,
     subject: 'Acceso a tu reserva ' + pnr.toUpperCase() + ' — Traslados GC',
-    html: plantillaEmail(
+    html: plantillaEmailEnIdioma(reserva.lang_cliente,
       `<p>Hola <strong>${reserva.nombre_cliente}</strong>,</p>
        <p>Aquí tienes tu contraseña provisional para acceder al seguimiento de tu reserva <span class="pnr">${pnr.toUpperCase()}</span>.</p>
        <div class="info-box" style="text-align:center;">
@@ -13849,10 +13855,12 @@ app.post('/api/cliente/recuperar-password', asyncHandler(async (req, res) => {
 
   const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
   const enlace = `${BASE_URL}/restablecer-password?token=${token}&tipo=cliente`;
+  let _langMarcaRec = 'es';
+  try { _langMarcaRec = await idiomaPortalPorEmail(reserva.email_cliente); } catch (e) { _langMarcaRec = 'es'; }
   await enviarEmail({
     to: reserva.email_cliente,
     subject: 'Recupera tu contraseña — Traslados GC',
-    html: plantillaEmail(
+    html: plantillaEmailEnIdioma(_langMarcaRec,
       `<p>Hola <strong>${reserva.nombre_cliente}</strong>,</p>
        <p>Has solicitado recuperar el acceso a tu cuenta. Pulsa el botón para elegir una contraseña nueva:</p>
        <p style="text-align:center;"><a href="${enlace}" class="boton">Crear nueva contraseña</a></p>
@@ -15123,7 +15131,7 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
     await fnEmail({
       to: r.email_cliente,
       subject: (_pdl && _pdl.asunto) || ('✅ Servicio completado — ' + r.numero_reserva),
-      html: plantillaEmail(
+      html: plantillaEmailEnIdioma(r.lang_cliente,
         (_pdl && _pdl.email) ||
         `<p>Hola <strong>${r.nombre_cliente}</strong> 👋</p>
          <div class="caja-verde">
@@ -15225,7 +15233,7 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pns2 && _pns2.asunto) || ('🔒 Depósito retenido por no-show — ' + r.numero_reserva),
-      html: plantillaEmail(
+      html: plantillaEmailEnIdioma(r.lang_cliente,
         (_pns2 && _pns2.email) ||
         `<p>Hola <strong>${r.nombre_cliente}</strong> 👋</p>
          <div class="caja-roja">
@@ -16243,7 +16251,7 @@ app.post('/api/whatsapp/marcar-sin-respuesta/:id', requierePuenteWhatsapp, async
       await enviarEmail({
         to: em,
         subject: 'Reserva ' + numero_reserva + ' sin respuesta de choferes (15 min)',
-        html: '<p>La reserva <strong>' + numero_reserva + '</strong> lleva 15 minutos avisada a los choferes disponibles sin que nadie haya aceptado. Puede que quieras buscar chofer manualmente desde el panel de administración.</p>'
+        html: plantillaEmail('<p>La reserva <strong>' + numero_reserva + '</strong> lleva 15 minutos avisada a los choferes disponibles sin que nadie haya aceptado. Puede que quieras buscar chofer manualmente desde el panel de administración.</p>')
       });
     }
   } catch (err) {
