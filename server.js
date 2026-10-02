@@ -2698,9 +2698,9 @@ Un saludo cordial, 🙏
 Hola, <strong>{nombre_cliente}</strong> 👋
 
 🔑 Has solicitado recuperar el acceso a tu cuenta. Pulsa el botón para elegir una contraseña nueva:
-<p style="text-align:center;">
-  <a href="{enlace_recuperacion}" class="boton">Crear nueva contraseña</a>
-</p>
+<div style="text-align:center;margin:12px 0;">
+  <a href="{enlace_recuperacion}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Crear nueva contraseña</a>
+</div>
 <span style="font-size:13px;color:#5b5347;">⏱️ Este enlace caduca en 1 hora y solo se puede usar una vez. Tu contraseña actual sigue funcionando hasta que la cambies desde aquí.</span>
 
 <span style="font-size:12px;color:#aaa;"><em>Si no has solicitado esto, simplemente ignora este mensaje — no se cambiará nada.</em></span>
@@ -2870,9 +2870,9 @@ Hola, <strong>{nombre_chofer}</strong> 👋
 🎉 Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de Traslados GC.
 
 📱 Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.
-<p style="text-align:center;margin:24px 0;">
-  <a href="https://traslados-gc.onrender.com/chofer/acceso" class="boton">Acceder a mi portal</a>
-</p>
+<div style="text-align:center;margin:12px 0;">
+  <a href="{url_portal}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Acceder a mi portal</a>
+</div>
 <span style="font-size:13px;color:#5b5347;">❓ Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</span>
 
 Un saludo cordial, 🙏
@@ -3010,9 +3010,9 @@ Revisa el estado del depósito desde el panel de administración.
 🔑 Se ha solicitado restablecer la contraseña de la cuenta de administrador.
 
 Pulsa el botón para crear una nueva contraseña:
-<p style="text-align:center;">
-  <a href="{enlace_recuperacion}" class="boton">Crear nueva contraseña</a>
-</p>
+<div style="text-align:center;margin:12px 0;">
+  <a href="{enlace_recuperacion}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Crear nueva contraseña</a>
+</div>
 <span style="font-size:13px;color:#5b5347;">⏱️ Este enlace caduca en 1 hora y solo se puede usar una vez.</span>
 
 <span style="font-size:12px;color:#aaa;"><em>Si no has solicitado esto, ignora este mensaje — no se cambiará nada.</em></span>
@@ -4668,7 +4668,7 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
              <strong>Contraseña provisional:</strong> ${d.password}
            </div>
            <p>En tu portal encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil.</p>
-           <p style="text-align:center;margin:24px 0;"><a href="https://traslados-gc.onrender.com/chofer/acceso" class="boton">Acceder a mi portal</a></p>
+           <div style="text-align:center;margin:12px 0;"><a href="${BASE_URL}/chofer/acceso" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Acceder a mi portal</a></div>
            <p style="font-size:13px;color:#5b5347;">Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</p>`
         )
       });
@@ -4709,7 +4709,7 @@ app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req,
             `<p>Hola <strong>${nombre}</strong>,</p>
              <p>Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de Traslados GC.</p>
              <p>Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.</p>
-             <p style="text-align:center;margin:24px 0;"><a href="https://traslados-gc.onrender.com/chofer/acceso" class="boton">Acceder a mi portal</a></p>
+             <div style="text-align:center;margin:12px 0;"><a href="${BASE_URL}/chofer/acceso" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Acceder a mi portal</a></div>
              <p style="font-size:13px;color:#5b5347;">Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</p>`
           )
         });
@@ -9035,7 +9035,7 @@ app.post('/chofer/recuperar-password', asyncHandler(async (req, res) => {
     html: (_pRecCh && _pRecCh.email) ? plantillaEmail(_pRecCh.email) : plantillaEmail(
       `<p>Hola <strong>${chofer.nombre}</strong>,</p>
        <p>Has solicitado recuperar el acceso a tu portal de chofer. Pulsa el botón para elegir una contraseña nueva:</p>
-       <p style="text-align:center;"><a href="${enlace}" class="boton">Crear nueva contraseña</a></p>
+       <div style="text-align:center;margin:12px 0;"><a href="${enlace}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Crear nueva contraseña</a></div>
        <p style="font-size:13px;color:#5b5347;">Este enlace caduca en 1 hora y solo se puede usar una vez. Tu contraseña actual sigue funcionando hasta que la cambies desde aquí.</p>
        <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado esto, ignora este mensaje — no se cambiará nada.</p>`
     )
@@ -9379,7 +9379,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
        <span style="font-size:13px;color:#888;">Reserva ${r.numero_reserva} · ${fechaTexto}</span>
      </div>
      <p>Tu opinión nos ayuda a seguir mejorando el servicio. Solo te llevará un momento.</p>
-     <p style="text-align:center;margin:24px 0;"><a href="${enlace}" class="boton">⭐ Valorar mi traslado</a></p>
+     <div style="text-align:center;margin:12px 0;"><a href="${enlace}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">⭐ Valorar mi traslado</a></div>
      <p style="color:#888;font-size:13px;">Si no fuiste tú quien realizó este traslado, puedes ignorar este mensaje.</p>`
   );
 
@@ -10008,7 +10008,7 @@ app.post('/admin/cotizaciones/:id/enviar', requireAdmin, asyncHandler(async (req
        <tbody>${filasPrecios}</tbody>
      </table>
      <p style="font-size:12px;color:#999;margin-top:16px;line-height:1.6;">El precio indicado es una estimación. El cobro lo realiza el conductor directamente al finalizar el servicio.</p>
-     <p style="text-align:center;margin:24px 0;"><a href="https://traslados-gc.onrender.com" class="boton">Ver todas las rutas</a></p>`
+     <div style="text-align:center;margin:12px 0;"><a href="${BASE_URL}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Ver todas las rutas</a></div>`
   );
 
   try {
@@ -10199,7 +10199,7 @@ app.post('/admin/cotizaciones/:id/respuesta-positiva', requireAdmin, asyncHandle
        <tbody>${filasPrecios}</tbody>
      </table>` : ''}
      <p>${textos.parrafo3}</p>
-     <p style="text-align:center;"><a href="${urlRuta}" class="boton">${textos.boton}</a></p>
+     <div style="text-align:center;margin:12px 0;"><a href="${urlRuta}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">${textos.boton}</a></div>
      <p style="font-size:12px;color:#999;margin-top:16px;line-height:1.6;">${textos.nota}</p>
      <p>${textos.despedida}</p>`
   );
@@ -11866,7 +11866,7 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
 
   // Enviar email con nuevo enlace
   const _txtBotonPagoReenvio = (await obtenerFrase('frase_boton_pagar_deposito', lang, 'Pagar depósito de {importe} €')).replace('{importe}', importe);
-  const botonPagoReenvio = `<p style="text-align:center;margin:12px 0;"><a href="${session.url}" class="boton">💳 ${_txtBotonPagoReenvio}</a></p>`;
+  const botonPagoReenvio = `<div style="text-align:center;margin:12px 0;"><a href="${session.url}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">💳 ${_txtBotonPagoReenvio}</a></div>`;
   const codigoPagoEmail = await generarCodigoCorto('pago', r.id, null, session.url);
   const urlCortaEmail = `${BASE_URL}/v/${codigoPagoEmail}`;
   const _pep = await obtenerPlantilla('cliente_enlace_pago', {
@@ -13943,7 +13943,7 @@ app.post('/api/cliente/solicitar-acceso', asyncHandler(async (req, res) => {
          <div style="font-family:monospace;font-size:24px;font-weight:700;color:#C1502E;letter-spacing:4px;">${pwd}</div>
        </div>
        <p style="font-size:13px;color:#5b5347;">Al entrar por primera vez se te pedirá que la cambies por una propia.</p>
-       <p style="text-align:center;"><a href="${BASE_URL}/mi-reserva" class="boton">Ver mi reserva</a></p>
+       <div style="text-align:center;margin:12px 0;"><a href="${BASE_URL}/mi-reserva" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Ver mi reserva</a></div>
        <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado este acceso, ignora este mensaje.</p>`
     )
   });
@@ -14078,7 +14078,7 @@ app.post('/api/cliente/recuperar-password', asyncHandler(async (req, res) => {
     html: (_pRec && _pRec.email) ? plantillaEmail(_pRec.email) : plantillaEmailEnIdioma(_langMarcaRec,
       `<p>Hola <strong>${reserva.nombre_cliente}</strong>,</p>
        <p>Has solicitado recuperar el acceso a tu cuenta. Pulsa el botón para elegir una contraseña nueva:</p>
-       <p style="text-align:center;"><a href="${enlace}" class="boton">Crear nueva contraseña</a></p>
+       <div style="text-align:center;margin:12px 0;"><a href="${enlace}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Crear nueva contraseña</a></div>
        <p style="font-size:13px;color:#5b5347;">Este enlace caduca en 1 hora y solo se puede usar una vez. Tu contraseña actual sigue funcionando hasta que la cambies desde aquí.</p>
        <p style="font-size:12px;color:#aaa;margin-top:20px;">Si no has solicitado esto, simplemente ignora este mensaje — no se cambiará nada.</p>`
     )
