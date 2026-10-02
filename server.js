@@ -2879,6 +2879,51 @@ Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n🎉 Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de Traslados GC.\n\n📱 Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.\n\n❓ Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+    // (02/10/2026) Emails de cuenta del chofer que estaban escritos fijos en el programa
+    { clave: 'chofer_alta_datos_acceso', nombre: 'Alta de chofer desde el Admin (datos de acceso)', categoria: 'chofer',
+      asunto_email: '\u00a1Bienvenido a Traslados GC! Tus datos de acceso',
+      cuerpo_email: `Hola, <strong>{nombre_chofer}</strong> 👋
+
+🎉 Te hemos dado de alta en nuestra flota de choferes. Ya puedes acceder a tu portal con estos datos:
+<div class="info-box">
+  📩 <strong>Usuario (email):</strong> {email_chofer}
+  🔑 <strong>Contraseña provisional:</strong> {password_temporal}
+</div>
+📱 En tu portal encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil.
+<div style="text-align:center;margin:12px 0;">
+  <a href="{url_portal}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Acceder a mi portal</a>
+</div>
+<span style="font-size:13px;color:#5b5347;">❓ Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</span>
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>`,
+      cuerpo_whatsapp: '' },
+    { clave: 'chofer_solicitud_recibida', nombre: 'Solicitud de registro recibida (chofer)', categoria: 'chofer',
+      asunto_email: 'Solicitud recibida \u2014 Traslados GC',
+      cuerpo_email: `Hola, <strong>{nombre_chofer}</strong> 👋
+
+📨 Hemos recibido tu solicitud para unirte a nuestra flota de choferes. Revisaremos tu información y te contactaremos en breve.
+
+<span style="font-size:13px;color:#888;">❓ Si tienes alguna pregunta, no dudes en contactarnos.</span>
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>`,
+      cuerpo_whatsapp: '' },
+    { clave: 'chofer_recuperar_password', nombre: 'Recuperar contraseña (portal chofer)', categoria: 'chofer',
+      asunto_email: 'Recupera tu contrase\u00f1a \u2014 Traslados GC',
+      cuerpo_email: `Hola, <strong>{nombre_chofer}</strong> 👋
+
+🔑 Has solicitado recuperar el acceso a tu portal de chofer. Pulsa el botón para elegir una contraseña nueva:
+<div style="text-align:center;margin:12px 0;">
+  <a href="{enlace_recuperacion}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Crear nueva contraseña</a>
+</div>
+<span style="font-size:13px;color:#5b5347;">⏱️ Este enlace caduca en 1 hora y solo se puede usar una vez. Tu contraseña actual sigue funcionando hasta que la cambies desde aquí.</span>
+
+<span style="font-size:12px;color:#aaa;"><em>Si no has solicitado esto, simplemente ignora este mensaje — no se cambiará nada.</em></span>
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>`,
+      cuerpo_whatsapp: '' },
     { clave: 'chofer_comunicacion_masiva', nombre: 'Comunicaci\u00f3n masiva (a choferes)', categoria: 'chofer',
       asunto_email: '{asunto_libre}',
       cuerpo_email: `
@@ -4605,10 +4650,17 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
     const nuevoId = result.rows[0].id;
 
     try {
+      // (02/10/2026) Plantilla de Comunicaciones → Chofer; si falta, el texto de siempre
+      const _pAlta = await obtenerPlantilla('chofer_alta_datos_acceso', {
+        nombre_chofer: d.nombre.trim(),
+        email_chofer: d.email.toLowerCase().trim(),
+        password_temporal: d.password,
+        url_portal: BASE_URL + '/chofer/acceso'
+      });
       await enviarEmail({
         to: d.email.toLowerCase().trim(),
-        subject: '¡Bienvenido a Traslados GC! Tus datos de acceso',
-        html: plantillaEmail(
+        subject: (_pAlta && _pAlta.email && _pAlta.asunto) || '¡Bienvenido a Traslados GC! Tus datos de acceso',
+        html: (_pAlta && _pAlta.email) ? plantillaEmail(_pAlta.email) : plantillaEmail(
           `<p>Hola <strong>${d.nombre.trim()}</strong>,</p>
            <p>Te hemos dado de alta en nuestra flota de choferes. Ya puedes acceder a tu portal con estos datos:</p>
            <div class="info-box">
@@ -4645,10 +4697,15 @@ app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req,
       if (chofer.rows.length) {
         const { nombre, email } = chofer.rows[0];
         const nombreEmpresa = 'Traslados GC';
+        // (02/10/2026) Plantilla de Comunicaciones → Chofer "Bienvenida al chofer"; si falta, el texto de siempre
+        const _pBienv = await obtenerPlantilla('chofer_bienvenida', {
+          nombre_chofer: nombre,
+          url_portal: BASE_URL + '/chofer/acceso'
+        });
         await enviarEmail({
           to: email,
-          subject: `¡Bienvenido a ${nombreEmpresa}!`,
-          html: plantillaEmail(
+          subject: (_pBienv && _pBienv.email && _pBienv.asunto) || `¡Bienvenido a ${nombreEmpresa}!`,
+          html: (_pBienv && _pBienv.email) ? plantillaEmail(_pBienv.email) : plantillaEmail(
             `<p>Hola <strong>${nombre}</strong>,</p>
              <p>Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de Traslados GC.</p>
              <p>Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.</p>
@@ -8899,10 +8956,12 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
 
   // Email de confirmación al chofer
   try {
+    // (02/10/2026) Plantilla de Comunicaciones → Chofer; si falta, el texto de siempre
+    const _pSolCh = await obtenerPlantilla('chofer_solicitud_recibida', { nombre_chofer: nombre.trim() });
     await enviarEmail({
       to: email.trim(),
-      subject: 'Solicitud recibida — Traslados GC',
-      html: plantillaEmail(
+      subject: (_pSolCh && _pSolCh.email && _pSolCh.asunto) || 'Solicitud recibida — Traslados GC',
+      html: (_pSolCh && _pSolCh.email) ? plantillaEmail(_pSolCh.email) : plantillaEmail(
         `<p>Hola <strong>${nombre.trim()}</strong>,</p>
          <p>Hemos recibido tu solicitud para unirte a nuestra flota de choferes. Revisaremos tu información y te contactaremos en breve.</p>
          <p style="font-size:13px;color:#888;">Si tienes alguna pregunta, no dudes en contactarnos.</p>`
@@ -8965,10 +9024,15 @@ app.post('/chofer/recuperar-password', asyncHandler(async (req, res) => {
 
   const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
   const enlace = `${BASE_URL}/restablecer-password?token=${token}&tipo=chofer`;
+  // (02/10/2026) Plantilla de Comunicaciones → Chofer; si falta, el texto de siempre
+  const _pRecCh = await obtenerPlantilla('chofer_recuperar_password', {
+    nombre_chofer: chofer.nombre,
+    enlace_recuperacion: enlace
+  });
   await enviarEmail({
     to: chofer.email,
-    subject: 'Recupera tu contraseña — Traslados GC',
-    html: plantillaEmail(
+    subject: (_pRecCh && _pRecCh.email && _pRecCh.asunto) || 'Recupera tu contraseña — Traslados GC',
+    html: (_pRecCh && _pRecCh.email) ? plantillaEmail(_pRecCh.email) : plantillaEmail(
       `<p>Hola <strong>${chofer.nombre}</strong>,</p>
        <p>Has solicitado recuperar el acceso a tu portal de chofer. Pulsa el botón para elegir una contraseña nueva:</p>
        <p style="text-align:center;"><a href="${enlace}" class="boton">Crear nueva contraseña</a></p>
