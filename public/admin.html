@@ -1484,6 +1484,11 @@ table.tabla-precios input {
               <p style="font-size:12px;color:var(--texto-muted);margin:0 0 6px;">Puedes usar HTML básico: <code>&lt;strong&gt;</code>, <code>&lt;br&gt;</code>, etc. Las variables en <code>{llaves}</code> se sustituyen automáticamente.</p>
               <textarea id="com-email" class="campo" rows="12" style="font-family:monospace;font-size:13px;resize:vertical;"></textarea>
             </div>
+            <!-- (02/10/2026) Vista previa real: el email tal como lo recibe el destinatario -->
+            <div style="margin-top:10px;background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
+              <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;">&#128065;&#65039; Vista previa — así llega el email</p>
+              <div id="com-email-vista" style="width:100%;background:#fff;border-radius:4px;padding:10px;box-sizing:border-box;"></div>
+            </div>
             <div style="margin-top:8px;background:var(--fondo-tarjeta);border:1px solid var(--borde);border-radius:8px;padding:10px 14px;">
               <p style="font-size:12px;color:var(--texto-muted);margin:0 0 4px;font-weight:600;">Variables disponibles:</p>
               <p style="font-size:12px;color:var(--texto-muted);margin:0;line-height:1.8;">
@@ -1504,6 +1509,11 @@ table.tabla-precios input {
               <label class="etiqueta">Texto de WhatsApp</label>
               <p style="font-size:12px;color:var(--texto-muted);margin:0 0 6px;">Texto plano. Puedes usar emojis y saltos de línea. Las variables en <code>{llaves}</code> se sustituyen automáticamente.</p>
               <textarea id="com-wa" class="campo" rows="12" style="font-family:monospace;font-size:13px;resize:vertical;" placeholder="Escribe aquí el texto para WhatsApp...&#10;&#10;Si esta plantilla no tiene WhatsApp, deja este campo en blanco."></textarea>
+            </div>
+            <!-- (02/10/2026) Vista previa: el WhatsApp como se ve en el teléfono -->
+            <div style="margin-top:10px;background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
+              <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;">&#128065;&#65039; Vista previa — así llega el WhatsApp</p>
+              <div id="com-wa-vista" style="width:100%;"></div>
             </div>
             <div style="margin-top:8px;background:var(--fondo-tarjeta);border:1px solid var(--borde);border-radius:8px;padding:10px 14px;">
               <p style="font-size:12px;color:var(--texto-muted);margin:0 0 4px;font-weight:600;">Variables disponibles:</p>
@@ -5211,6 +5221,31 @@ function pintarEmailReal(elId, texto, lang) {
     });
 }
 
+// (02/10/2026) Vista previa de WhatsApp como se ve en el teléfono: burbuja blanca sobre el fondo del chat,
+// con los formatos de WhatsApp: *negrita*, _cursiva_, ~tachado~, ```monoespaciado``` y enlaces en azul.
+function whatsappAHtml(texto) {
+  var t = String(texto || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  t = t.replace(/```([\s\S]+?)```/g, '<code style="font-family:monospace;">$1</code>');
+  var borde = '(^|[\\s(\\[¡¿"\'])';
+  var fin = '(?=$|[\\s.,;:!?)\\]"\'])';
+  t = t.replace(new RegExp(borde + '\\*([^*\\n]*[^*\\s])\\*' + fin, 'gm'), function(m, a, b) { return /^\s/.test(b) ? m : a + '<strong>' + b + '</strong>'; });
+  t = t.replace(new RegExp(borde + '_([^_\\n]*[^_\\s])_' + fin, 'gm'), function(m, a, b) { return /^\s/.test(b) ? m : a + '<em>' + b + '</em>'; });
+  t = t.replace(new RegExp(borde + '~([^~\\n]*[^~\\s])~' + fin, 'gm'), function(m, a, b) { return /^\s/.test(b) ? m : a + '<s>' + b + '</s>'; });
+  t = t.replace(/(https?:\/\/[^\s<]+)/g, '<span style="color:#027eb5;">$1</span>');
+  return t.replace(/\n/g, '<br>');
+}
+function pintarWhatsappReal(elId, texto) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  el._pedidoPreview = (el._pedidoPreview || 0) + 1; // anula una vista de email que aún estuviera cargando
+  el.innerHTML = '<div style="background:#efeae2;padding:12px;border-radius:6px;">' +
+    '<div style="background:#fff;border-radius:8px;padding:8px 10px;max-width:92%;box-shadow:0 1px 1px rgba(0,0,0,0.13);' +
+    'font-family:Helvetica,Arial,sans-serif;font-size:14.2px;line-height:1.45;color:#111b21;word-wrap:break-word;">' +
+    (String(texto || '').trim() ? whatsappAHtml(texto) : '<span style="color:#999;font-size:12px;">— sin texto —</span>') +
+    '</div></div>';
+}
+
 function abrirModalComTrad(clave, tipo, lang) {
   _comClienteClaveTrad = clave;
   _comClienteTipoTrad = tipo;
@@ -5249,11 +5284,7 @@ function abrirModalComTrad(clave, tipo, lang) {
       pintarEmailReal('modal-com-trad-ref-texto', plantilla.texto_es_email || '', 'es');
     } else {
       if (refAsunto) refAsunto.innerHTML = '';
-      var waEs = (plantilla.texto_es_wa || '')
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
-        .replace(/\n/g, '<br>');
-      actualizarRefEsIframe('<p style="font-family:sans-serif;font-size:14px;line-height:1.6;">' + waEs + '</p>');
+      pintarWhatsappReal('modal-com-trad-ref-texto', plantilla.texto_es_wa || '');
     }
   }
 
@@ -5282,12 +5313,8 @@ function abrirModalComTrad(clave, tipo, lang) {
         pintarEmailReal('modal-com-trad-ref-trad', textarea.value, lang);
       }, 500);
     } else {
-      // WhatsApp: texto plano con negritas y saltos
-      var waHtml = textarea.value
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
-        .replace(/\n/g, '<br>');
-      actualizarPreviewIframe('<p style="font-family:sans-serif;font-size:14px;line-height:1.6;">' + waHtml + '</p>');
+      // WhatsApp: como se ve en el teléfono
+      pintarWhatsappReal('modal-com-trad-ref-trad', textarea.value);
     }
   };
   textarea.addEventListener('input', textarea._previewHandler);
@@ -5308,11 +5335,7 @@ function abrirModalComTrad(clave, tipo, lang) {
           pintarEmailReal('modal-com-trad-ref-trad', trad.cuerpo_email || '', lang);
         } else {
           textarea.value = trad.cuerpo_whatsapp || '';
-          var waHtml = (trad.cuerpo_whatsapp || '')
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
-            .replace(/\n/g, '<br>');
-          actualizarPreviewIframe('<p style="font-family:sans-serif;font-size:14px;line-height:1.6;">' + waHtml + '</p>');
+          pintarWhatsappReal('modal-com-trad-ref-trad', trad.cuerpo_whatsapp || '');
         }
       } else {
         actualizarPreviewIframe('<p style="color:#999;font-size:12px;">— sin traducción aún —</p>');
@@ -9431,6 +9454,20 @@ function abrirModalPlantilla(clave) {
   document.getElementById('com-email').value = p.cuerpo_email || '';
   document.getElementById('com-wa').value = p.cuerpo_whatsapp || '';
 
+  // (02/10/2026) Vistas previas reales (email y WhatsApp), también mientras se escribe
+  pintarVistaEmailEdicion();
+  pintarWhatsappReal('com-wa-vista', p.cuerpo_whatsapp || '');
+  var _taEmail = document.getElementById('com-email');
+  var _taWa = document.getElementById('com-wa');
+  if (!_taEmail._vistaConectada) {
+    _taEmail._vistaConectada = true;
+    _taEmail.addEventListener('input', function() {
+      clearTimeout(_taEmail._vistaEspera);
+      _taEmail._vistaEspera = setTimeout(pintarVistaEmailEdicion, 500);
+    });
+    _taWa.addEventListener('input', function() { pintarWhatsappReal('com-wa-vista', _taWa.value); });
+  }
+
   document.getElementById('com-msg-guardado').style.display = 'none';
   document.getElementById('com-msg-error').style.display = 'none';
 
@@ -9439,6 +9476,17 @@ function abrirModalPlantilla(clave) {
 
   document.getElementById('modal-plantilla-com').classList.remove('oculto');
   document.getElementById('modal-plantilla-com').style.display = 'flex';
+}
+
+function pintarVistaEmailEdicion() {
+  var texto = document.getElementById('com-email').value;
+  if (!texto.trim()) {
+    var el = document.getElementById('com-email-vista');
+    el._pedidoPreview = (el._pedidoPreview || 0) + 1;
+    el.innerHTML = '<p style="color:#999;font-size:12px;margin:0;">— Esta plantilla no tiene email —</p>';
+    return;
+  }
+  pintarEmailReal('com-email-vista', texto, 'es');
 }
 
 function cerrarModalPlantilla() {
