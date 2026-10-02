@@ -1522,6 +1522,36 @@ async function initSchema() {
 
   // Voucher (el del email y el PDF), en el idioma del cliente. ON CONFLICT DO NOTHING:
   // se crean la primera vez y nunca sobrescriben lo editado en el Admin.
+  // (02/10/2026) Página "Restablecer contraseña" en el idioma del cliente.
+  // Son los textos que tenía la página, tal cual. Se crean una sola vez (DO NOTHING).
+  const TEXTOS_RESTABLECER = [
+    { clave: 'rest_1_titulo_pestana',     contexto: 'Título de la pestaña del navegador', es: 'Nueva contraseña — Traslados GC' },
+    { clave: 'rest_2_titulo',             contexto: 'Título grande de la página', es: 'Restablecer contraseña' },
+    { clave: 'rest_3_subtitulo',          contexto: 'Frase bajo el título', es: 'Elige tu nueva contraseña de acceso' },
+    { clave: 'rest_4_label_nueva',        contexto: 'Etiqueta del primer campo', es: 'Nueva contraseña' },
+    { clave: 'rest_5_placeholder_nueva',  contexto: 'Texto gris dentro del primer campo', es: 'Mínimo 6 caracteres' },
+    { clave: 'rest_6_label_repite',       contexto: 'Etiqueta del segundo campo', es: 'Repite la contraseña' },
+    { clave: 'rest_7_placeholder_repite', contexto: 'Texto gris dentro del segundo campo', es: 'Repite la contraseña' },
+    { clave: 'rest_8_boton',              contexto: 'Botón para guardar', es: 'Guardar y entrar' },
+    { clave: 'rest_9_guardando',          contexto: 'Texto del botón mientras guarda', es: 'Guardando...' },
+    { clave: 'rest_10_ok',                contexto: 'Mensaje verde al guardar bien la contraseña', es: '✅ Tu contraseña se ha actualizado correctamente. Ya puedes acceder con ella.' },
+    { clave: 'rest_11_err_enlace',        contexto: 'Error: se abrió la página sin un enlace correcto', es: 'Este enlace no es válido.' },
+    { clave: 'rest_12_err_minimo',        contexto: 'Error: contraseña demasiado corta', es: 'Mínimo 6 caracteres.' },
+    { clave: 'rest_13_err_no_coinciden',  contexto: 'Error: las dos contraseñas no son iguales', es: 'Las contraseñas no coinciden.' },
+    { clave: 'rest_14_err_conexion',      contexto: 'Error: sin conexión al guardar', es: 'Error de conexión. Inténtalo de nuevo.' },
+    { clave: 'rest_15_srv_enlace',        contexto: 'Error del servidor: enlace no válido', es: 'Enlace no válido.' },
+    { clave: 'rest_16_srv_minimo',        contexto: 'Error del servidor: contraseña demasiado corta', es: 'La contraseña debe tener al menos 6 caracteres.' },
+    { clave: 'rest_17_srv_caducado',      contexto: 'Error del servidor: el enlace ya se usó o caducó (1 hora)', es: 'Este enlace no es válido o ha caducado. Solicita uno nuevo.' }
+  ];
+  for (const tx of TEXTOS_RESTABLECER) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Restablecer contraseña', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
   const TEXTOS_VOUCHER = [
     { clave: 'vou_hola',              contexto: 'Saludo del voucher; el programa añade detrás el nombre del cliente y una coma (ej: Hola Ana,)', es: 'Hola' },
     { clave: 'vou_confirmado',        contexto: 'Aviso verde arriba del voucher', es: 'Depósito recibido. Tu traslado está confirmado.' },
@@ -13637,21 +13667,50 @@ app.get('/:lang([a-z]{2})/:palabra', asyncHandler(async (req, res, next) => {
   return renderMiReserva(req, res, lang);
 }));
 
-app.get('/restablecer-password', (req, res) => {
+// (02/10/2026) Página en el idioma del cliente, como el resto de la web. El idioma sale del enlace:
+// cuenta del cliente → idioma de su portal; enlace antiguo por reserva → idioma de la reserva; chofer → español.
+app.get('/restablecer-password', asyncHandler(async (req, res) => {
   res.set('Cache-Control', 'no-cache');
-  res.sendFile(path.join(__dirname, 'public', 'restablecer-password.html'));
-});
+  const token = typeof req.query.token === 'string' ? req.query.token : '';
+  const tipo = typeof req.query.tipo === 'string' ? req.query.tipo : '';
+  let lang = 'es';
+  if (token) {
+    try {
+      const f = await pool.query('SELECT tipo, referencia_id, email FROM tokens_recuperacion WHERE token = $1', [token]);
+      if (f.rows.length) {
+        const fila = f.rows[0];
+        if (fila.tipo === 'cliente_cuenta' && fila.email) {
+          lang = await idiomaPortalPorEmail(fila.email);
+        } else if (fila.tipo === 'cliente') {
+          const r = await pool.query('SELECT lang_cliente FROM reservas WHERE id = $1', [fila.referencia_id]);
+          if (r.rows.length && r.rows[0].lang_cliente) lang = r.rows[0].lang_cliente;
+        }
+      }
+    } catch (e) { lang = 'es'; }
+  }
+  if (!IDIOMAS_PERMITIDOS.includes(lang)) lang = 'es';
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
+  const urlMiReserva = lang === 'es' ? '/mi-reserva' : '/' + lang + '/' + (palabrasPaginas['mi-reserva'] || 'mi-reserva');
+  res.render('restablecer-password', { lang, t, palabrasPaginas, token, tipo, urlMiReserva });
+}));
 
 app.post('/api/restablecer-password', asyncHandler(async (req, res) => {
   const { token, password_nueva } = req.body;
-  if (!token) return res.status(400).json({ error: 'Enlace no válido.' });
-  if (!password_nueva || password_nueva.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+  // (02/10/2026) Mensajes de error en el idioma de la página (si falta el texto, el español de siempre)
+  const _langRest = (req.body && IDIOMAS_PERMITIDOS.includes(req.body.lang)) ? req.body.lang : 'es';
+  const _txtRest = function (clave, porDefecto) {
+    const v = obtenerTexto(clave, _langRest);
+    return (v && v.indexOf('[[') !== 0) ? v : porDefecto;
+  };
+  if (!token) return res.status(400).json({ error: _txtRest('rest_15_srv_enlace', 'Enlace no válido.') });
+  if (!password_nueva || password_nueva.length < 6) return res.status(400).json({ error: _txtRest('rest_16_srv_minimo', 'La contraseña debe tener al menos 6 caracteres.') });
 
   const result = await pool.query(
     'SELECT * FROM tokens_recuperacion WHERE token = $1 AND usado = FALSE AND expira_en > NOW()',
     [token]
   );
-  if (!result.rows.length) return res.status(400).json({ error: 'Este enlace no es válido o ha caducado. Solicita uno nuevo.' });
+  if (!result.rows.length) return res.status(400).json({ error: _txtRest('rest_17_srv_caducado', 'Este enlace no es válido o ha caducado. Solicita uno nuevo.') });
   const fila = result.rows[0];
 
   const hash = await bcrypt.hash(password_nueva, 10);
@@ -13678,7 +13737,7 @@ app.post('/api/restablecer-password', asyncHandler(async (req, res) => {
   } else if (fila.tipo === 'chofer') {
     await pool.query('UPDATE conductores SET password_hash = $1 WHERE id = $2', [hash, fila.referencia_id]);
   } else {
-    return res.status(400).json({ error: 'Enlace no válido.' });
+    return res.status(400).json({ error: _txtRest('rest_15_srv_enlace', 'Enlace no válido.') });
   }
 
   await pool.query('UPDATE tokens_recuperacion SET usado = TRUE WHERE id = $1', [fila.id]);
