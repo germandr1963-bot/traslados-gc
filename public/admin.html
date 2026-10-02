@@ -5185,6 +5185,17 @@ function abrirModalComTradBtn(btn) {
 // (02/10/2026) Vista previa REAL del email: el servidor lo dibuja con la misma función que usa
 // para enviar (cabecera, pie, recuadros, botón y espacios). Se muestra en un iframe aislado
 // para que los estilos del email no se mezclen con los del Admin.
+// El recuadro mide exactamente lo que mide el email (sin hueco gris debajo).
+function ajustarAltoVistaEmail(marco) {
+  try {
+    var doc = marco.contentDocument;
+    // Letra por defecto de Gmail (Arial) para lo que el email no fija; el email no se modifica
+    doc.documentElement.style.fontFamily = 'Arial, Helvetica, sans-serif';
+    marco.style.height = '0px'; // se mide desde cero: así el alto también puede bajar
+    marco.style.height = doc.documentElement.scrollHeight + 'px';
+  } catch (e) {}
+}
+
 function pintarEmailReal(elId, texto, lang) {
   var el = document.getElementById(elId);
   if (!el) return;
@@ -5203,13 +5214,10 @@ function pintarEmailReal(elId, texto, lang) {
         el.innerHTML = '';
         marco = document.createElement('iframe');
         marco.className = 'vista-email-real';
-        marco.style.cssText = 'width:100%;border:0;display:block;min-height:200px;';
+        marco.style.cssText = 'width:100%;border:0;display:block;';
         marco.onload = function() {
-          try {
-            // Letra por defecto de Gmail (Arial) para lo que el email no fija; el email no se modifica
-            marco.contentDocument.documentElement.style.fontFamily = 'Arial, Helvetica, sans-serif';
-            marco.style.height = (marco.contentDocument.documentElement.scrollHeight + 4) + 'px';
-          } catch (e) {}
+          ajustarAltoVistaEmail(marco);
+          setTimeout(function() { ajustarAltoVistaEmail(marco); }, 300); // por si la ventana aún se estaba abriendo
         };
         el.appendChild(marco);
       }
