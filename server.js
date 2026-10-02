@@ -16460,6 +16460,15 @@ app.put('/admin/plantillas-comunicacion/:clave', requireAdmin, asyncHandler(asyn
 // ─── Traducciones de plantillas de comunicación ──────────────────────────────
 
 // GET — obtener todas las traducciones de una plantilla
+// (02/10/2026) Vista previa REAL de un email para el Admin (solo lectura).
+// Dibuja el texto con las mismas funciones que el envío (saltosEmailAHtml + plantillaEmail),
+// con la cabecera y el pie de "Email — marca" en el idioma indicado. No envía nada ni guarda nada.
+app.post('/admin/vista-previa-email', requireAdmin, asyncHandler(async (req, res) => {
+  const texto = (req.body && typeof req.body.texto === 'string') ? req.body.texto : '';
+  const lang = (req.body && IDIOMAS_PERMITIDOS.includes(req.body.lang)) ? req.body.lang : 'es';
+  res.json({ html: plantillaEmail('<!--lang:' + lang + '-->' + saltosEmailAHtml(texto)) });
+}));
+
 app.get('/admin/plantillas-comunicacion/:clave/traducciones', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT lang_code, asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, actualizado_en
