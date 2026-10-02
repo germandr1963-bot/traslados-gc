@@ -119,7 +119,7 @@ function plantillaEmail(contenidoHtml) {
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <style>
     body{margin:0;padding:0;background:#f5f5f5;}
-    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+    .wrapper{max-width:600px;margin:0 auto;background:#fff;font-family:'Helvetica Neue',Arial,sans-serif;}
     .header{background:#2c2c2c;padding:24px;text-align:center;}
     .body{padding:28px 24px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#1C1815;line-height:1.6;}
     .footer{background:#f5f0ea;padding:16px;text-align:center;font-size:12px;color:#888;}
@@ -134,11 +134,11 @@ function plantillaEmail(contenidoHtml) {
   </style></head><body>
   <div class="wrapper">
     <div class="header">
-      <h1 style="color:#d4956a;margin:0;font-size:20px;">${_marcaNombre}</h1>
-      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">${_marcaSubtitulo}</p>
+      <h1 style="color:#d4956a;margin:0;font-size:20px;font-family:'Helvetica Neue',Arial,sans-serif;">${_marcaNombre}</h1>
+      <p style="color:#aaa;margin:4px 0 0;font-size:12px;font-family:'Helvetica Neue',Arial,sans-serif;">${_marcaSubtitulo}</p>
     </div>
     <div class="body">${contenidoHtml}</div>
-    <div class="footer">${_marcaPie}</div>
+    <div class="footer" style="font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;">${_marcaPie}</div>
   </div></body></html>`;
 }
 
@@ -10923,7 +10923,7 @@ async function generarHtmlVoucher(reservaId) {
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <style>
     body{margin:0;padding:0;background:#f5f5f5;}
-    .wrapper{max-width:600px;margin:0 auto;background:#fff;}
+    .wrapper{max-width:600px;margin:0 auto;background:#fff;font-family:'Helvetica Neue',Arial,sans-serif;}
     .header{background:#2c2c2c;padding:24px;text-align:center;}
     .body{padding:28px 24px;}
     .pnr{font-family:monospace;font-size:22px;font-weight:700;color:#C1502E;letter-spacing:3px;}
@@ -10935,8 +10935,8 @@ async function generarHtmlVoucher(reservaId) {
   </style></head><body>
   <div class="wrapper">
     <div class="header">
-      <h1 style="color:#d4956a;margin:0;font-size:20px;">${textoMarcaEmail('email_marca_1_nombre', _lv, 'Traslados GC')}</h1>
-      <p style="color:#aaa;margin:4px 0 0;font-size:12px;">${textoMarcaEmail('email_marca_2_subtitulo', _lv, 'Gran Canaria')}</p>
+      <h1 style="color:#d4956a;margin:0;font-size:20px;font-family:'Helvetica Neue',Arial,sans-serif;">${textoMarcaEmail('email_marca_1_nombre', _lv, 'Traslados GC')}</h1>
+      <p style="color:#aaa;margin:4px 0 0;font-size:12px;font-family:'Helvetica Neue',Arial,sans-serif;">${textoMarcaEmail('email_marca_2_subtitulo', _lv, 'Gran Canaria')}</p>
     </div>
     <div class="body">
       <p>${tv('vou_hola')} <strong>${r.nombre_cliente}</strong>,</p>
@@ -10960,7 +10960,7 @@ async function generarHtmlVoucher(reservaId) {
         <strong>⚠️ ${textoVoucherConDato('vou_cancelacion', _lv, '{fecha}', _textoLimiteVoucher)}</strong> ${textoVoucherConDato('vou_cancelacion_despues', _lv, '{importe}', _importeVoucher)}
       </div>
     </div>
-    <div class="footer">${textoMarcaEmail('email_marca_3_pie', _lv, 'Traslados GC · Gran Canaria')}</div>
+    <div class="footer" style="font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;">${textoMarcaEmail('email_marca_3_pie', _lv, 'Traslados GC · Gran Canaria')}</div>
   </div></body></html>`;
 }
 
