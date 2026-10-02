@@ -3180,6 +3180,49 @@ Un saludo cordial, 🙏
   await pool.query(`ALTER TABLE plantillas_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado_email BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE plantillas_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado_wa BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE frases_comunicacion_traducciones ADD COLUMN IF NOT EXISTS desactualizado BOOLEAN DEFAULT FALSE`);
+  // (02/10/2026) Identidad igual que el resto — cambio ÚNICO (migraciones_datos: formato_acceso_acuse_20261002).
+  // Solo cambia trozos exactos; no reescribe las plantillas. Si un trozo ya no está (porque ya se cambió
+  // en el Admin), no hace nada con él. Las traducciones afectadas pasan a "desactualizado" (rojo en Idiomas).
+  //  · Acceso a reserva (email): "Contraseña provisional" en negrita; botón igual que "Pagar depósito".
+  //  · Acceso a reserva (WhatsApp): enlace al portal con 🔍, como el resto.
+  //  · Solicitud recibida (email): Origen, Destino y Fecha en negrita, como "Cancelación".
+  //  · Solicitud recibida (WhatsApp): línea del número igual que el resto ("🔖 *Reserva:*").
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_datos (clave TEXT PRIMARY KEY, hecho_en TIMESTAMP DEFAULT NOW())`);
+    const hechaFmt = await pool.query(`SELECT 1 FROM migraciones_datos WHERE clave = 'formato_acceso_acuse_20261002'`);
+    if (!hechaFmt.rows.length) {
+      const cambiosFmt = [
+        ['cliente_acceso_reserva', 'cuerpo_email',
+          '<div style="font-size:12px;color:#5b5347;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">🔑 Contraseña provisional</div>',
+          '<div style="font-size:12px;color:#5b5347;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;"><strong>🔑 Contraseña provisional</strong></div>'],
+        ['cliente_acceso_reserva', 'cuerpo_email',
+          '<p style="text-align:center;"><a href="{url_portal}" class="boton">Ver mi reserva</a></p>',
+          '<div style="text-align:center;margin:12px 0;">\n  <a href="{url_portal}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Ver mi reserva</a>\n</div>'],
+        ['cliente_acceso_reserva', 'cuerpo_whatsapp', '👉 Ver mi reserva:', '🔍 Ver mi reserva:'],
+        ['cliente_acuse_recibo', 'cuerpo_email', '📍 Origen: {origen}', '📍 <strong>Origen:</strong> {origen}'],
+        ['cliente_acuse_recibo', 'cuerpo_email', '🏁 Destino: {destino}', '🏁 <strong>Destino:</strong> {destino}'],
+        ['cliente_acuse_recibo', 'cuerpo_email', '📅 Fecha: {fecha}', '📅 <strong>Fecha:</strong> {fecha}'],
+        ['cliente_acuse_recibo', 'cuerpo_whatsapp', '🔖 *Tu número de reserva es:* {numero_reserva}', '🔖 *Reserva:* {numero_reserva}']
+      ];
+      const resumenFmt = [];
+      for (const c of cambiosFmt) {
+        const campo = c[1];
+        const r = await pool.query(
+          `UPDATE plantillas_comunicacion SET ${campo} = replace(${campo}, $2, $3), actualizado_en = NOW()
+           WHERE clave = $1 AND position($2 in ${campo}) > 0 RETURNING clave`,
+          [c[0], c[2], c[3]]
+        );
+        resumenFmt.push(c[0] + '/' + (campo === 'cuerpo_email' ? 'email' : 'wa') + ':' + r.rows.length);
+        if (r.rows.length) {
+          const marca = campo === 'cuerpo_email' ? 'desactualizado_email' : 'desactualizado_wa';
+          await pool.query(`UPDATE plantillas_comunicacion_traducciones SET ${marca} = TRUE
+                            WHERE plantilla_clave = $1 AND ${campo} IS NOT NULL AND ${campo} <> ''`, [c[0]]);
+        }
+      }
+      await pool.query(`INSERT INTO migraciones_datos (clave) VALUES ('formato_acceso_acuse_20261002') ON CONFLICT DO NOTHING`);
+      console.log('Formato acceso y solicitud recibida (02/10): ' + resumenFmt.join(' · '));
+    }
+  } catch (e) { console.warn('Formato acceso y solicitud recibida (02/10):', e.message); }
   console.log('Frases de comunicaci\u00f3n cargadas.');
 
   // ─── Guía de iconos (30/09/2026): 🚗 Categoría, 🧭 Chofer. Cambio ÚNICO sobre lo ya guardado ───
