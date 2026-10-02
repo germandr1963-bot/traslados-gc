@@ -5172,6 +5172,45 @@ function abrirModalComTradBtn(btn) {
   abrirModalComTrad(clave, tipo, lang);
 }
 
+// (02/10/2026) Vista previa REAL del email: el servidor lo dibuja con la misma función que usa
+// para enviar (cabecera, pie, recuadros, botón y espacios). Se muestra en un iframe aislado
+// para que los estilos del email no se mezclen con los del Admin.
+function pintarEmailReal(elId, texto, lang) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  el._pedidoPreview = (el._pedidoPreview || 0) + 1;
+  var miPedido = el._pedidoPreview;
+  fetch('/admin/vista-previa-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto: texto || '', lang: lang || 'es' })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (miPedido !== el._pedidoPreview) return; // ya hay una petición más nueva
+      var marco = el.querySelector('iframe.vista-email-real');
+      if (!marco) {
+        el.innerHTML = '';
+        marco = document.createElement('iframe');
+        marco.className = 'vista-email-real';
+        marco.style.cssText = 'width:100%;border:0;display:block;min-height:200px;';
+        marco.onload = function() {
+          try {
+            // Letra por defecto de Gmail (Arial) para lo que el email no fija; el email no se modifica
+            marco.contentDocument.documentElement.style.fontFamily = 'Arial, Helvetica, sans-serif';
+            marco.style.height = (marco.contentDocument.documentElement.scrollHeight + 4) + 'px';
+          } catch (e) {}
+        };
+        el.appendChild(marco);
+      }
+      marco.srcdoc = d.html || '';
+    })
+    .catch(function() {
+      if (miPedido !== el._pedidoPreview) return;
+      el.innerHTML = '<p style="color:#c00;font-size:12px;">No se pudo cargar la vista previa.</p>';
+    });
+}
+
 function abrirModalComTrad(clave, tipo, lang) {
   _comClienteClaveTrad = clave;
   _comClienteTipoTrad = tipo;
@@ -5198,6 +5237,7 @@ function abrirModalComTrad(clave, tipo, lang) {
   function actualizarRefEsIframe(html) {
     var el = document.getElementById('modal-com-trad-ref-texto');
     if (!el) return;
+    el._pedidoPreview = (el._pedidoPreview || 0) + 1; // anula una vista de email que aún estuviera cargando
     el.innerHTML = (html || '').replace(/\n/g, '<br>');
   }
 
@@ -5206,7 +5246,7 @@ function abrirModalComTrad(clave, tipo, lang) {
     var refAsunto = document.getElementById('modal-com-trad-ref-asunto');
     if (tipo === 'email') {
       if (refAsunto) refAsunto.innerHTML = '<strong>Asunto:</strong> ' + (plantilla.asunto_es || '—');
-      actualizarRefEsIframe(plantilla.texto_es_email || '');
+      pintarEmailReal('modal-com-trad-ref-texto', plantilla.texto_es_email || '', 'es');
     } else {
       if (refAsunto) refAsunto.innerHTML = '';
       var waEs = (plantilla.texto_es_wa || '')
@@ -5221,6 +5261,7 @@ function abrirModalComTrad(clave, tipo, lang) {
   function actualizarPreviewIframe(html) {
     var el = document.getElementById('modal-com-trad-ref-trad');
     if (!el) return;
+    el._pedidoPreview = (el._pedidoPreview || 0) + 1; // anula una vista de email que aún estuviera cargando
     el.innerHTML = (html || '<p style="color:#999;font-size:12px;">— sin traducción aún —</p>').replace(/\n/g, '<br>');
   }
 
@@ -5236,7 +5277,10 @@ function abrirModalComTrad(clave, tipo, lang) {
   if (textarea._previewHandler) textarea.removeEventListener('input', textarea._previewHandler);
   textarea._previewHandler = function() {
     if (tipo === 'email') {
-      actualizarPreviewIframe(textarea.value);
+      clearTimeout(textarea._previewEspera);
+      textarea._previewEspera = setTimeout(function() {
+        pintarEmailReal('modal-com-trad-ref-trad', textarea.value, lang);
+      }, 500);
     } else {
       // WhatsApp: texto plano con negritas y saltos
       var waHtml = textarea.value
@@ -5261,7 +5305,7 @@ function abrirModalComTrad(clave, tipo, lang) {
             refAsuntoTrad.innerHTML = '<strong>Asunto:</strong> ' + trad.asunto_email;
             refAsuntoTrad.style.display = 'block';
           }
-          actualizarPreviewIframe(trad.cuerpo_email || '');
+          pintarEmailReal('modal-com-trad-ref-trad', trad.cuerpo_email || '', lang);
         } else {
           textarea.value = trad.cuerpo_whatsapp || '';
           var waHtml = (trad.cuerpo_whatsapp || '')
