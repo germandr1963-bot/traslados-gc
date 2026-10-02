@@ -2302,6 +2302,8 @@ async function initSchema() {
       creado_en TIMESTAMP DEFAULT NOW()
     );
   `);
+  // (02/10/2026) Recuperar contraseña del cliente por su CUENTA (email), no por una reserva
+  await pool.query(`ALTER TABLE tokens_recuperacion ADD COLUMN IF NOT EXISTS email TEXT`);
 
   // ─── Reservas × Extras ────────────────────────────────────────────────────
   await pool.query(`
@@ -13665,6 +13667,14 @@ app.post('/api/restablecer-password', asyncHandler(async (req, res) => {
         [rEmail.rows[0].email_cliente.toLowerCase(), hash]
       );
     }
+  } else if (fila.tipo === 'cliente_cuenta' && fila.email) {
+    // (02/10/2026) Contraseña de la cuenta del cliente (la que usa el portal para entrar)
+    await pool.query(
+      `INSERT INTO clientes_datos (email_cliente, password_hash)
+       VALUES ($1, $2)
+       ON CONFLICT (email_cliente) DO UPDATE SET password_hash = $2, actualizado_en = NOW()`,
+      [fila.email.toLowerCase(), hash]
+    );
   } else if (fila.tipo === 'chofer') {
     await pool.query('UPDATE conductores SET password_hash = $1 WHERE id = $2', [hash, fila.referencia_id]);
   } else {
@@ -13901,32 +13911,48 @@ app.post('/api/cliente/recuperar-password', asyncHandler(async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Indica tu email.' });
 
-  const result = await pool.query(
-    `SELECT id, nombre_cliente, email_cliente
-     FROM reservas
-     WHERE LOWER(email_cliente) = LOWER($1) AND cliente_password_hash IS NOT NULL
-     ORDER BY creado_en DESC LIMIT 1`,
-    [email.trim()]
+  // (02/10/2026) La primera vez se entra con una reserva; después, la contraseña es de la CUENTA del
+  // cliente (su email). Se busca la cuenta (clientes_datos) y, para clientes antiguos, una reserva con
+  // contraseña guardada. El enlace queda ligado al email de la cuenta, no a una reserva.
+  const emailNormRec = email.trim().toLowerCase();
+  const cuentaRec = await pool.query(
+    'SELECT nombre, password_hash FROM clientes_datos WHERE LOWER(email_cliente) = $1',
+    [emailNormRec]
   );
+  const reservaRec = await pool.query(
+    `SELECT nombre_cliente, email_cliente, cliente_password_hash
+     FROM reservas WHERE LOWER(email_cliente) = $1
+     ORDER BY creado_en DESC`,
+    [emailNormRec]
+  );
+  const tieneContrasenaRec = (cuentaRec.rows.length && cuentaRec.rows[0].password_hash) ||
+    reservaRec.rows.some(function (r) { return !!r.cliente_password_hash; });
   // Por seguridad, respondemos ok igual exista o no la cuenta (no revelamos si el email está registrado)
-  if (!result.rows.length) return res.json({ ok: true });
-  const reserva = result.rows[0];
+  if (!tieneContrasenaRec) return res.json({ ok: true });
+  const reserva = {
+    nombre_cliente: (cuentaRec.rows.length && cuentaRec.rows[0].nombre) || (reservaRec.rows.length && reservaRec.rows[0].nombre_cliente) || '',
+    email_cliente: (reservaRec.rows.length && reservaRec.rows[0].email_cliente) || email.trim()
+  };
 
   const token = crypto.randomBytes(32).toString('hex');
   const expira = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
   await pool.query(
-    'INSERT INTO tokens_recuperacion (tipo, referencia_id, token, expira_en) VALUES ($1,$2,$3,$4)',
-    ['cliente', reserva.id, token, expira]
+    'INSERT INTO tokens_recuperacion (tipo, referencia_id, token, expira_en, email) VALUES ($1,$2,$3,$4,$5)',
+    ['cliente_cuenta', 0, token, expira, emailNormRec]
   );
 
   const BASE_URL = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
   const enlace = `${BASE_URL}/restablecer-password?token=${token}&tipo=cliente`;
   let _langMarcaRec = 'es';
   try { _langMarcaRec = await idiomaPortalPorEmail(reserva.email_cliente); } catch (e) { _langMarcaRec = 'es'; }
+  const _pRec = await obtenerPlantilla('cliente_recuperar_password', {
+    nombre_cliente: reserva.nombre_cliente,
+    enlace_recuperacion: enlace
+  }, _langMarcaRec);
   await enviarEmail({
     to: reserva.email_cliente,
-    subject: 'Recupera tu contraseña — Traslados GC',
-    html: plantillaEmailEnIdioma(_langMarcaRec,
+    subject: (_pRec && _pRec.email && _pRec.asunto) || 'Recupera tu contraseña — Traslados GC',
+    html: (_pRec && _pRec.email) ? plantillaEmail(_pRec.email) : plantillaEmailEnIdioma(_langMarcaRec,
       `<p>Hola <strong>${reserva.nombre_cliente}</strong>,</p>
        <p>Has solicitado recuperar el acceso a tu cuenta. Pulsa el botón para elegir una contraseña nueva:</p>
        <p style="text-align:center;"><a href="${enlace}" class="boton">Crear nueva contraseña</a></p>
