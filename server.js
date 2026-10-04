@@ -1509,7 +1509,7 @@ async function initSchema() {
     { clave: 'fac_extra',            contexto: 'Palabra delante de cada extra en la factura (ej: Extra: Silla de bebé)', es: 'Extra' },
     { clave: 'fac_total',            contexto: 'Etiqueta del importe total de la factura, en MAYÚSCULAS', es: 'TOTAL' },
     { clave: 'fac_gracias',          contexto: 'Frase final de la factura', es: 'Gracias por viajar con nosotros.' },
-    { clave: 'fac_nombre_archivo',   contexto: 'Palabra con la que empieza el nombre del archivo PDF de la factura (ej: factura-TGC-2026-0015.pdf). Una sola palabra, en minúsculas, sin acentos', es: 'factura' },
+    { clave: 'fac_nombre_archivo',   contexto: 'Palabra con la que empieza el nombre del archivo PDF de la factura (ej: Factura-TGC-2026-0015.pdf). Se usa exactamente como se escribe, con sus mayúsculas, acentos y letras propias del idioma.', es: 'Factura' },
   ];
   for (const tx of TEXTOS_FACTURA_PDF) {
     await pool.query(
@@ -1585,7 +1585,7 @@ async function initSchema() {
     { clave: 'vou_enlace_texto',      contexto: 'Texto del recuadro de contacto con el conductor en el voucher. Mantén {whatsapp} y {numero_reserva} EXACTAMENTE así, sin traducir: el programa pone ahí el número de WhatsApp y el número de reserva. Sin emojis', es: 'Desde 2 horas antes de tu recogida, escríbenos por WhatsApp al {whatsapp} (el número del que recibes nuestros avisos) y tu mensaje llegará directamente a tu chofer, traducido a su idioma. Si escribes desde otro móvil, empieza tu mensaje con tu número de reserva: {numero_reserva}.' },
     { clave: 'vou_despedida',         contexto: 'Despedida al final del voucher (el programa añade detrás el emoji 🙏)', es: 'Un saludo cordial,' },
     { clave: 'vou_firma',             contexto: 'Firma en negrita bajo la despedida del voucher', es: 'El equipo de Traslados GC' },
-    { clave: 'vou_nombre_archivo',    contexto: 'Palabra con la que empieza el nombre del archivo PDF del voucher (ej: voucher-ABC123.pdf). Una sola palabra, en minúsculas, sin acentos', es: 'voucher' },
+    { clave: 'vou_nombre_archivo',    contexto: 'Palabra con la que empieza el nombre del archivo PDF del voucher (ej: Voucher-ABC123.pdf). Se usa exactamente como se escribe, con sus mayúsculas, acentos y letras propias del idioma.', es: 'Voucher' },
   ];
   for (const tx of TEXTOS_VOUCHER) {
     await pool.query(
