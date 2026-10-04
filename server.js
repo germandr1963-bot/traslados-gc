@@ -10889,7 +10889,7 @@ async function reasignarChofer(reservaId, nuevoConductorId, causa, desdeAdmin) {
         const nombreDocV = palabraArchivoVoucher(langR) + '-' + r.numero_reserva + '.pdf';
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
-          [r.telefono_cliente, (pv && pv.whatsapp) || r.numero_reserva, BASE_URL + '/voucher-descarga/' + reservaId + '/' + firmaV + '/' + nombreDocV, nombreDocV]
+          [r.telefono_cliente, (pv && pv.whatsapp) || r.numero_reserva, BASE_URL + '/voucher-descarga/' + reservaId + '/' + firmaV + '/' + encodeURIComponent(nombreDocV), nombreDocV]
         );
       }
     } catch (e) { console.warn('Reasignación: voucher al cliente:', e.message); }
@@ -10937,7 +10937,9 @@ app.get('/admin/conductores-aprobados', requireAdmin, asyncHandler(async (req, r
 function palabraArchivoVoucher(lang) {
   let w = obtenerTexto('vou_nombre_archivo', lang || 'es');
   if (!w || w.indexOf('[[') === 0) w = 'voucher';
-  w = w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  // Tal cual se escribe en el Admin (mayúsculas, acentos y letras de cualquier idioma).
+  // Solo se cambian por guion los signos que ningún nombre de archivo admite.
+  w = String(w).normalize('NFC').replace(/[\/\\:*?"<>|\u0000-\u001f]+/g, '-').trim().replace(/^-+|-+$/g, '');
   return w || 'voucher';
 }
 function textoVoucherConDato(clave, lang, marca, valor) {
@@ -11553,7 +11555,7 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
           try {
             const firma = firmarVoucher(reservaId);
             const nombreDoc = `${palabraArchivoVoucher(r.lang_cliente)}-${r.numero_reserva}.pdf`;
-            const urlDoc = `${BASE_URL}/voucher-descarga/${reservaId}/${firma}/${nombreDoc}`;
+            const urlDoc = `${BASE_URL}/voucher-descarga/${reservaId}/${firma}/${encodeURIComponent(nombreDoc)}`;
             const textoWaVoucherA = (_pvA && _pvA.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`;
             await pool.query(
               'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
@@ -12027,7 +12029,7 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
       try {
         const firma = firmarVoucher(req.params.id);
         const nombreDoc = `${palabraArchivoVoucher(r.lang_cliente)}-${r.numero_reserva}.pdf`;
-        const urlDoc = `${BASE_URL}/voucher-descarga/${req.params.id}/${firma}/${nombreDoc}`;
+        const urlDoc = `${BASE_URL}/voucher-descarga/${req.params.id}/${firma}/${encodeURIComponent(nombreDoc)}`;
         const textoWaVoucherM = (_pvM && _pvM.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos el voucher de tu traslado ${r.numero_reserva}.\n\nTraslados GC`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
@@ -12168,8 +12170,14 @@ app.get('/voucher-descarga/:id/:firma/:nombre?', asyncHandler(async (req, res) =
   const resultado = await generarVoucherPDF(req.params.id);
   if (!resultado) return res.status(404).send('Voucher no disponible.');
   const nombreArchivo = req.params.nombre || 'voucher-' + (resultado.numero_reserva || req.params.id) + '.pdf';
+  // Nombre con letras de cualquier idioma: forma estándar filename*=UTF-8''…
+  // y, para teléfonos antiguos, un nombre de reserva solo con letras latinas sin acentos.
+  const soloLatino = function (t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7e]/g, '').replace(/["\\]/g, '').trim(); };
+  const nombreLatino = (/^[\x20-\x7e]+$/.test(nombreArchivo) && nombreArchivo.indexOf('"') === -1 && nombreArchivo.indexOf('\\') === -1)
+    ? nombreArchivo
+    : (soloLatino(palabraArchivoVoucher('es')) || 'voucher') + '-' + (resultado.numero_reserva || req.params.id) + '.pdf';
   res.set('Content-Type', 'application/pdf');
-  res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
+  res.set('Content-Disposition', 'attachment; filename="' + nombreLatino + '"; filename*=UTF-8\'\'' + encodeURIComponent(nombreArchivo));
   res.send(resultado.buffer);
 }));
 
