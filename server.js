@@ -1583,6 +1583,8 @@ async function initSchema() {
     { clave: 'vou_cancelacion_despues', contexto: 'Frase tras el aviso de cancelación en el voucher. Mantén {importe} EXACTAMENTE así, sin traducir: el programa pone ahí el importe del depósito', es: 'Después de esa fecha, el depósito de {importe} € no será reembolsado.' },
     { clave: 'vou_enlace_titulo',     contexto: 'Título del recuadro del voucher que explica cómo contactar con el conductor por WhatsApp el día del viaje (sin emojis: el PDF no los muestra)', es: 'Contacto con tu chofer el día del viaje' },
     { clave: 'vou_enlace_texto',      contexto: 'Texto del recuadro de contacto con el conductor en el voucher. Mantén {whatsapp} y {numero_reserva} EXACTAMENTE así, sin traducir: el programa pone ahí el número de WhatsApp y el número de reserva. Sin emojis', es: 'Desde 2 horas antes de tu recogida, escríbenos por WhatsApp al {whatsapp} (el número del que recibes nuestros avisos) y tu mensaje llegará directamente a tu chofer, traducido a su idioma. Si escribes desde otro móvil, empieza tu mensaje con tu número de reserva: {numero_reserva}.' },
+    { clave: 'vou_despedida',         contexto: 'Despedida al final del voucher (el programa añade detrás el emoji 🙏)', es: 'Un saludo cordial,' },
+    { clave: 'vou_firma',             contexto: 'Firma en negrita bajo la despedida del voucher', es: 'El equipo de Traslados GC' },
     { clave: 'vou_nombre_archivo',    contexto: 'Palabra con la que empieza el nombre del archivo PDF del voucher (ej: voucher-ABC123.pdf). Una sola palabra, en minúsculas, sin acentos', es: 'voucher' },
   ];
   for (const tx of TEXTOS_VOUCHER) {
@@ -11015,7 +11017,15 @@ async function generarHtmlVoucher(reservaId) {
         <p style="margin:6px 0 0 0;font-size:13px;font-weight:600;color:#2c2c2c;">${r.conductor_nombre || ''}</p>
         <p style="margin:2px 0 0 0;font-size:11px;color:#888;">${tv('vou_tu_conductor')}</p>
        </div>`
-    : (r.conductor_nombre ? `<p style="text-align:center;font-size:13px;font-weight:600;margin:12px 0;"><strong>${tv('vou_conductor')}:</strong> ${r.conductor_nombre}</p>` : '');
+    : (r.conductor_nombre ? `<p style="text-align:center;font-size:13px;font-weight:600;margin:12px 0;">🧑‍✈️ <strong>${tv('vou_conductor')}:</strong> ${r.conductor_nombre}</p>` : '');
+  // Recuadro "Contacto con tu chofer el día del viaje", igual que en el PDF (solo si se conoce el WhatsApp de OpenWA)
+  const _waEnlaceV = await numeroWhatsappEnlace();
+  const enlaceHtml = _waEnlaceV
+    ? `<div style="background:#e6f0f7;border-radius:6px;padding:10px 14px;margin-top:14px;font-size:13px;color:#1B4F72;">
+        <strong>${tv('vou_enlace_titulo')}</strong><br>
+        ${tv('vou_enlace_texto').split('{whatsapp}').join(_waEnlaceV).split('{numero_reserva}').join(r.numero_reserva || '')}
+      </div>`
+    : '';
 
   return `<!DOCTYPE html><html lang="${_lv}"><head><meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -11037,26 +11047,27 @@ async function generarHtmlVoucher(reservaId) {
       <p style="color:#aaa;margin:4px 0 0;font-size:12px;font-family:'Helvetica Neue',Arial,sans-serif;">${textoMarcaEmail('email_marca_2_subtitulo', _lv, 'Gran Canaria')}</p>
     </div>
     <div class="body">
-      <p>${tv('vou_hola')} <strong>${r.nombre_cliente}</strong>,</p>
+      <p>${tv('vou_hola')}, <strong>${r.nombre_cliente}</strong> 👋</p>
       <div class="pagado">✔ ${tv('vou_confirmado')}</div>
       <div class="voucher-box">
         <p style="text-align:center;margin:0 0 12px 0;font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;">${tv('vou_titulo')}</p>
         <p style="text-align:center;margin:0 0 16px 0;">${tv('vou_numero')} <span class="pnr">${r.numero_reserva}</span></p>
         ${fotoChoferHtml}
         <div class="info-box">
-          <strong>${tv('vou_origen')}:</strong> ${_origenV}<br>
-          <strong>${tv('vou_destino')}:</strong> ${_destinoV}<br>
-          <strong>${tv('vou_fecha')}:</strong> ${fechaViaje}<br>
-          <strong>${tv('vou_hora')}:</strong> ${r.hora ? r.hora.slice(0,5) : '—'}<br>
-          <strong>${tv('vou_categoria')}:</strong> ${_categoriaV}<br>
-          <strong>${tv('vou_pasajeros')}:</strong> ${r.num_pasajeros || '—'}${r.direccion_recogida ? '<br><strong>' + tv('vou_dir_recogida') + ':</strong> ' + r.direccion_recogida : ''}${r.direccion_destino ? '<br><strong>' + tv('vou_dir_destino') + ':</strong> ' + r.direccion_destino : ''}${r.numero_vuelo ? '<br><strong>' + tv('vou_vuelo') + ':</strong> ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · ' + tv('vou_llegada') + ' ' + r.hora_llegada_vuelo.slice(0,5) : '') : ''}${r.nombre_barco ? '<br><strong>' + tv('vou_barco') + ':</strong> ' + r.nombre_barco + (r.hora_atraque ? ' · ' + tv('vou_atraque') + ' ' + r.hora_atraque.slice(0,5) : '') : ''}${r.notas_cliente ? '<br><strong>' + tv('vou_notas') + ':</strong> ' + r.notas_cliente : ''}${extrasHtml}
+          📍 <strong>${tv('vou_origen')}:</strong> ${_origenV}<br>
+          🏁 <strong>${tv('vou_destino')}:</strong> ${_destinoV}<br>
+          📅 <strong>${tv('vou_fecha')}:</strong> ${fechaViaje}${r.hora ? ' · ' + r.hora.slice(0,5) : ''}<br>
+          🚗 <strong>${tv('vou_categoria')}:</strong> ${_categoriaV}<br>
+          👥 <strong>${tv('vou_pasajeros')}:</strong> ${r.num_pasajeros || '—'}${r.direccion_recogida ? '<br>📍 <strong>' + tv('vou_dir_recogida') + ':</strong> ' + r.direccion_recogida : ''}${r.direccion_destino ? '<br>🏁 <strong>' + tv('vou_dir_destino') + ':</strong> ' + r.direccion_destino : ''}${r.numero_vuelo ? '<br>✈️ <strong>' + tv('vou_vuelo') + ':</strong> ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · ' + tv('vou_llegada') + ' ' + r.hora_llegada_vuelo.slice(0,5) : '') : ''}${r.nombre_barco ? '<br>⛴️ <strong>' + tv('vou_barco') + ':</strong> ' + r.nombre_barco + (r.hora_atraque ? ' · ' + tv('vou_atraque') + ' ' + r.hora_atraque.slice(0,5) : '') : ''}${r.notas_cliente ? '<br>📝 <strong>' + tv('vou_notas') + ':</strong> ' + r.notas_cliente : ''}${extrasHtml}
         </div>
         ${totalExtrasHtml}
       </div>
       <p style="font-size:13px;color:#888;">${tv('vou_nota_pie')}</p>
+      ${enlaceHtml}
       <div style="background:#fff3cd;border-radius:6px;padding:10px 14px;margin-top:14px;font-size:12px;color:#856404;">
         <strong>⚠️ ${textoVoucherConDato('vou_cancelacion', _lv, '{fecha}', _textoLimiteVoucher)}</strong> ${textoVoucherConDato('vou_cancelacion_despues', _lv, '{importe}', _importeVoucher)}
       </div>
+      <p style="margin-top:20px;">${tv('vou_despedida')} 🙏<br><strong>${tv('vou_firma')}</strong></p>
     </div>
     <div class="footer" style="font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;">${textoMarcaEmail('email_marca_3_pie', _lv, 'Traslados GC · Gran Canaria')}</div>
   </div></body></html>`;
