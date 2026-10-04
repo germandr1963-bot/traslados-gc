@@ -11092,6 +11092,25 @@ async function numeroWhatsappEnlace() {
 }
 
 // ─── Helper: generar voucher PDF para el cliente ─────────────────────────────
+// Iconos del voucher en PDF (la letra del PDF no dibuja emojis, así que van como imágenes).
+// Dibujos de Twemoji — Copyright Twitter, Inc. y otros colaboradores — licencia CC-BY 4.0
+// (https://creativecommons.org/licenses/by/4.0/). Mismos iconos que la Guía de iconos.
+const ICONOS_VOUCHER_PDF = {
+  saludo: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAwFBMVEVHcExdrez/3F3/3F1drexdrez/3F3/3F3/3F3/3F3/3F1drexdrexdrexdrez/3F1drez/3F3/3F1drez/3F3/3F1drez/3F1drexdrexdrez/3F1drez/3F3wm0ZdrezvlkXvlkXvlkXvlkX2tU/+11tvstz90lr5wlTvlkXvlkXvlkX4u1L4vVLvlkVdrez/3F3wmkf+2Fz7y1fyo0rxn0j2tVD5wlT3uVH6xlb0rE3zqEv4vVP8z1n901r1sE7Bu7vOAAAALnRSTlMAQK9ggBBAEO+Az5/PYDAgv99Q779wjzBQ33Cfr4+AIDC/cCDXz4/fgJ9Az++Pgf5MAQAAA8ZJREFUeNqlmFt32joQhcdgY2ODMT7mGkh6TntuvchDzCUhSfv//1UXyPJIHsldod9LeGDtaM8ejSTgVvyyLEfJOIDfJCglf8yD3xZSUkvoJo8R70JwMS8b5tBFHy/EIa9Mucr8FCD1lv7o10oTlPQchlb+tTaelFp2LkiSMyFVGx8uJNfPvOLhMMJpH+AT1kQTZk0xShsln+nEeGH7cY+KAgw8b5ys1KLGAAAj25KGKPkmnlExA8YyKyUXJU9+MPlXGdrtHjVzHG+llOSSEjD4q8KaZ3HWzXGCRLpL690CBn++ouKsmRuyTi0WAGtZcYDl5W9L6NAYetTM4QKIfuN3fFVag8eF/hdHVFTiBRUxEFHdqdRDKRf6LESFiqN4tZgbYE1Yl7lcX/adb7Zi9FXsyNxh9x0VAybUV8mvrK14EmeruWmovof6Lrz2U9pqRZ7Wk3hCxRZqpro3T3rT+duW1l68MXM93Rtc+nIDGh+oFTVDb2LPzA0Nb/N2ke6fWmlxcz2qNnkbt6O/Z2lxczlV28zN2GWOtL7vqNmj0Kx2zyb0UYhnq7lXcWyZ6+neAtbV98KR1ouozNE0NLz5bDx+EWeWFjM3MapdgI0PgqVlH00hNvCRN7krik/Ckda5NXenplV++Jz0VtzZR1O00Ksdt9fjTIubi1W1aeIRM/Wv9zt7WscTKh7vISehOzAYutNSkGXxX4Ro9CiRW9M6iR9Mp9qRYxoBxNSVFl/PCQ2mYDDQvrpnaek6tGD7kraOtEwfe4vZgk1sW1qmjydhK/8ADBbutMipqJDT4/cQbq61oBfk8A0Xm2lxaEGs3NwcpcU4UbN2e4OZsbcYP+RG5ETQpiBzFhcH1aqMkA2lqDH3wrw9CoEOBsDNcfjR4haia0nvFiG689BFKYxuFzIPufwWoZkhlAKZu7VGAb1L3ObexOHXxdafSgN0wOPnfTTSLzlb5NB46e7sRPMG4RQdm//YvdfUbSmjufu+IvXb77kxH02tQfvsLJG6lmzMZ2CMDDrRuTNKTHYSvXAWriVV1vBJyAP5kEu6zVW20VaAIZSWpNRh7lDxBelC6+bVOwpoNDG6s8/qq3tG7102mjj8EiHfgQFAMColmezMO2R0D8cHVZsgK2tW82VKZy/DdRJtmmb0S51/4vfpQEqlSTNdKYzfoUMLSR6uM25DQhB21inKoU1SXtmsPQ8gGCej5rec3N0FxQTApUS/lgSeJ0eva1HTHDhmmflVPuIyfXBBZQZG2O/pWvF2AV08rDOyxljkwyuzQQh2fgLrB1woYWK5YwAAAABJRU5ErkJggg==', 'base64'),
+  origen: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAdVBMVEVHcEzdLkTdLkTdLkTdLkTdLkTdLkTdLkTdLkTdLkTYN0yZqrWmk6C7bH3MTWCZqrWZqrWZqrWZqrWZqrWZqrWZqrWZqrWZqrWZqrWZqrWZqrWZqrUpLzMpLzMpLzMpLzNaZWwpLzMpLzM+RkspLzOSoq1vfISBw8GTAAAAJXRSTlMAMIC//2DPIFDv31D///9A/yDfv6+AcDDvj2DPYJ/P//9Q3//vLAM7jgAAAU1JREFUeAHs1TUCxSAQBNCBHYjL/S/7rYnbFFv91yfAKs6FaPyxGKBLmTM5QVMYV6yAoKy4UZXCs7gr4aGSB8qH8al4oHoWJ+Mh0wNEPUyZJzJuCzwVcFfkqaiGWg83L/j/6P8jp/QLBenQIkrTCmOk9B9s+qjVh7/POhIWpLCyNanmTJ0ga9qu50/ftQ10w/gupT5MLIaBIAxvB1or2O85ybn/Es+IgyEf3P8VMCDNsC4BBHUu3hngLkZE5UQjkoKSEVlB2YiioGJEr6DeiMBmJIOCBkPgjOTjvz7GJM2IyZoRUzQjpteMmKAZMZ2uEaQZQVHXiElsRvL15mtUYTOSoPaZQUcEUvtQVPtMUvtMUWnM6K/RuKD2IZUGTe6TCTrb2ah5WevmvtV1mUHMftTX6X7W17Hbf121ue/aXDToeWBQe5ocO/zs5s/P/gEcTCzGH83q4QAAAABJRU5ErkJggg==', 'base64'),
+  destino: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAq1BMVEVHcEyquMKImaYxNz3h6O0xNz2quMLh6O0xNz0xNz3h6O0xNz2Imabh6O3h6O0xNz3h6O3h6O0xNz2quMIxNz3h6O0xNz0xNz0xNz3h6O3h6O3h6O3h6O0xNz0xNz0xNz0xNz1dY2m1vMGJkJWImaaquMLh6O2fpqvW3eJzeX+Um6DAx8zL0tc8QkhobnR+hIqotsCqsba1wcqRoa1HTVNSWF6ZqbSOnqqTo6/1aNupAAAAIHRSTlMA31Dfv79QQIBAgBDfcN8gECCfEFDvYK8wn2Cvj++PcNtezRMAAAFTSURBVHhe7dfXboMwFIBhCBAbyGjSNLPDg5292r7/k/UQR62SHlBQctHh/+5I1qfDjWWMH1vdDEOzfgMnPHSZRAhx2wWQqSCzFOgQb2Q/RHkMcrovw3PnPjxWZPg9D4iv2DHruf0Net0GmyiajO/ODZcOLMYAQCCInkjgBMGbOmR7Y9IBwXVdSh0woBKInUFbgNDDVaEA+lWQhjSUiEymPE9NseTzylASpztsv6lEoEUmMGifZtOSD0UgBvFUCpHk0J5zvpRrZVeD8MN/HNKQhnYLGYvZYeLQUsJQHUrjGbLffBHPEChaLzkGJULy6hfbVEjJ89SQST7Xl/9lkIY01LK9JiH5S3zo9qlTCG1KoNakCcJpfn/AGEWg4P2xhUBPDu35RmEYFBhGpzmyPyHL6dLjj1BVCOtfQxrSkIY0tFrdCGoop3E1VFNQzbhegp0a1zgf2sF7H4sc3JUAAAAASUVORK5CYII=', 'base64'),
+  fecha: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAkFBMVEVHcEzg5+zdL0XdL0Xg5+zg5+zg5+zdL0XdL0Xg5+zdL0XdL0Xg5+xmdX/Cy9GjrrZufIbY4OWyvMOFkpp1g42rtbzR2d7J0tiUoKi6w8qbp699ipOMmaH1+PrdL0XfPFDjYXLiVWfoh5Tvxs3plKDmeon06+/x0tjy3+P0q7ruucHgSFzsrbbpbYDeN0zroKtu5F22AAAADHRSTlMAYDBQzyC/QIDv3+8TQt+hAAAB30lEQVR4XuSUy2rDQAxFh3hhY3/DlTQPv5P0//+uUQWloMXETttFexbCgjsHaWwcQtOT0YUPOqrhs33z8HwGWhO1VMdnm9B/j6gPWl9bzfgiGi7quQwVh8s6EQ1d23Z1j8+a6DW8SEokSomtGwsTp/GEiIGJEvBmHmCjDRiPiwQAFSBrYw8ZKP9IdFvXm6/HRff1ga+/Laqv9qOXPZGSz4l43E0UAVztw0Y6sdoG5EWH0bNY8gxgYm2UeX/usk0Em4VnGFNUq1GeFsVF85l1yyuUrFMkGHLgrUWRSAaLyH7yf+T5G6L3dutttUIYiMJwBHdgg5NJojEe+v7PWSKdyYXSGpa0N10P8PFr8DA8tL+F/qHo6dgYDmCj86Z8A5pJthwsXc2Hn6GkkC/QSJdLLRB9A3HLpZG65613b7ZC4TJpunn8TqCy7OrWLyg2QqexBIHQ7CUIhBYJwiA90IhCGgRCWYJQaJQnB4JUJwYhDQogVINAaJcgEIoaBEKTBIFQDQIhDQIh1iAMCl6CQKgGYVANAqFNgzBoJgkCoaRBIMQS1A7lwxmFlaB2aPjQz7K+q/fQAukis6uuY07ht/7Y7DOONd0zUGdM/4TTG2Neb9x5v0yR4Ka+OGWdRRjbFeMTPo945fSVpjYAAAAASUVORK5CYII=', 'base64'),
+  categoria: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAjVBMVEVHcEwpLzMpLzPdLkQpLzMpLzPdLkTdLkTdLkTdLkTdLkTdLkTdLkTdLkTdLkQpLzPdLkTdLkTdLkTdLkTdLkS73fXdLkQpLzPM1t24wchcY2jVWnDMhp3EscmaLj5LLzbHLkJWLzfIm7PQcIa90urbOU/BvNQ0LzTZRFrOe5HKkKjXT2XSZXvGpr6/x9/aQEfPAAAAFXRSTlMAIM+Av2Df7xCfUGCvQL/vIDDPj3CFL1J3AAABk0lEQVR42u2U2Y6CQBAARzkFvHca8EIE8d7//7ylwdggCwzCwyZLvUhiTTndGllPT09PT09PT5bZSIMcmmV8lIFfUM2mHQlKUMdNMvMFlGPpwh1TAySIOIKP+Bpdb89dCa5KT7dz3nJOoZTvy1H8UrN0rEvI30NIeDgLbmqejHV8cJ4PEdfkVpLQem4RL4SI8F4/ngnIOuTlIeSQjDcv76RrDjhBoWJJM6o7F14f4gEgX1WdAxcJbSBhxIro1BG+UbE0liZAnWIo2sZcNzH3NQIvloUIckw6eOiBhwI8c4Zq9OdAkgbtMOj31w4JO0tozyTuGNBRSIUO0BjToRM6DLF/E9r5doy/gxLIqAztPfuJtwdCwGAzNWud7Bcn8kQMZmU1z87gAVFvsNz0+O7KdRx3hU+0hXpDy4V8tJwE9Hwg6gwrF7Jj3FRz8RmIOmPMtDfNeZLRBIwJY2YXoYWOf0dq29FUib0h51cpM9bIIJT8l6s0NYihnWHY2CAGU7Kmgw8M8oavTxt8ZBCKjJKsCBh/nB/d0L9gsuJoawAAAABJRU5ErkJggg==', 'base64'),
+  pasajeros: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAk1BMVEVHcEwiZplVrO5VrO5VrO4iZplVrO4iZplVrO4iZplVrO4iZplVrO4iZpkiZplVrO4iZplVrO4iZpkiZpkiZplVrO5VrO4iZplVrO5VrO4iZplVrO4iZpkiZplVrO4xerEiZplVrO4veK4sc6lPo+Mlap44hb4/jclCks5Im9lFltM1gLkob6RLn948icRSqOkyfLTrzL1IAAAAIHRSTlMAn59AEBDvv7/vMDCPYFBgICBA34DfcM/PgI9Qr3Cv33gbXUAAAAG0SURBVHja3dZXUsMwEIBhd1kuiWtCHMoqvQL3Px0zeQqWtbsKMAH+A3xjrWTZzj1KJll8KZsktyvlrFVXRd5tVpAprbi0d/xWDRSNbZ2xMuTZOsYyq3UppLnFnCMMagM2NFNoE4sHQmv5kyYqmZCHM/xxxxQ0+4cQvf/pUycudU8pPWzfoBRNDVfJlzMBecEQE3agtVjh0sOAVNUw0HpnO6UcDB1RKNYdYxsbqAKkAx8KJQad3szQ82eoAbStGRprD4R14m5/DkQrA+P3jpFLQQfmd0RQ0Ct2QX4dip1vghJ7aItPiD/s/dCW6U4qKOion+2o1JxCAtmyL0UJsjCsLeOSrTnQQnvF9OAGyPlRaMqB3hlQw4F2vcM4D3QonLK2v5/n61JFMfvByzbWqUcc2rC/tDl1QZpqE+RQ4ltPvCojDDorTArYU9ooNI97BpYKL+pfSnLYWa8UkcOS1mfFgeiB7xVZyflF2tFOzLpQHEa/HqoaMdWhbhRaKSNXgim3YjN5DWiCRxUCyNyQsSoJjOqUdICXJKRCAlfCV+cCOxeFgJ9EVwYWOVh3gQoMEnxHOH+oD+qQe2emyBLUAAAAAElFTkSuQmCC', 'base64'),
+  vuelo: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAwFBMVEVHcExVrO5VrO5VrO5VrO5VrO5VrO5VrO7M1t1VrO5VrO5VrO7M1t1mdX9mdX9VrO7M1t3M1t1VrO5Vq+vM1t3M1t1VrO5mdX/M1t3M1t3M1t1mdX9VrO5mdX9mdX+kyOPM1t1mdX+kyOPM1t2vusLM1t1kfY+RweakyONVrO5mdX/M1t1se4XF095cr+22zuCMmaKmsrpksey2wcijyOOEvehrtOuCj5m/ytGTn6hekbdig5uYxOTG0Nd6uelgiqlNiWZyAAAAKXRSTlMAEM+AIGCfv59w7zDvMO9AMGCvjxDPUCBwj79g30AQ7yCfv4C/UHC/j7N3QhkAAAKlSURBVHhezdbZdpswEIDhMWBjwA4J3h07W5O2Et73rH3/t2pAEUI5Gg+Um/639vmQZMAD/0fdp9G4F8fjH9WUYS+WVZDumnGu8T87w1asRQHt6cDoiOUUh645v2hjzozz2eoknB7pJBKyHp4024ozohwhmfe1XR8TKV3TiHKENMDOZ/0prRLoiXJEU5MjpVkCdSlH1MZ/ryPnubMOI5995btpUecl6TXtJ6iGsd46hYbCqbMiuUm/4m9t+SzbmcMKt4+NNSHNq+q07gTUr+SIExK5xZwD4jRBVusUcuaoo3I6VkVHVes3JhUdleNFiLMhnWILWywJx1xgW9UdtUnaGRKI2qR/1vkNxQs7E8Z2ZmfvQqmCW8RhJaEm5gioojM/sJLQCHNKQleYI6Dqjqiis9ywryo6C1YSuqQcJmYV0mlRDlOzSmlnl3eYnDDKO7dM65WWukanGRogMatgTs/oAPgGiE9LOiMAaJigdjnnSo0bOnQNWJlz+u5ATYd0py42PnHdhm2HYSAf+PcVP+UcUZSH/miOg/zDb2d8lXcMk8uLdIxDzVINh+9ybLk0X/YlcTBoL5xnzvlWOSorDyUOsrWFGBVWn87a5ECHqToA2EfsLXOejQ4ETGWDXkM5G+lkB93rgp6PQPox7ShHXhZ5aQeWXBDpQB+DRLY8odQ54g7UzkMQJBPpXF/PCExFGCTz/A/NWR4c8/coCJyH+Dlz5nvGQvPXSAjG68x5WzAMAouEHuV9uNvo9wl2ByPOzUX6XMzfBINCIQXd84vH8cMHy2qAOf88NOD3NwCOz8jDjM5DN4PU82iorkFobgZNEMhBIexFAUhWIQhsEvKKQWBRUM1PnQig4OaIRfeBil56A7nNzK9BH/ACOwAoKtWheuB4nlMK+AtMy4GynxGGywAAAABJRU5ErkJggg==', 'base64'),
+  barco: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAjVBMVEVHcEzM1t3M1t0iZpnM1t3M1t1mdX9mdX9se4VvfYdmdX+m04jqWW5VrO6m04jqWW5VrO7M1t3iaHHqWW7clC/0kAxVrO70kAzM1t3M1t3M1t3M1t3M1t3M1t3M1t3M1t3M1t3dLkTdLkTdLkTdLkTdLkTdLkTdLkTdLkTdLkTdLkTdLkTcOk/dLkTdLkRZc2E+AAAAL3RSTlMA7///QHCA//+/z6+vr////zD/IM+vIP+Aj7+v3xBgz59Q/8+vnxBgMO8gv9/fj+zFdqsAAAEnSURBVHgB7dIFYuMwEIXh5wkzM/Nu6f7HayZkBmlU1teGk98i/C6W48AMol8ZchxDIaJfF8oFfXkoT37QVTAVKpauiM53ZUGo4g2VBKFqZKhWq9f5vtHgV/X69TFRKXJqzWarxfftNr9qtfgxWYcC7qFuqwcO9QfX0FBt98MjGo2yjWhMivKINiFFY0SbkqIZos1J0Txplcoldt3+pFdjJFkQlR6Ikl4hCp/VwaBWA1RC/KtabTCAi0/GaNRsqoX4V83maBRcYQGwJckZGxJMDSmwSmU+HxqPtIJ/SKUznUea4mYqDE1wkxdOrYC7NYnkcbdwSAKuzVZgB4+9IHSAx3GnHzrB699/7dATfI7Pmp0XBJ1etUJvYG1DbMiG5GzIhmzIhsTeATNnsikvv2cBAAAAAElFTkSuQmCC', 'base64'),
+  notas: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAvVBMVEVHcEzqWW7pYHXM1t3M1t3M1t3M1t2crbjqWW7M1t3qWW7man2qucLM1t3ZnoKzwMmZqrX/zE0pLzNmdX9re4WLmaOYpq6ksr2flmzqWW65xcxxgIqsu8SCj5i+ytKKgoCtgm6crbjf0qjOztY1O0B2YFZrWVHUoIhfZmutuL/UtabDloF2hpDkcIOsjoGoqKnSm4JHS1DP1dR5iJLCztbxu2HWrbi/t47J09ubkHN3e3/1zmjG0Ne9o5jOzMyNyzwVAAAADXRSTlMA2ltgIM/vYJ+/gO9gbvaOvwAAAepJREFUeF7t2Fdy4zAQBFDIFOWlbQDMylmOOWxO9z/WmlqaFNSUBpjyp/oAr6p78AXxP14gHRN4AtP2pXu+nvb7rRPT6XCc/jqfNiGf54DkSUaW9ygF7szkc5Pk7gzCOUgsaBSCxIEmuyTnXiOUThhQN2yQWgzoe6PkCi1+vYDEgRZRhBJU0yGVb1G0QzrahGycZqlwACKcRqlwoBrpoOQJA6J33iEdC4RoB6XKES4OSp5AiHZQOhMIaXJnlIpeAJEOSpmgIXRQypJGSBMOpJcAZLUzOgAxHYCYDkJ8hx6b3nkPxHBoiHaIag4OQpydy3QBYjnpQJLQUn0hndffkoZu1JaETlYUoMZ+VMqU0JlLhPD8f5QhoZNqaQVdKkMCZziQeyBtNKsldO5GcgeEU9cSOrmUltClqiVw0q60hf4qhVKvnscaulEo9epXSEK6vhlIlROuo/dCcLNKqpwsLMOD1I9y5soJrapdnM8M5uFnOXNeOdpm7Os4js8r5emdSTJzZhq6it8yK5VpAq/QGloV0IVStxtKkl5LZygu8jwtG+ErtH5HqzfmKjEyhnlszp9sJc2gliuUjsd5dwKAbbVh0SXXGgQaonOAyByggO8EBuTxIU8Y8bmOLwR8jXHSaXM+6zA+OB/yffgPf+8VB0L0cbkAAAAASUVORK5CYII=', 'base64'),
+  chofer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAulBMVEVHcEzu8/YpLzNEQzf0vVcpLzOxfTP91VkpLzMpLzP/szn/rDP/rTQrMDP+3Wnp7/Pn7fEpLzP90ln/1Vv/rDPh6O2vkUqukUr/rDP/sDX/3F3U2+C3v8OLlJnn4s2wpYT+y1cpLzP/rDNeVDn/sjj/3F31+PrUmj75zFbwwFj/uD9mdX/fpVX/wkbNf1KNWiuTiGtmIRN5OBw2ODSKdEBSXGM/RUXjuVH45qrBaU/48tgxOT7524Ph6O2q0ey7AAAAG3RSTlMA++82LNf+/hiMRnDmwtdQjWC5bcPf14Cvn5/hDCexAAADfUlEQVR4XsTT13LiMBSAYYMrBJMAGdjs1ZFcC72mvv9rrXQQq3hFJMHN/jNO4hnPx1GOcTS5o17sE5Ef90auc0ejXpcodXuj25TorHwcD4dGdDgcP85WdAMjlObfzpYthdMIRelwxKlsxon5NJJRKT5VbBzK5Wv6xqybdQVQsV/fKL5E1zAPO9axkRW0BoASoKZFI2Pn60Zax8dxZJSCiFIk5FC+TuLrahSoVKGGL08zELkKoaVCJNIOpEKYAmlH8hVoTWvAarpWIP9HiCDUlgqU6gKdNkRsILX/BlVgVaWF/NsgX7N+23b69Uf8kSAxO0kR4AupGymgtNBbSVBQSlekp/3SJhRj2H6fJLvWcZJktUcEi/Vf/4CKFpkIanopTanswdFGRZDJQlicsTQLFxcrfdY6nngqUwJOpEzlEqaF+tJRgxQPnNpDkP3QAkdNbaE6+zFcAdhCkBlCZ2D8Z6cCKLabIJOdtptVKebi0LNh/fJk281mU0loxW4Le2ggX8UNa96GxIShxQv5bIIwC+iBQ/JopYQCPJqEPD3Ul9Bpuy0yWbnaBt/X5ujzELLY/y/HkC30YIIGlpBngl6sIDyZaW11G5jzqpYDlPYdY4O05VRvvGUbwi+aeaTQNFGNAxl7Ma4txd1bSAYHBo5lv/XQwLOFPAFUS7kteVOiY9ckw/i6+O4r9mPJbtAJ0bFtjNDyrdUSIXTsG+KHszkkMw+5M5GArYSV1RyrSoaYHPvVDT3njvqh4jj3NW5LYTm+i3nsDMOyDMOLwv4edh5vALzRbDwlPa+T569sir+F2Wue516PTMezkacTIncyi6cwJ3s4ke5Tznrns7Bwrvec9dQlJ9iTOUzj2cSNrjkuAyqSAOBFOjn2mYk+c6xDCEAirj1xr0Ec2LHreOSPfaHDj4e9itsvcnlix66rUPT3s/6UWsa6CoRAFH1bvOR10ljNDOvE+BJjjSHC/f/fMguCcR2DyZ5qaE7uhSkIOTIVUQuVb+0A4phDz212+9VznsV7VP47MT5nVLyXOZ8//P0dXpi6SKSPE15w5t5gxUNDIaVALdAKa6/2tojTwpVt0d4OZHRjTQWtJowjOVNE0kTC5YrWuFGz2o2YLtV0IeYSaNgN70zEAKUCAUyGCN+IQABYVZMql+N3IptrqaYBCxtE/dVoo0jSA9koCk0UBqI7tjTf1YDwFJsAAAAASUVORK5CYII=', 'base64'),
+  despedida: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAwFBMVEVHcExQpeb/2lxQpeZQpeZQpeZQpeb/21xQpeZQpeb/3F3/3F1QpeZQpeb80Vj/3F380VhQpeb/3F3Fyov6zFVdqdz/3F3/3F391lr/21z/3F3/3F3/3F1Qpeb20V75ylX5ylX5ylX5ylVQpeZ2scjg0nP02WZgqtkcY5k4h8REltXx1GHTzn+twJhHeo4seLHIy4i9x5CdvaqSurOHtrtFg6V+oZZxkIMqa5X5ylX/3F37z1f70Vj5y1b+2lz801n33QGGAAAAI3RSTlMAQDDPv+8QEGCAz0Dfn3q/nyCA77/f3+9QYI+vIK/f70CPIJK2P1UAAAJjSURBVHjaxdXZcqpAEIDhERXiipIEJIvmnBZBTYzZQ4eY93+rgKCjNT2Udi78r6iy6ivpnlFRlvVvFMcXhhB3wzgedQW7izhr9H8Qr+txHT8ugGHxcMeEenHeKC7qct/sO/lJNkj6+M2GMG31lTFfK0xjDsnycC1l0NpBz+LNGvO+0i+EeT4LciSUYJ7zV+jnT5CtQvZpIVeFXBaEKoQcx6IgiwG1KKh1SsihIOeUkE1B9ikhpCBkHCMasnjblxB//z4N+bztS4i/f5uGbMYvPwl5FmtEEmIPqamDmrxTJCHmSfIViPluPT3U44xIQtwhoQqx7q1RBhmsGysh1r31FYi5NqcMck4AWW4Z5FoH78zDMgg9g+MUEEMaeKiDpDQQ2iqdOkC7ITdPQ/IMNNoA9U5F7Ne/hbxzpCGlc8i77e86Z3VIm87CJR4K4TKcTSGtfiadDmQ9Rp8BHg6tgs/oEbI6BWPWIIcWc9RClDRf5BDUzLVThbx36agQ2fwd8qrmjgMPSJdoIXwAKW0deEW6VZKgplfYSgJkEzyyCch2oSeku75GuicNNEa6VgvpxhoIAqS6EuIKqQLQQS9I1LSEsJpI9KKFIKAdWgqAhugp2ZmTSTYxIT0E97iX64ttvot73UMZFE5wm9c1xF5G18Ntk7AUgmfcNLwRSjdD3PQMCkS/3PJSEF0uiRejoTDYXEfCMTdXOwh1kGycjeljClBRoQrA9CMb0BhUiJDmi0gPRYu54tAQhG9RGRS9hUBBVLMZAPRVqF98RkK62oKoDVTlUIOCGsdDVZOCzOqxUE1x5H8X2S+GKAiiBooqAQAAAABJRU5ErkJggg==', 'base64'),
+  aviso: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAWlBMVEVHcEz/zE3/zE3/zE3/zE3/zE3/zE3/zE3/zE3/zE3/zE3/zE3/zE3/zE3/zE3/zE3/zE2tizwjHyCRdjfIoULxwUpoVS4xKiN2YDFaSis/NSZMPyifgDnWrEWCNKz2AAAAEHRSTlMAgL9gQO/fIJ8Qr48wcFDP1xEQBwAAAZhJREFUeNrN2IuKwjAQhWET2/Sm7kla6/39X3OhTTdISCfTkcXzAD8fKBlx948ruq74RGcPAHt5pykBoGzEoQ7TOmmngl8lDNXwq8WgQBKCAkkOkpNaIKwVfKfxtmJzSONtWgiSkzQgIwWQnBRActIJ8/q7cw+LeacNIYNpVzftimlm43sGDM5vwLT9VlC/hPpA4oPiEJ9kEiEu6YhUCEf+ix+H2HdAIR2CYoLiEJ+ksBaCYoHiEJ+kkAgxSVVJhcoq8wRRIdRZINAhVHkgOlQzQFGISaqTIR7pgLwQDkRI54Y0dYJyQygIUHZIkyA6RJM0J6QJEB2iSYYX+qFOEB0iTpPhhkw+CM8l9MQKiQbhfJk7lzNWSDQIeF2mzgvIJDUeFJts31vviUlN4sVnTyVOEHtlE4NkJBpk787dLUEiQeE3JEEiQdb52SxSjdRuS+iBsOQdqJCc+xuSqwJIFqozQBiXzgiClARFP9gpkgcRH5sFSFKL1Q3j7TYOWF3rX3z5igCiRpPwkX1lqINs4e8lZSCcUbsv3C/iUatV7NwgPwAAAABJRU5ErkJggg==', 'base64'),
+  extras: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAaVBMVEVHcEz92Ij92Ij92Ij92Ij92Ij92Ij92Ij92Ij92Ij92Ij92Ij92Ij92Ij92Ij92Ii/aVL92IhndX96gYCNjoH00oeyp4Rwe4DhxYbqzIefmoLYv4bOuYWpoIPFs4WDiIGWlIK/aVK7rYQ/6loZAAAAEXRSTlMAgGBQ348QzyDvMECfv3CvgLj/t0oAAAI5SURBVHjaxZjbdoMgEEXVeI0x6YD3a9L//8jWYhYWkCOrD91PvriXHJhhlt4B94woWh+ChL5JLutzRJTdPSfutPLIrw/aeOS5eA6cRCEdErp4YrLwDyK0NBd8OsR3EsXh4QfFnhPXjIxkV08Hm7AH8/Ey8uEseh3wDyK0NGfSzJB16rmTkIHE3RORkcjVc6EDLn8PCMeEA8Ix4YBwTDggEJNrQFXJGG9hTDignn3DYUw4IPZDC2ICAUnR4BxTmmGRHhM+QWMvRMs0usV0oz0zZ5KmrkhyA3e+svG/aUaS3K0d/5dnYRp7k+0eKNQDtFLWdf92NiQpjj0B7ejEq1sw3aalHcG5G79mK5/0ZuDqCQ/RBwlKtTSqupw6OvNJoS4qSQV/UhqRLmItaih4kJnENukm66mME1LpmKDvLKb4TI+u2cZzBGtDA9oka6NvT60tJTPjrmaX2bJv8NKo6kaquEmVgoSkat9JygqERFaGXmbVWmfcmABVzd9JkcJDEUHeYak5FcrSMO3CTMWXaWFjk9qQBEmsbD+mNIooAQey68vZIFpIw7eXCF/farUifoJDqackO/bmEWHPYGC6mkSiXMfVNUxi+zma4XxjE9EZyIT9AExMZyYkMtYYVzR8ICwyMj4b0JCQSDJ8btvXgYEZiPRBC2x/8hdReq7aGnRR+qD9a+MxTkg/kZaB3dJGYEpdB9aFLm3MLXX7H+L6eyMnR3IwsgHQwIZN2CPJw9P55J6doKATFIGa8xe4+dzA9QkE6gAAAABJRU5ErkJggg==', 'base64'),
+  confirmado: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEgAAABICAMAAABiM0N1AAAAM1BMVEVHcEwxNz0xNz0xNz0xNz0xNz0xNz0xNz0xNz0xNz0xNz0xNz0xNz0xNz0xNz0xNz0xNz3UIFXbAAAAEHRSTlMAQI8gz4C/7xAw31Bgr59wPZVHyAAAAUpJREFUeF7Nl1uKwzAQBCNbr5Flee5/2v0Iy1rbHwo9Q5I5QOFCULQfX3MhhN0Bk4qq6rCiatTnFbGBNv29ZuIE/btuAbUb6DRwkt4u8xxRJ1CcQJuPmKqwnL04fVCeOK2ynGsWO5zETiexQosdTmLVS+ycxXYnsctJLPM1cxILs1iixdrEiU5iKj410+RUs+hVs+AkttnE/GsWnGo2Pl6z6ytr5p/p/t6a8ZmWlJKsarbOtORno2RRs5WYFJimXM0ivAWX6bB+Vcz0ulWd22YI0sFlGkE62JodCiQy0+0/KdZ7zV7PdFAkcaPzKEjiaiZAasKNTiQV4TItEUnc6KxI6lymkaSdG501A4kdnQMAWDM7qez0rjNtsw4AqBlJ4kdnL5wYnhSbGJLs20yaOo3OCpnmSSBGk0CMvQHZNf4G5fqw3p5y3l5/+B82A1HQUtmFVwAAAABJRU5ErkJggg==', 'base64'),
+};
 async function generarVoucherPDF(reservaId) {
   const result = await pool.query(
     `SELECT r.*, cv.nombre AS categoria_nombre,
@@ -11152,6 +11171,11 @@ async function generarVoucherPDF(reservaId) {
       console.warn('Voucher PDF: letra DejaVu no disponible, se usa Helvetica:', errFuente.message);
     }
 
+    // Dibuja un icono (ver ICONOS_VOUCHER_PDF); si falla, no se dibuja y el voucher sigue
+    const icono = (nombre, x, yy, tam) => {
+      try { doc.image(ICONOS_VOUCHER_PDF[nombre], x, yy, { width: tam, height: tam }); } catch (eIc) {}
+    };
+
     const PW = doc.page.width;
     const PH = doc.page.height;
     const ML = 40;
@@ -11160,17 +11184,28 @@ async function generarVoucherPDF(reservaId) {
 
     // Cabecera
     doc.rect(0, 0, PW, 72).fill('#2c2c2c');
-    doc.fontSize(18).font(FUENTE_NEGRITA).fillColor('#d4956a').text('Traslados GC', ML, 18, { align: 'center', width: W });
-    doc.fontSize(10).font(FUENTE).fillColor('#aaaaaa').text('Gran Canaria', ML, 42, { align: 'center', width: W });
+    doc.fontSize(18).font(FUENTE_NEGRITA).fillColor('#d4956a').text(textoMarcaEmail('email_marca_1_nombre', _lv, 'Traslados GC'), ML, 18, { align: 'center', width: W });
+    doc.fontSize(10).font(FUENTE).fillColor('#aaaaaa').text(textoMarcaEmail('email_marca_2_subtitulo', _lv, 'Gran Canaria'), ML, 42, { align: 'center', width: W });
     y = 90;
 
     // Saludo
-    doc.fontSize(12).font(FUENTE).fillColor('#1C1815').text(tv('vou_hola') + ' ', ML, y, { continued: true }).font(FUENTE_NEGRITA).text(r.nombre_cliente + ',');
-    y = doc.y + 10;
+    {
+      const _sal1 = tv('vou_hola') + ', ';
+      const _sal2 = String(r.nombre_cliente || '');
+      doc.fontSize(12).font(FUENTE).fillColor('#1C1815');
+      const _wSal1 = doc.widthOfString(_sal1);
+      doc.text(_sal1, ML, y, { lineBreak: false });
+      doc.font(FUENTE_NEGRITA);
+      const _wSal2 = doc.widthOfString(_sal2);
+      doc.text(_sal2, ML + _wSal1, y, { lineBreak: false });
+      icono('saludo', ML + _wSal1 + _wSal2 + 5, y, 13);
+      y += 16 + 10;
+    }
 
     // Caja verde dep\u00f3sito
     doc.rect(ML, y, W, 28).fill('#d1e7dd');
-    doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#0f5132').text(tv('vou_confirmado'), ML + 10, y + 8, { width: W - 20 });
+    icono('confirmado', ML + 10, y + 8, 12);
+    doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#0f5132').text(tv('vou_confirmado'), ML + 28, y + 8, { width: W - 38 });
     y += 28 + 14;
 
     // Voucher box
@@ -11200,25 +11235,28 @@ async function generarVoucherPDF(reservaId) {
         y = doc.y + 12;
       } catch(e) { y += 8; }
     } else if (r.conductor_nombre) {
-      doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815').text(tv('vou_conductor') + ': ' + r.conductor_nombre, ML + 16, y, { align: 'center', width: W - 32 });
-      y = doc.y + 12;
+      const _txtCh = tv('vou_conductor') + ': ' + r.conductor_nombre;
+      doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815');
+      const _xCh = (PW - (doc.widthOfString(_txtCh) + 17)) / 2;
+      icono('chofer', _xCh, y, 12);
+      doc.text(_txtCh, _xCh + 17, y, { lineBreak: false });
+      y += 16 + 12;
     }
 
     // Info box: fondo primero, texto encima
     const infoX = ML + 16;
     const infoW = W - 32;
     const lineas = [];
-    lineas.push({ l: tv('vou_origen'), v: _origenV });
-    lineas.push({ l: tv('vou_destino'), v: _destinoV });
-    lineas.push({ l: tv('vou_fecha'), v: fechaViaje });
-    lineas.push({ l: tv('vou_hora'), v: r.hora ? r.hora.slice(0, 5) : '\u2014' });
-    lineas.push({ l: tv('vou_categoria'), v: _categoriaV });
-    lineas.push({ l: tv('vou_pasajeros'), v: String(r.num_pasajeros || '\u2014') });
-    if (r.direccion_recogida) lineas.push({ l: tv('vou_dir_recogida'), v: r.direccion_recogida });
-    if (r.direccion_destino)  lineas.push({ l: tv('vou_dir_destino'), v: r.direccion_destino });
-    if (r.numero_vuelo) lineas.push({ l: tv('vou_vuelo'), v: r.numero_vuelo + (r.hora_llegada_vuelo ? ' \u00b7 ' + tv('vou_llegada') + ' ' + r.hora_llegada_vuelo.slice(0, 5) : '') });
-    if (r.nombre_barco) lineas.push({ l: tv('vou_barco'), v: r.nombre_barco + (r.hora_atraque ? ' \u00b7 ' + tv('vou_atraque') + ' ' + r.hora_atraque.slice(0, 5) : '') });
-    if (r.notas_cliente) lineas.push({ l: tv('vou_notas'), v: r.notas_cliente });
+    lineas.push({ ic: 'origen', l: tv('vou_origen'), v: _origenV });
+    lineas.push({ ic: 'destino', l: tv('vou_destino'), v: _destinoV });
+    lineas.push({ ic: 'fecha', l: tv('vou_fecha'), v: fechaViaje + (r.hora ? ' \u00b7 ' + r.hora.slice(0, 5) : '') });
+    lineas.push({ ic: 'categoria', l: tv('vou_categoria'), v: _categoriaV });
+    lineas.push({ ic: 'pasajeros', l: tv('vou_pasajeros'), v: String(r.num_pasajeros || '\u2014') });
+    if (r.direccion_recogida) lineas.push({ ic: 'origen', l: tv('vou_dir_recogida'), v: r.direccion_recogida });
+    if (r.direccion_destino)  lineas.push({ ic: 'destino', l: tv('vou_dir_destino'), v: r.direccion_destino });
+    if (r.numero_vuelo) lineas.push({ ic: 'vuelo', l: tv('vou_vuelo'), v: r.numero_vuelo + (r.hora_llegada_vuelo ? ' \u00b7 ' + tv('vou_llegada') + ' ' + r.hora_llegada_vuelo.slice(0, 5) : '') });
+    if (r.nombre_barco) lineas.push({ ic: 'barco', l: tv('vou_barco'), v: r.nombre_barco + (r.hora_atraque ? ' \u00b7 ' + tv('vou_atraque') + ' ' + r.hora_atraque.slice(0, 5) : '') });
+    if (r.notas_cliente) lineas.push({ ic: 'notas', l: tv('vou_notas'), v: r.notas_cliente });
 
     const altoLinea = 18;
     // Altura real de los extras: cada uno puede ocupar una, dos o más líneas
@@ -11238,9 +11276,10 @@ async function generarVoucherPDF(reservaId) {
     doc.rect(infoX, y, infoW, altoInfo).fill('#f5f0ea');
 
     let yInfo = y + 10;
-    lineas.forEach(({ l, v }) => {
-      doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815').text(l + ': ', infoX + 8, yInfo, { continued: true, width: infoW - 16 });
-      doc.font(FUENTE).fillColor('#333333').text(v, { width: infoW - 16 });
+    lineas.forEach(({ ic, l, v }) => {
+      icono(ic, infoX + 8, yInfo + 1, 11);
+      doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815').text(l + ': ', infoX + 24, yInfo, { continued: true, width: infoW - 32 });
+      doc.font(FUENTE).fillColor('#333333').text(v, { width: infoW - 32 });
       yInfo = doc.y + 3;
     });
 
@@ -11265,14 +11304,15 @@ async function generarVoucherPDF(reservaId) {
     // Total extras
     if (extrasACobrar.length) {
       // La caja crece si el texto traducido ocupa más de una línea
-      const _txtTot = '\u2022 ' + tv('vou_total_extras') + ' ' + totalExtras.toFixed(2) + ' \u20ac';
-      const _hTot1 = doc.fontSize(11).font(FUENTE_NEGRITA).heightOfString(_txtTot, { width: W - 20 });
+      const _txtTot = tv('vou_total_extras') + ' ' + totalExtras.toFixed(2) + ' \u20ac';
+      const _hTot1 = doc.fontSize(11).font(FUENTE_NEGRITA).heightOfString(_txtTot, { width: W - 38 });
       const _hTot2 = doc.fontSize(9).font(FUENTE).heightOfString(tv('vou_total_extras_nota'), { width: W - 20 });
       const altoTotal = Math.max(44, 8 + _hTot1 + 3 + _hTot2 + 8);
       doc.rect(ML, y, W, altoTotal).fill('#fff8e1');
       doc.rect(ML, y, W, altoTotal).lineWidth(0.5).strokeColor('#D9A441').stroke();
+      icono('extras', ML + 10, y + 8, 12);
       doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815')
-        .text(_txtTot, ML + 10, y + 8, { width: W - 20 });
+        .text(_txtTot, ML + 28, y + 8, { width: W - 38 });
       doc.fontSize(9).font(FUENTE).fillColor('#555555')
         .text(tv('vou_total_extras_nota'), ML + 10, Math.max(y + 24, y + 8 + _hTot1 + 3), { width: W - 20 });
       y += altoTotal + 8;
@@ -11307,22 +11347,36 @@ async function generarVoucherPDF(reservaId) {
 
     // Caja cancelaci\u00f3n
     // La caja crece si el texto traducido ocupa más de una línea
-    const _txtCan1 = '\u2022 ' + textoVoucherConDato('vou_cancelacion', _lv, '{fecha}', _textoLimite);
+    const _txtCan1 = textoVoucherConDato('vou_cancelacion', _lv, '{fecha}', _textoLimite);
     const _txtCan2 = textoVoucherConDato('vou_cancelacion_despues', _lv, '{importe}', _importe);
-    const _hCan1 = doc.fontSize(10).font(FUENTE_NEGRITA).heightOfString(_txtCan1, { width: W - 20 });
+    const _hCan1 = doc.fontSize(10).font(FUENTE_NEGRITA).heightOfString(_txtCan1, { width: W - 38 });
     const _hCan2 = doc.fontSize(10).font(FUENTE).heightOfString(_txtCan2, { width: W - 20 });
     const altoCancelacion = Math.max(44, 8 + _hCan1 + 3 + _hCan2 + 8);
     doc.rect(ML, y, W, altoCancelacion).fill('#fff3cd');
+    icono('aviso', ML + 10, y + 8, 11);
     doc.fontSize(10).font(FUENTE_NEGRITA).fillColor('#856404')
-      .text(_txtCan1, ML + 10, y + 8, { width: W - 20 });
+      .text(_txtCan1, ML + 28, y + 8, { width: W - 38 });
     doc.fontSize(10).font(FUENTE).fillColor('#856404')
       .text(_txtCan2, ML + 10, Math.max(y + 24, y + 8 + _hCan1 + 3), { width: W - 20 });
     y += altoCancelacion + 14;
 
+    // Despedida (como en el email del voucher)
+    if (y + 40 > PH - 50) { doc.addPage(); y = 50; }
+    {
+      const _desp = tv('vou_despedida');
+      doc.fontSize(11).font(FUENTE).fillColor('#1C1815');
+      const _wDesp = doc.widthOfString(_desp);
+      doc.text(_desp, ML, y, { lineBreak: false });
+      icono('despedida', ML + _wDesp + 5, y, 12);
+      y += 16;
+      doc.fontSize(11).font(FUENTE_NEGRITA).fillColor('#1C1815').text(tv('vou_firma'), ML, y, { width: W });
+      y = doc.y + 10;
+    }
+
     // Footer
     doc.rect(0, PH - 36, PW, 36).fill('#f5f0ea');
-    doc.fontSize(10).font(FUENTE).fillColor('#888888')
-      .text('Traslados GC \u00b7 Gran Canaria', ML, PH - 22, { align: 'center', width: W });
+    doc.fontSize(10).font(FUENTE_NEGRITA).fillColor('#888888')
+      .text(textoMarcaEmail('email_marca_3_pie', _lv, 'Traslados GC \u00b7 Gran Canaria'), ML, PH - 22, { align: 'center', width: W });
 
     doc.end();
   });
