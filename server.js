@@ -9437,7 +9437,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
       try {
         const firmaCierre = firmarFactura(r.id);
         const numFac = facturaPDF.numeroFactura || r.numero_reserva;
-        const urlFacturaDoc = `${BASE_URL}/factura-descarga/${r.id}/${firmaCierre}/${palabraArchivoFactura(_langVal)}-${numFac}.pdf`;
+        const urlFacturaDoc = `${BASE_URL}/factura-descarga/${r.id}/${firmaCierre}/${encodeURIComponent(palabraArchivoFactura(_langVal) + '-' + numFac + '.pdf')}`;
         const _pfacwa = await obtenerPlantilla('cliente_factura', {
           nombre_cliente: r.nombre_cliente,
           numero_reserva: r.numero_reserva,
@@ -12117,7 +12117,7 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
       try {
         const firma = firmarFactura(req.params.id);
         const nombreDoc = `${palabraArchivoFactura(r.lang_cliente)}-${resultado.numeroFactura}.pdf`;
-        const urlDoc = `${BASE_URL}/factura-descarga/${req.params.id}/${firma}/${nombreDoc}`;
+        const urlDoc = `${BASE_URL}/factura-descarga/${req.params.id}/${firma}/${encodeURIComponent(nombreDoc)}`;
         const textoWa = (_pf && _pf.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${resultado.numeroFactura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`;
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
@@ -12528,8 +12528,14 @@ app.get('/factura-descarga/:id/:firma/:nombre?', asyncHandler(async (req, res) =
   const resultado = await generarFacturaPDF(req.params.id, 'cliente');
   if (!resultado) return res.status(404).send('Factura no disponible.');
   const nombreArchivo = req.params.nombre || 'factura-' + (resultado.numero_reserva || req.params.id) + '.pdf';
+  // Nombre con letras de cualquier idioma: forma estándar filename*=UTF-8''…
+  // y, para teléfonos antiguos, un nombre de reserva solo con letras latinas sin acentos.
+  const soloLatinoF = function (t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7e]/g, '').replace(/["\\]/g, '').trim(); };
+  const nombreLatinoF = (/^[\x20-\x7e]+$/.test(nombreArchivo) && nombreArchivo.indexOf('"') === -1 && nombreArchivo.indexOf('\\') === -1)
+    ? nombreArchivo
+    : (soloLatinoF(palabraArchivoFactura('es')) || 'factura') + '-' + (resultado.numeroFactura || resultado.numero_reserva || req.params.id) + '.pdf';
   res.set('Content-Type', 'application/pdf');
-  res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
+  res.set('Content-Disposition', 'attachment; filename="' + nombreLatinoF + '"; filename*=UTF-8\'\'' + encodeURIComponent(nombreArchivo));
   res.send(resultado.buffer);
 }));
 
@@ -12554,8 +12560,14 @@ app.get('/api/cliente/factura/:id', asyncHandler(async (req, res) => {
   const resultado = await generarFacturaPDF(req.params.id, 'cliente');
   if (!resultado) return res.status(404).send('Factura no disponible.');
   const nombreArchivo = palabraArchivoFactura(reservaQ.rows[0].lang_cliente || 'es') + '-' + (resultado.numeroFactura || resultado.numero_reserva || req.params.id) + '.pdf';
+  // Nombre con letras de cualquier idioma: forma estándar filename*=UTF-8''…
+  // y, para teléfonos antiguos, un nombre de reserva solo con letras latinas sin acentos.
+  const soloLatinoF = function (t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7e]/g, '').replace(/["\\]/g, '').trim(); };
+  const nombreLatinoF = (/^[\x20-\x7e]+$/.test(nombreArchivo) && nombreArchivo.indexOf('"') === -1 && nombreArchivo.indexOf('\\') === -1)
+    ? nombreArchivo
+    : (soloLatinoF(palabraArchivoFactura('es')) || 'factura') + '-' + (resultado.numeroFactura || resultado.numero_reserva || req.params.id) + '.pdf';
   res.set('Content-Type', 'application/pdf');
-  res.set('Content-Disposition', 'attachment; filename="' + nombreArchivo + '"');
+  res.set('Content-Disposition', 'attachment; filename="' + nombreLatinoF + '"; filename*=UTF-8\'\'' + encodeURIComponent(nombreArchivo));
   res.send(resultado.buffer);
 }));
 
@@ -15652,11 +15664,13 @@ app.post('/admin/contacto', requireAdmin, asyncHandler(async (req, res) => {
 
 // ─── Helper: generar factura PDF ────────────────────────────────────────────
 // Palabra del nombre del archivo de la factura en el idioma del cliente (ej: "invoice").
-// Solo letras sin acentos; si no quedan letras latinas (p. ej. ruso) se usa "invoice".
+// Se usa tal cual se escribe en el Admin (mayúsculas, acentos y letras de cualquier idioma).
 function palabraArchivoFactura(lang) {
   let w = obtenerTexto('fac_nombre_archivo', lang || 'es');
   if (!w || w.indexOf('[[') === 0) w = 'factura';
-  w = w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  // Tal cual se escribe en el Admin (mayúsculas, acentos y letras de cualquier idioma).
+  // Solo se cambian por guion los signos que ningún nombre de archivo admite.
+  w = String(w).normalize('NFC').replace(/[\/\\:*?"<>|\u0000-\u001f]+/g, '-').trim().replace(/^-+|-+$/g, '');
   return w || 'invoice';
 }
 
@@ -15951,7 +15965,7 @@ app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, re
     try {
       const firma = firmarFactura(factura.reserva_id);
       const nombreDoc = `${palabraArchivoFactura(r.lang_cliente)}-${factura.numero_factura}.pdf`;
-      const urlDoc = `${BASE_URL}/factura-descarga/${factura.reserva_id}/${firma}/${nombreDoc}`;
+      const urlDoc = `${BASE_URL}/factura-descarga/${factura.reserva_id}/${firma}/${encodeURIComponent(nombreDoc)}`;
       const textoWa = (_pf && _pf.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTe adjuntamos la factura ${factura.numero_factura} de tu reserva ${r.numero_reserva}.\n\nGracias por viajar con Traslados GC.`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
