@@ -11872,6 +11872,10 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
   const _pep = await obtenerPlantilla('cliente_enlace_pago', {
     nombre_cliente: r.nombre_cliente,
     numero_reserva: r.numero_reserva,
+    origen: r.origen || '—',
+    destino: r.destino || '—',
+    fecha: fechaCliente(r.fecha, lang),
+    hora: r.hora ? r.hora.slice(0,5) : '—',
     importe: importe,
     url_pago: urlCortaEmail,
     boton_pago: botonPagoReenvio
@@ -11903,6 +11907,10 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
       const _pepwa = await obtenerPlantilla('cliente_enlace_pago', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
+        origen: r.origen || '—',
+        destino: r.destino || '—',
+        fecha: r.fecha ? fechaCliente(r.fecha, lang) : '—',
+        hora: r.hora ? r.hora.slice(0,5) : '—',
         importe: importe,
         url_pago: urlCorta,
         url_corta: urlCorta
