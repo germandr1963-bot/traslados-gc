@@ -10876,7 +10876,9 @@ async function reasignarChofer(reservaId, nuevoConductorId, causa, desdeAdmin) {
   if (r.deposito_pagado) {
     try {
       const html = await generarHtmlVoucher(reservaId);
-      const pv = await obtenerPlantilla('cliente_voucher', { nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva }, langR);
+      const pv = await obtenerPlantilla('cliente_voucher', { nombre_cliente: r.nombre_cliente, numero_reserva: r.numero_reserva,
+        origen: r.origen || '—', destino: r.destino || '—',
+        fecha: r.fecha ? fechaCliente(r.fecha, langR) : '—', hora: r.hora ? r.hora.slice(0,5) : '—' }, langR);
       if (html && r.email_cliente) {
         await enviarEmail({ to: r.email_cliente, subject: (pv && pv.asunto) || ('Voucher — ' + r.numero_reserva), html });
       }
@@ -11467,7 +11469,11 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         const htmlVoucher = await generarHtmlVoucher(reservaId);
         const _pvA = await obtenerPlantilla('cliente_voucher', {
           nombre_cliente: r.nombre_cliente,
-          numero_reserva: r.numero_reserva
+          numero_reserva: r.numero_reserva,
+          origen: r.origen || '—',
+          destino: r.destino || '—',
+          fecha: r.fecha ? fechaCliente(r.fecha, r.lang_cliente || 'es') : '—',
+          hora: r.hora ? r.hora.slice(0,5) : '—'
         }, r.lang_cliente || 'es');
         if (htmlVoucher) {
           await enviarEmail({
@@ -11939,7 +11945,11 @@ app.post('/admin/reservas/:id/email-voucher', requireAdmin, asyncHandler(async (
     if (!html) return res.status(500).json({ error: 'No se pudo generar el voucher.' });
     const _pvM = await obtenerPlantilla('cliente_voucher', {
       nombre_cliente: r.nombre_cliente,
-      numero_reserva: r.numero_reserva
+      numero_reserva: r.numero_reserva,
+      origen: r.origen || '—',
+      destino: r.destino || '—',
+      fecha: r.fecha ? fechaCliente(r.fecha, r.lang_cliente || 'es') : '—',
+      hora: r.hora ? r.hora.slice(0,5) : '—'
     }, r.lang_cliente || 'es');
     await enviarEmail({
       to: r.email_cliente,
