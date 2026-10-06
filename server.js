@@ -14215,6 +14215,31 @@ app.post('/api/cliente/recuperar-password', asyncHandler(async (req, res) => {
     )
   });
 
+  // (06/10/2026) También por WhatsApp, con la misma plantilla y en el mismo idioma:
+  // al teléfono de la cuenta del cliente o, si no lo tiene, al de su última reserva. Sin teléfono, solo email.
+  if (_pRec && _pRec.whatsapp) {
+    try {
+      let _telRec = '';
+      const _tCuenta = await pool.query('SELECT telefono FROM clientes_datos WHERE LOWER(email_cliente) = $1', [emailNormRec]);
+      if (_tCuenta.rows.length && _tCuenta.rows[0].telefono) _telRec = _tCuenta.rows[0].telefono;
+      if (!_telRec) {
+        const _tReserva = await pool.query(
+          `SELECT telefono_cliente FROM reservas
+           WHERE LOWER(email_cliente) = $1 AND telefono_cliente IS NOT NULL AND telefono_cliente <> ''
+           ORDER BY creado_en DESC LIMIT 1`,
+          [emailNormRec]
+        );
+        if (_tReserva.rows.length) _telRec = _tReserva.rows[0].telefono_cliente;
+      }
+      if (_telRec) {
+        await pool.query(
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+          [_telRec, _pRec.whatsapp.replace(/\n{3,}/g, '\n\n')]
+        );
+      }
+    } catch (e) { console.warn('Error encolando WhatsApp de recuperar contraseña:', e.message); }
+  }
+
   res.json({ ok: true });
 }));
 
