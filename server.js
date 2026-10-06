@@ -16117,6 +16117,22 @@ app.get('/api/whatsapp/plantilla/:clave', requierePuenteWhatsapp, asyncHandler(a
       varsPlantilla.extras = '';
     }
   }
+  // (06/10/2026) "Seguimos gestionando": puente.js solo envía nombre y número, así que el servidor
+  // añade origen, destino, fecha y hora de la reserva (como en la Confirmación) si no vienen.
+  if (req.params.clave === 'cliente_en_gestion' && varsPlantilla.origen === undefined && varsPlantilla.numero_reserva) {
+    try {
+      const rg = await pool.query('SELECT origen, destino, fecha, hora FROM reservas WHERE numero_reserva = $1', [varsPlantilla.numero_reserva]);
+      if (rg.rows.length) {
+        const g = rg.rows[0];
+        varsPlantilla.origen = g.origen || '—';
+        varsPlantilla.destino = g.destino || '—';
+        varsPlantilla.fecha = fechaCliente(g.fecha, lang || 'es');
+        varsPlantilla.hora = g.hora ? String(g.hora).slice(0,5) : '—';
+      }
+    } catch (eGest) {
+      console.warn('Datos del traslado para el WhatsApp de "Seguimos gestionando":', eGest.message);
+    }
+  }
   const resultado = await obtenerPlantilla(req.params.clave, varsPlantilla, lang);
   if (!resultado) return res.json({ ok: false });
   res.json({ ok: true, whatsapp: resultado.whatsapp });
@@ -16577,18 +16593,23 @@ app.post('/api/whatsapp/marcar-sin-respuesta/:id', requierePuenteWhatsapp, async
   const reserva = await pool.query(
     `UPDATE reservas SET estado_aviso_whatsapp = 'sin_respuesta'
      WHERE id = $1 AND estado_aviso_whatsapp = 'enviado'
-     RETURNING numero_reserva, nombre_cliente, email_cliente, lang_cliente`,
+     RETURNING numero_reserva, nombre_cliente, email_cliente, lang_cliente, origen, destino, fecha, hora`,
     [req.params.id]
   );
   if (!reserva.rows.length) return res.json({ ok: true, ya_marcada: true });
 
   const { numero_reserva, nombre_cliente, email_cliente, lang_cliente } = reserva.rows[0];
+  const _rGest = reserva.rows[0];
 
   try {
     // Plantilla "Seguimos gestionando" de Admin → Comunicaciones, en el idioma del cliente
     const _pgest = await obtenerPlantilla('cliente_en_gestion', {
       nombre_cliente: nombre_cliente,
-      numero_reserva: numero_reserva
+      numero_reserva: numero_reserva,
+      origen: _rGest.origen || '—',
+      destino: _rGest.destino || '—',
+      fecha: fechaCliente(_rGest.fecha, lang_cliente || 'es'),
+      hora: _rGest.hora ? String(_rGest.hora).slice(0,5) : '—'
     }, lang_cliente || 'es');
     await enviarEmail({
       to: email_cliente,
