@@ -9603,6 +9603,7 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
       origen: _origenNs,
       destino: _destinoNs,
       fecha: _fechaNs,
+      hora: r.hora ? r.hora.slice(0,5) : '—',
       importe: importe
     }, _langNs);
     await enviarEmail({
@@ -9634,6 +9635,7 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
         origen: _origenNs,
         destino: _destinoNs,
         fecha: _fechaNs,
+        hora: r.hora ? r.hora.slice(0,5) : '—',
         importe: importe
       }, _langNs);
       const textoWa = (_pns1wa && _pns1wa.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) no pudo realizarse al no presentarse en el punto de recogida. El depósito de garantía ha sido retenido según nuestra política de reservas.\n\nSi crees que ha habido un error, contáctanos. Un saludo 🙏`;
@@ -15564,7 +15566,11 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
 
   await pool.query('UPDATE reservas SET deposito_retenido_noshow = TRUE WHERE id = $1', [req.params.id]);
 
-  const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+  // (06/10/2026) En el idioma de la reserva, igual que el aviso que sale cuando el chofer marca el no-show
+  const _langNs2 = r.lang_cliente || 'es';
+  const fechaViaje = r.fecha ? fechaCliente(r.fecha, _langNs2) : '—';
+  const _origenNs2 = (await traducirLugarCliente(r.origen, _langNs2)) || r.origen || '—';
+  const _destinoNs2 = (await traducirLugarCliente(r.destino, _langNs2)) || r.destino || '—';
   const _cfgNs2b = await pool.query('SELECT importe_deposito FROM configuracion_noshow WHERE es_general=TRUE LIMIT 1');
   const importe = ((_cfgNs2b.rows[0] && _cfgNs2b.rows[0].importe_deposito) || 10).toString();
 
@@ -15573,11 +15579,12 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
     const _pns2 = await obtenerPlantilla('cliente_deposito_noshow', {
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva,
-      origen: r.origen || '—',
-      destino: r.destino || '—',
+      origen: _origenNs2,
+      destino: _destinoNs2,
       fecha: fechaViaje,
+      hora: r.hora ? r.hora.slice(0,5) : '—',
       importe: importe
-    });
+    }, _langNs2);
     await enviarEmail({
       to: r.email_cliente,
       subject: (_pns2 && _pns2.asunto) || ('🔒 Depósito retenido por no-show — ' + r.numero_reserva),
@@ -15604,11 +15611,12 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
       const _pns2wa = await obtenerPlantilla('cliente_deposito_noshow', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
-        origen: r.origen || '—',
-        destino: r.destino || '—',
+        origen: _origenNs2,
+        destino: _destinoNs2,
         fecha: fechaViaje,
+        hora: r.hora ? r.hora.slice(0,5) : '—',
         importe: importe
-      });
+      }, _langNs2);
       const textoWa = (_pns2wa && _pns2wa.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) no pudo realizarse al no presentarse en el punto de recogida. El depósito de garantía ha sido retenido según nuestra política de reservas.\n\nSi crees que ha habido un error, contáctanos. Un saludo 🙏`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
