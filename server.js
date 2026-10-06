@@ -12270,6 +12270,14 @@ async function traducirCategoriaCliente(nombre, lang) {
   return nombre;
 }
 
+// (06/10/2026) Enlace a "Mi reserva" en el idioma del cliente, igual que en "Acceso a reserva"
+// (Admin → Palabras de URL). Para "Modificación aprobada" y "Reserva actualizada".
+function urlMiReservaCliente(lang) {
+  const _l = (lang && IDIOMAS_PERMITIDOS.includes(lang)) ? lang : 'es';
+  const _palabra = PALABRAS_PAGINAS[_l] && PALABRAS_PAGINAS[_l]['mi-reserva'];
+  return (_l === 'es' || !_palabra) ? BASE_URL + '/mi-reserva' : BASE_URL + '/' + _l + '/' + _palabra;
+}
+
 // Resumen de los datos de una reserva en el idioma del cliente, para los mensajes
 // "Reserva actualizada" y "Modificación aprobada". canal: 'email' (HTML) o 'whatsapp' (texto).
 async function resumenReservaCliente(reservaId, lang, canal) {
@@ -15018,7 +15026,8 @@ app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(
     const _pma = await obtenerPlantilla('cliente_modificacion_aprobada', {
       nombre_cliente: ra.nombre_cliente,
       numero_reserva: ra.numero_reserva,
-      resumen: await resumenReservaCliente(ra.id, _langMa, 'email')
+      resumen: await resumenReservaCliente(ra.id, _langMa, 'email'),
+      url_portal: urlMiReservaCliente(_langMa)
     }, _langMa);
     await enviarEmail({
       to: ra.email_cliente,
@@ -15041,7 +15050,8 @@ app.post('/admin/reservas/:id/aprobar-modificacion', requireAdmin, asyncHandler(
       const _pmaWa = await obtenerPlantilla('cliente_modificacion_aprobada', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
-        resumen: await resumenReservaCliente(r.id, _langMaWa, 'whatsapp')
+        resumen: await resumenReservaCliente(r.id, _langMaWa, 'whatsapp'),
+        url_portal: urlMiReservaCliente(_langMaWa)
       }, _langMaWa);
       const textoWa = (_pmaWa && _pmaWa.whatsapp ? _pmaWa.whatsapp.replace(/\n{3,}/g, '\n\n') : null) ||
         `Hola, *${r.nombre_cliente}* 👋\n\n✅ Hemos revisado y aprobado los cambios en tu reserva *${r.numero_reserva}*.\n\n🔍 Accede a tu portal para ver todos los detalles actualizados.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
@@ -15263,7 +15273,7 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
         nombre_cliente: ra.nombre_cliente,
         numero_reserva: ra.numero_reserva,
         resumen: await resumenReservaCliente(ra.id, _langRa, 'email'),
-        url_portal: BASE_URL + '/mi-reserva'
+        url_portal: urlMiReservaCliente(_langRa)
       }, _langRa);
 
       await enviarEmail({
@@ -15288,7 +15298,7 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
           nombre_cliente: ra.nombre_cliente,
           numero_reserva: ra.numero_reserva,
           resumen: await resumenReservaCliente(ra.id, _langRa, 'whatsapp'),
-          url_portal: BASE_URL + '/mi-reserva'
+          url_portal: urlMiReservaCliente(_langRa)
         }, _langRa);
         const textoWa = (_praWa && _praWa.whatsapp ? _praWa.whatsapp.replace(/\n{3,}/g, '\n\n') : null) ||
           `Hola, *${ra.nombre_cliente}* 👋\n\n✏️ Tu reserva *${ra.numero_reserva}* ha sido actualizada por nuestro equipo.\n\n🔍 Si tienes alguna pregunta, accede a tu portal:\n${BASE_URL}/mi-reserva\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
