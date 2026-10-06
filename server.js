@@ -11620,7 +11620,11 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
       try {
         const _ppp = await obtenerPlantilla('cliente_problema_pago', {
           nombre_cliente: r.nombre_cliente,
-          numero_reserva: r.numero_reserva
+          numero_reserva: r.numero_reserva,
+          origen: r.origen || '—',
+          destino: r.destino || '—',
+          fecha: fechaCliente(r.fecha, _langPp),
+          hora: r.hora ? r.hora.slice(0,5) : '—'
         }, _langPp);
         await enviarEmail({
           to: r.email_cliente,
@@ -11641,7 +11645,11 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHand
         try {
           const _pppWa = await obtenerPlantilla('cliente_problema_pago', {
             nombre_cliente: r.nombre_cliente,
-            numero_reserva: r.numero_reserva
+            numero_reserva: r.numero_reserva,
+            origen: r.origen || '—',
+            destino: r.destino || '—',
+            fecha: fechaCliente(r.fecha, _langPp),
+            hora: r.hora ? r.hora.slice(0,5) : '—'
           }, _langPp);
           const textoWa = (_pppWa && _pppWa.whatsapp ? _pppWa.whatsapp.replace(/\n{3,}/g, '\n\n') : null) ||
             `Hola, *${r.nombre_cliente}* 👋\n\n⚠️ No hemos podido procesar el pago del depósito para tu reserva *${r.numero_reserva}*.\n\nPor favor, contacta con nosotros por WhatsApp para resolver el pago y confirmar tu traslado.\n\nSi crees que es un error, puedes intentarlo de nuevo.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
