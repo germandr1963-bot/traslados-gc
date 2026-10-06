@@ -14867,6 +14867,7 @@ async function procesoCancelacionCliente(r, porEquipo, decisionEquipo) {
       origen: r.origen || '—',
       destino: r.destino || '—',
       fecha: fechaTextoCancel,
+      hora: r.hora ? r.hora.slice(0,5) : '—',
       aviso_deposito: avisoDeposito
     }, _langCancel);
     await enviarEmail({
@@ -14897,6 +14898,7 @@ async function procesoCancelacionCliente(r, porEquipo, decisionEquipo) {
         origen: r.origen || '—',
         destino: r.destino || '—',
         fecha: fechaTextoWa,
+        hora: r.hora ? r.hora.slice(0,5) : '—',
         aviso_deposito: !r.deposito_pagado ? '' : fueraDePlazo ? '⚠️ ' + (await obtenerFrase('frase_cancel_wa_fuera_plazo', _langCancelWa, 'La cancelación se ha realizado fuera del plazo establecido. El depósito de garantía ha sido retenido.')) : '✅ ' + (await obtenerFrase('frase_cancel_wa_dentro_plazo', _langCancelWa, 'La cancelación se ha realizado dentro del plazo establecido. Hemos liberado tu depósito de garantía; el importe llegará a tu tarjeta en un plazo de 5 a 10 días hábiles, según tu entidad bancaria.'))
       }, _langCancelWa);
       const textoWa = (_pcancelWa && _pcancelWa.whatsapp ? _pcancelWa.whatsapp.replace(/\n{3,}/g, '\n\n') : null) || (fueraDePlazo
