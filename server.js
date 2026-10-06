@@ -15346,7 +15346,7 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
         mensaje: mensaje.trim().replace(/\n/g,'<br>'),
-        url_portal: BASE_URL + '/mi-reserva',
+        url_portal: urlMiReservaCliente(_langMsg),
         origen: r.origen || '—', destino: r.destino || '—',
         fecha: r.fecha ? fechaCliente(r.fecha, _langMsg) : '—', hora: r.hora ? String(r.hora).slice(0, 5) : '—'
       }, _langMsg);
@@ -15357,7 +15357,7 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
             nombre_cliente: r.nombre_cliente,
             numero_reserva: r.numero_reserva,
             mensaje: mensaje.trim(),
-            url_portal: BASE_URL + '/mi-reserva',
+            url_portal: urlMiReservaCliente(_langMsg),
             origen: r.origen || '—', destino: r.destino || '—',
             fecha: r.fecha ? fechaCliente(r.fecha, _langMsg) : '—', hora: r.hora ? String(r.hora).slice(0, 5) : '—'
           }, _langMsg);
