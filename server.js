@@ -16117,9 +16117,9 @@ app.get('/api/whatsapp/plantilla/:clave', requierePuenteWhatsapp, asyncHandler(a
       varsPlantilla.extras = '';
     }
   }
-  // (06/10/2026) "Seguimos gestionando": puente.js solo envía nombre y número, así que el servidor
+  // (06/10/2026) "Seguimos gestionando" y "Reserva anulada": puente.js solo envía nombre y número, así que el servidor
   // añade origen, destino, fecha y hora de la reserva (como en la Confirmación) si no vienen.
-  if (req.params.clave === 'cliente_en_gestion' && varsPlantilla.origen === undefined && varsPlantilla.numero_reserva) {
+  if ((req.params.clave === 'cliente_en_gestion' || req.params.clave === 'cliente_reserva_anulada') && varsPlantilla.origen === undefined && varsPlantilla.numero_reserva) {
     try {
       const rg = await pool.query('SELECT origen, destino, fecha, hora FROM reservas WHERE numero_reserva = $1', [varsPlantilla.numero_reserva]);
       if (rg.rows.length) {
@@ -16646,18 +16646,23 @@ app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asy
   const reserva = await pool.query(
     `UPDATE reservas SET estado = 'cancelada', estado_aviso_whatsapp = 'cancelada_sin_respuesta'
      WHERE id = $1 AND estado NOT IN ('cancelada', 'completada')
-     RETURNING numero_reserva, nombre_cliente, email_cliente, lang_cliente`,
+     RETURNING numero_reserva, nombre_cliente, email_cliente, lang_cliente, origen, destino, fecha, hora`,
     [req.params.id]
   );
   if (!reserva.rows.length) return res.json({ ok: true, ya_cancelada: true });
 
   const { numero_reserva, nombre_cliente, email_cliente, lang_cliente } = reserva.rows[0];
+  const _rAnul = reserva.rows[0];
 
   try {
     // Plantilla "Reserva anulada" de Admin → Comunicaciones, en el idioma del cliente
     const _panul = await obtenerPlantilla('cliente_reserva_anulada', {
       nombre_cliente: nombre_cliente,
-      numero_reserva: numero_reserva
+      numero_reserva: numero_reserva,
+      origen: _rAnul.origen || '—',
+      destino: _rAnul.destino || '—',
+      fecha: fechaCliente(_rAnul.fecha, lang_cliente || 'es'),
+      hora: _rAnul.hora ? String(_rAnul.hora).slice(0,5) : '—'
     }, lang_cliente || 'es');
     await enviarEmail({
       to: email_cliente,
