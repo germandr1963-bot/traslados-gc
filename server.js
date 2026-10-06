@@ -14012,7 +14012,7 @@ app.post('/api/cliente/solicitar-acceso', asyncHandler(async (req, res) => {
   if (!pnr || !email) return res.status(400).json({ error: 'PNR y email son obligatorios.' });
 
   const result = await pool.query(
-    'SELECT id, nombre_cliente, email_cliente, cliente_password_hash, cliente_primer_acceso, lang_cliente, telefono_cliente FROM reservas WHERE UPPER(numero_reserva) = UPPER($1)',
+    'SELECT id, nombre_cliente, email_cliente, cliente_password_hash, cliente_primer_acceso, lang_cliente, telefono_cliente, origen, destino, fecha, hora FROM reservas WHERE UPPER(numero_reserva) = UPPER($1)',
     [pnr.trim()]
   );
   if (!result.rows.length) return res.status(404).json({ error: 'No encontramos una reserva con ese número.' });
@@ -14048,7 +14048,11 @@ app.post('/api/cliente/solicitar-acceso', asyncHandler(async (req, res) => {
     nombre_cliente: reserva.nombre_cliente,
     numero_reserva: pnr.toUpperCase(),
     password_temporal: pwd,
-    url_portal: _urlPortalAcc
+    url_portal: _urlPortalAcc,
+    origen: reserva.origen || '—',
+    destino: reserva.destino || '—',
+    fecha: fechaCliente(reserva.fecha, _langAcc),
+    hora: reserva.hora ? String(reserva.hora).slice(0,5) : '—'
   };
   const _pAcc = await obtenerPlantilla('cliente_acceso_reserva', _varsAcc, _langAcc);
   if (reserva.telefono_cliente && _pAcc && _pAcc.whatsapp) {
