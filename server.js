@@ -12291,18 +12291,25 @@ async function resumenReservaCliente(reservaId, lang, canal) {
   const origen  = (await traducirLugarCliente(ra.origen, _lang)) || '—';
   const destino = (await traducirLugarCliente(ra.destino, _lang)) || '—';
   const categoria = (await traducirCategoriaCliente(ra.categoria_nombre, _lang)) || '—';
+  // (06/10/2026) Identidad común: mismas líneas, iconos y palabras que el voucher
+  // (Textos de interfaz → Voucher, ya traducidos). Fecha y hora juntas en una línea.
+  const tv = function (clave, respaldo) {
+    const t = obtenerTexto(clave, _lang);
+    return (t && t.indexOf('[[') !== 0) ? t : respaldo;
+  };
   const lineas = [
-    et(await f('frase_resumen_ruta', 'Ruta')) + origen + ' → ' + destino,
-    et(await f('frase_resumen_fecha', 'Fecha')) + (ra.fecha ? fechaCliente(ra.fecha, _lang) : '—'),
-    et(await f('frase_resumen_hora_recogida', 'Hora de recogida')) + (ra.hora ? ra.hora.slice(0,5) : '—'),
-    et(await f('frase_resumen_pasajeros', 'Pasajeros')) + (ra.num_pasajeros || '—'),
-    et(await f('frase_resumen_categoria', 'Categoría')) + categoria,
-    et(await f('frase_resumen_precio_estimado', 'Precio estimado')) + (ra.precio_estimado ? parseFloat(ra.precio_estimado).toFixed(2) + ' €' : '—'),
+    '📍 ' + et(tv('vou_origen', 'Origen')) + origen,
+    '🏁 ' + et(tv('vou_destino', 'Destino')) + destino,
+    '📅 ' + et(tv('vou_fecha', 'Fecha')) + (ra.fecha ? fechaCliente(ra.fecha, _lang) : '—') + (ra.hora ? ' · ' + ra.hora.slice(0,5) : ''),
+    '🚗 ' + et(tv('vou_categoria', 'Categoría')) + categoria,
+    '👥 ' + et(tv('vou_pasajeros', 'Pasajeros')) + (ra.num_pasajeros || '—'),
+    '💶 ' + et(await f('frase_resumen_precio_estimado', 'Precio estimado')) + (ra.precio_estimado ? parseFloat(ra.precio_estimado).toFixed(2) + ' €' : '—'),
   ];
-  if (ra.direccion_recogida) lineas.push(et(await f('frase_resumen_dir_recogida', 'Dirección de recogida')) + ra.direccion_recogida);
-  if (ra.direccion_destino) lineas.push(et(await f('frase_resumen_dir_destino', 'Dirección de destino')) + ra.direccion_destino);
-  if (ra.numero_vuelo) lineas.push(et(await f('frase_resumen_vuelo', 'Vuelo')) + ra.numero_vuelo + (ra.hora_llegada_vuelo ? ' · ' + (await f('frase_resumen_llegada', 'Llegada')) + ' ' + ra.hora_llegada_vuelo.slice(0,5) : ''));
-  if (ra.nombre_barco) lineas.push(et(await f('frase_resumen_barco', 'Barco')) + ra.nombre_barco + (ra.hora_atraque ? ' · ' + (await f('frase_resumen_atraque', 'Atraque')) + ' ' + ra.hora_atraque.slice(0,5) : ''));
+  if (ra.direccion_recogida) lineas.push('📍 ' + et(tv('vou_dir_recogida', 'Dirección de recogida')) + ra.direccion_recogida);
+  if (ra.direccion_destino) lineas.push('🏁 ' + et(tv('vou_dir_destino', 'Dirección de destino')) + ra.direccion_destino);
+  if (ra.numero_vuelo) lineas.push('✈️ ' + et(tv('vou_vuelo', 'Vuelo')) + ra.numero_vuelo + (ra.hora_llegada_vuelo ? ' · ' + tv('vou_llegada', 'Llegada') + ' ' + ra.hora_llegada_vuelo.slice(0,5) : ''));
+  if (ra.nombre_barco) lineas.push('⛴️ ' + et(tv('vou_barco', 'Barco')) + ra.nombre_barco + (ra.hora_atraque ? ' · ' + tv('vou_atraque', 'Atraque') + ' ' + ra.hora_atraque.slice(0,5) : ''));
+  if (ra.notas_cliente) lineas.push('📝 ' + et(tv('vou_notas', 'Notas')) + ra.notas_cliente);
   if (exq.rows.length) {
     // Todos los extras, gratis y de pago, con las mismas palabras que la confirmación
     const fIncluido = await f('frase_extras_incluido', 'incluido');
@@ -12320,9 +12327,8 @@ async function resumenReservaCliente(reservaId, lang, canal) {
     });
     // Un extra por línea, en forma de lista
     const sep = canal === 'whatsapp' ? '\n• ' : '<br>&nbsp;&nbsp;&#183; ';
-    lineas.push(et(await f('frase_resumen_extras', 'Extras')) + sep + nombres.join(sep));
+    lineas.push(et(tv('vou_extras', 'Extras')) + sep + nombres.join(sep));
   }
-  if (ra.notas_cliente) lineas.push(et(await f('frase_resumen_notas', 'Notas')) + ra.notas_cliente);
   return lineas.join(canal === 'whatsapp' ? '\n' : '<br>');
 }
 
