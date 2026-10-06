@@ -15463,15 +15463,17 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
   try {
     const adjunto = facturaBuffer ? { filename: palabraArchivoFactura(r.lang_cliente) + '-' + r.numero_reserva + '.pdf', content: facturaBuffer } : null;
     const fnEmail = adjunto ? enviarEmailConAdjunto : enviarEmail;
-    const fechaViaje = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+    // (06/10/2026) En el idioma de la reserva, igual que el aviso que sale al completar desde el panel del chofer
+    const _langDl = r.lang_cliente || 'es';
+    const fechaViaje = r.fecha ? fechaCliente(r.fecha, _langDl) : '—';
     const _pdl = await obtenerPlantilla('cliente_deposito_liberado', {
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva,
-      origen: r.origen || '—',
-      destino: r.destino || '—',
+      origen: (await traducirLugarCliente(r.origen, _langDl)) || r.origen || '—',
+      destino: (await traducirLugarCliente(r.destino, _langDl)) || r.destino || '—',
       fecha: fechaViaje,
       numero_factura: numeroFactura || ''
-    });
+    }, _langDl);
     await fnEmail({
       to: r.email_cliente,
       subject: (_pdl && _pdl.asunto) || ('✅ Servicio completado — ' + r.numero_reserva),
@@ -15532,15 +15534,17 @@ app.post('/admin/reservas/:id/liberar-deposito', requireAdmin, asyncHandler(asyn
   // WhatsApp al cliente
   if (r.telefono_cliente) {
     try {
-      const fechaViajeDl = r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}) : '—';
+      // (06/10/2026) En el idioma de la reserva, igual que el aviso que sale al completar desde el panel del chofer
+      const _langDlWa = r.lang_cliente || 'es';
+      const fechaViajeDl = r.fecha ? fechaCliente(r.fecha, _langDlWa) : '—';
       const _pdlwa = await obtenerPlantilla('cliente_deposito_liberado', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
-        origen: r.origen || '—',
-        destino: r.destino || '—',
+        origen: (await traducirLugarCliente(r.origen, _langDlWa)) || r.origen || '—',
+        destino: (await traducirLugarCliente(r.destino, _langDlWa)) || r.destino || '—',
         fecha: fechaViajeDl,
         numero_factura: numeroFactura || ''
-      });
+      }, _langDlWa);
       const textoWa = (_pdlwa && _pdlwa.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nEl depósito de garantía de tu reserva ${r.numero_reserva} (${r.origen || '—'} → ${r.destino || '—'}) ha sido liberado. El importe quedará disponible en tu tarjeta en un plazo de 5 a 10 días hábiles según tu entidad bancaria.\n\nUn saludo, el equipo de Traslados GC 🙏`;
       await pool.query(
         'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
