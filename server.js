@@ -701,6 +701,32 @@ async function initSchema() {
     );
   `);
 
+  // (07/10/2026) "El Admin manda": al cambiar el español de un texto (Admin, Categorías/Extras… o una orden de Neon),
+  // sus traducciones pasan a rojo (desactualizado) sin borrarse; se corrigen o se aprueban tal cual en el Admin.
+  // Lo hace una regla de la base de datos (trigger), así vale para cualquier camino por el que cambie el español.
+  try {
+    await pool.query(`ALTER TABLE textos_interfaz_traducciones ADD COLUMN IF NOT EXISTS desactualizado BOOLEAN DEFAULT FALSE`);
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION marcar_traducciones_desactualizadas() RETURNS trigger AS $fn$
+      BEGIN
+        IF NEW.texto_es IS DISTINCT FROM OLD.texto_es THEN
+          UPDATE textos_interfaz_traducciones SET desactualizado = TRUE
+          WHERE texto_id = NEW.id AND texto IS NOT NULL AND texto <> '';
+        END IF;
+        RETURN NEW;
+      END;
+      $fn$ LANGUAGE plpgsql;
+    `);
+    await pool.query(`DROP TRIGGER IF EXISTS trg_textos_es_cambiado ON textos_interfaz`);
+    await pool.query(`
+      CREATE TRIGGER trg_textos_es_cambiado
+      AFTER UPDATE OF texto_es ON textos_interfaz
+      FOR EACH ROW EXECUTE FUNCTION marcar_traducciones_desactualizadas()
+    `);
+  } catch (eTrig) {
+    console.warn('Aviso de traducciones desactualizadas (Textos de interfaz):', eTrig.message);
+  }
+
   // Los 21 textos fijos de la página de ruta (traslado.ejs), con su contexto
   // para que cualquier traductor sepa exactamente dónde aparece cada uno.
   // El español se mantiene siempre sincronizado con el código en cada deploy.
@@ -730,7 +756,7 @@ async function initSchema() {
     const fila = await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, $2, $3, $4)
-       ON CONFLICT (clave) DO UPDATE SET modulo = $2, contexto = $3, texto_es = $4
+       ON CONFLICT (clave) DO UPDATE SET modulo = $2, contexto = $3
        RETURNING id`,
       [t.clave, t.modulo, t.contexto, t.es]
     );
@@ -767,7 +793,7 @@ async function initSchema() {
     await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, $2, $3, $4)
-       ON CONFLICT (clave) DO UPDATE SET modulo = $2, contexto = $3, texto_es = $4`,
+       ON CONFLICT (clave) DO UPDATE SET modulo = $2, contexto = $3`,
       [t.clave, t.modulo, t.contexto, t.es]
     );
   }
@@ -887,7 +913,7 @@ async function initSchema() {
     const fila = await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, 'Página de inicio', $2, $3)
-       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de inicio', contexto = $2, texto_es = $3
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de inicio', contexto = $2
        RETURNING id`,
       [tx.clave, tx.contexto, tx.es]
     );
@@ -970,7 +996,7 @@ async function initSchema() {
     await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, 'Página de flota', $2, $3)
-       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de flota', contexto = $2, texto_es = $3`,
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de flota', contexto = $2`,
       [t.clave, t.contexto, t.es]
     );
   }
@@ -1108,7 +1134,7 @@ async function initSchema() {
     const fila = await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, 'Página de reserva', $2, $3)
-       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de reserva', contexto = $2, texto_es = $3
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de reserva', contexto = $2
        RETURNING id`,
       [tx.clave, tx.contexto, tx.es]
     );
@@ -1195,7 +1221,7 @@ async function initSchema() {
     await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, 'Páginas de destino', $2, $3)
-       ON CONFLICT (clave) DO UPDATE SET modulo = 'Páginas de destino', contexto = $2, texto_es = $3`,
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Páginas de destino', contexto = $2`,
       [tx.clave, tx.contexto, tx.es]
     );
   }
@@ -1209,7 +1235,7 @@ async function initSchema() {
     await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, 'Página de ruta', $2, $3)
-       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de ruta', contexto = $2, texto_es = $3`,
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de ruta', contexto = $2`,
       [tx.clave, tx.contexto, tx.es]
     );
   }
@@ -1225,7 +1251,7 @@ async function initSchema() {
     await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, 'Páginas de destino', $2, $3)
-       ON CONFLICT (clave) DO UPDATE SET modulo = 'Páginas de destino', contexto = $2, texto_es = $3`,
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Páginas de destino', contexto = $2`,
       [tx.clave, tx.contexto, tx.es]
     );
   }
@@ -1248,7 +1274,7 @@ async function initSchema() {
     await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, 'Página de contacto', $2, $3)
-       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de contacto', contexto = $2, texto_es = $3`,
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de contacto', contexto = $2`,
       [tx.clave, tx.contexto, tx.es]
     );
   }
@@ -1303,7 +1329,7 @@ async function initSchema() {
     await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
        VALUES ($1, 'Acceso clientes', $2, $3)
-       ON CONFLICT (clave) DO UPDATE SET modulo = 'Acceso clientes', contexto = $2, texto_es = $3`,
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Acceso clientes', contexto = $2`,
       [tx.clave, tx.contexto, tx.es]
     );
   }
@@ -8035,23 +8061,31 @@ app.get('/admin/textos', requireAdmin, asyncHandler(async (req, res) => {
     `SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY (modulo = 'Email — marca') DESC, modulo, (regexp_replace(clave, '[^0-9]', '', 'g') || '0')::int, clave`
   );
   const traducciones = await pool.query(
-    `SELECT texto_id, lang_code, texto FROM textos_interfaz_traducciones`
+    `SELECT texto_id, lang_code, texto, desactualizado FROM textos_interfaz_traducciones`
   );
 
   const traduccionesPorTexto = {};
+  const desactPorTexto = {};
   for (const fila of traducciones.rows) {
     if (!traduccionesPorTexto[fila.texto_id]) traduccionesPorTexto[fila.texto_id] = {};
     traduccionesPorTexto[fila.texto_id][fila.lang_code] = fila.texto;
+    if (fila.desactualizado) {
+      if (!desactPorTexto[fila.texto_id]) desactPorTexto[fila.texto_id] = {};
+      desactPorTexto[fila.texto_id][fila.lang_code] = true;
+    }
   }
 
   const lista = textos.rows.map(function (t) {
     const estado = {};
+    const desact = {};
     estado['es'] = !!(t.texto_es && t.texto_es.trim());
     for (const lang of IDIOMAS_TRADUCIBLES) {
       const valor = traduccionesPorTexto[t.id] && traduccionesPorTexto[t.id][lang];
-      estado[lang] = !!(valor && valor.trim());
+      // (07/10/2026) Una traducción en rojo (el español cambió) no cuenta como traducida hasta revisarla
+      desact[lang] = !!(desactPorTexto[t.id] && desactPorTexto[t.id][lang]);
+      estado[lang] = !!(valor && valor.trim()) && !desact[lang];
     }
-    return { ...t, estado };
+    return { ...t, estado, desact };
   });
 
   res.json({ textos: lista, idiomas: IDIOMAS_TRADUCIBLES });
@@ -8139,7 +8173,7 @@ app.post('/admin/textos/importar', requireAdmin, upload.single('archivo'), async
       await pool.query(
         `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
          VALUES ($1, $2, $3)
-         ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
+         ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE`,
         [f.textoId, f.langCode, f.traduccion]
       );
       actualizadas++;
@@ -8157,10 +8191,10 @@ app.get('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req,
     return res.status(400).json({ error: 'Idioma no válido' });
   }
   const result = await pool.query(
-    'SELECT texto FROM textos_interfaz_traducciones WHERE texto_id = $1 AND lang_code = $2',
+    'SELECT texto, desactualizado FROM textos_interfaz_traducciones WHERE texto_id = $1 AND lang_code = $2',
     [req.params.id, req.params.lang]
   );
-  res.json({ texto: result.rows.length ? result.rows[0].texto : '' });
+  res.json({ texto: result.rows.length ? result.rows[0].texto : '', desactualizado: !!(result.rows.length && result.rows[0].desactualizado) });
 }));
 
 // Editar el texto base en español de cualquier clave desde el admin
@@ -8183,10 +8217,22 @@ app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req
   await pool.query(
     `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
      VALUES ($1, $2, $3)
-     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
+     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE`,
     [req.params.id, req.params.lang, req.body.texto || '']
   );
   await cargarTextosCache();
+  res.json({ ok: true });
+}));
+
+// (07/10/2026) "✔ Aprobar tal cual": la traducción sigue valiendo aunque haya cambiado el español
+app.post('/admin/textos/:id/idioma/:lang/aprobar', requireAdmin, asyncHandler(async (req, res) => {
+  if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
+    return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  await pool.query(
+    'UPDATE textos_interfaz_traducciones SET desactualizado = FALSE WHERE texto_id = $1 AND lang_code = $2',
+    [req.params.id, req.params.lang]
+  );
   res.json({ ok: true });
 }));
 
@@ -8200,11 +8246,14 @@ app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (re
 
   const textos = await pool.query('SELECT id, clave, contexto, texto_es FROM textos_interfaz ORDER BY modulo, (regexp_replace(clave, \'[^0-9]\', \'\', \'g\') || \'0\')::int, clave');
   const traducciones = await pool.query(
-    'SELECT texto_id, texto FROM textos_interfaz_traducciones WHERE lang_code = $1',
+    'SELECT texto_id, texto, desactualizado FROM textos_interfaz_traducciones WHERE lang_code = $1',
     [lang]
   );
   const yaTraducidos = {};
-  for (const fila of traducciones.rows) yaTraducidos[fila.texto_id] = fila.texto;
+  for (const fila of traducciones.rows) {
+    // (07/10/2026) Las que están en rojo (cambió el español) también se proponen de nuevo
+    if (!fila.desactualizado) yaTraducidos[fila.texto_id] = fila.texto;
+  }
 
   const pendientes = textos.rows.filter(function (t) {
     return !(yaTraducidos[t.id] && yaTraducidos[t.id].trim());
@@ -8251,7 +8300,7 @@ app.post('/admin/textos/guardar-lote', requireAdmin, asyncHandler(async (req, re
     await pool.query(
       `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
        VALUES ($1, $2, $3)
-       ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW()`,
+       ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE`,
       [item.texto_id, lang, item.texto || '']
     );
     guardadas++;
@@ -16263,8 +16312,24 @@ app.post('/admin/guia-iconos/aplicar', requireAdmin, asyncHandler(async (req, re
      WHERE position($1 in COALESCE(asunto_email, '') || COALESCE(cuerpo_email, '') || COALESCE(cuerpo_whatsapp, '')) > 0`, [viejo, nuevo]);
   const f = await pool.query(`UPDATE frases_comunicacion SET texto_es = replace(texto_es, $1, $2) WHERE position($1 in texto_es) > 0`, [viejo, nuevo]);
   const ft = await pool.query(`UPDATE frases_comunicacion_traducciones SET texto = replace(texto, $1, $2) WHERE position($1 in COALESCE(texto, '')) > 0`, [viejo, nuevo]);
+  // (07/10/2026) Cambiar el español pone las traducciones en rojo (regla de la base de datos); un emoji no se
+  // traduce, así que después se deja cada traducción como estaba antes (en rojo solo si ya lo estaba).
+  const _afectados = await pool.query(`SELECT id FROM textos_interfaz WHERE position($1 in texto_es) > 0`, [viejo]);
+  const _idsAfectados = _afectados.rows.map(function (r) { return r.id; });
+  const _yaRojos = _idsAfectados.length ? await pool.query(
+    `SELECT texto_id, lang_code FROM textos_interfaz_traducciones WHERE desactualizado = TRUE AND texto_id = ANY($1::int[])`, [_idsAfectados]) : { rows: [] };
   const t = await pool.query(`UPDATE textos_interfaz SET texto_es = replace(texto_es, $1, $2) WHERE position($1 in texto_es) > 0`, [viejo, nuevo]);
   const tt = await pool.query(`UPDATE textos_interfaz_traducciones SET texto = replace(texto, $1, $2) WHERE position($1 in COALESCE(texto, '')) > 0`, [viejo, nuevo]);
+  if (_idsAfectados.length) {
+    await pool.query(`UPDATE textos_interfaz_traducciones SET desactualizado = FALSE WHERE texto_id = ANY($1::int[])`, [_idsAfectados]);
+    if (_yaRojos.rows.length) {
+      await pool.query(
+        `UPDATE textos_interfaz_traducciones t SET desactualizado = TRUE
+         FROM unnest($1::int[], $2::text[]) AS r(texto_id, lang_code)
+         WHERE t.texto_id = r.texto_id AND t.lang_code = r.lang_code`,
+        [_yaRojos.rows.map(function (r) { return r.texto_id; }), _yaRojos.rows.map(function (r) { return r.lang_code; })]);
+    }
+  }
   await cargarTextosCache();
   console.log('🎨 Icono ' + viejo + ' → ' + nuevo + ': ' + contar(p) + ' plantillas, ' + contar(f) + ' frases, ' + contar(t) + ' textos (y traducciones).');
   res.json({ ok: true, plantillas: contar(p) + contar(pt), frases: contar(f) + contar(ft), textos: contar(t) + contar(tt) });
