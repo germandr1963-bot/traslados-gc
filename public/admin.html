@@ -5200,6 +5200,9 @@ function ajustarAltoVistaEmail(marco) {
     var doc = marco.contentDocument;
     // Letra por defecto de Gmail (Arial) para lo que el email no fija; el email no se modifica
     doc.documentElement.style.fontFamily = 'Arial, Helvetica, sans-serif';
+    // (07/10/2026) Sin barra de desplazamiento dentro del recuadro: al medir desde 0 aparecía y estrechaba
+    // el email; el texto ocupaba más líneas y quedaba una franja gris bajo el pie. El email no se modifica.
+    doc.documentElement.style.overflow = 'hidden';
     marco.style.height = '0px'; // se mide desde cero: así el alto también puede bajar
     marco.style.height = doc.documentElement.scrollHeight + 'px';
   } catch (e) {}
