@@ -7640,8 +7640,6 @@ function enviarRespuestaNegativa() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ lang_respuesta: langNeg })
   })
-  av.innerHTML = '<div class="aviso-ok">📧 Traduciendo y enviando email...</div>';
-  fetch('/admin/cotizaciones/' + cotizacionDetalleId + '/respuesta-negativa', { method: 'POST' })
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (data.error) {
