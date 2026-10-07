@@ -9924,7 +9924,9 @@ async function obtenerTextosTraducidos(claves, lang) {
 // ─── API pública: cotizaciones ───────────────────────────────────────────────
 
 app.post('/api/cotizaciones', asyncHandler(async (req, res) => {
-  const { origen, destino, fecha_aproximada, num_pasajeros, email_cliente, lang_cliente } = req.body;
+  // (07/10/2026) La página envía el idioma como "lang" (el de la web desde la que escribe el cliente)
+  const { origen, destino, fecha_aproximada, num_pasajeros, email_cliente } = req.body;
+  const lang_cliente = req.body.lang_cliente || req.body.lang;
   if (!origen || !destino || !email_cliente) {
     return res.status(400).json({ error: 'Faltan datos obligatorios.' });
   }
