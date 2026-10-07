@@ -316,7 +316,7 @@ footer a:hover { color: var(--texto-oscuro); }
         <th><%= t('tabla_columna_categoria') %></th>
         <th><%= t('tabla_columna_pasajeros') %></th>
         <th><%= t('tabla_columna_equipaje') %></th>
-        <th><%= t('tabla_columna_precio') %></th>
+        <th><%= t('precio_estimado') %></th>
       </tr>
     </thead>
     <tbody>
@@ -328,7 +328,6 @@ footer a:hover { color: var(--texto-oscuro); }
         <td>
           <% if (p.precio) { %>
             <span class="precio-fijo"><%= Number(p.precio).toFixed(0) %> €</span>
-            <span class="badge-fijo"><%= t('badge_precio_fijo') %></span>
           <% } else { %>
             <span class="consultar"><%= t('texto_a_consultar') %></span>
           <% } %>

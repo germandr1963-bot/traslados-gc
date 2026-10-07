@@ -249,7 +249,7 @@
       <thead>
         <tr>
           <th><%= t('tabla_columna_categoria') || 'Ruta' %></th>
-          <th style="text-align:right;"><%= t('tabla_columna_precio') || 'Precio' %></th>
+          <th style="text-align:right;"><%= t('precio_estimado') || 'Precio estimado' %></th>
         </tr>
       </thead>
       <tbody>
@@ -259,7 +259,6 @@
           <td style="text-align:right;">
             <% if (p.precio) { %>
               <span class="precio-valor"><%= Number(p.precio).toFixed(0) %> €</span>
-              <span class="badge-fijo"><%= t('badge_precio_fijo') || '' %></span>
             <% } else { %>
               <span class="consultar"><%= t('texto_a_consultar') || 'A consultar' %></span>
             <% } %>
