@@ -5228,6 +5228,15 @@ function pintarEmailReal(elId, texto, lang) {
           ajustarAltoVistaEmail(marco);
           setTimeout(function() { ajustarAltoVistaEmail(marco); }, 300); // por si la ventana aún se estaba abriendo
         };
+        // (07/10/2026) Si después cambia el ancho del recuadro (la ventana termina de abrirse, carga la otra
+        // columna…), el email ocupa otro alto: se vuelve a medir. Solo cuando cambia el ancho, nunca el alto.
+        if (window.ResizeObserver) {
+          var _anchoMarco = 0;
+          new ResizeObserver(function() {
+            var w = marco.clientWidth;
+            if (w && w !== _anchoMarco) { _anchoMarco = w; ajustarAltoVistaEmail(marco); }
+          }).observe(marco);
+        }
         el.appendChild(marco);
       }
       marco.srcdoc = d.html || '';
