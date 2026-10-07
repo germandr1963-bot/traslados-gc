@@ -12274,7 +12274,7 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
       to: r.email_cliente,
       subject: (_pf && _pf.asunto) || ('📄 Factura ' + resultado.numeroFactura + ' — Reserva ' + r.numero_reserva),
       html: plantillaEmail((_pf && _pf.email) || `<p>Hola <strong>${r.nombre_cliente}</strong>,</p><p>Adjuntamos la factura <strong>${resultado.numeroFactura}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p><p>Gracias por viajar con Traslados GC.</p>`),
-      adjunto: { filename: palabraArchivoFactura(r.lang_cliente) + '-' + r.numero_reserva + '.pdf', content: pdfBuffer }
+      adjunto: { filename: palabraArchivoFactura(r.lang_cliente) + '-' + resultado.numeroFactura + '.pdf', content: pdfBuffer }
     });
     if (r.telefono_cliente) {
       try {
@@ -16249,7 +16249,7 @@ app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, re
     to: emailFinal,
     subject: (_pf && _pf.asunto) || ('📄 Factura ' + factura.numero_factura + ' — Reserva ' + r.numero_reserva),
     html: plantillaEmail((_pf && _pf.email) || `<p>Hola <strong>${r.nombre_cliente}</strong>,</p><p>Adjuntamos la factura <strong>${factura.numero_factura}</strong> correspondiente a tu reserva <strong>${r.numero_reserva}</strong>.</p><p>Gracias por viajar con Traslados GC.</p>`),
-    adjunto: { filename: palabraArchivoFactura(r.lang_cliente) + '-' + r.numero_reserva + '.pdf', content: resultado.buffer }
+    adjunto: { filename: palabraArchivoFactura(r.lang_cliente) + '-' + factura.numero_factura + '.pdf', content: resultado.buffer }
   });
   // WhatsApp al cliente con la factura (igual que "Reenviar factura")
   if (r.telefono_cliente) {
