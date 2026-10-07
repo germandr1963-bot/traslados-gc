@@ -8236,6 +8236,12 @@ app.post('/admin/textos/:id/idioma/:lang/aprobar', requireAdmin, asyncHandler(as
   res.json({ ok: true });
 }));
 
+// (07/10/2026) "No afecta, mantenerlas" / "✔ Aprobar todas tal cual": todas las traducciones de un texto vuelven a verde
+app.post('/admin/textos/:id/aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE textos_interfaz_traducciones SET desactualizado = FALSE WHERE texto_id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
 // Traduce con IA (Claude) todos los textos que falten en un idioma — no
 // guarda nada todavía, solo devuelve propuestas para revisar antes de guardar
 app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
