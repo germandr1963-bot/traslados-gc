@@ -466,7 +466,7 @@ footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13
     </div>
     <div class="traslado-precio-box">
       <div class="traslado-precio" id="tbl-precio"></div>
-      <div class="traslado-badge" id="tbl-badge"><%= t('home_badge_precio_aprox') %></div>
+      <div class="traslado-badge" id="tbl-badge"><%= t('precio_estimado') %></div>
       <div class="traslado-cat" id="tbl-categoria"></div>
     </div>
   </div>
@@ -798,7 +798,7 @@ var TXT = {
   selecciona:     '<%- t("home_label_selecciona").replace(/'/g, "\\'") %>',
   eligeRuta:      '<%- t("home_texto_elige_ruta").replace(/'/g, "\\'") %>',
   aConsultar:     '<%- t("home_texto_a_consultar").replace(/'/g, "\\'") %>',
-  badgeAprox:     '<%- t("home_badge_precio_aprox").replace(/'/g, "\\'") %>',
+  badgeAprox:     '<%- t("precio_estimado").replace(/'/g, "\\'") %>',
   notaTaxi:       '<%- t("home_nota_taximetro").replace(/'/g, "\\'") %>',
   botonReservar:  '<%- t("home_boton_reservar").replace(/'/g, "\\'") %>',
   verOtrasCats:   '<%- t("home_texto_ver_otras_cats").replace(/'/g, "\\'") %>',
@@ -829,7 +829,7 @@ var TXT = {
   resFecha:       '<%- t("reserva_res_fecha").replace(/'/g, "\\'") %>',
   resHora:        '<%- t("reserva_res_hora").replace(/'/g, "\\'") %>',
   resPasajeros:   '<%- t("reserva_res_pasajeros").replace(/'/g, "\\'") %>',
-  resPrecio:      '<%- t("reserva_res_precio_estimado").replace(/'/g, "\\'") %>',
+  resPrecio:      '<%- (t("precio_estimado") + ":").replace(/'/g, "\\'") %>',
   resExtras:      '<%- t("reserva_res_extras").replace(/'/g, "\\'") %>',
   resPasajero:    '<%- t("reserva_res_pasajero").replace(/'/g, "\\'") %>',
   resPasaporte:   '<%- t("reserva_res_pasaporte").replace(/'/g, "\\'") %>',
