@@ -1596,6 +1596,20 @@ async function initSchema() {
     );
   }
 
+  // (07/10/2026) Textos comunes: un solo texto para toda la web y los emails (se traduce una vez en
+  // Admin → Idiomas → Textos de interfaz → "Textos comunes"). DO NOTHING: el programa nunca pisa lo que hay en Neon.
+  const TEXTOS_COMUNES = [
+    { clave: 'precio_estimado', contexto: 'Etiqueta del precio en toda la web y en los emails (buscador, tablas de tarifas, reserva, Mi reserva y emails). Todos nuestros precios son estimados: el precio final lo marca el taxímetro. Sin dos puntos: el programa los añade donde hace falta.', es: 'Precio estimado' },
+  ];
+  for (const tx of TEXTOS_COMUNES) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Textos comunes', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
   await cargarTextosCache();
 
   // ─── Tarifario de precios ─────────────────────────────────────────────────
@@ -10235,7 +10249,7 @@ app.post('/admin/cotizaciones/:id/respuesta-positiva', requireAdmin, asyncHandle
     parrafo2:     t['email_cotiz_positivo_p2'] || 'Aquí tienes los precios disponibles para tu ruta:',
     col_categoria:t['email_cotiz_col_categoria'] || 'Categoría',
     col_capacidad:t['email_cotiz_col_capacidad'] || 'Capacidad',
-    col_precio:   t['email_cotiz_col_precio'] || 'Precio est.',
+    col_precio:   textoPrecioEstimado(lang),
     parrafo3:     t['email_cotiz_positivo_p3'] || 'Pulsa el botón para ver todos los detalles y hacer tu reserva.',
     boton:        t['email_cotiz_boton_reservar'] || 'Ver ruta y reservar',
     nota:         t['email_cotiz_nota_precio'] || 'El precio es una estimación basada en los km de distancia.',
@@ -12367,6 +12381,12 @@ function urlMiReservaCliente(lang) {
   return (_l === 'es' || !_palabra) ? BASE_URL + '/mi-reserva' : BASE_URL + '/' + _l + '/' + _palabra;
 }
 
+// (07/10/2026) Texto único "Precio estimado" (Textos de interfaz → "Textos comunes"), en el idioma pedido.
+function textoPrecioEstimado(lang) {
+  const t = obtenerTexto('precio_estimado', lang || 'es');
+  return (t && t.indexOf('[[') !== 0) ? t : 'Precio estimado';
+}
+
 // (07/10/2026) Consultas de precio ("a consultar"): recuadro "Detalles del traslado" con la identidad
 // común (mismas etiquetas e iconos que el voucher, ya traducidas). Fecha y pasajeros solo si el cliente los dio.
 function escHtmlConsulta(t) {
@@ -12421,7 +12441,7 @@ async function tablaTarifasEmail(rutaId, lang) {
     return '<tr><td style="' + td + '"><strong>' + nombre + '</strong></td><td style="' + td + '">' + p.capacidad_pasajeros + ' ' + t('sufijo_pax') +
       '</td><td style="' + td + '">' + maletas + '</td><td style="' + td + 'text-align:right;white-space:nowrap;">' + precio + '</td></tr>';
   }).join('');
-  const cabPrecio = await obtenerFrase('frase_resumen_precio_estimado', _l, 'Precio estimado');
+  const cabPrecio = textoPrecioEstimado(_l);
   return '<table style="width:100%;border-collapse:collapse;margin:12px 0;"><thead><tr style="background:#2c2c2c;">' +
     '<th style="' + th + '">' + t('tabla_columna_categoria') + '</th><th style="' + th + '">' + t('tabla_columna_pasajeros') +
     '</th><th style="' + th + '">' + t('tabla_columna_equipaje') + '</th><th style="' + th + 'text-align:right;">' + cabPrecio +
@@ -12461,7 +12481,7 @@ async function resumenReservaCliente(reservaId, lang, canal) {
     '📅 ' + et(tv('vou_fecha', 'Fecha')) + (ra.fecha ? fechaCliente(ra.fecha, _lang) : '—') + (ra.hora ? ' · ' + ra.hora.slice(0,5) : ''),
     '🚗 ' + et(tv('vou_categoria', 'Categoría')) + categoria,
     '👥 ' + et(tv('vou_pasajeros', 'Pasajeros')) + (ra.num_pasajeros || '—'),
-    '💶 ' + et(await f('frase_resumen_precio_estimado', 'Precio estimado')) + (ra.precio_estimado ? parseFloat(ra.precio_estimado).toFixed(2) + ' €' : '—'),
+    '💶 ' + et(textoPrecioEstimado(_lang)) + (ra.precio_estimado ? parseFloat(ra.precio_estimado).toFixed(2) + ' €' : '—'),
   ];
   if (ra.direccion_recogida) lineas.push('📍 ' + et(tv('vou_dir_recogida', 'Dirección de recogida')) + ra.direccion_recogida);
   if (ra.direccion_destino) lineas.push('🏁 ' + et(tv('vou_dir_destino', 'Dirección de destino')) + ra.direccion_destino);
@@ -15429,7 +15449,7 @@ app.post('/admin/reservas/:id/editar', requireAdmin, asyncHandler(async (req, re
         '<strong>' + (await _f('frase_resumen_hora_recogida', 'Hora de recogida')) + ':</strong> ' + (ra.hora ? ra.hora.slice(0,5) : '—'),
         '<strong>' + (await _f('frase_resumen_pasajeros', 'Pasajeros')) + ':</strong> ' + (ra.num_pasajeros || '—'),
         '<strong>' + (await _f('frase_resumen_categoria', 'Categoría')) + ':</strong> ' + _catRa,
-        '<strong>' + (await _f('frase_resumen_precio_estimado', 'Precio estimado')) + ':</strong> ' + (ra.precio_estimado ? parseFloat(ra.precio_estimado).toFixed(2) + ' €' : '—'),
+        '<strong>' + textoPrecioEstimado(_langRa) + ':</strong> ' + (ra.precio_estimado ? parseFloat(ra.precio_estimado).toFixed(2) + ' €' : '—'),
       ];
       if (ra.direccion_recogida) lineas.push('<strong>' + (await _f('frase_resumen_dir_recogida', 'Dirección de recogida')) + ':</strong> ' + ra.direccion_recogida);
       if (ra.direccion_destino) lineas.push('<strong>' + (await _f('frase_resumen_dir_destino', 'Dirección de destino')) + ':</strong> ' + ra.direccion_destino);
