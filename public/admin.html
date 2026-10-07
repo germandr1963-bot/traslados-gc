@@ -807,12 +807,10 @@ table.tabla-precios input {
         <h2 id="cotiz-detalle-titulo" style="font-size:1.1rem;margin:0 0 1rem 0;"></h2>
         <div id="cotiz-detalle-info" style="margin-bottom:1.5rem;"></div>
 
-        <h3 style="font-size:0.9rem;font-weight:600;margin:0 0 0.75rem 0;">Precios por categoría <span style="font-size:0.78rem;color:#888;font-weight:400;">(opcional — solo para respuesta positiva)</span></h3>
-        <div id="cotiz-detalle-precios" style="margin-bottom:1.5rem;"></div>
-
         <!-- Selector de ruta e idioma para respuesta positiva -->
         <div style="background:#f5f0ea;border-radius:8px;padding:1rem;margin-bottom:1rem;">
           <p style="font-size:0.85rem;font-weight:600;margin:0 0 0.75rem 0;">✅ Respuesta positiva — enlace a ruta del sistema</p>
+          <p style="font-size:0.78rem;color:#888;margin:0 0 0.75rem 0;">Los precios que recibe el cliente son los de la ruta elegida (los mismos de "Tarifas disponibles" en su página). Si la ruta aún no existe, créala primero en Rutas con sus precios.</p>
           <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.5rem;">
             <div style="flex:2;min-width:200px;">
               <label style="font-size:0.78rem;color:#666;display:block;margin-bottom:3px;">Ruta del sistema</label>
@@ -841,7 +839,6 @@ table.tabla-precios input {
 
         <div id="aviso-cotiz-detalle" style="display:none;margin-bottom:1rem;"></div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-          <button class="boton-costa" onclick="guardarPreciosCotizacion()">💾 Guardar precios</button>
           <button class="boton-peligro" onclick="borrarCotizacion()">🗑 Eliminar</button>
           <button class="boton-costa" onclick="cerrarDetalleCotizacion()">Cerrar</button>
         </div>
@@ -7518,29 +7515,6 @@ function abrirDetalleCotizacion(id) {
           '<tr><th>Idioma detectado</th><td><strong style="color:var(--terracota);">' + langDetectado.toUpperCase() + '</strong></td></tr>' +
         '</table>';
 
-      // Cargar categorías con precios existentes
-      fetch('/admin/categorias')
-        .then(function(r) { return r.json(); })
-        .then(function(cats) {
-          categoriasCotiz = cats;
-          var preciosExistentes = {};
-          if (c.precios) {
-            c.precios.forEach(function(p) { if (p) preciosExistentes[p.categoria_id] = p.precio; });
-          }
-          document.getElementById('cotiz-detalle-precios').innerHTML =
-            '<table class="tabla-admin"><thead><tr><th>Categoría</th><th>Capacidad</th><th>Precio (€)</th></tr></thead><tbody>' +
-            cats.filter(function(cat) { return cat.activa !== false; }).map(function(cat) {
-              var precio = preciosExistentes[cat.id] || '';
-              return '<tr>' +
-                '<td>' + cat.nombre + '</td>' +
-                '<td>' + cat.capacidad_pasajeros + ' pax</td>' +
-                '<td><input type="number" step="0.01" min="0" class="campo" style="height:32px;width:100px;" ' +
-                  'data-categoria-id="' + cat.id + '" value="' + precio + '" placeholder="—"></td>' +
-              '</tr>';
-            }).join('') +
-            '</tbody></table>';
-        });
-
       // Cargar rutas activas del sistema en el selector
       Promise.all([
         fetch('/admin/cotizaciones/rutas-activas').then(function(r) { return r.json(); }),
@@ -7574,27 +7548,6 @@ function abrirDetalleCotizacion(id) {
 function cerrarDetalleCotizacion() {
   document.getElementById('detalle-cotizacion').classList.add('oculto');
   cotizacionDetalleId = null;
-}
-
-function guardarPreciosCotizacion() {
-  if (!cotizacionDetalleId) return;
-  var inputs = document.querySelectorAll('#cotiz-detalle-precios input[type="number"]');
-  var precios = [];
-  inputs.forEach(function(inp) {
-    if (inp.value && !isNaN(inp.value)) {
-      precios.push({ categoria_id: Number(inp.dataset.categoriaId), precio: parseFloat(inp.value) });
-    }
-  });
-  fetch('/admin/cotizaciones/' + cotizacionDetalleId + '/precios', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ precios: precios })
-  }).then(function(r) { return r.json(); }).then(function() {
-    var av = document.getElementById('aviso-cotiz-detalle');
-    av.style.display = 'block';
-    av.innerHTML = '<div class="aviso-ok">✔ Precios guardados.</div>';
-    setTimeout(function() { av.style.display = 'none'; }, 2000);
-  });
 }
 
 function enviarRespuestaPositiva() {
