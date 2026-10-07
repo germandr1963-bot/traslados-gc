@@ -5754,6 +5754,8 @@ function abrirEditorTexto(textoId) {
     '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="texto-campo-editor"></div>' +
     '<div id="texto-mensaje-editor" style="margin-top:8px;"></div>' +
+    (texto.desact && IDIOMAS_TEXTOS.some(function (l) { return texto.desact[l]; }) ?
+      '<button class="boton-secundario" style="margin-top:10px;margin-right:8px;" onclick="aprobarTodasTexto(' + textoId + ')">✔ Aprobar todas tal cual</button>' : '') +
     (texto.modulo === 'Categorías de vehículo' ?
       '<button class="boton-peligro" style="margin-top:10px;margin-right:8px;font-size:0.82rem;" onclick="limpiarTraduccionesCategoria(' + textoId + ')">🗑 Limpiar todas las traducciones</button>' : '') +
     '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-texto-interfaz\').classList.add(\'oculto\')">Cerrar</button>';
@@ -5828,9 +5830,27 @@ function aprobarTraduccionTexto(textoId, lang) {
     });
 }
 
+// (07/10/2026) Recarga la lista y vuelve a abrir el editor del texto (para ver los idiomas en rojo o en verde)
+function recargarTextosYEditor(textoId) {
+  fetch('/admin/textos').then(function (r) { return r.json(); }).then(function (datos) {
+    textosCache = datos;
+    renderizarTablaTextos(datos);
+    abrirEditorTexto(textoId);
+  });
+}
+
+function aprobarTodasTexto(textoId) {
+  fetch('/admin/textos/' + textoId + '/aprobar-todas', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function () { recargarTextosYEditor(textoId); });
+}
+
 function guardarTraduccionTexto(textoId, lang) {
   var valor = document.getElementById('texto-traduccion').value;
   var msg = document.getElementById('texto-mensaje-editor');
+  var _textoAntes = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
+  var _esCambiado = lang === 'es' && _textoAntes && (_textoAntes.texto_es || '') !== valor;
+  var _tieneTraducciones = _textoAntes && IDIOMAS_TEXTOS.some(function (l) { return l !== 'es' && (_textoAntes.estado[l] || (_textoAntes.desact && _textoAntes.desact[l])); });
   var url = lang === 'es'
     ? '/admin/textos/' + textoId + '/es'
     : '/admin/textos/' + textoId + '/idioma/' + lang;
@@ -5839,7 +5859,15 @@ function guardarTraduccionTexto(textoId, lang) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto: valor })
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
-    if (respuesta.ok) {
+    if (respuesta.ok && _esCambiado && _tieneTraducciones) {
+      // (07/10/2026) El español ha cambiado: ¿afecta a las traducciones?
+      msg.innerHTML = '<div style="background:#fff8e1;border:1px solid #ffe083;border-radius:8px;padding:10px 14px;font-size:13px;">' +
+        '✅ Español guardado. <strong>¿Este cambio afecta a las traducciones?</strong><br>' +
+        '<button class="boton-secundario" style="margin-top:8px;margin-right:8px;" onclick="recargarTextosYEditor(' + textoId + ')">⚠️ Sí, revisar traducciones</button>' +
+        '<button class="boton-primario" style="margin-top:8px;" onclick="aprobarTodasTexto(' + textoId + ')">✔ No afecta, mantenerlas</button>' +
+        '</div>';
+      cargarTextosInterfaz();
+    } else if (respuesta.ok) {
       msg.innerHTML = '<div class="aviso-ok">✅ Guardado</div>';
       cargarTextosInterfaz();
       setTimeout(function () { msg.innerHTML = ''; }, 2000);
