@@ -12416,15 +12416,15 @@ async function tablaTarifasEmail(rutaId, lang) {
   const filas = precios.rows.map(function (p) {
     const nombre = mapaCategorias[p.nombre] || p.nombre;
     const maletas = mapaCategorias[p.capacidad_maletas] || p.capacidad_maletas;
-    const precio = p.precio
-      ? '<strong>' + Number(p.precio).toFixed(0) + ' €</strong> <span style="font-size:11px;color:#888;">' + t('badge_precio_fijo') + '</span>'
-      : t('texto_a_consultar');
+    // (07/10/2026) En el email, solo el importe (la cabecera ya dice "Precio estimado")
+    const precio = p.precio ? '<strong>' + Number(p.precio).toFixed(0) + ' €</strong>' : t('texto_a_consultar');
     return '<tr><td style="' + td + '"><strong>' + nombre + '</strong></td><td style="' + td + '">' + p.capacidad_pasajeros + ' ' + t('sufijo_pax') +
-      '</td><td style="' + td + '">' + maletas + '</td><td style="' + td + 'text-align:right;">' + precio + '</td></tr>';
+      '</td><td style="' + td + '">' + maletas + '</td><td style="' + td + 'text-align:right;white-space:nowrap;">' + precio + '</td></tr>';
   }).join('');
+  const cabPrecio = await obtenerFrase('frase_resumen_precio_estimado', _l, 'Precio estimado');
   return '<table style="width:100%;border-collapse:collapse;margin:12px 0;"><thead><tr style="background:#2c2c2c;">' +
     '<th style="' + th + '">' + t('tabla_columna_categoria') + '</th><th style="' + th + '">' + t('tabla_columna_pasajeros') +
-    '</th><th style="' + th + '">' + t('tabla_columna_equipaje') + '</th><th style="' + th + 'text-align:right;">' + t('tabla_columna_precio') +
+    '</th><th style="' + th + '">' + t('tabla_columna_equipaje') + '</th><th style="' + th + 'text-align:right;">' + cabPrecio +
     '</th></tr></thead><tbody>' + filas + '</tbody></table>';
 }
 
