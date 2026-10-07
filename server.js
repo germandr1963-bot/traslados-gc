@@ -3068,6 +3068,34 @@ Se está ofreciendo por WhatsApp a los demás choferes aprobados. Revisa la rese
 El cliente ya ha recibido el aviso del cambio de chofer.
 `,
       cuerpo_whatsapp: '' },
+    // (07/10/2026) Consulta de precio desde la web ("¿No encuentras tu ruta? Pídenos precio"):
+    // acuse al cliente (solo email por ahora: el formulario no pide teléfono) y aviso al equipo.
+    { clave: 'cliente_precio_recibida', nombre: 'Precio \u201ca consultar\u201d \u2192 consulta recibida', categoria: 'cliente',
+      asunto_email: '📨 Hemos recibido tu consulta de traslado — Traslados GC',
+      cuerpo_email: `Hola 👋
+
+📨 <strong>Hemos recibido tu consulta.</strong> La estamos revisando y te responderemos en breve.
+<div class="info-box">
+  <strong>Detalles del traslado:</strong>
+  {detalles}
+</div>
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>`,
+      cuerpo_whatsapp: 'Hola 👋\n\n📨 *Hemos recibido tu consulta.* La estamos revisando y te responderemos en breve.\n\n{detalles}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+    { clave: 'interno_consulta_precio', nombre: '[Admin] Nueva consulta de precio', categoria: 'interno',
+      asunto_email: '💬 Nueva consulta de precio: {origen} → {destino}',
+      cuerpo_email: `💬 <strong>Nueva consulta de precio desde la web</strong>
+<div class="info-box">
+  📨 <strong>Recibida:</strong> {recibida}
+  📍 <strong>Origen:</strong> {origen}
+  🏁 <strong>Destino:</strong> {destino}
+  📅 <strong>Fecha del viaje:</strong> {fecha}
+  👥 <strong>Pasajeros:</strong> {pasajeros}
+  👤 <strong>Cliente:</strong> {email_cliente}
+  🌐 <strong>Idioma:</strong> {idioma}
+</div>
+🔍 Accede al panel de administración → Cotizaciones para responderla.`,
+      cuerpo_whatsapp: null },
   ];
 
   for (const p of plantillasBase) {
@@ -9917,6 +9945,33 @@ app.post('/api/cotizaciones', asyncHandler(async (req, res) => {
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
     [origen.trim(), destino.trim(), fecha_aproximada || null, num_pasajeros || null, email_cliente.trim().toLowerCase(), lang]
   );
+
+  // (07/10/2026) Acuse al cliente (plantilla "Precio a consultar → consulta recibida", en su idioma)
+  // y aviso al equipo (plantilla interna "Nueva consulta de precio"). Si fallan, la consulta queda guardada igual.
+  try {
+    const cq = await pool.query('SELECT * FROM cotizaciones WHERE id = $1', [result.rows[0].id]);
+    const c = cq.rows[0];
+    const _pAcuse = await obtenerPlantilla('cliente_precio_recibida', {
+      origen: c.origen,
+      destino: c.destino,
+      detalles: await detallesConsultaPrecio(c, lang, c.origen, c.destino)
+    }, lang);
+    if (_pAcuse && _pAcuse.email) {
+      await enviarEmail({ to: c.email_cliente, subject: _pAcuse.asunto || 'Traslados GC', html: plantillaEmail(_pAcuse.email) });
+    }
+    await avisarEquipoPlantilla('interno_consulta_precio', {
+      recibida: fechaHoraCliente(new Date(), 'es'),
+      origen: escHtmlConsulta(c.origen),
+      destino: escHtmlConsulta(c.destino),
+      fecha: c.fecha_aproximada ? fechaCliente(c.fecha_aproximada, 'es') : '—',
+      pasajeros: c.num_pasajeros || '—',
+      email_cliente: escHtmlConsulta(c.email_cliente),
+      idioma: String(lang).toUpperCase()
+    });
+  } catch (eAcuse) {
+    console.warn('Consulta de precio: acuse al cliente / aviso al equipo:', eAcuse.message);
+  }
+
   res.json({ ok: true, id: result.rows[0].id });
 }));
 
@@ -10073,8 +10128,17 @@ app.post('/admin/cotizaciones/:id/respuesta-negativa', requireAdmin, asyncHandle
 
   const fechaViaje = c.fecha_aproximada ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES') : null;
 
+  // (07/10/2026) Plantilla "Precio a consultar → no disponible" de Comunicaciones, en el idioma del cliente.
+  // Si la plantilla no estuviera disponible, sale el email de siempre (más abajo).
+  const _pNeg = await obtenerPlantilla('cliente_precio_negativa', {
+    origen: c.origen,
+    destino: c.destino,
+    detalles: await detallesConsultaPrecio(c, lang, c.origen, c.destino)
+  }, lang);
+  if (_pNeg && _pNeg.email) textoNegativo.asunto = _pNeg.asunto || textoNegativo.asunto;
+
   // (01/10/2026) <!--lang:..--> = cabecera y pie de la marca en el idioma del cliente
-  const html = plantillaEmail(
+  const html = (_pNeg && _pNeg.email) ? plantillaEmail(_pNeg.email) : plantillaEmail(
     `<!--lang:${lang}--><p>${textoNegativo.saludo}</p>
      <p>${textoNegativo.parrafo1}</p>
      <p>${textoNegativo.parrafo2}</p>
@@ -10188,8 +10252,21 @@ app.post('/admin/cotizaciones/:id/respuesta-positiva', requireAdmin, asyncHandle
     '</tr>';
   }).join('');
 
+  // (07/10/2026) Plantilla "Precio a consultar → respuesta con precio" de Comunicaciones, en el idioma del cliente.
+  // Los precios son los de la ruta elegida (tabla "Tarifas disponibles" de su página), no los escritos en la consulta.
+  const _tarifas = await tablaTarifasEmail(ruta_id, lang);
+  if (!_tarifas) return res.status(400).json({ error: 'La ruta elegida no tiene precios. Ponlos en Rutas antes de responder.' });
+  const _pPos = await obtenerPlantilla('cliente_precio_respuesta', {
+    origen: seo.origen,
+    destino: seo.destino,
+    detalles: await detallesConsultaPrecio(c, lang, seo.origen, seo.destino),
+    tarifas: _tarifas,
+    url_ruta: urlRuta
+  }, lang);
+  if (_pPos && _pPos.email) textos.asunto = _pPos.asunto || textos.asunto;
+
   // (01/10/2026) <!--lang:..--> = cabecera y pie de la marca en el idioma del cliente
-  const html = plantillaEmail(
+  const html = (_pPos && _pPos.email) ? plantillaEmail(_pPos.email) : plantillaEmail(
     `<!--lang:${lang}--><p>${textos.saludo}</p>
      <p>${textos.parrafo1}</p>
      <div class="info-box">
@@ -12286,6 +12363,67 @@ function urlMiReservaCliente(lang) {
   const _l = (lang && IDIOMAS_PERMITIDOS.includes(lang)) ? lang : 'es';
   const _palabra = PALABRAS_PAGINAS[_l] && PALABRAS_PAGINAS[_l]['mi-reserva'];
   return (_l === 'es' || !_palabra) ? BASE_URL + '/mi-reserva' : BASE_URL + '/' + _l + '/' + _palabra;
+}
+
+// (07/10/2026) Consultas de precio ("a consultar"): recuadro "Detalles del traslado" con la identidad
+// común (mismas etiquetas e iconos que el voucher, ya traducidas). Fecha y pasajeros solo si el cliente los dio.
+function escHtmlConsulta(t) {
+  return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+async function detallesConsultaPrecio(c, lang, origen, destino) {
+  const _l = (lang && IDIOMAS_PERMITIDOS.includes(lang)) ? lang : 'es';
+  const tx = function (clave, respaldo) {
+    const t = obtenerTexto(clave, _l);
+    return (t && t.indexOf('[[') !== 0) ? t : respaldo;
+  };
+  const o = escHtmlConsulta((await traducirLugarCliente(origen, _l)) || origen || '—');
+  const d = escHtmlConsulta((await traducirLugarCliente(destino, _l)) || destino || '—');
+  const lineas = [
+    '📍 <strong>' + tx('vou_origen', 'Origen') + ':</strong> ' + o,
+    '🏁 <strong>' + tx('vou_destino', 'Destino') + ':</strong> ' + d
+  ];
+  if (c.fecha_aproximada) lineas.push('📅 <strong>' + tx('vou_fecha', 'Fecha') + ':</strong> ' + fechaCliente(c.fecha_aproximada, _l));
+  if (c.num_pasajeros) lineas.push('👥 <strong>' + tx('vou_pasajeros', 'Pasajeros') + ':</strong> ' + escHtmlConsulta(c.num_pasajeros));
+  return lineas.join('<br>');
+}
+// Copia en el email de la tabla "Tarifas disponibles" de la página de la ruta (renderTraslado):
+// mismos precios (rutas_precios), mismas categorías y orden, mismas columnas y palabras traducidas.
+async function tablaTarifasEmail(rutaId, lang) {
+  const _l = (lang && IDIOMAS_PERMITIDOS.includes(lang)) ? lang : 'es';
+  const t = function (clave) { return obtenerTexto(clave, _l); };
+  const precios = await pool.query(
+    `SELECT cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, rp.precio
+     FROM rutas_precios rp
+     JOIN categorias_vehiculos cv ON cv.id = rp.categoria_id
+     WHERE rp.ruta_id = $1 AND cv.disponible = TRUE
+     ORDER BY cv.orden, cv.nombre`,
+    [rutaId]
+  );
+  if (!precios.rows.length) return '';
+  const catsTrad = await pool.query(
+    `SELECT ti.texto_es, COALESCE(tit.texto, ti.texto_es) AS nombre_traducido
+     FROM textos_interfaz ti
+     LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+     WHERE ti.modulo = 'Categorías de vehículo'`,
+    [_l]
+  );
+  const mapaCategorias = {};
+  for (const c of catsTrad.rows) mapaCategorias[c.texto_es] = c.nombre_traducido;
+  const th = 'color:#fff;padding:8px 12px;text-align:left;font-size:13px;';
+  const td = 'padding:8px 12px;border-bottom:1px solid #eee;';
+  const filas = precios.rows.map(function (p) {
+    const nombre = mapaCategorias[p.nombre] || p.nombre;
+    const maletas = mapaCategorias[p.capacidad_maletas] || p.capacidad_maletas;
+    const precio = p.precio
+      ? '<strong>' + Number(p.precio).toFixed(0) + ' €</strong> <span style="font-size:11px;color:#888;">' + t('badge_precio_fijo') + '</span>'
+      : t('texto_a_consultar');
+    return '<tr><td style="' + td + '"><strong>' + nombre + '</strong></td><td style="' + td + '">' + p.capacidad_pasajeros + ' ' + t('sufijo_pax') +
+      '</td><td style="' + td + '">' + maletas + '</td><td style="' + td + 'text-align:right;">' + precio + '</td></tr>';
+  }).join('');
+  return '<table style="width:100%;border-collapse:collapse;margin:12px 0;"><thead><tr style="background:#2c2c2c;">' +
+    '<th style="' + th + '">' + t('tabla_columna_categoria') + '</th><th style="' + th + '">' + t('tabla_columna_pasajeros') +
+    '</th><th style="' + th + '">' + t('tabla_columna_equipaje') + '</th><th style="' + th + 'text-align:right;">' + t('tabla_columna_precio') +
+    '</th></tr></thead><tbody>' + filas + '</tbody></table>';
 }
 
 // Resumen de los datos de una reserva en el idioma del cliente, para los mensajes
