@@ -9380,7 +9380,7 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   // Verificar que la reserva pertenece a este chofer y está confirmada
   const check = await pool.query(
     `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.email_cliente, r.telefono_cliente,
-            r.origen, r.destino, r.fecha, r.lang_cliente,
+            r.origen, r.destino, r.fecha, r.hora, r.lang_cliente,
             c.nombre AS nombre_chofer, c.telefono AS telefono_chofer
      FROM reservas r
      LEFT JOIN conductores c ON c.id = $2
@@ -9497,7 +9497,11 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
       const _pfacemail = await obtenerPlantilla('cliente_factura', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
-        numero_factura: numFacEmail
+        numero_factura: numFacEmail,
+        origen: r.origen || '—',
+        destino: r.destino || '—',
+        fecha: fechaCliente(r.fecha, _langVal),
+        hora: r.hora ? r.hora.slice(0,5) : '—'
       }, _langVal);
       await enviarEmailConAdjunto({
         to: r.email_cliente,
@@ -9531,7 +9535,11 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
         const _pfacwa = await obtenerPlantilla('cliente_factura', {
           nombre_cliente: r.nombre_cliente,
           numero_reserva: r.numero_reserva,
-          numero_factura: numFac
+          numero_factura: numFac,
+          origen: r.origen || '—',
+          destino: r.destino || '—',
+          fecha: fechaCliente(r.fecha, _langVal),
+          hora: r.hora ? r.hora.slice(0,5) : '—'
         }, _langVal);
         const textoFacturaWa = (_pfacwa && _pfacwa.whatsapp) || `📄 Adjuntamos la factura de tu traslado *${r.numero_reserva}*.`;
         await pool.query(
@@ -12256,7 +12264,11 @@ app.post('/admin/reservas/:id/reenviar-factura-cliente', requireAdmin, asyncHand
     const _pf = await obtenerPlantilla('cliente_factura', {
       nombre_cliente: r.nombre_cliente,
       numero_reserva: r.numero_reserva,
-      numero_factura: resultado.numeroFactura
+      numero_factura: resultado.numeroFactura,
+      origen: r.origen || '—',
+      destino: r.destino || '—',
+      fecha: fechaCliente(r.fecha, r.lang_cliente || 'es'),
+      hora: r.hora ? r.hora.slice(0,5) : '—'
     }, r.lang_cliente || 'es');
     await enviarEmailConAdjunto({
       to: r.email_cliente,
@@ -16227,7 +16239,11 @@ app.post('/admin/facturas/:id/enviar', requireAdmin, asyncHandler(async (req, re
   const _pf = await obtenerPlantilla('cliente_factura', {
     nombre_cliente: r.nombre_cliente,
     numero_reserva: r.numero_reserva,
-    numero_factura: factura.numero_factura
+    numero_factura: factura.numero_factura,
+    origen: r.origen || '—',
+    destino: r.destino || '—',
+    fecha: fechaCliente(r.fecha, r.lang_cliente || 'es'),
+    hora: r.hora ? r.hora.slice(0,5) : '—'
   }, r.lang_cliente || 'es');
   await enviarEmailConAdjunto({
     to: emailFinal,
