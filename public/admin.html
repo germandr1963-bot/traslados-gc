@@ -5791,12 +5791,41 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
     fetch('/admin/textos/' + textoId + '/idioma/' + lang)
       .then(function (r) { return r.json(); })
       .then(function (datos) {
+        // (07/10/2026) Traducción en rojo: el español cambió después de traducirla
+        var texto = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
+        var avisoDesact = datos.desactualizado
+          ? '<div style="background:#fdecea;border:1px solid #f5b8b8;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#7a1e1e;">' +
+              '⚠️ <strong>El español ha cambiado.</strong> Revisa esta traducción: corrígela y guárdala, o apruébala tal cual si el cambio no le afecta.' +
+              (texto ? '<br><span style="color:#5b5347;">Español actual: <em>' + escapar(texto.texto_es || '') + '</em></span>' : '') +
+            '</div>'
+          : '';
+        var botonAprobar = datos.desactualizado
+          ? '<button class="boton-secundario" style="margin-top:10px;margin-left:8px;" onclick="aprobarTraduccionTexto(' + textoId + ', \'' + lang + '\')">✔ Aprobar tal cual</button>'
+          : '';
         campo.innerHTML =
+          avisoDesact +
           '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
           '<textarea class="campo" id="texto-traduccion" rows="3" placeholder="Todavía sin traducir...">' + escapar(datos.texto || '') + '</textarea>' +
-          '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar</button>';
+          '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar</button>' +
+          botonAprobar;
       });
   }
+}
+
+// (07/10/2026) "✔ Aprobar tal cual": la traducción sigue valiendo aunque haya cambiado el español
+function aprobarTraduccionTexto(textoId, lang) {
+  var msg = document.getElementById('texto-mensaje-editor');
+  fetch('/admin/textos/' + textoId + '/idioma/' + lang + '/aprobar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (respuesta) {
+      if (respuesta.ok) {
+        msg.innerHTML = '<div class="aviso-ok">✅ Aprobada tal cual</div>';
+        cargarTextosInterfaz();
+        setTimeout(function () { msg.innerHTML = ''; }, 2000);
+      } else {
+        msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al aprobar') + '</div>';
+      }
+    });
 }
 
 function guardarTraduccionTexto(textoId, lang) {
