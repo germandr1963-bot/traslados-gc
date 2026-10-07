@@ -239,6 +239,8 @@
   <script>
     // Textos del portal en el idioma del cliente (Admin → Idiomas → Textos de interfaz → fila "Portal del cliente")
     var TX = <%- JSON.stringify(textos).replace(/</g, '\\u003c') %>;
+    // (07/10/2026) Texto único "Precio estimado" (Textos de interfaz → "Textos comunes"); los dos puntos los pone el programa
+    var TXT_PRECIO_ESTIMADO = <%- JSON.stringify(t('precio_estimado') + ':').replace(/</g, '\\u003c') %>;
     function tx(clave, datos) {
       var s = TX[clave] || '';
       if (datos) Object.keys(datos).forEach(function(k) { s = s.split('{' + k + '}').join(datos[k]); });
@@ -317,7 +319,7 @@
         '<div><strong>' + tx('por_estado') + '</strong> ' + (estadoBadge[r.estado] || r.estado) + '</div>' +
         '<div><strong>' + tx('por_categoria') + '</strong> ' + (r.categoria_cliente || r.categoria_nombre || '—') + '</div>' +
         '<div><strong>' + tx('por_pasajeros') + '</strong> ' + (r.num_pasajeros || '—') + '</div>' +
-        '<div><strong>' + tx('por_precio_estimado') + '</strong> ' + (r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—') + '</div>' +
+        '<div><strong>' + TXT_PRECIO_ESTIMADO + '</strong> ' + (r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—') + '</div>' +
         (r.direccion_recogida ? '<div><strong>' + tx('por_dir_recogida') + '</strong> ' + r.direccion_recogida + '</div>' : '') +
         (r.direccion_destino ? '<div><strong>' + tx('por_dir_destino') + '</strong> ' + r.direccion_destino + '</div>' : '') +
         (r.numero_vuelo ? '<div><strong>' + tx('por_vuelo') + '</strong> ' + r.numero_vuelo + (r.hora_llegada_vuelo ? ' · ' + tx('por_llegada') + ' ' + r.hora_llegada_vuelo.slice(0,5) : '') + '</div>' : '') +
