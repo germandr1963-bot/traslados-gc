@@ -125,6 +125,18 @@ table.tabla-precios input {
   outline-offset: 2px;
   font-weight: 700;
 }
+/* (07/10/2026) Pestaña de idioma traducido y al día: verde */
+.tab-idioma-verde {
+  background: #e8f5e9 !important;
+  color: #2e7d32 !important;
+  border-color: #2e7d32 !important;
+  font-weight: 700;
+}
+.tab-idioma-verde.activo {
+  outline: 3px solid #2e7d32;
+  outline-offset: 2px;
+  font-weight: 700;
+}
 .estado-seo-ok    { color: #2e7d32; font-weight: 600; font-size: 13px; }
 .estado-seo-draft { color: #b8860b; font-size: 13px; }
 .estado-seo-vacio { color: #ccc; font-size: 12px; }
@@ -4641,7 +4653,7 @@ function abrirEditorCategoriaIA(catId) {
 
   var tabs = datos.idiomas.map(function (lang, i) {
     var ok = cat.estado[lang];
-    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? '' : ' tab-idioma-rojo') + '" ' +
+    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? ' tab-idioma-verde' : ' tab-idioma-rojo') + '" ' +
       'onclick="cambiarIdiomaEditorCategoriaIA(' + catId + ', \'' + lang + '\', this)">' +
       lang.toUpperCase() + (ok ? '' : ' ⚠️') + '</button>';
   }).join('');
@@ -5739,7 +5751,7 @@ function abrirEditorTexto(textoId) {
 
   var tabs = IDIOMAS_TEXTOS.map(function (lang, i) {
     var ok = texto.estado[lang];
-    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? '' : ' tab-idioma-rojo') + '" ' +
+    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? ' tab-idioma-verde' : ' tab-idioma-rojo') + '" ' +
       'onclick="cambiarIdiomaEditorTexto(' + textoId + ', \'' + lang + '\', this)">' +
       lang.toUpperCase() + (ok ? '' : ' ⚠️') + '</button>';
   }).join('');
