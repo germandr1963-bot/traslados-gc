@@ -17607,7 +17607,8 @@ async function cancelarReservasSinPago() {
             numero_reserva: r.numero_reserva,
             origen: r.origen || '—',
             destino: r.destino || '—',
-            fecha: fechaCliente(r.fecha, r.lang_cliente || 'es')
+            fecha: fechaCliente(r.fecha, r.lang_cliente || 'es'),
+            hora: r.hora ? r.hora.slice(0,5) : '—'
           }, r.lang_cliente || 'es');
           await enviarEmail({
             to: r.email_cliente,
@@ -17635,7 +17636,8 @@ async function cancelarReservasSinPago() {
               numero_reserva: r.numero_reserva,
               origen: r.origen || '—',
               destino: r.destino || '—',
-              fecha: fechaCliente(r.fecha, r.lang_cliente || 'es')
+              fecha: fechaCliente(r.fecha, r.lang_cliente || 'es'),
+              hora: r.hora ? r.hora.slice(0,5) : '—'
             }, r.lang_cliente || 'es');
             const textoWaCliente = (_pclientewa && _pclientewa.whatsapp) ||
               `Hola, ${r.nombre_cliente} 👋\n\n❌ Tu reserva ${r.numero_reserva} ha sido cancelada automáticamente.\n\nNo hemos recibido el pago del depósito de garantía en el plazo establecido.\n\n📍 Ruta: ${r.origen || '—'} → ${r.destino || '—'}\n📅 Fecha: ${fechaTexto}\n\nSi deseas realizar este traslado, puedes enviarnos una nueva solicitud. Un saludo 🙏`;
