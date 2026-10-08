@@ -1573,7 +1573,7 @@ async function initSchema() {
   }
 
   const TEXTOS_VOUCHER = [
-    { clave: 'vou_hola',              contexto: 'Saludo del voucher; el programa añade detrás el nombre del cliente y una coma (ej: Hola Ana,)', es: 'Hola' },
+    { clave: 'vou_hola',              contexto: 'Saludo del voucher, con su coma (ej: Hola,). El programa añade detrás el nombre del cliente en negrita y 👋 (ej: Hola, Ana 👋).', es: 'Hola,' },
     { clave: 'vou_confirmado',        contexto: 'Aviso verde arriba del voucher', es: 'Depósito recibido. Tu traslado está confirmado.' },
     { clave: 'vou_titulo',            contexto: 'Título pequeño del voucher, encima del número de reserva', es: 'Voucher de Traslado' },
     { clave: 'vou_numero',            contexto: 'Abreviatura de "número" delante del número de reserva (ej: Nº ABC123)', es: 'Nº' },
@@ -11112,6 +11112,13 @@ async function datosIdiomaVoucher(r) {
   return { lang, tv, origen, destino, categoria, nombreExtra };
 }
 
+// (08/10/2026) Saludo del voucher: la coma va en el texto de Textos de interfaz (vou_hola = "Hola,").
+// Si un idioma aún no la lleva, el programa la pone, para que nunca salga sin coma ni con dos.
+function conComaSaludo(t) {
+  const s = String(t || '').trim();
+  return /,$/.test(s) ? s + ' ' : s + ', ';
+}
+
 async function generarHtmlVoucher(reservaId) {
   const result = await pool.query(
     `SELECT r.*, cv.nombre AS categoria_nombre,
@@ -11200,7 +11207,7 @@ async function generarHtmlVoucher(reservaId) {
       <p style="color:#aaa;margin:4px 0 0;font-size:12px;font-family:'Helvetica Neue',Arial,sans-serif;">${textoMarcaEmail('email_marca_2_subtitulo', _lv, 'Gran Canaria')}</p>
     </div>
     <div class="body">
-      <p>${tv('vou_hola')}, <strong>${r.nombre_cliente}</strong> 👋</p>
+      <p>${conComaSaludo(tv('vou_hola'))}<strong>${r.nombre_cliente}</strong> 👋</p>
       <div class="pagado">✔ ${tv('vou_confirmado')}</div>
       <div class="voucher-box">
         <p style="text-align:center;margin:0 0 12px 0;font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;">${tv('vou_titulo')}</p>
@@ -11343,7 +11350,7 @@ async function generarVoucherPDF(reservaId) {
 
     // Saludo
     {
-      const _sal1 = tv('vou_hola') + ', ';
+      const _sal1 = conComaSaludo(tv('vou_hola'));
       const _sal2 = String(r.nombre_cliente || '');
       doc.fontSize(12).font(FUENTE).fillColor('#1C1815');
       const _wSal1 = doc.widthOfString(_sal1);
