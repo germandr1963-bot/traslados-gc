@@ -1500,7 +1500,7 @@ table.tabla-precios input {
             </div>
             <div style="margin-top:8px;background:var(--fondo-tarjeta);border:1px solid var(--borde);border-radius:8px;padding:10px 14px;">
               <p style="font-size:12px;color:var(--texto-muted);margin:0 0 4px;font-weight:600;">Variables disponibles:</p>
-              <p style="font-size:12px;color:var(--texto-muted);margin:0;line-height:1.8;">
+              <p id="com-vars-email" style="font-size:12px;color:var(--texto-muted);margin:0;line-height:1.8;">
                 <code>{nombre_cliente}</code> <code>{nombre_chofer}</code> <code>{numero_reserva}</code>
                 <code>{origen}</code> <code>{destino}</code> <code>{fecha}</code> <code>{hora}</code>
                 <code>{precio}</code> <code>{importe}</code> <code>{categoria}</code>
@@ -1528,7 +1528,7 @@ table.tabla-precios input {
             </div>
             <div style="margin-top:8px;background:var(--fondo-tarjeta);border:1px solid var(--borde);border-radius:8px;padding:10px 14px;">
               <p style="font-size:12px;color:var(--texto-muted);margin:0 0 4px;font-weight:600;">Variables disponibles:</p>
-              <p style="font-size:12px;color:var(--texto-muted);margin:0;line-height:1.8;">
+              <p id="com-vars-wa" style="font-size:12px;color:var(--texto-muted);margin:0;line-height:1.8;">
                 <code>{nombre_cliente}</code> <code>{nombre_chofer}</code> <code>{numero_reserva}</code>
                 <code>{origen}</code> <code>{destino}</code> <code>{fecha}</code> <code>{hora}</code>
                 <code>{precio}</code> <code>{importe}</code> <code>{categoria}</code>
@@ -9485,6 +9485,41 @@ function guardarFraseCom() {
     .catch(function() { document.getElementById('modal-frase-com-err').style.display = 'inline'; });
 }
 
+// (08/10/2026) "Variables disponibles": cada plantilla muestra solo las variables que el programa le rellena,
+// por canal (ficha VARIABLES_PLANTILLAS de server.js). Si la ficha no se puede leer, queda la lista general de siempre.
+var _varsPlantillas = null;
+function cargarVarsPlantillas() {
+  if (_varsPlantillas) return Promise.resolve(_varsPlantillas);
+  return fetch('/admin/plantillas-variables')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) { if (d && d.variables) _varsPlantillas = d.variables; return _varsPlantillas; })
+    .catch(function() { return null; });
+}
+function pintarVarsPlantilla(clave) {
+  cargarVarsPlantillas().then(function(mapa) {
+    if (!mapa) return;
+    var ficha = mapa[clave];
+    [['email', 'com-vars-email'], ['wa', 'com-vars-wa']].forEach(function(par) {
+      var el = document.getElementById(par[1]);
+      if (!el) return;
+      var html;
+      if (!ficha) {
+        html = '<em>Esta plantilla no la usa ningún envío del programa.</em>';
+      } else if (ficha[par[0]] === null) {
+        html = '<em>Por este canal no se envía; las variables no se rellenarían.</em>';
+      } else if (!ficha[par[0]].length) {
+        html = '<em>Esta plantilla no lleva variables.</em>';
+      } else {
+        html = ficha[par[0]].map(function(v) { return '<code>{' + v + '}</code>'; }).join(' ');
+        if (par[0] === 'email' && ficha.solo_asunto_email) {
+          html += '<br><em>Solo se usan en el asunto: el cuerpo del email del voucher lo dibuja el programa aparte.</em>';
+        }
+      }
+      el.innerHTML = html;
+    });
+  });
+}
+
 function abrirModalPlantilla(clave) {
   var p = _plantillasCom.find(function(x) { return x.clave === clave; });
   if (!p) return;
@@ -9512,6 +9547,8 @@ function abrirModalPlantilla(clave) {
 
   document.getElementById('com-msg-guardado').style.display = 'none';
   document.getElementById('com-msg-error').style.display = 'none';
+
+  pintarVarsPlantilla(p.clave);
 
   // Mostrar tab email por defecto
   switchTabCom('email');
