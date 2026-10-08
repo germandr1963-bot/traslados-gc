@@ -2890,7 +2890,7 @@ Un saludo cordial, 🙏
       cuerpo_email: `
 Hola, <strong>{nombre_chofer}</strong> 👋
 
-💬 El equipo de Traslados GC te ha enviado un mensaje sobre la reserva <strong>{nombre_reserva}</strong>:
+💬 El equipo de Traslados GC te ha enviado un mensaje sobre la reserva <strong>{numero_reserva}</strong>:
 <blockquote>{mensaje}</blockquote>
 🔍 Accede a tu portal para ver los detalles.
 
@@ -16985,6 +16985,74 @@ app.post('/api/whatsapp/asignar/:id', requierePuenteWhatsapp, asyncHandler(async
 }));
 
 // ─── Plantillas de comunicación ───────────────────────────────────────────────
+
+// (08/10/2026) Variables de cada plantilla, por canal: las que el programa (server.js y puente.js) rellena
+// de verdad en cada envío. El Admin las muestra debajo del texto ("Variables disponibles").
+// null = la plantilla no se envía por ese canal. Una plantilla que no está aquí no la usa ningún envío.
+// Si se añade una variable a un envío, hay que añadirla también aquí.
+const _V6 = ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'hora'];
+const _VCH = ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha', 'hora'];
+const _VCONF = _V6.concat(['categoria', 'chofer', 'importe_deposito', 'horas_cancelacion', 'fecha_limite_cancelacion', 'extras']);
+const VARIABLES_PLANTILLAS = {
+  // Chofer
+  chofer_alta_datos_acceso:      { email: ['nombre_chofer', 'email_chofer', 'password_temporal', 'url_portal'], wa: null },
+  chofer_aviso_reserva:          { email: null, wa: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora', 'categoria'] },
+  chofer_aviso_reasignacion:     { email: null, wa: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora', 'categoria'] },
+  chofer_bienvenida:             { email: ['nombre_chofer', 'url_portal'], wa: null },
+  chofer_cancelacion:            { email: null, wa: _VCH },
+  chofer_cancelacion_no_pago:    { email: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'], wa: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'] },
+  chofer_cartel:                 { email: _VCH, wa: _VCH },
+  chofer_enlace_cancelada:       { email: null, wa: ['numero_reserva'] },
+  chofer_enlace_enviado:         { email: null, wa: ['numero_reserva'] },
+  chofer_enlace_fuera_ventana:   { email: null, wa: ['numero_reserva', 'fecha', 'hora'] },
+  chofer_enlace_mensaje_cliente: { email: null, wa: ['numero_reserva', 'nombre_cliente', 'idioma', 'mensaje', 'original'] },
+  chofer_enlace_no_asignada:     { email: null, wa: ['numero_reserva'] },
+  chofer_enlace_no_existe:       { email: null, wa: ['numero_reserva'] },
+  chofer_enlace_no_presentado:   { email: null, wa: ['numero_reserva'] },
+  chofer_enlace_sin_chofer:      { email: null, wa: ['numero_reserva'] },
+  chofer_enlace_sin_servicio:    { email: null, wa: [] },
+  chofer_enlace_terminado:       { email: null, wa: ['numero_reserva'] },
+  chofer_factura_comision:       { email: ['nombre_chofer', 'numero_factura', 'numero_reserva', 'origen', 'destino', 'fecha', 'importe'], wa: ['nombre_chofer', 'numero_factura', 'numero_reserva', 'origen', 'destino', 'fecha', 'importe'] },
+  chofer_gracias_servicio:       { email: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'], wa: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'] },
+  chofer_recuperar_password:     { email: ['nombre_chofer', 'enlace_recuperacion'], wa: null },
+  chofer_respuesta_confirmado:   { email: null, wa: ['numero_reserva'] },
+  chofer_respuesta_rechazo:      { email: null, wa: [] },
+  chofer_respuesta_ya_asignada:  { email: null, wa: ['numero_reserva'] },
+  chofer_servicio_asignado:      { email: null, wa: _VCH.concat(['pasajeros', 'idioma']) },
+  chofer_servicio_reasignado:    { email: null, wa: _VCH },
+  chofer_solicitud_recibida:     { email: ['nombre_chofer'], wa: null },
+  // Cliente
+  cliente_acceso_reserva:        { email: _V6.concat(['password_temporal', 'url_portal']), wa: _V6.concat(['password_temporal', 'url_portal']) },
+  cliente_acuse_recibo:          { email: _V6.concat(['extras']), wa: _V6.concat(['extras']) },
+  cliente_cambio_conductor:      { email: _V6.concat(['nombre_chofer', 'nombre_conductor']), wa: _V6.concat(['nombre_chofer', 'nombre_conductor']) },
+  cliente_cancelacion:           { email: _V6.concat(['aviso_deposito']), wa: _V6.concat(['aviso_deposito']) },
+  cliente_cancelacion_no_pago:   { email: _V6, wa: _V6 },
+  cliente_confirmacion:          { email: _VCONF.concat(['boton_pago']), wa: _VCONF.concat(['url_pago']) },
+  cliente_deposito_liberado:     { email: ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'numero_factura'], wa: ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'numero_factura'] },
+  cliente_deposito_noshow:       { email: _V6.concat(['importe']), wa: _V6.concat(['importe']) },
+  cliente_en_gestion:            { email: _V6, wa: _V6 },
+  cliente_enlace_pago:           { email: _V6.concat(['importe', 'url_pago', 'boton_pago']), wa: _V6.concat(['importe', 'url_pago', 'url_corta']) },
+  cliente_factura:               { email: _V6.concat(['numero_factura']), wa: _V6.concat(['numero_factura']) },
+  cliente_mensaje_admin:         { email: _V6.concat(['mensaje', 'url_portal']), wa: _V6.concat(['mensaje', 'url_portal']) },
+  cliente_modificacion_aprobada: { email: ['nombre_cliente', 'numero_reserva', 'resumen', 'url_portal'], wa: ['nombre_cliente', 'numero_reserva', 'resumen', 'url_portal'] },
+  cliente_precio_negativa:       { email: ['origen', 'destino', 'detalles'], wa: null },
+  cliente_precio_recibida:       { email: ['origen', 'destino', 'detalles'], wa: null },
+  cliente_precio_respuesta:      { email: ['origen', 'destino', 'detalles', 'tarifas', 'url_ruta'], wa: null },
+  cliente_problema_pago:         { email: _V6, wa: _V6 },
+  cliente_recuperar_password:    { email: ['nombre_cliente', 'enlace_recuperacion'], wa: ['nombre_cliente', 'enlace_recuperacion'] },
+  cliente_reserva_actualizada:   { email: ['nombre_cliente', 'numero_reserva', 'resumen', 'url_portal'], wa: ['nombre_cliente', 'numero_reserva', 'resumen', 'url_portal'] },
+  cliente_reserva_anulada:       { email: _V6, wa: _V6 },
+  cliente_valoracion:            { email: ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'boton_valoracion'], wa: ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'url_valoracion'] },
+  cliente_voucher:               { email: _V6, wa: _V6, solo_asunto_email: true },
+  // Interno
+  interno_consulta_precio:       { email: ['recibida', 'origen', 'destino', 'fecha', 'pasajeros', 'email_cliente', 'idioma'], wa: null },
+  interno_nuevo_chofer:          { email: ['numero_reserva', 'fecha', 'hora', 'nombre_chofer'], wa: null },
+  interno_servicio_liberado:     { email: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora', 'chofer_anterior', 'causa'], wa: null }
+};
+
+app.get('/admin/plantillas-variables', requireAdmin, (req, res) => {
+  res.json({ variables: VARIABLES_PLANTILLAS });
+});
 
 // GET: listar todas las plantillas
 app.get('/admin/plantillas-comunicacion', requireAdmin, asyncHandler(async (req, res) => {
