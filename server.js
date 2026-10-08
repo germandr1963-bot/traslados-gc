@@ -1583,7 +1583,6 @@ async function initSchema() {
     { clave: 'vou_origen',            contexto: 'Etiqueta del lugar de recogida en el voucher', es: 'Origen' },
     { clave: 'vou_destino',           contexto: 'Etiqueta del lugar de destino en el voucher', es: 'Destino' },
     { clave: 'vou_fecha',             contexto: 'Etiqueta de la fecha del viaje en el voucher', es: 'Fecha' },
-    { clave: 'vou_hora',              contexto: 'Etiqueta de la hora del viaje en el voucher', es: 'Hora' },
     { clave: 'vou_categoria',         contexto: 'Etiqueta de la categoría de vehículo en el voucher', es: 'Categoría' },
     { clave: 'vou_pasajeros',         contexto: 'Etiqueta del número de pasajeros en el voucher', es: 'Pasajeros' },
     { clave: 'vou_dir_recogida',      contexto: 'Etiqueta de la dirección de recogida en el voucher', es: 'Dirección de recogida' },
