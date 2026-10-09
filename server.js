@@ -2993,7 +2993,7 @@ Un saludo cordial, 🙏
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>`,
       cuerpo_whatsapp: '' },
-    { clave: 'chofer_comunicacion_masiva', nombre: 'Comunicaci\u00f3n masiva (a choferes)', categoria: 'chofer',
+    { clave: 'chofer_comunicacion_masiva', nombre: 'Comunicado al equipo', categoria: 'chofer',
       asunto_email: '{asunto_libre}',
       cuerpo_email: `
 Hola, <strong>{nombre_chofer}</strong> 👋
@@ -14205,14 +14205,18 @@ app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res)
   const yaEmail = new Set();
   const yaTel = new Set();
   for (const chofer of lista) {
+    // (09/10/2026) Paso 4: el texto sale de la plantilla "Comunicado al equipo" (chofer_comunicacion_masiva):
+    // saludo, mensaje, despedida y firma. Si la plantilla no está disponible, se envía como antes.
+    const _pcom = await obtenerPlantilla('chofer_comunicacion_masiva',
+      { nombre_chofer: chofer.nombre || '', asunto_libre: asunto || '', mensaje_libre: mensaje }, 'es');
     const em = String(chofer.email || '').trim().toLowerCase();
     if (email && em && !yaEmail.has(em)) {
       yaEmail.add(em);
       try {
         await enviarEmail({
           to: chofer.email,
-          subject: asunto,
-          html: plantillaEmail(`<p>Hola <strong>${chofer.nombre || ''}</strong>,</p><p style="white-space:pre-wrap;">${mensaje}</p>`)
+          subject: (_pcom && _pcom.asunto) || asunto,
+          html: plantillaEmail((_pcom && _pcom.email) || `<p>Hola <strong>${chofer.nombre || ''}</strong>,</p><p style="white-space:pre-wrap;">${mensaje}</p>`)
         });
       } catch(e) { errores.push(chofer.email); }
     }
@@ -14222,7 +14226,7 @@ app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res)
       try {
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
-          [chofer.telefono, mensaje]
+          [chofer.telefono, (_pcom && _pcom.whatsapp) || mensaje]
         );
       } catch(e) { /* WhatsApp no bloquea el envío general */ }
     }
@@ -17182,6 +17186,7 @@ const VARIABLES_PLANTILLAS = {
   chofer_cancelacion:            { email: null, wa: _VCH },
   chofer_cancelacion_no_pago:    { email: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'], wa: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'] },
   chofer_cartel:                 { email: _VCH, wa: _VCH },
+  chofer_comunicacion_masiva:    { email: ['nombre_chofer', 'asunto_libre', 'mensaje_libre'], wa: ['nombre_chofer', 'mensaje_libre'] },
   chofer_enlace_cancelada:       { email: null, wa: ['numero_reserva'] },
   chofer_enlace_enviado:         { email: null, wa: ['numero_reserva'] },
   chofer_enlace_fuera_ventana:   { email: null, wa: ['numero_reserva', 'fecha', 'hora'] },
