@@ -629,6 +629,40 @@ async function initSchema() {
   // Columna observaciones en conductores: campo libre para notas del registro web.
   await pool.query(`ALTER TABLE conductores ADD COLUMN IF NOT EXISTS observaciones TEXT DEFAULT ''`);
 
+  // (09/10/2026) Equipo por departamentos (Admin → Equipo), para comunicados informativos.
+  // equipo_departamentos: los departamentos (se crean, renombran y borran desde el Admin).
+  //   es_choferes = TRUE marca el departamento al que pasan solos los choferes aprobados de Conductores.
+  // equipo_personas: las personas que no son choferes (se añaden desde Equipo; paso 2).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS equipo_departamentos (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      es_choferes BOOLEAN DEFAULT FALSE,
+      orden INT DEFAULT 0,
+      creado_en TIMESTAMP DEFAULT NOW()
+    )`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS equipo_personas (
+      id SERIAL PRIMARY KEY,
+      departamento_id INT REFERENCES equipo_departamentos(id),
+      nombre TEXT NOT NULL,
+      email TEXT,
+      telefono TEXT,
+      estado TEXT DEFAULT 'activo',
+      creado_en TIMESTAMP DEFAULT NOW()
+    )`);
+  // Departamentos de partida: se crean UNA sola vez (migraciones_datos), para no recrearlos si se borran.
+  await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_datos (clave TEXT PRIMARY KEY, hecho_en TIMESTAMP DEFAULT NOW())`);
+  const _depHecho = await pool.query(`SELECT 1 FROM migraciones_datos WHERE clave = 'equipo_departamentos_20261009'`);
+  if (!_depHecho.rows.length) {
+    const _depHay = await pool.query('SELECT COUNT(*)::int AS n FROM equipo_departamentos');
+    if (!_depHay.rows[0].n) {
+      await pool.query(`INSERT INTO equipo_departamentos (nombre, es_choferes, orden) VALUES
+        ('Choferes', TRUE, 1), ('Equipo interno', FALSE, 2), ('Empresas colaboradoras', FALSE, 3), ('Colaboradores externos', FALSE, 4)`);
+    }
+    await pool.query(`INSERT INTO migraciones_datos (clave) VALUES ('equipo_departamentos_20261009') ON CONFLICT DO NOTHING`);
+  }
+
   // Columna activo en route_seo_settings: controla si la página
   // de esa ruta en ese idioma está visible en internet o no.
   await pool.query(`
@@ -13963,11 +13997,81 @@ app.get('/admin/clientes', requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 // ─── Admin: listado de equipo (choferes) ─────────────────────────────────────
+// (09/10/2026) Equipo por departamentos. Los choferes aprobados de Conductores pasan solos a su departamento
+// (es_choferes); las demás personas salen de equipo_personas. Cada fila lleva su departamento y su estado.
+// Si no hay departamento de choferes (se borró vacío) y hay choferes aprobados, se vuelve a crear solo.
+async function departamentoChoferes() {
+  let d = await pool.query('SELECT id, nombre FROM equipo_departamentos WHERE es_choferes = TRUE ORDER BY id LIMIT 1');
+  if (d.rows.length) return d.rows[0];
+  const hay = await pool.query("SELECT 1 FROM conductores WHERE estado = 'aprobado' LIMIT 1");
+  if (!hay.rows.length) return null;
+  d = await pool.query("INSERT INTO equipo_departamentos (nombre, es_choferes, orden) VALUES ('Choferes', TRUE, 0) RETURNING id, nombre");
+  return d.rows[0];
+}
+
 app.get('/admin/equipo', requireAdmin, asyncHandler(async (req, res) => {
-  const result = await pool.query(
+  const dc = await departamentoChoferes();
+  const choferes = await pool.query(
     "SELECT nombre, email, telefono FROM conductores WHERE estado = 'aprobado' ORDER BY nombre ASC"
   );
-  res.json(result.rows);
+  const filas = choferes.rows.map(function (c) {
+    return { nombre: c.nombre, email: c.email, telefono: c.telefono, es_chofer: true,
+             departamento_id: dc ? dc.id : null, departamento: dc ? dc.nombre : '', estado: 'activo' };
+  });
+  const personas = await pool.query(
+    `SELECT p.id, p.nombre, p.email, p.telefono, p.estado, p.departamento_id, d.nombre AS departamento
+     FROM equipo_personas p LEFT JOIN equipo_departamentos d ON d.id = p.departamento_id
+     ORDER BY d.orden, d.nombre, p.nombre`
+  );
+  personas.rows.forEach(function (p) {
+    filas.push({ id: p.id, nombre: p.nombre, email: p.email || '', telefono: p.telefono || '', es_chofer: false,
+                 departamento_id: p.departamento_id, departamento: p.departamento || '', estado: p.estado || 'activo' });
+  });
+  res.json(filas);
+}));
+
+// Departamentos con el número de personas de cada uno
+app.get('/admin/equipo/departamentos', requireAdmin, asyncHandler(async (req, res) => {
+  await departamentoChoferes();
+  const r = await pool.query(
+    `SELECT d.id, d.nombre, d.es_choferes,
+       CASE WHEN d.es_choferes THEN (SELECT COUNT(*)::int FROM conductores WHERE estado = 'aprobado')
+            ELSE (SELECT COUNT(*)::int FROM equipo_personas p WHERE p.departamento_id = d.id) END AS personas
+     FROM equipo_departamentos d ORDER BY d.orden, d.id`
+  );
+  res.json({ departamentos: r.rows });
+}));
+
+app.post('/admin/equipo/departamentos', requireAdmin, asyncHandler(async (req, res) => {
+  const nombre = String((req.body && req.body.nombre) || '').trim().slice(0, 80);
+  if (!nombre) return res.status(400).json({ error: 'Escribe el nombre del departamento.' });
+  const rep = await pool.query('SELECT 1 FROM equipo_departamentos WHERE LOWER(nombre) = LOWER($1)', [nombre]);
+  if (rep.rows.length) return res.status(400).json({ error: 'Ya existe un departamento con ese nombre.' });
+  const o = await pool.query('SELECT COALESCE(MAX(orden), 0) + 1 AS o FROM equipo_departamentos');
+  await pool.query('INSERT INTO equipo_departamentos (nombre, orden) VALUES ($1, $2)', [nombre, o.rows[0].o]);
+  res.json({ ok: true });
+}));
+
+app.put('/admin/equipo/departamentos/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const nombre = String((req.body && req.body.nombre) || '').trim().slice(0, 80);
+  if (!nombre) return res.status(400).json({ error: 'Escribe el nombre del departamento.' });
+  const rep = await pool.query('SELECT 1 FROM equipo_departamentos WHERE LOWER(nombre) = LOWER($1) AND id <> $2', [nombre, req.params.id]);
+  if (rep.rows.length) return res.status(400).json({ error: 'Ya existe un departamento con ese nombre.' });
+  const r = await pool.query('UPDATE equipo_departamentos SET nombre = $1 WHERE id = $2', [nombre, req.params.id]);
+  if (!r.rowCount) return res.status(404).json({ error: 'Departamento no encontrado.' });
+  res.json({ ok: true });
+}));
+
+// Solo se borra si no tiene a nadie (en el de choferes: si no hay choferes aprobados)
+app.delete('/admin/equipo/departamentos/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const d = await pool.query('SELECT id, es_choferes FROM equipo_departamentos WHERE id = $1', [req.params.id]);
+  if (!d.rows.length) return res.status(404).json({ error: 'Departamento no encontrado.' });
+  const n = d.rows[0].es_choferes
+    ? await pool.query("SELECT COUNT(*)::int AS n FROM conductores WHERE estado = 'aprobado'")
+    : await pool.query('SELECT COUNT(*)::int AS n FROM equipo_personas WHERE departamento_id = $1', [req.params.id]);
+  if (n.rows[0].n > 0) return res.status(400).json({ error: 'No se puede borrar: el departamento tiene personas.' });
+  await pool.query('DELETE FROM equipo_departamentos WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
 }));
 
 // ─── Admin: enviar comunicado a clientes ─────────────────────────────────────
