@@ -29,7 +29,9 @@ const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_
 
 // ─── Email (Nodemailer / Gmail) ───────────────────────────────────────────────
 // ─── Email via Resend ─────────────────────────────────────────────────────────
-async function enviarEmail({ to, subject, html }) {
+// (09/10/2026) replyTo es opcional: solo lo indica el Comunicado al equipo ("Responder" va al email de
+// Admin → Notificaciones → Notificación del Equipo). Los demás emails no lo indican y salen igual que antes.
+async function enviarEmail({ to, subject, html, replyTo }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn('Email no configurado — falta RESEND_API_KEY');
@@ -41,12 +43,12 @@ async function enviarEmail({ to, subject, html }) {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ' + apiKey
     },
-    body: JSON.stringify({
+    body: JSON.stringify(Object.assign({
       from: 'Traslados GC <noreply@traslados-gc.es>',
       to: [to],
       subject: subject,
       html: html
-    })
+    }, replyTo ? { reply_to: replyTo } : {}))
   });
   if (!response.ok) {
     const error = await response.text();
@@ -14191,7 +14193,13 @@ app.post('/admin/comunicado/clientes', requireAdmin, asyncHandler(async (req, re
 // la persona recibe solo por el canal que tenga. Un mismo email o teléfono no recibe dos veces.
 app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res) => {
   const { email, whatsapp, asunto, mensaje } = req.body;
-  if (!mensaje) return res.status(400).json({ error: 'El mensaje es obligatorio.' });
+  // (09/10/2026) Un texto para el email y otro para el WhatsApp (pestañas de la ventana "Nuevo comunicado").
+  // Si llega un solo "mensaje" (forma anterior), vale para los dos canales, como antes.
+  const mensajeEmail = String((req.body.mensaje_email !== undefined ? req.body.mensaje_email : mensaje) || '').trim();
+  const mensajeWa = String((req.body.mensaje_whatsapp !== undefined ? req.body.mensaje_whatsapp : mensaje) || '').trim();
+  if (!(email && mensajeEmail) && !(whatsapp && mensajeWa)) return res.status(400).json({ error: 'El mensaje es obligatorio.' });
+  if (email && !mensajeEmail) return res.status(400).json({ error: 'Escribe el mensaje del email.' });
+  if (whatsapp && !mensajeWa) return res.status(400).json({ error: 'Escribe el mensaje del WhatsApp.' });
   const todos = !!req.body.todos;
   const deptos = (Array.isArray(req.body.departamentos) ? req.body.departamentos : [])
     .map(function (x) { return parseInt(x, 10); }).filter(function (x) { return x > 0; });
@@ -14216,14 +14224,25 @@ app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res)
 
   if (!lista.length) return res.status(400).json({ error: 'No hay destinatarios.' });
 
+  // (09/10/2026) "Responder" del email → email de Admin → Notificaciones → "Notificación del Equipo".
+  // Si está vacío, el email sale como antes (sin dirección de respuesta).
+  let _responderA = '';
+  try {
+    const _ca = await pool.query('SELECT email FROM contactos_admin WHERE id = 1');
+    _responderA = String((_ca.rows[0] && _ca.rows[0].email) || '').trim();
+  } catch (e) { _responderA = ''; }
+
   const errores = [];
   const yaEmail = new Set();
   const yaTel = new Set();
   for (const chofer of lista) {
     // (09/10/2026) Paso 4: el texto sale de la plantilla "Comunicado al equipo" (chofer_comunicacion_masiva):
     // saludo, mensaje, despedida y firma. Si la plantilla no está disponible, se envía como antes.
+    // El email lleva el mensaje del email y el WhatsApp el mensaje del WhatsApp.
     const _pcom = await obtenerPlantilla('chofer_comunicacion_masiva',
-      { nombre_chofer: chofer.nombre || '', asunto_libre: asunto || '', mensaje_libre: mensaje }, 'es');
+      { nombre_chofer: chofer.nombre || '', asunto_libre: asunto || '', mensaje_libre: mensajeEmail }, 'es');
+    const _pcomWa = await obtenerPlantilla('chofer_comunicacion_masiva',
+      { nombre_chofer: chofer.nombre || '', asunto_libre: asunto || '', mensaje_libre: mensajeWa }, 'es');
     const em = String(chofer.email || '').trim().toLowerCase();
     if (email && em && !yaEmail.has(em)) {
       yaEmail.add(em);
@@ -14231,7 +14250,8 @@ app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res)
         await enviarEmail({
           to: chofer.email,
           subject: (_pcom && _pcom.asunto) || asunto,
-          html: plantillaEmail((_pcom && _pcom.email) || `<p>Hola <strong>${chofer.nombre || ''}</strong>,</p><p style="white-space:pre-wrap;">${mensaje}</p>`)
+          html: plantillaEmail((_pcom && _pcom.email) || `<p>Hola <strong>${chofer.nombre || ''}</strong>,</p><p style="white-space:pre-wrap;">${mensajeEmail}</p>`),
+          replyTo: _responderA || undefined
         });
       } catch(e) { errores.push(chofer.email); }
     }
@@ -14241,7 +14261,7 @@ app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res)
       try {
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
-          [chofer.telefono, (_pcom && _pcom.whatsapp) || mensaje]
+          [chofer.telefono, (_pcomWa && _pcomWa.whatsapp) || mensajeWa]
         );
       } catch(e) { /* WhatsApp no bloquea el envío general */ }
     }
