@@ -2993,7 +2993,7 @@ Un saludo cordial, 🙏
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>`,
       cuerpo_whatsapp: '' },
-    { clave: 'chofer_comunicacion_masiva', nombre: 'Comunicado al equipo', categoria: 'chofer',
+    { clave: 'chofer_comunicacion_masiva', nombre: 'Comunicado al equipo', categoria: 'interno',
       asunto_email: '{asunto_libre}',
       cuerpo_email: `
 Hola, <strong>{nombre_chofer}</strong> 👋
