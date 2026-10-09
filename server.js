@@ -2388,6 +2388,17 @@ async function initSchema() {
   `);
   await pool.query(`ALTER TABLE configuracion_contacto ADD COLUMN IF NOT EXISTS emails_notificacion TEXT DEFAULT ''`);
   await pool.query(`ALTER TABLE configuracion_contacto ADD COLUMN IF NOT EXISTS wa_grupo_choferes TEXT DEFAULT ''`);
+  // (09/10/2026) Contactos Admin: contacto INTERNO de la administración (no se publica nunca).
+  // Tabla aparte de configuracion_contacto, que es la del Contacto público de la web.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS contactos_admin (
+      id INT PRIMARY KEY,
+      email TEXT DEFAULT '',
+      telefono TEXT DEFAULT '',
+      whatsapp TEXT DEFAULT '',
+      actualizado_en TIMESTAMP DEFAULT NOW()
+    )`);
+  await pool.query(`INSERT INTO contactos_admin (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
 
   // Enlaces de recuperación de contraseña (clientes y choferes)
   await pool.query(`
@@ -16126,6 +16137,25 @@ app.get('/og-imagen/:tipo', asyncHandler(async (req, res) => {
 app.get('/admin/contacto-info', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT * FROM configuracion_contacto WHERE id = 1');
   res.json(result.rows[0] || {});
+}));
+
+// (09/10/2026) Contactos Admin (interno, solo con sesión del Admin)
+app.get('/admin/contactos-admin', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query('SELECT email, telefono, whatsapp FROM contactos_admin WHERE id = 1');
+  res.json(r.rows[0] || { email: '', telefono: '', whatsapp: '' });
+}));
+
+app.post('/admin/contactos-admin', requireAdmin, asyncHandler(async (req, res) => {
+  const email = String((req.body && req.body.email) || '').trim().toLowerCase().slice(0, 160);
+  const telefono = String((req.body && req.body.telefono) || '').trim().slice(0, 40);
+  const whatsapp = String((req.body && req.body.whatsapp) || '').trim().slice(0, 40);
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'El email no es válido.' });
+  await pool.query(
+    `INSERT INTO contactos_admin (id, email, telefono, whatsapp, actualizado_en) VALUES (1, $1, $2, $3, NOW())
+     ON CONFLICT (id) DO UPDATE SET email = $1, telefono = $2, whatsapp = $3, actualizado_en = NOW()`,
+    [email, telefono, whatsapp]
+  );
+  res.json({ ok: true });
 }));
 
 app.post('/admin/contacto', requireAdmin, asyncHandler(async (req, res) => {
