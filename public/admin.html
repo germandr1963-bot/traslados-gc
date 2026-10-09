@@ -7028,7 +7028,7 @@ function enviarComunicadoEquipo() {
 var _emailsNotif = [];
 
 function cargarNotificaciones() {
-  fetch('/api/contacto')
+  fetch('/admin/contacto-info')
     .then(function(r) { return r.json(); })
     .then(function(d) {
       _emailsNotif = d.emails_notificacion
@@ -7094,7 +7094,7 @@ function guardarNotificaciones() {
 
 // ─── Contacto público ─────────────────────────────────────────────────────────
 function cargarContacto() {
-  fetch('/api/contacto')
+  fetch('/admin/contacto-info')
     .then(function(r) { return r.json(); })
     .then(function(d) {
       document.getElementById('contacto-nombre-empresa').value = d.nombre_empresa || '';
