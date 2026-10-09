@@ -1357,11 +1357,44 @@ table.tabla-precios input {
       <h1>Equipo</h1>
       <p class="subtitulo">Personas del equipo, por departamento. Los choferes aprobados en Conductores pasan solos a su departamento.</p>
       <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap;">
         <input type="text" id="filtro-equipo" class="campo" placeholder="Buscar por nombre, email o teléfono…" style="max-width:300px;" oninput="filtrarEquipo()">
         <select id="filtro-depto-equipo" class="campo" style="max-width:240px;" onchange="filtrarEquipo()"><option value="">Departamento: Todos</option></select>
-        <button class="boton-costa" onclick="abrirDepartamentosEquipo()">&#128450; Departamentos</button>
-        <button class="boton-primario" onclick="abrirComunicadoEquipo()">Enviar comunicado</button>
+        <button class="boton-costa" onclick="abrirDepartamentosEquipo()" style="white-space:nowrap;">&#128450; Departamentos</button>
+        <button class="boton-costa" onclick="abrirPersonaEquipo()" style="white-space:nowrap;">&#10133; Añadir persona</button>
+        <button class="boton-primario" onclick="abrirComunicadoEquipo()" style="white-space:nowrap;">Enviar comunicado</button>
+      </div>
+      <!-- (09/10/2026) Formulario Añadir / Editar persona (no choferes) -->
+      <div id="panel-persona-equipo" class="tarjeta" style="display:none;margin-bottom:18px;max-width:640px;">
+        <h2 id="titulo-persona-equipo" style="font-size:1.05rem;margin:0 0 14px;">&#10133; Añadir persona</h2>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Departamento</label>
+          <select id="persona-depto-equipo" class="campo"></select>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Nombre y apellidos</label>
+          <input type="text" id="persona-nombre-equipo" class="campo" maxlength="120">
+        </div>
+        <div style="display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Email</label>
+            <input type="email" id="persona-email-equipo" class="campo" maxlength="160">
+          </div>
+          <div style="flex:1;min-width:200px;">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Teléfono</label>
+            <input type="text" id="persona-telefono-equipo" class="campo" maxlength="40" placeholder="+34 600 000 000">
+          </div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Estado</label>
+          <select id="persona-estado-equipo" class="campo" style="max-width:200px;">
+            <option value="activo">Activo</option><option value="ausente">Ausente</option><option value="baja">De baja</option>
+          </select>
+        </div>
+        <p style="font-size:12px;color:#8a8175;margin:0 0 12px;">Pon al menos el email o el teléfono. Los choferes se dan de alta en Conductores.</p>
+        <button class="boton-primario" onclick="guardarPersonaEquipo()">&#128190; Guardar</button>
+        <button class="boton-secundario" onclick="cerrarPersonaEquipo()">Cancelar</button>
+        <div id="aviso-persona-equipo" style="display:none;margin-top:10px;font-size:13px;"></div>
       </div>
       <!-- (09/10/2026) Ventana Departamentos: crear, renombrar y borrar -->
       <div id="panel-departamentos-equipo" class="tarjeta" style="display:none;margin-bottom:18px;max-width:640px;">
@@ -1376,7 +1409,7 @@ table.tabla-precios input {
         <div style="margin-top:14px;"><button class="boton-secundario" onclick="cerrarDepartamentosEquipo()">Cerrar</button></div>
       </div>
       <table class="tabla-admin">
-        <thead><tr><th><input type="checkbox" id="check-todos-equipo" onchange="toggleTodosEquipo(this)"></th><th>Departamento</th><th>Nombre y apellidos</th><th>Email</th><th>Teléfono</th><th>Estado</th></tr></thead>
+        <thead><tr><th><input type="checkbox" id="check-todos-equipo" onchange="toggleTodosEquipo(this)"></th><th>Departamento</th><th>Nombre y apellidos</th><th>Email</th><th>Teléfono</th><th>Estado</th><th></th></tr></thead>
         <tbody id="tabla-equipo"></tbody>
       </table>
       <div id="aviso-equipo" style="display:none;margin-top:12px;"></div>
@@ -6704,7 +6737,7 @@ var ESTADOS_EQUIPO = { activo: ['Activo', '#2d7a4f'], ausente: ['Ausente', '#b07
 function renderTablaEquipo(lista) {
   var tbody = document.getElementById('tabla-equipo');
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No hay nadie en el equipo con este filtro.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px;">No hay nadie en el equipo con este filtro.</td></tr>';
     return;
   }
   tbody.innerHTML = lista.map(function(c) {
@@ -6719,6 +6752,10 @@ function renderTablaEquipo(lista) {
       '<td>' + escapar(c.email || '—') + '</td>' +
       '<td>' + escapar(c.telefono || '—') + '</td>' +
       '<td style="font-weight:600;color:' + est[1] + ';">' + est[0] + '</td>' +
+      (c.es_chofer
+        ? '<td style="font-size:12px;color:#8a8175;white-space:nowrap;">En Conductores</td>'
+        : '<td style="white-space:nowrap;"><button class="boton-costa" style="font-size:12px;padding:4px 10px;" onclick="abrirPersonaEquipo(' + c.id + ')">&#9998; Editar</button> ' +
+          '<button class="boton-costa" style="font-size:12px;padding:4px 10px;" title="Borrar" onclick="borrarPersonaEquipo(' + c.id + ')">&#128465;</button></td>') +
       '</tr>';
   }).join('');
 }
@@ -6810,6 +6847,69 @@ function guardarNombreDepartamento(id) {
     .then(function(r) { return r.json(); })
     .then(function(d) { trasCambioDepartamentos(d, 'Nombre cambiado.'); })
     .catch(function() { avisoDepartamentos('Error de conexión.', false); });
+}
+// ─── (09/10/2026) Personas del equipo (no choferes): añadir, editar, borrar ──
+var _personaEquipoId = null;
+function avisoPersonaEquipo(texto, ok) {
+  var av = document.getElementById('aviso-persona-equipo');
+  av.style.display = texto ? 'block' : 'none';
+  av.style.color = ok ? '#27ae60' : '#c0392b';
+  av.textContent = texto || '';
+}
+function abrirPersonaEquipo(id) {
+  cargarDepartamentosEquipo().then(function() {
+    var deptos = _departamentosEquipo.filter(function(x) { return !x.es_choferes; });
+    var sel = document.getElementById('persona-depto-equipo');
+    sel.innerHTML = deptos.length
+      ? deptos.map(function(x) { return '<option value="' + x.id + '">' + escapar(x.nombre) + '</option>'; }).join('')
+      : '<option value="">— Crea primero un departamento en 🗂 Departamentos —</option>';
+    var p = id ? _equipoData.find(function(c) { return !c.es_chofer && c.id === id; }) : null;
+    _personaEquipoId = p ? p.id : null;
+    document.getElementById('titulo-persona-equipo').innerHTML = p ? '&#9998; Editar persona' : '&#10133; Añadir persona';
+    document.getElementById('persona-nombre-equipo').value = p ? p.nombre : '';
+    document.getElementById('persona-email-equipo').value = p ? p.email : '';
+    document.getElementById('persona-telefono-equipo').value = p ? p.telefono : '';
+    document.getElementById('persona-estado-equipo').value = p ? (p.estado || 'activo') : 'activo';
+    if (p && p.departamento_id) sel.value = String(p.departamento_id);
+    avisoPersonaEquipo('');
+    var panel = document.getElementById('panel-persona-equipo');
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+}
+function cerrarPersonaEquipo() {
+  document.getElementById('panel-persona-equipo').style.display = 'none';
+  _personaEquipoId = null;
+}
+function guardarPersonaEquipo() {
+  var datos = {
+    departamento_id: document.getElementById('persona-depto-equipo').value,
+    nombre: document.getElementById('persona-nombre-equipo').value.trim(),
+    email: document.getElementById('persona-email-equipo').value.trim(),
+    telefono: document.getElementById('persona-telefono-equipo').value.trim(),
+    estado: document.getElementById('persona-estado-equipo').value
+  };
+  if (!datos.departamento_id) { avisoPersonaEquipo('Elige un departamento.', false); return; }
+  if (!datos.nombre) { avisoPersonaEquipo('Escribe el nombre y apellidos.', false); return; }
+  if (!datos.email && !datos.telefono) { avisoPersonaEquipo('Pon al menos el email o el teléfono.', false); return; }
+  var url = '/admin/equipo/personas' + (_personaEquipoId ? '/' + _personaEquipoId : '');
+  fetch(url, { method: _personaEquipoId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d && d.ok) { cerrarPersonaEquipo(); cargarEquipo(); }
+      else avisoPersonaEquipo((d && d.error) || 'Error al guardar.', false);
+    })
+    .catch(function() { avisoPersonaEquipo('Error de conexión.', false); });
+}
+function borrarPersonaEquipo(id) {
+  var p = _equipoData.find(function(c) { return !c.es_chofer && c.id === id; });
+  if (!confirm('¿Borrar a "' + (p ? p.nombre : '') + '" del equipo?')) return;
+  fetch('/admin/equipo/personas/' + id, { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d && d.ok) { if (_personaEquipoId === id) cerrarPersonaEquipo(); cargarEquipo(); }
+      else alert((d && d.error) || 'Error al borrar.');
+    });
 }
 function borrarDepartamentoEquipo(id) {
   var x = _departamentosEquipo.find(function(y) { return y.id === id; });
