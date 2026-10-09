@@ -1451,13 +1451,34 @@ table.tabla-precios input {
           <label style="font-size:13px;margin-right:16px;"><input type="checkbox" id="canal-email-equipo" checked onchange="resumirComunicadoEquipo()"> Email</label>
           <label style="font-size:13px;"><input type="checkbox" id="canal-whatsapp-equipo" onchange="resumirComunicadoEquipo()"> WhatsApp</label>
         </div>
-        <div style="margin-bottom:10px;">
-          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Asunto <span style="font-weight:400;color:#999;">(solo email)</span></label>
-          <input type="text" id="asunto-comunicado-equipo" class="campo" placeholder="Asunto del email…">
+        <!-- (09/10/2026) Un texto para el email y otro para el WhatsApp, en pestañas como en Comunicaciones -->
+        <div style="display:flex;gap:0;margin-bottom:0;border-bottom:2px solid var(--borde);">
+          <button type="button" id="tab-email-com-equipo" onclick="switchTabComEquipo('email')" style="padding:8px 20px;border:none;background:var(--fondo-tarjeta);border-bottom:3px solid var(--acento);cursor:pointer;font-weight:600;color:var(--texto);">&#128231; Email</button>
+          <button type="button" id="tab-wa-com-equipo" onclick="switchTabComEquipo('wa')" style="padding:8px 20px;border:none;background:none;border-bottom:3px solid transparent;cursor:pointer;color:var(--texto-muted);">&#128241; WhatsApp</button>
         </div>
-        <div style="margin-bottom:16px;">
-          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Mensaje</label>
-          <textarea id="mensaje-comunicado-equipo" class="campo" rows="5" placeholder="Escribe el mensaje…" style="resize:vertical;"></textarea>
+        <div id="panel-email-com-equipo" style="padding-top:12px;margin-bottom:16px;">
+          <div style="margin-bottom:10px;">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Asunto</label>
+            <input type="text" id="asunto-comunicado-equipo" class="campo" placeholder="Asunto del email…">
+          </div>
+          <div style="margin-bottom:4px;">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Mensaje</label>
+            <textarea id="mensaje-comunicado-equipo" class="campo" rows="5" placeholder="Escribe el mensaje…" style="resize:vertical;"></textarea>
+          </div>
+          <div style="margin-top:10px;background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
+            <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;">&#128065;&#65039; Vista previa — así llega el email</p>
+            <div id="vista-email-com-equipo" style="width:100%;background:#fff;border-radius:4px;padding:10px;box-sizing:border-box;"></div>
+          </div>
+        </div>
+        <div id="panel-wa-com-equipo" style="display:none;padding-top:12px;margin-bottom:16px;">
+          <div style="margin-bottom:4px;">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Mensaje</label>
+            <textarea id="mensaje-wa-comunicado-equipo" class="campo" rows="5" placeholder="Escribe el mensaje…" style="resize:vertical;"></textarea>
+          </div>
+          <div style="margin-top:10px;background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
+            <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;">&#128065;&#65039; Vista previa — así llega el WhatsApp</p>
+            <div id="vista-wa-com-equipo" style="width:100%;"></div>
+          </div>
         </div>
         <div id="resumen-destinatarios-equipo" style="background:#f4f1ec;border-radius:6px;padding:10px 12px;font-size:13px;color:#3d372f;margin-bottom:14px;"></div>
         <div style="display:flex;gap:10px;">
@@ -6963,9 +6984,87 @@ function abrirComunicadoEquipo() {
       }).join('');
     document.getElementById('incluir-inactivos-equipo').checked = false;
     resumirComunicadoEquipo();
+    switchTabComEquipo('email');
+    prepararVistasComEquipo();
     document.getElementById('panel-comunicado-equipo').style.display = 'block';
     document.getElementById('panel-comunicado-equipo').scrollIntoView({ behavior: 'smooth' });
   });
+}
+
+// (09/10/2026) Pestañas Email / WhatsApp de la ventana "Nuevo comunicado" (como en Comunicaciones)
+function switchTabComEquipo(tab) {
+  var pe = document.getElementById('panel-email-com-equipo');
+  var pw = document.getElementById('panel-wa-com-equipo');
+  var be = document.getElementById('tab-email-com-equipo');
+  var bw = document.getElementById('tab-wa-com-equipo');
+  var esEmail = tab === 'email';
+  pe.style.display = esEmail ? 'block' : 'none';
+  pw.style.display = esEmail ? 'none' : 'block';
+  be.style.borderBottomColor = esEmail ? 'var(--acento)' : 'transparent';
+  be.style.fontWeight = esEmail ? '600' : 'normal';
+  be.style.color = esEmail ? 'var(--texto)' : 'var(--texto-muted)';
+  bw.style.borderBottomColor = esEmail ? 'transparent' : 'var(--acento)';
+  bw.style.fontWeight = esEmail ? 'normal' : '600';
+  bw.style.color = esEmail ? 'var(--texto-muted)' : 'var(--texto)';
+  if (!esEmail) pintarVistaWaComEquipo(); // la del email se pinta al escribir
+  else pintarVistaEmailComEquipo();
+}
+
+// Vista previa: el texto de la plantilla "Comunicado al equipo" con lo que se escribe, rellenado igual
+// que en el servidor. El nombre es el de la primera persona que lo recibirá (o "Nombre" si aún no hay).
+var _plantillaComEquipo = null;
+
+function prepararVistasComEquipo() {
+  var ta = document.getElementById('mensaje-comunicado-equipo');
+  var taWa = document.getElementById('mensaje-wa-comunicado-equipo');
+  var asu = document.getElementById('asunto-comunicado-equipo');
+  if (!ta._vistaConectada) {
+    ta._vistaConectada = true;
+    var esperar = function() { clearTimeout(ta._vistaEspera); ta._vistaEspera = setTimeout(pintarVistaEmailComEquipo, 500); };
+    ta.addEventListener('input', esperar);
+    asu.addEventListener('input', esperar);
+    taWa.addEventListener('input', pintarVistaWaComEquipo);
+  }
+  fetch('/admin/plantillas-comunicacion')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      _plantillaComEquipo = (d.plantillas || []).find(function(p) { return p.clave === 'chofer_comunicacion_masiva'; }) || null;
+      pintarVistaEmailComEquipo();
+      pintarVistaWaComEquipo();
+    })
+    .catch(function() { _plantillaComEquipo = null; pintarVistaEmailComEquipo(); pintarVistaWaComEquipo(); });
+}
+
+function nombreVistaComEquipo() {
+  var lista = (typeof destinatariosComunicadoEquipo === 'function') ? destinatariosComunicadoEquipo() : [];
+  return (lista[0] && lista[0].nombre) ? lista[0].nombre : 'Nombre';
+}
+
+function rellenarComEquipo(texto, mensaje) {
+  var vars = { nombre_chofer: nombreVistaComEquipo(),
+               asunto_libre: document.getElementById('asunto-comunicado-equipo').value.trim(),
+               mensaje_libre: mensaje };
+  return String(texto || '').replace(/\{([^}]+)\}/g, function(m, k) {
+    return (vars[k] !== undefined && vars[k] !== null) ? String(vars[k]) : '{' + k + '}';
+  });
+}
+
+function pintarVistaEmailComEquipo() {
+  var mensaje = document.getElementById('mensaje-comunicado-equipo').value.trim();
+  var p = _plantillaComEquipo;
+  var texto = (p && p.cuerpo_email && p.cuerpo_email.trim())
+    ? rellenarComEquipo(p.cuerpo_email, mensaje)
+    : '<p>Hola <strong>' + nombreVistaComEquipo() + '</strong>,</p><p style="white-space:pre-wrap;">' + mensaje + '</p>';
+  pintarEmailReal('vista-email-com-equipo', texto, 'es');
+}
+
+function pintarVistaWaComEquipo() {
+  var mensaje = document.getElementById('mensaje-wa-comunicado-equipo').value.trim();
+  var p = _plantillaComEquipo;
+  var texto = (p && p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim())
+    ? rellenarComEquipo(p.cuerpo_whatsapp, mensaje)
+    : mensaje;
+  pintarWhatsappReal('vista-wa-com-equipo', texto);
 }
 
 function marcarTodosDeptosComunicado(cb) {
@@ -6984,6 +7083,8 @@ function destinatariosComunicadoEquipo() {
 }
 
 function resumirComunicadoEquipo() {
+  // (09/10/2026) Si la ventana ya está abierta, las vistas previas toman el nombre de la nueva selección
+  if (document.getElementById('panel-comunicado-equipo').style.display === 'block') { pintarVistaEmailComEquipo(); pintarVistaWaComEquipo(); }
   var todos = document.querySelectorAll('.depto-com');
   var marcados = document.querySelectorAll('.depto-com:checked');
   var cbTodos = document.getElementById('depto-com-todos');
@@ -7010,6 +7111,7 @@ function cerrarComunicadoEquipo() {
   document.getElementById('panel-comunicado-equipo').style.display = 'none';
   document.getElementById('asunto-comunicado-equipo').value = '';
   document.getElementById('mensaje-comunicado-equipo').value = '';
+  document.getElementById('mensaje-wa-comunicado-equipo').value = '';
   var av = document.getElementById('aviso-envio-equipo');
   av.style.display = 'none';
 }
@@ -7019,10 +7121,13 @@ function enviarComunicadoEquipo() {
   var whatsapp = document.getElementById('canal-whatsapp-equipo').checked;
   var asunto = document.getElementById('asunto-comunicado-equipo').value.trim();
   var mensaje = document.getElementById('mensaje-comunicado-equipo').value.trim();
+  var mensajeWa = document.getElementById('mensaje-wa-comunicado-equipo').value.trim();
   var av = document.getElementById('aviso-envio-equipo');
   if (!email && !whatsapp) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Selecciona al menos un canal.'; return; }
-  if (!mensaje) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Escribe un mensaje.'; return; }
-  if (email && !asunto) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='El asunto es obligatorio para email.'; return; }
+  // (09/10/2026) Cada canal marcado necesita su texto (pestañas Email y WhatsApp)
+  if (email && !mensaje) { switchTabComEquipo('email'); av.style.display='block'; av.style.color='#c0392b'; av.textContent='Escribe el mensaje del email (pestaña Email).'; return; }
+  if (email && !asunto) { switchTabComEquipo('email'); av.style.display='block'; av.style.color='#c0392b'; av.textContent='El asunto es obligatorio para email.'; return; }
+  if (whatsapp && !mensajeWa) { switchTabComEquipo('wa'); av.style.display='block'; av.style.color='#c0392b'; av.textContent='Escribe el mensaje del WhatsApp (pestaña WhatsApp).'; return; }
   var deptos = Array.from(document.querySelectorAll('.depto-com:checked')).map(function(c) { return c.value; });
   if (!deptos.length) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Elige al menos un departamento.'; return; }
   var cuantos = destinatariosComunicadoEquipo().length;
@@ -7034,7 +7139,8 @@ function enviarComunicadoEquipo() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ departamentos: deptos, todos: todosDeptos, incluir_inactivos: document.getElementById('incluir-inactivos-equipo').checked,
-                           email: email, whatsapp: whatsapp, asunto: asunto, mensaje: mensaje })
+                           email: email, whatsapp: whatsapp, asunto: asunto,
+                           mensaje_email: email ? mensaje : '', mensaje_whatsapp: whatsapp ? mensajeWa : '' })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.ok) {
       av.style.color = '#27ae60';
