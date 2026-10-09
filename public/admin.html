@@ -1189,6 +1189,28 @@ table.tabla-precios input {
         <button class="boton-primario" onclick="guardarContacto()">💾 Guardar</button>
         <div id="aviso-contacto" style="display:none;margin-top:0.75rem;"></div>
       </div>
+
+      <!-- (09/10/2026) Contactos Admin: interno, no se publica -->
+      <div class="tarjeta" style="margin-top:1.5rem;border:2px solid #2d7a4f;">
+        <h2 style="font-size:1.05rem;margin:0 0 4px;">&#128274; Contactos Admin <span style="font-weight:400;font-size:13px;color:var(--texto-muted);">(interno — no se publica)</span></h2>
+        <p style="font-size:13px;color:var(--texto-muted);margin:0 0 12px;">Contacto de la administración. Aquí llegarán las respuestas a los comunicados del equipo.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+          <div style="grid-column:1/-1;">
+            <label class="etiqueta">Email de la administración</label>
+            <input type="email" id="cadmin-email" class="campo" placeholder="admin@traslados-gc.es">
+          </div>
+          <div>
+            <label class="etiqueta">Teléfono</label>
+            <input type="text" id="cadmin-telefono" class="campo" placeholder="+34 600 000 000">
+          </div>
+          <div>
+            <label class="etiqueta">WhatsApp</label>
+            <input type="text" id="cadmin-whatsapp" class="campo" placeholder="+34 600 000 000">
+          </div>
+        </div>
+        <button class="boton-primario" onclick="guardarContactosAdmin()">&#128190; Guardar</button>
+        <div id="aviso-contactos-admin" style="display:none;margin-top:0.75rem;"></div>
+      </div>
     </div>
 
     <div id="seccion-facturacion" class="oculto">
@@ -7105,6 +7127,36 @@ function cargarContacto() {
       document.getElementById('contacto-direccion').value = d.direccion || '';
 
     });
+  cargarContactosAdmin();
+}
+
+// (09/10/2026) Contactos Admin (interno)
+function cargarContactosAdmin() {
+  fetch('/admin/contactos-admin')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('cadmin-email').value = d.email || '';
+      document.getElementById('cadmin-telefono').value = d.telefono || '';
+      document.getElementById('cadmin-whatsapp').value = d.whatsapp || '';
+    });
+}
+function guardarContactosAdmin() {
+  var av = document.getElementById('aviso-contactos-admin');
+  fetch('/admin/contactos-admin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: document.getElementById('cadmin-email').value.trim(),
+      telefono: document.getElementById('cadmin-telefono').value.trim(),
+      whatsapp: document.getElementById('cadmin-whatsapp').value.trim()
+    })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    av.style.display = 'block';
+    av.innerHTML = (d && d.ok)
+      ? '<div class="aviso-ok">✔ Contactos Admin guardados.</div>'
+      : '<div class="aviso-error">' + escapar((d && d.error) || 'Error al guardar.') + '</div>';
+    setTimeout(function() { av.style.display = 'none'; }, 3000);
+  });
 }
 
 function guardarContacto() {
