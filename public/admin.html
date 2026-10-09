@@ -1355,14 +1355,28 @@ table.tabla-precios input {
 
     <div id="seccion-equipo" class="oculto">
       <h1>Equipo</h1>
-      <p class="subtitulo">Choferes registrados en la plataforma.</p>
+      <p class="subtitulo">Personas del equipo, por departamento. Los choferes aprobados en Conductores pasan solos a su departamento.</p>
       <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;">
-        <input type="text" id="filtro-equipo" class="campo" placeholder="Buscar por nombre, email o teléfono…" style="max-width:320px;" oninput="filtrarEquipo()">
+        <input type="text" id="filtro-equipo" class="campo" placeholder="Buscar por nombre, email o teléfono…" style="max-width:300px;" oninput="filtrarEquipo()">
+        <select id="filtro-depto-equipo" class="campo" style="max-width:240px;" onchange="filtrarEquipo()"><option value="">Departamento: Todos</option></select>
+        <button class="boton-costa" onclick="abrirDepartamentosEquipo()">&#128450; Departamentos</button>
         <button class="boton-primario" onclick="abrirComunicadoEquipo()">Enviar comunicado</button>
       </div>
+      <!-- (09/10/2026) Ventana Departamentos: crear, renombrar y borrar -->
+      <div id="panel-departamentos-equipo" class="tarjeta" style="display:none;margin-bottom:18px;max-width:640px;">
+        <h2 style="font-size:1.05rem;margin:0 0 4px;">&#128450; Departamentos</h2>
+        <p style="font-size:13px;color:#5b5347;margin:0 0 12px;">Crea, renombra o borra departamentos. Un departamento solo se puede borrar si no tiene a nadie.</p>
+        <div id="lista-departamentos-equipo"></div>
+        <div style="display:flex;gap:10px;margin-top:14px;">
+          <input type="text" id="nuevo-departamento-equipo" class="campo" placeholder="Nombre del nuevo departamento…" maxlength="80">
+          <button class="boton-primario" style="white-space:nowrap;" onclick="crearDepartamentoEquipo()">&#10133; Crear</button>
+        </div>
+        <div id="aviso-departamentos-equipo" style="display:none;margin-top:10px;font-size:13px;"></div>
+        <div style="margin-top:14px;"><button class="boton-secundario" onclick="cerrarDepartamentosEquipo()">Cerrar</button></div>
+      </div>
       <table class="tabla-admin">
-        <thead><tr><th><input type="checkbox" id="check-todos-equipo" onchange="toggleTodosEquipo(this)"></th><th>Nombre</th><th>Email</th><th>Teléfono</th></tr></thead>
+        <thead><tr><th><input type="checkbox" id="check-todos-equipo" onchange="toggleTodosEquipo(this)"></th><th>Departamento</th><th>Nombre y apellidos</th><th>Email</th><th>Teléfono</th><th>Estado</th></tr></thead>
         <tbody id="tabla-equipo"></tbody>
       </table>
       <div id="aviso-equipo" style="display:none;margin-top:12px;"></div>
@@ -6679,34 +6693,131 @@ function cargarEquipo() {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       _equipoData = data;
-      renderTablaEquipo(data);
+      filtrarEquipo();
     });
+  cargarDepartamentosEquipo();
 }
+
+// (09/10/2026) Estado de cada persona del equipo, como se ve en la tabla
+var ESTADOS_EQUIPO = { activo: ['Activo', '#2d7a4f'], ausente: ['Ausente', '#b07a1c'], baja: ['De baja', '#999'] };
 
 function renderTablaEquipo(lista) {
   var tbody = document.getElementById('tabla-equipo');
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;padding:20px;">No hay choferes registrados aún.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px;">No hay nadie en el equipo con este filtro.</td></tr>';
     return;
   }
   tbody.innerHTML = lista.map(function(c) {
+    var est = ESTADOS_EQUIPO[c.estado] || [c.estado || '—', '#5b5347'];
+    var depto = c.departamento
+      ? '<span style="display:inline-block;font-size:12px;padding:2px 9px;border-radius:10px;background:' + (c.es_chofer ? '#e8f0ea;color:#2d5a3a' : '#eee;color:#444') + ';">' + (c.es_chofer ? '&#129489;&#8205;&#9992;&#65039; ' : '') + escapar(c.departamento) + '</span>'
+      : '<span style="color:#999;">—</span>';
     return '<tr>' +
-      '<td><input type="checkbox" class="check-equipo" value="' + c.email + '"></td>' +
-      '<td>' + (c.nombre || '—') + '</td>' +
-      '<td>' + c.email + '</td>' +
-      '<td>' + (c.telefono || '—') + '</td>' +
+      '<td><input type="checkbox" class="check-equipo" value="' + escapar(c.email).replace(/"/g, '&quot;') + '"></td>' +
+      '<td>' + depto + '</td>' +
+      '<td>' + escapar(c.nombre || '—') + '</td>' +
+      '<td>' + escapar(c.email || '—') + '</td>' +
+      '<td>' + escapar(c.telefono || '—') + '</td>' +
+      '<td style="font-weight:600;color:' + est[1] + ';">' + est[0] + '</td>' +
       '</tr>';
   }).join('');
 }
 
 function filtrarEquipo() {
   var q = document.getElementById('filtro-equipo').value.toLowerCase();
+  var dep = document.getElementById('filtro-depto-equipo').value;
   var filtrados = _equipoData.filter(function(c) {
+    if (dep && String(c.departamento_id) !== dep) return false;
     return (c.nombre || '').toLowerCase().includes(q) ||
-           c.email.toLowerCase().includes(q) ||
+           (c.email || '').toLowerCase().includes(q) ||
            (c.telefono || '').toLowerCase().includes(q);
   });
   renderTablaEquipo(filtrados);
+}
+
+// ─── (09/10/2026) Departamentos del equipo: crear, renombrar, borrar ─────────
+var _departamentosEquipo = [];
+function cargarDepartamentosEquipo() {
+  return fetch('/admin/equipo/departamentos')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      _departamentosEquipo = (d && d.departamentos) || [];
+      var sel = document.getElementById('filtro-depto-equipo');
+      var actual = sel.value;
+      sel.innerHTML = '<option value="">Departamento: Todos</option>' + _departamentosEquipo.map(function(x) {
+        return '<option value="' + x.id + '">' + escapar(x.nombre) + '</option>';
+      }).join('');
+      if (_departamentosEquipo.some(function(x) { return String(x.id) === actual; })) sel.value = actual;
+      pintarDepartamentosEquipo();
+    });
+}
+function pintarDepartamentosEquipo(editandoId) {
+  var cont = document.getElementById('lista-departamentos-equipo');
+  if (!cont) return;
+  if (!_departamentosEquipo.length) { cont.innerHTML = '<p style="font-size:13px;color:#999;">No hay departamentos.</p>'; return; }
+  cont.innerHTML = _departamentosEquipo.map(function(x) {
+    var n = x.personas === 1 ? '1 persona' : x.personas + ' personas';
+    var fila = '<div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid #e6e0d6;font-size:14px;">';
+    if (String(editandoId) === String(x.id)) {
+      return fila + '<input type="text" id="renombrar-depto-' + x.id + '" class="campo" maxlength="80" value="' + escapar(x.nombre).replace(/"/g, '&quot;') + '" style="flex:1;">' +
+        '<button class="boton-primario" style="font-size:12px;padding:5px 12px;" onclick="guardarNombreDepartamento(' + x.id + ')">Guardar</button>' +
+        '<button class="boton-secundario" style="font-size:12px;padding:5px 12px;" onclick="pintarDepartamentosEquipo()">Cancelar</button></div>';
+    }
+    var vacio = !x.personas;
+    return fila + '<span style="flex:1;"><strong>' + (x.es_choferes ? '&#129489;&#8205;&#9992;&#65039; ' : '') + escapar(x.nombre) + '</strong> <span style="font-size:12px;color:#8a8175;">· ' + n +
+        (x.es_choferes ? ' · salen solos de Conductores' : '') + '</span></span>' +
+      '<button class="boton-costa" style="font-size:12px;padding:4px 10px;" onclick="pintarDepartamentosEquipo(' + x.id + ')">&#9998; Renombrar</button>' +
+      '<button class="boton-costa" style="font-size:12px;padding:4px 10px;' + (vacio ? '' : 'opacity:.45;cursor:not-allowed;') + '"' +
+        (vacio ? ' onclick="borrarDepartamentoEquipo(' + x.id + ')"' : ' disabled title="Tiene personas: no se puede borrar"') + '>&#128465; Borrar</button></div>';
+  }).join('');
+}
+function avisoDepartamentos(texto, ok) {
+  var av = document.getElementById('aviso-departamentos-equipo');
+  av.style.display = texto ? 'block' : 'none';
+  av.style.color = ok ? '#27ae60' : '#c0392b';
+  av.textContent = texto || '';
+}
+function abrirDepartamentosEquipo() {
+  avisoDepartamentos('');
+  document.getElementById('panel-departamentos-equipo').style.display = 'block';
+  cargarDepartamentosEquipo();
+}
+function cerrarDepartamentosEquipo() {
+  document.getElementById('panel-departamentos-equipo').style.display = 'none';
+  document.getElementById('nuevo-departamento-equipo').value = '';
+}
+function trasCambioDepartamentos(d, textoOk) {
+  if (d && d.ok) {
+    avisoDepartamentos(textoOk, true);
+    cargarEquipo();
+  } else {
+    avisoDepartamentos((d && d.error) || 'Error al guardar.', false);
+  }
+}
+function crearDepartamentoEquipo() {
+  var campo = document.getElementById('nuevo-departamento-equipo');
+  var nombre = campo.value.trim();
+  if (!nombre) { avisoDepartamentos('Escribe el nombre del departamento.', false); return; }
+  fetch('/admin/equipo/departamentos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: nombre }) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (d && d.ok) campo.value = ''; trasCambioDepartamentos(d, 'Departamento creado.'); })
+    .catch(function() { avisoDepartamentos('Error de conexión.', false); });
+}
+function guardarNombreDepartamento(id) {
+  var nombre = (document.getElementById('renombrar-depto-' + id).value || '').trim();
+  if (!nombre) { avisoDepartamentos('Escribe el nombre del departamento.', false); return; }
+  fetch('/admin/equipo/departamentos/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: nombre }) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { trasCambioDepartamentos(d, 'Nombre cambiado.'); })
+    .catch(function() { avisoDepartamentos('Error de conexión.', false); });
+}
+function borrarDepartamentoEquipo(id) {
+  var x = _departamentosEquipo.find(function(y) { return y.id === id; });
+  if (!confirm('¿Borrar el departamento "' + (x ? x.nombre : '') + '"?')) return;
+  fetch('/admin/equipo/departamentos/' + id, { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { trasCambioDepartamentos(d, 'Departamento borrado.'); })
+    .catch(function() { avisoDepartamentos('Error de conexión.', false); });
 }
 
 function toggleTodosEquipo(cb) {
