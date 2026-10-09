@@ -8413,8 +8413,12 @@ app.get('/contacto', asyncHandler(async (req, res) => {
   await renderContacto(req, res, 'es');
 }));
 
+// (09/10/2026) Dirección pública: SOLO los datos que salen en la página de Contacto.
+// Los datos internos (Notificaciones de Reservas, etc.) los lee el Admin por /admin/contacto-info (con sesión).
 app.get('/api/contacto', asyncHandler(async (req, res) => {
-  const result = await pool.query('SELECT * FROM configuracion_contacto WHERE id = 1');
+  const result = await pool.query(
+    'SELECT nombre_empresa, telefono, whatsapp, email, direccion, horario FROM configuracion_contacto WHERE id = 1'
+  );
   res.json(result.rows[0] || {});
 }));
 
