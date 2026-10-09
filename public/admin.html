@@ -1418,13 +1418,17 @@ table.tabla-precios input {
       <div id="panel-comunicado-equipo" style="display:none;margin-top:24px;" class="tarjeta">
         <h2 style="font-size:1rem;margin:0 0 16px 0;">Nuevo comunicado</h2>
         <div style="margin-bottom:10px;">
-          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Destinatarios</label>
-          <span id="resumen-destinatarios-equipo" style="font-size:13px;color:#5b5347;"></span>
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Destinatarios — departamentos</label>
+          <div id="deptos-comunicado-equipo"></div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:13px;"><input type="checkbox" id="incluir-inactivos-equipo" onchange="resumirComunicadoEquipo()"> Incluir también a los que están <strong>Ausentes</strong> o <strong>De baja</strong></label>
+          <div style="font-size:12px;color:#8a8175;margin-top:2px;">Si no se marca, solo reciben los que están Activos.</div>
         </div>
         <div style="margin-bottom:10px;">
           <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Canal</label>
-          <label style="font-size:13px;margin-right:16px;"><input type="checkbox" id="canal-email-equipo" checked> Email</label>
-          <label style="font-size:13px;"><input type="checkbox" id="canal-whatsapp-equipo"> WhatsApp</label>
+          <label style="font-size:13px;margin-right:16px;"><input type="checkbox" id="canal-email-equipo" checked onchange="resumirComunicadoEquipo()"> Email</label>
+          <label style="font-size:13px;"><input type="checkbox" id="canal-whatsapp-equipo" onchange="resumirComunicadoEquipo()"> WhatsApp</label>
         </div>
         <div style="margin-bottom:10px;">
           <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Asunto <span style="font-weight:400;color:#999;">(solo email)</span></label>
@@ -1434,6 +1438,7 @@ table.tabla-precios input {
           <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Mensaje</label>
           <textarea id="mensaje-comunicado-equipo" class="campo" rows="5" placeholder="Escribe el mensaje…" style="resize:vertical;"></textarea>
         </div>
+        <div id="resumen-destinatarios-equipo" style="background:#f4f1ec;border-radius:6px;padding:10px 12px;font-size:13px;color:#3d372f;margin-bottom:14px;"></div>
         <div style="display:flex;gap:10px;">
           <button class="boton-primario" onclick="enviarComunicadoEquipo()">Enviar</button>
           <button class="boton-secundario" onclick="cerrarComunicadoEquipo()">Cancelar</button>
@@ -6924,14 +6929,60 @@ function toggleTodosEquipo(cb) {
   document.querySelectorAll('.check-equipo').forEach(function(c) { c.checked = cb.checked; });
 }
 
+// (09/10/2026) Comunicado por departamentos. Las casillas de la tabla no cuentan para este envío
+// (quedan para el envío individual, más adelante).
 function abrirComunicadoEquipo() {
-  var seleccionados = Array.from(document.querySelectorAll('.check-equipo:checked')).map(function(c) { return c.value; });
-  var resumen = seleccionados.length
-    ? seleccionados.length + ' chofer(es) seleccionado(s)'
-    : 'Todo el equipo (' + _equipoData.length + ')';
-  document.getElementById('resumen-destinatarios-equipo').textContent = resumen;
-  document.getElementById('panel-comunicado-equipo').style.display = 'block';
-  document.getElementById('panel-comunicado-equipo').scrollIntoView({ behavior: 'smooth' });
+  cargarDepartamentosEquipo().then(function() {
+    var cont = document.getElementById('deptos-comunicado-equipo');
+    cont.innerHTML = '<label style="display:block;font-size:13px;margin:3px 0;"><input type="checkbox" id="depto-com-todos" onchange="marcarTodosDeptosComunicado(this)"> <strong>Todos los departamentos</strong></label>' +
+      _departamentosEquipo.map(function(x) {
+        var n = x.personas === 1 ? '1 persona' : x.personas + ' personas';
+        return '<label style="display:block;font-size:13px;margin:3px 0;"><input type="checkbox" class="depto-com" value="' + x.id + '" onchange="resumirComunicadoEquipo()"> ' +
+          (x.es_choferes ? '&#129489;&#8205;&#9992;&#65039; ' : '') + escapar(x.nombre) + ' <span style="color:#8a8175;font-size:12px;">· ' + n + '</span></label>';
+      }).join('');
+    document.getElementById('incluir-inactivos-equipo').checked = false;
+    resumirComunicadoEquipo();
+    document.getElementById('panel-comunicado-equipo').style.display = 'block';
+    document.getElementById('panel-comunicado-equipo').scrollIntoView({ behavior: 'smooth' });
+  });
+}
+
+function marcarTodosDeptosComunicado(cb) {
+  document.querySelectorAll('.depto-com').forEach(function(c) { c.checked = cb.checked; });
+  resumirComunicadoEquipo();
+}
+
+// Quién recibirá el comunicado, con la misma regla que el servidor
+function destinatariosComunicadoEquipo() {
+  var ids = Array.from(document.querySelectorAll('.depto-com:checked')).map(function(c) { return c.value; });
+  var inactivos = document.getElementById('incluir-inactivos-equipo').checked;
+  return _equipoData.filter(function(c) {
+    if (ids.indexOf(String(c.departamento_id)) === -1) return false;
+    return c.es_chofer || inactivos || (c.estado || 'activo') === 'activo';
+  });
+}
+
+function resumirComunicadoEquipo() {
+  var todos = document.querySelectorAll('.depto-com');
+  var marcados = document.querySelectorAll('.depto-com:checked');
+  var cbTodos = document.getElementById('depto-com-todos');
+  if (cbTodos) cbTodos.checked = todos.length > 0 && marcados.length === todos.length;
+  var lista = destinatariosComunicadoEquipo();
+  var caja = document.getElementById('resumen-destinatarios-equipo');
+  if (!marcados.length) { caja.innerHTML = '&#128203; Elige al menos un departamento.'; return; }
+  var porDepto = {};
+  lista.forEach(function(c) { porDepto[c.departamento] = (porDepto[c.departamento] || 0) + 1; });
+  var detalle = Object.keys(porDepto).map(function(k) { return porDepto[k] + ' de ' + escapar(k); }).join(' · ');
+  var html = '&#128203; <strong>Se enviará a ' + lista.length + (lista.length === 1 ? ' persona' : ' personas') + '</strong>' + (detalle ? ' (' + detalle + ').' : '.');
+  var sinEmail = lista.filter(function(c) { return !c.email; }).length;
+  var sinTel = lista.filter(function(c) { return !c.telefono; }).length;
+  var usaEmail = document.getElementById('canal-email-equipo').checked;
+  var usaWa = document.getElementById('canal-whatsapp-equipo').checked;
+  var avisos = [];
+  if (usaEmail && sinEmail) avisos.push(sinEmail + (sinEmail === 1 ? ' no tiene email' : ' no tienen email'));
+  if (usaWa && sinTel) avisos.push(sinTel + (sinTel === 1 ? ' no tiene teléfono' : ' no tienen teléfono'));
+  if (avisos.length) html += '<br><span style="font-size:12px;color:#8a8175;">' + avisos.join(' y ') + ': les llegará solo por el canal que tengan.</span>';
+  caja.innerHTML = html;
 }
 
 function cerrarComunicadoEquipo() {
@@ -6943,7 +6994,6 @@ function cerrarComunicadoEquipo() {
 }
 
 function enviarComunicadoEquipo() {
-  var seleccionados = Array.from(document.querySelectorAll('.check-equipo:checked')).map(function(c) { return c.value; });
   var email = document.getElementById('canal-email-equipo').checked;
   var whatsapp = document.getElementById('canal-whatsapp-equipo').checked;
   var asunto = document.getElementById('asunto-comunicado-equipo').value.trim();
@@ -6952,11 +7002,18 @@ function enviarComunicadoEquipo() {
   if (!email && !whatsapp) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Selecciona al menos un canal.'; return; }
   if (!mensaje) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Escribe un mensaje.'; return; }
   if (email && !asunto) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='El asunto es obligatorio para email.'; return; }
+  var deptos = Array.from(document.querySelectorAll('.depto-com:checked')).map(function(c) { return c.value; });
+  if (!deptos.length) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Elige al menos un departamento.'; return; }
+  var cuantos = destinatariosComunicadoEquipo().length;
+  if (!cuantos) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='No hay nadie a quien enviar con esta selección.'; return; }
+  if (!confirm('¿Enviar el comunicado a ' + cuantos + (cuantos === 1 ? ' persona?' : ' personas?'))) return;
+  var todosDeptos = deptos.length === document.querySelectorAll('.depto-com').length;
   av.style.display='block'; av.style.color='#5b5347'; av.textContent='Enviando…';
   fetch('/admin/comunicado/equipo', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ destinatarios: seleccionados, email: email, whatsapp: whatsapp, asunto: asunto, mensaje: mensaje })
+    body: JSON.stringify({ departamentos: deptos, todos: todosDeptos, incluir_inactivos: document.getElementById('incluir-inactivos-equipo').checked,
+                           email: email, whatsapp: whatsapp, asunto: asunto, mensaje: mensaje })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.ok) {
       av.style.color = '#27ae60';
