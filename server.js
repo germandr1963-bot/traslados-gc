@@ -16126,9 +16126,11 @@ app.get('/admin/contacto-info', requireAdmin, asyncHandler(async (req, res) => {
 
 app.post('/admin/contacto', requireAdmin, asyncHandler(async (req, res) => {
   const { nombre_empresa, telefono, whatsapp, email, direccion, horario, emails_notificacion } = req.body;
+  // (09/10/2026) Guardar el Contacto público NO toca la lista de Notificaciones de Reservas:
+  // si no se envía (la pantalla Contacto no la envía), se deja como está.
   await pool.query(
-    `UPDATE configuracion_contacto SET nombre_empresa=$1, telefono=$2, whatsapp=$3, email=$4, direccion=$5, horario=$6, emails_notificacion=$7, actualizado_en=NOW() WHERE id=1`,
-    [nombre_empresa||'', telefono||'', whatsapp||'', email||'', direccion||'', horario||'', emails_notificacion||'']
+    `UPDATE configuracion_contacto SET nombre_empresa=$1, telefono=$2, whatsapp=$3, email=$4, direccion=$5, horario=$6, emails_notificacion=COALESCE($7, emails_notificacion), actualizado_en=NOW() WHERE id=1`,
+    [nombre_empresa||'', telefono||'', whatsapp||'', email||'', direccion||'', horario||'', (emails_notificacion === undefined ? null : (emails_notificacion || ''))]
   );
   res.json({ ok: true });
 }));
