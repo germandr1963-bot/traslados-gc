@@ -14169,27 +14169,45 @@ app.post('/admin/comunicado/clientes', requireAdmin, asyncHandler(async (req, re
 }));
 
 // ─── Admin: enviar comunicado al equipo (choferes) ───────────────────────────
+// (09/10/2026) Comunicado al equipo por DEPARTAMENTOS (Admin → Equipo → Enviar comunicado).
+// departamentos: ids elegidos (o todos = true). Choferes = los aprobados de Conductores (siempre activos).
+// Personas de Equipo: solo las activas, salvo incluir_inactivos (ausentes y de baja).
+// El texto que llega es el de siempre (la plantilla se conecta en el paso 4). Sin email o sin teléfono,
+// la persona recibe solo por el canal que tenga. Un mismo email o teléfono no recibe dos veces.
 app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res) => {
-  const { destinatarios, email, whatsapp, asunto, mensaje } = req.body;
+  const { email, whatsapp, asunto, mensaje } = req.body;
   if (!mensaje) return res.status(400).json({ error: 'El mensaje es obligatorio.' });
+  const todos = !!req.body.todos;
+  const deptos = (Array.isArray(req.body.departamentos) ? req.body.departamentos : [])
+    .map(function (x) { return parseInt(x, 10); }).filter(function (x) { return x > 0; });
+  if (!todos && !deptos.length) return res.status(400).json({ error: 'Elige al menos un departamento.' });
+  const incluirInactivos = !!req.body.incluir_inactivos;
 
-  let lista;
-  if (Array.isArray(destinatarios) && destinatarios.length > 0) {
-    const result = await pool.query(
-      "SELECT nombre, email, telefono FROM conductores WHERE email = ANY($1) AND estado = 'aprobado'",
-      [destinatarios]
-    );
-    lista = result.rows;
-  } else {
-    const result = await pool.query("SELECT nombre, email, telefono FROM conductores WHERE estado = 'aprobado' ORDER BY nombre ASC");
-    lista = result.rows;
+  const lista = [];
+  const dc = await departamentoChoferes();
+  if (dc && (todos || deptos.includes(dc.id))) {
+    const ch = await pool.query("SELECT nombre, email, telefono FROM conductores WHERE estado = 'aprobado' ORDER BY nombre ASC");
+    ch.rows.forEach(function (c) { lista.push(c); });
   }
+  const pe = await pool.query(
+    `SELECT p.nombre, p.email, p.telefono FROM equipo_personas p
+     JOIN equipo_departamentos d ON d.id = p.departamento_id
+     WHERE d.es_choferes = FALSE AND ($1 OR p.departamento_id = ANY($2::int[]))
+       AND ($3 OR COALESCE(p.estado, 'activo') = 'activo')
+     ORDER BY p.nombre ASC`,
+    [todos, deptos, incluirInactivos]
+  );
+  pe.rows.forEach(function (p) { lista.push(p); });
 
   if (!lista.length) return res.status(400).json({ error: 'No hay destinatarios.' });
 
   const errores = [];
+  const yaEmail = new Set();
+  const yaTel = new Set();
   for (const chofer of lista) {
-    if (email) {
+    const em = String(chofer.email || '').trim().toLowerCase();
+    if (email && em && !yaEmail.has(em)) {
+      yaEmail.add(em);
       try {
         await enviarEmail({
           to: chofer.email,
@@ -14198,7 +14216,9 @@ app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res)
         });
       } catch(e) { errores.push(chofer.email); }
     }
-    if (whatsapp && chofer.telefono) {
+    const tel = String(chofer.telefono || '').replace(/[^0-9]/g, '');
+    if (whatsapp && tel && !yaTel.has(tel)) {
+      yaTel.add(tel);
       try {
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
