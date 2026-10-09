@@ -14074,6 +14074,56 @@ app.delete('/admin/equipo/departamentos/:id', requireAdmin, asyncHandler(async (
   res.json({ ok: true });
 }));
 
+// (09/10/2026) Personas del equipo que no son choferes (Admin → Equipo → ➕ Añadir persona): añadir, editar y borrar.
+// Los choferes de Conductores no se tocan aquí. Estados: activo, ausente, baja.
+const ESTADOS_EQUIPO = ['activo', 'ausente', 'baja'];
+async function validarPersonaEquipo(b) {
+  const datos = {
+    departamento_id: parseInt(b && b.departamento_id, 10),
+    nombre: String((b && b.nombre) || '').trim().slice(0, 120),
+    email: String((b && b.email) || '').trim().toLowerCase().slice(0, 160),
+    telefono: String((b && b.telefono) || '').trim().slice(0, 40),
+    estado: ESTADOS_EQUIPO.includes(b && b.estado) ? b.estado : 'activo'
+  };
+  if (!datos.nombre) return { error: 'Escribe el nombre y apellidos.' };
+  if (!datos.email && !datos.telefono) return { error: 'Pon al menos el email o el teléfono.' };
+  if (datos.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(datos.email)) return { error: 'El email no es válido.' };
+  if (!datos.departamento_id) return { error: 'Elige un departamento.' };
+  const d = await pool.query('SELECT es_choferes FROM equipo_departamentos WHERE id = $1', [datos.departamento_id]);
+  if (!d.rows.length) return { error: 'El departamento no existe.' };
+  if (d.rows[0].es_choferes) return { error: 'Los choferes se dan de alta en Conductores.' };
+  return { datos: datos };
+}
+
+app.post('/admin/equipo/personas', requireAdmin, asyncHandler(async (req, res) => {
+  const v = await validarPersonaEquipo(req.body);
+  if (v.error) return res.status(400).json({ error: v.error });
+  const x = v.datos;
+  await pool.query(
+    'INSERT INTO equipo_personas (departamento_id, nombre, email, telefono, estado) VALUES ($1, $2, $3, $4, $5)',
+    [x.departamento_id, x.nombre, x.email, x.telefono, x.estado]
+  );
+  res.json({ ok: true });
+}));
+
+app.put('/admin/equipo/personas/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const v = await validarPersonaEquipo(req.body);
+  if (v.error) return res.status(400).json({ error: v.error });
+  const x = v.datos;
+  const r = await pool.query(
+    'UPDATE equipo_personas SET departamento_id = $1, nombre = $2, email = $3, telefono = $4, estado = $5 WHERE id = $6',
+    [x.departamento_id, x.nombre, x.email, x.telefono, x.estado, req.params.id]
+  );
+  if (!r.rowCount) return res.status(404).json({ error: 'Persona no encontrada.' });
+  res.json({ ok: true });
+}));
+
+app.delete('/admin/equipo/personas/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query('DELETE FROM equipo_personas WHERE id = $1', [req.params.id]);
+  if (!r.rowCount) return res.status(404).json({ error: 'Persona no encontrada.' });
+  res.json({ ok: true });
+}));
+
 // ─── Admin: enviar comunicado a clientes ─────────────────────────────────────
 app.post('/admin/comunicado/clientes', requireAdmin, asyncHandler(async (req, res) => {
   const { destinatarios, email, whatsapp, asunto, mensaje } = req.body;
