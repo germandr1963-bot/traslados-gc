@@ -169,7 +169,12 @@
         <label for="r-email">Email *</label>
         <input id="r-email" type="email" autocomplete="email" placeholder="tu@email.com">
         <label for="r-telefono">Teléfono móvil *</label>
-        <input id="r-telefono" type="tel" autocomplete="tel" placeholder="+34 600 000 000">
+        <!-- (13/10/2026) Prefijo del país + número (misma lista que la Reserva) y "Otro" para escribirlo a mano -->
+        <div style="display:flex;gap:6px;">
+          <select id="r-telefono-prefijo" onchange="cambioPrefijoAlta()" style="width:120px;flex-shrink:0;"><option value="+34">🇪🇸 +34</option><option value="+44">🇬🇧 +44</option><option value="+49">🇩🇪 +49</option><option value="+46">🇸🇪 +46</option><option value="+47">🇳🇴 +47</option><option value="+31">🇳🇱 +31</option><option value="+39">🇮🇹 +39</option><option value="+33">🇫🇷 +33</option><option value="+358">🇫🇮 +358</option><option value="+7">🇷🇺 +7</option><option value="+1">🇺🇸 +1</option><option value="+351">🇵🇹 +351</option><option value="+32">🇧🇪 +32</option><option value="+41">🇨🇭 +41</option><option value="+43">🇦🇹 +43</option><option value="+48">🇵🇱 +48</option><option value="otro"><%= t('alta_tel_otro') %></option></select>
+          <input id="r-telefono-prefijo-otro" type="text" maxlength="5" placeholder="+54" style="display:none;width:76px;flex-shrink:0;">
+          <input id="r-telefono" type="tel" autocomplete="tel-national" placeholder="600 000 000" style="flex:1;min-width:0;">
+        </div>
         <label for="r-password">Contraseña (mínimo 6 caracteres) *</label>
         <input id="r-password" type="password" autocomplete="new-password">
         <label for="r-password2">Repetir contraseña *</label>
@@ -428,6 +433,12 @@
       });
     }
 
+    // (13/10/2026) "Otro": el prefijo de un país que no está en la lista se escribe a mano
+    function cambioPrefijoAlta() {
+      var otro = document.getElementById('r-telefono-prefijo').value === 'otro';
+      document.getElementById('r-telefono-prefijo-otro').style.display = otro ? 'block' : 'none';
+    }
+
     function registrarse() {
       var msg = document.getElementById('mensaje-registro');
       msg.style.display = 'none';
@@ -495,6 +506,15 @@
         primerFaltante.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
+
+      // (13/10/2026) Teléfono: número solo con cifras y prefijo del país (de la lista o escrito a mano)
+      if (!/^[0-9 ]+$/.test(telefono)) { marcar(document.getElementById('r-telefono')); mostrarError(msg, <%- JSON.stringify(t('alta_tel_solo_cifras')) %>); return; }
+      var prefijoTel = document.getElementById('r-telefono-prefijo').value;
+      if (prefijoTel === 'otro') {
+        prefijoTel = document.getElementById('r-telefono-prefijo-otro').value.trim();
+        if (!/^\+[0-9]{1,4}$/.test(prefijoTel)) { marcar(document.getElementById('r-telefono-prefijo-otro')); mostrarError(msg, <%- JSON.stringify(t('alta_tel_prefijo_otro')) %>); return; }
+      }
+      telefono = prefijoTel + ' ' + telefono.replace(/\s/g, '');
 
       if (password.length < 6) { marcar(document.getElementById('r-password')); mostrarError(msg, 'La contraseña debe tener al menos 6 caracteres.'); return; }
       if (password !== password2) { marcar(document.getElementById('r-password2')); mostrarError(msg, 'Las contraseñas no coinciden.'); return; }
