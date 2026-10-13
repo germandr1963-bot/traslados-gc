@@ -190,8 +190,11 @@
         <div id="categorias-grid" class="categorias-grid">
           <div style="font-size:13px;color:var(--texto-muted)">Cargando...</div>
         </div>
+        <!-- (13/10/2026) "Otro vehículo": el chofer describe su vehículo (obligatorio) -->
         <div id="aviso-otra" class="aviso-otra">
-          Si tu vehículo no encaja en ninguna de estas categorías, indícalo en las observaciones. Lo estudiaremos y te contactaremos.
+          <label for="r-otro-vehiculo" style="margin-top:0"><%= t('alta_otro_titulo') %></label>
+          <input id="r-otro-vehiculo" type="text" maxlength="300" placeholder="<%= t('alta_otro_ejemplo') %>">
+          <div style="margin-top:6px"><%= t('alta_otro_nota') %></div>
         </div>
 
         <h2>Vehículo</h2>
@@ -370,13 +373,15 @@
       else if (!document.getElementById('formulario-recuperar').classList.contains('oculto')) recuperarPassword();
     });
 
-    fetch('/api/categorias')
+    // (13/10/2026) Todas las categorías activas de Admin → Categorías (no solo las que tienen choferes hoy)
+    var TXT_MALETAS = <%- JSON.stringify(t('alta_cat_maletas')) %>;
+    fetch('/api/categorias-alta')
       .then(function(r) { return r.json(); })
       .then(function(cats) {
         var html = cats.map(function(c) {
           return '<div class="cat-opcion" data-id="' + c.id + '" data-nombre="' + c.nombre + '" onclick="selCat(this)">'
             + '<div class="cn">' + c.nombre + '</div>'
-            + '<div class="cd">' + c.capacidad_pasajeros + ' pas. · ' + c.capacidad_maletas + ' mal.</div></div>';
+            + '<div class="cd">' + c.capacidad_pasajeros + ' pas. · ' + TXT_MALETAS + ' ' + c.capacidad_maletas + '</div></div>';
         }).join('') + '<div class="cat-otra" data-id="otra" onclick="selCat(this)"><div class="cn">Otro vehículo</div></div>';
         document.getElementById('categorias-grid').innerHTML = html;
       })
@@ -522,7 +527,13 @@
       if (!privacidad) { mostrarError(msg, 'Debes aceptar la Política de Privacidad.'); return; }
 
       var obs = document.getElementById('r-observaciones').value.trim();
-      if (categoriaSeleccionada === 'otra') obs = obs ? '[Otro vehículo] ' + obs : '[Otro vehículo]';
+      // (13/10/2026) "Otro vehículo": su descripción es obligatoria y va delante de las observaciones
+      if (categoriaSeleccionada === 'otra') {
+        var otroEl = document.getElementById('r-otro-vehiculo');
+        var otroTxt = otroEl.value.trim();
+        if (!otroTxt) { marcar(otroEl); mostrarError(msg, <%- JSON.stringify(t('alta_otro_falta')) %>); return; }
+        obs = '[Otro vehículo] ' + otroTxt + (obs ? ' — ' + obs : '');
+      }
 
       var btn = document.querySelector('#formulario-registro button.principal');
       btn.disabled = true; btn.textContent = 'Enviando...';
