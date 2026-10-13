@@ -1540,6 +1540,22 @@ async function initSchema() {
     );
   }
 
+  // (13/10/2026) Alta de chofer: teléfono con prefijo del país. DO NOTHING: lo editado en el Admin manda.
+  const TEXTOS_ALTA_CHOFER = [
+    { clave: 'alta_tel_otro', contexto: 'Opción "Otro" de la lista de prefijos del teléfono (país que no está en la lista)', es: '🌐 Otro' },
+    { clave: 'alta_tel_solo_cifras', contexto: 'Aviso si el número del teléfono lleva letras o un +', es: 'Escribe el número sin prefijo, solo cifras: el prefijo del país se elige en el desplegable.' },
+    { clave: 'alta_tel_prefijo_otro', contexto: 'Aviso si el prefijo escrito a mano (opción Otro) no es válido', es: 'Escribe el prefijo del país con + y sus cifras (por ejemplo +54).' },
+    { clave: 'alta_tel_sin_prefijo', contexto: 'Aviso del servidor si el teléfono llega sin prefijo del país', es: 'El teléfono debe llevar el prefijo del país (por ejemplo +34 600 000 000).' },
+  ];
+  for (const tx of TEXTOS_ALTA_CHOFER) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Alta de chofer', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
 
   // Factura en PDF que recibe el cliente, en su idioma. ON CONFLICT DO NOTHING:
   // se crean la primera vez y nunca sobrescriben lo editado en el Admin.
@@ -9064,6 +9080,14 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
 
   if (!nombre || !email || !telefono || !password) {
     return res.status(400).json({ error: 'Los campos nombre, email, teléfono y contraseña son obligatorios.' });
+  }
+  // (13/10/2026) El móvil del chofer siempre con el prefijo del país (+34, +44…)
+  {
+    const _tel = String(telefono).trim();
+    const _cifras = _tel.replace(/[^0-9]/g, '');
+    if (!/^\+[0-9][0-9 ]*$/.test(_tel) || _cifras.length < 8 || _cifras.length > 15) {
+      return res.status(400).json({ error: obtenerTexto('alta_tel_sin_prefijo', 'es') });
+    }
   }
 
   // Verificar que el email no existe ya
