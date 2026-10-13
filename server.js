@@ -14029,10 +14029,11 @@ async function departamentoChoferes() {
 app.get('/admin/equipo', requireAdmin, asyncHandler(async (req, res) => {
   const dc = await departamentoChoferes();
   const choferes = await pool.query(
-    "SELECT nombre, email, telefono FROM conductores WHERE estado = 'aprobado' ORDER BY nombre ASC"
+    "SELECT id, nombre, email, telefono FROM conductores WHERE estado = 'aprobado' ORDER BY nombre ASC"
   );
   const filas = choferes.rows.map(function (c) {
-    return { nombre: c.nombre, email: c.email, telefono: c.telefono, es_chofer: true,
+    // (13/10/2026) chofer_id: número del chofer en Conductores, para elegirlo suelto en "Nuevo comunicado"
+    return { chofer_id: c.id, nombre: c.nombre, email: c.email, telefono: c.telefono, es_chofer: true,
              departamento_id: dc ? dc.id : null, departamento: dc ? dc.nombre : '', estado: 'activo' };
   });
   const personas = await pool.query(
@@ -14203,22 +14204,35 @@ app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res)
   const todos = !!req.body.todos;
   const deptos = (Array.isArray(req.body.departamentos) ? req.body.departamentos : [])
     .map(function (x) { return parseInt(x, 10); }).filter(function (x) { return x > 0; });
-  if (!todos && !deptos.length) return res.status(400).json({ error: 'Elige al menos un departamento.' });
+  // (13/10/2026) Personas sueltas elegidas en la ventana: choferes por su número de Conductores
+  // y el resto por su número de Equipo. Las reglas de envío son las mismas que por departamento.
+  const _numeros = function (v) {
+    return (Array.isArray(v) ? v : []).map(function (x) { return parseInt(x, 10); }).filter(function (x) { return x > 0; });
+  };
+  const choferesSueltos = _numeros(req.body.choferes);
+  const personasSueltas = _numeros(req.body.personas);
+  if (!todos && !deptos.length && !choferesSueltos.length && !personasSueltas.length) {
+    return res.status(400).json({ error: 'Elige al menos un departamento o una persona.' });
+  }
   const incluirInactivos = !!req.body.incluir_inactivos;
 
   const lista = [];
   const dc = await departamentoChoferes();
-  if (dc && (todos || deptos.includes(dc.id))) {
-    const ch = await pool.query("SELECT nombre, email, telefono FROM conductores WHERE estado = 'aprobado' ORDER BY nombre ASC");
+  const choferesEnteros = !!(dc && (todos || deptos.includes(dc.id)));
+  if (choferesEnteros || choferesSueltos.length) {
+    const ch = await pool.query(
+      "SELECT nombre, email, telefono FROM conductores WHERE estado = 'aprobado' AND ($1 OR id = ANY($2::int[])) ORDER BY nombre ASC",
+      [choferesEnteros, choferesSueltos]
+    );
     ch.rows.forEach(function (c) { lista.push(c); });
   }
   const pe = await pool.query(
     `SELECT p.nombre, p.email, p.telefono FROM equipo_personas p
      JOIN equipo_departamentos d ON d.id = p.departamento_id
-     WHERE d.es_choferes = FALSE AND ($1 OR p.departamento_id = ANY($2::int[]))
+     WHERE d.es_choferes = FALSE AND ($1 OR p.departamento_id = ANY($2::int[]) OR p.id = ANY($4::int[]))
        AND ($3 OR COALESCE(p.estado, 'activo') = 'activo')
      ORDER BY p.nombre ASC`,
-    [todos, deptos, incluirInactivos]
+    [todos, deptos, incluirInactivos, personasSueltas]
   );
   pe.rows.forEach(function (p) { lista.push(p); });
 
