@@ -3097,6 +3097,15 @@ function verFichaConductor(id) {
           campoFicha('Plazas', 'plazas', c.plazas, 'number') +
           '<label class="etiqueta" style="margin:0;white-space:nowrap">Isla</label>' +
           '<select class="campo" id="f-isla">' + opcionesIslaFicha(c.isla) + '</select>' +
+          // (13/10/2026) Categoría dentro de la misma rejilla: mide lo mismo que los demás campos
+          '<label class="etiqueta" style="margin:0;white-space:nowrap">Categoría del vehículo</label>' +
+          '<select class="campo" id="f-categoria_id">' +
+            // (13/10/2026) Sin categoría (eligió "Otro vehículo" en el alta): no se asigna ninguna por error
+            '<option value=""' + (c.categoria_id ? '' : ' selected') + '>— Sin categoría (Otro vehículo) —</option>' +
+            catalogoConductorCache.categorias.map(function(cat) {
+              return '<option value="' + cat.id + '"' + (c.categoria_id === cat.id ? ' selected' : '') + '>' + escapar(cat.nombre) + '</option>';
+            }).join('') +
+          '</select>' +
         '</div>' +
         '<div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap">' +
           '<div id="f-vehiculo_marca-nueva-caja" class="' + (marcaInfo.esOtra ? '' : 'oculto') + '" style="flex:1;min-width:200px">' +
@@ -3107,16 +3116,6 @@ function verFichaConductor(id) {
             '<label class="etiqueta">Escribe el nombre del modelo nuevo</label>' +
             '<input class="campo" id="f-vehiculo_modelo-nuevo" type="text" placeholder="Escribir aquí" value="' + escapar(modeloInfo.esOtra ? c.vehiculo_modelo : '') + '">' +
           '</div>' +
-        '</div>' +
-        '<div style="display:grid;grid-template-columns:max-content 1fr;gap:8px 12px;margin-top:10px;align-items:center">' +
-          '<label class="etiqueta" style="margin:0;white-space:nowrap">Categoría del vehículo</label>' +
-          '<select class="campo" id="f-categoria_id">' +
-            // (13/10/2026) Sin categoría (eligió "Otro vehículo" en el alta): no se asigna ninguna por error
-            '<option value=""' + (c.categoria_id ? '' : ' selected') + '>— Sin categoría (Otro vehículo) —</option>' +
-            catalogoConductorCache.categorias.map(function(cat) {
-              return '<option value="' + cat.id + '"' + (c.categoria_id === cat.id ? ' selected' : '') + '>' + escapar(cat.nombre) + '</option>';
-            }).join('') +
-          '</select>' +
         '</div>' +
         '<p style="margin-top:10px;font-size:13px">' +
           '<strong>Foto de carné:</strong> ' + ETIQUETAS_FOTO_CONDUCTOR[c.foto_estado || 'sin_foto'] +
