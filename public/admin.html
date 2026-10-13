@@ -6974,14 +6974,29 @@ function toggleTodosEquipo(cb) {
 // (09/10/2026) Comunicado por departamentos. Las casillas de la tabla no cuentan para este envío
 // (quedan para el envío individual, más adelante).
 function abrirComunicadoEquipo() {
-  cargarDepartamentosEquipo().then(function() {
+  // (13/10/2026) La lista del equipo se vuelve a leer al abrir (trae el número de cada chofer)
+  var leerEquipo = fetch('/admin/equipo').then(function(r) { return r.json(); }).then(function(data) { if (Array.isArray(data)) _equipoData = data; });
+  Promise.all([cargarDepartamentosEquipo(), leerEquipo]).then(function() {
     var cont = document.getElementById('deptos-comunicado-equipo');
+    // (13/10/2026) Cada departamento se despliega (▸) con sus personas; se marca entero o persona a persona
     cont.innerHTML = '<label style="display:block;font-size:13px;margin:3px 0;"><input type="checkbox" id="depto-com-todos" onchange="marcarTodosDeptosComunicado(this)"> <strong>Todos los departamentos</strong></label>' +
       _departamentosEquipo.map(function(x) {
-        var n = x.personas === 1 ? '1 persona' : x.personas + ' personas';
-        return '<label style="display:block;font-size:13px;margin:3px 0;"><input type="checkbox" class="depto-com" value="' + x.id + '" onchange="resumirComunicadoEquipo()"> ' +
-          (x.es_choferes ? '&#129489;&#8205;&#9992;&#65039; ' : '') + escapar(x.nombre) + ' <span style="color:#8a8175;font-size:12px;">· ' + n + '</span></label>';
+        var gente = _equipoData.filter(function(c) { return String(c.departamento_id) === String(x.id); });
+        var vacio = !gente.length;
+        var filas = gente.map(function(c) {
+          var est = (c.estado && c.estado !== 'activo' && ESTADOS_EQUIPO[c.estado]) ? ' <span style="font-size:12px;color:' + ESTADOS_EQUIPO[c.estado][1] + ';">· ' + ESTADOS_EQUIPO[c.estado][0] + '</span>' : '';
+          return '<label style="display:block;font-size:13px;margin:3px 0;"><input type="checkbox" class="persona-com" data-depto="' + x.id + '"' +
+            ' data-tipo="' + (c.es_chofer ? 'chofer' : 'persona') + '" data-id="' + (c.es_chofer ? c.chofer_id : c.id) + '"' +
+            ' onchange="marcarPersonaComunicado(\'' + x.id + '\')"> ' + escapar(c.nombre || '—') + est + '</label>';
+        }).join('');
+        return '<div style="font-size:13px;margin:3px 0;">' +
+          '<span onclick="desplegarDeptoComunicado(\'' + x.id + '\')" id="flecha-depto-com-' + x.id + '" style="display:inline-block;width:16px;cursor:' + (vacio ? 'default' : 'pointer') + ';color:#8a8175;user-select:none;">&#9656;</span>' +
+          '<label><input type="checkbox" class="depto-com" value="' + x.id + '"' + (vacio ? ' disabled' : '') + ' onchange="marcarDeptoComunicado(this)"> ' +
+          (x.es_choferes ? '&#129489;&#8205;&#9992;&#65039; ' : '') + escapar(x.nombre) + ' <span id="cuenta-depto-com-' + x.id + '" style="color:#8a8175;font-size:12px;"></span></label>' +
+          '<div id="personas-depto-com-' + x.id + '" style="display:none;margin-left:36px;border-left:1px solid #e0dbd2;padding-left:10px;">' + filas + '</div>' +
+          '</div>';
       }).join('');
+    _departamentosEquipo.forEach(function(x) { actualizarDeptoComunicado(String(x.id)); });
     document.getElementById('incluir-inactivos-equipo').checked = false;
     resumirComunicadoEquipo();
     switchTabComEquipo('email');
@@ -7068,30 +7083,69 @@ function pintarVistaWaComEquipo() {
 }
 
 function marcarTodosDeptosComunicado(cb) {
-  document.querySelectorAll('.depto-com').forEach(function(c) { c.checked = cb.checked; });
+  document.querySelectorAll('.persona-com').forEach(function(c) { c.checked = cb.checked; });
+  document.querySelectorAll('.depto-com').forEach(function(c) { actualizarDeptoComunicado(c.value); });
   resumirComunicadoEquipo();
+}
+
+// (13/10/2026) Departamentos desplegables: la casilla del departamento marca a todas sus personas;
+// si solo hay algunas marcadas se ve "a medias" y la cuenta dice "X de N personas".
+function personasDeptoComunicado(id) {
+  return Array.from(document.querySelectorAll('.persona-com[data-depto="' + id + '"]'));
+}
+function desplegarDeptoComunicado(id) {
+  var caja = document.getElementById('personas-depto-com-' + id);
+  if (!caja || !personasDeptoComunicado(id).length) return;
+  var abrir = caja.style.display === 'none';
+  caja.style.display = abrir ? 'block' : 'none';
+  document.getElementById('flecha-depto-com-' + id).innerHTML = abrir ? '&#9662;' : '&#9656;';
+}
+function marcarDeptoComunicado(cb) {
+  personasDeptoComunicado(cb.value).forEach(function(c) { c.checked = cb.checked; });
+  actualizarDeptoComunicado(cb.value);
+  resumirComunicadoEquipo();
+}
+function marcarPersonaComunicado(id) {
+  actualizarDeptoComunicado(id);
+  resumirComunicadoEquipo();
+}
+function actualizarDeptoComunicado(id) {
+  var ps = personasDeptoComunicado(id);
+  var n = ps.filter(function(c) { return c.checked; }).length;
+  var cb = document.querySelector('.depto-com[value="' + id + '"]');
+  var cuenta = document.getElementById('cuenta-depto-com-' + id);
+  if (cb) { cb.checked = ps.length > 0 && n === ps.length; cb.indeterminate = n > 0 && n < ps.length; }
+  if (cuenta) cuenta.textContent = ps.length ? '· ' + n + ' de ' + ps.length + (ps.length === 1 ? ' persona' : ' personas') : '· 0 personas';
+}
+function datoPersonaComunicado(cb) {
+  return _equipoData.find(function(c) {
+    return cb.dataset.tipo === 'chofer' ? (c.es_chofer && String(c.chofer_id) === cb.dataset.id)
+                                        : (!c.es_chofer && String(c.id) === cb.dataset.id);
+  });
 }
 
 // Quién recibirá el comunicado, con la misma regla que el servidor
 function destinatariosComunicadoEquipo() {
-  var ids = Array.from(document.querySelectorAll('.depto-com:checked')).map(function(c) { return c.value; });
+  // (13/10/2026) Las personas marcadas (por departamento entero o una a una)
   var inactivos = document.getElementById('incluir-inactivos-equipo').checked;
-  return _equipoData.filter(function(c) {
-    if (ids.indexOf(String(c.departamento_id)) === -1) return false;
+  return marcadosComunicadoEquipo().filter(function(c) {
     return c.es_chofer || inactivos || (c.estado || 'activo') === 'activo';
   });
+}
+function marcadosComunicadoEquipo() {
+  return Array.from(document.querySelectorAll('.persona-com:checked')).map(datoPersonaComunicado).filter(Boolean);
 }
 
 function resumirComunicadoEquipo() {
   // (09/10/2026) Si la ventana ya está abierta, las vistas previas toman el nombre de la nueva selección
   if (document.getElementById('panel-comunicado-equipo').style.display === 'block') { pintarVistaEmailComEquipo(); pintarVistaWaComEquipo(); }
-  var todos = document.querySelectorAll('.depto-com');
-  var marcados = document.querySelectorAll('.depto-com:checked');
+  var todas = document.querySelectorAll('.persona-com');
+  var marcados = document.querySelectorAll('.persona-com:checked');
   var cbTodos = document.getElementById('depto-com-todos');
-  if (cbTodos) cbTodos.checked = todos.length > 0 && marcados.length === todos.length;
+  if (cbTodos) { cbTodos.checked = todas.length > 0 && marcados.length === todas.length; cbTodos.indeterminate = marcados.length > 0 && marcados.length < todas.length; }
   var lista = destinatariosComunicadoEquipo();
   var caja = document.getElementById('resumen-destinatarios-equipo');
-  if (!marcados.length) { caja.innerHTML = '&#128203; Elige al menos un departamento.'; return; }
+  if (!marcados.length) { caja.innerHTML = '&#128203; Elige al menos un departamento o una persona.'; return; }
   var porDepto = {};
   lista.forEach(function(c) { porDepto[c.departamento] = (porDepto[c.departamento] || 0) + 1; });
   var detalle = Object.keys(porDepto).map(function(k) { return porDepto[k] + ' de ' + escapar(k); }).join(' · ');
@@ -7104,6 +7158,14 @@ function resumirComunicadoEquipo() {
   if (usaEmail && sinEmail) avisos.push(sinEmail + (sinEmail === 1 ? ' no tiene email' : ' no tienen email'));
   if (usaWa && sinTel) avisos.push(sinTel + (sinTel === 1 ? ' no tiene teléfono' : ' no tienen teléfono'));
   if (avisos.length) html += '<br><span style="font-size:12px;color:#8a8175;">' + avisos.join(' y ') + ': les llegará solo por el canal que tengan.</span>';
+  // (13/10/2026) Marcados que están Ausentes o De baja y no recibirán
+  if (!document.getElementById('incluir-inactivos-equipo').checked) {
+    var fuera = marcadosComunicadoEquipo().filter(function(c) { return !c.es_chofer && (c.estado || 'activo') !== 'activo'; });
+    fuera.forEach(function(c) {
+      var e = ESTADOS_EQUIPO[c.estado] ? ESTADOS_EQUIPO[c.estado][0] : c.estado;
+      html += '<br><span style="font-size:12px;color:#b07a1c;">' + escapar(c.nombre || '—') + ' está ' + e + ': no le llegará (marca "Incluir también…" si quieres que le llegue).</span>';
+    });
+  }
   caja.innerHTML = html;
 }
 
@@ -7128,17 +7190,24 @@ function enviarComunicadoEquipo() {
   if (email && !mensaje) { switchTabComEquipo('email'); av.style.display='block'; av.style.color='#c0392b'; av.textContent='Escribe el mensaje del email (pestaña Email).'; return; }
   if (email && !asunto) { switchTabComEquipo('email'); av.style.display='block'; av.style.color='#c0392b'; av.textContent='El asunto es obligatorio para email.'; return; }
   if (whatsapp && !mensajeWa) { switchTabComEquipo('wa'); av.style.display='block'; av.style.color='#c0392b'; av.textContent='Escribe el mensaje del WhatsApp (pestaña WhatsApp).'; return; }
+  // (13/10/2026) Departamentos marcados enteros se envían como antes; del resto, solo las personas marcadas
   var deptos = Array.from(document.querySelectorAll('.depto-com:checked')).map(function(c) { return c.value; });
-  if (!deptos.length) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Elige al menos un departamento.'; return; }
+  var choferesSueltos = [], personasSueltas = [];
+  document.querySelectorAll('.persona-com:checked').forEach(function(c) {
+    if (deptos.indexOf(c.dataset.depto) !== -1) return;
+    (c.dataset.tipo === 'chofer' ? choferesSueltos : personasSueltas).push(c.dataset.id);
+  });
+  if (!deptos.length && !choferesSueltos.length && !personasSueltas.length) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Elige al menos un departamento o una persona.'; return; }
   var cuantos = destinatariosComunicadoEquipo().length;
   if (!cuantos) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='No hay nadie a quien enviar con esta selección.'; return; }
   if (!confirm('¿Enviar el comunicado a ' + cuantos + (cuantos === 1 ? ' persona?' : ' personas?'))) return;
-  var todosDeptos = deptos.length === document.querySelectorAll('.depto-com').length;
+  var conGente = Array.from(document.querySelectorAll('.depto-com')).filter(function(c) { return !c.disabled; }).length;
+  var todosDeptos = conGente > 0 && deptos.length === conGente;
   av.style.display='block'; av.style.color='#5b5347'; av.textContent='Enviando…';
   fetch('/admin/comunicado/equipo', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ departamentos: deptos, todos: todosDeptos, incluir_inactivos: document.getElementById('incluir-inactivos-equipo').checked,
+    body: JSON.stringify({ departamentos: deptos, choferes: choferesSueltos, personas: personasSueltas, todos: todosDeptos, incluir_inactivos: document.getElementById('incluir-inactivos-equipo').checked,
                            email: email, whatsapp: whatsapp, asunto: asunto,
                            mensaje_email: email ? mensaje : '', mensaje_whatsapp: whatsapp ? mensajeWa : '' })
   }).then(function(r) { return r.json(); }).then(function(d) {
