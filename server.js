@@ -1453,6 +1453,11 @@ async function initSchema() {
     { clave: 'por_guardar_datos', contexto: 'Botón para guardar los datos personales', es: 'Guardar mis datos' },
     { clave: 'por_nombre_obligatorio', contexto: 'Aviso si se guarda sin nombre', es: 'El nombre es obligatorio.' },
     { clave: 'por_telefono_invalido', contexto: 'Aviso si el teléfono no es válido', es: 'Introduce un teléfono válido.' },
+    // (13/10/2026) Teléfono con prefijo del país en "Mis datos"
+    { clave: 'por_tel_otro', contexto: 'Opción "Otro" de la lista de prefijos del teléfono (país que no está en la lista)', es: '🌐 Otro' },
+    { clave: 'por_tel_solo_cifras', contexto: 'Aviso si el número del teléfono lleva letras o un +', es: 'Escribe el número sin prefijo, solo cifras: el prefijo del país se elige en el desplegable.' },
+    { clave: 'por_tel_prefijo_otro', contexto: 'Aviso si el prefijo escrito a mano (opción Otro) no es válido', es: 'Escribe el prefijo del país con + y sus cifras (por ejemplo +54).' },
+    { clave: 'por_tel_sin_prefijo', contexto: 'Aviso del servidor si el teléfono llega sin prefijo del país', es: 'El teléfono debe llevar el prefijo del país (por ejemplo +34 600 000 000).' },
     { clave: 'por_guardando', contexto: 'Texto mientras se guarda', es: 'Guardando…' },
     { clave: 'por_datos_guardados', contexto: 'Aviso tras guardar los datos', es: '✓ Datos guardados' },
     { clave: 'por_no_guardar', contexto: 'Aviso si no se pudo guardar', es: 'No se pudo guardar.' },
@@ -14963,6 +14968,8 @@ app.post('/api/cliente/mis-datos', asyncHandler(async (req, res) => {
   if (telefono.replace(/[^\d]/g, '').length < 7) return res.status(400).json({ error: 'Introduce un teléfono válido.' });
   // El idioma del portal solo cambia si el cliente cambia concretamente el idioma (26/09/2026)
   const idiomaActual = await idiomaPortalCliente(req);
+  // (13/10/2026) El teléfono siempre con el prefijo del país; el aviso, en el idioma del portal
+  if (!telefonoConPrefijo(telefono)) return res.status(400).json({ error: obtenerTexto('por_tel_sin_prefijo', idiomaActual) });
   const idiomaCambiado = IDIOMAS_PERMITIDOS.includes(idioma) && idioma !== idiomaActual;
   if (idiomaCambiado) {
     await pool.query(
