@@ -172,7 +172,12 @@
           </div>
           <div style="margin-bottom:10px;">
             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;"><%= t('por_telefono') %></label>
-            <input type="tel" id="mis-datos-telefono" style="width:100%;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;">
+            <!-- (13/10/2026) Prefijo del país + número (misma lista que la Reserva) y "Otro" para escribirlo a mano -->
+            <div style="display:flex;gap:6px;">
+              <select id="mis-datos-telefono-prefijo" onchange="cambioPrefijoMisDatos()" style="width:110px;flex-shrink:0;border:1px solid var(--borde);border-radius:8px;padding:9px 6px;font-size:13px;font-family:inherit;background:#fff;"><option value="+34">🇪🇸 +34</option><option value="+44">🇬🇧 +44</option><option value="+49">🇩🇪 +49</option><option value="+46">🇸🇪 +46</option><option value="+47">🇳🇴 +47</option><option value="+31">🇳🇱 +31</option><option value="+39">🇮🇹 +39</option><option value="+33">🇫🇷 +33</option><option value="+358">🇫🇮 +358</option><option value="+7">🇷🇺 +7</option><option value="+1">🇺🇸 +1</option><option value="+351">🇵🇹 +351</option><option value="+32">🇧🇪 +32</option><option value="+41">🇨🇭 +41</option><option value="+43">🇦🇹 +43</option><option value="+48">🇵🇱 +48</option><option value="otro"><%= t('por_tel_otro') %></option></select>
+              <input type="text" id="mis-datos-telefono-prefijo-otro" maxlength="5" placeholder="+54" style="display:none;width:70px;flex-shrink:0;border:1px solid var(--borde);border-radius:8px;padding:9px 8px;font-size:13px;font-family:inherit;">
+              <input type="tel" id="mis-datos-telefono" placeholder="600 000 000" style="flex:1;min-width:0;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;">
+            </div>
           </div>
           <div style="margin-bottom:12px;">
             <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;"><%= t('por_email') %></label>
@@ -625,7 +630,12 @@
         .then(function(d){
           if (d.error) return;
           document.getElementById('mis-datos-nombre').value = d.nombre_cliente || '';
-          document.getElementById('mis-datos-telefono').value = d.telefono_cliente || '';
+          // (13/10/2026) El teléfono guardado se separa en prefijo + número (si no tiene prefijo, sale +34)
+          var telPartes = separarTelefonoMisDatos(d.telefono_cliente || '');
+          document.getElementById('mis-datos-telefono-prefijo').value = telPartes.prefijo;
+          document.getElementById('mis-datos-telefono-prefijo-otro').value = telPartes.otro;
+          document.getElementById('mis-datos-telefono').value = telPartes.numero;
+          cambioPrefijoMisDatos();
           document.getElementById('mis-datos-email').value = d.email_cliente || '';
           var idiomaGuardado = d.idioma || 'es';
           document.getElementById('mis-datos-idioma').value = idiomaGuardado;
@@ -644,6 +654,29 @@
       document.getElementById('mis-datos-flecha').textContent = abierto ? '▼' : '▲';
     }
 
+    // (13/10/2026) Teléfono con prefijo del país: banderas y "Otro" para escribirlo a mano
+    function cambioPrefijoMisDatos() {
+      var otro = document.getElementById('mis-datos-telefono-prefijo').value === 'otro';
+      document.getElementById('mis-datos-telefono-prefijo-otro').style.display = otro ? 'block' : 'none';
+    }
+    function separarTelefonoMisDatos(tel) {
+      tel = String(tel || '').trim();
+      var lista = Array.from(document.getElementById('mis-datos-telefono-prefijo').options).map(function(o) { return o.value; })
+        .filter(function(v) { return v !== 'otro'; }).sort(function(a, b) { return b.length - a.length; });
+      var conEspacio = tel.match(/^(\+[0-9]{1,4}) +([0-9 ]+)$/);
+      if (conEspacio) {
+        if (lista.indexOf(conEspacio[1]) !== -1) return { prefijo: conEspacio[1], otro: '', numero: conEspacio[2] };
+        return { prefijo: 'otro', otro: conEspacio[1], numero: conEspacio[2] };
+      }
+      if (tel.charAt(0) === '+') {
+        var limpio = '+' + tel.replace(/[^0-9]/g, '');
+        for (var i = 0; i < lista.length; i++) {
+          if (limpio.indexOf(lista[i]) === 0) return { prefijo: lista[i], otro: '', numero: limpio.slice(lista[i].length) };
+        }
+      }
+      return { prefijo: '+34', otro: '', numero: tel };
+    }
+
     function guardarMisDatos() {
       var msg = document.getElementById('mis-datos-msg');
       var nombre = document.getElementById('mis-datos-nombre').value.trim();
@@ -652,6 +685,21 @@
         msg.textContent = tx('por_nombre_obligatorio');
         msg.style.color = 'var(--peligro)';
         return;
+      }
+      // (13/10/2026) Número solo con cifras y prefijo del país (de la lista o escrito a mano)
+      if (telefono && !/^[0-9 ]+$/.test(telefono)) {
+        msg.textContent = tx('por_tel_solo_cifras');
+        msg.style.color = 'var(--peligro)';
+        return;
+      }
+      var prefijoTel = document.getElementById('mis-datos-telefono-prefijo').value;
+      if (prefijoTel === 'otro') {
+        prefijoTel = document.getElementById('mis-datos-telefono-prefijo-otro').value.trim();
+        if (!/^\+[0-9]{1,4}$/.test(prefijoTel)) {
+          msg.textContent = tx('por_tel_prefijo_otro');
+          msg.style.color = 'var(--peligro)';
+          return;
+        }
       }
       if (telefono.replace(/[^\d]/g, '').length < 7) {
         msg.textContent = tx('por_telefono_invalido');
@@ -663,7 +711,7 @@
       fetch('/api/cliente/mis-datos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre: nombre, telefono: telefono, idioma: document.getElementById('mis-datos-idioma').value || 'es' })
+        body: JSON.stringify({ nombre: nombre, telefono: prefijoTel + ' ' + telefono.replace(/\s/g, ''), idioma: document.getElementById('mis-datos-idioma').value || 'es' })
       })
       .then(function(r){ return r.json(); })
       .then(function(d){
