@@ -14106,6 +14106,13 @@ async function validarPersonaEquipo(b) {
   if (!datos.nombre) return { error: 'Escribe el nombre y apellidos.' };
   if (!datos.email && !datos.telefono) return { error: 'Pon al menos el email o el teléfono.' };
   if (datos.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(datos.email)) return { error: 'El email no es válido.' };
+  // (13/10/2026) El teléfono siempre con el prefijo del país (+34, +44…), como en la Reserva
+  if (datos.telefono) {
+    const cifras = datos.telefono.replace(/[^0-9]/g, '');
+    if (!/^\+[0-9][0-9 ]*$/.test(datos.telefono) || cifras.length < 8 || cifras.length > 15) {
+      return { error: 'El teléfono debe llevar el prefijo del país (por ejemplo +34 600 000 000).' };
+    }
+  }
   if (!datos.departamento_id) return { error: 'Elige un departamento.' };
   const d = await pool.query('SELECT es_choferes FROM equipo_departamentos WHERE id = $1', [datos.departamento_id]);
   if (!d.rows.length) return { error: 'El departamento no existe.' };
