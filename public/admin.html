@@ -1403,7 +1403,11 @@ table.tabla-precios input {
           </div>
           <div style="flex:1;min-width:200px;">
             <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Teléfono</label>
-            <input type="text" id="persona-telefono-equipo" class="campo" maxlength="40" placeholder="+34 600 000 000">
+            <!-- (13/10/2026) Prefijo del país + número, con la misma lista que la Reserva -->
+            <div style="display:flex;gap:6px;">
+              <select id="persona-prefijo-equipo" class="campo" style="width:110px;flex-shrink:0;"><option value="+34">&#127466;&#127480; +34</option><option value="+44">&#127468;&#127463; +44</option><option value="+49">&#127465;&#127466; +49</option><option value="+46">&#127480;&#127466; +46</option><option value="+47">&#127475;&#127476; +47</option><option value="+31">&#127475;&#127473; +31</option><option value="+39">&#127470;&#127481; +39</option><option value="+33">&#127467;&#127479; +33</option><option value="+358">&#127467;&#127470; +358</option><option value="+7">&#127479;&#127482; +7</option><option value="+1">&#127482;&#127480; +1</option><option value="+351">&#127477;&#127481; +351</option><option value="+32">&#127463;&#127466; +32</option><option value="+41">&#127464;&#127469; +41</option><option value="+43">&#127462;&#127481; +43</option><option value="+48">&#127477;&#127473; +48</option></select>
+              <input type="tel" id="persona-telefono-equipo" class="campo" maxlength="30" placeholder="600 000 000" style="flex:1;min-width:0;">
+            </div>
           </div>
         </div>
         <div style="margin-bottom:14px;">
@@ -6915,7 +6919,10 @@ function abrirPersonaEquipo(id) {
     document.getElementById('titulo-persona-equipo').innerHTML = p ? '&#9998; Editar persona' : '&#10133; Añadir persona';
     document.getElementById('persona-nombre-equipo').value = p ? p.nombre : '';
     document.getElementById('persona-email-equipo').value = p ? p.email : '';
-    document.getElementById('persona-telefono-equipo').value = p ? p.telefono : '';
+    // (13/10/2026) El teléfono guardado se separa en prefijo + número (si no tiene prefijo, sale +34)
+    var partesTel = separarPrefijoEquipo(p ? p.telefono : '');
+    document.getElementById('persona-prefijo-equipo').value = partesTel.prefijo;
+    document.getElementById('persona-telefono-equipo').value = partesTel.numero;
     document.getElementById('persona-estado-equipo').value = p ? (p.estado || 'activo') : 'activo';
     if (p && p.departamento_id) sel.value = String(p.departamento_id);
     avisoPersonaEquipo('');
@@ -6928,12 +6935,31 @@ function cerrarPersonaEquipo() {
   document.getElementById('panel-persona-equipo').style.display = 'none';
   _personaEquipoId = null;
 }
+function separarPrefijoEquipo(tel) {
+  tel = String(tel || '').trim();
+  var prefijos = Array.from(document.getElementById('persona-prefijo-equipo').options).map(function(o) { return o.value; })
+    .sort(function(a, b) { return b.length - a.length; });
+  if (tel.charAt(0) === '+') {
+    var limpio = '+' + tel.replace(/[^0-9]/g, '');
+    for (var i = 0; i < prefijos.length; i++) {
+      if (limpio.indexOf(prefijos[i]) === 0) return { prefijo: prefijos[i], numero: limpio.slice(prefijos[i].length) };
+    }
+  }
+  return { prefijo: '+34', numero: tel };
+}
+function telefonoPersonaEquipo() {
+  var num = document.getElementById('persona-telefono-equipo').value.trim();
+  if (!num) return '';
+  return document.getElementById('persona-prefijo-equipo').value + ' ' + num.replace(/\s/g, '');
+}
 function guardarPersonaEquipo() {
+  var numTel = document.getElementById('persona-telefono-equipo').value.trim();
+  if (numTel && !/^[0-9 ]+$/.test(numTel)) { avisoPersonaEquipo('Escribe el número sin prefijo, solo cifras: el prefijo del país se elige en el desplegable.', false); return; }
   var datos = {
     departamento_id: document.getElementById('persona-depto-equipo').value,
     nombre: document.getElementById('persona-nombre-equipo').value.trim(),
     email: document.getElementById('persona-email-equipo').value.trim(),
-    telefono: document.getElementById('persona-telefono-equipo').value.trim(),
+    telefono: telefonoPersonaEquipo(),
     estado: document.getElementById('persona-estado-equipo').value
   };
   if (!datos.departamento_id) { avisoPersonaEquipo('Elige un departamento.', false); return; }
