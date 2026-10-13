@@ -582,7 +582,7 @@ footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13
       <div class="campo-grupo">
         <label><%= t('reserva_label_telefono') %></label>
         <div style="display:flex;gap:8px;align-items:center;">
-          <select id="telefono-prefijo" style="width:120px;flex-shrink:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 8px;font-family:inherit;font-size:14px;">
+          <select id="telefono-prefijo" onchange="cambioPrefijoReserva('telefono-prefijo')" style="width:120px;flex-shrink:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 8px;font-family:inherit;font-size:14px;">
             <option value="+34">🇪🇸 +34</option>
             <option value="+44">🇬🇧 +44</option>
             <option value="+49">🇩🇪 +49</option>
@@ -599,10 +599,13 @@ footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13
             <option value="+41">🇨🇭 +41</option>
             <option value="+43">🇦🇹 +43</option>
             <option value="+48">🇵🇱 +48</option>
+            <option value="otro"><%= t('reserva_tel_otro') %></option>
           </select>
+          <input type="text" id="telefono-prefijo-otro" maxlength="5" placeholder="+54" style="display:none;width:70px;flex-shrink:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 8px;font-family:inherit;font-size:14px;">
           <input type="tel" id="telefono-numero" placeholder="600 000 000" style="flex:1;min-width:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 12px;font-family:inherit;font-size:14px;">
         </div>
         <div class="aviso-campo" id="err-telefono"><%= t('reserva_err_telefono') %></div>
+        <div class="aviso-campo" id="err-telefono-prefijo"><%= t('reserva_err_prefijo_otro') %></div>
       </div>
 
       <div class="campo-grupo">
@@ -649,7 +652,7 @@ footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13
         <div class="campo-grupo">
           <label><%= t('reserva_label_otra_telefono') %></label>
           <div style="display:flex;gap:8px;align-items:center;">
-            <select id="otra-persona-prefijo" style="width:120px;flex-shrink:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 8px;font-family:inherit;font-size:14px;">
+            <select id="otra-persona-prefijo" onchange="cambioPrefijoReserva('otra-persona-prefijo')" style="width:120px;flex-shrink:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 8px;font-family:inherit;font-size:14px;">
               <option value="+34">🇪🇸 +34</option>
               <option value="+44">🇬🇧 +44</option>
               <option value="+49">🇩🇪 +49</option>
@@ -666,10 +669,13 @@ footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13
               <option value="+41">🇨🇭 +41</option>
               <option value="+43">🇦🇹 +43</option>
               <option value="+48">🇵🇱 +48</option>
+              <option value="otro"><%= t('reserva_tel_otro') %></option>
             </select>
+            <input type="text" id="otra-persona-prefijo-otro" maxlength="5" placeholder="+54" style="display:none;width:70px;flex-shrink:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 8px;font-family:inherit;font-size:14px;">
             <input type="tel" id="otra-persona-telefono" placeholder="600 000 000" style="flex:1;min-width:0;border:1px solid var(--piedra-borde);border-radius:6px;background:#fff;color:var(--texto-oscuro);padding:10px 12px;font-family:inherit;font-size:14px;">
           </div>
           <div class="aviso-campo" id="err-otra-persona-telefono"><%= t('reserva_err_otra_telefono') %></div>
+          <div class="aviso-campo" id="err-otra-persona-prefijo"><%= t('reserva_err_prefijo_otro') %></div>
         </div>
         <div class="campo-grupo">
           <label><%= t('reserva_label_otra_email') %></label>
@@ -1030,6 +1036,7 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
         var prefijoSel = document.getElementById('telefono-prefijo');
         var existe = Array.from(prefijoSel.options).some(function(o){ return o.value === partes[0]; });
         if (existe) prefijoSel.value = partes[0];
+        else { prefijoSel.value = 'otro'; document.getElementById('telefono-prefijo-otro').value = partes[0]; cambioPrefijoReserva('telefono-prefijo'); }
         document.getElementById('telefono-numero').value = partes.slice(1).join(' ');
       } else {
         document.getElementById('telefono-numero').value = tel;
@@ -1046,6 +1053,10 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
       pref.disabled = true;
       pref.style.background = 'var(--gris-fondo)';
       pref.style.color = 'var(--texto-muted)';
+      var prefOtro = document.getElementById('telefono-prefijo-otro');
+      prefOtro.readOnly = true;
+      prefOtro.style.background = 'var(--gris-fondo)';
+      prefOtro.style.color = 'var(--texto-muted)';
     });
   });
 })();
@@ -1412,6 +1423,19 @@ function validarPaso1() {
   return ok;
 }
 
+// (13/10/2026) "Otro": el prefijo de un país que no está en la lista se escribe a mano.
+// prefijoReserva devuelve el prefijo elegido o escrito ('+54'), o '' si el escrito a mano no es válido.
+function cambioPrefijoReserva(idSel) {
+  var otro = document.getElementById(idSel).value === 'otro';
+  document.getElementById(idSel + '-otro').style.display = otro ? 'block' : 'none';
+}
+function prefijoReserva(idSel) {
+  var v = document.getElementById(idSel).value;
+  if (v !== 'otro') return v;
+  var escrito = document.getElementById(idSel + '-otro').value.trim();
+  return /^\+[0-9]{1,4}$/.test(escrito) ? escrito : '';
+}
+
 function validarPaso2() {
   var ok = true;
   // Titular (quien reserva)
@@ -1424,6 +1448,9 @@ function validarPaso2() {
   document.getElementById('err-telefono').style.display = telValido ? 'none' : 'block';
   document.getElementById('err-email').style.display = emailValido ? 'none' : 'block';
   if (!nombre || !telValido || !emailValido) ok = false;
+  var prefTitularValido = !!prefijoReserva('telefono-prefijo');
+  document.getElementById('err-telefono-prefijo').style.display = prefTitularValido ? 'none' : 'block';
+  if (!prefTitularValido) ok = false;
   // Quien viaja (si la reserva es para otra persona)
   if (document.getElementById('es-para-otra-persona').checked) {
     var pNombre = document.getElementById('pasajero-nombre').value.trim();
@@ -1437,6 +1464,9 @@ function validarPaso2() {
     document.getElementById('err-otra-persona-telefono').style.display = otraTelValido2 ? 'none' : 'block';
     document.getElementById('err-otra-persona-email').style.display = otraEmailValido2 ? 'none' : 'block';
     if (!pNombre || !pApellidos || !otraTelValido2 || !otraEmailValido2) ok = false;
+    var prefOtraValido = !!prefijoReserva('otra-persona-prefijo');
+    document.getElementById('err-otra-persona-prefijo').style.display = prefOtraValido ? 'none' : 'block';
+    if (!prefOtraValido) ok = false;
   }
   // Pasaporte/DNI: solo en recogidas en aeropuerto o puerto — del cliente o de quien viaja
   if (origenEsAero || origenEsPuerto) {
@@ -1548,6 +1578,9 @@ function toggleOtraPersona(marcado) {
     document.getElementById('otra-persona-pasaporte').value = '';
     document.getElementById('otra-persona-telefono').value = '';
     document.getElementById('otra-persona-prefijo').value = '+34';
+    document.getElementById('otra-persona-prefijo-otro').value = '';
+    cambioPrefijoReserva('otra-persona-prefijo');
+    document.getElementById('err-otra-persona-prefijo').style.display = 'none';
     document.getElementById('otra-persona-email').value = '';
     document.getElementById('err-pasajero-nombre').style.display = 'none';
     document.getElementById('err-pasajero-apellidos').style.display = 'none';
@@ -1566,7 +1599,7 @@ function mostrarResumen() {
 
   var esOtraPersona = document.getElementById('es-para-otra-persona').checked;
   var otraTelNum = document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'');
-  var otraTel = document.getElementById('otra-persona-prefijo').value + ' ' + otraTelNum;
+  var otraTel = prefijoReserva('otra-persona-prefijo') + ' ' + otraTelNum;
   var otraEmail = document.getElementById('otra-persona-email').value.trim();
 
   var fecha = document.getElementById('fecha').value;
@@ -1577,7 +1610,7 @@ function mostrarResumen() {
   var pasajero = esOtraPersona
     ? document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim()
     : nombre;
-  var tel = document.getElementById('telefono-prefijo').value + ' ' + telNum;
+  var tel = prefijoReserva('telefono-prefijo') + ' ' + telNum;
   var dirDestino = (!destinoEsAero && !destinoEsPuerto) ? document.getElementById('direccion-destino').value.trim() : '';
   var dirOrigen = (!origenEsAero && !origenEsPuerto) ? document.getElementById('direccion-origen').value.trim() : '';
 
@@ -1610,7 +1643,7 @@ function confirmarEnvio() {
   var btn = document.getElementById('boton-enviar');
   btn.disabled = true; btn.textContent = TXT.enviando;
 
-  var tel = document.getElementById('telefono-prefijo').value + ' ' + document.getElementById('telefono-numero').value.trim().replace(/\s/g,'');
+  var tel = prefijoReserva('telefono-prefijo') + ' ' + document.getElementById('telefono-numero').value.trim().replace(/\s/g,'');
   var dirOrigen = (!origenEsAero && !origenEsPuerto) ? document.getElementById('direccion-origen').value.trim() : '';
   var dirDestino = (!destinoEsAero && !destinoEsPuerto) ? document.getElementById('direccion-destino').value.trim() : '';
   var hora = origenEsAero ? document.getElementById('hora-llegada-vuelo').value
@@ -1648,7 +1681,7 @@ function confirmarEnvio() {
       ? document.getElementById('pasajero-nombre').value.trim() + ' ' + document.getElementById('pasajero-apellidos').value.trim()
       : '',
     telefono_pasajero_otro: document.getElementById('es-para-otra-persona').checked
-      ? document.getElementById('otra-persona-prefijo').value + ' ' + document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'')
+      ? prefijoReserva('otra-persona-prefijo') + ' ' + document.getElementById('otra-persona-telefono').value.trim().replace(/\s/g,'')
       : '',
     email_pasajero_otro: document.getElementById('otra-persona-email').value.trim(),
     extras: extrasSeleccionados.map(function(e){ return { id: e.extra_id, precio: e.precio }; }),
