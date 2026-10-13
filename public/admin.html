@@ -3071,6 +3071,11 @@ function verFichaConductor(id) {
       ficha.innerHTML = '' +
         '<h2 style="margin-top:0">📋 Expediente: ' + escapar(c.nombre) + ' <span style="font-size:0.8rem;color:#5a6c79;font-weight:400">(modifica lo que necesites y pulsa Guardar)</span></h2>' +
         (c.cambios_pendientes ? bloqueCambiosPendientes(c) : '') +
+        // (13/10/2026) Lo que escribió el chofer al darse de alta (destacado si eligió "Otro vehículo")
+        (c.observaciones ? '<div style="margin-top:12px;padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.5;' +
+          (c.categoria_id ? 'background:#f4f1ec;color:#3d372f;' : 'background:#fdf3e1;color:#7a4e0b;border:1px solid #efd29a;') + '">' +
+          '&#128221; <strong>' + (c.categoria_id ? 'Observaciones del alta' : 'Otro vehículo — lo que describió el chofer') + ':</strong> ' +
+          escapar(String(c.observaciones).replace('[Otro vehículo] ', '').replace('[Otro vehículo]', '')) + '</div>' : '') +
         (c.foto ? '<img src="' + c.foto + '" alt="Foto" style="width:100px;height:100px;object-fit:cover;border-radius:50%;float:right;margin-left:12px;border:2px solid var(--gris-borde)">' : '') +
         '<div style="display:grid;grid-template-columns:max-content 1fr max-content 1fr;gap:8px 12px;margin-top:18px;align-items:center">' +
           campoFicha('Nombre completo', 'nombre', c.nombre) +
@@ -3106,6 +3111,8 @@ function verFichaConductor(id) {
         '<div style="display:grid;grid-template-columns:max-content 1fr;gap:8px 12px;margin-top:10px;align-items:center">' +
           '<label class="etiqueta" style="margin:0;white-space:nowrap">Categoría del vehículo</label>' +
           '<select class="campo" id="f-categoria_id">' +
+            // (13/10/2026) Sin categoría (eligió "Otro vehículo" en el alta): no se asigna ninguna por error
+            '<option value=""' + (c.categoria_id ? '' : ' selected') + '>— Sin categoría (Otro vehículo) —</option>' +
             catalogoConductorCache.categorias.map(function(cat) {
               return '<option value="' + cat.id + '"' + (c.categoria_id === cat.id ? ' selected' : '') + '>' + escapar(cat.nombre) + '</option>';
             }).join('') +
