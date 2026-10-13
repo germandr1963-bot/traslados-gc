@@ -680,6 +680,56 @@
       if (esNuevo) document.getElementById('p-vehiculo_modelo-nuevo').value = '';
     }
 
+    // (13/10/2026) Teléfono con prefijo del país: la misma lista que la Reserva, el Alta y el Admin, y "🌐 Otro" a mano
+    var PREFIJOS_TELEFONO = [['&#127466;&#127480;','+34'],['&#127468;&#127463;','+44'],['&#127465;&#127466;','+49'],['&#127480;&#127466;','+46'],
+      ['&#127475;&#127476;','+47'],['&#127475;&#127473;','+31'],['&#127470;&#127481;','+39'],['&#127467;&#127479;','+33'],['&#127467;&#127470;','+358'],
+      ['&#127479;&#127482;','+7'],['&#127482;&#127480;','+1'],['&#127477;&#127481;','+351'],['&#127463;&#127466;','+32'],['&#127464;&#127469;','+41'],
+      ['&#127462;&#127481;','+43'],['&#127477;&#127473;','+48']];
+    function separarTelefonoPrefijo(tel) {
+      tel = String(tel || '').trim();
+      var lista = PREFIJOS_TELEFONO.map(function(p) { return p[1]; }).sort(function(a, b) { return b.length - a.length; });
+      var conEspacio = tel.match(/^(\+[0-9]{1,4}) +([0-9 ]+)$/);
+      if (conEspacio) {
+        if (lista.indexOf(conEspacio[1]) !== -1) return { prefijo: conEspacio[1], otro: '', numero: conEspacio[2] };
+        return { prefijo: 'otro', otro: conEspacio[1], numero: conEspacio[2] };
+      }
+      if (tel.charAt(0) === '+') {
+        var limpio = '+' + tel.replace(/[^0-9]/g, '');
+        for (var i = 0; i < lista.length; i++) {
+          if (limpio.indexOf(lista[i]) === 0) return { prefijo: lista[i], otro: '', numero: limpio.slice(lista[i].length) };
+        }
+      }
+      return { prefijo: '+34', otro: '', numero: tel };
+    }
+    function campoTelefonoPerfil(etiqueta, valor) {
+      var p = separarTelefonoPrefijo(valor);
+      var opciones = PREFIJOS_TELEFONO.map(function(x) {
+        return '<option value="' + x[1] + '"' + (p.prefijo === x[1] ? ' selected' : '') + '>' + x[0] + ' ' + x[1] + '</option>';
+      }).join('') + '<option value="otro"' + (p.prefijo === 'otro' ? ' selected' : '') + '>&#127760; Otro</option>';
+      return '<label class="etiqueta" style="display:block;margin-top:10px">' + etiqueta + '</label>' +
+        '<div style="display:flex;gap:6px;">' +
+        '<select class="campo" id="p-telefono-prefijo" style="width:105px;flex-shrink:0;box-sizing:border-box" onchange="cambioTelefonoPerfil()">' + opciones + '</select>' +
+        '<input class="campo" id="p-telefono-prefijo-otro" type="text" maxlength="5" placeholder="+54" value="' + escapar(p.otro) + '" style="width:70px;flex-shrink:0;box-sizing:border-box;' + (p.prefijo === 'otro' ? '' : 'display:none;') + '">' +
+        '<input class="campo" id="p-telefono" type="tel" placeholder="600 000 000" value="' + escapar(p.numero) + '" style="flex:1;min-width:0;box-sizing:border-box">' +
+        '</div>';
+    }
+    function cambioTelefonoPerfil() {
+      var otro = document.getElementById('p-telefono-prefijo').value === 'otro';
+      document.getElementById('p-telefono-prefijo-otro').style.display = otro ? 'block' : 'none';
+    }
+    // Devuelve { telefono: '+34 600000000' } o { error: '…' }
+    function leerTelefonoPerfil() {
+      var num = document.getElementById('p-telefono').value.trim();
+      if (!num) return { telefono: '' };
+      if (!/^[0-9 ]+$/.test(num)) return { error: 'Escribe el número sin prefijo, solo cifras: el prefijo del país se elige en el desplegable.' };
+      var pref = document.getElementById('p-telefono-prefijo').value;
+      if (pref === 'otro') {
+        pref = document.getElementById('p-telefono-prefijo-otro').value.trim();
+        if (!/^\+[0-9]{1,4}$/.test(pref)) return { error: 'Escribe el prefijo del país con + y sus cifras (por ejemplo +54).' };
+      }
+      return { telefono: pref + ' ' + num.replace(/\s/g, '') };
+    }
+
     function campoPerfil(etiqueta, id, valor) {
       return '<label class="etiqueta" style="display:block;margin-top:10px">' + etiqueta + '</label>' +
         '<input class="campo" id="p-' + id + '" type="text" value="' + escapar(valor == null ? '' : valor) + '" style="width:100%;box-sizing:border-box">';
@@ -727,7 +777,7 @@
         var modeloInfo = opcionesModeloPerfil(marcaInfo.marcaIdActual, conductor.vehiculo_modelo);
         cuerpo.innerHTML =
           '<p style="font-size:13px;color:#5a6c79;margin-top:0">Modifica lo que necesites. Nombre y documento no se pueden cambiar aquí. Al guardar, los cambios quedan pendientes de aprobación por la administración.</p>' +
-          campoPerfil('Teléfono', 'telefono', conductor.telefono) +
+          campoTelefonoPerfil('Teléfono', conductor.telefono) +
           campoPerfil('Email', 'email', conductor.email) +
           campoPerfil('Dirección', 'direccion', conductor.direccion) +
           campoPerfil('Código postal', 'cp', conductor.cp) +
@@ -765,7 +815,7 @@
       aviso.style.display = 'none';
 
       var datos = {
-        telefono: document.getElementById('p-telefono').value.trim(),
+        telefono: '',
         email: document.getElementById('p-email').value.trim(),
         direccion: document.getElementById('p-direccion').value.trim(),
         cp: document.getElementById('p-cp').value.trim(),
@@ -792,6 +842,15 @@
         var modeloEl = document.getElementById('p-vehiculo_modelo');
         datos.vehiculo_modelo = (modeloEl.selectedOptions[0] || {}).text || '';
       }
+
+      // (13/10/2026) Teléfono con prefijo del país
+      var telPerfil = leerTelefonoPerfil();
+      if (telPerfil.error) {
+        aviso.style.display = 'block';
+        aviso.innerHTML = '<span style="color:#c0392b">' + telPerfil.error + '</span>';
+        return;
+      }
+      datos.telefono = telPerfil.telefono;
 
       if (!confirm('¿Enviar estos cambios para que la administración los apruebe?')) return;
 

@@ -6868,7 +6868,7 @@ function renderTablaEquipo(lista) {
       '<td>' + depto + '</td>' +
       '<td>' + escapar(c.nombre || '—') + '</td>' +
       '<td>' + escapar(c.email || '—') + '</td>' +
-      '<td>' + escapar(c.telefono || '—') + '</td>' +
+      '<td style="font-variant-numeric:tabular-nums;">' + escapar(c.telefono || '—') + '</td>' +
       '<td style="font-weight:600;color:' + est[1] + ';">' + est[0] + '</td>' +
       (c.es_chofer
         ? '<td style="font-size:12px;color:#8a8175;white-space:nowrap;">En Conductores</td>'
