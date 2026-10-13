@@ -2930,6 +2930,58 @@ function editarNombreConductor(id, actual) {
   }).then(function () { cargarConductores(); });
 }
 
+// (13/10/2026) Teléfono con prefijo del país: la misma lista que la Reserva y Equipo, y "🌐 Otro" a mano.
+// idNum es el id del campo del número; el desplegable es idNum + '-prefijo' y la casilla de "Otro", idNum + '-prefijo-otro'.
+var PREFIJOS_TELEFONO = [['&#127466;&#127480;','+34'],['&#127468;&#127463;','+44'],['&#127465;&#127466;','+49'],['&#127480;&#127466;','+46'],
+  ['&#127475;&#127476;','+47'],['&#127475;&#127473;','+31'],['&#127470;&#127481;','+39'],['&#127467;&#127479;','+33'],['&#127467;&#127470;','+358'],
+  ['&#127479;&#127482;','+7'],['&#127482;&#127480;','+1'],['&#127477;&#127481;','+351'],['&#127463;&#127466;','+32'],['&#127464;&#127469;','+41'],
+  ['&#127462;&#127481;','+43'],['&#127477;&#127473;','+48']];
+function separarTelefonoPrefijo(tel) {
+  tel = String(tel || '').trim();
+  var lista = PREFIJOS_TELEFONO.map(function(p) { return p[1]; }).sort(function(a, b) { return b.length - a.length; });
+  var conEspacio = tel.match(/^(\+[0-9]{1,4}) +([0-9 ]+)$/);
+  if (conEspacio) {
+    if (lista.indexOf(conEspacio[1]) !== -1) return { prefijo: conEspacio[1], otro: '', numero: conEspacio[2] };
+    return { prefijo: 'otro', otro: conEspacio[1], numero: conEspacio[2] };
+  }
+  if (tel.charAt(0) === '+') {
+    var limpio = '+' + tel.replace(/[^0-9]/g, '');
+    for (var i = 0; i < lista.length; i++) {
+      if (limpio.indexOf(lista[i]) === 0) return { prefijo: lista[i], otro: '', numero: limpio.slice(lista[i].length) };
+    }
+  }
+  return { prefijo: '+34', otro: '', numero: tel };
+}
+function htmlTelefonoPrefijo(idNum, valor, estiloExtra) {
+  var p = separarTelefonoPrefijo(valor);
+  var opciones = PREFIJOS_TELEFONO.map(function(x) {
+    return '<option value="' + x[1] + '"' + (p.prefijo === x[1] ? ' selected' : '') + '>' + x[0] + ' ' + x[1] + '</option>';
+  }).join('') + '<option value="otro"' + (p.prefijo === 'otro' ? ' selected' : '') + '>&#127760; Otro</option>';
+  return '<div style="display:flex;gap:6px;min-width:0;' + (estiloExtra || '') + '">' +
+    '<select class="campo" id="' + idNum + '-prefijo" style="width:105px;flex-shrink:0;" onchange="cambioTelefonoPrefijo(\'' + idNum + '\')">' + opciones + '</select>' +
+    '<input class="campo" id="' + idNum + '-prefijo-otro" type="text" maxlength="5" placeholder="+54" value="' + escapar(p.otro) + '" style="width:70px;flex-shrink:0;' + (p.prefijo === 'otro' ? '' : 'display:none;') + '">' +
+    '<input class="campo" id="' + idNum + '" type="tel" placeholder="600 000 000" value="' + escapar(p.numero) + '" style="flex:1;min-width:0;">' +
+    '</div>';
+}
+function cambioTelefonoPrefijo(idNum) {
+  var otro = document.getElementById(idNum + '-prefijo').value === 'otro';
+  document.getElementById(idNum + '-prefijo-otro').style.display = otro ? 'block' : 'none';
+}
+// Devuelve { telefono: '+34 600000000' } o { error: '…', campo: elemento }
+function leerTelefonoPrefijo(idNum) {
+  var numEl = document.getElementById(idNum);
+  var num = numEl.value.trim();
+  if (!num) return { telefono: '' };
+  if (!/^[0-9 ]+$/.test(num)) return { error: 'Escribe el número sin prefijo, solo cifras: el prefijo del país se elige en el desplegable.', campo: numEl };
+  var pref = document.getElementById(idNum + '-prefijo').value;
+  if (pref === 'otro') {
+    var otroEl = document.getElementById(idNum + '-prefijo-otro');
+    pref = otroEl.value.trim();
+    if (!/^\+[0-9]{1,4}$/.test(pref)) return { error: 'Escribe el prefijo del país con + y sus cifras (por ejemplo +54).', campo: otroEl };
+  }
+  return { telefono: pref + ' ' + num.replace(/\s/g, '') };
+}
+
 function campoFicha(etiqueta, idCampo, valor, tipo) {
   return '<label class="etiqueta" style="margin:0;white-space:nowrap">' + etiqueta + '</label>' +
     '<input class="campo" id="f-' + idCampo + '" type="' + (tipo || 'text') + '" value="' + escapar(valor == null ? '' : String(valor)) + '">';
@@ -3022,7 +3074,7 @@ function verFichaConductor(id) {
         '<div style="display:grid;grid-template-columns:max-content 1fr max-content 1fr;gap:8px 12px;margin-top:18px;align-items:center">' +
           campoFicha('Nombre completo', 'nombre', c.nombre) +
           campoFicha('Documento (DNI/NIE)', 'documento', c.documento) +
-          campoFicha('Teléfono', 'telefono', c.telefono) +
+          '<label class="etiqueta" style="margin:0;white-space:nowrap">Teléfono</label>' + htmlTelefonoPrefijo('f-telefono', c.telefono) +
           campoFicha('Email', 'email', c.email) +
           campoFicha('Dirección', 'direccion', c.direccion) +
           campoFicha('Código postal', 'cp', c.cp) +
@@ -3167,6 +3219,16 @@ function guardarFichaConductor(id) {
     if (primerFaltante) primerFaltante.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
+  // (13/10/2026) Teléfono con prefijo del país
+  var telFicha = leerTelefonoPrefijo('f-telefono');
+  if (telFicha.error) {
+    telFicha.campo.classList.add('campo-obligatorio-vacio');
+    avFicha.style.display = 'block';
+    avFicha.innerHTML = '<div class="aviso-error">' + telFicha.error + '</div>';
+    telFicha.campo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  datos.telefono = telFicha.telefono;
 
   if (!confirm('¿Seguro que quieres guardar estos cambios en la ficha de ' + datos.nombre + '?')) return;
 
@@ -3213,7 +3275,7 @@ function formularioConductor() {
   return '' +
     '<label class="etiqueta">Nombre completo</label><input class="campo" id="ac-nombre" type="text" style="margin-bottom:10px">' +
     '<label class="etiqueta">Email (será su usuario)</label><input class="campo" id="ac-email" type="email" style="margin-bottom:10px">' +
-    '<label class="etiqueta">Teléfono</label><input class="campo" id="ac-telefono" type="tel" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Teléfono</label>' + htmlTelefonoPrefijo('ac-telefono', '', 'margin-bottom:10px;') +
     '<label class="etiqueta">Contraseña provisional (mínimo 6 caracteres)</label><input class="campo" id="ac-password" type="text" style="margin-bottom:10px">' +
     '<label class="etiqueta">Documento de identidad (DNI/NIE)</label><input class="campo" id="ac-documento" type="text" style="margin-bottom:10px">' +
     '<label class="etiqueta">Dirección</label><input class="campo" id="ac-direccion" type="text" style="margin-bottom:10px">' +
@@ -3324,7 +3386,7 @@ function guardarConductor() {
   var datos = {
     nombre: document.getElementById('ac-nombre').value,
     email: document.getElementById('ac-email').value,
-    telefono: document.getElementById('ac-telefono').value,
+    telefono: '',
     password: document.getElementById('ac-password').value,
     documento: document.getElementById('ac-documento').value,
     direccion: document.getElementById('ac-direccion').value,
@@ -3345,6 +3407,10 @@ function guardarConductor() {
     foto: fotoConductorNueva
   };
   var msg = document.getElementById('ac-mensaje');
+  // (13/10/2026) Teléfono con prefijo del país
+  var telAlta = leerTelefonoPrefijo('ac-telefono');
+  if (telAlta.error) { msg.innerHTML = '<div class="aviso-error">' + telAlta.error + '</div>'; return; }
+  datos.telefono = telAlta.telefono;
   fetch('/admin/conductores', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
