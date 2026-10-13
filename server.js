@@ -1088,6 +1088,9 @@ async function initSchema() {
     { clave: 'reserva_err_obligatorio',     contexto: 'Error genérico de campo obligatorio', es: 'Campo obligatorio', en: 'Required field' },
     { clave: 'reserva_label_telefono',      contexto: 'Etiqueta del campo teléfono con código de país', es: 'Teléfono (con código de país) *', en: 'Phone (with country code) *' },
     { clave: 'reserva_err_telefono',        contexto: 'Error de teléfono no válido', es: 'Introduce un número válido (mínimo 7 dígitos)', en: 'Enter a valid number (minimum 7 digits)' },
+    // (13/10/2026) Opción "Otro" de la lista de prefijos: el prefijo de un país que no está en la lista se escribe a mano
+    { clave: 'reserva_tel_otro',            contexto: 'Opción "Otro" de la lista de prefijos del teléfono (país que no está en la lista)', es: '🌐 Otro' },
+    { clave: 'reserva_err_prefijo_otro',    contexto: 'Error si el prefijo escrito a mano (opción Otro) no es válido', es: 'Escribe el prefijo del país con + y sus cifras (por ejemplo +54).' },
     { clave: 'reserva_label_email',         contexto: 'Etiqueta del campo email de contacto', es: 'Email *', en: 'Email *' },
     { clave: 'reserva_ph_email',            contexto: 'Placeholder del campo email de contacto', es: 'tu@email.com', en: 'you@email.com' },
     { clave: 'reserva_err_email',           contexto: 'Error de email no válido', es: 'Introduce un email válido', en: 'Enter a valid email address' },
