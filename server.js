@@ -4728,11 +4728,20 @@ app.get('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   res.json(result.rows);
 }));
 
+// (13/10/2026) Móvil siempre con el prefijo del país (+34, +44…): + y de 8 a 15 cifras en total
+function telefonoConPrefijo(tel) {
+  const t = String(tel || '').trim();
+  const cifras = t.replace(/[^0-9]/g, '');
+  return /^\+[0-9][0-9 ]*$/.test(t) && cifras.length >= 8 && cifras.length <= 15;
+}
+const AVISO_TELEFONO_PREFIJO = 'El teléfono debe llevar el prefijo del país (por ejemplo +34 600 000 000).';
+
 app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   const d = req.body;
   if (!d.nombre || !d.email || !d.telefono || !d.password || d.password.length < 6) {
     return res.status(400).json({ error: 'Nombre, email, teléfono y contraseña (mínimo 6 caracteres) son obligatorios.' });
   }
+  if (!telefonoConPrefijo(d.telefono)) return res.status(400).json({ error: AVISO_TELEFONO_PREFIJO });
   if (!d.documento || !d.direccion || !d.cp || !d.municipio) {
     return res.status(400).json({ error: 'Faltan datos personales: documento, dirección, CP y municipio.' });
   }
@@ -4893,6 +4902,7 @@ app.post('/admin/conductores/:id/editar', requireAdmin, asyncHandler(async (req,
       if ((campo === 'nombre' || campo === 'email') && !valor) {
         return res.status(400).json({ error: 'El nombre y el email no pueden quedar vacíos.' });
       }
+      if (campo === 'telefono' && !telefonoConPrefijo(valor)) return res.status(400).json({ error: AVISO_TELEFONO_PREFIJO });
       valores.push(valor);
       cambios.push(`${campo} = $${valores.length}`);
     }
