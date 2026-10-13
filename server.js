@@ -9298,6 +9298,12 @@ app.post('/chofer/mi-perfil', requireChofer, asyncHandler(async (req, res) => {
     if (campo === 'email') nuevo = nuevo.toLowerCase();
     if (campo === 'matricula') nuevo = nuevo.toUpperCase();
     const actualValor = c[campo] == null ? '' : String(c[campo]).trim();
+    // (13/10/2026) Teléfono: si solo cambia la forma de escribirlo (mismas cifras) no es un cambio;
+    // si cambia de verdad, tiene que llevar el prefijo del país
+    if (campo === 'telefono') {
+      if (nuevo.replace(/[^0-9]/g, '') === actualValor.replace(/[^0-9]/g, '')) continue;
+      if (!telefonoConPrefijo(nuevo)) return res.status(400).json({ error: AVISO_TELEFONO_PREFIJO });
+    }
     if (nuevo !== actualValor) {
       propuesta[campo] = { etiqueta: etiquetas[campo], anterior: actualValor, nuevo: nuevo };
     }
