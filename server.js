@@ -1554,6 +1554,12 @@ async function initSchema() {
     { clave: 'alta_tel_solo_cifras', contexto: 'Aviso si el número del teléfono lleva letras o un +', es: 'Escribe el número sin prefijo, solo cifras: el prefijo del país se elige en el desplegable.' },
     { clave: 'alta_tel_prefijo_otro', contexto: 'Aviso si el prefijo escrito a mano (opción Otro) no es válido', es: 'Escribe el prefijo del país con + y sus cifras (por ejemplo +54).' },
     { clave: 'alta_tel_sin_prefijo', contexto: 'Aviso del servidor si el teléfono llega sin prefijo del país', es: 'El teléfono debe llevar el prefijo del país (por ejemplo +34 600 000 000).' },
+    // (13/10/2026) Categoría del vehículo: maletas y "Otro vehículo" con su descripción
+    { clave: 'alta_cat_maletas', contexto: 'Palabra delante de las maletas de cada categoría (ej.: maletas: 3 grandes)', es: 'maletas:' },
+    { clave: 'alta_otro_titulo', contexto: 'Etiqueta del campo para describir el vehículo cuando se elige "Otro vehículo"', es: 'Describe tu vehículo *' },
+    { clave: 'alta_otro_ejemplo', contexto: 'Ejemplo dentro del campo para describir el vehículo', es: 'Ej.: autobús de 30 plazas con bodega para equipaje' },
+    { clave: 'alta_otro_nota', contexto: 'Nota bajo el campo para describir el vehículo', es: 'Lo revisaremos y te contactaremos para darte de alta.' },
+    { clave: 'alta_otro_falta', contexto: 'Aviso si se elige "Otro vehículo" y no se describe', es: 'Describe tu vehículo: tipo, plazas, maletero…' },
   ];
   for (const tx of TEXTOS_ALTA_CHOFER) {
     await pool.query(
@@ -3968,6 +3974,15 @@ app.get('/api/precio', asyncHandler(async (req, res) => {
   res.json({ precio: Number(result.rows[0].precio), a_consultar: false });
 }));
 
+// (13/10/2026) Alta de chofer: todas las categorías activas de Admin → Categorías
+// (la de /api/categorias es la del buscador: solo las que tienen choferes disponibles hoy)
+app.get('/api/categorias-alta', asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, nombre, capacidad_pasajeros, capacidad_maletas FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre'
+  );
+  res.json(result.rows);
+}));
+
 app.get('/api/categorias-publicas', asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, nombre, capacidad_pasajeros FROM categorias_vehiculos WHERE activa = TRUE ORDER BY id'
@@ -4884,7 +4899,7 @@ app.get('/admin/conductores/:id/ficha', requireAdmin, asyncHandler(async (req, r
             c.municipio_licencia, c.numero_licencia, c.central_flota,
             c.vehiculo_marca, c.vehiculo_modelo, c.matricula, c.numero_taxi, c.plazas, c.isla,
             c.tipo, c.estado, c.foto, c.foto_estado, c.foto_motivo, c.creado_en, c.permitir_edicion_ficha,
-            c.cambios_pendientes,
+            c.cambios_pendientes, c.observaciones,
             cat.nombre AS categoria, c.categoria_id
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
@@ -9098,6 +9113,10 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
 
   if (!nombre || !email || !telefono || !password) {
     return res.status(400).json({ error: 'Los campos nombre, email, teléfono y contraseña son obligatorios.' });
+  }
+  // (13/10/2026) "Otro vehículo": la descripción del vehículo es obligatoria
+  if (!categoria_id && !String(observaciones || '').replace('[Otro vehículo]', '').trim()) {
+    return res.status(400).json({ error: obtenerTexto('alta_otro_falta', 'es') });
   }
   // (13/10/2026) El móvil del chofer siempre con el prefijo del país (+34, +44…)
   {
