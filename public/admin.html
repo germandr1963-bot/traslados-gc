@@ -1456,16 +1456,17 @@ table.tabla-precios input {
           <label style="font-size:13px;margin-right:16px;"><input type="checkbox" id="canal-email-equipo" checked onchange="resumirComunicadoEquipo()"> Email</label>
           <label style="font-size:13px;"><input type="checkbox" id="canal-whatsapp-equipo" onchange="resumirComunicadoEquipo()"> WhatsApp</label>
         </div>
+        <!-- (13/10/2026) Asunto común: es el asunto del email y el título del WhatsApp -->
+        <div style="margin-bottom:12px;">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Asunto <span style="font-weight:400;font-size:12px;color:#8a8175;">(vale para el email y el WhatsApp)</span></label>
+          <input type="text" id="asunto-comunicado-equipo" class="campo" placeholder="Asunto del comunicado…">
+        </div>
         <!-- (09/10/2026) Un texto para el email y otro para el WhatsApp, en pestañas como en Comunicaciones -->
         <div style="display:flex;gap:0;margin-bottom:0;border-bottom:2px solid var(--borde);">
           <button type="button" id="tab-email-com-equipo" onclick="switchTabComEquipo('email')" style="padding:8px 20px;border:none;background:var(--fondo-tarjeta);border-bottom:3px solid var(--acento);cursor:pointer;font-weight:600;color:var(--texto);">&#128231; Email</button>
           <button type="button" id="tab-wa-com-equipo" onclick="switchTabComEquipo('wa')" style="padding:8px 20px;border:none;background:none;border-bottom:3px solid transparent;cursor:pointer;color:var(--texto-muted);">&#128241; WhatsApp</button>
         </div>
         <div id="panel-email-com-equipo" style="padding-top:12px;margin-bottom:16px;">
-          <div style="margin-bottom:10px;">
-            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Asunto</label>
-            <input type="text" id="asunto-comunicado-equipo" class="campo" placeholder="Asunto del email…">
-          </div>
           <div style="margin-bottom:4px;">
             <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Mensaje</label>
             <textarea id="mensaje-comunicado-equipo" class="campo" rows="5" placeholder="Escribe el mensaje…" style="resize:vertical;"></textarea>
@@ -7150,6 +7151,7 @@ function prepararVistasComEquipo() {
     var esperar = function() { clearTimeout(ta._vistaEspera); ta._vistaEspera = setTimeout(pintarVistaEmailComEquipo, 500); };
     ta.addEventListener('input', esperar);
     asu.addEventListener('input', esperar);
+    asu.addEventListener('input', pintarVistaWaComEquipo); // (13/10/2026) el asunto también va en el WhatsApp
     taWa.addEventListener('input', pintarVistaWaComEquipo);
   }
   fetch('/admin/plantillas-comunicacion')
@@ -7190,7 +7192,7 @@ function pintarVistaWaComEquipo() {
   var p = _plantillaComEquipo;
   var texto = (p && p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim())
     ? rellenarComEquipo(p.cuerpo_whatsapp, mensaje)
-    : mensaje;
+    : ((document.getElementById('asunto-comunicado-equipo').value.trim() ? '*' + document.getElementById('asunto-comunicado-equipo').value.trim() + '*\n\n' : '') + mensaje);
   pintarWhatsappReal('vista-wa-com-equipo', texto);
 }
 
@@ -7298,9 +7300,10 @@ function enviarComunicadoEquipo() {
   var mensajeWa = document.getElementById('mensaje-wa-comunicado-equipo').value.trim();
   var av = document.getElementById('aviso-envio-equipo');
   if (!email && !whatsapp) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Selecciona al menos un canal.'; return; }
+  // (13/10/2026) El asunto vale para los dos canales: es obligatorio siempre
+  if (!asunto) { av.style.display='block'; av.style.color='#c0392b'; av.textContent='Escribe el asunto.'; document.getElementById('asunto-comunicado-equipo').focus(); return; }
   // (09/10/2026) Cada canal marcado necesita su texto (pestañas Email y WhatsApp)
   if (email && !mensaje) { switchTabComEquipo('email'); av.style.display='block'; av.style.color='#c0392b'; av.textContent='Escribe el mensaje del email (pestaña Email).'; return; }
-  if (email && !asunto) { switchTabComEquipo('email'); av.style.display='block'; av.style.color='#c0392b'; av.textContent='El asunto es obligatorio para email.'; return; }
   if (whatsapp && !mensajeWa) { switchTabComEquipo('wa'); av.style.display='block'; av.style.color='#c0392b'; av.textContent='Escribe el mensaje del WhatsApp (pestaña WhatsApp).'; return; }
   // (13/10/2026) Departamentos marcados enteros se envían como antes; del resto, solo las personas marcadas
   var deptos = Array.from(document.querySelectorAll('.depto-com:checked')).map(function(c) { return c.value; });
