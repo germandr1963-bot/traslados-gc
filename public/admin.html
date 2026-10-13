@@ -1405,7 +1405,8 @@ table.tabla-precios input {
             <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Teléfono</label>
             <!-- (13/10/2026) Prefijo del país + número, con la misma lista que la Reserva -->
             <div style="display:flex;gap:6px;">
-              <select id="persona-prefijo-equipo" class="campo" style="width:110px;flex-shrink:0;"><option value="+34">&#127466;&#127480; +34</option><option value="+44">&#127468;&#127463; +44</option><option value="+49">&#127465;&#127466; +49</option><option value="+46">&#127480;&#127466; +46</option><option value="+47">&#127475;&#127476; +47</option><option value="+31">&#127475;&#127473; +31</option><option value="+39">&#127470;&#127481; +39</option><option value="+33">&#127467;&#127479; +33</option><option value="+358">&#127467;&#127470; +358</option><option value="+7">&#127479;&#127482; +7</option><option value="+1">&#127482;&#127480; +1</option><option value="+351">&#127477;&#127481; +351</option><option value="+32">&#127463;&#127466; +32</option><option value="+41">&#127464;&#127469; +41</option><option value="+43">&#127462;&#127481; +43</option><option value="+48">&#127477;&#127473; +48</option></select>
+              <select id="persona-prefijo-equipo" class="campo" style="width:110px;flex-shrink:0;" onchange="cambioPrefijoEquipo()"><option value="+34">&#127466;&#127480; +34</option><option value="+44">&#127468;&#127463; +44</option><option value="+49">&#127465;&#127466; +49</option><option value="+46">&#127480;&#127466; +46</option><option value="+47">&#127475;&#127476; +47</option><option value="+31">&#127475;&#127473; +31</option><option value="+39">&#127470;&#127481; +39</option><option value="+33">&#127467;&#127479; +33</option><option value="+358">&#127467;&#127470; +358</option><option value="+7">&#127479;&#127482; +7</option><option value="+1">&#127482;&#127480; +1</option><option value="+351">&#127477;&#127481; +351</option><option value="+32">&#127463;&#127466; +32</option><option value="+41">&#127464;&#127469; +41</option><option value="+43">&#127462;&#127481; +43</option><option value="+48">&#127477;&#127473; +48</option><option value="otro">&#127760; Otro</option></select>
+              <input type="text" id="persona-prefijo-otro-equipo" class="campo" maxlength="5" placeholder="+54" style="display:none;width:70px;flex-shrink:0;">
               <input type="tel" id="persona-telefono-equipo" class="campo" maxlength="30" placeholder="600 000 000" style="flex:1;min-width:0;">
             </div>
           </div>
@@ -6922,7 +6923,9 @@ function abrirPersonaEquipo(id) {
     // (13/10/2026) El teléfono guardado se separa en prefijo + número (si no tiene prefijo, sale +34)
     var partesTel = separarPrefijoEquipo(p ? p.telefono : '');
     document.getElementById('persona-prefijo-equipo').value = partesTel.prefijo;
+    document.getElementById('persona-prefijo-otro-equipo').value = partesTel.otro || '';
     document.getElementById('persona-telefono-equipo').value = partesTel.numero;
+    cambioPrefijoEquipo();
     document.getElementById('persona-estado-equipo').value = p ? (p.estado || 'activo') : 'activo';
     if (p && p.departamento_id) sel.value = String(p.departamento_id);
     avisoPersonaEquipo('');
@@ -6935,10 +6938,21 @@ function cerrarPersonaEquipo() {
   document.getElementById('panel-persona-equipo').style.display = 'none';
   _personaEquipoId = null;
 }
+// (13/10/2026) "🌐 Otro": el prefijo de un país que no está en la lista se escribe a mano
+function cambioPrefijoEquipo() {
+  var otro = document.getElementById('persona-prefijo-equipo').value === 'otro';
+  document.getElementById('persona-prefijo-otro-equipo').style.display = otro ? 'block' : 'none';
+}
 function separarPrefijoEquipo(tel) {
   tel = String(tel || '').trim();
   var prefijos = Array.from(document.getElementById('persona-prefijo-equipo').options).map(function(o) { return o.value; })
+    .filter(function(v) { return v !== 'otro'; })
     .sort(function(a, b) { return b.length - a.length; });
+  var conEspacio = tel.match(/^(\+[0-9]{1,4}) +([0-9 ]+)$/);
+  if (conEspacio) {
+    if (prefijos.indexOf(conEspacio[1]) !== -1) return { prefijo: conEspacio[1], numero: conEspacio[2] };
+    return { prefijo: 'otro', otro: conEspacio[1], numero: conEspacio[2] };
+  }
   if (tel.charAt(0) === '+') {
     var limpio = '+' + tel.replace(/[^0-9]/g, '');
     for (var i = 0; i < prefijos.length; i++) {
@@ -6950,11 +6964,17 @@ function separarPrefijoEquipo(tel) {
 function telefonoPersonaEquipo() {
   var num = document.getElementById('persona-telefono-equipo').value.trim();
   if (!num) return '';
-  return document.getElementById('persona-prefijo-equipo').value + ' ' + num.replace(/\s/g, '');
+  var pref = document.getElementById('persona-prefijo-equipo').value;
+  if (pref === 'otro') pref = document.getElementById('persona-prefijo-otro-equipo').value.trim();
+  return pref + ' ' + num.replace(/\s/g, '');
 }
 function guardarPersonaEquipo() {
   var numTel = document.getElementById('persona-telefono-equipo').value.trim();
   if (numTel && !/^[0-9 ]+$/.test(numTel)) { avisoPersonaEquipo('Escribe el número sin prefijo, solo cifras: el prefijo del país se elige en el desplegable.', false); return; }
+  if (numTel && document.getElementById('persona-prefijo-equipo').value === 'otro' &&
+      !/^\+[0-9]{1,4}$/.test(document.getElementById('persona-prefijo-otro-equipo').value.trim())) {
+    avisoPersonaEquipo('Escribe el prefijo del país con + y sus cifras (por ejemplo +54).', false); return;
+  }
   var datos = {
     departamento_id: document.getElementById('persona-depto-equipo').value,
     nombre: document.getElementById('persona-nombre-equipo').value.trim(),
