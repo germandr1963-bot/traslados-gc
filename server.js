@@ -3040,7 +3040,7 @@ Hola, <strong>{nombre_chofer}</strong> 👋
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n{mensaje_libre}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: '*{asunto_libre}*\n\nHola, *{nombre_chofer}* 👋\n\n{mensaje_libre}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_factura_comision', nombre: 'Factura de comisi\u00f3n (al chofer)', categoria: 'chofer',
       asunto_email: 'Factura de comisi\u00f3n {numero_factura} \u2014 Reserva {numero_reserva}',
       cuerpo_email: `
@@ -14330,7 +14330,7 @@ app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res)
       try {
         await pool.query(
           'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
-          [chofer.telefono, (_pcomWa && _pcomWa.whatsapp) || mensajeWa]
+          [chofer.telefono, (_pcomWa && _pcomWa.whatsapp) || ((asunto ? '*' + asunto + '*\n\n' : '') + mensajeWa)]
         );
       } catch(e) { /* WhatsApp no bloquea el envío general */ }
     }
@@ -17313,7 +17313,7 @@ const VARIABLES_PLANTILLAS = {
   chofer_cancelacion:            { email: null, wa: _VCH },
   chofer_cancelacion_no_pago:    { email: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'], wa: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'] },
   chofer_cartel:                 { email: _VCH, wa: _VCH },
-  chofer_comunicacion_masiva:    { email: ['nombre_chofer', 'asunto_libre', 'mensaje_libre'], wa: ['nombre_chofer', 'mensaje_libre'] },
+  chofer_comunicacion_masiva:    { email: ['nombre_chofer', 'asunto_libre', 'mensaje_libre'], wa: ['nombre_chofer', 'asunto_libre', 'mensaje_libre'] },
   chofer_enlace_cancelada:       { email: null, wa: ['numero_reserva'] },
   chofer_enlace_enviado:         { email: null, wa: ['numero_reserva'] },
   chofer_enlace_fuera_ventana:   { email: null, wa: ['numero_reserva', 'fecha', 'hora'] },
