@@ -15141,10 +15141,12 @@ app.post('/api/cliente/modificar', asyncHandler(async (req, res) => {
     const pnr = req.session.clientePnr;
     if (emails.length) {
       for (const em of emails) {
+        // (14/10/2026) Plantilla "[Admin] Cliente modificó datos de reserva"; si faltara, el texto de antes
+        const _pMod = await obtenerPlantilla('interno_cliente_modifico', { numero_reserva: pnr }, 'es');
         await enviarEmail({
           to: em,
-          subject: '✏️ Cliente modificó datos — ' + pnr,
-          html: plantillaEmail(`<p>El cliente de la reserva <strong>${pnr}</strong> ha modificado los datos de su traslado.</p><p>Accede al panel de administración para ver los cambios.</p>`)
+          subject: (_pMod && _pMod.email && _pMod.asunto) || ('✏️ Cliente modificó datos — ' + pnr),
+          html: (_pMod && _pMod.email) ? plantillaEmail(_pMod.email) : plantillaEmail(`<p>El cliente de la reserva <strong>${pnr}</strong> ha modificado los datos de su traslado.</p><p>Accede al panel de administración para ver los cambios.</p>`)
         });
       }
     }
@@ -15173,10 +15175,12 @@ app.post('/api/cliente/mensaje', asyncHandler(async (req, res) => {
     const pnr = reservaInfo.rows[0] ? reservaInfo.rows[0].numero_reserva : '—';
     if (emails.length) {
       for (const em of emails) {
+        // (14/10/2026) Plantilla "[Admin] Nuevo mensaje de cliente"; si faltara, el texto de antes
+        const _pMsg = await obtenerPlantilla('interno_cliente_mensaje', { numero_reserva: pnr, nombre_cliente: nombre, mensaje: mensaje.trim() }, 'es');
         await enviarEmail({
           to: em,
-          subject: '💬 Nuevo mensaje de cliente — ' + pnr,
-          html: plantillaEmail(`<p><strong>${nombre}</strong> (reserva <strong>${pnr}</strong>) ha enviado un mensaje:</p><blockquote>${mensaje.trim()}</blockquote><p>Accede al panel de administración para responder o ver el historial.</p>`)
+          subject: (_pMsg && _pMsg.email && _pMsg.asunto) || ('💬 Nuevo mensaje de cliente — ' + pnr),
+          html: (_pMsg && _pMsg.email) ? plantillaEmail(_pMsg.email) : plantillaEmail(`<p><strong>${nombre}</strong> (reserva <strong>${pnr}</strong>) ha enviado un mensaje:</p><blockquote>${mensaje.trim()}</blockquote><p>Accede al panel de administración para responder o ver el historial.</p>`)
         });
       }
     }
@@ -15352,7 +15356,15 @@ app.post('/api/cliente/modificar-completo', asyncHandler(async (req, res) => {
   // Notificar al equipo
   try {
     const emails = await obtenerEmailsNotificacion();
+    // (14/10/2026) Plantilla "[Admin] Cliente solicitó modificación"; {cambios} = la lista de cambios pedidos
+    const _cambiosHtml = '<ul>' + cambios.map(c => '<li>' + c + '</li>').join('') + '</ul>';
+    const _pSol = await obtenerPlantilla('interno_modificacion_solicitada',
+      { numero_reserva: r.numero_reserva, nombre_cliente: r.nombre_cliente || '', cambios: _cambiosHtml }, 'es');
     for (const em of emails) {
+      if (_pSol && _pSol.email) {
+        await enviarEmail({ to: em, subject: _pSol.asunto || ('✏️ Modificación solicitada — ' + r.numero_reserva), html: plantillaEmail(_pSol.email) });
+        continue;
+      }
       await enviarEmail({
         to: em,
         subject: '✏️ Modificación solicitada — ' + r.numero_reserva,
@@ -15431,7 +15443,16 @@ async function procesoCancelacionCliente(r, porEquipo, decisionEquipo) {
   // Notificar al equipo
   try {
     const emails = await obtenerEmailsNotificacion();
+    // (14/10/2026) Plantilla "[Admin] Cliente canceló una reserva"; si faltara, el texto de antes
+    const _pCan = await obtenerPlantilla('interno_cliente_cancelo', {
+      numero_reserva: r.numero_reserva, nombre_cliente: r.nombre_cliente || '',
+      origen: r.origen || '—', destino: r.destino || '—', fecha: r.fecha ? fechaCliente(r.fecha, 'es') : '—'
+    }, 'es');
     for (const em of emails) {
+      if (_pCan && _pCan.email) {
+        await enviarEmail({ to: em, subject: _pCan.asunto || ('❌ Cancelación de reserva — ' + r.numero_reserva), html: plantillaEmail(_pCan.email) });
+        continue;
+      }
       await enviarEmail({
         to: em,
         subject: '❌ Cancelación de reserva — ' + r.numero_reserva,
@@ -15660,6 +15681,15 @@ app.post('/admin/reservas/:id/mensaje-chofer', requireAdmin, asyncHandler(async 
   // Notificar al chofer por email si tiene email
   if (r.conductor_email) {
     try {
+      // (14/10/2026) Plantilla "Mensaje del equipo al chofer"; si faltara, el texto de antes
+      const _pCh = await obtenerPlantilla('chofer_mensaje_admin', {
+        numero_reserva: r.numero_reserva, nombre_chofer: r.conductor_nombre || 'Chofer',
+        mensaje: mensaje.trim().replace(/\n/g, '<br>'), url_portal: BASE_URL + '/chofer/portal'
+      }, 'es');
+      if (_pCh && _pCh.email) {
+        await enviarEmail({ to: r.conductor_email, subject: _pCh.asunto || ('💬 Mensaje sobre la reserva ' + r.numero_reserva), html: plantillaEmail(_pCh.email) });
+        return res.json({ ok: true });
+      }
       await enviarEmail({
         to: r.conductor_email,
         subject: '💬 Mensaje sobre la reserva ' + r.numero_reserva,
@@ -17247,7 +17277,13 @@ app.post('/api/whatsapp/marcar-sin-respuesta/:id', requierePuenteWhatsapp, async
 
   try {
     const destinatarios = await obtenerEmailsNotificacion();
+    // (14/10/2026) Plantilla "[Admin] Sin respuesta de choferes (15 min)"; si faltara, el texto de antes
+    const _pSin = await obtenerPlantilla('interno_sin_choferes', { numero_reserva: numero_reserva }, 'es');
     for (const em of destinatarios) {
+      if (_pSin && _pSin.email) {
+        await enviarEmail({ to: em, subject: _pSin.asunto || ('Reserva ' + numero_reserva + ' sin respuesta de choferes (15 min)'), html: plantillaEmail(_pSin.email) });
+        continue;
+      }
       await enviarEmail({
         to: em,
         subject: 'Reserva ' + numero_reserva + ' sin respuesta de choferes (15 min)',
@@ -17368,6 +17404,13 @@ const VARIABLES_PLANTILLAS = {
   chofer_factura_comision:       { email: ['nombre_chofer', 'numero_factura', 'numero_reserva', 'origen', 'destino', 'fecha', 'importe'], wa: ['nombre_chofer', 'numero_factura', 'numero_reserva', 'origen', 'destino', 'fecha', 'importe'] },
   chofer_gracias_servicio:       { email: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'], wa: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'] },
   chofer_recuperar_password:     { email: ['nombre_chofer', 'enlace_recuperacion'], wa: null },
+  // (14/10/2026) Conectadas a sus envíos
+  chofer_mensaje_admin:          { email: ['nombre_chofer', 'numero_reserva', 'mensaje', 'url_portal'], wa: null },
+  interno_cliente_modifico:      { email: ['numero_reserva'], wa: null },
+  interno_cliente_mensaje:       { email: ['numero_reserva', 'nombre_cliente', 'mensaje'], wa: null },
+  interno_modificacion_solicitada: { email: ['numero_reserva', 'nombre_cliente', 'cambios'], wa: null },
+  interno_cliente_cancelo:       { email: ['numero_reserva', 'nombre_cliente', 'origen', 'destino', 'fecha'], wa: null },
+  interno_sin_choferes:          { email: ['numero_reserva'], wa: null },
   chofer_respuesta_confirmado:   { email: null, wa: ['numero_reserva'] },
   chofer_respuesta_rechazo:      { email: null, wa: [] },
   chofer_respuesta_ya_asignada:  { email: null, wa: ['numero_reserva'] },
