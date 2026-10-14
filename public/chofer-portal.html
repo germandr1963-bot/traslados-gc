@@ -350,6 +350,7 @@
         else if (r.estado === 'en_curso') semaforo = { color: '#2980b9', titulo: 'En curso' };
         else if (r.estado === 'cancelada') semaforo = { color: '#e74c3c', titulo: 'Cancelada' };
         else if (r.estado === 'completada') semaforo = { color: '#7f8c8d', titulo: 'Completada' };
+        else if (r.estado === 'no_show') semaforo = { color: '#7f8c8d', titulo: 'Cliente no se presentó' }; // (14/10/2026)
 
         // Separar extras: incluidos y a cobrar
         var extrasIncluidos = (r.extras || []).filter(function(e) { return !parseFloat(e.precio) || parseFloat(e.precio) === 0; });
