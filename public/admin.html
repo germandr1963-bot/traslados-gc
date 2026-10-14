@@ -1464,8 +1464,8 @@ table.tabla-precios input {
           <input type="text" id="asunto-comunicado-equipo" class="campo" placeholder="Asunto del comunicado…">
         </div>
         <!-- (09/10/2026) Un texto para el email y otro para el WhatsApp, en pestañas como en Comunicaciones -->
-        <div style="display:flex;gap:0;margin-bottom:0;border-bottom:2px solid var(--borde);">
-          <button type="button" id="tab-email-com-equipo" onclick="switchTabComEquipo('email')" style="padding:8px 20px;border:none;background:var(--fondo-tarjeta);border-bottom:3px solid var(--acento);cursor:pointer;font-weight:600;color:var(--texto);">&#128231; Email</button>
+        <div style="display:flex;gap:0;margin-bottom:0;border-bottom:2px solid var(--gris-borde);">
+          <button type="button" id="tab-email-com-equipo" onclick="switchTabComEquipo('email')" style="padding:8px 20px;border:none;background:none;border-bottom:3px solid var(--terracota);cursor:pointer;font-weight:600;color:var(--texto-oscuro);">&#128231; Email</button>
           <button type="button" id="tab-wa-com-equipo" onclick="switchTabComEquipo('wa')" style="padding:8px 20px;border:none;background:none;border-bottom:3px solid transparent;cursor:pointer;color:var(--texto-muted);">&#128241; WhatsApp</button>
         </div>
         <div id="panel-email-com-equipo" style="padding-top:12px;margin-bottom:16px;">
@@ -1579,8 +1579,8 @@ table.tabla-precios input {
           </div>
 
           <!-- Tabs Email / WhatsApp -->
-          <div style="display:flex;gap:0;margin-bottom:0;border-bottom:2px solid var(--borde);">
-            <button id="tab-email-btn" onclick="switchTabCom('email')" style="padding:8px 20px;border:none;background:var(--fondo-tarjeta);border-bottom:3px solid var(--acento);cursor:pointer;font-weight:600;color:var(--texto);">&#128231; Email</button>
+          <div style="display:flex;gap:0;margin-bottom:0;border-bottom:2px solid var(--gris-borde);">
+            <button id="tab-email-btn" onclick="switchTabCom('email')" style="padding:8px 20px;border:none;background:none;border-bottom:3px solid var(--terracota);cursor:pointer;font-weight:600;color:var(--texto-oscuro);">&#128231; Email</button>
             <button id="tab-wa-btn" onclick="switchTabCom('wa')" style="padding:8px 20px;border:none;background:none;border-bottom:3px solid transparent;cursor:pointer;color:var(--texto-muted);">&#128241; WhatsApp</button>
           </div>
 
@@ -7218,12 +7218,12 @@ function switchTabComEquipo(tab) {
   var esEmail = tab === 'email';
   pe.style.display = esEmail ? 'block' : 'none';
   pw.style.display = esEmail ? 'none' : 'block';
-  be.style.borderBottomColor = esEmail ? 'var(--acento)' : 'transparent';
+  be.style.borderBottomColor = esEmail ? 'var(--terracota)' : 'transparent';
   be.style.fontWeight = esEmail ? '600' : 'normal';
-  be.style.color = esEmail ? 'var(--texto)' : 'var(--texto-muted)';
-  bw.style.borderBottomColor = esEmail ? 'transparent' : 'var(--acento)';
+  be.style.color = esEmail ? 'var(--texto-oscuro)' : 'var(--texto-muted)';
+  bw.style.borderBottomColor = esEmail ? 'transparent' : 'var(--terracota)';
   bw.style.fontWeight = esEmail ? 'normal' : '600';
-  bw.style.color = esEmail ? 'var(--texto-muted)' : 'var(--texto)';
+  bw.style.color = esEmail ? 'var(--texto-muted)' : 'var(--texto-oscuro)';
   if (!esEmail) pintarVistaWaComEquipo(); // la del email se pinta al escribir
   else pintarVistaEmailComEquipo();
 }
@@ -10288,18 +10288,18 @@ function switchTabCom(tab) {
   if (tab === 'email') {
     emailPanel.style.display = 'block';
     waPanel.style.display = 'none';
-    emailBtn.style.borderBottomColor = 'var(--acento)';
+    emailBtn.style.borderBottomColor = 'var(--terracota)';
     emailBtn.style.fontWeight = '600';
-    emailBtn.style.color = 'var(--texto)';
+    emailBtn.style.color = 'var(--texto-oscuro)';
     waBtn.style.borderBottomColor = 'transparent';
     waBtn.style.fontWeight = 'normal';
     waBtn.style.color = 'var(--texto-muted)';
   } else {
     emailPanel.style.display = 'none';
     waPanel.style.display = 'block';
-    waBtn.style.borderBottomColor = 'var(--acento)';
+    waBtn.style.borderBottomColor = 'var(--terracota)';
     waBtn.style.fontWeight = '600';
-    waBtn.style.color = 'var(--texto)';
+    waBtn.style.color = 'var(--texto-oscuro)';
     emailBtn.style.borderBottomColor = 'transparent';
     emailBtn.style.fontWeight = 'normal';
     emailBtn.style.color = 'var(--texto-muted)';
