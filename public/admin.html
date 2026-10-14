@@ -591,6 +591,8 @@ table.tabla-precios input {
                           <tbody id="tbody-com-frases"></tbody>
                         </table>
                       </div>
+                      <!-- (14/10/2026) Ventana de revisión: se abre sola al pulsar "Generar Frases" -->
+                      <div id="revision-com-frases" style="display:none;margin-top:18px;background:#fff;border:2px solid #1a3a6b;border-radius:10px;padding:16px 18px;"></div>
                     </td>
                   </tr>
                 </tbody>
@@ -5880,6 +5882,85 @@ function guardarComFrase() {
     .catch(function() { document.getElementById('modal-com-frase-msg-err').style.display = 'inline'; });
 }
 
+// (14/10/2026) Ventana de revisión tras "Generar Frases": aprobar una a una, todas de una vez,
+// o cerrar (se quedan en naranja y se aprueban después con "Aprobar todo").
+function mostrarRevisionComFrases(lang, lista) {
+  var caja = document.getElementById('revision-com-frases');
+  var nombre = (typeof NOMBRES_IDIOMA !== 'undefined' && NOMBRES_IDIOMA[lang]) || lang.toUpperCase();
+  function esc(t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  var filas = lista.map(function(f, i) {
+    return '<div class="rev-frase" data-clave="' + esc(f.clave) + '" style="border-bottom:1px solid var(--gris-borde);padding:12px 0;">' +
+      '<div style="font-size:13px;color:#3d372f;margin-bottom:6px;white-space:normal;">&#127466;&#127480; ' + esc(f.texto_es) + '</div>' +
+      '<textarea class="campo rev-frase-texto" rows="2" style="width:100%;font-size:13px;resize:vertical;">' + esc(f.texto) + '</textarea>' +
+      '<div style="display:flex;gap:10px;align-items:center;margin-top:6px;">' +
+        '<button class="boton-costa rev-frase-btn" style="padding:5px 12px;font-size:0.8rem;" onclick="aprobarRevisionComFrase(this, \'' + lang + '\')">&#10004; Aprobar</button>' +
+        '<span class="rev-frase-msg" style="font-size:12px;"></span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  caja.innerHTML =
+    '<h3 style="margin:0 0 4px;font-size:1rem;color:#1a3a6b;">&#129302; Revisión — frases en ' + esc(nombre) + '</h3>' +
+    '<p style="font-size:12px;color:var(--texto-muted);margin:0 0 6px;">Revisa cada traducción. Puedes corregirla antes de aprobar. Las variables <code>{entre_llaves}</code> se dejan exactamente igual.</p>' +
+    filas +
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">' +
+      '<button class="boton-primario" onclick="aprobarTodasRevisionComFrases(\'' + lang + '\')">&#9989; Aprobar todas</button>' +
+      '<button class="boton-secundario" onclick="cerrarRevisionComFrases()">Cerrar</button>' +
+      '<span style="font-size:12px;color:var(--texto-muted);">Si cierras sin aprobar, se quedan en naranja y puedes aprobarlas después con «Aprobar todo».</span>' +
+      '<span id="rev-frases-msg" style="font-size:13px;"></span>' +
+    '</div>';
+  caja.style.display = 'block';
+  caja.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function cerrarRevisionComFrases() {
+  var caja = document.getElementById('revision-com-frases');
+  caja.style.display = 'none';
+  caja.innerHTML = '';
+}
+// Guarda el texto (tal como esté en el recuadro) y lo aprueba → verde
+function guardarYAprobarComFrase(clave, lang, texto) {
+  return fetch('/admin/frases-comunicacion/' + clave + '/traducciones/' + lang, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto: texto, generado_por_ia: true })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.ok) throw new Error('guardar');
+    return fetch('/admin/frases-comunicacion/' + clave + '/traducciones/' + lang, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ solo_aprobar: true })
+    }).then(function(r) { return r.json(); });
+  }).then(function(d) { if (!d.ok) throw new Error('aprobar'); return true; });
+}
+function aprobarRevisionComFrase(btn, lang) {
+  var fila = btn.closest('.rev-frase');
+  var msg = fila.querySelector('.rev-frase-msg');
+  var texto = fila.querySelector('.rev-frase-texto').value.trim();
+  if (!texto) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'La traducción no puede quedar vacía.'; return; }
+  btn.disabled = true; msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Guardando…';
+  guardarYAprobarComFrase(fila.dataset.clave, lang, texto).then(function() {
+    fila.dataset.aprobada = '1';
+    fila.style.opacity = '0.6';
+    msg.style.color = '#2e7d32'; msg.textContent = '✓ Aprobada';
+    btn.style.display = 'none';
+    _comFrasesDatos = null; cargarComFrases();
+  }).catch(function() { btn.disabled = false; msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error al guardar. Inténtalo de nuevo.'; });
+}
+function aprobarTodasRevisionComFrases(lang) {
+  var filas = Array.from(document.querySelectorAll('#revision-com-frases .rev-frase')).filter(function(f) { return f.dataset.aprobada !== '1'; });
+  var msg = document.getElementById('rev-frases-msg');
+  if (!filas.length) { cerrarRevisionComFrases(); return; }
+  var vacia = filas.find(function(f) { return !f.querySelector('.rev-frase-texto').value.trim(); });
+  if (vacia) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Hay una traducción vacía.'; vacia.scrollIntoView({ block: 'center' }); return; }
+  msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Aprobando…';
+  Promise.all(filas.map(function(f) {
+    return guardarYAprobarComFrase(f.dataset.clave, lang, f.querySelector('.rev-frase-texto').value.trim()).then(function() { return true; }, function() { return false; });
+  })).then(function(res) {
+    var fallos = res.filter(function(x) { return !x; }).length;
+    _comFrasesDatos = null; cargarComFrases();
+    if (fallos) { msg.style.color = 'var(--rojo-error)'; msg.textContent = fallos + ' no se pudieron guardar. Inténtalo de nuevo.'; return; }
+    msg.style.color = '#2e7d32'; msg.textContent = '✓ ' + res.length + ' aprobada(s).';
+    setTimeout(cerrarRevisionComFrases, 1200);
+  });
+}
+
 function generarComFrasesIA() {
   var lang = document.getElementById('select-com-frases-ia').value;
   var msg = document.getElementById('com-frases-msg-ia');
@@ -5914,6 +5995,8 @@ function generarComFrasesIA() {
         msg.style.color = '#2e7d32';
         _comFrasesDatos = null;
         cargarComFrases();
+        // (14/10/2026) Se abre la ventana de revisión con las frases recién traducidas
+        if (respuesta.lista && respuesta.lista.length) mostrarRevisionComFrases(lang, respuesta.lista);
       } else {
         msg.textContent = '';
       }
