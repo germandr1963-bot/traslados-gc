@@ -2352,6 +2352,10 @@ async function initSchema() {
       creado_en TIMESTAMP DEFAULT NOW()
     );
   `);
+  // (14/10/2026) Mensajes cliente ↔ equipo traducidos: cada uno lee en su idioma (como el enlace del WhatsApp)
+  await pool.query(`ALTER TABLE reservas_mensajes ADD COLUMN IF NOT EXISTS mensaje_es TEXT`);
+  await pool.query(`ALTER TABLE reservas_mensajes ADD COLUMN IF NOT EXISTS mensaje_cliente TEXT`);
+  await pool.query(`ALTER TABLE reservas_mensajes ADD COLUMN IF NOT EXISTS lang TEXT`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS reservas_mensajes_chofer (
@@ -15168,10 +15172,20 @@ app.post('/api/cliente/mensaje', asyncHandler(async (req, res) => {
   if (!mensaje || !mensaje.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
   const reservaId = reserva_id || req.session.clienteReservaId;
 
+  // (14/10/2026) El cliente escribe en el idioma de su portal; al equipo le llega en español
+  const _langCli = await idiomaPortalCliente(req);
+  let _mensajeEs = null;
+  if (_langCli !== 'es') {
+    const _tr = await traducirEnlace(mensaje.trim(), 'es');
+    if (_tr && _tr.trim() && _tr.trim() !== mensaje.trim()) _mensajeEs = _tr.trim();
+  }
   await pool.query(
-    'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
-    [reservaId, 'cliente', mensaje.trim()]
+    'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje, mensaje_es, lang) VALUES ($1, $2, $3, $4, $5)',
+    [reservaId, 'cliente', mensaje.trim(), _mensajeEs, _langCli]
   );
+  const _mensajeParaEquipo = _mensajeEs
+    ? _mensajeEs + '<br><br><span style="font-size:12px;color:#8a8175;">Original (' + (NOMBRES_IDIOMA_ES[_langCli] || _langCli) + '): ' + mensaje.trim() + '</span>'
+    : mensaje.trim();
 
   // Notificar al equipo
   try {
@@ -15182,11 +15196,11 @@ app.post('/api/cliente/mensaje', asyncHandler(async (req, res) => {
     if (emails.length) {
       for (const em of emails) {
         // (14/10/2026) Plantilla "[Admin] Nuevo mensaje de cliente"; si faltara, el texto de antes
-        const _pMsg = await obtenerPlantilla('interno_cliente_mensaje', { numero_reserva: pnr, nombre_cliente: nombre, mensaje: mensaje.trim() }, 'es');
+        const _pMsg = await obtenerPlantilla('interno_cliente_mensaje', { numero_reserva: pnr, nombre_cliente: nombre, mensaje: _mensajeParaEquipo }, 'es');
         await enviarEmail({
           to: em,
           subject: (_pMsg && _pMsg.email && _pMsg.asunto) || ('💬 Nuevo mensaje de cliente — ' + pnr),
-          html: (_pMsg && _pMsg.email) ? plantillaEmail(_pMsg.email) : plantillaEmail(`<p><strong>${nombre}</strong> (reserva <strong>${pnr}</strong>) ha enviado un mensaje:</p><blockquote>${mensaje.trim()}</blockquote><p>Accede al panel de administración para responder o ver el historial.</p>`)
+          html: (_pMsg && _pMsg.email) ? plantillaEmail(_pMsg.email) : plantillaEmail(`<p><strong>${nombre}</strong> (reserva <strong>${pnr}</strong>) ha enviado un mensaje:</p><blockquote>${_mensajeParaEquipo}</blockquote><p>Accede al panel de administración para responder o ver el historial.</p>`)
         });
       }
     }
@@ -15200,7 +15214,8 @@ app.get('/api/cliente/mensajes', asyncHandler(async (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
   const reservaId = req.query.reserva_id || req.session.clienteReservaId;
   const result = await pool.query(
-    'SELECT id, autor, mensaje, creado_en FROM reservas_mensajes WHERE reserva_id = $1 ORDER BY creado_en ASC',
+    `SELECT id, autor, CASE WHEN autor = 'admin' THEN COALESCE(mensaje_cliente, mensaje) ELSE mensaje END AS mensaje, creado_en
+     FROM reservas_mensajes WHERE reserva_id = $1 ORDER BY creado_en ASC`,
     [reservaId]
   );
   // El cliente ha abierto sus mensajes: los del equipo pasan a leídos (quita el aviso "nuevos" del portal)
@@ -15929,8 +15944,8 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
   const { mensaje } = req.body;
   if (!mensaje || !mensaje.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
 
-  await pool.query(
-    'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
+  const _insMsg = await pool.query(
+    'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3) RETURNING id',
     [req.params.id, 'admin', mensaje.trim()]
   );
 
@@ -15944,10 +15959,19 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
       const r = reserva.rows[0];
       // El aviso va en el idioma del portal del cliente (la conversación cliente ↔ equipo), no en el de la reserva
       const _langMsg = await idiomaPortalPorEmail(r.email_cliente);
+      // (14/10/2026) El equipo escribe en español (o en el idioma del cliente); al cliente le llega en el de su portal
+      let _textoCli = mensaje.trim();
+      if (_langMsg !== 'es') {
+        const _tr = await traducirEnlace(mensaje.trim(), _langMsg);
+        if (_tr && _tr.trim()) {
+          _textoCli = _tr.trim();
+          await pool.query('UPDATE reservas_mensajes SET mensaje_cliente = $1, lang = $2 WHERE id = $3', [_textoCli, _langMsg, _insMsg.rows[0].id]);
+        }
+      }
       const _pmsg = await obtenerPlantilla('cliente_mensaje_admin', {
         nombre_cliente: r.nombre_cliente,
         numero_reserva: r.numero_reserva,
-        mensaje: mensaje.trim().replace(/\n/g,'<br>'),
+        mensaje: _textoCli.replace(/\n/g,'<br>'),
         url_portal: urlMiReservaCliente(_langMsg),
         origen: r.origen || '—', destino: r.destino || '—',
         fecha: r.fecha ? fechaCliente(r.fecha, _langMsg) : '—', hora: r.hora ? String(r.hora).slice(0, 5) : '—'
@@ -15958,7 +15982,7 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
           const _pmsgWa = await obtenerPlantilla('cliente_mensaje_admin', {
             nombre_cliente: r.nombre_cliente,
             numero_reserva: r.numero_reserva,
-            mensaje: mensaje.trim(),
+            mensaje: _textoCli,
             url_portal: urlMiReservaCliente(_langMsg),
             origen: r.origen || '—', destino: r.destino || '—',
             fecha: r.fecha ? fechaCliente(r.fecha, _langMsg) : '—', hora: r.hora ? String(r.hora).slice(0, 5) : '—'
@@ -15978,7 +16002,7 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
           (_pmsg && _pmsg.email) ||
           `<p>Hola <strong>${r.nombre_cliente}</strong>,</p>
            <p>El equipo de Traslados GC te ha enviado un mensaje sobre tu reserva <strong>${r.numero_reserva}</strong>:</p>
-           <blockquote>${mensaje.trim().replace(/\n/g,'<br>')}</blockquote>
+           <blockquote>${_textoCli.replace(/\n/g,'<br>')}</blockquote>
            <p>Accede a tu portal para ver el hilo completo y responder:<br>
            <a href="${BASE_URL}/mi-reserva" style="color:#C1502E;">${BASE_URL}/mi-reserva</a></p>`
         )
@@ -15992,7 +16016,12 @@ app.post('/admin/reservas/:id/mensaje', requireAdmin, asyncHandler(async (req, r
 // Admin: mensajes del cliente
 app.get('/admin/reservas/:id/mensajes', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, autor, mensaje, leido, creado_en FROM reservas_mensajes WHERE reserva_id = $1 ORDER BY creado_en ASC',
+    `SELECT id, autor,
+            CASE WHEN autor = 'cliente' THEN COALESCE(mensaje_es, mensaje) ELSE mensaje END AS mensaje,
+            CASE WHEN autor = 'cliente' AND mensaje_es IS NOT NULL THEN mensaje END AS original,
+            CASE WHEN autor = 'admin' THEN mensaje_cliente END AS enviado_traducido,
+            lang, leido, creado_en
+     FROM reservas_mensajes WHERE reserva_id = $1 ORDER BY creado_en ASC`,
     [req.params.id]
   );
   // Marcar mensajes del cliente como leídos
