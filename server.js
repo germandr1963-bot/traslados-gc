@@ -17953,6 +17953,7 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
 
   let generadas = 0;
   const errores = [];
+  const lista = []; // (14/10/2026) para la ventana de revisión del Admin
   for (const f of pendientes) {
     const traduccion = parsed[f.clave];
     if (!traduccion || typeof traduccion !== 'string' || !traduccion.trim()) {
@@ -17982,8 +17983,9 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
       [f.clave, lang, traduccion.trim()]
     );
     generadas++;
+    lista.push({ clave: f.clave, texto_es: f.texto_es, texto: traduccion.trim() });
   }
-  res.json({ ok: true, generadas, errores });
+  res.json({ ok: true, generadas, errores, lista });
 }));
 
 // ─── Tarea automática: cancelar reservas confirmadas sin pago de depósito ────
