@@ -1443,6 +1443,8 @@ async function initSchema() {
     { clave: 'por_reservas_una', contexto: 'Bajo el saludo, cuando hay 1 reserva. {n} = número', es: '{n} reserva encontrada' },
     { clave: 'por_reservas_varias', contexto: 'Bajo el saludo, cuando hay varias reservas. {n} = número', es: '{n} reservas encontradas' },
     { clave: 'por_sin_reservas', contexto: 'Aviso cuando el cliente no tiene reservas', es: 'No tienes reservas.' },
+    // (14/10/2026) Las reservas realizadas se ven 1 mes en el portal
+    { clave: 'por_aviso_un_mes', contexto: 'Nota encima de la lista de reservas: las realizadas desaparecen del portal al mes', es: 'Las reservas realizadas se mantienen 1 mes en tu portal y después desaparecen. Si necesitas algo, descarga o guarda tus documentos (voucher y factura).' },
     { clave: 'por_mis_datos', contexto: 'Título del recuadro de datos personales', es: 'Mis datos' },
     { clave: 'por_aviso_idioma', contexto: 'Nota bajo \"Mis datos\" que indica dónde cambiar el idioma', es: '✱ Aquí puedes cambiar tu idioma de comunicación' },
     { clave: 'por_mis_datos_intro', contexto: 'Explicación dentro de \"Mis datos\"', es: 'Con estos datos rellenamos tus reservas y te enviamos tus documentos. Mantenlos al día, con tu nombre y apellidos completos.' },
@@ -15052,6 +15054,8 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
      LEFT JOIN conductores c ON c.id = r.conductor_id
      WHERE LOWER(r.email_cliente) = LOWER($1) AND r.archivada = FALSE
+       -- (14/10/2026) En el portal solo las futuras y las del último mes (en el Admin siguen todas)
+       AND r.fecha >= (CURRENT_DATE - INTERVAL '1 month')
      ORDER BY r.fecha DESC, r.hora DESC`,
     [emailCliente]
   );
