@@ -3275,6 +3275,8 @@ Un saludo cordial, 🙏
     { clave: 'frase_enlace_fuera_ventana', canal: 'wa', orden: 310, contexto: 'Respuesta automática por WhatsApp: el viaje no es ahora. {numero_reserva}, {fecha} y {hora} los pone el programa', es: 'Tu reserva {numero_reserva} es para el {fecha} a las {hora}. El contacto con tu chofer por este WhatsApp se abre 2 horas antes del viaje.' },
     { clave: 'frase_enlace_cancelada', canal: 'wa', orden: 320, contexto: 'Respuesta automática por WhatsApp: la reserva está cancelada', es: 'La reserva {numero_reserva} está cancelada.' },
     { clave: 'frase_enlace_realizada', canal: 'wa', orden: 330, contexto: 'Respuesta automática por WhatsApp: el viaje ya se realizó', es: 'La reserva {numero_reserva} ya se realizó. ¡Gracias por viajar con Traslados GC!' },
+    // (14/10/2026) Frase propia cuando el chofer marcó "cliente no se presentó"
+    { clave: 'frase_enlace_no_presentado', canal: 'wa', orden: 335, contexto: 'Respuesta automática por WhatsApp: el chofer marcó que el cliente no se presentó', es: 'La reserva {numero_reserva} consta como «cliente no presentado». Si crees que es un error, escríbenos desde tu portal de cliente.' },
     { clave: 'frase_enlace_sin_chofer', canal: 'wa', orden: 340, contexto: 'Respuesta automática por WhatsApp: la reserva aún no tiene conductor asignado', es: 'Tu reserva {numero_reserva} todavía no tiene chofer asignado. Te avisaremos en cuanto lo tenga.' },
     { clave: 'frase_enlace_enviado_conductor', canal: 'wa', orden: 360, contexto: 'Confirmación por WhatsApp al cliente: su mensaje se ha enviado a su conductor', es: '✅ Mensaje enviado a tu chofer.' },
     { clave: 'frase_enlace_mensaje_conductor', canal: 'wa', orden: 370, contexto: 'Cabecera del mensaje del conductor que recibe el cliente por WhatsApp. {nombre} = nombre del conductor; debajo va el mensaje traducido', es: '💬 Mensaje de tu chofer ({nombre}):' },
@@ -10782,7 +10784,11 @@ app.post('/admin/reservas/:id/estado', requireAdmin, asyncHandler(async (req, re
   const { estado } = req.body;
   const estadosValidos = ['pendiente', 'confirmada', 'completada', 'cancelada', 'modificacion_pendiente', 'no_show'];
   if (!estadosValidos.includes(estado)) return res.status(400).json({ error: 'Estado no válido' });
-  await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', [estado, req.params.id]);
+  // (14/10/2026) Al marcar "completada" se guarda la hora (si no la tenía): desde ahí cuentan las 2 h del enlace
+  await pool.query(
+    `UPDATE reservas SET estado = $1,
+       completada_en = CASE WHEN $1::text = 'completada' THEN COALESCE(completada_en, NOW()) ELSE completada_en END
+     WHERE id = $2`, [estado, req.params.id]);
   res.json({ ok: true });
 }));
 
@@ -16892,25 +16898,41 @@ async function traducirEnlace(texto, lang) {
   }
 }
 
-// ¿Está ahora la reserva dentro de la ventana del enlace (2 h antes y 2 h después de la recogida)?
-function reservaEnVentana(r) {
+// (14/10/2026) ¿Está abierto ahora el enlace chofer ↔ cliente de esta reserva?
+// - Se abre 2 h antes de la hora del servicio.
+// - Mientras el chofer no lo termina, sigue abierto (cubre los retrasos de vuelos y barcos),
+//   con un límite de seguridad de 12 h después de la hora del servicio.
+// - "Completada": sigue abierto 2 h más desde la hora en que se marcó (objetos olvidados…).
+// - "Cliente no se presentó" o "cancelada": cerrado.
+const LIMITE_ENLACE_SIN_CERRAR_HORAS = 12;
+function enlaceAbierto(r) {
+  if (r.estado === 'no_show' || r.estado === 'cancelada') return false;
   const recogida = calcularFechaCancelacion(new Date(r.fecha), r.hora, 0);
   const ahora = new Date();
-  return ahora >= new Date(recogida.getTime() - VENTANA_ENLACE_HORAS * 3600000) &&
-         ahora <= new Date(recogida.getTime() + VENTANA_ENLACE_HORAS * 3600000);
+  if (ahora < new Date(recogida.getTime() - VENTANA_ENLACE_HORAS * 3600000)) return false;
+  if (r.estado === 'completada') {
+    const fin = r.completada_en ? new Date(r.completada_en) : recogida;
+    return ahora <= new Date(fin.getTime() + VENTANA_ENLACE_HORAS * 3600000);
+  }
+  return ahora <= new Date(recogida.getTime() + LIMITE_ENLACE_SIN_CERRAR_HORAS * 3600000);
 }
+function reservaEnVentana(r) { return enlaceAbierto(r); }
 
 // Reservas en curso de quien escribe: si es un chofer activo, sus servicios asignados; si no,
 // las reservas en las que su móvil es el del cliente o el del viajero. Solo con chofer y sin cancelar.
 async function reservasEnCurso(tel, conductorId) {
   const q = conductorId
     ? await pool.query(
-        `SELECT numero_reserva, fecha, hora FROM reservas
-         WHERE conductor_id = $1 AND archivada = FALSE AND estado NOT IN ('cancelada', 'completada', 'no_show')
+        `SELECT numero_reserva, fecha, hora, estado, completada_en FROM reservas
+         WHERE conductor_id = $1 AND archivada = FALSE
+           AND (estado NOT IN ('cancelada', 'completada', 'no_show')
+             OR (estado = 'completada' AND completada_en > NOW() - INTERVAL '2 hours'))
            AND fecha BETWEEN CURRENT_DATE - 1 AND CURRENT_DATE + 1`, [conductorId])
     : await pool.query(
-        `SELECT numero_reserva, fecha, hora FROM reservas
-         WHERE archivada = FALSE AND conductor_id IS NOT NULL AND estado NOT IN ('cancelada', 'completada', 'no_show')
+        `SELECT numero_reserva, fecha, hora, estado, completada_en FROM reservas
+         WHERE archivada = FALSE AND conductor_id IS NOT NULL
+           AND (estado NOT IN ('cancelada', 'completada', 'no_show')
+             OR (estado = 'completada' AND completada_en > NOW() - INTERVAL '2 hours'))
            AND fecha BETWEEN CURRENT_DATE - 1 AND CURRENT_DATE + 1
            AND (RIGHT(regexp_replace(COALESCE(telefono_cliente, ''), '[^0-9]', '', 'g'), 9) = RIGHT($1, 9)
              OR RIGHT(regexp_replace(COALESCE(telefono_pasajero_otro, ''), '[^0-9]', '', 'g'), 9) = RIGHT($1, 9)
@@ -16985,7 +17007,7 @@ async function procesarEntrante(entranteId) {
 
     const pnr = encaje[1].toUpperCase();
     const rq = await pool.query(
-      `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.estado, r.lang_cliente, r.conductor_id,
+      `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.estado, r.completada_en, r.lang_cliente, r.conductor_id,
               r.nombre_cliente, r.telefono_cliente, r.es_para_otra_persona, r.nombre_pasajero_otro,
               c.telefono AS telefono_chofer, c.nombre AS nombre_chofer
        FROM reservas r LEFT JOIN conductores c ON c.id = r.conductor_id
@@ -17020,13 +17042,13 @@ async function procesarEntrante(entranteId) {
       console.log('   ↩️ Respuesta automática a +' + tel + ': ' + etiqueta + ' (' + pnr + ')');
     };
     if (r.estado === 'cancelada') return aviso('frase_enlace_cancelada', 'chofer_enlace_cancelada', 'Reserva ' + pnr + ': viaje cancelado.', 'cancelada');
-    if (r.estado === 'completada') return aviso('frase_enlace_realizada', 'chofer_enlace_terminado', 'Reserva ' + pnr + ': viaje terminado.', 'realizada');
-    if (r.estado === 'no_show') return aviso('frase_enlace_realizada', 'chofer_enlace_no_presentado', 'Reserva ' + pnr + ': cliente no se presentó.', 'realizada');
+    // (14/10/2026) Completada: el enlace sigue abierto 2 h desde que se marcó; después, "ya se realizó"
+    if (r.estado === 'completada' && !enlaceAbierto(r)) return aviso('frase_enlace_realizada', 'chofer_enlace_terminado', 'Reserva ' + pnr + ': viaje terminado.', 'realizada');
+    // (14/10/2026) Cliente no presentado: frase propia y enlace cerrado
+    if (r.estado === 'no_show') return aviso('frase_enlace_no_presentado', 'chofer_enlace_no_presentado', 'Reserva ' + pnr + ': cliente no se presentó.', 'no presentado');
     if (!r.conductor_id) return aviso('frase_enlace_sin_chofer', 'chofer_enlace_sin_chofer', 'La reserva ' + pnr + ' no tiene chofer asignado.', 'sin chofer');
-    const recogida = calcularFechaCancelacion(new Date(r.fecha), r.hora, 0);
-    const ahora = new Date();
-    const dentro = ahora >= new Date(recogida.getTime() - VENTANA_ENLACE_HORAS * 3600000) &&
-                   ahora <= new Date(recogida.getTime() + VENTANA_ENLACE_HORAS * 3600000);
+    // (14/10/2026) Ventana: 2 h antes; abierto mientras el chofer no termina (límite de seguridad 12 h)
+    const dentro = enlaceAbierto(r);
     if (!dentro) {
       const horaTxt = r.hora ? String(r.hora).slice(0, 5) : '—';
       return aviso('frase_enlace_fuera_ventana', 'chofer_enlace_fuera_ventana',
