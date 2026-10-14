@@ -15687,7 +15687,7 @@ app.post('/admin/reservas/:id/mensaje-chofer', requireAdmin, asyncHandler(async 
   if (!mensaje || !mensaje.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
 
   const reserva = await pool.query(
-    `SELECT r.*, c.email AS conductor_email, c.nombre AS conductor_nombre
+    `SELECT r.*, c.email AS conductor_email, c.nombre AS conductor_nombre, c.telefono AS conductor_telefono
      FROM reservas r LEFT JOIN conductores c ON c.id = r.conductor_id WHERE r.id = $1`,
     [req.params.id]
   );
@@ -15699,12 +15699,29 @@ app.post('/admin/reservas/:id/mensaje-chofer', requireAdmin, asyncHandler(async 
     [req.params.id, 'admin', mensaje.trim()]
   );
 
+  // (14/10/2026) Cliente que ve el chofer: quien viaja (si la reserva es para otra persona) o quien reservó
+  const _clienteCh = (r.es_para_otra_persona && r.nombre_pasajero_otro) ? r.nombre_pasajero_otro : (r.nombre_cliente || '—');
+
+  // (14/10/2026) WhatsApp al chofer con la plantilla "Mensaje del equipo al chofer" (reserva, cliente y mensaje)
+  if (r.conductor_telefono) {
+    try {
+      const _pChWa = await obtenerPlantilla('chofer_mensaje_admin', {
+        numero_reserva: r.numero_reserva, nombre_chofer: r.conductor_nombre || 'Chofer',
+        nombre_cliente: _clienteCh, mensaje: mensaje.trim()
+      }, 'es');
+      const _textoWa = (_pChWa && _pChWa.whatsapp) ||
+        ('Hola, *' + (r.conductor_nombre || 'Chofer') + '* 👋\n\n💬 *Mensaje del equipo*\n🔖 *Reserva:* ' + r.numero_reserva +
+         '\n👤 *Cliente:* ' + _clienteCh + '\n\n' + mensaje.trim() + '\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*');
+      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [r.conductor_telefono, _textoWa]);
+    } catch (e) { console.warn('Error encolando WhatsApp al chofer:', e.message); }
+  }
+
   // Notificar al chofer por email si tiene email
   if (r.conductor_email) {
     try {
       // (14/10/2026) Plantilla "Mensaje del equipo al chofer"; si faltara, el texto de antes
       const _pCh = await obtenerPlantilla('chofer_mensaje_admin', {
-        numero_reserva: r.numero_reserva, nombre_chofer: r.conductor_nombre || 'Chofer',
+        numero_reserva: r.numero_reserva, nombre_chofer: r.conductor_nombre || 'Chofer', nombre_cliente: _clienteCh,
         mensaje: mensaje.trim().replace(/\n/g, '<br>'), url_portal: BASE_URL + '/chofer/portal'
       }, 'es');
       if (_pCh && _pCh.email) {
@@ -17440,7 +17457,7 @@ const VARIABLES_PLANTILLAS = {
   chofer_gracias_servicio:       { email: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'], wa: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'] },
   chofer_recuperar_password:     { email: ['nombre_chofer', 'enlace_recuperacion'], wa: null },
   // (14/10/2026) Conectadas a sus envíos
-  chofer_mensaje_admin:          { email: ['nombre_chofer', 'numero_reserva', 'mensaje', 'url_portal'], wa: null },
+  chofer_mensaje_admin:          { email: ['nombre_chofer', 'numero_reserva', 'nombre_cliente', 'mensaje', 'url_portal'], wa: ['nombre_chofer', 'numero_reserva', 'nombre_cliente', 'mensaje'] },
   interno_cliente_modifico:      { email: ['numero_reserva'], wa: null },
   interno_cliente_mensaje:       { email: ['numero_reserva', 'nombre_cliente', 'mensaje'], wa: null },
   interno_modificacion_solicitada: { email: ['numero_reserva', 'nombre_cliente', 'cambios'], wa: null },
