@@ -9184,6 +9184,36 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
     console.warn('Error enviando email confirmación registro chofer:', err.message);
   }
 
+  // (14/10/2026) Aviso al equipo (Admin → Notificaciones) con la plantilla "[Admin] Nuevo chofer registrado"
+  try {
+    let _vehiculo = '';
+    if (catId) {
+      const _cat = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [catId]);
+      _vehiculo = _cat.rows.length ? _cat.rows[0].nombre : '';
+    } else {
+      _vehiculo = 'Otro vehículo: ' + String(observaciones || '').replace('[Otro vehículo]', '').trim();
+    }
+    const _varsReg = {
+      nombre_chofer: nombre.trim(), email_chofer: email.trim().toLowerCase(), telefono_chofer: telefono.trim(),
+      vehiculo: _vehiculo || '—', isla: isla || 'Gran Canaria'
+    };
+    const _pReg = await obtenerPlantilla('interno_registro_chofer', _varsReg, 'es');
+    const _emailsReg = await obtenerEmailsNotificacion();
+    for (const em of _emailsReg) {
+      await enviarEmail({
+        to: em,
+        subject: (_pReg && _pReg.email && _pReg.asunto) || ('🚗 Nuevo chofer registrado — ' + _varsReg.nombre_chofer),
+        html: (_pReg && _pReg.email) ? plantillaEmail(_pReg.email) : plantillaEmail(
+          `<p>🚗 El chofer <strong>${_varsReg.nombre_chofer}</strong> ha enviado su solicitud para unirse a la flota.</p>
+           <p>📧 <strong>Email:</strong> ${_varsReg.email_chofer}<br>📱 <strong>Teléfono:</strong> ${_varsReg.telefono_chofer}<br>
+           🚘 <strong>Vehículo:</strong> ${_varsReg.vehiculo}<br>🏝️ <strong>Isla:</strong> ${_varsReg.isla}</p>
+           <p>🔍 Accede al panel de administración, en Conductores, para revisar su perfil y aprobar o rechazar la solicitud.</p>`)
+      });
+    }
+  } catch (err) {
+    console.warn('Error avisando al equipo del registro de chofer:', err.message);
+  }
+
   res.json({ ok: true });
 }));
 
@@ -17467,6 +17497,7 @@ const VARIABLES_PLANTILLAS = {
   interno_modificacion_solicitada: { email: ['numero_reserva', 'nombre_cliente', 'cambios'], wa: null },
   interno_cliente_cancelo:       { email: ['numero_reserva', 'nombre_cliente', 'origen', 'destino', 'fecha'], wa: null },
   interno_sin_choferes:          { email: ['numero_reserva'], wa: null },
+  interno_registro_chofer:       { email: ['nombre_chofer', 'email_chofer', 'telefono_chofer', 'vehiculo', 'isla'], wa: null },
   chofer_respuesta_confirmado:   { email: null, wa: ['numero_reserva'] },
   chofer_respuesta_rechazo:      { email: null, wa: [] },
   chofer_respuesta_ya_asignada:  { email: null, wa: ['numero_reserva'] },
