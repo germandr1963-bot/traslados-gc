@@ -5717,7 +5717,7 @@ function renderizarComFrases(data) {
   var idiomas = data.idiomas || [];
 
   document.getElementById('thead-com-frases').innerHTML =
-    '<tr><th style="text-align:left;">Frase</th>' +
+    '<tr><th style="text-align:left;white-space:normal;min-width:260px;max-width:420px;">Frase</th>' +
     '<th style="text-align:center;">ES</th>' +
     idiomas.map(function(l) { return '<th style="text-align:center;">' + l.toUpperCase() + '</th>'; }).join('') +
     '<th style="text-align:center;">Acción</th></tr>';
@@ -5757,7 +5757,8 @@ function renderizarComFrases(data) {
   var html = '';
   frases.forEach(function(f) {
     html += '<tr>' +
-      '<td><strong style="font-size:12px;">' + esc(f.texto_es) + '</strong><br>' +
+      // (14/10/2026) Frases largas en 2 o 3 líneas para que las columnas de idiomas no se vayan a la derecha
+      '<td style="white-space:normal;min-width:260px;max-width:420px;"><strong style="font-size:12px;">' + esc(f.texto_es) + '</strong><br>' +
       '<span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + f.clave + '</span><br>' +
       etiquetaCanal(f.canal) + '</td>' +
       celda(f.estado['es']) +
