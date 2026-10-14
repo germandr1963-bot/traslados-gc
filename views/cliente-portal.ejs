@@ -356,7 +356,7 @@
         '</div>';
       }
 
-      // Solo si no es historial: modificar y mensajes
+      // Solo si no es historial: modificar (los mensajes van aparte, más abajo)
       if (!r.es_historial) {
         html += '<div class="seccion-titulo">' + tx('por_gestionar') + '</div>';
         html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">' +
@@ -391,7 +391,11 @@
             '<div id="aviso-viaje-' + i + '" style="display:none;font-size:12px;margin-top:6px;"></div>' +
           '</div>' +
         '</div>';
+      }
 
+      // (14/10/2026) Mensajes con el equipo: también en las reservas ya realizadas, mientras estén en el portal
+      // (antes solo salían hasta la hora del servicio y el cliente no podía escribirnos después del viaje)
+      {
         // Mensajes — colapsado por defecto
         var numMsg = r.mensajes_sin_leer || 0;
         html += '<div style="border:1px solid #d4c4b0;border-radius:10px;overflow:hidden;margin-bottom:12px;">' +
