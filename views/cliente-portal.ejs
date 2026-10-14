@@ -282,7 +282,12 @@
           '<div class="reserva-resumen" onclick="toggleDetalle(' + i + ')">' +
             dotHTML +
             '<div class="reserva-info">' +
-              '<div class="reserva-pnr">' + r.numero_reserva + '</div>' +
+              // (14/10/2026) Aviso de mensajes nuevos del equipo, visible en la lista sin abrir la reserva (como en el Admin)
+              '<div class="reserva-pnr">' + r.numero_reserva +
+                (parseInt(r.mensajes_sin_leer) > 0
+                  ? ' <span id="badge-lista-msg-' + i + '" style="display:inline-block;background:#e65100;color:#fff;font-size:12px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle;">💬 ' + parseInt(r.mensajes_sin_leer) + '</span>'
+                  : '') +
+              '</div>' +
               '<div class="reserva-ruta">' + (r.origen_cliente || r.origen || '—') + ' → ' + (r.destino_cliente || r.destino || '—') + '</div>' +
               '<div class="reserva-fecha">📅 ' + fecha + ' · ' + hora + 'h</div>' +
             '</div>' +
@@ -518,6 +523,8 @@
         // Al abrir, los mensajes quedan leídos: se quita el aviso "nuevos"
         var badge = document.getElementById('badge-msg-' + i);
         if (badge) badge.style.display = 'none';
+        var badgeLista = document.getElementById('badge-lista-msg-' + i);
+        if (badgeLista) badgeLista.style.display = 'none';
       }
     }
 
