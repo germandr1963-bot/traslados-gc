@@ -2496,6 +2496,8 @@ async function initSchema() {
   `);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS token_valoracion TEXT UNIQUE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS completada_en TIMESTAMPTZ`);
+  // (14/10/2026) Hora en que se marcó "cliente no se presentó" (el portal del chofer la muestra 24 h más)
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS no_show_en TIMESTAMPTZ`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS aviso_pago_fallido_enviado BOOLEAN DEFAULT FALSE`);
 
   // \u2500\u2500\u2500 Tabla de plantillas de comunicaci\u00f3n \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -9405,7 +9407,10 @@ app.get('/chofer/mis-reservas', requireChofer, asyncHandler(async (req, res) => 
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
      WHERE r.conductor_id = $1
        AND (r.archivada = FALSE OR r.archivada IS NULL)
-       AND r.estado NOT IN ('cancelada', 'completada')
+       -- (14/10/2026) Completadas y "cliente no se presentó" siguen visibles 24 h desde que se marcaron
+       AND (r.estado NOT IN ('cancelada', 'completada', 'no_show')
+         OR (r.estado = 'completada' AND r.completada_en > NOW() - INTERVAL '24 hours')
+         OR (r.estado = 'no_show' AND r.no_show_en > NOW() - INTERVAL '24 hours'))
      ORDER BY r.fecha ASC, r.hora ASC`,
     [req.session.choferId]
   );
@@ -9799,7 +9804,7 @@ app.post('/chofer/reservas/:id/no-show', requireChofer, asyncHandler(async (req,
 
   // Actualizar estado y depósito
   await pool.query(
-    `UPDATE reservas SET estado = 'no_show', deposito_retenido_noshow = TRUE WHERE id = $1`,
+    `UPDATE reservas SET estado = 'no_show', deposito_retenido_noshow = TRUE, no_show_en = NOW() WHERE id = $1`,
     [r.id]
   );
 
@@ -10787,7 +10792,8 @@ app.post('/admin/reservas/:id/estado', requireAdmin, asyncHandler(async (req, re
   // (14/10/2026) Al marcar "completada" se guarda la hora (si no la tenía): desde ahí cuentan las 2 h del enlace
   await pool.query(
     `UPDATE reservas SET estado = $1,
-       completada_en = CASE WHEN $1::text = 'completada' THEN COALESCE(completada_en, NOW()) ELSE completada_en END
+       completada_en = CASE WHEN $1::text = 'completada' THEN COALESCE(completada_en, NOW()) ELSE completada_en END,
+       no_show_en = CASE WHEN $1::text = 'no_show' THEN COALESCE(no_show_en, NOW()) ELSE no_show_en END
      WHERE id = $2`, [estado, req.params.id]);
   res.json({ ok: true });
 }));
