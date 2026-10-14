@@ -8727,7 +8727,9 @@ function abrirDetalleReserva(id, sinScroll) {
         var nombresIdioma = { es: 'Español', en: 'Inglés (English)', de: 'Alemán (Deutsch)', sv: 'Sueco (Svenska)', no: 'Noruego (Norsk)', nl: 'Neerlandés (Nederlands)', it: 'Italiano', fr: 'Francés (Français)', fi: 'Finés (Suomi)', ru: 'Ruso (Русский)' };
         var codIdioma = r.idioma_portal || r.lang_cliente || 'es';
         var codReserva = r.lang_cliente || 'es';
-        idiomaCliEl.innerHTML = '🌐 <strong>Idioma del cliente: ' + (nombresIdioma[codIdioma] || codIdioma) + '</strong> — escríbele en este idioma.' +
+        // (14/10/2026) Los mensajes se traducen solos: el equipo escribe en español
+        idiomaCliEl.innerHTML = '🌐 <strong>Idioma del cliente: ' + (nombresIdioma[codIdioma] || codIdioma) + '</strong>' +
+          (codIdioma !== 'es' ? ' — escribe en español: le llegará traducido a su idioma.' : '') +
           (codReserva !== codIdioma ? '<br>📄 Idioma de la reserva: ' + (nombresIdioma[codReserva] || codReserva) + ' — documentos y chofer.' : '') +
           (r.idioma_viajero_otro ? '<br>🧳 Idioma de quien viaja: <strong>' + String(r.idioma_viajero_otro).replace(/</g,'&lt;') + '</strong>' : '');
       }
@@ -8960,6 +8962,7 @@ function enviarMensajeChofer() {
   });
 }
 
+var NOMBRES_IDIOMA_MSG = { es: 'español', en: 'inglés', de: 'alemán', sv: 'sueco', no: 'noruego', nl: 'neerlandés', it: 'italiano', fr: 'francés', fi: 'finés', ru: 'ruso' };
 function cargarMensajesAdmin(reservaId) {
   fetch('/admin/reservas/' + reservaId + '/mensajes')
     .then(function(r) { return r.json(); })
@@ -8979,6 +8982,9 @@ function cargarMensajesAdmin(reservaId) {
           '<span style="font-weight:600;color:' + (esCliente ? '#e65100' : '#2e7d32') + ';">' + (esCliente ? '👤 Cliente' : '👨‍💼 Equipo') + '</span>' +
           '<span style="color:#999;font-size:0.75rem;margin-left:8px;">' + fecha + '</span>' +
           '<p style="margin:4px 0 0;color:#333;">' + m.mensaje.replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n').join('<br>') + '</p>' +
+          // (14/10/2026) Traducción: el original del cliente, o cómo le llegó al cliente lo que escribió el equipo
+          (m.original ? '<p style="margin:4px 0 0;color:#8a8175;font-size:0.75rem;">🌐 Original (' + (NOMBRES_IDIOMA_MSG[m.lang] || m.lang || '') + '): ' + m.original.replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n').join('<br>') + '</p>' : '') +
+          (m.enviado_traducido ? '<p style="margin:4px 0 0;color:#8a8175;font-size:0.75rem;">🌐 Le llegó en ' + (NOMBRES_IDIOMA_MSG[m.lang] || m.lang || '') + ': ' + m.enviado_traducido.replace(/</g,'&lt;').replace(/>/g,'&gt;').split('\n').join('<br>') + '</p>' : '') +
           '</div>';
       }).join('');
       hilo.scrollTop = hilo.scrollHeight;
