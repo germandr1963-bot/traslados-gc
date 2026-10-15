@@ -286,6 +286,36 @@ function firmarFacturaComision(numeroFactura) {
     .update('factura-comision-' + String(numeroFactura)).digest('hex').slice(0, 20);
 }
 
+// (15/10/2026) WhatsApp con la foto de Admin → WhatsApp (tipo: 'traslado-confirmado', 'pago'…) arriba del texto.
+// puente.js la envía como foto con el texto debajo; si la foto falla, envía el texto solo.
+// Si no hay foto subida, sale como siempre: solo texto. Si el texto es muy largo para ir debajo de una
+// foto (más de 1000 caracteres), la foto va primero con el número de reserva y el texto entero justo detrás.
+async function encolarWhatsappConFoto(telefono, texto, tipoFoto, numeroReserva) {
+  let foto = null;
+  try {
+    const q = await pool.query('SELECT actualizado_en FROM whatsapp_imagenes WHERE tipo = $1 LIMIT 1', [tipoFoto]);
+    if (q.rows.length) foto = q.rows[0];
+  } catch (e) { console.warn('Foto de WhatsApp (' + tipoFoto + '):', e.message); }
+  if (!foto) {
+    await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [telefono, texto]);
+    return;
+  }
+  const ver = foto.actualizado_en ? new Date(foto.actualizado_en).getTime() : Date.now();
+  const urlFoto = BASE_URL + '/og-imagen/' + tipoFoto + '?v=' + ver;
+  if (String(texto || '').length <= 1000) {
+    await pool.query(
+      'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+      [telefono, texto, urlFoto, tipoFoto + '.png']
+    );
+    return;
+  }
+  await pool.query(
+    'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+    [telefono, '🔖 ' + (numeroReserva || ''), urlFoto, tipoFoto + '.png']
+  );
+  await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [telefono, texto]);
+}
+
 async function generarCodigoCorto(tipo, reservaId, tokenValoracion, urlDestino) {
   let codigo = crypto.randomBytes(3).toString('hex');
   try {
@@ -2488,6 +2518,9 @@ async function initSchema() {
       actualizado_en TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  // (15/10/2026) Biblioteca de imágenes (Admin → WhatsApp → Imágenes): cada imagen tiene su nombre
+  await pool.query(`ALTER TABLE whatsapp_imagenes ADD COLUMN IF NOT EXISTS nombre TEXT`);
+  await pool.query(`UPDATE whatsapp_imagenes SET nombre = CASE tipo WHEN 'valoracion' THEN 'Valoración' WHEN 'pago' THEN 'Enlace de pago' ELSE tipo END WHERE nombre IS NULL`);
 
   // ─── Valoraciones ─────────────────────────────────────────────────────────
   await pool.query(`
@@ -11053,10 +11086,8 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
       }, r.lang_cliente || 'es');
       const textoWa = (_pc1wa && _pc1wa.whatsapp) ||
         ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Hemos asignado un conductor para tu servicio. Revisa tu email para todos los detalles y el enlace de pago del depósito.');
-      await pool.query(
-        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
-        [r.telefono_cliente, textoWa]
-      );
+      // (15/10/2026) Con la foto de Admin → WhatsApp, si está subida
+      await encolarWhatsappConFoto(r.telefono_cliente, textoWa, 'traslado-confirmado', r.numero_reserva);
     }
   } catch(waErr) {
     console.warn('Error encolando WhatsApp confirmación al cliente:', waErr.message);
@@ -12215,10 +12246,8 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
       }, r.lang_cliente || 'es');
       const textoWa = (_pc2wa && _pc2wa.whatsapp) ||
         ('¡Tu traslado ' + r.numero_reserva + ' está confirmado! Revisa tu email para ver los detalles y el enlace de pago del depósito.');
-      await pool.query(
-        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
-        [r.telefono_cliente, textoWa]
-      );
+      // (15/10/2026) Con la foto de Admin → WhatsApp, si está subida
+      await encolarWhatsappConFoto(r.telefono_cliente, textoWa, 'traslado-confirmado', r.numero_reserva);
     }
   } catch(waErr) {
     console.warn('Error encolando WhatsApp confirmación manual:', waErr.message);
@@ -12333,10 +12362,8 @@ app.post('/admin/reservas/:id/reenviar-pago', requireAdmin, asyncHandler(async (
       }, lang);
       const textoWa = (_pepwa && _pepwa.whatsapp) ||
         `Hola, *${r.nombre_cliente}* 👋\n\n💳 Te reenviamos el enlace de pago para confirmar tu reserva *${r.numero_reserva}*.\n\n👉 ${urlCorta}\n\n❓ Si tienes algún problema con el pago, contacta con nosotros por WhatsApp.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*`;
-      await pool.query(
-        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
-        [r.telefono_cliente, textoWa]
-      );
+      // (15/10/2026) Con la foto de Admin → WhatsApp, si está subida
+      await encolarWhatsappConFoto(r.telefono_cliente, textoWa, 'pago', r.numero_reserva);
     }
   } catch(waErr) {
     console.warn('Error encolando WhatsApp enlace pago:', waErr.message);
@@ -16322,28 +16349,59 @@ app.post('/admin/reservas/:id/retener-noshow', requireAdmin, asyncHandler(async 
 
 // ─── Admin: imágenes de WhatsApp ─────────────────────────────────────────────
 // Devuelve los tipos que ya tienen imagen guardada
+// (15/10/2026) Biblioteca de imágenes (Admin → WhatsApp → Imágenes). Germán sube las que quiera con su nombre;
+// el programa usa cada una por su clave. USOS_IMAGENES dice dónde se usa cada clave: si se enlaza una imagen
+// nueva en el programa, hay que añadirla aquí. Una imagen que se usa no se puede borrar.
+const USOS_IMAGENES = {
+  'valoracion': 'WhatsApp «Solicitud de valoración»',
+  'traslado-confirmado': 'WhatsApp «Traslado confirmado»',
+  'pago': 'WhatsApp «Enlace de pago (depósito)»'
+};
+function claveImagen(nombre) {
+  return String(nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+function leerImagenSubida(imagen) {
+  if (!imagen || !/^data:image\/(png|jpeg);base64,/.test(imagen)) return { error: 'La imagen tiene que ser PNG o JPG.' };
+  if (imagen.length > 4000000) return { error: 'La imagen pesa demasiado (máx. ~3MB).' };
+  const partes = imagen.split(',');
+  return { mime: partes[0].match(/data:([^;]+)/)[1], buffer: Buffer.from(partes[1], 'base64') };
+}
+
 app.get('/admin/whatsapp-imagenes', requireAdmin, asyncHandler(async (req, res) => {
-  const result = await pool.query('SELECT tipo, tipo_mime, actualizado_en FROM whatsapp_imagenes ORDER BY tipo');
-  res.json({ imagenes: result.rows });
+  const result = await pool.query('SELECT tipo, nombre, tipo_mime, actualizado_en FROM whatsapp_imagenes ORDER BY actualizado_en ASC');
+  res.json({ imagenes: result.rows.map(function (f) {
+    return { tipo: f.tipo, nombre: f.nombre || f.tipo, tipo_mime: f.tipo_mime, actualizado_en: f.actualizado_en, uso: USOS_IMAGENES[f.tipo] || null };
+  }) });
 }));
 
-// Sube o actualiza la imagen de un tipo concreto (valoracion, factura, cartel)
+// Añadir una imagen nueva con su nombre
+app.post('/admin/whatsapp-imagenes', requireAdmin, asyncHandler(async (req, res) => {
+  const nombre = String((req.body && req.body.nombre) || '').trim().slice(0, 80);
+  if (!nombre) return res.status(400).json({ error: 'Escribe el nombre de la imagen.' });
+  const tipo = claveImagen(nombre);
+  if (!tipo) return res.status(400).json({ error: 'El nombre tiene que llevar letras o números.' });
+  const img = leerImagenSubida(req.body && req.body.imagen);
+  if (img.error) return res.status(400).json({ error: img.error });
+  const existe = await pool.query('SELECT 1 FROM whatsapp_imagenes WHERE tipo = $1', [tipo]);
+  if (existe.rows.length) return res.status(400).json({ error: 'Ya hay una imagen con ese nombre. Usa «Cambiar» en ella o elige otro nombre.' });
+  await pool.query('INSERT INTO whatsapp_imagenes (tipo, nombre, imagen, tipo_mime, actualizado_en) VALUES ($1, $2, $3, $4, NOW())', [tipo, nombre, img.buffer, img.mime]);
+  res.json({ ok: true, tipo: tipo });
+}));
+
+// Cambiar la foto de una imagen que ya existe
 app.post('/admin/whatsapp-imagenes/:tipo', requireAdmin, asyncHandler(async (req, res) => {
-  const tipo = req.params.tipo;
-  const tiposPermitidos = ['valoracion', 'pago'];
-  if (!tiposPermitidos.includes(tipo)) return res.status(400).json({ error: 'Tipo no válido.' });
-  const { imagen } = req.body;
-  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
-  if (imagen.length > 4000000) return res.status(400).json({ error: 'La imagen pesa demasiado (máx. ~3MB).' });
-  const [header, base64] = imagen.split(',');
-  const tipoMime = header.match(/data:([^;]+)/)[1];
-  const buffer = Buffer.from(base64, 'base64');
-  await pool.query(
-    `INSERT INTO whatsapp_imagenes (tipo, imagen, tipo_mime, actualizado_en)
-     VALUES ($1, $2, $3, NOW())
-     ON CONFLICT (tipo) DO UPDATE SET imagen = $2, tipo_mime = $3, actualizado_en = NOW()`,
-    [tipo, buffer, tipoMime]
-  );
+  const img = leerImagenSubida(req.body && req.body.imagen);
+  if (img.error) return res.status(400).json({ error: img.error });
+  const r = await pool.query('UPDATE whatsapp_imagenes SET imagen = $2, tipo_mime = $3, actualizado_en = NOW() WHERE tipo = $1 RETURNING tipo', [req.params.tipo, img.buffer, img.mime]);
+  if (!r.rows.length) return res.status(404).json({ error: 'Imagen no encontrada.' });
+  res.json({ ok: true });
+}));
+
+// Borrar una imagen (solo si no se usa en ningún sitio)
+app.delete('/admin/whatsapp-imagenes/:tipo', requireAdmin, asyncHandler(async (req, res) => {
+  if (USOS_IMAGENES[req.params.tipo]) return res.status(400).json({ error: 'Esta imagen se usa en ' + USOS_IMAGENES[req.params.tipo] + ': no se puede borrar.' });
+  await pool.query('DELETE FROM whatsapp_imagenes WHERE tipo = $1', [req.params.tipo]);
   res.json({ ok: true });
 }));
 
@@ -16873,7 +16931,7 @@ app.get('/api/whatsapp/plantilla/:clave', requierePuenteWhatsapp, asyncHandler(a
 
 app.get('/api/whatsapp/mensajes-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT id, telefono, texto, url_documento, nombre_documento, documento_base64 FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC LIMIT 20'
+    'SELECT id, telefono, texto, url_documento, nombre_documento, documento_base64 FROM whatsapp_mensajes_pendientes WHERE enviado = FALSE ORDER BY creado_en ASC, id ASC LIMIT 20'
   );
   res.json(result.rows);
 }));
