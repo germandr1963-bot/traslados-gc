@@ -3256,13 +3256,37 @@ Mientras siga parado no sale ningún WhatsApp: ni avisos a los choferes, ni conf
 
 📨 WhatsApp esperando en la cola: <strong>{en_cola}</strong>
 
-🔍 Revisa que el PC esté encendido, con OpenWA y la ventana de puente.js abiertos.`,
+🔍 Revisa que el PC esté encendido, con OpenWA y la ventana de puente.js abiertos.
+
+{que_hacer}`,
       cuerpo_whatsapp: null },
     { clave: 'interno_whatsapp_cola', nombre: '[Admin] Los WhatsApp no están saliendo', categoria: 'interno',
       asunto_email: '⚠️ Los WhatsApp no están saliendo',
       cuerpo_email: `⚠️ <strong>Los WhatsApp no están saliendo.</strong> puente.js funciona, pero hay <strong>{en_cola}</strong> WhatsApp esperando en la cola desde las <strong>{hora}</strong>.
 
-🔍 Revisa OpenWA en el PC (que esté abierto y con la sesión de WhatsApp conectada).`,
+🔍 Revisa OpenWA en el PC (que esté abierto y con la sesión de WhatsApp conectada).
+
+{que_hacer}`,
+      cuerpo_whatsapp: null },
+    // Pasos de ayuda: se escriben UNA vez y salen en el email de aviso ({que_hacer}) y en el recuadro del Admin
+    { clave: 'interno_ayuda_whatsapp_parado', nombre: '[Admin] Ayuda — WhatsApp parado (qué hacer)', categoria: 'interno',
+      asunto_email: 'Ayuda — WhatsApp parado (no se envía sola)',
+      cuerpo_email: `🛠️ <strong>Qué hacer:</strong>
+1. Comprueba que el PC está encendido. Si se fue la luz o se apagó, enciéndelo.
+2. Abre <strong>OpenWA</strong> (si no arranca solo con el PC) y comprueba que la sesión de WhatsApp está conectada.
+3. Abre la ventana de <strong>puente.js</strong>. Su primera línea dice «Puente Traslados GC — versión …».
+4. En unos segundos llegará el aviso «✅ WhatsApp automático funcionando de nuevo».
+
+⚠️ Si no sabes hacerlo o no se resuelve, <strong>avisa enseguida a tu responsable</strong>.`,
+      cuerpo_whatsapp: null },
+    { clave: 'interno_ayuda_whatsapp_cola', nombre: '[Admin] Ayuda — WhatsApp no sale (qué hacer)', categoria: 'interno',
+      asunto_email: 'Ayuda — WhatsApp no sale (no se envía sola)',
+      cuerpo_email: `🛠️ <strong>Qué hacer:</strong>
+1. En el PC, abre <strong>OpenWA</strong> y comprueba que la sesión de WhatsApp está conectada.
+2. Si OpenWA está bien, cierra la ventana de <strong>puente.js</strong> y vuelve a abrirla.
+3. En Admin → WhatsApp, comprueba que «WhatsApp en cola sin enviar» baja a 0.
+
+⚠️ Si no sabes hacerlo o no se resuelve, <strong>avisa enseguida a tu responsable</strong>.`,
       cuerpo_whatsapp: null },
     { clave: 'interno_whatsapp_vuelve', nombre: '[Admin] WhatsApp automático funcionando de nuevo', categoria: 'interno',
       asunto_email: '✅ WhatsApp automático funcionando de nuevo',
@@ -16867,6 +16891,19 @@ async function colaWhatsapp() {
   return { lista: q.rows, total: t.rows[0].n };
 }
 
+// Pasos de "Qué hacer" (plantillas de ayuda de Comunicaciones → Interno), ya en HTML; si faltaran, los de partida
+const AYUDA_WHATSAPP_RESPALDO = {
+  interno_ayuda_whatsapp_parado: '🛠️ <strong>Qué hacer:</strong>\n1. Comprueba que el PC está encendido. Si se fue la luz o se apagó, enciéndelo.\n2. Abre <strong>OpenWA</strong> (si no arranca solo con el PC) y comprueba que la sesión de WhatsApp está conectada.\n3. Abre la ventana de <strong>puente.js</strong>. Su primera línea dice «Puente Traslados GC — versión …».\n4. En unos segundos llegará el aviso «✅ WhatsApp automático funcionando de nuevo».\n\n⚠️ Si no sabes hacerlo o no se resuelve, <strong>avisa enseguida a tu responsable</strong>.',
+  interno_ayuda_whatsapp_cola: '🛠️ <strong>Qué hacer:</strong>\n1. En el PC, abre <strong>OpenWA</strong> y comprueba que la sesión de WhatsApp está conectada.\n2. Si OpenWA está bien, cierra la ventana de <strong>puente.js</strong> y vuelve a abrirla.\n3. En Admin → WhatsApp, comprueba que «WhatsApp en cola sin enviar» baja a 0.\n\n⚠️ Si no sabes hacerlo o no se resuelve, <strong>avisa enseguida a tu responsable</strong>.'
+};
+async function ayudaWhatsapp(clave) {
+  try {
+    const p = await obtenerPlantilla(clave, {}, 'es');
+    if (p && p.email) return String(p.email).replace(/^<!--lang:[a-z]+-->/, '');
+  } catch (e) { console.warn('Ayuda WhatsApp (' + clave + '):', e.message); }
+  return saltosEmailAHtml(AYUDA_WHATSAPP_RESPALDO[clave] || '');
+}
+
 // Envía un aviso del estado del WhatsApp con su plantilla de Comunicaciones → Interno; si faltara, el texto fijo
 async function avisoEstadoWhatsapp(clave, vars, asuntoRespaldo, cuerpoRespaldo) {
   try {
@@ -16894,11 +16931,11 @@ async function vigilarPuente() {
     if (!vivo && !estadoPuente.avisadoParado && (ahora - referencia) > PUENTE_AVISO_MS) {
       estadoPuente.avisadoParado = true;
       estadoPuente.paradoDesde = referencia;
-      const v = { hora: horaCanarias(referencia), fecha: fechaCanariasLarga(referencia), en_cola: String(cola.total) };
+      const v = { hora: horaCanarias(referencia), fecha: fechaCanariasLarga(referencia), en_cola: String(cola.total), que_hacer: await ayudaWhatsapp('interno_ayuda_whatsapp_parado') };
       console.log('⚠️ WhatsApp automático parado desde las ' + v.hora + ' — aviso al equipo.');
       await avisoEstadoWhatsapp('interno_whatsapp_parado', v,
         '⚠️ WhatsApp automático parado — desde las ' + v.hora,
-        '<p>⚠️ El WhatsApp automático está <strong>parado</strong> desde las <strong>' + v.hora + '</strong> (' + v.fecha + ').</p><p>Mientras siga parado no sale ningún WhatsApp. Los mensajes esperan en la cola y saldrán solos cuando vuelva.</p><p>📨 WhatsApp esperando en la cola: <strong>' + v.en_cola + '</strong></p><p>🔍 Revisa que el PC esté encendido, con OpenWA y la ventana de puente.js abiertos.</p>');
+        '<p>⚠️ El WhatsApp automático está <strong>parado</strong> desde las <strong>' + v.hora + '</strong> (' + v.fecha + ').</p><p>Mientras siga parado no sale ningún WhatsApp. Los mensajes esperan en la cola y saldrán solos cuando vuelva.</p><p>📨 WhatsApp esperando en la cola: <strong>' + v.en_cola + '</strong></p><p>🔍 Revisa que el PC esté encendido, con OpenWA y la ventana de puente.js abiertos.</p><p>' + v.que_hacer + '</p>');
     }
     if (vivo && estadoPuente.avisadoParado) {
       const desde = estadoPuente.paradoDesde || referencia;
@@ -16914,11 +16951,11 @@ async function vigilarPuente() {
     const colaAtascada = masAntiguo && (ahora - masAntiguo) > PUENTE_AVISO_MS;
     if (vivo && colaAtascada && !estadoPuente.avisadoCola) {
       estadoPuente.avisadoCola = true;
-      const v = { en_cola: String(cola.total), hora: horaCanarias(masAntiguo) };
+      const v = { en_cola: String(cola.total), hora: horaCanarias(masAntiguo), que_hacer: await ayudaWhatsapp('interno_ayuda_whatsapp_cola') };
       console.log('⚠️ Hay WhatsApp en cola sin salir desde las ' + v.hora + ' — aviso al equipo.');
       await avisoEstadoWhatsapp('interno_whatsapp_cola', v,
         '⚠️ Los WhatsApp no están saliendo',
-        '<p>⚠️ <strong>Los WhatsApp no están saliendo.</strong> puente.js funciona, pero hay <strong>' + v.en_cola + '</strong> WhatsApp esperando en la cola desde las <strong>' + v.hora + '</strong>.</p><p>🔍 Revisa OpenWA en el PC (que esté abierto y con la sesión de WhatsApp conectada).</p>');
+        '<p>⚠️ <strong>Los WhatsApp no están saliendo.</strong> puente.js funciona, pero hay <strong>' + v.en_cola + '</strong> WhatsApp esperando en la cola desde las <strong>' + v.hora + '</strong>.</p><p>🔍 Revisa OpenWA en el PC (que esté abierto y con la sesión de WhatsApp conectada).</p><p>' + v.que_hacer + '</p>');
     }
     if (!colaAtascada) estadoPuente.avisadoCola = false;
   } catch (e) {
@@ -16941,7 +16978,9 @@ app.get('/admin/whatsapp-estado', requireAdmin, asyncHandler(async (req, res) =>
                desde: new Date(m.creado_en).toLocaleString('es-ES', { timeZone: ZONA_HORARIA, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
                minutos: Math.round((ahora - new Date(m.creado_en).getTime()) / 60000) };
     }),
-    total_cola: cola.total
+    total_cola: cola.total,
+    ayuda_parado: await ayudaWhatsapp('interno_ayuda_whatsapp_parado'),
+    ayuda_cola: await ayudaWhatsapp('interno_ayuda_whatsapp_cola')
   });
 }));
 
@@ -17733,8 +17772,10 @@ const VARIABLES_PLANTILLAS = {
   interno_nuevo_chofer:          { email: ['numero_reserva', 'fecha', 'hora', 'nombre_chofer'], wa: null },
   interno_servicio_liberado:     { email: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora', 'chofer_anterior', 'causa'], wa: null },
   // (15/10/2026) Estado del WhatsApp automático
-  interno_whatsapp_parado:       { email: ['hora', 'fecha', 'en_cola'], wa: null },
-  interno_whatsapp_cola:         { email: ['en_cola', 'hora'], wa: null },
+  interno_whatsapp_parado:       { email: ['hora', 'fecha', 'en_cola', 'que_hacer'], wa: null },
+  interno_whatsapp_cola:         { email: ['en_cola', 'hora', 'que_hacer'], wa: null },
+  interno_ayuda_whatsapp_parado: { email: [], wa: null },
+  interno_ayuda_whatsapp_cola:   { email: [], wa: null },
   interno_whatsapp_vuelve:       { email: ['hora', 'duracion'], wa: null }
 };
 
