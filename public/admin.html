@@ -7581,7 +7581,7 @@ function cargarImagenesWhatsapp() {
               (tiene ? '<span style="font-size:12px;color:var(--texto-muted);margin-left:10px;">Actualizada ' + cuando + '</span>' : '<span style="font-size:12px;color:#e07b5a;margin-left:10px;">Sin imagen</span>') +
               (WA_IMAGENES_MEDIDAS[tipo] ? '<div style="font-size:11px;color:var(--texto-muted);margin-top:4px;">' + WA_IMAGENES_MEDIDAS[tipo] + '</div>' : '') +
             '</div>' +
-            (tiene ? '<a href="/og-imagen/' + tipo + '" target="_blank" style="font-size:12px;color:var(--dorado);">Ver imagen actual ↗</a>' : '') +
+            (tiene ? '<a href="/og-imagen/' + tipo + '?v=' + encodeURIComponent(guardadas[tipo].actualizado_en || '') + '" target="_blank" style="font-size:12px;color:var(--dorado);">Ver imagen actual ↗</a>' : '') +
           '</div>' +
           '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
             '<input type="file" id="wa-img-file-' + tipo + '" accept="image/png,image/jpeg,image/webp" style="font-size:13px;flex:1;min-width:0;" onchange="previsualizarImagenWa(\'' + tipo + '\')">' +
