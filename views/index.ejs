@@ -412,6 +412,11 @@ footer {
 
 
     <div class="panel-busqueda">
+      <!-- (15/10/2026) Fecha del viaje, primero: decide qué categorías hay ese día -->
+      <div class="fila-fecha-busqueda" style="margin-bottom:10px;">
+        <label class="etiqueta" for="fecha-busqueda"><%= t('home_label_fecha') %></label>
+        <input type="date" id="fecha-busqueda" class="campo" style="display:block;width:100%;max-width:260px;box-sizing:border-box;min-height:40px;padding:8px 10px;background:#fff;">
+      </div>
       <div class="fila-busqueda">
         <div class="custom-select-wrapper">
           <label class="etiqueta"><%= t('home_label_desde') %></label>
@@ -519,6 +524,8 @@ footer {
 var LANG = '<%= lang %>';
 var RUTA_RESERVA = '<%= rutaReserva %>';
 var TXT = {
+  eligeFecha:    '<%- t("home_texto_elige_fecha").replace(/'/g, "\\'") %>',
+  sinCatsFecha:  '<%- t("home_sin_categorias_fecha").replace(/'/g, "\\'") %>',
   eligeRuta:     '<%- t("home_texto_elige_ruta").replace(/'/g, "\\'") %>',
   aConsultar:    '<%- t("home_texto_a_consultar").replace(/'/g, "\\'") %>',
   badgeAprox:    '<%- t("precio_estimado").replace(/'/g, "\\'") %>',
@@ -732,8 +739,36 @@ function cargarRutas() {
   });
 }
 
+// (15/10/2026) Fecha del viaje: hoy (Canarias), mínimo hoy o mañana según Modelo de negocio
+var CONFIG_FECHA = { hoy: null, mismo_dia: true };
+function fechaBusqueda() { return document.getElementById('fecha-busqueda').value; }
+function sumarDia(ymd) { var d = new Date(ymd + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); }
+function prepararFechaBusqueda() {
+  var input = document.getElementById('fecha-busqueda');
+  var paramFecha = new URLSearchParams(window.location.search).get('fecha');
+  if (paramFecha && /^\d{4}-\d{2}-\d{2}$/.test(paramFecha)) input.value = paramFecha;
+  fetch('/api/reservas-config').then(function (r) { return r.json(); }).then(function (c) {
+    CONFIG_FECHA = c;
+    input.min = c.mismo_dia ? c.hoy : sumarDia(c.hoy);
+    comprobarFechaBusqueda();
+  }).catch(function () {});
+  input.addEventListener('change', function () {
+    comprobarFechaBusqueda();
+    document.getElementById('resultado-precio').innerHTML = '';
+    cargarCategorias();
+  });
+}
+// Si no se aceptan reservas del mismo día, la fecha de hoy simplemente no vale: se quita sin avisar
+function comprobarFechaBusqueda() {
+  var input = document.getElementById('fecha-busqueda');
+  var f = input.value;
+  if (f && input.min && f < input.min) { input.value = ''; return false; }
+  return true;
+}
+
 function cargarCategorias() {
-  fetch('/api/categorias?lang=' + LANG).then(function (r) { return r.json(); }).then(function (categorias) {
+  var _f = fechaBusqueda();
+  fetch('/api/categorias?lang=' + LANG + (_f ? '&fecha=' + encodeURIComponent(_f) : '')).then(function (r) { return r.json(); }).then(function (categorias) {
     categoriasDisponibles = categorias;
     var paramCategoria = new URLSearchParams(window.location.search).get('categoria');
     if (paramCategoria) {
@@ -776,6 +811,10 @@ function actualizarCategoriasSegunRuta() {
     if (String(c.id) === String(valorActual)) opt.selected = true;
     select.appendChild(opt);
   });
+  // (15/10/2026) Ruta sin ningún vehículo ese día: se avisa
+  if (!categoriasRuta.length && fechaBusqueda() && comprobarFechaBusqueda()) {
+    document.getElementById('resultado-precio').innerHTML = '<div class="resultado-vacio">' + TXT.sinCatsFecha + '</div>';
+  }
 
   if (valorActual && !categoriasRuta.find(function(c) { return String(c.id) === String(valorActual); })) {
     document.getElementById('resultado-precio').innerHTML = '';
@@ -788,6 +827,10 @@ function verPrecio() {
   var hastaVal = document.getElementById('hasta').value;
   var categoriaId = document.getElementById('categoria').value;
   var resultado = document.getElementById('resultado-precio');
+
+  // (15/10/2026) Primero la fecha
+  if (!fechaBusqueda()) { resultado.innerHTML = '<div class="resultado-vacio">' + TXT.eligeFecha + '</div>'; return; }
+  if (!comprobarFechaBusqueda()) { resultado.innerHTML = '<div class="resultado-vacio">' + TXT.eligeFecha + '</div>'; return; }
 
   if (!desdeVal || !hastaVal || !categoriaId) {
     resultado.innerHTML = '<div class="resultado-vacio">' + TXT.eligeRuta + '</div>';
@@ -852,7 +895,7 @@ function irAReserva() {
   var desde = document.getElementById('desde').value;
   var hasta = document.getElementById('hasta').value;
   var categoriaId = document.getElementById('categoria').value;
-  var params = new URLSearchParams({ desde: desde, hasta: hasta, categoria_id: categoriaId });
+  var params = new URLSearchParams({ desde: desde, hasta: hasta, categoria_id: categoriaId, fecha: fechaBusqueda() });
   window.location.href = RUTA_RESERVA + '?' + params.toString();
 }
 
@@ -860,6 +903,7 @@ document.getElementById('ver-precio').addEventListener('click', verPrecio);
 cargarFondo();
 iniciarDropdowns();
 cargarRutas();
+prepararFechaBusqueda(); // (15/10/2026) antes de cargar las categorías: la fecha decide cuáles hay
 cargarCategorias();
 
 function abrirFormCotizacion() {

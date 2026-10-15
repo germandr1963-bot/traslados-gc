@@ -933,6 +933,20 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
 
   // Fecha mínima hoy
   document.getElementById('fecha').min = new Date().toISOString().split('T')[0];
+  // (15/10/2026) La fecha elegida en el buscador llega puesta; el mínimo es hoy o mañana según Modelo de negocio
+  (function () {
+    var inputFecha = document.getElementById('fecha');
+    var paramFecha = new URLSearchParams(window.location.search).get('fecha');
+    if (paramFecha && /^\d{4}-\d{2}-\d{2}$/.test(paramFecha)) inputFecha.value = paramFecha;
+    fetch('/api/reservas-config').then(function (r) { return r.json(); }).then(function (c) {
+      CONFIG_FECHA_RESERVA = c;
+      if (c.hoy) {
+        var d = new Date(c.hoy + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + 1);
+        inputFecha.min = c.mismo_dia ? c.hoy : d.toISOString().slice(0, 10);
+        if (inputFecha.value && inputFecha.value < inputFecha.min) inputFecha.value = ''; // hoy no vale: se quita sin avisar
+      }
+    }).catch(function () {});
+  })();
 
   // Cargar precio y categoría
   if (paramCategoriaId && paramOrigen && paramDestino) {
@@ -1392,11 +1406,15 @@ function siguientePaso(desde) {
   irAPaso(desde + 1);
 }
 
+var CONFIG_FECHA_RESERVA = { hoy: null, mismo_dia: true };
 function validarPaso1() {
   var ok = true;
   var fecha = document.getElementById('fecha').value;
   document.getElementById('err-fecha').style.display = fecha ? 'none' : 'block';
   if (!fecha) ok = false;
+  // (15/10/2026) Hoy no vale si en Modelo de negocio no se aceptan reservas del mismo día: se quita sin avisar
+  var _inF = document.getElementById('fecha');
+  if (fecha && _inF.min && fecha < _inF.min) { _inF.value = ''; document.getElementById('err-fecha').style.display = 'block'; ok = false; }
 
   if (origenEsAero) {
     var h = document.getElementById('hora-llegada-vuelo').value;
