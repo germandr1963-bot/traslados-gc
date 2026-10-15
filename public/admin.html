@@ -169,7 +169,7 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="configuracion">No-Show</button>
       <button class="item-menu" data-seccion="contacto">Contacto</button>
       <button class="item-menu" data-seccion="facturacion">Facturación</button>
-      <button class="item-menu" data-seccion="whatsapp">WhatsApp</button>
+      <button class="item-menu" data-seccion="whatsapp">WhatsApp <span id="badge-wa-parado" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">parado</span></button>
       <button class="item-menu" data-seccion="extras">Extras</button>
       <button class="item-menu" data-seccion="cotizaciones">Cotizaciones <span id="badge-cotiz" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">0</span></button>
       <button class="item-menu" data-seccion="reservas">Reservas</button>
@@ -1283,6 +1283,17 @@ table.tabla-precios input {
     <div id="seccion-whatsapp" class="oculto">
       <h1>WhatsApp</h1>
 
+      <!-- (15/10/2026) Estado del WhatsApp automático (puente.js + OpenWA en el PC) -->
+      <div class="tarjeta" style="margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <h2 style="font-size:1rem;margin:0;">📡 Estado del WhatsApp automático</h2>
+          <button class="boton-secundario" style="font-size:0.8rem;padding:5px 12px;" onclick="cargarEstadoWhatsapp()">🔄 Actualizar</button>
+        </div>
+        <p style="font-size:13px;color:var(--texto-muted);margin:4px 0 14px;">Si puente.js está funcionando en el PC, los WhatsApp salen solos. Se comprueba cada 30 segundos. Si se para más de 5 minutos, llega un aviso por email a Notificaciones.</p>
+        <div id="wa-estado-caja" style="border-radius:8px;padding:10px 14px;font-size:14px;background:var(--gris-fondo);">Comprobando…</div>
+        <p id="wa-estado-cola-total" style="font-size:14px;margin:12px 0 0;"></p>
+        <div id="wa-estado-cola" style="margin-top:8px;"></div>
+      </div>
 
       <div class="tarjeta" style="margin-bottom:20px;">
         <!-- (15/10/2026) Biblioteca de imágenes: se suben con su nombre; cada una dice dónde se usa -->
@@ -2171,6 +2182,9 @@ function mostrarAdmin() {
   cargarPreciosGrid();
   // Badge de cotizaciones pendientes
   setTimeout(function() { cargarCotizaciones(); }, 500);
+  // (15/10/2026) Estado del WhatsApp automático: marca "parado" en el menú, comprobada cada 30 s
+  setTimeout(function() { cargarEstadoWhatsapp(); }, 700);
+  if (!window._intervaloEstadoWa) window._intervaloEstadoWa = setInterval(cargarEstadoWhatsapp, 30000);
   // Tras "🔄 Actualizar" (o la franja de versión nueva): volver a la sección en la que estaba
   try {
     var seccionGuardada = sessionStorage.getItem('adminSeccion');
@@ -2237,7 +2251,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'configuracion') cargarConfiguracionNoshow();
     if (boton.dataset.seccion === 'contacto') cargarContacto();
     if (boton.dataset.seccion === 'facturacion') cargarFacturacion();
-    if (boton.dataset.seccion === 'whatsapp') { cargarImagenesWhatsapp(); }
+    if (boton.dataset.seccion === 'whatsapp') { cargarImagenesWhatsapp(); cargarEstadoWhatsapp(); }
     if (boton.dataset.seccion === 'notificaciones') cargarNotificaciones();
     if (boton.dataset.seccion === 'destinos') { cargarDestinos(); cargarSelectorLangDestinos(); }
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
@@ -7568,6 +7582,48 @@ function guardarContacto() {
     av.innerHTML = '<div class="aviso-ok">✔ Datos de contacto guardados.</div>';
     setTimeout(function() { av.style.display = 'none'; }, 3000);
   });
+}
+
+// (15/10/2026) Estado del WhatsApp automático (Admin → WhatsApp) y marca "parado" en el menú
+function cargarEstadoWhatsapp() {
+  fetch('/admin/whatsapp-estado')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var badge = document.getElementById('badge-wa-parado');
+      if (badge) badge.style.display = d.funcionando ? 'none' : 'inline';
+      var caja = document.getElementById('wa-estado-caja');
+      if (!caja) return;
+      var colaVieja = (d.cola || []).some(function(m) { return m.minutos >= 2; });
+      if (d.funcionando && !colaVieja) {
+        caja.style.background = 'var(--verde-ok-fondo)'; caja.style.color = 'var(--verde-ok)';
+        caja.innerHTML = '🟢 <strong>Funcionando</strong> — último contacto de puente.js hace ' + d.segundos + ' segundos.';
+      } else if (d.funcionando) {
+        caja.style.background = '#fff4dc'; caja.style.color = '#7a5200';
+        caja.innerHTML = '🟡 <strong>puente.js funciona, pero los WhatsApp no salen.</strong><br><span style="font-size:13px;">Hay mensajes esperando más de 2 minutos. Revisa OpenWA en el PC (que esté abierto y con la sesión de WhatsApp conectada).</span>';
+      } else {
+        caja.style.background = 'var(--rojo-error-fondo)'; caja.style.color = 'var(--rojo-error)';
+        caja.innerHTML = '🔴 <strong>Parado</strong> — ' + (d.hora_ultimo ? 'último contacto de puente.js a las ' + escImgWa(d.hora_ultimo) + '.' : 'puente.js no ha hablado con la web desde que se reinició la web.') +
+          '<br><span style="font-size:13px;">Revisa que el PC esté encendido, con OpenWA y la ventana de puente.js abiertos. Mientras tanto no sale ningún WhatsApp, ni el aviso de 15 minutos ni la cancelación de 24 horas.</span>';
+      }
+      document.getElementById('wa-estado-cola-total').innerHTML = 'WhatsApp en cola sin enviar: <strong>' + (d.total_cola || 0) + '</strong>' +
+        (d.total_cola ? (d.funcionando ? '' : ' — saldrán solos cuando puente.js vuelva.') : '');
+      var lista = d.cola || [];
+      document.getElementById('wa-estado-cola').innerHTML = lista.length
+        ? '<table style="width:100%;border-collapse:collapse;font-size:13px;"><tr>' +
+            '<th style="text-align:left;padding:6px 8px;background:var(--gris-fondo);border-bottom:1px solid var(--gris-borde);">Desde</th>' +
+            '<th style="text-align:left;padding:6px 8px;background:var(--gris-fondo);border-bottom:1px solid var(--gris-borde);">Para</th>' +
+            '<th style="text-align:left;padding:6px 8px;background:var(--gris-fondo);border-bottom:1px solid var(--gris-borde);">Mensaje (comienzo)</th></tr>' +
+          lista.map(function(m) {
+            return '<tr><td style="padding:6px 8px;border-bottom:1px solid var(--gris-borde);white-space:nowrap;">' + escImgWa(m.desde) + '</td>' +
+              '<td style="padding:6px 8px;border-bottom:1px solid var(--gris-borde);white-space:nowrap;">' + escImgWa(m.telefono) + '</td>' +
+              '<td style="padding:6px 8px;border-bottom:1px solid var(--gris-borde);">' + (m.documento ? '📎 ' + escImgWa(m.documento) + ' · ' : '') + escImgWa(m.texto) + '…</td></tr>';
+          }).join('') + '</table>'
+        : '';
+    })
+    .catch(function() {
+      var caja = document.getElementById('wa-estado-caja');
+      if (caja) { caja.style.background = 'var(--gris-fondo)'; caja.style.color = ''; caja.textContent = 'No se pudo comprobar el estado. Pulsa 🔄 Actualizar.'; }
+    });
 }
 
 // (15/10/2026) Biblioteca de imágenes (Admin → WhatsApp → Imágenes)
