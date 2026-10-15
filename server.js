@@ -4387,7 +4387,7 @@ app.get('/fondo-activo', asyncHandler(async (req, res) => {
     return res.status(404).end();
   }
   res.set('Content-Type', result.rows[0].tipo_mime);
-  res.set('Cache-Control', 'public, max-age=3600');
+  res.set('Cache-Control', 'no-cache'); // (15/10/2026) Siempre la foto actual: el navegador pregunta cada vez si cambió (antes guardaba copia 1 h o 24 h)
   res.send(result.rows[0].imagen);
 }));
 
@@ -4719,7 +4719,7 @@ app.get('/admin/categorias/:id/foto', asyncHandler(async (req, res) => {
   const match = dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
   if (!match) return res.status(404).end();
   res.set('Content-Type', match[1]);
-  res.set('Cache-Control', 'public, max-age=86400');
+  res.set('Cache-Control', 'no-cache'); // (15/10/2026) Siempre la foto actual: el navegador pregunta cada vez si cambió (antes guardaba copia 1 h o 24 h)
   res.send(Buffer.from(match[2], 'base64'));
 }));
 
@@ -5468,7 +5468,7 @@ app.get('/ruta-imagen/:id', asyncHandler(async (req, res) => {
   const match = dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
   if (!match) return res.status(404).end();
   res.set('Content-Type', match[1]);
-  res.set('Cache-Control', 'public, max-age=86400');
+  res.set('Cache-Control', 'no-cache'); // (15/10/2026) Siempre la foto actual: el navegador pregunta cada vez si cambió (antes guardaba copia 1 h o 24 h)
   res.send(Buffer.from(match[2], 'base64'));
 }));
 
@@ -9680,10 +9680,22 @@ app.post('/chofer/reservas/:id/completar', requireChofer, asyncHandler(async (re
   if (r.telefono_cliente) {
     const textoWa = (_pval && _pval.whatsapp) || `Hola, ${r.nombre_cliente} 👋\n\nTu traslado ${r.numero_reserva} (${r.origen} → ${r.destino}) ha finalizado.\n\n⭐ ¿Nos cuentas cómo fue?\n👉 ${enlaceCorto}`;
     try {
-      await pool.query(
-        'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
-        [r.telefono_cliente, textoWa]
-      );
+      // (15/10/2026) Si hay foto "Valoración" en Admin → WhatsApp, el WhatsApp sale como FOTO con este texto debajo
+      // (puente.js la envía como imagen; si la foto fallara, envía el texto solo). Sin foto, como siempre: solo texto.
+      const _fotoVal = await pool.query("SELECT actualizado_en FROM whatsapp_imagenes WHERE tipo = 'valoracion' LIMIT 1");
+      if (_fotoVal.rows.length) {
+        // ?v= cambia cada vez que se sube una foto nueva: así nunca sale una copia antigua
+        const _verFoto = _fotoVal.rows[0].actualizado_en ? new Date(_fotoVal.rows[0].actualizado_en).getTime() : Date.now();
+        await pool.query(
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto, url_documento, nombre_documento) VALUES ($1, $2, $3, $4)',
+          [r.telefono_cliente, textoWa, BASE_URL + '/og-imagen/valoracion?v=' + _verFoto, 'valoracion.png']
+        );
+      } else {
+        await pool.query(
+          'INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+          [r.telefono_cliente, textoWa]
+        );
+      }
     } catch(e) { console.warn('Error encolando WhatsApp valoración:', e.message); }
 
     // Enviar factura PDF por WhatsApp como documento separado
@@ -13239,7 +13251,7 @@ app.get('/imagen-og-defecto', asyncHandler(async (req, res) => {
   const match = dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
   if (!match) return res.status(404).end();
   res.set('Content-Type', match[1]);
-  res.set('Cache-Control', 'public, max-age=86400');
+  res.set('Cache-Control', 'no-cache'); // (15/10/2026) Siempre la foto actual: el navegador pregunta cada vez si cambió (antes guardaba copia 1 h o 24 h)
   res.send(Buffer.from(match[2], 'base64'));
 }));
 
@@ -16349,7 +16361,7 @@ app.get('/foto-chofer/:slug', asyncHandler(async (req, res) => {
   if (!match) return res.status(400).send('Formato no válido.');
   const buffer = Buffer.from(match[2], 'base64');
   res.set('Content-Type', match[1]);
-  res.set('Cache-Control', 'public, max-age=86400');
+  res.set('Cache-Control', 'no-cache'); // (15/10/2026) Siempre la foto actual: el navegador pregunta cada vez si cambió (antes guardaba copia 1 h o 24 h)
   res.send(buffer);
 }));
 
@@ -16360,7 +16372,7 @@ app.get('/og-imagen/:tipo', asyncHandler(async (req, res) => {
   );
   if (!result.rows.length) return res.status(404).send('Imagen no disponible.');
   res.set('Content-Type', result.rows[0].tipo_mime);
-  res.set('Cache-Control', 'public, max-age=3600');
+  res.set('Cache-Control', 'no-cache'); // (15/10/2026) Siempre la foto actual: el navegador pregunta cada vez si cambió (antes guardaba copia 1 h o 24 h)
   res.send(result.rows[0].imagen);
 }));
 
