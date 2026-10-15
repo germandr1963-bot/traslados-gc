@@ -158,6 +158,7 @@ table.tabla-precios input {
   <div class="admin-menu">
     <span class="marca">Traslados · GC</span>
     <div class="admin-menu-botones">
+      <button class="item-menu" data-seccion="modelo">🏢 Modelo de negocio</button>
       <button class="item-menu activo" data-seccion="fondos">Fondos de portada</button>
       <button class="item-menu" data-seccion="categorias">Categorías</button>
       <button class="item-menu" data-seccion="conductores">Conductores</button>
@@ -1280,6 +1281,22 @@ table.tabla-precios input {
       </div>
     </div>
 
+    <!-- (15/10/2026) Modelo de negocio: reglas de cómo trabaja la empresa -->
+    <div id="seccion-modelo" class="oculto">
+      <h1>🏢 Modelo de negocio</h1>
+      <p class="subtitulo">Reglas de cómo trabaja la empresa. Lo que se marca aquí cambia lo que puede hacer el cliente en la web.</p>
+      <div class="tarjeta" style="margin-bottom:20px;">
+        <h2 style="font-size:1rem;margin:0 0 10px 0;">📅 Reservas</h2>
+        <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:14px;">
+          <input type="checkbox" id="modelo-no-mismo-dia" style="width:18px;height:18px;margin-top:2px;">
+          <span><strong>No aceptamos reservas del mismo día</strong><br>
+          <span style="font-size:13px;color:var(--texto-muted);">Marcado: en el buscador y en la página de reserva la fecha de hoy no sale; el calendario empieza mañana. Sin marcar: se puede reservar para hoy, y solo salen las categorías con algún chofer con «Disponible hoy».</span></span>
+        </label>
+        <div style="margin-top:14px;"><button class="boton-primario" style="font-size:0.85rem;padding:7px 14px;" onclick="guardarModeloNegocio()">💾 Guardar</button>
+        <span id="aviso-modelo" style="margin-left:10px;font-size:0.85rem;"></span></div>
+      </div>
+    </div>
+
     <div id="seccion-whatsapp" class="oculto">
       <h1>WhatsApp</h1>
 
@@ -2252,6 +2269,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'contacto') cargarContacto();
     if (boton.dataset.seccion === 'facturacion') cargarFacturacion();
     if (boton.dataset.seccion === 'whatsapp') { cargarImagenesWhatsapp(); cargarEstadoWhatsapp(); }
+    if (boton.dataset.seccion === 'modelo') { cargarModeloNegocio(); }
     if (boton.dataset.seccion === 'notificaciones') cargarNotificaciones();
     if (boton.dataset.seccion === 'destinos') { cargarDestinos(); cargarSelectorLangDestinos(); }
     if (boton.dataset.seccion === 'precios') cargarPreciosGrid();
@@ -7582,6 +7600,22 @@ function guardarContacto() {
     av.innerHTML = '<div class="aviso-ok">✔ Datos de contacto guardados.</div>';
     setTimeout(function() { av.style.display = 'none'; }, 3000);
   });
+}
+
+// (15/10/2026) Modelo de negocio
+function cargarModeloNegocio() {
+  fetch('/admin/modelo-negocio').then(function(r) { return r.json(); }).then(function(d) {
+    document.getElementById('modelo-no-mismo-dia').checked = !!d.no_mismo_dia;
+  }).catch(function() {});
+}
+function guardarModeloNegocio() {
+  var av = document.getElementById('aviso-modelo');
+  av.style.color = 'var(--texto-muted)'; av.textContent = 'Guardando...';
+  fetch('/admin/modelo-negocio', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ no_mismo_dia: document.getElementById('modelo-no-mismo-dia').checked }) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (d.ok) { av.style.color = 'green'; av.textContent = '✅ Guardado.'; } else { av.style.color = 'var(--rojo)'; av.textContent = '❌ No se pudo guardar.'; } })
+    .catch(function() { av.style.color = 'var(--rojo)'; av.textContent = '❌ Error de conexión.'; });
 }
 
 // (15/10/2026) Pasos de "Qué hacer" (se editan en Comunicaciones → Interno → "[Admin] Ayuda — …"), separados del aviso
