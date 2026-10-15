@@ -7584,6 +7584,12 @@ function guardarContacto() {
   });
 }
 
+// (15/10/2026) Pasos de "Qué hacer" (se editan en Comunicaciones → Interno → "[Admin] Ayuda — …"), separados del aviso
+function ayudaEstadoWa(html) {
+  if (!html) return '';
+  return '<div style="margin-top:10px;padding:10px 12px;background:#fff;border:1px solid var(--gris-borde);border-radius:6px;color:var(--texto-oscuro);font-size:13px;line-height:1.5;">' + html + '</div>';
+}
+
 // (15/10/2026) Estado del WhatsApp automático (Admin → WhatsApp) y marca "parado" en el menú
 function cargarEstadoWhatsapp() {
   fetch('/admin/whatsapp-estado')
@@ -7599,11 +7605,11 @@ function cargarEstadoWhatsapp() {
         caja.innerHTML = '🟢 <strong>Funcionando</strong> — último contacto de puente.js hace ' + d.segundos + ' segundos.';
       } else if (d.funcionando) {
         caja.style.background = '#fff4dc'; caja.style.color = '#7a5200';
-        caja.innerHTML = '🟡 <strong>puente.js funciona, pero los WhatsApp no salen.</strong><br><span style="font-size:13px;">Hay mensajes esperando más de 2 minutos. Revisa OpenWA en el PC (que esté abierto y con la sesión de WhatsApp conectada).</span>';
+        caja.innerHTML = '🟡 <strong>puente.js funciona, pero los WhatsApp no salen.</strong><br><span style="font-size:13px;">Hay mensajes esperando más de 2 minutos. Revisa OpenWA en el PC (que esté abierto y con la sesión de WhatsApp conectada).</span>' + ayudaEstadoWa(d.ayuda_cola);
       } else {
         caja.style.background = 'var(--rojo-error-fondo)'; caja.style.color = 'var(--rojo-error)';
         caja.innerHTML = '🔴 <strong>Parado</strong> — ' + (d.hora_ultimo ? 'último contacto de puente.js a las ' + escImgWa(d.hora_ultimo) + '.' : 'puente.js no ha hablado con la web desde que se reinició la web.') +
-          '<br><span style="font-size:13px;">Revisa que el PC esté encendido, con OpenWA y la ventana de puente.js abiertos. Mientras tanto no sale ningún WhatsApp, ni el aviso de 15 minutos ni la cancelación de 24 horas.</span>';
+          '<br><span style="font-size:13px;">Revisa que el PC esté encendido, con OpenWA y la ventana de puente.js abiertos. Mientras tanto no sale ningún WhatsApp, ni el aviso de 15 minutos ni la cancelación de 24 horas.</span>' + ayudaEstadoWa(d.ayuda_parado);
       }
       document.getElementById('wa-estado-cola-total').innerHTML = 'WhatsApp en cola sin enviar: <strong>' + (d.total_cola || 0) + '</strong>' +
         (d.total_cola ? (d.funcionando ? '' : ' — saldrán solos cuando puente.js vuelva.') : '');
