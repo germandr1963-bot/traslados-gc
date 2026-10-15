@@ -928,6 +928,11 @@ async function initSchema() {
     { clave: 'home_asistente_texto',   contexto: 'Párrafo de marketing del asistente de selección de vehículo en el hero', es: '¿Viajas con tabla de surf, bicicleta, silla de ruedas u otro equipaje especial? No todos los vehículos son iguales. Nuestro asistente te dice en segundos qué categoría se adapta mejor a tu grupo.' },
     { clave: 'home_asistente_cta',     contexto: 'Enlace que abre el asistente de selección de vehículo', es: '→ Tengo equipaje especial — Ver qué vehículo me conviene' },
     { clave: 'home_asistente_cerrar',  contexto: 'Botón de cerrar el asistente de selección de vehículo', es: 'Cerrar' },
+    // (15/10/2026) Fecha del viaje, primero en el buscador
+    { clave: 'home_label_fecha',         contexto: 'Etiqueta del campo de fecha del viaje en el buscador de rutas (va primero)', es: 'Fecha', en: 'Date', de: 'Datum', fr: 'Date', it: 'Data', nl: 'Datum', no: 'Dato', sv: 'Datum', fi: 'Päivämäärä' },
+    { clave: 'home_texto_elige_fecha',   contexto: 'Aviso del buscador si se pulsa Ver precio sin haber elegido la fecha', es: 'Elige la fecha del viaje', en: 'Choose the date of your trip', de: 'Wähle das Reisedatum', fr: 'Choisissez la date du trajet', it: 'Scegli la data del viaggio', nl: 'Kies de reisdatum', no: 'Velg reisedato', sv: 'Välj resdatum', fi: 'Valitse matkan päivämäärä' },
+    { clave: 'home_aviso_mismo_dia',     contexto: 'Solo por seguridad: respuesta si alguien intenta guardar una reserva para hoy cuando en Admin → Modelo de negocio está marcado «No aceptamos reservas del mismo día» (en la web, la fecha de hoy simplemente no sale)', es: 'No aceptamos reservas para hoy. Elige otra fecha.', en: 'We do not accept bookings for today. Please choose another date.', de: 'Für heute nehmen wir keine Buchungen an. Bitte wähle ein anderes Datum.', fr: 'Nous n\u2019acceptons pas de réservations pour aujourd\u2019hui. Choisissez une autre date.', it: 'Non accettiamo prenotazioni per oggi. Scegli un\u2019altra data.', nl: 'We nemen geen boekingen voor vandaag aan. Kies een andere datum.', no: 'Vi tar ikke imot bestillinger for i dag. Velg en annen dato.', sv: 'Vi tar inte emot bokningar för i dag. Välj ett annat datum.', fi: 'Emme ota vastaan varauksia tälle päivälle. Valitse toinen päivä.' },
+    { clave: 'home_sin_categorias_fecha', contexto: 'Aviso del buscador cuando la ruta no tiene ningún vehículo disponible en la fecha elegida', es: 'No hay vehículos disponibles para esta ruta en esa fecha.', en: 'No vehicles are available for this route on that date.', de: 'Für diese Strecke sind an diesem Datum keine Fahrzeuge verfügbar.', fr: 'Aucun véhicule n\u2019est disponible pour ce trajet à cette date.', it: 'Nessun veicolo disponibile per questo percorso in quella data.', nl: 'Er zijn geen voertuigen beschikbaar voor deze route op die datum.', no: 'Ingen kjøretøy er tilgjengelige for denne ruten på den datoen.', sv: 'Inga fordon finns tillgängliga för den här rutten det datumet.', fi: 'Tälle reitille ei ole ajoneuvoja saatavilla sinä päivänä.' },
     { clave: 'home_label_desde',         contexto: 'Etiqueta del selector de origen en el buscador de rutas', es: 'Desde', en: 'From' },
     { clave: 'home_label_hasta',         contexto: 'Etiqueta del selector de destino en el buscador de rutas', es: 'Hasta', en: 'To' },
     { clave: 'home_label_categoria',     contexto: 'Etiqueta del selector de categoría de vehículo', es: 'Categoría', en: 'Category' },
@@ -2509,6 +2514,16 @@ async function initSchema() {
   await pool.query(`ALTER TABLE url_cortas ALTER COLUMN token_valoracion DROP NOT NULL`);
   await pool.query(`ALTER TABLE url_cortas ADD COLUMN IF NOT EXISTS url_destino TEXT`);
 
+  // ─── (15/10/2026) Modelo de negocio (Admin → Modelo de negocio) ────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS configuracion_modelo (
+      id INT PRIMARY KEY DEFAULT 1,
+      no_mismo_dia BOOLEAN NOT NULL DEFAULT FALSE,
+      actualizado_en TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query(`INSERT INTO configuracion_modelo (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+
   // ─── Imágenes de WhatsApp ──────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS whatsapp_imagenes (
@@ -3815,6 +3830,17 @@ async function obtenerConfigNoshow(fechaViaje) {
 // y en verano todos los cálculos iban 1 hora tarde.
 const ZONA_HORARIA = 'Atlantic/Canary';
 
+// (15/10/2026) Fecha de hoy en Canarias (AAAA-MM-DD) y modelo de negocio (Admin → Modelo de negocio)
+function hoyCanarias() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_HORARIA, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+async function leerModeloNegocio() {
+  try {
+    const q = await pool.query('SELECT no_mismo_dia FROM configuracion_modelo WHERE id = 1');
+    return { no_mismo_dia: !!(q.rows.length && q.rows[0].no_mismo_dia) };
+  } catch (e) { return { no_mismo_dia: false }; }
+}
+
 // Diferencia en milisegundos entre la hora de Canarias y la universal en un instante dado
 function desfaseCanarias(instante) {
   const partes = new Intl.DateTimeFormat('en-US', {
@@ -3934,12 +3960,26 @@ app.get('/admin/sesion', (req, res) => {
 app.get('/api/categorias', asyncHandler(async (req, res) => {
   // Solo muestra categorías que tienen al menos un conductor aprobado y disponible_hoy = TRUE.
   // Si no hay ningún conductor operativo en una categoría, no aparece en el buscador público.
+  // (15/10/2026) Con ?fecha=AAAA-MM-DD (buscador con fecha): para HOY, choferes con «Disponible hoy»
+  // (y nada si en Modelo de negocio no se aceptan reservas del mismo día); para OTRO día, choferes aprobados.
+  // Sin fecha, como siempre.
+  const fechaPedida = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.fecha || '')) ? String(req.query.fecha) : null;
+  let filtroDisponible = 'AND c.disponible_hoy = TRUE';
+  if (fechaPedida) {
+    const hoy = hoyCanarias();
+    if (fechaPedida < hoy) return res.json([]);
+    if (fechaPedida === hoy) {
+      if ((await leerModeloNegocio()).no_mismo_dia) return res.json([]);
+    } else {
+      filtroDisponible = '';
+    }
+  }
   const result = await pool.query(
     `SELECT DISTINCT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.descripcion, cv.limite_sillas, cv.foto, cv.orden
      FROM categorias_vehiculos cv
      JOIN conductores c ON c.categoria_id = cv.id
                        AND c.estado = 'aprobado'
-                       AND c.disponible_hoy = TRUE
+                       ${filtroDisponible}
      WHERE cv.disponible = TRUE
      ORDER BY cv.orden, cv.nombre`
   );
@@ -3966,6 +4006,22 @@ app.get('/api/categorias', asyncHandler(async (req, res) => {
   }
 
   res.json(result.rows);
+}));
+
+// (15/10/2026) Lo que necesita el buscador para la fecha: hoy (Canarias) y si se aceptan reservas del mismo día
+app.get('/api/reservas-config', asyncHandler(async (req, res) => {
+  const m = await leerModeloNegocio();
+  res.json({ hoy: hoyCanarias(), mismo_dia: !m.no_mismo_dia });
+}));
+
+app.get('/admin/modelo-negocio', requireAdmin, asyncHandler(async (req, res) => {
+  res.json(await leerModeloNegocio());
+}));
+
+app.post('/admin/modelo-negocio', requireAdmin, asyncHandler(async (req, res) => {
+  const noMismoDia = !!(req.body && req.body.no_mismo_dia);
+  await pool.query('UPDATE configuracion_modelo SET no_mismo_dia = $1, actualizado_en = NOW() WHERE id = 1', [noMismoDia]);
+  res.json({ ok: true, no_mismo_dia: noMismoDia });
 }));
 
 app.get('/api/flota', asyncHandler(async (req, res) => {
@@ -4255,6 +4311,16 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
 
   if (!origen || !destino || !categoria_id || !fecha || !nombre_cliente || !telefono_cliente || !email_cliente) {
     return res.status(400).json({ error: 'Faltan datos obligatorios.' });
+  }
+  // (15/10/2026) Fecha del viaje: nunca en el pasado; hoy, solo si Modelo de negocio acepta reservas del mismo día
+  {
+    const _langErr = (lang_cliente && IDIOMAS_PERMITIDOS.includes(lang_cliente)) ? lang_cliente : 'es';
+    const _fechaRes = String(fecha).slice(0, 10);
+    const _hoyRes = hoyCanarias();
+    if (_fechaRes < _hoyRes) return res.status(400).json({ error: obtenerTexto('reserva_err_fecha', _langErr) });
+    if (_fechaRes === _hoyRes && (await leerModeloNegocio()).no_mismo_dia) {
+      return res.status(400).json({ error: obtenerTexto('home_aviso_mismo_dia', _langErr) });
+    }
   }
   if (es_para_otra_persona && (!nombre_pasajero_otro || !nombre_pasajero_otro.trim())) {
     return res.status(400).json({ error: 'Falta el nombre de la persona que viaja.' });
