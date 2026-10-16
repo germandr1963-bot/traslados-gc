@@ -1695,6 +1695,42 @@ async function initSchema() {
     );
   }
 
+  // (16/10/2026) Página "Modificar reserva" (portal del cliente → ✏️ Modificar) en el idioma del portal.
+  // Solo los textos propios de esta página; los iguales a la página de reserva se reutilizan. Se crean una sola vez (DO NOTHING).
+  const TEXTOS_MODIFICAR = [
+    { clave: 'mod_volver',            contexto: 'Botón para volver al portal (arriba, en el error y al terminar). Arriba lleva delante la flecha ←', es: 'Volver a mis reservas' },
+    { clave: 'mod_cargando',          contexto: 'Mientras se cargan los datos de la reserva', es: 'Cargando tu reserva...' },
+    { clave: 'mod_aviso',             contexto: 'Aviso amarillo arriba. {pnr} = número de reserva (no traducir lo que va entre llaves)', es: '✏️ Estás modificando tu reserva. El PNR {pnr} no cambiará. Nuestro equipo revisará los cambios y te confirmará.' },
+    { clave: 'mod_subtitulo',         contexto: 'Frase bajo el título "Modificar reserva"', es: 'Actualiza los datos que necesites y confirma al final.' },
+    { clave: 'mod_label_categoria',   contexto: 'Etiqueta del selector de categoría', es: 'Categoría de vehículo' },
+    { clave: 'mod_nota_extras',       contexto: 'Nota bajo la lista de extras', es: 'Los extras se abonan directamente al chofer. No forman parte de ningún cargo online.' },
+    { clave: 'mod_paso3_titulo',      contexto: 'Título del paso 3', es: 'Notas adicionales' },
+    { clave: 'mod_paso3_resumen',     contexto: 'Frase bajo el título del paso 3', es: 'Información extra para el equipo' },
+    { clave: 'mod_resumen_titulo',    contexto: 'Título del resumen final', es: 'Resumen de cambios' },
+    { clave: 'mod_resumen_aviso',     contexto: 'Frase bajo el resumen final', es: 'Revisa que todo sea correcto. Al confirmar, nuestro equipo recibirá la solicitud de modificación y te avisará por email.' },
+    { clave: 'mod_resumen_reserva',   contexto: 'Etiqueta del número de reserva en el resumen final', es: 'Reserva' },
+    { clave: 'mod_resumen_hora',      contexto: 'Etiqueta de la hora en el resumen final', es: 'Hora' },
+    { clave: 'mod_sin_extras',        contexto: 'Bajo el título del paso 2 si no se eligió ningún extra', es: 'Sin extras' },
+    { clave: 'mod_boton_revisar',     contexto: 'Botón del paso 3 para ver el resumen', es: 'Revisar cambios' },
+    { clave: 'mod_boton_confirmar',   contexto: 'Botón para enviar la modificación', es: 'Confirmar modificación' },
+    { clave: 'mod_ok_titulo',         contexto: 'Título al enviar bien la modificación', es: 'Modificación enviada' },
+    { clave: 'mod_ok_texto',          contexto: 'Texto al enviar bien la modificación', es: 'Hemos recibido tu solicitud de modificación. Nuestro equipo la revisará y recibirás confirmación por email en breve.' },
+    { clave: 'mod_err_sin_pnr',       contexto: 'Error: se abrió la página sin número de reserva', es: 'No se ha indicado un número de reserva.' },
+    { clave: 'mod_err_cargar',        contexto: 'Error: no se pudo cargar la reserva', es: 'Error al cargar la reserva.' },
+    { clave: 'mod_err_enviar',        contexto: 'Error: no se pudo enviar la modificación', es: 'Error al enviar.' },
+    { clave: 'mod_srv_no_encontrada', contexto: 'Error del servidor: la reserva no existe o no es de este cliente', es: 'Reserva no encontrada.' },
+    { clave: 'mod_srv_plazo_reserva', contexto: 'Error del servidor al abrir la página: ya pasó el plazo para modificar', es: 'El plazo de modificación ha vencido para esta reserva.' },
+    { clave: 'mod_srv_plazo',         contexto: 'Error del servidor al enviar: ya pasó el plazo para modificar', es: 'El plazo de modificación ha vencido.' }
+  ];
+  for (const tx of TEXTOS_MODIFICAR) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Modificar reserva', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
+
   const TEXTOS_VOUCHER = [
     { clave: 'vou_hola',              contexto: 'Saludo del voucher, con su coma (ej: Hola,). El programa añade detrás el nombre del cliente en negrita y 👋 (ej: Hola, Ana 👋).', es: 'Hola,' },
     { clave: 'vou_confirmado',        contexto: 'Aviso verde arriba del voucher', es: 'Depósito recibido. Tu traslado está confirmado.' },
@@ -4153,6 +4189,24 @@ app.get('/api/categorias-publicas', asyncHandler(async (req, res) => {
   const result = await pool.query(
     'SELECT id, nombre, capacidad_pasajeros FROM categorias_vehiculos WHERE activa = TRUE ORDER BY id'
   );
+  // (16/10/2026) Si se pide un idioma, se añade el nombre traducido (igual que /api/categorias). Sin idioma, como siempre.
+  const lang = req.query.lang;
+  if (lang && lang !== 'es') {
+    const catsTrad = await pool.query(
+      `SELECT ti.texto_es, COALESCE(tit.texto, ti.texto_es) AS nombre_traducido
+       FROM textos_interfaz ti
+       LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+       WHERE ti.modulo = 'Categorías de vehículo'`,
+      [lang]
+    );
+    const mapaCategorias = {};
+    for (const c of catsTrad.rows) {
+      mapaCategorias[c.texto_es] = c.nombre_traducido;
+    }
+    for (const r of result.rows) {
+      r.nombre_traducido = mapaCategorias[r.nombre] || r.nombre;
+    }
+  }
   res.json(result.rows);
 }));
 
@@ -15430,10 +15484,32 @@ app.get('/api/cliente/mensajes', asyncHandler(async (req, res) => {
 }));
 
 // ─── Portal cliente: página de modificación ──────────────────────────────────
+// (16/10/2026) En el idioma del portal del cliente (ver idiomaPortalCliente), como "Mi reserva".
+// Textos: Admin → Idiomas → Textos de interfaz → "Modificar reserva" (y los de la página de reserva que ya existían).
+// Si algo falla, se sirve la página antigua en español, como hasta ahora.
 app.get('/modificar-reserva', (req, res) => {
   res.set('Cache-Control', 'no-cache');
-  res.sendFile('modificar-reserva.html', { root: path.join(__dirname, 'public') });
+  (async function () {
+    let lang = 'es';
+    try {
+      if (req.session && req.session.clienteReservaId) lang = await idiomaPortalCliente(req);
+    } catch (e) { console.warn('Modificar reserva (idioma):', e.message); lang = 'es'; }
+    if (!IDIOMAS_PERMITIDOS.includes(lang)) lang = 'es';
+    const t = function (clave) { return obtenerTexto(clave, lang); };
+    res.render('modificar-reserva', { lang, t });
+  })().catch(function (e) {
+    console.warn('Modificar reserva:', e.message);
+    res.sendFile('modificar-reserva.html', { root: path.join(__dirname, 'public') });
+  });
 });
+
+// (16/10/2026) Mensajes de la página "Modificar" en el idioma del portal (si falta el texto, el español de siempre)
+async function textoModificar(req, clave, porDefecto) {
+  let lang = 'es';
+  try { lang = await idiomaPortalCliente(req); } catch (e) { lang = 'es'; }
+  const v = obtenerTexto(clave, lang);
+  return (v && v.indexOf('[[') !== 0) ? v : porDefecto;
+}
 
 // ─── Portal cliente: cargar datos de reserva para pre-rellenar el formulario ─
 app.get('/api/cliente/datos-modificacion', asyncHandler(async (req, res) => {
@@ -15457,7 +15533,7 @@ app.get('/api/cliente/datos-modificacion', asyncHandler(async (req, res) => {
      WHERE UPPER(r.numero_reserva) = UPPER($1) AND LOWER(r.email_cliente) = LOWER($2) AND r.archivada = FALSE`,
     [pnr, emailCliente]
   );
-  if (!result.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  if (!result.rows.length) return res.status(404).json({ error: await textoModificar(req, 'mod_srv_no_encontrada', 'Reserva no encontrada.') });
   const r = result.rows[0];
 
   const extras = await pool.query(
@@ -15469,7 +15545,7 @@ app.get('/api/cliente/datos-modificacion', asyncHandler(async (req, res) => {
   const cfgNoshow = await obtenerConfigNoshow(r.fecha);
   const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
   if (new Date() >= fechaCancelacion) {
-    return res.status(403).json({ error: 'El plazo de modificación ha vencido para esta reserva.' });
+    return res.status(403).json({ error: await textoModificar(req, 'mod_srv_plazo_reserva', 'El plazo de modificación ha vencido para esta reserva.') });
   }
 
   res.json({ reserva: Object.assign({}, r, { extras: extras.rows }) });
@@ -15496,13 +15572,13 @@ app.post('/api/cliente/modificar-completo', asyncHandler(async (req, res) => {
     'SELECT * FROM reservas WHERE UPPER(numero_reserva) = UPPER($1) AND LOWER(email_cliente) = LOWER($2) AND archivada = FALSE',
     [pnr, emailCliente]
   );
-  if (!reservaQ.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
+  if (!reservaQ.rows.length) return res.status(404).json({ error: await textoModificar(req, 'mod_srv_no_encontrada', 'Reserva no encontrada.') });
   const r = reservaQ.rows[0];
 
   const cfgNoshow = await obtenerConfigNoshow(r.fecha);
   const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
   if (new Date() >= fechaCancelacion) {
-    return res.status(403).json({ error: 'El plazo de modificación ha vencido.' });
+    return res.status(403).json({ error: await textoModificar(req, 'mod_srv_plazo', 'El plazo de modificación ha vencido.') });
   }
 
   // Detectar cambios para el historial
