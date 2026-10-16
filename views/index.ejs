@@ -416,6 +416,36 @@ footer {
 }
 .selector-resultado { margin-top: 12px; padding: 12px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; font-size: 13px; color: #fff; display: none; }
 .selector-resultado.visible { display: block; }
+/* (16/10/2026) Fecha y hora: el mismo aspecto en web y móvil, en el formato del idioma de la página (no del navegador) */
+.fh-caja { display: block; position: relative; }
+.fh-caja .fh-input { display: block; color: transparent !important; -webkit-text-fill-color: transparent; cursor: pointer; }
+.fh-caja .fh-input::-webkit-datetime-edit { color: transparent; }
+.fh-texto {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: inherit;
+  color: var(--texto-oscuro);
+}
+.fh-texto.fh-vacio { color: var(--texto-muted); }
+/* Solo iPhone/iPad (no pinta su propio icono): calendario en la fecha y reloj en la hora */
+@supports (-webkit-touch-callout: none) {
+  .fh-caja .fh-input {
+    -webkit-appearance: none;
+    appearance: none;
+    padding-right: 34px;
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+  .fh-caja .fh-input[type="date"] {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
+  }
+  .fh-caja .fh-input[type="time"] {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpolyline points='12 7 12 12 15 14'/%3E%3C/svg%3E");
+  }
+}
 </style>
 </head>
 <body>
@@ -553,6 +583,74 @@ footer {
   Traslados · GC — Gran Canaria
 </footer>
 
+<script>
+// (16/10/2026) Fecha y hora: lo que se ve dentro de la casilla lo pone la web, no el navegador.
+// Vacía: el formato del idioma (Textos de interfaz → home_formato_fecha) o --:--. Elegida: la fecha en el formato del
+// idioma de la página y la hora siempre en 24 horas. Lo que se guarda y se envía no cambia (año-mes-día y HH:MM).
+(function () {
+  var FH_LOCALE = { es:'es-ES', en:'en-GB', de:'de-DE', sv:'sv-SE', no:'nb-NO', nl:'nl-NL', it:'it-IT', fr:'fr-FR', fi:'fi-FI', ru:'ru-RU' }['<%= lang %>'] || 'es-ES';
+  var FH_FORMATO = <%- JSON.stringify(t('home_formato_fecha')) %>;
+  var valorNativo = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  function textoFH(input) {
+    var v = valorNativo.get.call(input);
+    if (!v) return input.type === 'date' ? FH_FORMATO : '--:--';
+    if (input.type === 'time') return v.slice(0, 5);
+    var p = v.split('-');
+    try {
+      return new Intl.DateTimeFormat(FH_LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })
+        .format(new Date(Date.UTC(+p[0], +p[1] - 1, +p[2], 12)));
+    } catch (e) { return p[2] + '/' + p[1] + '/' + p[0]; }
+  }
+  function refrescarFH(input) {
+    var s = input._fhTexto;
+    if (!s) return;
+    s.textContent = textoFH(input);
+    s.classList.toggle('fh-vacio', !valorNativo.get.call(input));
+  }
+  function abrirFH(input) { try { if (input.showPicker) input.showPicker(); } catch (e) {} }
+  function prepararFH(input) {
+    if (!input || input._fhTexto) return;
+    var caja = document.createElement('span');
+    caja.className = 'fh-caja';
+    input.parentNode.insertBefore(caja, input);
+    caja.appendChild(input);
+    var s = document.createElement('span');
+    s.className = 'fh-texto';
+    caja.appendChild(s);
+    input._fhTexto = s;
+    input.classList.add('fh-input');
+    var cs = window.getComputedStyle(input);
+    s.style.left = ((parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.borderLeftWidth) || 0)) + 'px';
+    s.style.fontSize = cs.fontSize;
+    // Si el programa pone o quita la fecha/hora (p. ej. la que llega del buscador), el texto se actualiza solo
+    Object.defineProperty(input, 'value', {
+      configurable: true,
+      get: function () { return valorNativo.get.call(this); },
+      set: function (v) { valorNativo.set.call(this, v); refrescarFH(this); }
+    });
+    input.addEventListener('input', function () { refrescarFH(input); });
+    input.addEventListener('change', function () { refrescarFH(input); });
+    input.addEventListener('blur', function () { refrescarFH(input); });
+    input.addEventListener('click', function () { abrirFH(input); });
+    // En el ordenador no se teclea (no se vería): se elige en el calendario/reloj. Borrar la vacía.
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Tab') return;
+      e.preventDefault();
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        valorNativo.set.call(input, '');
+        refrescarFH(input);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        abrirFH(input);
+      }
+    });
+    refrescarFH(input);
+  }
+  window.prepararFechasHoras = function (ids) { ids.forEach(function (id) { prepararFH(document.getElementById(id)); }); };
+})();
+</script>
+<script>prepararFechasHoras(['fecha-busqueda', 'cotiz-fecha']);</script>
 <script>
 var LANG = '<%= lang %>';
 var RUTA_RESERVA = '<%= rutaReserva %>';
