@@ -432,6 +432,35 @@ function GENERADOR_CATEGORIAS_SEO(nombreIdioma, item) {
     'Ruso':       { tRango: '42-48', tMax: 50, dRango: '118-125', dMax: 128, h1Max: 42, subMax: 155, descMax: 400 }
   };
   const L = LIMITES[nombreIdioma] || LIMITES['Español'];
+  // (16/10/2026) El Shuttle es otro servicio (minibús compartido con horarios y paradas): lleva su propio enfoque
+  const esShuttle = /shuttle/i.test(String(item.nombre || ''));
+  const BLOQUE_SHUTTLE = esShuttle ? `
+
+---
+
+## ⚠️ CATEGORÍA ESPECIAL: SHUTTLE (ESTAS REGLAS MANDAN SOBRE TODO LO ANTERIOR)
+"${item.nombre}" NO es un traslado privado puerta a puerta. Es un SHUTTLE: un servicio de traslado COMPARTIDO en minibús, con HORARIOS FIJOS, PUNTOS DE SALIDA ESTABLECIDOS, PARADAS PROGRAMADAS y TIEMPOS ESTIMADOS DE LLEGADA. Varios viajeros que no se conocen comparten el vehículo.
+Ejemplo del enfoque correcto (no copiar literal): "Shuttle en Gran Canaria: traslados compartidos en minibús con horarios fijos, puntos de salida establecidos, paradas programadas y tiempos estimados de llegada."
+
+Aplica este enfoque a TODOS los campos (meta_title, meta_description, h1_seo, subtitulo_seo, resena_breve, texto_descripcion):
+- Habla de traslado compartido en minibús, horarios fijos, puntos de salida, paradas programadas y tiempos estimados. Ideal para viajeros que buscan una opción práctica y económica.
+- PROHIBIDO hablar de: traslado privado, chófer privado, puerta a puerta, recogida personalizada, cartel con el nombre en la terminal, espera del conductor, seguimiento del vuelo, vehículo en exclusiva o servicio VIP.
+- PROHIBIDO inventar datos concretos: horarios, frecuencias, nombres o direcciones de paradas, duración de los trayectos, número de salidas o políticas (retrasos de vuelo, reembolsos, sillas de bebé, límites de equipaje). Di solo que hay horarios fijos, puntos de salida y paradas programadas, y que los detalles se indican al reservar.
+- Si hablas de destinos, nómbralos como zonas de la isla, sin afirmar que el shuttle para en un sitio concreto.
+- h1_seo: [equivalente nativo de "Shuttle" o "traslado compartido"] + [${item.nombre}] + [en ${item.isla_nombre}].
+- subtitulo_seo: traslado compartido en minibús con horarios fijos y paradas programadas en ${item.isla_nombre}; precio estimado y sin costes ocultos.
+- texto_descripcion: misma longitud y formato HTML, pero con esta estructura:
+  a) <h2>: ${item.nombre} en ${item.isla_nombre} + equivalente nativo de "traslado compartido" (sin repetir la palabra Shuttle).
+  b) <p>: Qué es y cómo funciona: minibús compartido, horarios fijos, puntos de salida establecidos, paradas programadas y tiempos estimados de llegada. Diferencia frente al traslado privado (en el privado el vehículo es solo para el cliente y le recoge donde indique; en el shuttle se comparte y se sale a horas y desde puntos fijos).
+  c) <h3>: Zonas de ${item.isla_nombre} que conecta (sin inventar paradas).
+  d) <p>: Para quién es ideal (viajeros solos, parejas, quien busca una opción económica y práctica). Si alguien necesita ir puerta a puerta o a su hora, puede elegir otra categoría de traslado privado.
+  e) <h2>: Preguntas frecuentes sobre ${item.nombre} en ${item.isla_nombre}
+  f) 4 preguntas en formato <p><strong>Pregunta</strong></p><p>Respuesta</p>, SOLO estas:
+     - P1: ¿Cómo funciona el shuttle? (horarios fijos, puntos de salida, paradas programadas).
+     - P2: ¿Dónde y a qué hora se toma? (en los puntos y horarios establecidos; se indican al reservar; sin inventarlos).
+     - P3: ¿Cuánto tarda? (tiempos estimados de llegada según las paradas programadas; sin dar minutos concretos).
+     - P4: ¿En qué se diferencia de un traslado privado? (compartido frente a exclusivo; horarios fijos frente a la hora que elige el cliente).
+  NO uses la estructura a)–f) de la sección 8 anterior ni sus preguntas frecuentes.` : '';
 
   return `# INSTRUCCIONES GENERALES DE REDACCIÓN SEO LOCAL Y METADATOS MULTIIDIOMA
 
@@ -467,7 +496,9 @@ Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y sig
 1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):
    Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
 2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
-   "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".
+   "Precio estimado" (el preferido), "precio aproximado", "precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial". Alterna estos sinónimos para no repetir siempre la misma expresión.
+3. CÓMO SE PAGA (úsalo cuando hables del precio, sin inventar nada más):
+   El precio que ve el cliente es un precio estimado. El viaje se paga directamente al chofer${esShuttle ? '' : ' según el taxímetro'}. Los extras no están incluidos en el precio estimado. No hay costes ocultos.
 
 ---
 
@@ -520,10 +551,10 @@ El nombre de la isla "${item.isla_nombre}" traducido o transliterado a ${nombreI
   e) <h2>: Preguntas frecuentes sobre el traslado ${item.nombre} en ${item.isla_nombre}
   f) 4 preguntas en formato <p><strong>Pregunta</strong></p><p>Respuesta</p>:
      - P1 (todos): retraso del vuelo — seguimiento en tiempo real, espera sin cargos.
-     - P2 (adaptada): Español → factura con IVA; Inglés/Alemán/Neerlandés → precio cerrado sin costes ocultos; Ruso/Francés/Italiano → privacidad y atención VIP; Sueco/Noruego/Finlandés → cómo identificar al conductor.
+     - P2 (adaptada): Español → factura con IGIC (impuesto de Canarias; nunca IVA); Inglés/Alemán/Neerlandés → precio estimado, pago directo al chofer y sin costes ocultos (nunca "precio cerrado"); Ruso/Francés/Italiano → privacidad y atención VIP; Sueco/Noruego/Finlandés → cómo identificar al conductor.
      - P3 (todos): sillas de bebé homologadas bajo reserva previa.
      - P4 (todos): equipamiento y confort — modelos ${item.subtitulo || ''}, Wi-Fi, climatización, cargadores.
-
+${BLOQUE_SHUTTLE}
 
 ---
 
