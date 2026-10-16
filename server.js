@@ -16738,7 +16738,7 @@ async function generarFacturaPDF(reservaId, lang) {
   const cfg = cfgQ.rows[0] || {};
 
   const facturaExistente = await pool.query(
-    'SELECT id, numero_factura FROM facturas WHERE reserva_id = $1 ORDER BY generada_en ASC LIMIT 1', [reservaId]
+    'SELECT id, numero_factura, generada_en FROM facturas WHERE reserva_id = $1 ORDER BY generada_en ASC LIMIT 1', [reservaId]
   );
 
   // Conceptos extra añadidos manualmente desde el admin
@@ -16756,22 +16756,26 @@ async function generarFacturaPDF(reservaId, lang) {
   const totalFactura = (parseFloat(r.precio_estimado) || 0) + totalExtras + totalConceptosExtra;
 
   let numeroFactura;
+  let fechaEmision = null; // (16/10/2026) día en que se creó la factura: no cambia en copias ni reenvíos
   if (facturaExistente.rows.length) {
     numeroFactura = facturaExistente.rows[0].numero_factura;
+    fechaEmision = facturaExistente.rows[0].generada_en;
   } else {
     await pool.query('UPDATE configuracion_facturacion SET contador_facturas = contador_facturas + 1 WHERE id = 1');
     const cntQ = await pool.query('SELECT contador_facturas FROM configuracion_facturacion WHERE id = 1');
     const num = cntQ.rows[0].contador_facturas;
     const anio = new Date().getFullYear();
     numeroFactura = 'TGC-' + anio + '-' + String(num).padStart(4, '0');
-    await pool.query(
-      'INSERT INTO facturas (reserva_id, numero_factura, importe_total) VALUES ($1, $2, $3)',
+    const _nuevaFac = await pool.query(
+      'INSERT INTO facturas (reserva_id, numero_factura, importe_total) VALUES ($1, $2, $3) RETURNING generada_en',
       [reservaId, numeroFactura, totalFactura]
     );
+    fechaEmision = _nuevaFac.rows[0].generada_en;
   }
 
   const fechaViaje = r.fecha ? fechaCliente(r.fecha, _lang) : '—';
-  const fechaFactura = fechaCliente(new Date(), _lang);
+  // (16/10/2026) Fecha de emisión = el día en que se creó la factura (hora de Canarias), también en las copias
+  const fechaFactura = new Date(fechaEmision || new Date()).toLocaleDateString(LOCALE_CLIENTE[_lang] || 'es-ES', { day: 'numeric', month: 'long', year: 'numeric', timeZone: ZONA_HORARIA });
   const rutaTexto = ((await traducirLugarCliente(r.origen, _lang)) || '—') + ' → ' + ((await traducirLugarCliente(r.destino, _lang)) || '—');
   const categoriaTexto = (await traducirCategoriaCliente(r.categoria_nombre, _lang)) || '—';
   const nombreExtra = function(e) {
