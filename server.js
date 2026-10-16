@@ -1002,6 +1002,26 @@ async function initSchema() {
     }
   }
 
+  // (16/10/2026) Formato de fecha: lo que se ve dentro de las casillas de fecha vacías (en los 10 idiomas, también ruso)
+  {
+    const FORMATO_FECHA = { en: 'dd/mm/yyyy', de: 'TT.MM.JJJJ', fr: 'jj/mm/aaaa', it: 'gg/mm/aaaa', nl: 'dd-mm-jjjj', sv: 'åååå-mm-dd', no: 'dd.mm.åååå', fi: 'pp.kk.vvvv', ru: 'дд.мм.гггг' };
+    const filaFF = await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Página de inicio', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Página de inicio', contexto = $2
+       RETURNING id`,
+      ['home_formato_fecha', 'Formato de fecha: lo que se ve dentro de las casillas de fecha cuando están vacías (buscador, página de reserva y «¿No encuentras tu ruta?»). Escríbelo como se pone la fecha en cada país.', 'dd/mm/aaaa']
+    );
+    for (const l of Object.keys(FORMATO_FECHA)) {
+      await pool.query(
+        `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (texto_id, lang_code) DO NOTHING`,
+        [filaFF.rows[0].id, l, FORMATO_FECHA[l]]
+      );
+    }
+  }
+
   // ─── Textos de la página de flota (traducibles desde Idiomas) ───────────
   const TEXTOS_FLOTA = [
     { clave: 'flota_page_title',            contexto: 'Título de la pestaña del navegador en la página de flota', es: 'Flota — Traslados GC' },
