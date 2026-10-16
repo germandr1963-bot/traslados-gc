@@ -421,7 +421,7 @@ var TX = <%- JSON.stringify({
   confirmar: t('mod_boton_confirmar'), enviando: t('home_modal_enviando'),
   errSinPnr: t('mod_err_sin_pnr'), errCargar: t('mod_err_cargar'), errEnviar: t('mod_err_enviar'), errConexion: t('home_modal_error_conexion')
 }).replace(/</g, '\\u003c') %>;
-var ORIGEN_MOSTRAR = '', DESTINO_MOSTRAR = '', PRECIO_A_CONSULTAR = false;
+var ORIGEN_MOSTRAR = '', DESTINO_MOSTRAR = '', PRECIO_A_CONSULTAR = false, FECHA_ORIGINAL = '';
 var reservaData = null;
 var extrasData = [];
 var extrasSeleccionados = [];
@@ -497,7 +497,15 @@ var destinoEsPuerto = false;
 
   // Fecha
   document.getElementById('fecha').value = reservaData.fecha ? reservaData.fecha.slice(0,10) : '';
-  document.getElementById('fecha').min = new Date().toISOString().split('T')[0];
+  FECHA_ORIGINAL = document.getElementById('fecha').value;
+  // (16/10/2026) Misma regla que la reserva: hoy (hora de Canarias) o mañana, según Admin → Modelo de negocio
+  try {
+    var _cfg = await fetch('/api/reservas-config').then(function (x) { return x.json(); });
+    if (_cfg && _cfg.hoy) {
+      var _man = new Date(_cfg.hoy + 'T12:00:00Z'); _man.setUTCDate(_man.getUTCDate() + 1);
+      document.getElementById('fecha').min = _cfg.mismo_dia ? _cfg.hoy : _man.toISOString().slice(0, 10);
+    }
+  } catch (e) {}
 
   // Pasajeros
   await cargarCategorias();
@@ -643,6 +651,9 @@ function validarPaso1() {
   var fecha = document.getElementById('fecha').value;
   document.getElementById('err-fecha').style.display = fecha ? 'none' : 'block';
   if (!fecha) ok = false;
+  // (16/10/2026) Un día nuevo que ya no vale (pasado, u hoy si no se aceptan reservas del mismo día) se quita, como en la reserva
+  var _inF = document.getElementById('fecha');
+  if (fecha && fecha !== FECHA_ORIGINAL && _inF.min && fecha < _inF.min) { _inF.value = ''; document.getElementById('err-fecha').style.display = 'block'; ok = false; }
 
   if (origenEsAero) {
     var h = document.getElementById('hora-llegada-vuelo').value;

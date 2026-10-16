@@ -1041,6 +1041,7 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
       if (c.hoy) {
         var d = new Date(c.hoy + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + 1);
         inputFecha.min = c.mismo_dia ? c.hoy : d.toISOString().slice(0, 10);
+        document.getElementById('cotiz-fecha').min = inputFecha.min; // (16/10/2026) misma regla en "¿No encuentras tu ruta?"
         if (inputFecha.value && inputFecha.value < inputFecha.min) inputFecha.value = ''; // hoy no vale: se quita sin avisar
       }
     }).catch(function () {});
@@ -1368,6 +1369,9 @@ function enviarCotizacion() {
   var destino = document.getElementById('cotiz-destino').value.trim();
   var email   = document.getElementById('cotiz-email').value.trim();
   var fecha   = document.getElementById('cotiz-fecha').value;
+  // (16/10/2026) Misma regla de fechas que la reserva: un día que ya no vale se quita sin avisar
+  var _minCotiz = document.getElementById('cotiz-fecha').min;
+  if (fecha && _minCotiz && fecha < _minCotiz) { document.getElementById('cotiz-fecha').value = ''; fecha = ''; }
   var pax     = document.getElementById('cotiz-pax').value;
   var err     = document.getElementById('cotiz-error');
   var ok      = document.getElementById('cotiz-ok');
