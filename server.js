@@ -10403,6 +10403,15 @@ app.post('/api/cotizaciones', asyncHandler(async (req, res) => {
   const idiomasValidos = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE');
   const codigos = idiomasValidos.rows.map(function(r) { return r.codigo; });
   if (!codigos.includes(lang)) lang = 'es';
+  // (16/10/2026) Misma regla de fechas que la reserva (la fecha es opcional): nunca en el pasado; hoy, solo si se aceptan reservas del mismo día
+  if (fecha_aproximada) {
+    const _fechaCot = String(fecha_aproximada).slice(0, 10);
+    const _hoyCot = hoyCanarias();
+    if (_fechaCot < _hoyCot) return res.status(400).json({ error: obtenerTexto('reserva_err_fecha', lang) });
+    if (_fechaCot === _hoyCot && (await leerModeloNegocio()).no_mismo_dia) {
+      return res.status(400).json({ error: obtenerTexto('home_aviso_mismo_dia', lang) });
+    }
+  }
 
   const result = await pool.query(
     `INSERT INTO cotizaciones (origen, destino, fecha_aproximada, num_pasajeros, email_cliente, lang_cliente)
@@ -15579,6 +15588,18 @@ app.post('/api/cliente/modificar-completo', asyncHandler(async (req, res) => {
   const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
   if (new Date() >= fechaCancelacion) {
     return res.status(403).json({ error: await textoModificar(req, 'mod_srv_plazo', 'El plazo de modificación ha vencido.') });
+  }
+  // (16/10/2026) Misma regla de fechas que una reserva nueva (si el cliente cambia el día): nunca en el pasado;
+  // hoy (hora de Canarias), solo si Admin → Modelo de negocio acepta reservas del mismo día
+  if (fecha && String(fecha).slice(0, 10) !== (r.fecha ? r.fecha.toISOString().slice(0,10) : '')) {
+    let _langMod = 'es';
+    try { _langMod = await idiomaPortalCliente(req); } catch (e) { _langMod = 'es'; }
+    const _fechaMod = String(fecha).slice(0, 10);
+    const _hoyMod = hoyCanarias();
+    if (_fechaMod < _hoyMod) return res.status(400).json({ error: obtenerTexto('reserva_err_fecha', _langMod) });
+    if (_fechaMod === _hoyMod && (await leerModeloNegocio()).no_mismo_dia) {
+      return res.status(400).json({ error: obtenerTexto('home_aviso_mismo_dia', _langMod) });
+    }
   }
 
   // Detectar cambios para el historial
