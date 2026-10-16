@@ -332,6 +332,23 @@ function GENERADOR_CATEGORIAS_FLOTA(nombreIdioma, items) {
     "Ruso":       { desc: "38-43", descMax: 44, sub: "48-53", subMax: 54, larga: "260-280", largaMax: 285, carac: "80-90",   caracMax: 92  }
   };
   const L = LIMITES_GEN12[nombreIdioma] || LIMITES_GEN12["Español"];
+  // (16/10/2026) El Shuttle es otro servicio (minibús compartido con horarios y paradas): lleva su propio enfoque
+  const esShuttle = /shuttle/i.test(String(item.nombre || ''));
+  const BLOQUE_SHUTTLE = esShuttle ? `
+
+---
+
+## ⚠️ CATEGORÍA ESPECIAL: SHUTTLE (ESTAS REGLAS MANDAN SOBRE TODO LO ANTERIOR)
+"${item.nombre}" NO es un traslado privado puerta a puerta. Es un SHUTTLE: un servicio de traslado COMPARTIDO en minibús, con HORARIOS FIJOS, PUNTOS DE SALIDA ESTABLECIDOS, PARADAS PROGRAMADAS y TIEMPOS ESTIMADOS DE LLEGADA. Varios viajeros que no se conocen comparten el vehículo. No se usa taxímetro.
+Ejemplo del enfoque correcto (no copiar literal): "Shuttle en Gran Canaria: traslados compartidos en minibús con horarios fijos, puntos de salida establecidos, paradas programadas y tiempos estimados de llegada."
+
+Aplica este enfoque a los 4 campos:
+- descripcion: frase gancho del traslado compartido en minibús (práctico, económico, con horarios fijos).
+- subtitulo: 2 o 3 modelos reales de minibús conocidos en el mercado europeo para unas ${item.capacidad_pasajeros} plazas.
+- descripcion_larga: qué es y cómo funciona (compartido, horarios fijos, puntos de salida, paradas programadas, tiempos estimados) y para quién es ideal (viajeros solos, parejas, quien busca una opción económica). Si alguien necesita ir puerta a puerta o a su hora, puede elegir otra categoría.
+- caracteristicas: ventajas del shuttle (por ejemplo: horarios fijos, paradas programadas, plazas compartidas, opción económica), sin inventar datos.
+- PROHIBIDO hablar de: traslado privado, chófer privado, puerta a puerta, recogida personalizada, cartel con el nombre, espera del conductor, seguimiento del vuelo, vehículo en exclusiva, servicio VIP o taxímetro.
+- PROHIBIDO inventar datos concretos: horarios, frecuencias, nombres o direcciones de paradas, duración de los trayectos, número de salidas o políticas (retrasos de vuelo, reembolsos, sillas de bebé, límites de equipaje).` : '';
 
   return `# INSTRUCCIONES GENERALES DE REDACCIÓN COMERCIAL NATIVA MULTIIDIOMA
 
@@ -343,7 +360,7 @@ No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa 
 ---
 
 ## CONTEXTO DEL SERVICIO
-Los vehículos realizan traslados privados de larga distancia en Gran Canaria — principalmente desde/hacia el Aeropuerto LPA, hoteles, puertos y municipios de la isla. El precio lo marca el taxímetro del conductor. Los choferes son profesionales con licencia oficial.
+Los vehículos realizan traslados privados de larga distancia en Gran Canaria — principalmente desde/hacia el Aeropuerto LPA, hoteles, puertos y municipios de la isla. El precio lo marca el taxímetro del conductor. Los choferes son profesionales con licencia oficial.${esShuttle ? ' (Excepción: esta categoría es un SHUTTLE compartido; lee el bloque "CATEGORÍA ESPECIAL: SHUTTLE" más abajo.)' : ''}
 
 ---
 
@@ -369,7 +386,9 @@ Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y sig
 1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):
    Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.
 2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:
-   "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".
+   "Precio estimado" (el preferido), "precio aproximado", "precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial". Alterna estos sinónimos para no repetir siempre la misma expresión.
+3. CÓMO SE PAGA (úsalo cuando hables del precio, sin inventar nada más):
+   El precio que ve el cliente es un precio estimado. El viaje se paga directamente al chofer${esShuttle ? '' : ' según el taxímetro'}. Los extras no están incluidos en el precio estimado. No hay costes ocultos.
 
 ---
 
@@ -400,6 +419,7 @@ Escribe entre 3 y 5 características.
 ## AUTOCONTROL DE CARACTERES (PROCESO INTERNO — NO ESCRIBAS NADA HASTA TENER EL JSON FINAL)
 Antes de responder, verifica internamente que cada campo cumple su límite máximo.
 Si alguno se pasa, corrígelo. Este proceso es interno — no aparece en la respuesta.
+${BLOQUE_SHUTTLE}
 
 ## CATEGORÍA A GENERAR
 JSON con id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas:
