@@ -2743,7 +2743,7 @@ function editarCategoria(id) {
   if (!cat) { return; }
   var editor = document.getElementById('editor-categoria');
   editor.classList.remove('oculto');
-  editor.innerHTML = '<h2 style="margin-top:0">✏️ Editar categoría</h2>' + formularioCategoria(cat) +
+  editor.innerHTML = '<h2 style="margin-top:0">✏️ Editar categoría — ' + escapar(cat.nombre || '') + '</h2>' + formularioCategoria(cat) +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
       '<button class="boton-primario" onclick="guardarCategoria(' + cat.id + ')">💾 Guardar cambios</button>' +
       '<button class="boton-secundario" onclick="document.getElementById(\'editor-categoria\').classList.add(\'oculto\')">Cancelar</button>' +
