@@ -774,6 +774,16 @@ function iniciarDropdowns() {
 
 function cargarRutas() {
   fetch('/api/rutas?lang=' + LANG).then(function (r) { return r.json(); }).then(function (rutas) {
+    // (17/10/2026) Llega desde Flota con una categoría: Desde y Hasta solo con las rutas que tienen precio para esa categoría
+    var catFlota = new URLSearchParams(window.location.search).get('categoria');
+    var rutasTodas = rutas;
+    function rutasDeCategoria(catId) {
+      if (!catId) return rutasTodas;
+      return rutasTodas.filter(function (r) {
+        return r.categorias_con_precio && r.categorias_con_precio.map(String).indexOf(String(catId)) !== -1;
+      });
+    }
+    if (catFlota) rutas = rutasDeCategoria(catFlota);
     rutasDisponibles = rutas;
     var vistosO = {}, origenes = [];
     var vistosD = {}, destinos = [];
@@ -867,6 +877,35 @@ function cargarRutas() {
       if (desdeVal) { selectDesde.value = desdeVal; sincronizarDropdown('desde'); }
       actualizarCategoriasSegunRuta();
     });
+
+    // (17/10/2026) Llegó desde Flota: si el cliente cambia de categoría, Desde y Hasta pasan a las rutas con precio de la nueva categoría
+    if (catFlota) {
+      document.getElementById('categoria').addEventListener('change', function () {
+        rutasDisponibles = rutasDeCategoria(this.value);
+        var selDesde = document.getElementById('desde');
+        var selHasta = document.getElementById('hasta');
+        var desdeAntes = selDesde.value, hastaAntes = selHasta.value;
+        var vO = {}, vD = {};
+        origenes = []; destinos = [];
+        rutasDisponibles.forEach(function (r) {
+          if (!vO[r.origen]) { vO[r.origen] = true; origenes.push({ valor: r.origen, etiqueta: r.origen_traducido || r.origen }); }
+          if (!vD[r.destino]) { vD[r.destino] = true; destinos.push({ valor: r.destino, etiqueta: r.destino_traducido || r.destino }); }
+        });
+        poblarSelect(selDesde, origenes);
+        if (desdeAntes && origenes.some(function (o) { return o.valor === desdeAntes; })) { selDesde.value = desdeAntes; sincronizarDropdown('desde'); }
+        var listaHasta = destinos;
+        if (selDesde.value) {
+          var vF = {}; listaHasta = [];
+          rutasDisponibles.forEach(function (r) {
+            if (r.origen === selDesde.value && !vF[r.destino]) { vF[r.destino] = true; listaHasta.push({ valor: r.destino, etiqueta: r.destino_traducido || r.destino }); }
+          });
+          listaHasta.sort(function (a, b) { return a.etiqueta.localeCompare(b.etiqueta); });
+        }
+        poblarSelect(selHasta, listaHasta);
+        if (hastaAntes && listaHasta.some(function (o) { return o.valor === hastaAntes; })) { selHasta.value = hastaAntes; sincronizarDropdown('hasta'); }
+        document.getElementById('resultado-precio').innerHTML = '';
+      });
+    }
   });
 }
 
@@ -917,12 +956,15 @@ function cargarCategorias() {
 function pintarCategoriaFlota(categorias, paramCategoria) {
     if (paramCategoria) {
       var select = document.getElementById('categoria');
+      // (17/10/2026) Si ya hay ruta elegida, la lista sale de esa ruta; si no, se respeta la categoría que tenga elegida el cliente
+      if (document.getElementById('desde').value && document.getElementById('hasta').value) { actualizarCategoriasSegunRuta(); return; }
+      var elegida = select.value || paramCategoria;
       select.innerHTML = '<option value="">' + TXT.selecciona + '</option>';
       categorias.forEach(function (c) {
         var opt = document.createElement('option');
         opt.value = c.id;
         opt.textContent = (c.nombre_traducido || c.nombre) + ' (' + c.capacidad_pasajeros + ' ' + TXT.paxSufijo + ')';
-        if (String(c.id) === String(paramCategoria)) opt.selected = true;
+        if (String(c.id) === String(elegida)) opt.selected = true;
         select.appendChild(opt);
       });
       sincronizarDropdown('categoria'); // (17/10/2026) que se vea marcada la categoría que llega de Flota, igual que Desde/Hasta
@@ -939,6 +981,9 @@ function actualizarCategoriasSegunRuta() {
 
   var ruta = rutasDisponibles.find(function (r) { return r.origen === desdeVal && r.destino === hastaVal; })
           || rutasDisponibles.find(function (r) { return r.origen === hastaVal && r.destino === desdeVal; });
+
+  // (17/10/2026) Llegó desde Flota: mientras la ruta no está completa, la categoría elegida se mantiene
+  if ((!ruta || !desdeVal || !hastaVal) && new URLSearchParams(window.location.search).get('categoria')) return;
 
   select.innerHTML = '<option value="">' + TXT.selecciona + '</option>';
 
