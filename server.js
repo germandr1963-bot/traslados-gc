@@ -1063,6 +1063,7 @@ async function initSchema() {
     { clave: 'flota_faq5_p',               contexto: 'Pregunta 5 del FAQ de flota', es: '¿Aceptan pago con tarjeta de crédito?' },
     { clave: 'flota_faq5_r',               contexto: 'Respuesta a la pregunta 5 del FAQ de flota', es: 'Sí, todos los vehículos están equipados con datáfono para aceptar pagos con Visa, Mastercard, Maestro, Apple Pay y Google Pay.' },
     { clave: 'flota_catalogo_titulo',       contexto: 'Título H2 del catálogo de categorías de vehículos', es: 'Nuestras Categorías de Vehículos' },
+    { clave: 'flota_catalogo_nota',         contexto: 'Nota bajo el título del catálogo: son las categorías con las que se trabaja; la disponibilidad se comprueba al pulsar Reservar; más información en Rutas', es: 'Estas son las categorías de vehículo con las que trabajamos. Al pulsar «Reservar» podrás comprobar su disponibilidad según la ruta y la fecha que elijas. Para más información, visita nuestra página de Rutas.' },
     { clave: 'flota_selector_mal_0',        contexto: 'Opción 0 maletas del selector de maletas', es: 'Sin maletas' },
     { clave: 'flota_selector_mal_1',        contexto: 'Opción 1 maleta del selector de maletas', es: '1 maleta' },
     { clave: 'flota_selector_mal_2',        contexto: 'Opción 2 maletas del selector de maletas', es: '2 maletas' },
