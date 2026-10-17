@@ -163,6 +163,7 @@
 
     <!-- CATÁLOGO -->
     <h2 style="font-family:'Big Shoulders Display',sans-serif;font-size:28px;color:var(--texto-oscuro);margin-bottom:20px;text-align:center;"><%= t('flota_catalogo_titulo') || 'Nuestras Categorías de Vehículos' %></h2>
+    <p style="text-align:center;color:var(--texto-muted);font-size:14px;line-height:1.6;max-width:760px;margin:-8px auto 24px;"><%= t('flota_catalogo_nota') %></p>
     <div class="grid-flota" id="grid-flota">
       <% if (!categorias || categorias.length === 0) { %>
         <p style="text-align:center;color:var(--texto-muted);padding:40px 0;">Próximamente más vehículos disponibles.</p>
