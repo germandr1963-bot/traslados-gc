@@ -903,6 +903,18 @@ function cargarCategorias() {
   fetch('/api/categorias?lang=' + LANG + (_f ? '&fecha=' + encodeURIComponent(_f) : '')).then(function (r) { return r.json(); }).then(function (categorias) {
     categoriasDisponibles = categorias;
     var paramCategoria = new URLSearchParams(window.location.search).get('categoria');
+    // (17/10/2026) Llega desde Flota sin fecha y esa categoría no está en la lista: se añade desde la flota completa para que salga marcada
+    if (paramCategoria && !_f && !categorias.some(function (c) { return String(c.id) === String(paramCategoria); })) {
+      fetch('/api/categorias-publicas?lang=' + LANG).then(function (r) { return r.json(); }).then(function (todas) {
+        var cat = todas.find(function (c) { return String(c.id) === String(paramCategoria); });
+        if (cat && !fechaBusqueda()) { categorias.push(cat); pintarCategoriaFlota(categorias, paramCategoria); }
+      }).catch(function () {});
+    }
+    pintarCategoriaFlota(categorias, paramCategoria);
+  });
+}
+
+function pintarCategoriaFlota(categorias, paramCategoria) {
     if (paramCategoria) {
       var select = document.getElementById('categoria');
       select.innerHTML = '<option value="">' + TXT.selecciona + '</option>';
@@ -917,7 +929,6 @@ function cargarCategorias() {
     } else {
       actualizarCategoriasSegunRuta();
     }
-  });
 }
 
 function actualizarCategoriasSegunRuta() {
