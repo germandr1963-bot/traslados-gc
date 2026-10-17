@@ -64,6 +64,9 @@
     .tarjeta-cat-cap { font-size: 12px; color: var(--texto-muted); margin-top: 2px; }
     .btn-reservar-cat { background: var(--terracota); color: #fff; border: none; border-radius: 8px; padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; font-family: 'Public Sans', sans-serif; white-space: nowrap; }
     .btn-reservar-cat:hover { background: var(--terracota-oscuro); }
+    .tarjeta-cat-botones { display: flex; gap: 10px; flex-shrink: 0; }
+    .tarjeta-cat-hueco { visibility: hidden; }
+    .tarjeta-cat-promo { display: inline-block; margin-left: 12px; background: #fff3e0; color: #e65100; border: 1.5px solid #e65100; border-radius: 8px; font-size: 13px; font-weight: 600; padding: 6px 14px; vertical-align: middle; white-space: nowrap; font-family: 'Public Sans', sans-serif; }
     .tarjeta-cat-body { padding: 18px 20px 12px; display: grid; grid-template-columns: 1fr 280px; gap: 20px; align-items: stretch; }
     .tarjeta-cat-desc { font-size: 13px; color: var(--texto-oscuro); line-height: 1.6; height: 180px; overflow: hidden; }
     .tarjeta-cat-foto { height: 180px; background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid var(--gris-borde); }
@@ -88,6 +91,11 @@
       .selector-campos { grid-template-columns: 1fr; }
       .tarjeta-cat-body { grid-template-columns: 1fr; }
       .tarjeta-cat-foto { height: 160px; }
+      .tarjeta-cat-top { flex-direction: column; align-items: stretch; gap: 12px; padding: 14px 16px; }
+      .tarjeta-cat-nombre { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+      .tarjeta-cat-promo { margin-left: 0; font-size: 12px; padding: 4px 10px; }
+      .tarjeta-cat-botones .btn-reservar-cat { flex: 1; text-align: center; padding: 10px 12px; }
+      .tarjeta-cat-hueco { display: none; }
     }
     footer { text-align: center; padding: 30px; color: var(--texto-muted); font-size: 13px; }
     footer a { color: var(--texto-muted); text-decoration: none; margin: 0 12px; font-size: 13px; }
@@ -172,15 +180,19 @@
                 <div class="tarjeta-cat-nombre">
                   <%= c.nombre %>
                   <% if (c.en_promo) { %>
-                    <span style="display:inline-block;margin-left:8px;background:#fff3e0;color:#e65100;border:1.5px solid #e65100;border-radius:8px;font-size:13px;font-weight:600;padding:6px 14px;vertical-align:middle;white-space:nowrap;font-family:'Public Sans',sans-serif;"><%= t('flota_badge_promo') || '🎁 Promoción activa' %></span>
+                    <span class="tarjeta-cat-promo"><%= t('flota_badge_promo') || '🎁 Promoción activa' %></span>
                   <% } %>
                 </div>
                 <div class="tarjeta-cat-cap"><%= cap %></div>
               </div>
-              <a href="<%= c.url_reserva %>?categoria=<%= c.id %>" class="btn-reservar-cat"><%= t('flota_catalogo_btn_reservar') || 'Reservar' %></a>
-              <% if (c.url_conoce_mas) { %>
-                <a href="<%= c.url_conoce_mas %>" class="btn-reservar-cat" style="background:var(--charcoal);"><%= t('flota_catalogo_btn_conoce_mas') || 'Conoce más' %></a>
-              <% } %>
+              <div class="tarjeta-cat-botones">
+                <a href="<%= c.url_reserva %>?categoria=<%= c.id %>" class="btn-reservar-cat"><%= t('flota_catalogo_btn_reservar') || 'Reservar' %></a>
+                <% if (c.url_conoce_mas) { %>
+                  <a href="<%= c.url_conoce_mas %>" class="btn-reservar-cat" style="background:var(--charcoal);"><%= t('flota_catalogo_btn_conoce_mas') || 'Conoce más' %></a>
+                <% } else { %>
+                  <span class="btn-reservar-cat tarjeta-cat-hueco" aria-hidden="true"><%= t('flota_catalogo_btn_conoce_mas') || 'Conoce más' %></span>
+                <% } %>
+              </div>
             </div>
             <div class="tarjeta-cat-body">
               <div class="tarjeta-cat-desc">
