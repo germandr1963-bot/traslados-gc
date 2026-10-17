@@ -7852,7 +7852,13 @@ async function traducirConClaudeIA(items, nombreIdioma) {
   const data = await response.json();
   const textoRespuesta = data.content.map(function (b) { return b.text || ''; }).join('');
   const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
-  return JSON.parse(limpio);
+  try {
+    return JSON.parse(limpio);
+  } catch (errLectura) {
+    // (17/10/2026) Comillas alemanas „…" cerradas con comilla recta: rompen la lectura. Se cambian por „…“ y se lee de nuevo.
+    const reparado = limpio.replace(/„([^"“”\n]*)"/g, '„$1“');
+    try { return JSON.parse(reparado); } catch (e2) { throw errLectura; }
+  }
 }
 
 // Igual que traducirConClaudeIA, pero pensada para título + descripción SEO
