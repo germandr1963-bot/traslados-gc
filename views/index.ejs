@@ -913,6 +913,7 @@ function cargarCategorias() {
         if (String(c.id) === String(paramCategoria)) opt.selected = true;
         select.appendChild(opt);
       });
+      sincronizarDropdown('categoria'); // (17/10/2026) que se vea marcada la categoría que llega de Flota, igual que Desde/Hasta
     } else {
       actualizarCategoriasSegunRuta();
     }
