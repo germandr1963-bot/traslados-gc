@@ -472,7 +472,7 @@ Aplica este enfoque a TODOS los campos (meta_title, meta_description, h1_seo, su
 - texto_descripcion: misma longitud y formato HTML, pero con esta estructura:
   a) <h2>: ${item.nombre} en ${item.isla_nombre} + equivalente nativo de "traslado compartido" (sin repetir la palabra Shuttle).
   b) <p>: Qué es y cómo funciona: minibús compartido, horarios fijos, puntos de salida establecidos, paradas programadas y tiempos estimados de llegada. Diferencia frente al traslado privado (en el privado el vehículo es solo para el cliente y le recoge donde indique; en el shuttle se comparte y se sale a horas y desde puntos fijos).
-  c) <h3>: Zonas de ${item.isla_nombre} que conecta (sin inventar paradas).
+  c) <h2>: Zonas de ${item.isla_nombre} que conecta (sin inventar paradas).
   d) <p>: Para quién es ideal (viajeros solos, parejas, quien busca una opción económica y práctica). Si alguien necesita ir puerta a puerta o a su hora, puede elegir otra categoría de traslado privado.
   e) <h2>: Preguntas frecuentes sobre ${item.nombre} en ${item.isla_nombre}
   f) 4 preguntas en formato <p><strong>Pregunta</strong></p><p>Respuesta</p>, SOLO estas:
