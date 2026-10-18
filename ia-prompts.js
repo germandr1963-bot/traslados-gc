@@ -563,7 +563,7 @@ URL amigable para esta categoría. ${item.reglasSlug} Solo letras minúsculas a-
 - Estructura interna obligatoria:
   a) <h2>: Título del servicio — [equivalente nativo de "Chófer privado / Transfer"] ${item.nombre} en ${item.isla_nombre}
   b) <p>: Párrafo de diferenciación frente al taxi tradicional del aeropuerto. Incluir: recogida personalizada con cartel en terminal de llegadas, ayuda con el equipaje, monitoreo del vuelo en tiempo real.
-  c) <h3>: Principales destinos y conexiones en ${item.isla_nombre}
+  c) <h2>: Principales destinos y conexiones en ${item.isla_nombre}
   d) <p> + <ul>: Lista con: Las Palmas de Gran Canaria, Sur de ${item.isla_nombre} (Maspalomas, Meloneras, Mogán), Servicios corporativos o eventos.
   e) <h2>: Preguntas frecuentes sobre el traslado ${item.nombre} en ${item.isla_nombre}
   f) 4 preguntas en formato <p><strong>Pregunta</strong></p><p>Respuesta</p>:
