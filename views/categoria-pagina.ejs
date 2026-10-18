@@ -46,9 +46,12 @@
   <!-- Hreflang -->
   <% alternates.forEach(function(alt) { %>
   <link rel="alternate" hreflang="<%= alt.lang_code %>"
-    href="<%= BASE_URL %><%= alt.lang_code !== 'es' ? '/' + alt.lang_code : '' %>/<%= (alt.lang_code !== 'es' && palabrasPaginas.flota) ? palabrasPaginas.flota : 'flota' %>/<%= cat.isla_slug %>/<%= alt.slug_url %>">
+    href="<%= BASE_URL %><%= alt.lang_code !== 'es' ? '/' + alt.lang_code : '' %>/<%= alt.palabra_flota || 'flota' %>/<%= alt.isla_slug || cat.isla_slug %>/<%= alt.slug_url %>">
   <% }); %>
-  <link rel="alternate" hreflang="x-default" href="<%= BASE_URL %>/flota/<%= cat.isla_slug %>/<%= cat.slug_url %>">
+  <% var _altEs = alternates.find(function(a) { return a.lang_code === 'es'; }); %>
+  <% if (_altEs) { %>
+  <link rel="alternate" hreflang="x-default" href="<%= BASE_URL %>/flota/<%= _altEs.isla_slug || cat.isla_slug %>/<%= _altEs.slug_url %>">
+  <% } %>
 
   <!-- Schema.org -->
   <script type="application/ld+json"><%- JSON.stringify(schemaVehicle).replace(/<\/script>/gi, '<\\/script>') %></script>
