@@ -5379,6 +5379,19 @@ app.get('/admin/seo/categorias', requireAdmin, asyncHandler(async (req, res) => 
       activo: row.activo
     };
   }
+  // (18/10/2026) Palabra de la isla de cada categoría en cada idioma (Islas/localidades), para el recuadro "URL pública"
+  const islasTrad = await pool.query(
+    `SELECT cv.id AS categoria_id, it.lang_code, it.slug
+     FROM categorias_vehiculos cv
+     JOIN islas_traducciones it ON it.isla_id = cv.isla_id
+     WHERE cv.activa = TRUE AND it.slug IS NOT NULL AND it.slug <> ''`
+  );
+  const islasPorCat = {};
+  for (const row of islasTrad.rows) {
+    if (!islasPorCat[row.categoria_id]) islasPorCat[row.categoria_id] = {};
+    islasPorCat[row.categoria_id][row.lang_code] = row.slug;
+  }
+  for (const cat of cats.rows) cat.isla_slugs = islasPorCat[cat.id] || {};
   res.json({ categorias: cats.rows, seo: seoMap, idiomas: IDIOMAS_PERMITIDOS });
 }));
 
@@ -5404,19 +5417,18 @@ app.post('/admin/seo/categorias/:id/idioma/:lang', requireAdmin, asyncHandler(as
   }
   const { slug_url, meta_title, meta_description, canonical_url, resena_breve, texto_descripcion, h1_seo, subtitulo_seo } = req.body;
   const slugLimpio = slug_url ? slugify(slug_url) : null;
-  // Usar canonical_url del cliente si viene, si no construir automático igual que Destinos
+  // (18/10/2026) La URL pública se monta SIEMPRE aquí: palabra de Flota + isla de Islas/localidades en ese idioma + slug
   const catIsla = await pool.query(
-    `SELECT COALESCE(i.slug, 'gran-canaria') AS isla_slug
+    `SELECT COALESCE(NULLIF(it.slug, ''), i.slug, 'gran-canaria') AS isla_slug
      FROM categorias_vehiculos cv
      LEFT JOIN islas i ON i.id = cv.isla_id
-     WHERE cv.id = $1`, [req.params.id]
+     LEFT JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = $2
+     WHERE cv.id = $1`, [req.params.id, req.params.lang]
   );
   const islaSlug = catIsla.rows[0] ? catIsla.rows[0].isla_slug : 'gran-canaria';
   const lang = req.params.lang;
   const palabraFlota = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
-  const canonicalFinal = (canonical_url && canonical_url.trim())
-    ? canonical_url.trim()
-    : (lang !== 'es' ? '/' + lang + '/' + palabraFlota : '/flota') + '/' + islaSlug + '/' + (slugLimpio || '');
+  const canonicalFinal = (lang !== 'es' ? '/' + lang + '/' + palabraFlota : '/flota') + '/' + islaSlug + '/' + (slugLimpio || '');
   await pool.query(
     `INSERT INTO categorias_vehiculos_traducciones (categoria_id, lang_code, slug_url, meta_title, meta_description, canonical_url, resena_breve, texto_descripcion, h1_seo, subtitulo_seo)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -5491,13 +5503,16 @@ app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(asyn
   const { lang } = req.body;
   if (!IDIOMAS_PERMITIDOS.includes(lang)) return res.status(400).json({ error: 'Idioma no válido.' });
 
+  // (18/10/2026) Nombre y slug de la isla desde Islas/localidades en el idioma pedido (si no hay traducción, los españoles)
   const catResult = await pool.query(
     `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.limite_sillas,
-            COALESCE(i.slug, 'gran-canaria') AS isla_slug, COALESCE(i.nombre, 'Gran Canaria') AS isla_nombre
+            COALESCE(NULLIF(it.slug, ''), i.slug, 'gran-canaria') AS isla_slug,
+            COALESCE(NULLIF(it.nombre, ''), i.nombre, 'Gran Canaria') AS isla_nombre
      FROM categorias_vehiculos cv
      LEFT JOIN islas i ON i.id = cv.isla_id
+     LEFT JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = $2
      WHERE cv.id = $1 AND cv.activa = TRUE`,
-    [req.params.id]
+    [req.params.id, lang]
   );
   if (catResult.rows.length === 0) return res.status(404).json({ error: 'Categoría no encontrada.' });
   const cat = catResult.rows[0];
@@ -5579,7 +5594,8 @@ app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(asyn
   const resenaBreve  = resultado.resena_breve || null;
   const textoDesc    = resultado.texto_descripcion || null;
 
-  const nombreIslaLimpio = limpiarSegmentoCat(resultado.nombre_isla || cat.isla_slug || 'gran-canaria');
+  // (18/10/2026) La isla de la dirección sale de Islas/localidades; lo que escriba la IA en nombre_isla se ignora
+  const nombreIslaLimpio = limpiarSegmentoCat(cat.isla_slug || 'gran-canaria');
   const palabraFlotaGen = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
   const urlPublicaGenerada = (lang !== 'es' ? '/' + lang + '/' + palabraFlotaGen : '') + '/flota/' + nombreIslaLimpio + '/' + slugGenerado;
   const urlPublicaFinal = lang !== 'es'
@@ -13601,210 +13617,6 @@ app.get('/admin/seo/salud', requireAdmin, asyncHandler(async (req, res) => {
   res.json(stats);
 }));
 
-// ─── API pública: datos de una categoría para categoria-pagina.html ──────────
-// Devuelve en JSON todo lo necesario para pintar la página de categoría.
-// La llama categoria-pagina.html desde el navegador, igual que traslado.html
-// llama a /api/ruta-publica.
-app.get('/api/categoria-publica/:lang/:slug', asyncHandler(async (req, res) => {
-  const { lang, slug } = req.params;
-
-  if (!IDIOMAS_PERMITIDOS.includes(lang)) {
-    return res.status(404).json({ error: 'Idioma no válido' });
-  }
-
-  // Buscar la categoría cuyo slug está activo en este idioma
-  // Incluye isla para construir la URL correcta
-  const catResult = await pool.query(
-    `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas,
-            cv.limite_sillas, cv.foto,
-            COALESCE(cvt.descripcion,       cv.descripcion)       AS descripcion,
-            COALESCE(cvt.subtitulo,         cv.subtitulo)         AS subtitulo,
-            COALESCE(cvt.descripcion_larga, cv.descripcion_larga) AS descripcion_larga,
-            COALESCE(cvt.caracteristicas,   cv.caracteristicas)   AS caracteristicas,
-            cvt.slug_url, cvt.meta_title, cvt.meta_description, cvt.activo,
-            cvt.resena_breve, cvt.texto_descripcion, cvt.h1_seo, cvt.subtitulo_seo,
-            i.slug AS isla_slug,
-            COALESCE(it.nombre, i.nombre) AS isla_nombre,
-            COALESCE(it.slug,   i.slug)   AS isla_slug_traducido
-     FROM categorias_vehiculos cv
-     JOIN categorias_vehiculos_traducciones cvt
-          ON cvt.categoria_id = cv.id AND cvt.lang_code = $1
-     LEFT JOIN islas i ON i.id = cv.isla_id
-     LEFT JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = $1
-     WHERE cvt.slug_url = $2 AND cvt.activo = TRUE
-       AND cv.activa = TRUE AND cv.en_flota = TRUE`,
-    [lang, slug]
-  );
-
-  if (catResult.rows.length === 0) {
-    return res.status(404).json({ error: 'Categoría no encontrada' });
-  }
-
-  const cat = catResult.rows[0];
-
-  // Alternates: todos los idiomas con slug activo para esta categoría (para hreflang)
-  const alternates = await pool.query(
-    `SELECT lang_code, slug_url
-     FROM categorias_vehiculos_traducciones
-     WHERE categoria_id = $1 AND activo = TRUE AND slug_url IS NOT NULL`,
-    [cat.id]
-  );
-
-  // Ajustes globales SEO (nombre marca, imagen defecto, twitter)
-  const ajustesGlobales = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
-  const globales = ajustesGlobales.rows[0] || { nombre_marca: 'Traslados · GC', imagen_og_defecto: null, twitter_activo: false };
-  const nombreMarca = globales.nombre_marca || 'Traslados · GC';
-
-  // Rutas con precio para esta categoría (tabla de precios en la página)
-  const precios = await pool.query(
-    `SELECT r.id AS ruta_id, r.origen, r.destino, rp.precio
-     FROM rutas_precios rp
-     JOIN rutas r ON r.id = rp.ruta_id
-     WHERE rp.categoria_id = $1 AND r.activa = TRUE
-     ORDER BY r.origen, r.destino`,
-    [cat.id]
-  );
-
-  // Traducir nombres de destinos para la tabla de precios
-  const destinosTrad = await pool.query(
-    `SELECT d.nombre AS nombre_es, COALESCE(dt.nombre, d.nombre) AS nombre_traducido
-     FROM destinos d
-     LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1`,
-    [lang]
-  );
-  const mapaDestinos = {};
-  for (const d of destinosTrad.rows) {
-    mapaDestinos[d.nombre_es] = (d.nombre_traducido && d.nombre_traducido.trim()) ? d.nombre_traducido : d.nombre_es;
-  }
-
-  // Nombre traducido de la categoría (desde textos_interfaz)
-  const nombreTrad = obtenerTexto('categoria_nombre_' + cat.id, lang);
-
-  // URL canónica y palabra de flota en este idioma
-  const palabraFlota = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
-  const slugIsla = cat.isla_slug || 'gran-canaria';
-  const urlActual = BASE_URL + (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota + '/' + slugIsla + '/' + slug;
-  const canonical_url = (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota + '/' + slugIsla + '/' + slug;
-
-  // Schema.org Vehicle + BreadcrumbList
-  const schemaVehicle = {
-    '@context': 'https://schema.org',
-    '@type': 'Vehicle',
-    name: (nombreTrad || cat.nombre) + ' — ' + nombreMarca,
-    description: cat.meta_description || cat.descripcion || undefined,
-    url: urlActual,
-    vehicleSeatingCapacity: cat.capacidad_pasajeros,
-    provider: { '@type': 'Organization', name: nombreMarca, url: BASE_URL },
-    areaServed: { '@type': 'Place', name: 'Gran Canaria' }
-  };
-  if (cat.foto) {
-    schemaVehicle.image = BASE_URL + '/admin/categorias/' + cat.id + '/foto';
-  } else if (globales.imagen_og_defecto) {
-    schemaVehicle.image = BASE_URL + '/imagen-og-defecto';
-  }
-
-  const schemaBreadcrumb = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Inicio', item: BASE_URL + (lang !== 'es' ? '/' + lang + '/' : '/') },
-      { '@type': 'ListItem', position: 2, name: obtenerTexto('home_footer_flota', lang) || 'Flota', item: BASE_URL + (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota },
-      { '@type': 'ListItem', position: 3, name: nombreTrad || cat.nombre, item: urlActual }
-    ]
-  };
-
-  const t = function (clave) { return obtenerTexto(clave, lang); };
-
-  // Fotos de galería de la categoría con alt text en el idioma solicitado
-  const fotosResult = await pool.query(
-    `SELECT cf.id, cf.nombre_archivo, cf.orden,
-            COALESCE(cfa.alt_texto, cf.alt_texto, '') AS alt_texto
-     FROM categorias_fotos cf
-     LEFT JOIN categorias_fotos_alt cfa ON cfa.foto_id = cf.id AND cfa.lang_code = $2
-     WHERE cf.categoria_id = $1
-     ORDER BY cf.orden`,
-    [cat.id, lang]
-  );
-
-  res.json({
-    categoria: {
-      id:                  cat.id,
-      nombre:              nombreTrad || cat.nombre,
-      capacidad_pasajeros: cat.capacidad_pasajeros,
-      capacidad_maletas:   obtenerTexto('categoria_maletas_' + cat.id, lang) || cat.capacidad_maletas,
-      limite_sillas:       cat.limite_sillas,
-      tiene_foto:          !!cat.foto,
-      descripcion:         cat.descripcion,
-      subtitulo:           cat.subtitulo,
-      descripcion_larga:   cat.descripcion_larga,
-      caracteristicas:     cat.caracteristicas,
-      slug_url:            cat.slug_url,
-      meta_title:          cat.meta_title,
-      meta_description:    cat.meta_description,
-      canonical_url,
-      isla_slug:           cat.isla_slug || 'gran-canaria',
-      isla_nombre:         cat.isla_nombre || 'Gran Canaria',
-      resena_breve:        cat.resena_breve || '',
-      texto_descripcion:   cat.texto_descripcion || '',
-      h1_seo:              cat.h1_seo || '',
-      subtitulo_seo:       cat.subtitulo_seo || ''
-    },
-    precios: precios.rows.map(function (p) {
-      return {
-        ruta_id:  p.ruta_id,
-        origen:   mapaDestinos[p.origen]  || p.origen,
-        destino:  mapaDestinos[p.destino] || p.destino,
-        origen_es:  p.origen,
-        destino_es: p.destino,
-        precio:   p.precio
-      };
-    }),
-    alternates:        alternates.rows,
-    nombreMarca,
-    BASE_URL,
-    palabraFlota,
-    tieneImagenDefecto: !!globales.imagen_og_defecto,
-    twitterActivo:      !!globales.twitter_activo,
-    schemaVehicle,
-    schemaBreadcrumb,
-    fotosGaleria:      fotosResult.rows,
-    palabrasPaginas:   PALABRAS_PAGINAS[lang] || {},
-    textos: {
-      titulo_tarifas:              t('titulo_tarifas'),
-      cat_ficha_categoria:         t('cat_ficha_categoria'),
-      cat_modelos_referencia:      t('cat_modelos_referencia'),
-      cat_sillas_bebe:             t('cat_sillas_bebe'),
-      tabla_columna_categoria:     t('tabla_columna_categoria'),
-      tabla_columna_pasajeros:     t('tabla_columna_pasajeros'),
-      tabla_columna_equipaje:      t('tabla_columna_equipaje'),
-      tabla_columna_precio:        t('precio_estimado'),
-      sufijo_pax:                  t('sufijo_pax'),
-      badge_precio_fijo:           t('precio_estimado'),
-      texto_a_consultar:           t('texto_a_consultar'),
-      texto_consulta_disponibilidad: t('texto_consulta_disponibilidad'),
-      boton_solicitar_traslado:    t('boton_solicitar_traslado'),
-      subtitulo_hero:              t('subtitulo_hero'),
-      titulo_como_funciona:        t('titulo_como_funciona'),
-      paso1_titulo:                t('paso1_titulo'),
-      paso1_texto:                 t('paso1_texto'),
-      paso2_titulo:                t('paso2_titulo'),
-      paso2_texto:                 t('paso2_texto'),
-      paso3_titulo:                t('paso3_titulo'),
-      paso3_texto:                 t('paso3_texto'),
-      nav_inicio:                  t('nav_inicio'),
-      nav_volver_flota:            t('home_footer_flota'),
-      nav_contacto:                t('nav_contacto'),
-      home_footer_rutas:           t('home_footer_rutas'),
-      home_footer_destinos:        t('home_footer_destinos'),
-      home_footer_flota:           t('home_footer_flota'),
-      home_footer_contacto:        t('home_footer_contacto'),
-      home_footer_alta_choferes:   t('home_footer_alta_choferes'),
-      home_footer_acceso_choferes: t('home_footer_acceso_choferes'),
-      home_footer_acceso_clientes: t('home_footer_acceso_clientes')
-    }
-  });
-}));
-
 // ─── Página de categoría individual — renderizada en servidor con EJS ──────
 async function renderCategoriaPagina(req, res, lang, slug) {
   if (!IDIOMAS_PERMITIDOS.includes(lang)) {
@@ -13840,12 +13652,22 @@ async function renderCategoriaPagina(req, res, lang, slug) {
   const t = function(clave) { return obtenerTexto(clave, lang); };
   const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
 
+  // (18/10/2026) Cada idioma con la palabra de su isla (Islas/localidades → islas_traducciones)
   const alternates = await pool.query(
-    `SELECT lang_code, slug_url
-     FROM categorias_vehiculos_traducciones
-     WHERE categoria_id = $1 AND activo = TRUE AND slug_url IS NOT NULL`,
+    `SELECT cvt.lang_code, cvt.slug_url, COALESCE(NULLIF(it.slug, ''), i.slug, 'gran-canaria') AS isla_slug
+     FROM categorias_vehiculos_traducciones cvt
+     JOIN categorias_vehiculos cv ON cv.id = cvt.categoria_id
+     LEFT JOIN islas i ON i.id = cv.isla_id
+     LEFT JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = cvt.lang_code
+     WHERE cvt.categoria_id = $1 AND cvt.activo = TRUE AND cvt.slug_url IS NOT NULL`,
     [cat.id]
   );
+  // (18/10/2026) Cada idioma con su propia palabra de Flota (en español siempre "flota", como su dirección fija /flota/...)
+  for (const alt of alternates.rows) {
+    alt.palabra_flota = alt.lang_code === 'es'
+      ? 'flota'
+      : ((PALABRAS_PAGINAS[alt.lang_code] && PALABRAS_PAGINAS[alt.lang_code].flota) || 'flota');
+  }
 
   const ajustesGlobales = await pool.query('SELECT * FROM ajustes_seo_globales WHERE id = 1');
   const globales = ajustesGlobales.rows[0] || { nombre_marca: 'Traslados · GC', imagen_og_defecto: null, twitter_activo: false };
@@ -13873,9 +13695,22 @@ async function renderCategoriaPagina(req, res, lang, slug) {
 
   const nombreTrad = obtenerTexto('categoria_nombre_' + cat.id, lang);
   const palabraFlota = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].flota) ? PALABRAS_PAGINAS[lang].flota : 'flota';
-  const slugIsla = cat.isla_slug || 'gran-canaria';
+  // (18/10/2026) La isla sale de Islas/localidades en el idioma de la página (si no hay traducción, la española)
+  const slugIsla = cat.isla_slug_traducido || cat.isla_slug || 'gran-canaria';
   const urlActual = BASE_URL + (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota + '/' + slugIsla + '/' + slug;
   const canonical_url = (lang !== 'es' ? '/' + lang : '') + '/' + palabraFlota + '/' + slugIsla + '/' + slug;
+
+  // (18/10/2026) Si se entra con otra palabra de isla, se lleva a la dirección correcta (una sola dirección por página)
+  const _partesPedidas = req.path.split('/').filter(Boolean);
+  const _partesBuenas  = canonical_url.split('/').filter(Boolean);
+  if (_partesPedidas.length === _partesBuenas.length) {
+    let _islaPedida = _partesPedidas[_partesPedidas.length - 2] || '';
+    try { _islaPedida = decodeURIComponent(_islaPedida); } catch (e) {}
+    if (_islaPedida !== slugIsla) {
+      const _consulta = req.originalUrl.indexOf('?') >= 0 ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+      return res.redirect(301, canonical_url + _consulta);
+    }
+  }
 
   const schemaVehicle = {
     '@context': 'https://schema.org',
@@ -13945,7 +13780,7 @@ async function renderCategoriaPagina(req, res, lang, slug) {
       meta_title:          cat.meta_title,
       meta_description:    cat.meta_description,
       canonical_url,
-      isla_slug:           slugIsla,
+      isla_slug:           cat.isla_slug || 'gran-canaria', // (18/10/2026) española: solo la usa el hreflang x-default (dirección en español)
       isla_nombre:         cat.isla_nombre || 'Gran Canaria',
       resena_breve:        cat.resena_breve || '',
       texto_descripcion:   cat.texto_descripcion || '',

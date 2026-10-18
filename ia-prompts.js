@@ -460,7 +460,7 @@ function GENERADOR_CATEGORIAS_SEO(nombreIdioma, item) {
 
 ## ⚠️ CATEGORÍA ESPECIAL: SHUTTLE (ESTAS REGLAS MANDAN SOBRE TODO LO ANTERIOR)
 "${item.nombre}" NO es un traslado privado puerta a puerta. Es un SHUTTLE: un servicio de traslado COMPARTIDO en minibús, con HORARIOS FIJOS, PUNTOS DE SALIDA ESTABLECIDOS, PARADAS PROGRAMADAS y TIEMPOS ESTIMADOS DE LLEGADA. Varios viajeros que no se conocen comparten el vehículo.
-Ejemplo del enfoque correcto (no copiar literal): "Shuttle en Gran Canaria: traslados compartidos en minibús con horarios fijos, puntos de salida establecidos, paradas programadas y tiempos estimados de llegada."
+Ejemplo del enfoque correcto (no copiar literal): "Shuttle en ${item.isla_nombre}: traslados compartidos en minibús con horarios fijos, puntos de salida establecidos, paradas programadas y tiempos estimados de llegada."
 
 Aplica este enfoque a TODOS los campos (meta_title, meta_description, h1_seo, subtitulo_seo, resena_breve, texto_descripcion):
 - Habla de traslado compartido en minibús, horarios fijos, puntos de salida, paradas programadas y tiempos estimados. Ideal para viajeros que buscan una opción práctica y económica.
@@ -484,22 +484,22 @@ Aplica este enfoque a TODOS los campos (meta_title, meta_description, h1_seo, su
 
   return `# INSTRUCCIONES GENERALES DE REDACCIÓN SEO LOCAL Y METADATOS MULTIIDIOMA
 
-Actúa como un Experto en SEO Local y Redactor Creativo Nativo. Tu trabajo consiste en redactar metadatos optimizados para Google, escritos de "humano a humano", para la página pública de la categoría de vehículo "${item.nombre}" de Traslados GC — empresa de traslados privados intermunicipales en Gran Canaria (Islas Canarias, España).
+Actúa como un Experto en SEO Local y Redactor Creativo Nativo. Tu trabajo consiste en redactar metadatos optimizados para Google, escritos de "humano a humano", para la página pública de la categoría de vehículo "${item.nombre}" de Traslados GC — empresa de traslados privados intermunicipales en ${item.isla_nombre} (Islas Canarias, España).
 
 REGLA DE NATIVIDAD (NO TRADUCIR):
-No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo busca y decide un viajero real de ese idioma cuando elige un vehículo para su traslado privado en Gran Canaria.
+No traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo busca y decide un viajero real de ese idioma cuando elige un vehículo para su traslado privado en ${item.isla_nombre}.
 
 ---
 
 ## CONCEPTO Y OBJETIVO DE LA PÁGINA
-Esta página es una ficha de captación para la categoría de vehículo "${item.nombre}". Su objetivo es responder a la intención de búsqueda de un viajero que quiere conocer qué tipo de vehículo se adapta mejor a sus necesidades para un traslado privado intermunicipal en Gran Canaria — y convencerle de reservar.
+Esta página es una ficha de captación para la categoría de vehículo "${item.nombre}". Su objetivo es responder a la intención de búsqueda de un viajero que quiere conocer qué tipo de vehículo se adapta mejor a sus necesidades para un traslado privado intermunicipal en ${item.isla_nombre} — y convencerle de reservar.
 
 ---
 
 ## REGLAS DE ORO Y ESTILO (HUMAN-LIKE)
 
 1. ENFOQUE HACIA LA CATEGORÍA:
-Todo el contenido (slug, meta_title, meta_description) debe girar en torno a la categoría "${item.nombre}", su perfil de cliente, su capacidad (${item.capacidad_pasajeros} pasajeros) y la experiencia de viaje que ofrece en Gran Canaria.
+Todo el contenido (slug, meta_title, meta_description) debe girar en torno a la categoría "${item.nombre}", su perfil de cliente, su capacidad (${item.capacidad_pasajeros} pasajeros) y la experiencia de viaje que ofrece en ${item.isla_nombre}.
 
 2. LÍMITES ESTRICTOS DE CARACTERES PARA ${nombreIdioma} (INFRANQUEABLES):
 Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido para aprovechar el espacio SEO, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter.
@@ -527,39 +527,36 @@ Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y sig
 1. SLUG (campo: slug):
 URL amigable para esta categoría. ${item.reglasSlug} Solo letras minúsculas a-z y guiones. Sin tildes, sin caracteres especiales, sin números salvo que sean parte del nombre propio. Debe ser el nombre de la categoría únicamente — NUNCA añadas palabras como "traslado", "transfer", "taxi", "gran-canaria" ni ninguna otra palabra que no sea el nombre de la categoría. Ejemplos correctos: "business", "business-class", "economy", "confort", "confort-plus", "minivan", "van-premium". Ejemplos incorrectos: "traslado-confort", "transfer-business", "taxi-economy".
 
-2. NOMBRE_ISLA (campo: nombre_isla):
-El nombre de la isla "${item.isla_nombre}" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico. Solo el nombre de la isla.
-
-3. META_TITLE (campo: meta_title):
+2. META_TITLE (campo: meta_title):
 - Usa el separador "|" para estructurar en 2 o 3 bloques visuales.
-- Incluye: nombre de la categoría en ${nombreIdioma} + Gran Canaria + propuesta de valor o marca.
-- Formato habitual: [Categoría ${item.nombre} Gran Canaria] | [Propuesta de Valor] | [Traslados GC]
+- Incluye: nombre de la categoría en ${nombreIdioma} + ${item.isla_nombre} + propuesta de valor o marca.
+- Formato habitual: [Categoría ${item.nombre} ${item.isla_nombre}] | [Propuesta de Valor] | [Traslados GC]
 
-4. META_DESCRIPTION (campo: meta_description):
+3. META_DESCRIPTION (campo: meta_description):
 - Redactada como presentación directa del vehículo para el viajero que está eligiendo su traslado.
 - Incluye: tipo de vehículo, capacidad (${item.capacidad_pasajeros} pasajeros), casos de uso concretos (aeropuerto, hotel, grupos, familias), ventaja competitiva y llamada a la acción corta.
 - Formato habitual: [Descripción del vehículo y perfil ideal] + [Ventajas: espacio, comodidad, tarifas competitivas] + [CTA breve].
 
 
-5. H1_SEO (campo: h1_seo):
+4. H1_SEO (campo: h1_seo):
 - Título principal de la página para Google y para el visitante. Intención de búsqueda transaccional.
 - Fórmula: [Traslado / Transfer / equivalente nativo en ${nombreIdioma}] + [${item.nombre}] + [en ${item.isla_nombre}]
 - MÁXIMO ABSOLUTO: ${L.h1Max} caracteres (espacios incluidos). NUNCA sobrepasar.
 - Redactar 100% nativo en ${nombreIdioma}. No traducir literalmente.
 
-6. SUBTITULO_SEO (campo: subtitulo_seo):
+5. SUBTITULO_SEO (campo: subtitulo_seo):
 - Línea de apoyo al H1. Resume la propuesta de valor: vehículo con chófer profesional, desde el aeropuerto LPA hacia los principales destinos de ${item.isla_nombre}. Mencionar puntualidad y tarifas transparentes.
 - MÁXIMO ABSOLUTO: ${L.subMax} caracteres (espacios incluidos). NUNCA sobrepasar.
 - Redactar 100% nativo en ${nombreIdioma}.
 
-7. RESENA_BREVE (campo: resena_breve):
+6. RESENA_BREVE (campo: resena_breve):
 - Texto corto de captación comercial. Aparece en la página pública justo después de la ficha técnica del vehículo.
 - Objetivo: convencer al visitante de que esta categoría es la ideal para su perfil de viajero. Destacar experiencia de viaje, confort y adecuación.
 - RANGO OBLIGATORIO: entre 350 y ${L.descMax} caracteres (espacios incluidos). Aproxímate lo máximo posible al límite superior. NUNCA sobrepasar ${L.descMax} caracteres, NUNCA quedarse por debajo de 350.
 - Redactar 100% nativo en ${nombreIdioma}. Tono cercano, natural y profesional.
 - PROHIBIDO repetir textos de otros campos ya generados.
 
-8. TEXTO_DESCRIPCION (campo: texto_descripcion):
+7. TEXTO_DESCRIPCION (campo: texto_descripcion):
 - Texto SEO enriquecido largo. Aparece al final de la página, después del bloque "Cómo funciona".
 - Objetivo: posicionamiento en Google. Longitud: entre 350 y 450 palabras.
 - Formato HTML limpio (usa <h2>, <h3>, <p>, <ul>, <li>, <strong>). Sin Markdown.
@@ -567,7 +564,7 @@ El nombre de la isla "${item.isla_nombre}" traducido o transliterado a ${nombreI
   a) <h2>: Título del servicio — [equivalente nativo de "Chófer privado / Transfer"] ${item.nombre} en ${item.isla_nombre}
   b) <p>: Párrafo de diferenciación frente al taxi tradicional del aeropuerto. Incluir: recogida personalizada con cartel en terminal de llegadas, ayuda con el equipaje, monitoreo del vuelo en tiempo real.
   c) <h3>: Principales destinos y conexiones en ${item.isla_nombre}
-  d) <p> + <ul>: Lista con: Las Palmas de Gran Canaria, Sur de Gran Canaria (Maspalomas, Meloneras, Mogán), Servicios corporativos o eventos.
+  d) <p> + <ul>: Lista con: Las Palmas de Gran Canaria, Sur de ${item.isla_nombre} (Maspalomas, Meloneras, Mogán), Servicios corporativos o eventos.
   e) <h2>: Preguntas frecuentes sobre el traslado ${item.nombre} en ${item.isla_nombre}
   f) 4 preguntas en formato <p><strong>Pregunta</strong></p><p>Respuesta</p>:
      - P1 (todos): retraso del vuelo — seguimiento en tiempo real, espera sin cargos.
@@ -591,7 +588,7 @@ ${JSON.stringify(item, null, 2)}
 Tu respuesta completa es ÚNICAMENTE el objeto JSON. Nada antes, nada después.
 PROHIBIDO: borradores, conteos, explicaciones, pasos intermedios, markdown, texto de ningún tipo.
 SOLO esto:
-{"slug": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "h1_seo": "...", "subtitulo_seo": "...", "resena_breve": "...", "texto_descripcion": "..."}`;
+{"slug": "...", "meta_title": "...", "meta_description": "...", "h1_seo": "...", "subtitulo_seo": "...", "resena_breve": "...", "texto_descripcion": "..."}`;
 }
 
 
