@@ -334,6 +334,13 @@ function GENERADOR_CATEGORIAS_FLOTA(nombreIdioma, items) {
   const L = LIMITES_GEN12[nombreIdioma] || LIMITES_GEN12["Español"];
   // (16/10/2026) El Shuttle es otro servicio (minibús compartido con horarios y paradas): lleva su propio enfoque
   const esShuttle = /shuttle/i.test(String(item.nombre_es || item.nombre || '')); // (20/10/2026) se reconoce por el nombre en español
+  // (20/10/2026) Vehículo Adaptado: silla de ruedas, nunca silla de bebé
+  const esAdaptado = /adaptado|pmr/i.test(String(item.nombre_es || item.nombre || ''));
+  const BLOQUE_ADAPTADO = esAdaptado ? `
+---
+
+## ⚠️ CATEGORÍA ESPECIAL: VEHÍCULO ADAPTADO (ESTAS REGLAS MANDAN SOBRE LAS GENERALES)
+Esta categoría es para personas que usan silla de ruedas o tienen movilidad reducida. Habla de: espacio para la silla de ruedas, acceso por rampa o plataforma elevadora según el modelo, sujeción conforme a la normativa europea y ayuda del chofer para subir al vehículo. NUNCA hables de sillas de bebé ni de servicios corporativos o eventos.` : '';
   const BLOQUE_SHUTTLE = esShuttle ? `
 
 ---
@@ -344,10 +351,10 @@ Ejemplo del enfoque correcto (no copiar literal): "Shuttle en Gran Canaria: tras
 
 Aplica este enfoque a los 4 campos:
 - descripcion: frase gancho del traslado compartido en minibús (práctico, económico, con horarios fijos).
-- subtitulo: 2 o 3 modelos reales de minibús conocidos en el mercado europeo para unas ${item.capacidad_pasajeros} plazas.
+- subtitulo: solo la lista de 2 o 3 modelos de minibús de referencia para unas ${item.capacidad_pasajeros} plazas, terminada en el equivalente nativo de "o similares", y después "Hasta ${item.capacidad_pasajeros} plazas." Sin ninguna etiqueta delante.
 - descripcion_larga: qué es y cómo funciona (compartido, horarios fijos, puntos de salida, paradas programadas, tiempos estimados) y para quién es ideal (viajeros solos, parejas, quien busca una opción económica). Si alguien necesita ir puerta a puerta o a su hora, puede elegir otra categoría.
 - caracteristicas: ventajas del shuttle (por ejemplo: horarios fijos, paradas programadas, plazas compartidas, opción económica), sin inventar datos.
-- PROHIBIDO hablar de: traslado privado, chófer privado, puerta a puerta, recogida personalizada, cartel con el nombre, espera del conductor, seguimiento del vuelo, vehículo en exclusiva, servicio VIP o taxímetro.
+- PROHIBIDO hablar de: traslado privado, chofer privado, puerta a puerta, recogida personalizada, cartel con el nombre, espera del conductor, seguimiento del vuelo, vehículo en exclusiva, servicio VIP o taxímetro.
 - PROHIBIDO inventar datos concretos: horarios, frecuencias, nombres o direcciones de paradas, duración de los trayectos, número de salidas o políticas (retrasos de vuelo, reembolsos, sillas de bebé, límites de equipaje).` : '';
 
   return `# INSTRUCCIONES GENERALES DE REDACCIÓN COMERCIAL NATIVA MULTIIDIOMA
@@ -392,6 +399,16 @@ Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y sig
 
 ---
 
+## DATOS REALES DEL SERVICIO (NUNCA LOS CONTRADIGAS NI INVENTES OTROS) — (20/10/2026)
+1. EXTRAS DEL CHOFER: Wi-Fi, cargadores, agua, sillas infantiles y otros extras NO dependen de la categoría: cada chofer decide qué ofrece y si es gratis o de pago. El cliente los elige al final de la reserva y, antes de enviar su solicitud, ve si son gratis o de pago. Por eso: NUNCA digas que están incluidos, que son gratis ni que el vehículo "lleva" Wi-Fi, cargadores o agua. Si los mencionas, di siempre el equivalente nativo de "según disponibilidad". Lo único que llevan todos los vehículos es aire acondicionado.
+2. SILLAS INFANTILES: ${item.limite_sillas > 0 ? 'solo como capacidad máxima del vehículo ("hasta ' + item.limite_sillas + ' sillas infantiles"), nunca como algo incluido o gratis.' : 'esta categoría no admite sillas infantiles: no las menciones.'}
+3. NO INVENTES: el idioma que habla el chofer, el equipamiento concreto del vehículo, premios, certificaciones, tiempos de trayecto ni políticas que no estén en estas instrucciones.
+4. CONTACTO CON EL CHOFER: el cliente NUNCA recibe el teléfono ni el número del chofer, ni SMS. Desde 2 horas antes del viaje (y hasta 2 horas después) se abre un chat con el chofer en el área de cliente, dentro de su reserva; cada uno escribe en su idioma y los mensajes se traducen automáticamente.
+5. RESERVA: el cliente envía una solicitud y recibe un acuse al momento; la confirmación llega cuando un chofer acepta el servicio. NUNCA digas "confirmación inmediata".
+6. MODELOS DE VEHÍCULO: son solo ejemplos de la gama (vendemos un servicio y una sensación, no un modelo concreto). Nunca prometas un modelo.
+
+---
+
 ## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
 
 1. descripcion (campo: descripcion):
@@ -400,8 +417,8 @@ Una sola frase que captura la esencia del vehículo y el perfil del cliente al q
 No describe características técnicas — transmite una sensación, un perfil, una promesa.
 
 2. subtitulo (campo: subtitulo):
-Aparece debajo de la descripcion en la tarjeta. Menciona 2 o 3 modelos de vehículos reales y conocidos en el mercado europeo que representan esta categoría.
-Da credibilidad y concreción al viajero. Adapta el formato de presentación al idioma de forma natural.
+Aparece debajo de la descripcion en la tarjeta. Escribe SOLO la lista de 2 o 3 modelos de referencia, reales y conocidos en el mercado europeo, que representan la gama de esta categoría, terminada en el equivalente nativo de "o similares" (ejemplo en español: "Toyota Corolla, Volkswagen Golf, Seat León o similares.").
+SIN ninguna etiqueta delante: la página ya pone sola "Modelos de referencia:". Los modelos son ejemplos de la gama, no una promesa.
 
 3. descripcion_larga (campo: descripcion_larga):
 Texto principal de la tarjeta en la página pública de flota.
@@ -409,17 +426,19 @@ Explica para quién es ideal este vehículo, qué experiencia ofrece el viaje, y
 Tono cercano y profesional. Sin tecnicismos. Sin inventar precios ni tiempos de trayecto.
 
 4. caracteristicas (campo: caracteristicas):
-Lista de puntos fuertes del vehículo. Una característica por línea, separadas por salto de línea (\\n).
-Cada ítem es una ventaja concreta, breve y verificable — no claims vagos.
-Se muestran en pantalla en fila horizontal con ✓ delante de cada una.
-Escribe entre 3 y 5 características.
+Una característica por línea, separadas por salto de línea (\\n). Se muestran en pantalla con ✓ delante de cada una.
+Escribe EXACTAMENTE 4 líneas, en este orden (igual en todas las categorías):
+  1) pasajeros: "hasta ${item.capacidad_pasajeros} pasajeros" (en ${nombreIdioma});
+  2) maletas: según capacidad_maletas ("${item.capacidad_maletas}");
+  3) ${item.limite_sillas > 0 ? 'sillas infantiles: "hasta ' + item.limite_sillas + ' sillas infantiles";' : 'otra ventaja real de la categoría (esta categoría no admite sillas infantiles);'}
+  4) un rasgo propio de la categoría, breve y verificable (nunca un extra del chofer).
 
 ---
 
 ## AUTOCONTROL DE CARACTERES (PROCESO INTERNO — NO ESCRIBAS NADA HASTA TENER EL JSON FINAL)
 Antes de responder, verifica internamente que cada campo cumple su límite máximo.
 Si alguno se pasa, corrígelo. Este proceso es interno — no aparece en la respuesta.
-${BLOQUE_SHUTTLE}
+${BLOQUE_ADAPTADO}${BLOQUE_SHUTTLE}
 
 ## CATEGORÍA A GENERAR
 JSON con id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas:
@@ -454,6 +473,8 @@ function GENERADOR_CATEGORIAS_SEO(nombreIdioma, item) {
   const L = LIMITES[nombreIdioma] || LIMITES['Español'];
   // (16/10/2026) El Shuttle es otro servicio (minibús compartido con horarios y paradas): lleva su propio enfoque
   const esShuttle = /shuttle/i.test(String(item.nombre_es || item.nombre || '')); // (20/10/2026) se reconoce por el nombre en español
+  // (20/10/2026) Vehículo Adaptado: silla de ruedas, nunca silla de bebé
+  const esAdaptado = /adaptado|pmr/i.test(String(item.nombre_es || item.nombre || ''));
   const BLOQUE_SHUTTLE = esShuttle ? `
 
 ---
@@ -464,7 +485,7 @@ Ejemplo del enfoque correcto (no copiar literal): "Shuttle en ${item.isla_nombre
 
 Aplica este enfoque a TODOS los campos (meta_title, meta_description, h1_seo, subtitulo_seo, resena_breve, texto_descripcion):
 - Habla de traslado compartido en minibús, horarios fijos, puntos de salida, paradas programadas y tiempos estimados. Ideal para viajeros que buscan una opción práctica y económica.
-- PROHIBIDO hablar de: traslado privado, chófer privado, puerta a puerta, recogida personalizada, cartel con el nombre en la terminal, espera del conductor, seguimiento del vuelo, vehículo en exclusiva o servicio VIP.
+- PROHIBIDO hablar de: traslado privado, chofer privado, puerta a puerta, recogida personalizada, cartel con el nombre en la terminal, espera del conductor, seguimiento del vuelo, vehículo en exclusiva o servicio VIP.
 - PROHIBIDO inventar datos concretos: horarios, frecuencias, nombres o direcciones de paradas, duración de los trayectos, número de salidas o políticas (retrasos de vuelo, reembolsos, sillas de bebé, límites de equipaje). Di solo que hay horarios fijos, puntos de salida y paradas programadas, y que los detalles se indican al reservar.
 - Si hablas de destinos, nómbralos como zonas de la isla, sin afirmar que el shuttle para en un sitio concreto.
 - h1_seo: [equivalente nativo de "Shuttle" o "traslado compartido"] + [${item.nombre}] + [en ${item.isla_nombre}].
@@ -522,6 +543,16 @@ Los límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y sig
 
 ---
 
+## DATOS REALES DEL SERVICIO (NUNCA LOS CONTRADIGAS NI INVENTES OTROS) — (20/10/2026)
+1. EXTRAS DEL CHOFER: Wi-Fi, cargadores, agua, sillas infantiles y otros extras NO dependen de la categoría: cada chofer decide qué ofrece y si es gratis o de pago. El cliente los elige al final de la reserva y, antes de enviar su solicitud, ve si son gratis o de pago. Por eso: NUNCA digas que están incluidos, que son gratis ni que el vehículo "lleva" Wi-Fi, cargadores o agua. Si los mencionas, di siempre el equivalente nativo de "según disponibilidad". Lo único que llevan todos los vehículos es aire acondicionado.
+2. SILLAS INFANTILES: ${item.limite_sillas > 0 ? 'solo como capacidad máxima del vehículo ("hasta ' + item.limite_sillas + ' sillas infantiles"), nunca como algo incluido o gratis.' : 'esta categoría no admite sillas infantiles: no las menciones.'}
+3. NO INVENTES: el idioma que habla el chofer, el equipamiento concreto del vehículo, premios, certificaciones, tiempos de trayecto ni políticas que no estén en estas instrucciones.
+4. CONTACTO CON EL CHOFER: el cliente NUNCA recibe el teléfono ni el número del chofer, ni SMS. Desde 2 horas antes del viaje (y hasta 2 horas después) se abre un chat con el chofer en el área de cliente, dentro de su reserva; cada uno escribe en su idioma y los mensajes se traducen automáticamente.
+5. RESERVA: el cliente envía una solicitud y recibe un acuse al momento; la confirmación llega cuando un chofer acepta el servicio. NUNCA digas "confirmación inmediata".
+6. MODELOS DE VEHÍCULO: son solo ejemplos de la gama (vendemos un servicio y una sensación, no un modelo concreto). Nunca prometas un modelo.
+
+---
+
 ## ESTRUCTURA DE LOS CONTENIDOS A GENERAR
 
 1. SLUG (campo: slug):
@@ -545,7 +576,7 @@ URL amigable para esta categoría. ${item.reglasSlug} Solo letras minúsculas a-
 - Redactar 100% nativo en ${nombreIdioma}. No traducir literalmente.
 
 5. SUBTITULO_SEO (campo: subtitulo_seo):
-- Línea de apoyo al H1. Resume la propuesta de valor: vehículo con chófer profesional, desde el aeropuerto LPA hacia los principales destinos de ${item.isla_nombre}. Mencionar puntualidad y tarifas transparentes.
+- Línea de apoyo al H1. Resume la propuesta de valor: vehículo con chofer profesional, desde el aeropuerto LPA hacia los principales destinos de ${item.isla_nombre}. Mencionar puntualidad y tarifas transparentes.
 - MÁXIMO ABSOLUTO: ${L.subMax} caracteres (espacios incluidos). NUNCA sobrepasar.
 - Redactar 100% nativo en ${nombreIdioma}.
 
@@ -561,16 +592,16 @@ URL amigable para esta categoría. ${item.reglasSlug} Solo letras minúsculas a-
 - Objetivo: posicionamiento en Google. Longitud: entre 350 y 450 palabras.
 - Formato HTML limpio (usa <h2>, <h3>, <p>, <ul>, <li>, <strong>). Sin Markdown.
 - Estructura interna obligatoria:
-  a) <h2>: Título del servicio — [equivalente nativo de "Chófer privado / Transfer"] ${item.nombre} en ${item.isla_nombre}
-  b) <p>: Párrafo de diferenciación frente al taxi tradicional del aeropuerto. Incluir: recogida personalizada con cartel en terminal de llegadas, ayuda con el equipaje, monitoreo del vuelo en tiempo real.
+  a) <h2>: Título del servicio — [equivalente nativo de "Chofer privado / Transfer"] ${item.nombre} en ${item.isla_nombre}
+  b) <p>: Párrafo de diferenciación frente al taxi tradicional del aeropuerto. Incluir: recogida personalizada con cartel en terminal de llegadas, ayuda con el equipaje${esAdaptado ? ' y para subir al vehículo' : ''}, monitoreo del vuelo en tiempo real.
   c) <h2>: Principales destinos y conexiones en ${item.isla_nombre}
-  d) <p> + <ul>: Lista con: Las Palmas de Gran Canaria, Sur de ${item.isla_nombre} (Maspalomas, Meloneras, Mogán), Servicios corporativos o eventos.
+  d) <p> + <ul>: Lista con: Las Palmas de Gran Canaria, Sur de ${item.isla_nombre} (Maspalomas, Meloneras, Mogán), ${esAdaptado ? 'Aeropuerto y puerto (recogida en la sala de llegadas o en el muelle, con ayuda para subir al vehículo y con el equipaje)' : 'Servicios corporativos o eventos'}.
   e) <h2>: Preguntas frecuentes sobre el traslado ${item.nombre} en ${item.isla_nombre}
   f) 4 preguntas en formato <p><strong>Pregunta</strong></p><p>Respuesta</p>:
      - P1 (todos): retraso del vuelo — seguimiento en tiempo real, espera sin cargos.
-     - P2 (adaptada): Español → factura con IGIC (impuesto de Canarias; nunca IVA); Inglés/Alemán/Neerlandés → precio estimado, pago directo al chofer y sin costes ocultos (nunca "precio cerrado"); Ruso/Francés/Italiano → privacidad y atención VIP; Sueco/Noruego/Finlandés → cómo identificar al conductor.
-     - P3 (todos): sillas de bebé homologadas bajo reserva previa.
-     - P4 (todos): equipamiento y confort — modelos ${item.subtitulo || ''}, Wi-Fi, climatización, cargadores.
+     - P2 (adaptada): Español → "¿Puedo obtener factura para mi empresa o gestión personal?": los datos de facturación (también de empresa) se indican al reservar y se pueden cambiar desde el Acceso clientes; al terminar el viaje el chofer entrega el ticket del taxímetro (pago con tarjeta) o un recibo (efectivo); después se emite la factura oficial con el IGIC (impuesto de Canarias; nunca IVA) desglosado y se envía por email y WhatsApp en unos 3 días hábiles. Inglés/Alemán/Neerlandés → precio estimado, pago directo al chofer y sin costes ocultos (nunca "precio cerrado" ni "el precio que ves es el que pagas"); Ruso/Francés/Italiano → privacidad y atención VIP; Sueco/Noruego/Finlandés → cómo identificar al chofer (cartel con el nombre en la sala de llegadas y el chat del área de cliente desde 2 horas antes; nunca teléfono, número ni SMS).
+     - P3: ${esAdaptado ? '"¿Puedo llevar mi propia silla de ruedas?": espacio para la silla, acceso por rampa o plataforma elevadora según el modelo, sujeción conforme a la normativa europea; al reservar, indicar en el campo de comentarios el tipo de silla (plegable o no) y si necesita ayuda para subir. NUNCA hables de sillas de bebé.' : 'sillas infantiles homologadas: se eligen como extra al final de la reserva y, antes de enviar la solicitud, el cliente ve si son gratis o de pago (nunca digas "gratis" ni "incluidas"); hasta ' + item.limite_sillas + ' sillas en esta categoría.'}
+     - P4 (todos): equipamiento y confort — aire acondicionado (lo llevan todos); ${esAdaptado ? 'acceso por rampa o plataforma elevadora según el modelo y normativa europea; ' : ''}Wi-Fi y cargadores solo "según disponibilidad"; los modelos, solo como ejemplos de la gama.
 ${BLOQUE_SHUTTLE}
 
 ---
