@@ -198,7 +198,8 @@
             <div class="tarjeta-cat-body">
               <div class="tarjeta-cat-desc">
                 <% if (desc) { %><p style="font-style:italic;font-weight:700;color:var(--texto-muted);font-size:15px;margin-bottom:8px;"><%= desc %></p><% } %>
-                <% if (subtitulo) { %><p style="font-weight:700;font-size:13px;color:var(--texto-oscuro);margin-bottom:6px;"><%= subtitulo %></p><% } %>
+                <%# (20/10/2026) Igual que la ficha de la página de categoría: etiqueta "Modelos de referencia" (Textos de interfaz, cat_modelos_referencia) en negrita + lista de modelos %>
+                <% if (subtitulo) { %><p style="font-size:13px;color:var(--texto-oscuro);margin-bottom:6px;"><strong><%= t('cat_modelos_referencia') || 'Modelos de referencia' %>:</strong> <%= subtitulo.replace(/^Modelos de referencia:\s*/i, '') %></p><% } %>
                 <% if (descLarga) { %><p style="font-size:13px;color:var(--texto-oscuro);line-height:1.6;margin:0;"><%- descLarga %></p><% } %>
               </div>
               <div class="tarjeta-cat-foto">
