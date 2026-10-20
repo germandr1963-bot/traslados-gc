@@ -5507,10 +5507,13 @@ app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(asyn
   const catResult = await pool.query(
     `SELECT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.limite_sillas,
             COALESCE(NULLIF(it.slug, ''), i.slug, 'gran-canaria') AS isla_slug,
-            COALESCE(NULLIF(it.nombre, ''), i.nombre, 'Gran Canaria') AS isla_nombre
+            COALESCE(NULLIF(it.nombre, ''), i.nombre, 'Gran Canaria') AS isla_nombre,
+            CASE WHEN $2 = 'es' THEN cv.nombre ELSE COALESCE(NULLIF(TRIM(tit.texto), ''), cv.nombre) END AS nombre_idioma
      FROM categorias_vehiculos cv
      LEFT JOIN islas i ON i.id = cv.isla_id
      LEFT JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = $2
+     LEFT JOIN textos_interfaz ti ON ti.clave = 'categoria_nombre_' || cv.id
+     LEFT JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $2
      WHERE cv.id = $1 AND cv.activa = TRUE`,
     [req.params.id, lang]
   );
@@ -5529,7 +5532,8 @@ app.post('/admin/seo/categorias/:id/generar-ia', requireAdmin, asyncHandler(asyn
     reglasSlug = `El slug debe estar en inglés, usando solo a-z y guiones.`;
   }
 
-  const item = { id: cat.id, nombre: cat.nombre, capacidad_pasajeros: cat.capacidad_pasajeros, capacidad_maletas: cat.capacidad_maletas, limite_sillas: cat.limite_sillas, isla_nombre: cat.isla_nombre || 'Gran Canaria', isla_slug: cat.isla_slug || 'gran-canaria', reglasSlug };
+  // (20/10/2026) La IA recibe el nombre de la categoría en el idioma que se genera (Textos de interfaz → Categorías de vehículo); nombre_es solo para reconocer el Shuttle
+  const item = { id: cat.id, nombre: cat.nombre_idioma || cat.nombre, nombre_es: cat.nombre, capacidad_pasajeros: cat.capacidad_pasajeros, capacidad_maletas: cat.capacidad_maletas, limite_sillas: cat.limite_sillas, isla_nombre: cat.isla_nombre || 'Gran Canaria', isla_slug: cat.isla_slug || 'gran-canaria', reglasSlug };
   const prompt = iaPrompts.GENERADOR_CATEGORIAS_SEO(nombreIdioma, item);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -8048,9 +8052,27 @@ app.post('/admin/categorias/generar-ia/:lang', requireAdmin, asyncHandler(async 
   }
 
   const nombreIdioma = await getNombreIdioma(lang);
+  // (20/10/2026) La IA recibe el nombre de cada categoría en el idioma que se genera (Textos de interfaz → Categorías de vehículo);
+  // nombre_es solo para reconocer el Shuttle. La ventana de revisión sigue mostrando el nombre en español (pendientes no cambia).
+  let nombresIdioma = {};
+  if (lang !== 'es' && pendientes.length > 0) {
+    const nt = await pool.query(
+      `SELECT ti.clave, tit.texto
+       FROM textos_interfaz ti
+       JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+       WHERE ti.clave = ANY($2::text[])`,
+      [lang, pendientes.map(function (c) { return 'categoria_nombre_' + c.id; })]
+    );
+    for (const f of nt.rows) {
+      if (f.texto && f.texto.trim()) nombresIdioma[f.clave] = f.texto.trim();
+    }
+  }
+  const itemsIA = pendientes.map(function (c) {
+    return Object.assign({}, c, { nombre: nombresIdioma['categoria_nombre_' + c.id] || c.nombre, nombre_es: c.nombre });
+  });
   let generado;
   try {
-    generado = await generarCategoriasConIA(pendientes, nombreIdioma);
+    generado = await generarCategoriasConIA(itemsIA, nombreIdioma);
   } catch (err) {
     console.error('Error generando categorías con IA:', err.message);
     return res.status(500).json({ error: err.message });

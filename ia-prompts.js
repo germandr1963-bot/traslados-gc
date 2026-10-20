@@ -333,7 +333,7 @@ function GENERADOR_CATEGORIAS_FLOTA(nombreIdioma, items) {
   };
   const L = LIMITES_GEN12[nombreIdioma] || LIMITES_GEN12["Español"];
   // (16/10/2026) El Shuttle es otro servicio (minibús compartido con horarios y paradas): lleva su propio enfoque
-  const esShuttle = /shuttle/i.test(String(item.nombre || ''));
+  const esShuttle = /shuttle/i.test(String(item.nombre_es || item.nombre || '')); // (20/10/2026) se reconoce por el nombre en español
   const BLOQUE_SHUTTLE = esShuttle ? `
 
 ---
@@ -453,7 +453,7 @@ function GENERADOR_CATEGORIAS_SEO(nombreIdioma, item) {
   };
   const L = LIMITES[nombreIdioma] || LIMITES['Español'];
   // (16/10/2026) El Shuttle es otro servicio (minibús compartido con horarios y paradas): lleva su propio enfoque
-  const esShuttle = /shuttle/i.test(String(item.nombre || ''));
+  const esShuttle = /shuttle/i.test(String(item.nombre_es || item.nombre || '')); // (20/10/2026) se reconoce por el nombre en español
   const BLOQUE_SHUTTLE = esShuttle ? `
 
 ---
