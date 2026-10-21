@@ -947,6 +947,9 @@ async function initSchema() {
     { clave: 'home_paso2_texto',         contexto: 'Descripción del paso 2 en la home', es: 'Un chofer acepta tu viaje y te lo confirmamos antes de que salgas de casa.', en: 'A driver accepts your trip and we confirm it before you leave home.' },
     { clave: 'home_paso3_titulo',        contexto: 'Título del paso 3 en la home', es: '3. Viaje', en: '3. Trip' },
     { clave: 'home_paso3_texto',         contexto: 'Descripción del paso 3 en la home', es: 'Coordinamos los detalles finales por WhatsApp. Tu chofer ya sabe dónde y cuándo recogerte.', en: 'We coordinate the final details by WhatsApp. Your driver already knows where and when to pick you up.' },
+    // (21/10/2026) Preguntas frecuentes de la portada (Admin → SEO → "Preguntas frecuentes — Portada")
+    { clave: 'home_faq_titulo',          contexto: 'Título de la sección de preguntas frecuentes de la página de inicio', es: 'Preguntas frecuentes', en: 'Frequently asked questions' },
+    { clave: 'home_faq_mas_info',        contexto: 'Texto delante del enlace al final de una respuesta de las preguntas frecuentes de la página de inicio (detrás va el nombre de la página, p. ej. "Flota")', es: 'Más información:', en: 'More information:' },
     { clave: 'home_modal_titulo',        contexto: 'Título del modal de solicitud de precio', es: 'Solicitar precio', en: 'Request a price' },
     { clave: 'home_modal_subtitulo',     contexto: 'Subtítulo del modal de solicitud de precio', es: 'Te respondemos por email con los precios disponibles.', en: 'We will reply by email with the available prices.' },
     { clave: 'home_modal_label_origen',  contexto: 'Etiqueta del campo origen en el modal de cotización', es: 'Origen', en: 'Origin' },
@@ -2118,6 +2121,34 @@ async function initSchema() {
       ('Solo puedo comunicarme por texto', '', 3)
     ) AS v(nombre, nota_interna, orden)
     WHERE NOT EXISTS (SELECT 1 FROM avisos_reserva a WHERE a.nombre = v.nombre);
+  `);
+
+  // ─── Preguntas frecuentes de la portada (21/10/2026) ───────────────────────
+  // Admin → SEO → "Preguntas frecuentes — Portada". Cada idioma tiene su propia
+  // lista de grupos y de preguntas. Sin datos de partida en el código: lo que
+  // hay en Neon es lo que vale (nada se vuelve a crear solo al arrancar).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS faq_portada_grupos (
+      id SERIAL PRIMARY KEY,
+      lang_code VARCHAR(2) NOT NULL,
+      nombre TEXT NOT NULL,
+      orden INT DEFAULT 0,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS faq_portada (
+      id SERIAL PRIMARY KEY,
+      lang_code VARCHAR(2) NOT NULL,
+      grupo_id INT REFERENCES faq_portada_grupos(id) ON DELETE SET NULL,
+      orden INT DEFAULT 0,
+      pregunta TEXT NOT NULL,
+      respuesta TEXT DEFAULT '',
+      enlace TEXT,
+      activa BOOLEAN DEFAULT TRUE,
+      creado_en TIMESTAMP DEFAULT NOW(),
+      actualizado_en TIMESTAMP DEFAULT NOW()
+    );
   `);
 
   // ─── Preferencias del pasajero (Grupo G — siempre gratuitas) ───────────────
@@ -9136,7 +9167,87 @@ async function renderHome(req, res, lang) {
   const idiomas = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
   const rutaReserva = lang === 'es' ? '/reserva' : '/' + lang + '/' + (SECCIONES_RESERVA[lang] || 'reserva');
   const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
-  res.render('index', { lang, t, idiomas: idiomas.rows, BASE_URL, rutaReserva, palabrasPaginas });
+  // (21/10/2026) Preguntas frecuentes de la portada, en el idioma de la página
+  let faqGrupos = [];
+  let faqJsonLd = null;
+  try {
+    faqGrupos = await obtenerFaqPortada(lang);
+    const conRespuesta = [];
+    faqGrupos.forEach(function (g) {
+      g.preguntas.forEach(function (p) { if (p.respuesta && p.respuesta.trim()) conRespuesta.push(p); });
+    });
+    if (conRespuesta.length) {
+      faqJsonLd = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: conRespuesta.map(function (p) {
+          return { '@type': 'Question', name: p.pregunta, acceptedAnswer: { '@type': 'Answer', text: p.respuesta } };
+        })
+      }).replace(/</g, '\\u003c');
+    }
+  } catch (e) { console.warn('Preguntas frecuentes de la portada:', e.message); }
+  res.render('index', { lang, t, idiomas: idiomas.rows, BASE_URL, rutaReserva, palabrasPaginas, faqGrupos, faqJsonLd });
+}
+
+// (21/10/2026) Preguntas frecuentes activas de un idioma, agrupadas y con su enlace ya montado
+// (la dirección se monta con la palabra de cada página y la isla del idioma).
+async function obtenerFaqPortada(lang) {
+  const grupos = await pool.query('SELECT id, nombre FROM faq_portada_grupos WHERE lang_code = $1 ORDER BY orden, id', [lang]);
+  const preg = await pool.query(
+    'SELECT id, grupo_id, pregunta, respuesta, enlace FROM faq_portada WHERE lang_code = $1 AND activa = TRUE ORDER BY orden, id',
+    [lang]
+  );
+  if (!preg.rows.length) return [];
+  const pp = PALABRAS_PAGINAS[lang] || {};
+  const pref = lang === 'es' ? '/' : '/' + lang + '/';
+  const enlaces = {};
+  const idsCat = [];
+  preg.rows.forEach(function (p) {
+    const m = /^categoria:(\d+)$/.exec(p.enlace || '');
+    if (m) idsCat.push(parseInt(m[1], 10));
+  });
+  if (idsCat.length) {
+    const cats = await pool.query(
+      `SELECT cv.id,
+              CASE WHEN cvt.activo = TRUE THEN cvt.slug_url ELSE NULL END AS slug_url,
+              COALESCE(NULLIF(it.slug, ''), i.slug, 'gran-canaria') AS isla_slug
+       FROM categorias_vehiculos cv
+       LEFT JOIN categorias_vehiculos_traducciones cvt ON cvt.categoria_id = cv.id AND cvt.lang_code = $1
+       LEFT JOIN islas i ON i.id = cv.isla_id
+       LEFT JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = $1
+       WHERE cv.id = ANY($2) AND cv.activa = TRUE`,
+      [lang, idsCat]
+    );
+    cats.rows.forEach(function (c) {
+      if (!c.slug_url) return;
+      const nombre = obtenerTexto('categoria_nombre_' + c.id, lang);
+      enlaces['categoria:' + c.id] = {
+        url: pref + (pp.flota || 'flota') + '/' + c.isla_slug + '/' + c.slug_url,
+        texto: (nombre && nombre.indexOf('[[') !== 0) ? nombre : ''
+      };
+    });
+  }
+  ['flota', 'rutas', 'destinos'].forEach(function (pg) {
+    enlaces[pg] = { url: pref + (pp[pg] || pg), texto: obtenerTexto('home_footer_' + pg, lang) };
+  });
+  const porGrupo = {};
+  const sinGrupo = [];
+  preg.rows.forEach(function (p) {
+    const e = p.enlace ? enlaces[p.enlace] : null;
+    const item = {
+      id: p.id, pregunta: p.pregunta, respuesta: p.respuesta || '',
+      enlace_url: (e && e.url && e.texto) ? e.url : null,
+      enlace_texto: (e && e.texto) ? e.texto : null
+    };
+    if (p.grupo_id) { (porGrupo[p.grupo_id] = porGrupo[p.grupo_id] || []).push(item); }
+    else sinGrupo.push(item);
+  });
+  const lista = [];
+  grupos.rows.forEach(function (g) {
+    if (porGrupo[g.id] && porGrupo[g.id].length) lista.push({ id: g.id, nombre: g.nombre, preguntas: porGrupo[g.id] });
+  });
+  if (sinGrupo.length) lista.push({ id: null, nombre: '', preguntas: sinGrupo });
+  return lista;
 }
 
 app.get('/', asyncHandler(async (req, res) => {
@@ -13406,6 +13517,78 @@ app.post('/admin/preferencias/:id/activo', requireAdmin, asyncHandler(async (req
 
 app.post('/admin/preferencias/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM preferencias_catalogo WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// ─── Admin: Preguntas frecuentes de la portada (21/10/2026) ───────────────────
+// Admin → SEO → "Preguntas frecuentes — Portada". Cada idioma, su lista.
+// Enlace: '' (ninguno) · 'flota' · 'rutas' · 'destinos' · 'categoria:<id>'.
+function faqLangValido(l) { return typeof l === 'string' && /^[a-z]{2}$/.test(l); }
+function faqEnlaceValido(e) { return !e || e === 'flota' || e === 'rutas' || e === 'destinos' || /^categoria:\d+$/.test(e); }
+
+app.get('/admin/faq-portada', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = faqLangValido(req.query.lang) ? req.query.lang : 'es';
+  const grupos = await pool.query('SELECT id, nombre, orden FROM faq_portada_grupos WHERE lang_code = $1 ORDER BY orden, id', [lang]);
+  const preguntas = await pool.query(
+    'SELECT id, grupo_id, orden, pregunta, respuesta, enlace, activa FROM faq_portada WHERE lang_code = $1 ORDER BY orden, id', [lang]
+  );
+  const cats = await pool.query('SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
+  const conteo = await pool.query('SELECT lang_code, COUNT(*)::int AS total FROM faq_portada GROUP BY lang_code');
+  res.json({ lang, grupos: grupos.rows, preguntas: preguntas.rows, categorias: cats.rows, conteo: conteo.rows });
+}));
+
+app.post('/admin/faq-portada/grupos', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang, nombre, orden } = req.body;
+  if (!faqLangValido(lang)) return res.status(400).json({ error: 'Idioma no válido.' });
+  if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre del grupo es obligatorio.' });
+  await pool.query('INSERT INTO faq_portada_grupos (lang_code, nombre, orden) VALUES ($1, $2, $3)', [lang, nombre.trim(), parseInt(orden, 10) || 0]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/faq-portada/grupos/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
+  const { nombre, orden } = req.body;
+  if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre del grupo es obligatorio.' });
+  await pool.query('UPDATE faq_portada_grupos SET nombre = $1, orden = $2 WHERE id = $3', [nombre.trim(), parseInt(orden, 10) || 0, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/faq-portada/grupos/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  const enUso = await pool.query('SELECT 1 FROM faq_portada WHERE grupo_id = $1 LIMIT 1', [req.params.id]);
+  if (enUso.rows.length) return res.status(400).json({ error: 'Este grupo tiene preguntas. Muévelas o elimínalas antes de borrar el grupo.' });
+  await pool.query('DELETE FROM faq_portada_grupos WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/faq-portada', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang, grupo_id, orden, pregunta, respuesta, enlace, activa } = req.body;
+  if (!faqLangValido(lang)) return res.status(400).json({ error: 'Idioma no válido.' });
+  if (!pregunta || !pregunta.trim()) return res.status(400).json({ error: 'La pregunta es obligatoria.' });
+  if (!faqEnlaceValido(enlace)) return res.status(400).json({ error: 'Enlace no válido.' });
+  await pool.query(
+    'INSERT INTO faq_portada (lang_code, grupo_id, orden, pregunta, respuesta, enlace, activa) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+    [lang, grupo_id ? parseInt(grupo_id, 10) : null, parseInt(orden, 10) || 0, pregunta.trim(), (respuesta || '').trim(), enlace || null, activa !== false]
+  );
+  res.json({ ok: true });
+}));
+
+app.post('/admin/faq-portada/:id/editar', requireAdmin, asyncHandler(async (req, res) => {
+  const { grupo_id, orden, pregunta, respuesta, enlace, activa } = req.body;
+  if (!pregunta || !pregunta.trim()) return res.status(400).json({ error: 'La pregunta es obligatoria.' });
+  if (!faqEnlaceValido(enlace)) return res.status(400).json({ error: 'Enlace no válido.' });
+  await pool.query(
+    'UPDATE faq_portada SET grupo_id = $1, orden = $2, pregunta = $3, respuesta = $4, enlace = $5, activa = $6, actualizado_en = NOW() WHERE id = $7',
+    [grupo_id ? parseInt(grupo_id, 10) : null, parseInt(orden, 10) || 0, pregunta.trim(), (respuesta || '').trim(), enlace || null, activa !== false, req.params.id]
+  );
+  res.json({ ok: true });
+}));
+
+app.post('/admin/faq-portada/:id/activa', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE faq_portada SET activa = $1, actualizado_en = NOW() WHERE id = $2', [!!req.body.activa, req.params.id]);
+  res.json({ ok: true });
+}));
+
+app.post('/admin/faq-portada/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM faq_portada WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
 
