@@ -408,6 +408,16 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 18px;
 }
+/* (21/10/2026) Preguntas frecuentes de la portada: mismo desplegable que la página de Flota */
+.faq-portada h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 28px; color: var(--texto-oscuro); margin-bottom: 20px; text-align: center; }
+.faq-portada h3 { font-family: 'Big Shoulders Display', sans-serif; font-size: 20px; font-weight: bold; color: var(--texto-oscuro); margin: 22px 0 8px; }
+.faq-item { border-bottom: 1px solid var(--gris-borde); }
+.faq-pregunta { width: 100%; background: none; border: none; padding: 16px 0; font-size: 15px; font-weight: 600; color: var(--texto-oscuro); text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-family: 'Public Sans', sans-serif; }
+.faq-pregunta .faq-icono { color: var(--terracota); font-size: 20px; transition: transform 0.2s; flex-shrink: 0; }
+.faq-pregunta.abierto .faq-icono { transform: rotate(45deg); }
+.faq-respuesta { font-size: 14px; color: var(--texto-muted); line-height: 1.7; padding-bottom: 16px; display: none; white-space: pre-line; }
+.faq-respuesta.visible { display: block; }
+.faq-respuesta a { color: var(--terracota); font-weight: 600; text-decoration: none; }
 footer {
   text-align: center;
   padding: 30px;
@@ -567,6 +577,40 @@ footer {
     </div>
   </div>
 </div>
+
+<% if (typeof faqGrupos !== 'undefined' && faqGrupos && faqGrupos.length) { %>
+<!-- (21/10/2026) Preguntas frecuentes — se editan en Admin → SEO → "Preguntas frecuentes — Portada" -->
+<div class="seccion faq-portada">
+  <h2><%= t('home_faq_titulo') %></h2>
+  <% faqGrupos.forEach(function (g) { %>
+    <% if (g.nombre) { %><h3><%= g.nombre %></h3><% } %>
+    <% g.preguntas.forEach(function (p) { %>
+    <div class="faq-item">
+      <button class="faq-pregunta" type="button" onclick="toggleFaq(this)">
+        <span><%= p.pregunta %></span>
+        <span class="faq-icono">+</span>
+      </button>
+      <div class="faq-respuesta"><%= p.respuesta %><% if (p.enlace_url) { %><%= p.respuesta ? '\n' : '' %><%= t('home_faq_mas_info') %> <a href="<%= p.enlace_url %>"><%= p.enlace_texto %> →</a><% } %></div>
+    </div>
+    <% }); %>
+  <% }); %>
+</div>
+<% if (faqJsonLd) { %><script type="application/ld+json"><%- faqJsonLd %></script><% } %>
+<script>
+  function toggleFaq(btn) {
+    var respuesta = btn.nextElementSibling;
+    var abierto = btn.classList.contains('abierto');
+    document.querySelectorAll('.faq-pregunta').forEach(function(b) {
+      b.classList.remove('abierto');
+      b.nextElementSibling.classList.remove('visible');
+    });
+    if (!abierto) {
+      btn.classList.add('abierto');
+      respuesta.classList.add('visible');
+    }
+  }
+</script>
+<% } %>
 
 <footer>
   <div style="margin-bottom:12px;">
