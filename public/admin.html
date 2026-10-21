@@ -376,6 +376,30 @@ table.tabla-precios input {
 
       <div id="mensaje-seo" style="margin-bottom:12px;"></div>
 
+      <!-- ─── BLOQUE PREGUNTAS FRECUENTES — PORTADA (21/10/2026) ──────────── -->
+      <div style="margin-bottom:32px;border:1px solid var(--gris-borde);border-radius:10px;overflow:hidden;">
+        <div style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--gris-fondo);user-select:none;" onclick="toggleBloqueFaqPortada()">
+          <span id="faq-portada-icono" style="font-size:14px;">▶</span>
+          <h2 style="font-size:17px;margin:0;">❓ Preguntas frecuentes — Portada</h2>
+          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
+        </div>
+        <div id="faq-portada-contenido" style="display:none;padding:18px;">
+          <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Preguntas frecuentes que salen en la página de inicio, agrupadas por tema. Cada idioma tiene su propia lista. Solo se ven en la web las activas; las que tienen respuesta se marcan además para Google.</p>
+          <div id="faq-portada-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <button class="boton-primario" onclick="abrirEditorFaq(null)">+ Añadir pregunta</button>
+            <button class="boton-secundario" onclick="abrirGruposFaq()">🗂 Grupos</button>
+          </div>
+          <div id="mensaje-faq-portada" style="margin-bottom:12px;"></div>
+          <div id="faq-portada-grupos" class="tarjeta oculto" style="margin-bottom:16px;max-width:760px;"></div>
+          <div id="faq-portada-editor" class="tarjeta oculto" style="margin-bottom:16px;max-width:760px;"></div>
+          <table class="tabla-admin">
+            <thead><tr><th>Orden</th><th>Grupo</th><th>Pregunta</th><th>Respuesta</th><th>Enlace</th><th>Activa</th><th>Acción</th></tr></thead>
+            <tbody id="faq-portada-cuerpo"></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- ─── BLOQUE SEO CATEGORÍAS DE FLOTA ─────────────────────────────── -->
       <div style="margin-bottom:32px;border:1px solid var(--gris-borde);border-radius:10px;overflow:hidden;">
         <div style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--gris-fondo);user-select:none;" onclick="toggleBloqueSEOCategorias()">
@@ -12520,6 +12544,222 @@ function toggleBloqueSEORutas() {
     contenido.style.display = 'none';
     icono.textContent = '▶';
   }
+}
+
+// ─── Preguntas frecuentes — Portada (21/10/2026) ───────────────────────────────
+var faqLang = 'es';
+var faqDatos = null;
+var faqIdiomas = null;
+function faqEsc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function faqMensaje(html) {
+  var m = document.getElementById('mensaje-faq-portada');
+  m.innerHTML = html;
+  if (html) setTimeout(function () { if (m.innerHTML === html) m.innerHTML = ''; }, 4000);
+}
+
+function toggleBloqueFaqPortada() {
+  var contenido = document.getElementById('faq-portada-contenido');
+  var icono = document.getElementById('faq-portada-icono');
+  if (contenido.style.display === 'none') {
+    contenido.style.display = 'block';
+    icono.textContent = '▼';
+    cargarFaqPortada();
+  } else {
+    contenido.style.display = 'none';
+    icono.textContent = '▶';
+  }
+}
+
+function cargarFaqPortada() {
+  var pIdiomas = faqIdiomas ? Promise.resolve(faqIdiomas) :
+    fetch('/admin/idiomas').then(function (r) { return r.json(); }).then(function (lista) {
+      faqIdiomas = lista.filter(function (i) { return i.activo; }).map(function (i) { return i.codigo; });
+      if (faqIdiomas.indexOf('es') > 0) { faqIdiomas.splice(faqIdiomas.indexOf('es'), 1); faqIdiomas.unshift('es'); }
+      if (!faqIdiomas.length) faqIdiomas = ['es'];
+      return faqIdiomas;
+    }).catch(function () { faqIdiomas = ['es']; return faqIdiomas; });
+  document.getElementById('faq-portada-cuerpo').innerHTML = '<tr><td colspan="7" style="color:var(--texto-muted)">Cargando...</td></tr>';
+  pIdiomas.then(function () {
+    return fetch('/admin/faq-portada?lang=' + encodeURIComponent(faqLang)).then(function (r) { return r.json(); });
+  }).then(function (datos) {
+    faqDatos = datos;
+    pintarFaqPortada();
+  }).catch(function () {
+    document.getElementById('faq-portada-cuerpo').innerHTML = '<tr><td colspan="7" style="color:var(--rojo-error)">No se pudieron cargar las preguntas.</td></tr>';
+  });
+}
+
+function cambiarIdiomaFaq(lang) {
+  faqLang = lang;
+  document.getElementById('faq-portada-editor').classList.add('oculto');
+  document.getElementById('faq-portada-grupos').classList.add('oculto');
+  cargarFaqPortada();
+}
+
+function faqNombreEnlace(e) {
+  if (!e) return '—';
+  if (e === 'flota') return 'Flota';
+  if (e === 'rutas') return 'Rutas';
+  if (e === 'destinos') return 'Destinos';
+  var m = /^categoria:(\d+)$/.exec(e);
+  if (m) {
+    var c = (faqDatos.categorias || []).filter(function (x) { return String(x.id) === m[1]; })[0];
+    return 'Categoría: ' + (c ? c.nombre : '(no activa)');
+  }
+  return e;
+}
+
+function pintarFaqPortada() {
+  var conteo = {};
+  (faqDatos.conteo || []).forEach(function (c) { conteo[c.lang_code] = c.total; });
+  document.getElementById('faq-portada-tabs').innerHTML = faqIdiomas.map(function (l) {
+    var clases = 'tab-idioma' + (conteo[l] ? ' tab-idioma-verde' : '') + (l === faqLang ? ' activo' : '');
+    return '<button class="' + clases + '" onclick="cambiarIdiomaFaq(\'' + l + '\')">' + l.toUpperCase() + (conteo[l] ? ' (' + conteo[l] + ')' : '') + '</button>';
+  }).join('');
+  var grupos = {};
+  (faqDatos.grupos || []).forEach(function (g) { grupos[g.id] = g.nombre; });
+  var filas = faqDatos.preguntas || [];
+  var cuerpo = document.getElementById('faq-portada-cuerpo');
+  if (!filas.length) {
+    cuerpo.innerHTML = '<tr><td colspan="7" style="color:var(--texto-muted)">Todavía no hay preguntas en ' + faqLang.toUpperCase() + '.</td></tr>';
+    return;
+  }
+  cuerpo.innerHTML = filas.map(function (p) {
+    var resp = (p.respuesta || '').trim();
+    return '<tr>' +
+      '<td>' + faqEsc(p.orden) + '</td>' +
+      '<td>' + faqEsc(p.grupo_id ? (grupos[p.grupo_id] || '—') : '—') + '</td>' +
+      '<td>' + faqEsc(p.pregunta) + '</td>' +
+      '<td>' + (resp ? '<span class="estado-seo-ok">✓ Sí</span>' : '<span style="color:var(--texto-muted)">Pendiente</span>') + '</td>' +
+      '<td>' + faqEsc(faqNombreEnlace(p.enlace)) + '</td>' +
+      '<td><input type="checkbox" ' + (p.activa ? 'checked' : '') + ' onchange="cambiarActivaFaq(' + p.id + ', this.checked)"></td>' +
+      '<td style="white-space:nowrap;"><button class="boton-secundario" onclick="abrirEditorFaq(' + p.id + ')">✎ Editar</button> ' +
+      '<button class="boton-peligro" onclick="eliminarFaq(' + p.id + ')">🗑</button></td>' +
+      '</tr>';
+  }).join('');
+}
+
+function abrirEditorFaq(id) {
+  var p = id ? (faqDatos.preguntas || []).filter(function (x) { return x.id === id; })[0] : null;
+  var maxOrden = 0;
+  (faqDatos.preguntas || []).forEach(function (x) { if (x.orden > maxOrden) maxOrden = x.orden; });
+  var optsGrupo = '<option value="">— Sin grupo —</option>' + (faqDatos.grupos || []).map(function (g) {
+    return '<option value="' + g.id + '"' + (p && p.grupo_id === g.id ? ' selected' : '') + '>' + faqEsc(g.nombre) + '</option>';
+  }).join('');
+  var enlaces = [['', '— Sin enlace —'], ['flota', 'Flota'], ['rutas', 'Rutas'], ['destinos', 'Destinos']].concat(
+    (faqDatos.categorias || []).map(function (c) { return ['categoria:' + c.id, 'Categoría: ' + c.nombre]; })
+  );
+  var optsEnlace = enlaces.map(function (e) {
+    return '<option value="' + e[0] + '"' + ((p && (p.enlace || '') === e[0]) ? ' selected' : '') + '>' + faqEsc(e[1]) + '</option>';
+  }).join('');
+  var ed = document.getElementById('faq-portada-editor');
+  ed.innerHTML =
+    '<h3 style="margin-top:0;">' + (p ? '✏️ Editar pregunta' : '➕ Nueva pregunta') + ' — ' + faqLang.toUpperCase() + '</h3>' +
+    '<label style="display:block;font-size:13px;margin-bottom:4px;">Grupo</label>' +
+    '<select id="faq-ed-grupo" style="width:100%;margin-bottom:10px;">' + optsGrupo + '</select>' +
+    '<label style="display:block;font-size:13px;margin-bottom:4px;">Orden</label>' +
+    '<input id="faq-ed-orden" type="number" style="width:100px;margin-bottom:10px;" value="' + (p ? p.orden : maxOrden + 1) + '">' +
+    '<label style="display:block;font-size:13px;margin-bottom:4px;">Pregunta</label>' +
+    '<input id="faq-ed-pregunta" type="text" style="width:100%;margin-bottom:10px;" value="' + faqEsc(p ? p.pregunta : '') + '">' +
+    '<label style="display:block;font-size:13px;margin-bottom:4px;">Respuesta</label>' +
+    '<textarea id="faq-ed-respuesta" rows="6" style="width:100%;margin-bottom:10px;">' + faqEsc(p ? p.respuesta : '') + '</textarea>' +
+    '<label style="display:block;font-size:13px;margin-bottom:4px;">Enlace al final de la respuesta</label>' +
+    '<select id="faq-ed-enlace" style="width:100%;margin-bottom:10px;">' + optsEnlace + '</select>' +
+    '<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:14px;"><input id="faq-ed-activa" type="checkbox"' + (!p || p.activa ? ' checked' : '') + '> Activa (se ve en la web)</label>' +
+    '<div style="display:flex;gap:8px;">' +
+    '<button class="boton-primario" onclick="guardarFaq(' + (p ? p.id : 'null') + ')">💾 Guardar</button>' +
+    '<button class="boton-secundario" onclick="document.getElementById(\'faq-portada-editor\').classList.add(\'oculto\')">Cancelar</button>' +
+    '</div>';
+  document.getElementById('faq-portada-grupos').classList.add('oculto');
+  ed.classList.remove('oculto');
+  ed.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function guardarFaq(id) {
+  var datos = {
+    lang: faqLang,
+    grupo_id: document.getElementById('faq-ed-grupo').value || null,
+    orden: document.getElementById('faq-ed-orden').value,
+    pregunta: document.getElementById('faq-ed-pregunta').value,
+    respuesta: document.getElementById('faq-ed-respuesta').value,
+    enlace: document.getElementById('faq-ed-enlace').value,
+    activa: document.getElementById('faq-ed-activa').checked
+  };
+  if (!datos.pregunta.trim()) { faqMensaje('<div class="aviso-error">La pregunta es obligatoria.</div>'); return; }
+  fetch(id ? '/admin/faq-portada/' + id + '/editar' : '/admin/faq-portada', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos)
+  }).then(function (r) { return r.json(); }).then(function (res) {
+    if (res.error) { faqMensaje('<div class="aviso-error">' + faqEsc(res.error) + '</div>'); return; }
+    document.getElementById('faq-portada-editor').classList.add('oculto');
+    faqMensaje('<div class="aviso-ok">Pregunta guardada</div>');
+    cargarFaqPortada();
+  }).catch(function () { faqMensaje('<div class="aviso-error">No se pudo guardar.</div>'); });
+}
+
+function cambiarActivaFaq(id, activa) {
+  fetch('/admin/faq-portada/' + id + '/activa', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activa: activa })
+  }).then(function () { cargarFaqPortada(); });
+}
+
+function eliminarFaq(id) {
+  if (!confirm('¿Eliminar esta pregunta? No se puede deshacer.')) return;
+  fetch('/admin/faq-portada/' + id + '/eliminar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function () { faqMensaje('<div class="aviso-ok">Pregunta eliminada</div>'); cargarFaqPortada(); });
+}
+
+function abrirGruposFaq() {
+  var panel = document.getElementById('faq-portada-grupos');
+  var grupos = faqDatos ? (faqDatos.grupos || []) : [];
+  var maxOrden = 0;
+  grupos.forEach(function (g) { if (g.orden > maxOrden) maxOrden = g.orden; });
+  panel.innerHTML =
+    '<h3 style="margin-top:0;">🗂 Grupos — ' + faqLang.toUpperCase() + '</h3>' +
+    (grupos.length ? grupos.map(function (g) {
+      return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">' +
+        '<input id="faq-gr-orden-' + g.id + '" type="number" style="width:70px;" value="' + g.orden + '">' +
+        '<input id="faq-gr-nombre-' + g.id + '" type="text" style="flex:1;" value="' + faqEsc(g.nombre) + '">' +
+        '<button class="boton-secundario" onclick="guardarGrupoFaq(' + g.id + ')">💾</button>' +
+        '<button class="boton-peligro" onclick="eliminarGrupoFaq(' + g.id + ')">🗑</button></div>';
+    }).join('') : '<p style="font-size:13px;color:var(--texto-muted);">Todavía no hay grupos en este idioma.</p>') +
+    '<div style="display:flex;gap:8px;align-items:center;margin-top:14px;border-top:1px solid var(--gris-borde);padding-top:12px;">' +
+    '<input id="faq-gr-orden-nuevo" type="number" style="width:70px;" value="' + (maxOrden + 1) + '">' +
+    '<input id="faq-gr-nombre-nuevo" type="text" style="flex:1;" placeholder="Nombre del grupo nuevo">' +
+    '<button class="boton-primario" onclick="guardarGrupoFaq(null)">+ Añadir grupo</button></div>' +
+    '<div style="margin-top:12px;"><button class="boton-secundario" onclick="document.getElementById(\'faq-portada-grupos\').classList.add(\'oculto\')">Cerrar</button></div>';
+  document.getElementById('faq-portada-editor').classList.add('oculto');
+  panel.classList.remove('oculto');
+}
+
+function guardarGrupoFaq(id) {
+  var suf = id ? id : 'nuevo';
+  var datos = {
+    lang: faqLang,
+    nombre: document.getElementById('faq-gr-nombre-' + suf).value,
+    orden: document.getElementById('faq-gr-orden-' + suf).value
+  };
+  if (!datos.nombre.trim()) { faqMensaje('<div class="aviso-error">El nombre del grupo es obligatorio.</div>'); return; }
+  fetch(id ? '/admin/faq-portada/grupos/' + id + '/editar' : '/admin/faq-portada/grupos', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos)
+  }).then(function (r) { return r.json(); }).then(function (res) {
+    if (res.error) { faqMensaje('<div class="aviso-error">' + faqEsc(res.error) + '</div>'); return; }
+    faqMensaje('<div class="aviso-ok">Grupo guardado</div>');
+    fetch('/admin/faq-portada?lang=' + encodeURIComponent(faqLang)).then(function (r) { return r.json(); })
+      .then(function (d) { faqDatos = d; pintarFaqPortada(); abrirGruposFaq(); });
+  });
+}
+
+function eliminarGrupoFaq(id) {
+  if (!confirm('¿Eliminar este grupo?')) return;
+  fetch('/admin/faq-portada/grupos/' + id + '/eliminar', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (res.error) { faqMensaje('<div class="aviso-error">' + faqEsc(res.error) + '</div>'); return; }
+      faqMensaje('<div class="aviso-ok">Grupo eliminado</div>');
+      fetch('/admin/faq-portada?lang=' + encodeURIComponent(faqLang)).then(function (r) { return r.json(); })
+        .then(function (d) { faqDatos = d; pintarFaqPortada(); abrirGruposFaq(); });
+    });
 }
 
 function toggleBloqueSEOCategorias() {
