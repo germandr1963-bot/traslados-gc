@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><%= t('home_page_title') %></title>
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700&family=Public+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/estilos.css">
 <style>
 .hero {
@@ -398,10 +398,11 @@
 }
 .seccion h2 {
   font-family: 'Big Shoulders Display', sans-serif;
-  font-weight: 500;
-  font-size: 24px;
-  margin-bottom: 16px;
-  color: var(--texto-oscuro);
+  font-weight: 700; /* (22/10/2026) negrita verdadera (se carga el peso 700) */
+  font-size: 32px;
+  margin-bottom: 22px;
+  color: var(--charcoal);
+  text-align: center;
 }
 .tres-columnas {
   display: grid;
@@ -409,8 +410,8 @@
   gap: 18px;
 }
 /* (21/10/2026) Preguntas frecuentes de la portada: mismo desplegable que la página de Flota */
-.faq-portada h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 28px; color: var(--texto-oscuro); margin-bottom: 20px; text-align: center; }
-.faq-portada h3 { font-family: 'Big Shoulders Display', sans-serif; font-size: 20px; font-weight: bold; color: var(--texto-oscuro); margin: 22px 0 8px; }
+.faq-portada h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 32px; font-weight: 700; color: #b02020; margin-bottom: 20px; text-align: center; } /* (22/10/2026) rojo de las categorías */
+.faq-portada h3 { font-family: 'Public Sans', sans-serif; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 1.5px; color: #b02020; margin: 30px 0 4px; } /* (22/10/2026) nombres de grupo como etiqueta */
 .faq-item { border-bottom: 1px solid var(--gris-borde); }
 .faq-pregunta { width: 100%; background: none; border: none; padding: 16px 0; font-size: 15px; font-weight: 600; color: var(--texto-oscuro); text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-family: 'Public Sans', sans-serif; }
 .faq-pregunta .faq-icono { color: var(--terracota); font-size: 20px; transition: transform 0.2s; flex-shrink: 0; }
