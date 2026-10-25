@@ -596,7 +596,8 @@ footer {
         <span><%= p.pregunta %></span>
         <span class="faq-icono">+</span>
       </button>
-      <div class="faq-respuesta"><%= p.respuesta %><% if (p.enlace_url) { %><%= p.respuesta ? '\n' : '' %><%= t('home_faq_mas_info') %> <a href="<%= p.enlace_url %>"><%= p.enlace_texto %> →</a><% } %></div>
+      <%# (25/10/2026) Un enlace: en la misma línea, como siempre. Dos o más: "Más información:" y cada enlace en su línea %>
+      <div class="faq-respuesta"><%= p.respuesta %><% if (p.enlaces && p.enlaces.length > 1) { %><%= p.respuesta ? '\n' : '' %><%= t('home_faq_mas_info') %><% p.enlaces.forEach(function (en) { %><%= '\n' %><a href="<%= en.url %>"><%= en.texto %> →</a><% }); %><% } else if (p.enlace_url) { %><%= p.respuesta ? '\n' : '' %><%= t('home_faq_mas_info') %> <a href="<%= p.enlace_url %>"><%= p.enlace_texto %> →</a><% } %></div>
     </div>
     <% }); %>
   <% }); %>
