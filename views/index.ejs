@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><%= t('home_page_title') %></title>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700&family=Public+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<% if (lang === 'ru') { %><!-- (25/10/2026) Solo en ruso: letras con alfabeto cirílico para las Preguntas frecuentes (Public Sans y Big Shoulders no lo tienen) --><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Oswald:wght@700&display=swap" rel="stylesheet"><% } %>
 <link rel="stylesheet" href="/estilos.css">
 <style>
 .hero {
@@ -419,6 +420,9 @@
 .faq-respuesta { font-size: 14px; color: var(--texto-muted); line-height: 1.7; padding-bottom: 16px; display: none; white-space: pre-line; text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
 .faq-respuesta.visible { display: block; }
 .faq-respuesta a { color: var(--terracota); font-weight: 600; text-decoration: none; }
+/* (25/10/2026) Solo en ruso y solo en las Preguntas frecuentes: las letras rusas se dibujan con Inter (texto) y Oswald (título); el resto de idiomas no cambia */
+html[lang="ru"] .faq-portada h2 { font-family: 'Big Shoulders Display', 'Oswald', sans-serif; }
+html[lang="ru"] .faq-portada h3, html[lang="ru"] .faq-pregunta, html[lang="ru"] .faq-respuesta { font-family: 'Public Sans', 'Inter', sans-serif; }
 footer {
   text-align: center;
   padding: 30px;
