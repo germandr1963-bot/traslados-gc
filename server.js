@@ -574,6 +574,9 @@ async function initSchema() {
       ADD COLUMN IF NOT EXISTS imagen_og TEXT,
       ADD COLUMN IF NOT EXISTS visible_en_listado BOOLEAN DEFAULT TRUE
   `);
+  // (25/10/2026) Km aproximados de la ruta (Admin → Rutas y precios). Los usa el
+  // Generador 18 (estudio SEO de las Preguntas frecuentes) para los precios de ejemplo.
+  await pool.query(`ALTER TABLE rutas ADD COLUMN IF NOT EXISTS km_aprox NUMERIC(6,1)`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rutas_precios (
@@ -5349,11 +5352,13 @@ app.post('/admin/rutas/:id/eliminar', requireAdmin, asyncHandler(async (req, res
 }));
 
 app.get('/admin/precios-grid', requireAdmin, asyncHandler(async (req, res) => {
-  const rutas = await pool.query('SELECT id, origen, destino, activa FROM rutas ORDER BY origen, destino');
+  const rutas = await pool.query('SELECT id, origen, destino, activa, km_aprox FROM rutas ORDER BY origen, destino');
   const categorias = await pool.query('SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
   const precios = await pool.query('SELECT ruta_id, categoria_id, precio FROM rutas_precios');
   res.json({
-    rutas: rutas.rows,
+    rutas: rutas.rows.map(function (r) {
+      return Object.assign({}, r, { km_aprox: r.km_aprox === null ? null : Number(r.km_aprox) });
+    }),
     categorias: categorias.rows,
     precios: precios.rows.map(function (p) {
       return { ruta_id: p.ruta_id, categoria_id: p.categoria_id, precio: Number(p.precio) };
@@ -5379,6 +5384,13 @@ app.post('/admin/precios-grid', requireAdmin, asyncHandler(async (req, res) => {
          ON CONFLICT (ruta_id, categoria_id) DO UPDATE SET precio = $3`,
         [c.ruta_id, c.categoria_id, c.precio]
       );
+    }
+  }
+  // (25/10/2026) Km aproximados de cada ruta (columna "Km aprox."). Si no llegan, no se toca nada.
+  if (Array.isArray(req.body.kms)) {
+    for (const k of req.body.kms) {
+      const km = (k.km === null || k.km === '' || isNaN(Number(k.km))) ? null : Number(k.km);
+      await pool.query('UPDATE rutas SET km_aprox = $1 WHERE id = $2', [km, k.ruta_id]);
     }
   }
   res.json({ ok: true });
