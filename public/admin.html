@@ -12602,6 +12602,10 @@ function cambiarIdiomaFaq(lang) {
 
 function faqNombreEnlace(e) {
   if (!e) return '—';
+  // (25/10/2026) Varios enlaces (separados por comas): se listan todos
+  if (String(e).indexOf(',') !== -1) {
+    return String(e).split(',').map(function (x) { return x.trim(); }).filter(Boolean).map(faqNombreEnlace).join(' + ');
+  }
   if (e === 'flota') return 'Flota';
   if (e === 'rutas') return 'Rutas';
   if (e === 'destinos') return 'Destinos';
@@ -12661,27 +12665,9 @@ function abrirEditorFaq(id) {
   var optsGrupo = '<option value="">— Sin grupo —</option>' + (faqDatos.grupos || []).map(function (g) {
     return '<option value="' + g.id + '"' + (p && p.grupo_id === g.id ? ' selected' : '') + '>' + faqEsc(g.nombre) + '</option>';
   }).join('');
-  // (25/10/2026) Enlaces en apartados; se añaden rutas y destinos con página activa en este idioma
-  var actualEnlace = p ? (p.enlace || '') : '';
-  var encontrado = false;
-  function faqOpcion(e) {
-    if (actualEnlace === e[0]) encontrado = true;
-    return '<option value="' + faqEsc(e[0]) + '"' + (actualEnlace === e[0] ? ' selected' : '') + '>' + faqEsc(e[1]) + '</option>';
-  }
-  function faqApartado(titulo, lista) {
-    if (!lista.length) return '';
-    return '<optgroup label="' + faqEsc(titulo) + '">' + lista.map(faqOpcion).join('') + '</optgroup>';
-  }
-  var L = faqLang.toUpperCase();
-  var optsEnlace = faqOpcion(['', '— Sin enlace —']) +
-    faqApartado('Páginas generales', [['flota', 'Flota'], ['rutas', 'Rutas'], ['destinos', 'Destinos']]) +
-    faqApartado('Categorías', (faqDatos.categorias || []).map(function (c) { return ['categoria:' + c.id, 'Categoría: ' + c.nombre]; })) +
-    faqApartado('Rutas con página en ' + L, (faqDatos.rutas || []).map(function (r) { return ['ruta:' + r.id, 'Ruta: ' + r.origen + ' → ' + r.destino]; })) +
-    faqApartado('Destinos con página en ' + L, (faqDatos.destinos || []).map(function (d) { return ['destino:' + d.id, 'Destino: ' + d.nombre]; }));
-  // Si el enlace guardado ya no está en la lista (p. ej. página desactivada), se conserva para no cambiarlo sin querer
-  if (actualEnlace && !encontrado) {
-    optsEnlace += '<option value="' + faqEsc(actualEnlace) + '" selected>' + faqEsc(faqNombreEnlace(actualEnlace)) + '</option>';
-  }
+  // (25/10/2026) Hasta 3 enlaces: un desplegable por enlace, con "+ Añadir otro enlace" y ✕ para quitarlo
+  var enlacesActuales = String(p ? (p.enlace || '') : '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+  if (!enlacesActuales.length) enlacesActuales = [''];
   var ed = document.getElementById('faq-portada-editor');
   ed.innerHTML =
     '<h3 style="margin-top:0;">' + (p ? '✏️ Editar pregunta' : '➕ Nueva pregunta') + ' — ' + faqLang.toUpperCase() + '</h3>' +
@@ -12693,16 +12679,66 @@ function abrirEditorFaq(id) {
     '<input id="faq-ed-pregunta" type="text" style="width:100%;margin-bottom:10px;" value="' + faqEsc(p ? p.pregunta : '') + '">' +
     '<label style="display:block;font-size:13px;margin-bottom:4px;">Respuesta</label>' +
     '<textarea id="faq-ed-respuesta" rows="6" style="width:100%;margin-bottom:10px;">' + faqEsc(p ? p.respuesta : '') + '</textarea>' +
-    '<label style="display:block;font-size:13px;margin-bottom:4px;">Enlace al final de la respuesta</label>' +
-    '<select id="faq-ed-enlace" style="width:100%;margin-bottom:10px;">' + optsEnlace + '</select>' +
+    '<label style="display:block;font-size:13px;margin-bottom:4px;">Enlaces al final de la respuesta</label>' +
+    '<div id="faq-ed-enlaces"></div>' +
+    '<button id="faq-ed-mas" class="boton-secundario" type="button" style="margin-bottom:12px;" onclick="anadirEnlaceFaq(\'\')">+ Añadir otro enlace</button>' +
     '<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:14px;"><input id="faq-ed-activa" type="checkbox"' + (!p || p.activa ? ' checked' : '') + '> Activa (se ve en la web)</label>' +
     '<div style="display:flex;gap:8px;">' +
     '<button class="boton-primario" onclick="guardarFaq(' + (p ? p.id : 'null') + ')">💾 Guardar</button>' +
     '<button class="boton-secundario" onclick="document.getElementById(\'faq-portada-editor\').classList.add(\'oculto\')">Cancelar</button>' +
     '</div>';
+  enlacesActuales.forEach(function (v) { anadirEnlaceFaq(v); });
   document.getElementById('faq-portada-grupos').classList.add('oculto');
   ed.classList.remove('oculto');
   ed.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// (25/10/2026) Opciones del desplegable de un enlace, en apartados (rutas y destinos con página activa en este idioma)
+function faqOpcionesEnlace(actual) {
+  var encontrado = false;
+  function opcion(e) {
+    if (actual === e[0]) encontrado = true;
+    return '<option value="' + faqEsc(e[0]) + '"' + (actual === e[0] ? ' selected' : '') + '>' + faqEsc(e[1]) + '</option>';
+  }
+  function apartado(titulo, lista) {
+    if (!lista.length) return '';
+    return '<optgroup label="' + faqEsc(titulo) + '">' + lista.map(opcion).join('') + '</optgroup>';
+  }
+  var L = faqLang.toUpperCase();
+  var html = opcion(['', '— Sin enlace —']) +
+    apartado('Páginas generales', [['flota', 'Flota'], ['rutas', 'Rutas'], ['destinos', 'Destinos']]) +
+    apartado('Categorías', (faqDatos.categorias || []).map(function (c) { return ['categoria:' + c.id, 'Categoría: ' + c.nombre]; })) +
+    apartado('Rutas con página en ' + L, (faqDatos.rutas || []).map(function (r) { return ['ruta:' + r.id, 'Ruta: ' + r.origen + ' → ' + r.destino]; })) +
+    apartado('Destinos con página en ' + L, (faqDatos.destinos || []).map(function (d) { return ['destino:' + d.id, 'Destino: ' + d.nombre]; }));
+  // Si el enlace guardado ya no está en la lista (p. ej. página desactivada), se conserva para no cambiarlo sin querer
+  if (actual && !encontrado) {
+    html += '<option value="' + faqEsc(actual) + '" selected>' + faqEsc(faqNombreEnlace(actual)) + '</option>';
+  }
+  return html;
+}
+
+function anadirEnlaceFaq(valor) {
+  var cont = document.getElementById('faq-ed-enlaces');
+  if (cont.children.length >= 3) return;
+  var fila = document.createElement('div');
+  fila.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;';
+  fila.innerHTML = '<select class="faq-ed-enlace" style="flex:1;">' + faqOpcionesEnlace(valor || '') + '</select>' +
+    '<button class="boton-secundario" type="button" title="Quitar este enlace" onclick="quitarEnlaceFaq(this)">✕</button>';
+  cont.appendChild(fila);
+  actualizarBotonesEnlaceFaq();
+}
+
+function quitarEnlaceFaq(boton) {
+  var cont = document.getElementById('faq-ed-enlaces');
+  if (cont.children.length <= 1) { cont.querySelector('select').value = ''; }
+  else { boton.parentNode.remove(); }
+  actualizarBotonesEnlaceFaq();
+}
+
+function actualizarBotonesEnlaceFaq() {
+  var cont = document.getElementById('faq-ed-enlaces');
+  var mas = document.getElementById('faq-ed-mas');
+  if (mas) mas.style.display = cont.children.length >= 3 ? 'none' : '';
 }
 
 function guardarFaq(id) {
@@ -12712,7 +12748,14 @@ function guardarFaq(id) {
     orden: document.getElementById('faq-ed-orden').value,
     pregunta: document.getElementById('faq-ed-pregunta').value,
     respuesta: document.getElementById('faq-ed-respuesta').value,
-    enlace: document.getElementById('faq-ed-enlace').value,
+    enlace: (function () {
+      // (25/10/2026) Los enlaces elegidos, sin vacíos ni repetidos, separados por comas
+      var vistos = [];
+      Array.prototype.forEach.call(document.querySelectorAll('#faq-ed-enlaces .faq-ed-enlace'), function (s) {
+        if (s.value && vistos.indexOf(s.value) === -1) vistos.push(s.value);
+      });
+      return vistos.join(',');
+    })(),
     activa: document.getElementById('faq-ed-activa').checked
   };
   if (!datos.pregunta.trim()) { faqMensaje('<div class="aviso-error">La pregunta es obligatoria.</div>'); return; }
