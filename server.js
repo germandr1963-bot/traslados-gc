@@ -9213,10 +9213,14 @@ async function obtenerFaqPortada(lang) {
   const pp = PALABRAS_PAGINAS[lang] || {};
   const pref = lang === 'es' ? '/' : '/' + lang + '/';
   const enlaces = {};
+  // (25/10/2026) Una pregunta puede tener hasta 3 enlaces, guardados juntos separados por comas
+  const partesEnlace = function (e) { return String(e || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean); };
   const idsCat = [];
   preg.rows.forEach(function (p) {
-    const m = /^categoria:(\d+)$/.exec(p.enlace || '');
-    if (m) idsCat.push(parseInt(m[1], 10));
+    partesEnlace(p.enlace).forEach(function (pe) {
+      const m = /^categoria:(\d+)$/.exec(pe);
+      if (m) idsCat.push(parseInt(m[1], 10));
+    });
   });
   if (idsCat.length) {
     const cats = await pool.query(
@@ -9247,10 +9251,12 @@ async function obtenerFaqPortada(lang) {
   const idsRuta = [];
   const idsDestino = [];
   preg.rows.forEach(function (p) {
-    const mr = /^ruta:(\d+)$/.exec(p.enlace || '');
-    if (mr) idsRuta.push(parseInt(mr[1], 10));
-    const md = /^destino:(\d+)$/.exec(p.enlace || '');
-    if (md) idsDestino.push(parseInt(md[1], 10));
+    partesEnlace(p.enlace).forEach(function (pe) {
+      const mr = /^ruta:(\d+)$/.exec(pe);
+      if (mr) idsRuta.push(parseInt(mr[1], 10));
+      const md = /^destino:(\d+)$/.exec(pe);
+      if (md) idsDestino.push(parseInt(md[1], 10));
+    });
   });
   if (idsRuta.length || idsDestino.length) {
     const nombresLang = await pool.query(
@@ -9299,11 +9305,16 @@ async function obtenerFaqPortada(lang) {
   const porGrupo = {};
   const sinGrupo = [];
   preg.rows.forEach(function (p) {
-    const e = p.enlace ? enlaces[p.enlace] : null;
+    // (25/10/2026) Lista de enlaces válidos de la pregunta (los de páginas no activas se omiten)
+    const lista_enlaces = partesEnlace(p.enlace).map(function (pe) { return enlaces[pe]; })
+      .filter(function (e) { return e && e.url && e.texto; })
+      .map(function (e) { return { url: e.url, texto: e.texto }; });
+    const e = lista_enlaces[0] || null;
     const item = {
       id: p.id, pregunta: p.pregunta, respuesta: p.respuesta || '',
-      enlace_url: (e && e.url && e.texto) ? e.url : null,
-      enlace_texto: (e && e.texto) ? e.texto : null
+      enlace_url: e ? e.url : null,
+      enlace_texto: e ? e.texto : null,
+      enlaces: lista_enlaces
     };
     if (p.grupo_id) { (porGrupo[p.grupo_id] = porGrupo[p.grupo_id] || []).push(item); }
     else sinGrupo.push(item);
@@ -13590,8 +13601,14 @@ app.post('/admin/preferencias/:id/eliminar', requireAdmin, asyncHandler(async (r
 // Admin → SEO → "Preguntas frecuentes — Portada". Cada idioma, su lista.
 // Enlace: '' (ninguno) · 'flota' · 'rutas' · 'destinos' · 'categoria:<id>'.
 // (25/10/2026) Además: 'ruta:<id>' (página de una ruta) y 'destino:<id>' (página de un destino).
+// (25/10/2026) Hasta 3 enlaces por pregunta, separados por comas (p. ej. 'categoria:8,destino:12').
 function faqLangValido(l) { return typeof l === 'string' && /^[a-z]{2}$/.test(l); }
-function faqEnlaceValido(e) { return !e || e === 'flota' || e === 'rutas' || e === 'destinos' || /^categoria:\d+$/.test(e) || /^ruta:\d+$/.test(e) || /^destino:\d+$/.test(e); }
+function faqEnlaceUnoValido(e) { return e === 'flota' || e === 'rutas' || e === 'destinos' || /^categoria:\d+$/.test(e) || /^ruta:\d+$/.test(e) || /^destino:\d+$/.test(e); }
+function faqEnlaceValido(e) {
+  if (!e) return true;
+  const partes = String(e).split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+  return partes.length <= 3 && partes.every(faqEnlaceUnoValido);
+}
 
 app.get('/admin/faq-portada', requireAdmin, asyncHandler(async (req, res) => {
   const lang = faqLangValido(req.query.lang) ? req.query.lang : 'es';
