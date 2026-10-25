@@ -9242,6 +9242,60 @@ async function obtenerFaqPortada(lang) {
   ['flota', 'rutas', 'destinos'].forEach(function (pg) {
     enlaces[pg] = { url: pref + (pp[pg] || pg), texto: obtenerTexto('home_footer_' + pg, lang) };
   });
+  // (25/10/2026) Enlace a la página de una ruta ('ruta:<id>') o de un destino ('destino:<id>'),
+  // solo si esa página está activa en este idioma. Dirección igual que en las páginas de Rutas y Destinos.
+  const idsRuta = [];
+  const idsDestino = [];
+  preg.rows.forEach(function (p) {
+    const mr = /^ruta:(\d+)$/.exec(p.enlace || '');
+    if (mr) idsRuta.push(parseInt(mr[1], 10));
+    const md = /^destino:(\d+)$/.exec(p.enlace || '');
+    if (md) idsDestino.push(parseInt(md[1], 10));
+  });
+  if (idsRuta.length || idsDestino.length) {
+    const nombresLang = await pool.query(
+      `SELECT d.nombre AS nombre_es, COALESCE(NULLIF(dt.nombre, ''), d.nombre) AS nombre
+       FROM destinos d
+       LEFT JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1`,
+      [lang]
+    );
+    const nombreLugar = {};
+    nombresLang.rows.forEach(function (n) { nombreLugar[n.nombre_es] = n.nombre; });
+    if (idsRuta.length) {
+      const palabraTraslado = SECCIONES_TRASLADO[lang] || 'traslado';
+      const rr = await pool.query(
+        `SELECT r.id, r.origen, r.destino, rss.slug_url
+         FROM rutas r
+         JOIN route_seo_settings rss ON rss.route_id = r.id AND rss.lang_code = $1
+         WHERE r.id = ANY($2) AND r.activa = TRUE AND rss.activo = TRUE AND COALESCE(rss.slug_url, '') <> ''`,
+        [lang, idsRuta]
+      );
+      rr.rows.forEach(function (r) {
+        enlaces['ruta:' + r.id] = {
+          url: '/' + lang + '/' + palabraTraslado + '/' + r.slug_url,
+          texto: (nombreLugar[r.origen] || r.origen) + ' – ' + (nombreLugar[r.destino] || r.destino)
+        };
+      });
+    }
+    if (idsDestino.length) {
+      const palabraDestino = (PALABRAS_PAGINAS[lang] && PALABRAS_PAGINAS[lang].destino) ? PALABRAS_PAGINAS[lang].destino : 'destino';
+      const dd = await pool.query(
+        `SELECT d.id, d.nombre, dss.slug_url, COALESCE(NULLIF(it.slug, ''), i.slug, 'gran-canaria') AS isla_slug
+         FROM destinos d
+         JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = $1
+         LEFT JOIN islas i ON i.nombre = COALESCE(d.isla, 'Gran Canaria')
+         LEFT JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = $1
+         WHERE d.id = ANY($2) AND d.activo = TRUE AND dss.activo = TRUE AND COALESCE(dss.slug_url, '') <> ''`,
+        [lang, idsDestino]
+      );
+      dd.rows.forEach(function (d) {
+        enlaces['destino:' + d.id] = {
+          url: (lang === 'es' ? '/es/destino/' : '/' + lang + '/' + palabraDestino + '/') + d.isla_slug + '/' + d.slug_url,
+          texto: nombreLugar[d.nombre] || d.nombre
+        };
+      });
+    }
+  }
   const porGrupo = {};
   const sinGrupo = [];
   preg.rows.forEach(function (p) {
@@ -13535,8 +13589,9 @@ app.post('/admin/preferencias/:id/eliminar', requireAdmin, asyncHandler(async (r
 // ─── Admin: Preguntas frecuentes de la portada (21/10/2026) ───────────────────
 // Admin → SEO → "Preguntas frecuentes — Portada". Cada idioma, su lista.
 // Enlace: '' (ninguno) · 'flota' · 'rutas' · 'destinos' · 'categoria:<id>'.
+// (25/10/2026) Además: 'ruta:<id>' (página de una ruta) y 'destino:<id>' (página de un destino).
 function faqLangValido(l) { return typeof l === 'string' && /^[a-z]{2}$/.test(l); }
-function faqEnlaceValido(e) { return !e || e === 'flota' || e === 'rutas' || e === 'destinos' || /^categoria:\d+$/.test(e); }
+function faqEnlaceValido(e) { return !e || e === 'flota' || e === 'rutas' || e === 'destinos' || /^categoria:\d+$/.test(e) || /^ruta:\d+$/.test(e) || /^destino:\d+$/.test(e); }
 
 app.get('/admin/faq-portada', requireAdmin, asyncHandler(async (req, res) => {
   const lang = faqLangValido(req.query.lang) ? req.query.lang : 'es';
@@ -13546,7 +13601,20 @@ app.get('/admin/faq-portada', requireAdmin, asyncHandler(async (req, res) => {
   );
   const cats = await pool.query('SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre');
   const conteo = await pool.query('SELECT lang_code, COUNT(*)::int AS total FROM faq_portada GROUP BY lang_code');
-  res.json({ lang, grupos: grupos.rows, preguntas: preguntas.rows, categorias: cats.rows, conteo: conteo.rows });
+  // (25/10/2026) Rutas y destinos con su página activa en este idioma (para el enlace de la pregunta)
+  const rutasLang = await pool.query(
+    `SELECT r.id, r.origen, r.destino FROM rutas r
+     JOIN route_seo_settings rss ON rss.route_id = r.id AND rss.lang_code = $1
+     WHERE r.activa = TRUE AND rss.activo = TRUE AND COALESCE(rss.slug_url, '') <> ''
+     ORDER BY r.origen, r.destino`, [lang]
+  );
+  const destinosLang = await pool.query(
+    `SELECT d.id, d.nombre FROM destinos d
+     JOIN destinos_seo_settings dss ON dss.destino_id = d.id AND dss.lang_code = $1
+     WHERE d.activo = TRUE AND dss.activo = TRUE AND COALESCE(dss.slug_url, '') <> ''
+     ORDER BY d.nombre`, [lang]
+  );
+  res.json({ lang, grupos: grupos.rows, preguntas: preguntas.rows, categorias: cats.rows, conteo: conteo.rows, rutas: rutasLang.rows, destinos: destinosLang.rows });
 }));
 
 app.post('/admin/faq-portada/grupos', requireAdmin, asyncHandler(async (req, res) => {
