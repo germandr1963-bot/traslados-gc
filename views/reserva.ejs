@@ -406,7 +406,7 @@ footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13
 
 <div class="contenedor">
   <div class="lang-bar">
-    <% idiomas.forEach(function(idi) { %>
+    <% idiomas.forEach(function(idi) { if (typeof soloIdioma !== 'undefined' && soloIdioma && idi.codigo !== soloIdioma) return; /* (27/10/2026) cliente con sesión: solo su idioma */ %>
       <a href="<%= idi.codigo === 'es' ? '/reserva' : '/' + idi.codigo + '/' + (palabrasReserva[idi.codigo] || 'reserva') %>"
          class="lang-pill<%= idi.codigo === lang ? ' activo' : '' %>">
         <%= idi.codigo.toUpperCase() %>
