@@ -323,7 +323,7 @@ footer a:hover { color: var(--texto-oscuro); }
       <% precios.forEach(function(p) { %>
       <tr>
         <td><strong><%= p.nombre %></strong></td>
-        <td><%= p.capacidad_pasajeros %> <%= t('sufijo_pax') %></td>
+        <td><%= textoPax(p.capacidad_pasajeros) %></td>
         <td><%= p.capacidad_maletas %></td>
         <td>
           <% if (p.precio) { %>
