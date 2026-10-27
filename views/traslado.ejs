@@ -182,6 +182,14 @@ h1.titulo-ruta .acento { color: var(--terracota); }
 }
 .tabla-tarifas th:nth-child(4),
 .tabla-tarifas td:nth-child(4) { text-align: right; }
+/* (27/10/2026) Sin dobles filas: pasajeros y precio siempre en una línea; la columna del precio, solo lo que necesita */
+.tabla-tarifas td:nth-child(2),
+.tabla-tarifas td:nth-child(4) { white-space: nowrap; }
+.tabla-tarifas th:nth-child(4) { width: 1%; }
+/* El equipaje en una línea cuando hay sitio (en pantallas estrechas se parte, y en el móvil esta columna no se ve) */
+@media (min-width: 761px) {
+  .tabla-tarifas td:nth-child(3) { white-space: nowrap; }
+}
 
 .precio-fijo {
   font-weight: 500;
