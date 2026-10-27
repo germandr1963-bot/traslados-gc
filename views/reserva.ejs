@@ -917,6 +917,9 @@ var TXT = {
   botonReservar:  '<%- t("home_boton_reservar").replace(/'/g, "\\'") %>',
   verOtrasCats:   '<%- t("home_texto_ver_otras_cats").replace(/'/g, "\\'") %>',
   paxSufijo:      '<%- t("home_pax_sufijo").replace(/'/g, "\\'") %>',
+  pax1:           '<%- t("flota_pax_1").replace(/'/g, "\\'") %>',
+  pax2:           '<%- t("flota_pax_2").replace(/'/g, "\\'") %>',
+  pax5:           '<%- t("flota_pax_5").replace(/'/g, "\\'") %>',
   enviando:       '<%- t("home_modal_enviando").replace(/'/g, "\\'") %>',
   cerrar:         '<%- t("home_modal_cerrar").replace(/'/g, "\\'") %>',
   okMsg:          '<%- t("home_modal_ok").replace(/'/g, "\\'") %>',
@@ -957,6 +960,16 @@ var TXT = {
   extrasGratis:         '<%- t("extras_gratis").replace(/'/g, "\\'") %>',
   serviciosInclTitulo:  '<%- t("servicios_incluidos_titulo").replace(/'/g, "\\'") %>'
 };
+// (27/10/2026) "N pasajeros" bien escrito en cada idioma, para cualquier número (igual que en la portada): sale de los
+// textos de Flota «1 pasajero» (flota_pax_1), «2 pasajeros» (flota_pax_2) y «5 pasajeros» (flota_pax_5); el idioma
+// decide cuál toca (en ruso: 1/21 → пассажир, 2–4/22 → пассажира, 5–20 → пассажиров) y se pone el número de Admin → Categorías.
+function textoPax(n) {
+  var forma = 'other';
+  try { forma = new Intl.PluralRules(LANG).select(Number(n)); } catch (e) {}
+  var modelo = forma === 'one' ? TXT.pax1 : (forma === 'few' ? TXT.pax2 : TXT.pax5);
+  if (!/[0-9]+/.test(modelo)) return n + ' ' + TXT.paxSufijo;
+  return modelo.replace(/[0-9]+/, String(n));
+}
 // Las píldoras de idioma conservan la ruta y categoría elegidas
 document.addEventListener('DOMContentLoaded', function() {
   if (window.location.search) {
@@ -1082,7 +1095,7 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
       var cat = cats.find(function(c){ return String(c.id) === String(paramCategoriaId); });
       if (!cat) return;
       categoriaNombre = cat.nombre_traducido || cat.nombre;
-      document.getElementById('tbl-categoria').textContent = (cat.nombre_traducido || cat.nombre) + ' · ' + cat.capacidad_pasajeros + ' ' + TXT.paxSufijo;
+      document.getElementById('tbl-categoria').textContent = (cat.nombre_traducido || cat.nombre) + ' · ' + textoPax(cat.capacidad_pasajeros);
       var maxPax = parseInt(cat.capacidad_pasajeros) || 8;
       var sel = document.getElementById('num-pasajeros');
       sel.innerHTML = '';
@@ -1364,7 +1377,7 @@ function actualizarCategoriasSegunRuta() {
   categoriasRuta.forEach(function (c) {
     var opt = document.createElement('option');
     opt.value = c.id;
-    opt.textContent = (c.nombre_traducido || c.nombre) + ' (' + c.capacidad_pasajeros + ' ' + TXT.paxSufijo + ')';
+    opt.textContent = (c.nombre_traducido || c.nombre) + ' (' + textoPax(c.capacidad_pasajeros) + ')';
     if (String(c.id) === String(valorActual)) opt.selected = true;
     select.appendChild(opt);
   });
@@ -1417,7 +1430,7 @@ function verPrecio() {
       var paxHtml = catData
         ? '<div class="tarjeta-resultado-dato">' +
             '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D9A441" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
-            catData.capacidad_pasajeros + ' ' + TXT.paxSufijo +
+            textoPax(catData.capacidad_pasajeros) +
           '</div>' +
           (catData.capacidad_maletas
             ? '<div class="tarjeta-resultado-dato">' +
