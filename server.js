@@ -367,6 +367,18 @@ function obtenerTexto(clave, lang) {
   return entrada.texto_es;
 }
 
+// (27/10/2026) "N pasajeros" bien escrito en cada idioma, para cualquier número (igual que en las páginas):
+// sale de los textos de Flota «1 pasajero» (flota_pax_1), «2 pasajeros» (flota_pax_2) y «5 pasajeros» (flota_pax_5);
+// el idioma decide cuál toca (en ruso: 1/21 → пассажир, 2–4/22 → пассажира, 5–20 → пассажиров) y se pone el número.
+function textoPax(n, lang) {
+  const l = (lang && IDIOMAS_PERMITIDOS.includes(lang)) ? lang : 'es';
+  let forma = 'other';
+  try { forma = new Intl.PluralRules(l).select(Number(n)); } catch (e) {}
+  const modelo = obtenerTexto(forma === 'one' ? 'flota_pax_1' : (forma === 'few' ? 'flota_pax_2' : 'flota_pax_5'), l);
+  if (!/[0-9]+/.test(modelo)) return n + ' ' + obtenerTexto('flota_catalogo_pasajeros', l);
+  return modelo.replace(/[0-9]+/, String(n));
+}
+
 // ─── Helpers generales ───────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
   if (req.session && req.session.adminId) {
@@ -10739,73 +10751,6 @@ app.post('/admin/cotizaciones/:id/precios', requireAdmin, asyncHandler(async (re
   res.json({ ok: true });
 }));
 
-app.post('/admin/cotizaciones/:id/enviar', requireAdmin, asyncHandler(async (req, res) => {
-  const cotiz = await pool.query(
-    `SELECT c.*, 
-            array_agg(json_build_object('nombre', cv.nombre, 'precio', cp.precio, 'pax', cv.capacidad_pasajeros) ORDER BY cv.orden, cv.nombre)
-              FILTER (WHERE cp.id IS NOT NULL) AS precios
-     FROM cotizaciones c
-     LEFT JOIN cotizaciones_precios cp ON cp.cotizacion_id = c.id
-     LEFT JOIN categorias_vehiculos cv ON cv.id = cp.categoria_id
-     WHERE c.id = $1
-     GROUP BY c.id`,
-    [req.params.id]
-  );
-
-  if (!cotiz.rows.length) return res.status(404).json({ error: 'Cotización no encontrada' });
-  const c = cotiz.rows[0];
-
-  if (!c.precios || !c.precios.length) {
-    return res.status(400).json({ error: 'Añade al menos un precio antes de enviar.' });
-  }
-
-  const fechaViaje = c.fecha_aproximada
-    ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES')
-    : 'A confirmar';
-
-  const filasPrecios = c.precios.map(function(p) {
-    return `<tr>
-      <td style="padding:8px 16px;border-bottom:1px solid #eee;">${p.nombre}</td>
-      <td style="padding:8px 16px;border-bottom:1px solid #eee;">${p.pax} pax</td>
-      <td style="padding:8px 16px;border-bottom:1px solid #eee;font-weight:600;">${parseFloat(p.precio).toFixed(2)} €</td>
-    </tr>`;
-  }).join('');
-
-  const html = plantillaEmailEnIdioma(c.lang_cliente,
-    `<p>Hola <strong>${c.nombre_cliente || ''}</strong>,</p>
-     <p>Gracias por contactarnos. Aquí tienes los precios disponibles para tu traslado:</p>
-     <div class="info-box">
-       <strong>Origen:</strong> ${c.origen}<br>
-       <strong>Destino:</strong> ${c.destino}<br>
-       <strong>Fecha aproximada:</strong> ${fechaViaje}
-       ${c.num_pasajeros ? '<br><strong>Pasajeros:</strong> ' + c.num_pasajeros : ''}
-     </div>
-     <p><strong>Opciones disponibles:</strong></p>
-     <table style="width:100%;border-collapse:collapse;margin:12px 0;">
-       <thead><tr style="background:#2c2c2c;"><th style="color:#fff;padding:8px 12px;text-align:left;font-size:13px;">Categoría</th><th style="color:#fff;padding:8px 12px;text-align:left;font-size:13px;">Capacidad</th><th style="color:#fff;padding:8px 12px;text-align:left;font-size:13px;">Precio estimado</th></tr></thead>
-       <tbody>${filasPrecios}</tbody>
-     </table>
-     <p style="font-size:12px;color:#999;margin-top:16px;line-height:1.6;">El precio indicado es una estimación. El cobro lo realiza el conductor directamente al finalizar el servicio.</p>
-     <div style="text-align:center;margin:12px 0;"><a href="${BASE_URL}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Ver todas las rutas</a></div>`
-  );
-
-  try {
-    await enviarEmail({
-      to: c.email_cliente,
-      subject: 'Precio de traslado: ' + c.origen + ' → ' + c.destino,
-      html
-    });
-    await pool.query(
-      "UPDATE cotizaciones SET estado = 'respondida', respuesta_enviada = TRUE WHERE id = $1",
-      [req.params.id]
-    );
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Error enviando email cotización:', err.message);
-    res.status(500).json({ error: 'Error enviando email: ' + err.message });
-  }
-}));
-
 // Listar rutas activas con sus slugs SEO por idioma (para el selector de respuesta positiva)
 app.get('/admin/cotizaciones/rutas-activas', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
@@ -10935,8 +10880,7 @@ app.post('/admin/cotizaciones/:id/respuesta-positiva', requireAdmin, asyncHandle
     'email_cotiz_asunto_positivo', 'email_cotiz_saludo',
     'email_cotiz_positivo_p1', 'email_cotiz_positivo_p2', 'email_cotiz_positivo_p3',
     'email_cotiz_boton_reservar', 'email_cotiz_nota_precio', 'email_cotiz_despedida',
-    'email_cotiz_col_categoria', 'email_cotiz_col_capacidad',
-    'sufijo_pax'
+    'email_cotiz_col_categoria', 'email_cotiz_col_capacidad'
   ];
   // Añadir claves de nombres de categorías
   preciosResult.rows.forEach(function(p) {
@@ -10956,8 +10900,7 @@ app.post('/admin/cotizaciones/:id/respuesta-positiva', requireAdmin, asyncHandle
     parrafo3:     t['email_cotiz_positivo_p3'] || 'Pulsa el botón para ver todos los detalles y hacer tu reserva.',
     boton:        t['email_cotiz_boton_reservar'] || 'Ver ruta y reservar',
     nota:         t['email_cotiz_nota_precio'] || 'El precio es una estimación basada en los km de distancia.',
-    despedida:    t['email_cotiz_despedida'] || 'Un saludo, el equipo de Traslados GC',
-    pax:          t['sufijo_pax'] || 'pax'
+    despedida:    t['email_cotiz_despedida'] || 'Un saludo, el equipo de Traslados GC'
   };
 
   const fechaViaje = c.fecha_aproximada ? new Date(c.fecha_aproximada).toLocaleDateString('es-ES') : null;
@@ -10966,7 +10909,7 @@ app.post('/admin/cotizaciones/:id/respuesta-positiva', requireAdmin, asyncHandle
     var nombreCat = t['categoria_nombre_' + p.categoria_id] || p.nombre;
     return '<tr>' +
       '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' + nombreCat + '</td>' +
-      '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' + p.capacidad_pasajeros + ' ' + textos.pax + '</td>' +
+      '<td style="padding:8px 12px;border-bottom:1px solid #eee;">' + textoPax(p.capacidad_pasajeros, lang) + '</td>' +
       '<td style="padding:8px 12px;border-bottom:1px solid #eee;font-weight:600;">' + parseFloat(p.precio).toFixed(2) + ' €</td>' +
     '</tr>';
   }).join('');
@@ -10991,7 +10934,7 @@ app.post('/admin/cotizaciones/:id/respuesta-positiva', requireAdmin, asyncHandle
      <div class="info-box">
        <strong>${seo.origen} → ${seo.destino}</strong>
        ${fechaViaje ? '<br><span style="font-size:13px;color:#888;">' + fechaViaje + '</span>' : ''}
-       ${c.num_pasajeros ? '<br><span style="font-size:13px;color:#888;">' + c.num_pasajeros + ' pax</span>' : ''}
+       ${c.num_pasajeros ? '<br><span style="font-size:13px;color:#888;">' + textoPax(c.num_pasajeros, lang) + '</span>' : ''}
      </div>
      ${preciosResult.rows.length ? `<p>${textos.parrafo2}</p>
      <table style="width:100%;border-collapse:collapse;margin:12px 0;">
@@ -13151,7 +13094,7 @@ async function tablaTarifasEmail(rutaId, lang) {
     const maletas = mapaCategorias[p.capacidad_maletas] || p.capacidad_maletas;
     // (07/10/2026) En el email, solo el importe (la cabecera ya dice "Precio estimado")
     const precio = p.precio ? '<strong>' + Number(p.precio).toFixed(0) + ' €</strong>' : t('texto_a_consultar');
-    return '<tr><td style="' + td + '"><strong>' + nombre + '</strong></td><td style="' + td + '">' + p.capacidad_pasajeros + ' ' + t('sufijo_pax') +
+    return '<tr><td style="' + td + '"><strong>' + nombre + '</strong></td><td style="' + td + '">' + textoPax(p.capacidad_pasajeros, _l) +
       '</td><td style="' + td + '">' + maletas + '</td><td style="' + td + 'text-align:right;white-space:nowrap;">' + precio + '</td></tr>';
   }).join('');
   const cabPrecio = textoPrecioEstimado(_l);
@@ -14220,6 +14163,7 @@ async function renderTraslado(req, res, lang, slug) {
   res.render('traslado', {
     lang,
     t,
+    textoPax: function (n) { return textoPax(n, lang); }, // (27/10/2026) «4 pasajeros» bien escrito en cada idioma
     palabrasPaginas,
     SECCIONES_TRASLADO,
     seo: seoConTrad,
