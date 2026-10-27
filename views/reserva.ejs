@@ -1242,9 +1242,91 @@ function cargarRutas() {
     });
     poblarSelect(document.getElementById('desde'), origenes);
     poblarSelect(document.getElementById('hasta'), destinos);
+    // (27/10/2026) Copiado de la portada: si llega origen o destino en la dirección, se filtra la otra lista y se marcan
+    var paramDesde = new URLSearchParams(window.location.search).get('desde');
+    var paramHasta = new URLSearchParams(window.location.search).get('hasta');
+
+    // Si llega destino preseleccionado, filtrar origenes
+    if (paramHasta) {
+      var vistosF = {}, filtradosO = [];
+      rutasDisponibles.forEach(function (r) {
+        if (r.destino === paramHasta && !vistosF[r.origen]) {
+          vistosF[r.origen] = true;
+          filtradosO.push({ valor: r.origen, etiqueta: r.origen_traducido || r.origen });
+        }
+      });
+      if (filtradosO.length > 0) {
+        filtradosO.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
+        poblarSelect(document.getElementById('desde'), filtradosO);
+      }
+    }
+
+    // Si llega origen preseleccionado, filtrar destinos
+    if (paramDesde) {
+      var vistosF2 = {}, filtradosD = [];
+      rutasDisponibles.forEach(function (r) {
+        if (r.origen === paramDesde && !vistosF2[r.destino]) {
+          vistosF2[r.destino] = true;
+          filtradosD.push({ valor: r.destino, etiqueta: r.destino_traducido || r.destino });
+        }
+      });
+      if (filtradosD.length > 0) {
+        filtradosD.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
+        poblarSelect(document.getElementById('hasta'), filtradosD);
+      }
+    }
+
+    // Asignar los dos valores al final para que no se pisen entre sí
+    if (paramDesde) { document.getElementById('desde').value = paramDesde; }
+    if (paramHasta) { document.getElementById('hasta').value = paramHasta; }
+
+    if (paramDesde || paramHasta) actualizarCategoriasSegunRuta();
     if (rutas.length === 0) {
       document.getElementById('resultado-precio').textContent = TXT.sinRutas;
     }
+
+    // (27/10/2026) Copiado de la portada — filtrado bidireccional: origen filtra destino, destino filtra origen
+    document.getElementById('desde').addEventListener('change', function () {
+      var origenVal = this.value;
+      var selectHasta = document.getElementById('hasta');
+      var hastaVal = selectHasta.value;
+      if (!origenVal) {
+        poblarSelect(selectHasta, destinos);
+      } else {
+        var vistos = {}, filtrados = [];
+        rutasDisponibles.forEach(function (r) {
+          if (r.origen === origenVal && !vistos[r.destino]) {
+            vistos[r.destino] = true;
+            filtrados.push({ valor: r.destino, etiqueta: r.destino_traducido || r.destino });
+          }
+        });
+        filtrados.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
+        poblarSelect(selectHasta, filtrados);
+      }
+      if (hastaVal) { selectHasta.value = hastaVal; }
+      actualizarCategoriasSegunRuta();
+    });
+
+    document.getElementById('hasta').addEventListener('change', function () {
+      var destinoVal = this.value;
+      var selectDesde = document.getElementById('desde');
+      var desdeVal = selectDesde.value;
+      if (!destinoVal) {
+        poblarSelect(selectDesde, origenes);
+      } else {
+        var vistos = {}, filtrados = [];
+        rutasDisponibles.forEach(function (r) {
+          if (r.destino === destinoVal && !vistos[r.origen]) {
+            vistos[r.origen] = true;
+            filtrados.push({ valor: r.origen, etiqueta: r.origen_traducido || r.origen });
+          }
+        });
+        filtrados.sort(function(a,b){ return a.etiqueta.localeCompare(b.etiqueta); });
+        poblarSelect(selectDesde, filtrados);
+      }
+      if (desdeVal) { selectDesde.value = desdeVal; }
+      actualizarCategoriasSegunRuta();
+    });
   });
 }
 
