@@ -9342,6 +9342,19 @@ async function renderReserva(req, res, lang) {
   if (!IDIOMAS_PERMITIDOS.includes(lang)) {
     return res.status(404).send('Página no encontrada');
   }
+  // (27/10/2026) Cliente con sesión abierta: reserva SOLO en el idioma que tiene elegido en sus datos del portal.
+  // Si llega en otro idioma, la página se abre en el suyo (con la misma ruta y fecha); la fila de idiomas muestra solo el suyo.
+  // El idioma se lee cada vez de sus datos: si lo cambia en el portal, la reserva sigue el nuevo.
+  let soloIdioma = null;
+  if (req.session && req.session.clienteReservaId) {
+    const langCliente = await idiomaPortalCliente(req);
+    if (langCliente !== lang && (langCliente === 'es' || SECCIONES_RESERVA[langCliente])) {
+      const iq = req.originalUrl.indexOf('?');
+      const q = iq !== -1 ? req.originalUrl.slice(iq) : '';
+      return res.redirect(langCliente === 'es' ? '/reserva' + q : '/' + langCliente + '/' + SECCIONES_RESERVA[langCliente] + q);
+    }
+    soloIdioma = lang;
+  }
   const t = function (clave) { return obtenerTexto(clave, lang); };
   const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
   // Nombres de los idiomas en el idioma de la página (fila "Nombres de idiomas")
@@ -9372,7 +9385,7 @@ async function renderReserva(req, res, lang) {
     lang, t, idiomas: idiomas.rows, BASE_URL,
     palabrasReserva: SECCIONES_RESERVA,
     palabrasPaginas: PALABRAS_PAGINAS[lang] || {},
-    rutaReserva, urlHome, preferenciasViajero
+    rutaReserva, urlHome, preferenciasViajero, soloIdioma
   });
 }
 
