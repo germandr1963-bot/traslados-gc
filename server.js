@@ -15662,7 +15662,13 @@ app.get('/modificar-reserva', (req, res) => {
     } catch (e) { console.warn('Modificar reserva (idioma):', e.message); lang = 'es'; }
     if (!IDIOMAS_PERMITIDOS.includes(lang)) lang = 'es';
     const t = function (clave) { return obtenerTexto(clave, lang); };
-    res.render('modificar-reserva', { lang, t });
+    // (27/10/2026) Las etiquetas del resumen («Ruta», «Pasajeros»…) son frases de los correos (🧩 Cliente — Frases), no textos
+    // de la interfaz: se leen de allí, en el idioma del cliente (antes la página enseñaba «[[frase_resumen_…]]»).
+    const frases = {};
+    for (const c of ['ruta', 'categoria', 'fecha', 'pasajeros', 'extras', 'notas']) {
+      frases[c] = await obtenerFrase('frase_resumen_' + c, lang, '');
+    }
+    res.render('modificar-reserva', { lang, t, frases });
   })().catch(function (e) {
     console.warn('Modificar reserva:', e.message);
     res.sendFile('modificar-reserva.html', { root: path.join(__dirname, 'public') });
