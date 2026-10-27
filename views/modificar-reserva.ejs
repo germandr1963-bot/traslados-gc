@@ -413,11 +413,12 @@
 var LANG = '<%= lang %>';
 var LOCALE = { es:'es-ES', en:'en-GB', de:'de-DE', sv:'sv-SE', no:'nb-NO', nl:'nl-NL', it:'it-IT', fr:'fr-FR', fi:'fi-FI', ru:'ru-RU' }[LANG] || 'es-ES';
 var TX = <%- JSON.stringify({
-  aConsultar: t('texto_a_consultar'), pasajero: t('flota_catalogo_pasajero'), pasajeros: t('flota_catalogo_pasajeros'),
+  aConsultar: t('texto_a_consultar'), pasajeros: t('flota_catalogo_pasajeros'),
+  pax1: t('flota_pax_1'), pax2: t('flota_pax_2'), pax5: t('flota_pax_5'),
   sinExtras: t('mod_sin_extras'), noExtras: t('reserva_sin_extras'),
-  rReserva: t('mod_resumen_reserva'), rRuta: t('frase_resumen_ruta'), rCategoria: t('frase_resumen_categoria'),
-  rPrecio: t('precio_estimado'), rFecha: t('frase_resumen_fecha'), rHora: t('mod_resumen_hora'),
-  rPasajeros: t('frase_resumen_pasajeros'), rExtras: t('frase_resumen_extras'), rNotas: t('frase_resumen_notas'),
+  rReserva: t('mod_resumen_reserva'), rRuta: frases.ruta, rCategoria: frases.categoria,
+  rPrecio: t('precio_estimado'), rFecha: frases.fecha, rHora: t('mod_resumen_hora'),
+  rPasajeros: frases.pasajeros, rExtras: frases.extras, rNotas: frases.notas,
   confirmar: t('mod_boton_confirmar'), enviando: t('home_modal_enviando'),
   errSinPnr: t('mod_err_sin_pnr'), errCargar: t('mod_err_cargar'), errEnviar: t('mod_err_enviar'), errConexion: t('home_modal_error_conexion')
 }).replace(/</g, '\\u003c') %>;
@@ -547,13 +548,24 @@ async function cargarCategorias() {
   poblarPasajeros(catActual ? catActual.capacidad_pasajeros : 8);
 }
 
+// (27/10/2026) "N pasajeros" bien escrito en cada idioma, para cualquier número (igual que en la portada): sale de los
+// textos «1 pasajero» (flota_pax_1), «2 pasajeros» (flota_pax_2) y «5 pasajeros» (flota_pax_5); el idioma decide cuál toca
+// (en ruso: 1/21 → пассажир, 2–4/22 → пассажира, 5–20 → пассажиров) y se pone el número.
+function textoPax(n) {
+  var forma = 'other';
+  try { forma = new Intl.PluralRules(LANG).select(Number(n)); } catch (e) {}
+  var modelo = forma === 'one' ? TX.pax1 : (forma === 'few' ? TX.pax2 : TX.pax5);
+  if (!/[0-9]+/.test(modelo)) return n + ' ' + TX.pasajeros;
+  return modelo.replace(/[0-9]+/, String(n));
+}
+
 function poblarPasajeros(max) {
   var sel = document.getElementById('num-pasajeros');
   sel.innerHTML = '';
   for (var i = 1; i <= (parseInt(max) || 8); i++) {
     var opt = document.createElement('option');
     opt.value = i;
-    opt.textContent = i + ' ' + (i === 1 ? TX.pasajero : TX.pasajeros);
+    opt.textContent = textoPax(i);
     if (i === reservaData.num_pasajeros) opt.selected = true;
     sel.appendChild(opt);
   }
