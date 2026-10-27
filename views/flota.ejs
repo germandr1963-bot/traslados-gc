@@ -136,7 +136,7 @@
         <div class="selector-campo">
           <label for="sel-pasajeros"><%= t('flota_selector_label_pax') || 'Pasajeros' %></label>
           <select id="sel-pasajeros">
-            <option value="1">1 pasajero</option>
+            <option value="1"><%= t('flota_pax_1') %></option>
           </select>
         </div>
         <div class="selector-campo">
@@ -308,19 +308,25 @@
   // Textos para el catálogo — vienen del servidor, no de fetch
   var txtHasta     = '<%= t("flota_catalogo_hasta") || "Hasta" %>';
   var txtPasajeros = '<%= t("flota_catalogo_pasajeros") || "pasajeros" %>';
-  var txtPasajero  = '<%= t("flota_catalogo_pasajero") || "pasajero" %>';
   var txtMaletas   = '<%= t("flota_catalogo_maletas") || "maletas" %>';
   var txtReservar  = '<%= t("flota_catalogo_btn_reservar") || "Reservar" %>';
   var txtConoceMas = '<%= t("flota_catalogo_btn_conoce_mas") || "Conoce más" %>';
   var txtIntroSelector = '<%= t("flota_selector_intro") || "Según tus parámetros de búsqueda, los vehículos recomendados pueden ser estos:" %>';
   var txtSinResultado  = '<%= t("flota_selector_sin_resultado") || "No encontramos ningún vehículo que se ajuste a tu selección." %>';
 
-  // Textos para opciones de pasajeros dinámicas
-  var txtsPax = {
-    <% for (var i = 1; i <= 8; i++) { %>
-    '<%= i %>': '<%= t("flota_pax_" + i) || "" %>',
-    <% } %>
-  };
+  // (27/10/2026) "N pasajeros" bien escrito en cada idioma, para cualquier número (igual que en la portada): sale de los
+  // textos «1 pasajero» (flota_pax_1), «2 pasajeros» (flota_pax_2) y «5 pasajeros» (flota_pax_5); el idioma decide cuál
+  // toca (en ruso: 1/21 → пассажир, 2–4/22 → пассажира, 5–20 → пассажиров) y se pone el número de Admin → Categorías.
+  var txtPax1 = '<%= t("flota_pax_1") %>';
+  var txtPax2 = '<%= t("flota_pax_2") %>';
+  var txtPax5 = '<%= t("flota_pax_5") %>';
+  function textoPax(n) {
+    var forma = 'other';
+    try { forma = new Intl.PluralRules(langFlota).select(Number(n)); } catch (e) {}
+    var modelo = forma === 'one' ? txtPax1 : (forma === 'few' ? txtPax2 : txtPax5);
+    if (!/[0-9]+/.test(modelo)) return n + ' ' + txtPasajeros;
+    return modelo.replace(/[0-9]+/, String(n));
+  }
 
   // Poblar select de pasajeros con los datos ya disponibles
   (function() {
@@ -335,7 +341,7 @@
     for (var p = 1; p <= maxPax; p++) {
       var opt = document.createElement('option');
       opt.value = p;
-      opt.textContent = p === 1 ? '1 ' + txtPasajero : p + ' ' + txtPasajeros;
+      opt.textContent = textoPax(p);
       if (p === 1) opt.selected = true;
       selPax.appendChild(opt);
     }
