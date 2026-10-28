@@ -4890,10 +4890,7 @@ function renderizarTablaCategoriasIA(datos) {
   }
   var html = datos.categorias.map(function (c) {
     var celdas = datos.idiomas.map(function (lang) {
-      var ok = c.estado[lang];
-      return '<td style="text-align:center">' + (ok
-        ? '<span style="color:#2e7d32;font-weight:600;">✓</span>'
-        : '<span style="color:#c0392b;">·</span>') + '</td>';
+      return celdaTextoInterfaz(c, lang); // (28/10/2026) mismas marcas: 🟢 ✓ · 🔵 ✓ · 🔴 ✓ · 🔴 ·
     }).join('');
     return '<tr>' +
       '<td><strong>' + escapar(c.nombre) + '</strong></td>' +
@@ -4913,9 +4910,10 @@ function abrirEditorCategoriaIA(catId) {
 
   var tabs = datos.idiomas.map(function (lang, i) {
     var ok = cat.estado[lang];
-    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? ' tab-idioma-verde' : ' tab-idioma-rojo') + '" ' +
+    var azul = !ok && cat.sinAprobar && cat.sinAprobar[lang]; // (28/10/2026) 🔵 hecha por la IA, sin aprobar
+    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? ' tab-idioma-verde' : (azul ? ' tab-idioma-azul' : ' tab-idioma-rojo')) + '" ' +
       'onclick="cambiarIdiomaEditorCategoriaIA(' + catId + ', \'' + lang + '\', this)">' +
-      lang.toUpperCase() + (ok ? '' : ' ⚠️') + '</button>';
+      lang.toUpperCase() + (ok || azul ? '' : ' ⚠️') + '</button>';
   }).join('');
 
   editor.innerHTML =
@@ -6563,6 +6561,7 @@ function generarCategoriasConIA() {
       }
       msg.innerHTML = '';
       mostrarRevisionCategorias(lang, respuesta.propuestas);
+      cargarTablaCategoriasIA(); // (28/10/2026) lo generado ya está guardado en 🔵
     })
     .catch(function () {
       msg.innerHTML = '<div class="aviso-error">No se pudo conectar con la IA. Inténtalo de nuevo.</div>';
@@ -6602,7 +6601,7 @@ function mostrarRevisionCategorias(lang, propuestas) {
     '<p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Revisa el contenido generado antes de guardar. Puedes editar cualquier campo.</p>' +
     '<div style="max-height:500px;overflow-y:auto;overflow-x:hidden;">' + filas + '</div>' +
     '<div id="revision-categorias-msg" style="margin:12px 0;"></div>' +
-    '<button class="boton-primario" onclick="guardarRevisionCategorias(\'' + lang + '\')">💾 Guardar todas</button> ' +
+    '<button class="boton-primario" onclick="guardarRevisionCategorias(\'' + lang + '\')">✅ Aprobar todas</button> ' +
     '<button class="boton-secundario" onclick="document.getElementById(\'editor-categorias-ia\').classList.add(\'oculto\')">Cancelar</button>';
 
   editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -6634,6 +6633,7 @@ function guardarRevisionCategorias(lang) {
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
     if (respuesta.ok) {
       msg.innerHTML = '<div class="aviso-ok">✅ Guardadas ' + respuesta.guardadas + ' categorías en ' + lang.toUpperCase() + '</div>';
+      cargarTablaCategoriasIA(); // (28/10/2026) pasan a 🟢
       setTimeout(function () { document.getElementById('editor-categorias-ia').classList.add('oculto'); }, 1500);
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
