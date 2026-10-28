@@ -116,12 +116,12 @@ table.tabla-precios input {
 }
 .tab-idioma-rojo {
   background: #fdecea !important;
-  color: var(--rojo-error) !important;
-  border-color: var(--rojo-error) !important;
+  color: #c0392b !important;
+  border-color: #e74c3c !important;
   font-weight: 700;
 }
 .tab-idioma-rojo.activo {
-  outline: 3px solid var(--rojo-error);
+  outline: 3px solid #c0392b;
   outline-offset: 2px;
   font-weight: 700;
 }
@@ -129,7 +129,7 @@ table.tabla-precios input {
 .tab-idioma-verde {
   background: #e8f5e9 !important;
   color: #2e7d32 !important;
-  border-color: #2e7d32 !important;
+  border-color: #81c784 !important;
   font-weight: 700;
 }
 .tab-idioma-verde.activo {
@@ -138,8 +138,8 @@ table.tabla-precios input {
   font-weight: 700;
 }
 .estado-seo-ok    { color: #2e7d32; font-weight: 600; font-size: 13px; }
-.estado-seo-draft { color: #b8860b; font-size: 13px; }
-.estado-seo-vacio { color: #ccc; font-size: 12px; }
+.estado-seo-draft { color: #1565c0; font-size: 13px; }
+.estado-seo-vacio { color: #c0392b; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -2469,7 +2469,7 @@ function renderizarEditorIsla(isla) {
     var bloqueTrads =
       '<hr style="margin:18px 0;border:none;border-top:1px solid var(--gris-borde);">' +
       '<h3 style="margin:0 0 10px;font-size:15px;">🌍 Traducciones por idioma</h3>' +
-      '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">🔴 Sin traducción &nbsp; 🟡 Traducido, pendiente de revisar &nbsp; 🟢 Revisado y aprobado</p>' +
+      '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">🔴 Sin traducción &nbsp; 🔵 Traducido, pendiente de revisar &nbsp; 🟢 Revisado y aprobado</p>' +
       '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">' + tabsHtml + '</div>' +
       '<div style="margin-bottom:10px;">' +
         '<button class="boton-costa" id="btn-isla-ia" onclick="traducirIslaIA(' + isla.id + ')">🤖 Generar todos los idiomas con IA</button>' +
@@ -2497,7 +2497,7 @@ function renderizarEditorIsla(isla) {
               tab.textContent = lang.toUpperCase() + ' ✓';
             } else {
               // Tiene traducción pero pendiente de revisar — amarillo
-              tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825';
+              tab.style.background = '#e3f2fd'; tab.style.color = '#1565c0'; tab.style.borderColor = '#90caf9';
               tab.textContent = lang.toUpperCase() + ' ·';
             }
           }
@@ -2585,7 +2585,7 @@ function guardarTraduccionIsla(islaId, lang) {
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ Guardado. Pulsa Aprobar cuando hayas revisado.'; }
       // Pestaña en amarillo — guardado pero pendiente de revisar
       var tab = document.getElementById('isla-tab-' + lang);
-      if (tab) { tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825'; tab.textContent = lang.toUpperCase() + ' ·'; }
+      if (tab) { tab.style.background = '#e3f2fd'; tab.style.color = '#1565c0'; tab.style.borderColor = '#90caf9'; tab.textContent = lang.toUpperCase() + ' ·'; }
       // Recargar campos para mostrar botón Aprobar
       renderizarCamposIdiomaIsla(islaId, lang, { nombre: nombre, slug: slug.toLowerCase(), revisado: false });
       setTimeout(function() { if (msg) msg.textContent = ''; }, 4000);
@@ -2647,7 +2647,7 @@ function traducirIslaIA(islaId) {
       // El guardado es individual por idioma — el admin revisa y pulsa Guardar en cada uno
       Object.keys(d.traducciones).forEach(function(lang) {
         var tab = document.getElementById('isla-tab-' + lang);
-        if (tab) { tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825'; tab.textContent = lang.toUpperCase() + ' ·'; }
+        if (tab) { tab.style.background = '#e3f2fd'; tab.style.color = '#1565c0'; tab.style.borderColor = '#90caf9'; tab.textContent = lang.toUpperCase() + ' ·'; }
       });
       // Guardar las traducciones generadas en memoria para usarlas al cambiar de pestaña
       window._islaTradIA = d.traducciones;
@@ -3771,7 +3771,7 @@ function abrirEditorSEO(rutaId) {
           : completo
             ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
             : parcial
-              ? 'background:#fff8e1;color:#b8860b;border-color:#f9a825;'
+              ? 'background:#e3f2fd;color:#1565c0;border-color:#90caf9;'
               : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
         var icono = excede ? ' ⚠️' : completo ? ' ✓' : parcial ? ' ·' : '';
         return '<button class="' + clases + '" id="tab-idioma-' + lang + '" ' +
@@ -4226,7 +4226,7 @@ function guardarSEO(rutaId, lang) {
           tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
           tab.innerHTML = lang.toUpperCase() + ' ✓';
         } else if (parcial) {
-          tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825';
+          tab.style.background = '#e3f2fd'; tab.style.color = '#1565c0'; tab.style.borderColor = '#90caf9';
           tab.innerHTML = lang.toUpperCase() + ' ·';
         } else {
           tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
@@ -4856,7 +4856,7 @@ function cargarTablaCategoriasIA() {
         return sum + idiomas.filter(function(l) { return c.estado[l]; }).length;
       }, 0);
       var pct = total > 0 ? Math.floor(traducidos / total * 100) : 0;
-      var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
+      var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#1565c0' : '#c0392b';
       var elPct = document.getElementById('bloque2-flota-pct');
       if (elPct) elPct.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
     });
@@ -4881,7 +4881,7 @@ function renderizarTablaCategoriasIA(datos) {
       var ok = c.estado[lang];
       return '<td style="text-align:center">' + (ok
         ? '<span style="color:#2e7d32;font-weight:600;">✓</span>'
-        : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+        : '<span style="color:#c0392b;">·</span>') + '</td>';
     }).join('');
     return '<tr>' +
       '<td><strong>' + escapar(c.nombre) + '</strong></td>' +
@@ -4997,7 +4997,7 @@ function renderizarTablaTextos(datos) {
     }, 0);
     var total = textos.length * IDIOMAS_TEXTOS.length;
     var pct = total > 0 ? Math.floor(traducidos / total * 100) : 0;
-    var colorPct = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
+    var colorPct = pct === 100 ? '#2e7d32' : pct > 50 ? '#1565c0' : '#c0392b';
     var seccionId = 'modulo-sec-' + idx;
 
     // Fila cabecera colapsable
@@ -5045,7 +5045,7 @@ function renderizarTablaTextos(datos) {
           depTraducidos += IDIOMAS_TEXTOS.filter(function(l) { return !!tWeb.estado[l]; }).length;
         });
         var depPct = depTotal > 0 ? Math.floor(depTraducidos / depTotal * 100) : 0;
-        var depColor = depPct === 100 ? '#2e7d32' : depPct > 50 ? '#b45309' : 'var(--rojo-error)';
+        var depColor = depPct === 100 ? '#2e7d32' : depPct > 50 ? '#1565c0' : '#c0392b';
         // Cabecera de departamento — colapsable
         html += '<tr class="' + seccionId + '" style="display:none;background:#e8f0fe;cursor:pointer;" onclick="toggleSeccionTextos(\'' + depSecId + '\', this)">' +
           '<td colspan="' + totalCols + '" style="padding:10px 20px 10px 32px;font-size:13px;font-weight:700;user-select:none;color:#1a3a6b;letter-spacing:0.01em;">' +
@@ -5065,7 +5065,7 @@ function renderizarTablaTextos(datos) {
           if (!tWeb) return;
           var celdas = IDIOMAS_TEXTOS.map(function(lang) {
             var ok = tWeb.estado[lang];
-            return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+            return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:#c0392b;">·</span>') + '</td>';
           }).join('');
           html += '<tr class="' + depSecId + '" style="display:none;">' +
             '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;padding-left:56px;"><strong>' + escapar(tNombre ? tNombre.texto_es : 'Extra ' + numStr) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(tWeb.clave) + '</span></td>' +
@@ -5080,7 +5080,7 @@ function renderizarTablaTextos(datos) {
       textos.forEach(function(t) {
         var celdas = IDIOMAS_TEXTOS.map(function(lang) {
           var ok = t.estado[lang];
-          return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:var(--rojo-error);">·</span>') + '</td>';
+          return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:#c0392b;">·</span>') + '</td>';
         }).join('');
         html += '<tr class="' + seccionId + '" style="display:none;">' +
           '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
@@ -5271,7 +5271,7 @@ function cargarComunicacionesCliente() {
       }, 0);
       var totalCeldas = plantillas.length * idiomas.length;
       var pct = totalCeldas > 0 ? Math.floor((aprobEmail + aprobWa) / (totalCeldas * 2) * 100) : 0;
-      var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
+      var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#1565c0' : '#c0392b';
       var el = document.getElementById('bloque-com-cliente-pct');
       if (el) el.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
       // 🧩 Frases: se cargan después y recalculan el contador y el % global del bloque
@@ -5309,7 +5309,7 @@ function renderizarComunicacionesCliente(data) {
   }, 0);
   var totalEmail = plantillas.length * idiomas.length;
   var pctEmail = totalEmail > 0 ? Math.floor(aprobadosEmail / totalEmail * 100) : 0;
-  var colorEmail = pctEmail === 100 ? '#2e7d32' : pctEmail > 50 ? '#b45309' : 'var(--rojo-error)';
+  var colorEmail = pctEmail === 100 ? '#2e7d32' : pctEmail > 50 ? '#1565c0' : '#c0392b';
   var elEmail = document.getElementById('com-email-pct');
   if (elEmail) elEmail.innerHTML = '<span style="color:' + colorEmail + ';">' + pctEmail + '% traducido</span>';
 
@@ -5319,7 +5319,7 @@ function renderizarComunicacionesCliente(data) {
   }, 0);
   var totalWa = plantillas.length * idiomas.length;
   var pctWa = totalWa > 0 ? Math.floor(aprobadosWa / totalWa * 100) : 0;
-  var colorWa = pctWa === 100 ? '#2e7d32' : pctWa > 50 ? '#b45309' : 'var(--rojo-error)';
+  var colorWa = pctWa === 100 ? '#2e7d32' : pctWa > 50 ? '#1565c0' : '#c0392b';
   var elWa = document.getElementById('com-wa-pct');
   if (elWa) elWa.innerHTML = '<span style="color:' + colorWa + ';">' + pctWa + '% traducido</span>';
 
@@ -5331,18 +5331,18 @@ function renderizarComunicacionesCliente(data) {
   // true/false  → compatibilidad con la celda ES que sigue siendo booleano
   function celdaEstado(estado) {
     if (estado === null || estado === undefined || estado === false) {
-      return '<td style="text-align:center;"><span style="color:var(--rojo-error);">·</span></td>';
+      return '<td style="text-align:center;"><span style="color:#c0392b;">·</span></td>';
     }
     if (estado === true || estado === 'ok') {
       return '<td style="text-align:center;"><span style="color:#2e7d32;font-weight:600;" title="Revisado y al día">✓</span></td>';
     }
     if (estado === 'ia') {
-      return '<td style="text-align:center;"><span style="color:#b45309;font-weight:600;" title="Generado por IA — pendiente de revisar">✓</span></td>';
+      return '<td style="text-align:center;"><span style="color:#1565c0;font-weight:600;" title="Generado por IA — pendiente de revisar">✓</span></td>';
     }
     if (estado === 'desactualizado') {
-      return '<td style="text-align:center;"><span style="color:var(--rojo-error);font-weight:600;" title="El español fue modificado — hay que retraducir">✓</span></td>';
+      return '<td style="text-align:center;"><span style="color:#c0392b;font-weight:600;" title="El español fue modificado — hay que retraducir">✓</span></td>';
     }
-    return '<td style="text-align:center;"><span style="color:var(--rojo-error);">·</span></td>';
+    return '<td style="text-align:center;"><span style="color:#c0392b;">·</span></td>';
   }
 
   // Filas Email
@@ -5779,7 +5779,7 @@ function actualizarPctGlobalComCliente() {
   }, 0);
   var total = plantillas.length * idiomas.length * 2 + frases.length * idiomasF.length;
   var pct = total > 0 ? Math.floor(aprob / total * 100) : 0;
-  var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
+  var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#1565c0' : '#c0392b';
   var elNum = document.getElementById('bloque-com-cliente-num');
   if (elNum) elNum.textContent = '(' + (plantillas.length * 2 + frases.length) + ' textos)';
   var el = document.getElementById('bloque-com-cliente-pct');
@@ -5804,7 +5804,7 @@ function renderizarComFrases(data) {
   }, 0);
   var total = frases.length * idiomas.length;
   var pct = total > 0 ? Math.floor(aprobados / total * 100) : 0;
-  var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#b45309' : 'var(--rojo-error)';
+  var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#1565c0' : '#c0392b';
   var elPct = document.getElementById('com-frases-pct');
   if (elPct) elPct.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
 
@@ -5813,12 +5813,12 @@ function renderizarComFrases(data) {
       return '<td style="text-align:center;"><span style="color:#2e7d32;font-weight:600;" title="Revisado y al día">✓</span></td>';
     }
     if (estado === 'ia') {
-      return '<td style="text-align:center;"><span style="color:#b45309;font-weight:600;" title="Generado por IA — pendiente de revisar">✓</span></td>';
+      return '<td style="text-align:center;"><span style="color:#1565c0;font-weight:600;" title="Generado por IA — pendiente de revisar">✓</span></td>';
     }
     if (estado === 'desactualizado') {
-      return '<td style="text-align:center;"><span style="color:var(--rojo-error);font-weight:600;" title="El español fue modificado — hay que retraducir">✓</span></td>';
+      return '<td style="text-align:center;"><span style="color:#c0392b;font-weight:600;" title="El español fue modificado — hay que retraducir">✓</span></td>';
     }
-    return '<td style="text-align:center;"><span style="color:var(--rojo-error);">·</span></td>';
+    return '<td style="text-align:center;"><span style="color:#c0392b;">·</span></td>';
   }
   function etiquetaCanal(canal) {
     var txt = canal === 'wa' ? '📱 WhatsApp' : canal === 'ambos' ? '📧📱 Email y WhatsApp' : '📧 Email';
@@ -5977,7 +5977,7 @@ function mostrarRevisionComFrases(lang, lista) {
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;">' +
       '<button class="boton-primario" onclick="aprobarTodasRevisionComFrases(\'' + lang + '\')">&#9989; Aprobar todas</button>' +
       '<button class="boton-secundario" onclick="cerrarRevisionComFrases()">Cerrar</button>' +
-      '<span style="font-size:12px;color:var(--texto-muted);">Si cierras sin aprobar, se quedan en naranja y puedes aprobarlas después con «Aprobar todo».</span>' +
+      '<span style="font-size:12px;color:var(--texto-muted);">Si cierras sin aprobar, se quedan en azul y puedes aprobarlas después con «Aprobar todo».</span>' +
       '<span id="rev-frases-msg" style="font-size:13px;"></span>' +
     '</div>';
   caja.style.display = 'block';
@@ -8174,13 +8174,13 @@ function renderizarTablaTraduccionesDestinos(destinos, propuestasIA) {
     var badge, badgeColor;
     if (tieneTraduccion) {
       badge = '✔ Traducido';
-      badgeColor = '#2d7a4f';
+      badgeColor = '#2e7d32';
     } else if (tienePropuesta) {
       badge = '✨ Propuesta IA';
-      badgeColor = '#b07d2a';
+      badgeColor = '#1565c0';
     } else {
       badge = '— Pendiente';
-      badgeColor = '#888';
+      badgeColor = '#c0392b';
     }
     return '<tr id="fila-dest-' + d.id + '">' +
       '<td>' + d.nombre_es + '</td>' +
@@ -8211,7 +8211,7 @@ function guardarTraduccionDestino(id) {
     var badge = document.getElementById('badge-dest-' + id);
     if (badge) {
       badge.textContent = nombre ? '✔ Traducido' : '— Pendiente';
-      badge.style.color = nombre ? '#2d7a4f' : '#888';
+      badge.style.color = nombre ? '#2e7d32' : '#c0392b';
     }
     var av = document.getElementById('aviso-traducciones-destinos');
     av.style.display = 'block';
@@ -8239,7 +8239,7 @@ function guardarTodasTraduccionesDestinos() {
       var badge = document.getElementById('badge-dest-' + p.id);
       if (badge) {
         badge.textContent = p.nombre ? '✔ Traducido' : '— Pendiente';
-        badge.style.color = p.nombre ? '#2d7a4f' : '#888';
+        badge.style.color = p.nombre ? '#2e7d32' : '#c0392b';
       }
     });
     var av = document.getElementById('aviso-traducciones-destinos');
@@ -8273,7 +8273,7 @@ function traducirDestinosIA() {
         if (inp && !inp.value.trim()) {
           inp.value = p.nombre;
           var badge = document.getElementById('badge-dest-' + p.id);
-          if (badge) { badge.textContent = '✨ Propuesta IA'; badge.style.color = '#b07d2a'; }
+          if (badge) { badge.textContent = '✨ Propuesta IA'; badge.style.color = '#1565c0'; }
         }
       });
       av.innerHTML = '<div class="aviso-ok">✨ La IA sugirió ' + data.propuestas.length + ' traducciones. Revisa cada una y pulsa Guardar.</div>';
@@ -11146,9 +11146,9 @@ function cargarPaginaRutas() {
           var s = seo[lang] || {};
           var tieneTitulo = !!(s.titulo && s.titulo.trim());
           var excede = !!s.excede;
-          var color  = excede ? '#c0392b' : (s.activo ? '#2e7d32' : (tieneTitulo ? '#b8860b' : '#aaa'));
-          var bg     = excede ? '#fdecea' : (s.activo ? '#e8f5e9' : (tieneTitulo ? '#fff8e1' : '#f5f5f5'));
-          var border = excede ? '#e74c3c' : (s.activo ? '#81c784' : (tieneTitulo ? '#f9a825' : '#ccc'));
+          var color  = excede ? '#c0392b' : (s.activo ? '#2e7d32' : (tieneTitulo ? '#1565c0' : '#c0392b'));
+          var bg     = excede ? '#fdecea' : (s.activo ? '#e8f5e9' : (tieneTitulo ? '#e3f2fd' : '#fdecea'));
+          var border = excede ? '#e74c3c' : (s.activo ? '#81c784' : (tieneTitulo ? '#90caf9' : '#e74c3c'));
           var icono  = excede ? ' ⚠️' : (s.activo ? ' ✓' : '');
           return '<span title="' + (excede ? 'Título o descripción pasados de píxeles' : '') + '" style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';margin:2px;display:inline-block;font-weight:' + (excede ? '700' : 'normal') + ';">' + lang.toUpperCase() + icono + '</span>';
         }).join('');
@@ -11197,7 +11197,7 @@ function abrirEditorDestino(destinoId) {
           : completo
             ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
             : parcial
-              ? 'background:#fff8e1;color:#b8860b;border-color:#f9a825;'
+              ? 'background:#e3f2fd;color:#1565c0;border-color:#90caf9;'
               : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
         var icono = excede ? ' ⚠️' : completo ? ' ✓' : parcial ? ' ·' : '';
         return '<button class="tab-idioma' + (lang === 'es' ? ' activo' : '') + '" ' +
@@ -11977,7 +11977,7 @@ function guardarDestinoSEO(destinoId, lang) {
         tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
         tab.innerHTML = lang.toUpperCase() + ' ✓';
       } else if (parcial) {
-        tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825';
+        tab.style.background = '#e3f2fd'; tab.style.color = '#1565c0'; tab.style.borderColor = '#90caf9';
         tab.innerHTML = lang.toUpperCase() + ' ·';
       } else {
         tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
@@ -12632,7 +12632,7 @@ function pintarFaqPortada() {
   var conteo = {};
   (faqDatos.conteo || []).forEach(function (c) { conteo[c.lang_code] = c.total; });
   document.getElementById('faq-portada-tabs').innerHTML = faqIdiomas.map(function (l) {
-    var clases = 'tab-idioma' + (conteo[l] ? ' tab-idioma-verde' : '') + (l === faqLang ? ' activo' : '');
+    var clases = 'tab-idioma' + (conteo[l] ? ' tab-idioma-verde' : ' tab-idioma-rojo') + (l === faqLang ? ' activo' : '');
     return '<button class="' + clases + '" onclick="cambiarIdiomaFaq(\'' + l + '\')">' + l.toUpperCase() + (conteo[l] ? ' (' + conteo[l] + ')' : '') + '</button>';
   }).join('');
   var grupos = {};
@@ -12649,7 +12649,7 @@ function pintarFaqPortada() {
       '<td>' + faqEsc(p.orden) + '</td>' +
       '<td>' + faqEsc(p.grupo_id ? (grupos[p.grupo_id] || '—') : '—') + '</td>' +
       '<td>' + faqEsc(p.pregunta) + '</td>' +
-      '<td>' + (resp ? '<span class="estado-seo-ok">✓ Sí</span>' : '<span style="color:var(--texto-muted)">Pendiente</span>') + '</td>' +
+      '<td>' + (resp ? '<span class="estado-seo-ok">✓ Sí</span>' : '<span style="color:#c0392b">Pendiente</span>') + '</td>' +
       '<td>' + faqEsc(faqNombreEnlace(p.enlace)) + '</td>' +
       '<td><input type="checkbox" ' + (p.activa ? 'checked' : '') + ' onchange="cambiarActivaFaq(' + p.id + ', this.checked)"></td>' +
       '<td style="white-space:nowrap;"><button class="boton-secundario" onclick="abrirEditorFaq(' + p.id + ')">✎ Editar</button> ' +
@@ -12908,9 +12908,9 @@ function abrirEditorSEOCat(catId) {
     var estilo = d.activo
       ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
       : completo
-        ? 'background:#fff8e1;color:#b8860b;border-color:#f9a825;'
+        ? 'background:#e3f2fd;color:#1565c0;border-color:#90caf9;'
         : d.titulo
-          ? 'background:#fff8e1;color:#b8860b;border-color:#f9a825;'
+          ? 'background:#e3f2fd;color:#1565c0;border-color:#90caf9;'
           : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
     var icono = d.activo ? ' ✓' : d.titulo ? ' ·' : '';
     return '<button class="' + clases + '" id="seo-cat-tab-' + lang + '" style="' + estilo + '" ' +
@@ -13469,7 +13469,7 @@ function guardarSEOCat(catId, lang) {
           tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
           tab.innerHTML = lang.toUpperCase() + ' ✓';
         } else if (parcial) {
-          tab.style.background = '#fff8e1'; tab.style.color = '#b8860b'; tab.style.borderColor = '#f9a825';
+          tab.style.background = '#e3f2fd'; tab.style.color = '#1565c0'; tab.style.borderColor = '#90caf9';
           tab.innerHTML = lang.toUpperCase() + ' ·';
         } else {
           tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
