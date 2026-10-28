@@ -787,6 +787,9 @@ async function initSchema() {
   // Lo hace una regla de la base de datos (trigger), así vale para cualquier camino por el que cambie el español.
   try {
     await pool.query(`ALTER TABLE textos_interfaz_traducciones ADD COLUMN IF NOT EXISTS desactualizado BOOLEAN DEFAULT FALSE`);
+    // (28/10/2026) Regla de las traducciones: 🔴 sin traducir o español cambiado · 🔵 sin aprobar (hecha por la IA) · 🟢 aprobada.
+    // Las traducciones que ya existían quedan aprobadas (DEFAULT TRUE).
+    await pool.query(`ALTER TABLE textos_interfaz_traducciones ADD COLUMN IF NOT EXISTS revisado BOOLEAN NOT NULL DEFAULT TRUE`);
     await pool.query(`
       CREATE OR REPLACE FUNCTION marcar_traducciones_desactualizadas() RETURNS trigger AS $fn$
       BEGIN
@@ -8486,11 +8489,12 @@ app.get('/admin/textos', requireAdmin, asyncHandler(async (req, res) => {
     `SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY (modulo = 'Email — marca') DESC, modulo, (regexp_replace(clave, '[^0-9]', '', 'g') || '0')::int, clave`
   );
   const traducciones = await pool.query(
-    `SELECT texto_id, lang_code, texto, desactualizado FROM textos_interfaz_traducciones`
+    `SELECT texto_id, lang_code, texto, desactualizado, revisado FROM textos_interfaz_traducciones`
   );
 
   const traduccionesPorTexto = {};
   const desactPorTexto = {};
+  const sinAprobarPorTexto = {}; // (28/10/2026) 🔵 hecha por la IA, sin aprobar
   for (const fila of traducciones.rows) {
     if (!traduccionesPorTexto[fila.texto_id]) traduccionesPorTexto[fila.texto_id] = {};
     traduccionesPorTexto[fila.texto_id][fila.lang_code] = fila.texto;
@@ -8498,19 +8502,26 @@ app.get('/admin/textos', requireAdmin, asyncHandler(async (req, res) => {
       if (!desactPorTexto[fila.texto_id]) desactPorTexto[fila.texto_id] = {};
       desactPorTexto[fila.texto_id][fila.lang_code] = true;
     }
+    if (fila.revisado === false && fila.texto && fila.texto.trim()) {
+      if (!sinAprobarPorTexto[fila.texto_id]) sinAprobarPorTexto[fila.texto_id] = {};
+      sinAprobarPorTexto[fila.texto_id][fila.lang_code] = true;
+    }
   }
 
   const lista = textos.rows.map(function (t) {
     const estado = {};
     const desact = {};
+    const sinAprobar = {};
     estado['es'] = !!(t.texto_es && t.texto_es.trim());
     for (const lang of IDIOMAS_TRADUCIBLES) {
       const valor = traduccionesPorTexto[t.id] && traduccionesPorTexto[t.id][lang];
       // (07/10/2026) Una traducción en rojo (el español cambió) no cuenta como traducida hasta revisarla
       desact[lang] = !!(desactPorTexto[t.id] && desactPorTexto[t.id][lang]);
-      estado[lang] = !!(valor && valor.trim()) && !desact[lang];
+      // (28/10/2026) Una traducción en azul (hecha por la IA, sin aprobar) tampoco cuenta hasta aprobarla
+      sinAprobar[lang] = !desact[lang] && !!(sinAprobarPorTexto[t.id] && sinAprobarPorTexto[t.id][lang]);
+      estado[lang] = !!(valor && valor.trim()) && !desact[lang] && !sinAprobar[lang];
     }
-    return { ...t, estado, desact };
+    return { ...t, estado, desact, sinAprobar };
   });
 
   res.json({ textos: lista, idiomas: IDIOMAS_TRADUCIBLES });
@@ -8598,7 +8609,7 @@ app.post('/admin/textos/importar', requireAdmin, upload.single('archivo'), async
       await pool.query(
         `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
          VALUES ($1, $2, $3)
-         ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE`,
+         ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE, revisado = TRUE`,
         [f.textoId, f.langCode, f.traduccion]
       );
       actualizadas++;
@@ -8642,7 +8653,7 @@ app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req
   await pool.query(
     `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
      VALUES ($1, $2, $3)
-     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE`,
+     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE, revisado = TRUE`,
     [req.params.id, req.params.lang, req.body.texto || '']
   );
   await cargarTextosCache();
@@ -8655,7 +8666,7 @@ app.post('/admin/textos/:id/idioma/:lang/aprobar', requireAdmin, asyncHandler(as
     return res.status(400).json({ error: 'Idioma no válido' });
   }
   await pool.query(
-    'UPDATE textos_interfaz_traducciones SET desactualizado = FALSE WHERE texto_id = $1 AND lang_code = $2',
+    'UPDATE textos_interfaz_traducciones SET desactualizado = FALSE, revisado = TRUE WHERE texto_id = $1 AND lang_code = $2',
     [req.params.id, req.params.lang]
   );
   res.json({ ok: true });
@@ -8663,7 +8674,7 @@ app.post('/admin/textos/:id/idioma/:lang/aprobar', requireAdmin, asyncHandler(as
 
 // (07/10/2026) "No afecta, mantenerlas" / "✔ Aprobar todas tal cual": todas las traducciones de un texto vuelven a verde
 app.post('/admin/textos/:id/aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query('UPDATE textos_interfaz_traducciones SET desactualizado = FALSE WHERE texto_id = $1', [req.params.id]);
+  await pool.query('UPDATE textos_interfaz_traducciones SET desactualizado = FALSE, revisado = TRUE WHERE texto_id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
 
@@ -8716,6 +8727,18 @@ app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (re
     };
   });
 
+  // (28/10/2026) Lo que genera la IA se guarda ya como 🔵 sin aprobar: si se cierra la ventana sin aprobar,
+  // queda en azul en la tabla y se aprueba después en el editor de ese texto («✔ Aprobar tal cual»).
+  for (const p of propuestas) {
+    if (!p.sugerencia || !p.sugerencia.trim()) continue;
+    await pool.query(
+      `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto, revisado)
+       VALUES ($1, $2, $3, FALSE)
+       ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE, revisado = FALSE`,
+      [p.texto_id, lang, p.sugerencia]
+    );
+  }
+  await cargarTextosCache();
   res.json({ ok: true, propuestas });
 }));
 
@@ -8738,6 +8761,27 @@ app.post('/admin/textos/guardar-lote', requireAdmin, asyncHandler(async (req, re
   }
   await cargarTextosCache();
   res.json({ ok: true, guardadas });
+}));
+
+// (28/10/2026) «✅ Aprobar todas» de la ventana de la IA: guarda lo revisado (con lo corregido) y lo pasa a 🟢 aprobado
+app.post('/admin/textos/aprobar-lote', requireAdmin, asyncHandler(async (req, res) => {
+  const { lang, traducciones } = req.body;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang) || !Array.isArray(traducciones)) {
+    return res.status(400).json({ error: 'Datos no válidos' });
+  }
+  let aprobadas = 0;
+  for (const item of traducciones) {
+    if (!item.texto_id) continue;
+    await pool.query(
+      `UPDATE textos_interfaz_traducciones
+       SET texto = $3, updated_at = NOW(), desactualizado = FALSE, revisado = TRUE
+       WHERE texto_id = $1 AND lang_code = $2`,
+      [item.texto_id, lang, item.texto || '']
+    );
+    aprobadas++;
+  }
+  await cargarTextosCache();
+  res.json({ ok: true, aprobadas });
 }));
 
 // ─── Calculador de tarifas ────────────────────────────────────────────────────
