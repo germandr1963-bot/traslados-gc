@@ -566,6 +566,39 @@ async function initSchema() {
       ADD COLUMN IF NOT EXISTS subtitulo_seo TEXT
   `);
 
+  // (28/10/2026) Regla de las traducciones en la ficha de cada categoría (Idiomas → «Página de flota — categorías»):
+  // 🔴 sin traducir o español cambiado · 🔵 hecha por la IA, sin aprobar · 🟢 aprobada. Lo que ya existía queda aprobado.
+  // Solo afecta a la ficha (descripción, subtítulo, descripción larga, características), no a los textos SEO.
+  await pool.query(`
+    ALTER TABLE categorias_vehiculos_traducciones
+      ADD COLUMN IF NOT EXISTS ficha_revisado BOOLEAN NOT NULL DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS ficha_desactualizado BOOLEAN NOT NULL DEFAULT FALSE
+  `);
+  try {
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION marcar_fichas_desactualizadas() RETURNS trigger AS $fn$
+      BEGIN
+        IF NEW.descripcion IS DISTINCT FROM OLD.descripcion
+           OR NEW.subtitulo IS DISTINCT FROM OLD.subtitulo
+           OR NEW.descripcion_larga IS DISTINCT FROM OLD.descripcion_larga
+           OR NEW.caracteristicas IS DISTINCT FROM OLD.caracteristicas THEN
+          UPDATE categorias_vehiculos_traducciones SET ficha_desactualizado = TRUE
+          WHERE categoria_id = NEW.id AND descripcion IS NOT NULL AND descripcion <> '';
+        END IF;
+        RETURN NEW;
+      END;
+      $fn$ LANGUAGE plpgsql;
+    `);
+    await pool.query(`DROP TRIGGER IF EXISTS trg_ficha_es_cambiada ON categorias_vehiculos`);
+    await pool.query(`
+      CREATE TRIGGER trg_ficha_es_cambiada
+      AFTER UPDATE OF descripcion, subtitulo, descripcion_larga, caracteristicas ON categorias_vehiculos
+      FOR EACH ROW EXECUTE FUNCTION marcar_fichas_desactualizadas()
+    `);
+  } catch (eTrigFicha) {
+    console.warn('Aviso de fichas desactualizadas (Página de flota — categorías):', eTrigFicha.message);
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rutas (
       id SERIAL PRIMARY KEY,
@@ -8003,24 +8036,30 @@ app.get('/admin/categorias/estado-ia', requireAdmin, asyncHandler(async (req, re
      ORDER BY orden, nombre`
   );
   const trads = await pool.query(
-    `SELECT categoria_id, lang_code, descripcion
+    `SELECT categoria_id, lang_code, descripcion, ficha_revisado, ficha_desactualizado
      FROM categorias_vehiculos_traducciones`
   );
 
   const tradPorCat = {};
   for (const fila of trads.rows) {
     if (!tradPorCat[fila.categoria_id]) tradPorCat[fila.categoria_id] = {};
-    tradPorCat[fila.categoria_id][fila.lang_code] = !!(fila.descripcion && fila.descripcion.trim());
+    tradPorCat[fila.categoria_id][fila.lang_code] = fila;
   }
 
   const todosLangs = ['es', ...IDIOMAS_TRADUCIBLES];
   const lista = cats.rows.map(function (c) {
     const estado = {};
+    const desact = {};     // (28/10/2026) 🔴 ✓ el español cambió
+    const sinAprobar = {}; // (28/10/2026) 🔵 hecha por la IA, sin aprobar
     estado['es'] = !!(c.descripcion && c.descripcion.trim());
     for (const lang of IDIOMAS_TRADUCIBLES) {
-      estado[lang] = !!(tradPorCat[c.id] && tradPorCat[c.id][lang]);
+      const f = tradPorCat[c.id] && tradPorCat[c.id][lang];
+      const tiene = !!(f && f.descripcion && f.descripcion.trim());
+      desact[lang] = tiene && !!f.ficha_desactualizado;
+      sinAprobar[lang] = tiene && !desact[lang] && f.ficha_revisado === false;
+      estado[lang] = tiene && !desact[lang] && !sinAprobar[lang];
     }
-    return { id: c.id, nombre: c.nombre, estado };
+    return { id: c.id, nombre: c.nombre, estado, desact, sinAprobar };
   });
 
   res.json({ categorias: lista, idiomas: todosLangs });
@@ -8102,7 +8141,8 @@ app.post('/admin/categorias/generar-ia/:lang', requireAdmin, asyncHandler(async 
   } else {
     const traducidas = await pool.query(
       `SELECT categoria_id FROM categorias_vehiculos_traducciones
-       WHERE lang_code = $1 AND descripcion IS NOT NULL AND descripcion <> ''`,
+       WHERE lang_code = $1 AND descripcion IS NOT NULL AND descripcion <> ''
+         AND ficha_desactualizado = FALSE`, // (28/10/2026) las 🔴 (español cambiado) se vuelven a generar
       [lang]
     );
     const idsConTexto = new Set(traducidas.rows.map(function (r) { return r.categoria_id; }));
@@ -8149,6 +8189,24 @@ app.post('/admin/categorias/generar-ia/:lang', requireAdmin, asyncHandler(async 
     };
   });
 
+  // (28/10/2026) Lo que genera la IA se guarda ya como 🔵 sin aprobar (solo en los idiomas traducidos; el español
+  // se sigue guardando solo al pulsar el botón). Si se cierra la ventana sin aprobar, queda en azul en la tabla.
+  if (lang !== 'es') {
+    for (const p of propuestas) {
+      if (!p.descripcion || !p.descripcion.trim()) continue;
+      await pool.query(
+        `INSERT INTO categorias_vehiculos_traducciones
+           (categoria_id, lang_code, descripcion, subtitulo, descripcion_larga, caracteristicas, updated_at, ficha_revisado, ficha_desactualizado)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), FALSE, FALSE)
+         ON CONFLICT (categoria_id, lang_code) DO UPDATE
+           SET descripcion = $3, subtitulo = $4, descripcion_larga = $5,
+               caracteristicas = $6, updated_at = NOW(), ficha_revisado = FALSE, ficha_desactualizado = FALSE`,
+        [p.categoria_id, lang, p.descripcion.trim(), (p.subtitulo || '').trim(),
+         (p.descripcion_larga || '').trim(), (p.caracteristicas || '').trim()]
+      );
+    }
+  }
+
   res.json({ ok: true, propuestas, lang });
 }));
 
@@ -8188,7 +8246,8 @@ app.post('/admin/categorias/guardar-ia-lote', requireAdmin, asyncHandler(async (
          VALUES ($1, $2, $3, $4, $5, $6, NOW())
          ON CONFLICT (categoria_id, lang_code) DO UPDATE
            SET descripcion = $3, subtitulo = $4, descripcion_larga = $5,
-               caracteristicas = $6, updated_at = NOW()`,
+               caracteristicas = $6, updated_at = NOW(),
+               ficha_revisado = TRUE, ficha_desactualizado = FALSE`, // (28/10/2026) guardar a mano o «✅ Aprobar todas» = 🟢
         [
           p.categoria_id,
           lang,
