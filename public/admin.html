@@ -137,6 +137,18 @@ table.tabla-precios input {
   outline-offset: 2px;
   font-weight: 700;
 }
+/* (28/10/2026) Pestaña de idioma traducido por la IA, sin aprobar: azul */
+.tab-idioma-azul {
+  background: #e3f2fd !important;
+  color: #1565c0 !important;
+  border-color: #90caf9 !important;
+  font-weight: 700;
+}
+.tab-idioma-azul.activo {
+  outline: 3px solid #1565c0;
+  outline-offset: 2px;
+  font-weight: 700;
+}
 .estado-seo-ok    { color: #2e7d32; font-weight: 600; font-size: 13px; }
 .estado-seo-draft { color: #1565c0; font-size: 13px; }
 .estado-seo-vacio { color: #c0392b; font-size: 12px; }
@@ -5064,8 +5076,7 @@ function renderizarTablaTextos(datos) {
           var tWeb    = grupo.web;
           if (!tWeb) return;
           var celdas = IDIOMAS_TEXTOS.map(function(lang) {
-            var ok = tWeb.estado[lang];
-            return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:#c0392b;">·</span>') + '</td>';
+            return celdaTextoInterfaz(tWeb, lang);
           }).join('');
           html += '<tr class="' + depSecId + '" style="display:none;">' +
             '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;padding-left:56px;"><strong>' + escapar(tNombre ? tNombre.texto_es : 'Extra ' + numStr) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(tWeb.clave) + '</span></td>' +
@@ -5079,8 +5090,7 @@ function renderizarTablaTextos(datos) {
     } else {
       textos.forEach(function(t) {
         var celdas = IDIOMAS_TEXTOS.map(function(lang) {
-          var ok = t.estado[lang];
-          return '<td style="text-align:center">' + (ok ? '<span style="color:#2e7d32;font-weight:600;">✓</span>' : '<span style="color:#c0392b;">·</span>') + '</td>';
+          return celdaTextoInterfaz(t, lang);
         }).join('');
         html += '<tr class="' + seccionId + '" style="display:none;">' +
           '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
@@ -6093,9 +6103,10 @@ function abrirEditorTexto(textoId) {
 
   var tabs = IDIOMAS_TEXTOS.map(function (lang, i) {
     var ok = texto.estado[lang];
-    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? ' tab-idioma-verde' : ' tab-idioma-rojo') + '" ' +
+    var azul = !ok && texto.sinAprobar && texto.sinAprobar[lang]; // (28/10/2026) 🔵 hecha por la IA, sin aprobar
+    return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? ' tab-idioma-verde' : (azul ? ' tab-idioma-azul' : ' tab-idioma-rojo')) + '" ' +
       'onclick="cambiarIdiomaEditorTexto(' + textoId + ', \'' + lang + '\', this)">' +
-      lang.toUpperCase() + (ok ? '' : ' ⚠️') + '</button>';
+      lang.toUpperCase() + (ok || azul ? '' : ' ⚠️') + '</button>';
   }).join('');
 
   var esEditable = texto.clave === 'contacto_horario';
@@ -6155,7 +6166,8 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
               (texto ? '<br><span style="color:#5b5347;">Español actual: <em>' + escapar(texto.texto_es || '') + '</em></span>' : '') +
             '</div>'
           : '';
-        var botonAprobar = datos.desactualizado
+        var sinAprobarLang = texto && texto.sinAprobar && texto.sinAprobar[lang]; // (28/10/2026) 🔵 también se aprueba aquí
+        var botonAprobar = (datos.desactualizado || sinAprobarLang)
           ? '<button class="boton-secundario" style="margin-top:10px;margin-left:8px;" onclick="aprobarTraduccionTexto(' + textoId + ', \'' + lang + '\')">✔ Aprobar tal cual</button>'
           : '';
         campo.innerHTML =
@@ -6453,6 +6465,11 @@ function traducirConIA() {
       }
       msg.innerHTML = '';
       mostrarRevisionIA(lang, respuesta.propuestas);
+      // (28/10/2026) Lo generado ya está guardado en 🔵: se refresca la tabla (sin tocar el selector de idioma)
+      fetch('/admin/textos').then(function (r) { return r.json(); }).then(function (datos) {
+        textosCache = datos;
+        renderizarTablaTextos(datos);
+      });
     })
     .catch(function () {
       msg.innerHTML = '<div class="aviso-error">No se pudo conectar con la IA. Inténtalo de nuevo.</div>';
@@ -6477,7 +6494,7 @@ function mostrarRevisionIA(lang, propuestas) {
     '<p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Revisa cada propuesta antes de guardar. Puedes editar cualquier texto antes de confirmar.</p>' +
     '<div style="max-height:400px;overflow-y:auto;">' + filas + '</div>' +
     '<div id="revision-ia-msg" style="margin:12px 0;"></div>' +
-    '<button class="boton-primario" onclick="guardarRevisionIA(\'' + lang + '\')">💾 Guardar todas</button> ' +
+    '<button class="boton-primario" onclick="guardarRevisionIA(\'' + lang + '\')">✅ Aprobar todas</button> ' +
     '<button class="boton-secundario" onclick="document.getElementById(\'editor-texto-interfaz\').classList.add(\'oculto\')">Cancelar</button>';
 
   editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -6491,19 +6508,35 @@ function guardarRevisionIA(lang) {
   var msg = document.getElementById('revision-ia-msg');
   msg.innerHTML = 'Guardando...';
 
-  fetch('/admin/textos/guardar-lote', {
+  // (28/10/2026) «✅ Aprobar todas»: guarda lo corregido y pasa todo a 🟢 (lo generado ya estaba guardado en 🔵)
+  fetch('/admin/textos/aprobar-lote', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ lang: lang, traducciones: traducciones })
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
     if (respuesta.ok) {
-      msg.innerHTML = '<div class="aviso-ok">✅ Guardadas ' + respuesta.guardadas + ' traducciones</div>';
+      msg.innerHTML = '<div class="aviso-ok">✅ ' + respuesta.aprobadas + ' traducción(es) aprobada(s).</div>';
       cargarTextosInterfaz();
       setTimeout(function () { document.getElementById('editor-texto-interfaz').classList.add('oculto'); }, 1200);
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
     }
   });
+}
+
+// (28/10/2026) Celda de la tabla de Textos de interfaz, con la regla de las traducciones (igual que Comunicaciones):
+// 🔴 · sin traducir · 🔴 ✓ el español ha cambiado · 🔵 ✓ hecha por la IA, sin aprobar · 🟢 ✓ aprobada
+function celdaTextoInterfaz(t, lang) {
+  if (t.estado[lang]) {
+    return '<td style="text-align:center"><span style="color:#2e7d32;font-weight:600;" title="Revisado y al día">✓</span></td>';
+  }
+  if (t.sinAprobar && t.sinAprobar[lang]) {
+    return '<td style="text-align:center"><span style="color:#1565c0;font-weight:600;" title="Generado por IA — pendiente de revisar">✓</span></td>';
+  }
+  if (t.desact && t.desact[lang]) {
+    return '<td style="text-align:center"><span style="color:#c0392b;font-weight:600;" title="El español fue modificado — hay que retraducir">✓</span></td>';
+  }
+  return '<td style="text-align:center"><span style="color:#c0392b;">·</span></td>';
 }
 
 // ─── Generador IA — Contenido de categorías de flota ─────────────────────────
