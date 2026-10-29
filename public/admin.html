@@ -5009,6 +5009,7 @@ function cambiarIdiomaEditorCategoriaIA(catId, lang, botonTab) {
 
   var url = '/admin/categorias/contenido-ia/' + catId + '/' + lang;
   fetch(url).then(function (r) { return r.json(); }).then(function (d) {
+    _catIACargado = { catId: catId, lang: lang, d: d }; // (29/10/2026) para saber si el español ha cambiado al guardar
     campos.innerHTML =
       '<div style="display:grid;gap:10px;">' +
         '<div><label class="etiqueta">Descripción vehículo</label>' +
@@ -5025,8 +5026,40 @@ function cambiarIdiomaEditorCategoriaIA(catId, lang, botonTab) {
   });
 }
 
+// (29/10/2026) Igual que en Textos de interfaz: si se cambia el español y la categoría ya tiene traducciones,
+// sale el recuadro «¿Este cambio afecta a las traducciones?» (las traducciones ya están en 🔴).
+var _catIACargado = null;
+function espanolCategoriaCambiado(catId, lang) {
+  if (lang !== 'es' || !_catIACargado || _catIACargado.catId !== catId || _catIACargado.lang !== 'es') return false;
+  var d = _catIACargado.d || {};
+  return (d.descripcion || '').trim() !== document.getElementById('cat-ia-descripcion').value.trim() ||
+    (d.subtitulo || '').trim() !== document.getElementById('cat-ia-subtitulo').value.trim() ||
+    (d.descripcion_larga || '').trim() !== document.getElementById('cat-ia-desc-larga').value.trim() ||
+    (d.caracteristicas || '').trim() !== document.getElementById('cat-ia-caract').value.trim();
+}
+function categoriaTieneTraducciones(catId) {
+  var cat = categoriasIACache && categoriasIACache.categorias.find(function (c) { return c.id === catId; });
+  if (!cat) return false;
+  return categoriasIACache.idiomas.some(function (l) {
+    return l !== 'es' && (cat.estado[l] || (cat.desact && cat.desact[l]) || (cat.sinAprobar && cat.sinAprobar[l]));
+  });
+}
+function noAfectaCategoriaIA(catId) {
+  var msg = document.getElementById('cat-ia-msg');
+  fetch('/admin/categorias/' + catId + '/aprobar-fichas', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (respuesta) {
+      if (!respuesta.ok) throw new Error(respuesta.error || 'Error al guardar');
+      msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+      cargarTablaCategoriasIA().then(function () { pintarPestanasCategoriaIA(catId); });
+    }).catch(function (e) {
+      msg.innerHTML = '<div class="aviso-error">' + escapar(e.message || 'Error al guardar') + '</div>';
+    });
+}
+
 function guardarCategoriaIA(catId, lang) {
   var msg = document.getElementById('cat-ia-msg');
+  var esCambiado = espanolCategoriaCambiado(catId, lang) && categoriaTieneTraducciones(catId);
   var datos = {
     lang: lang,
     propuestas: [{
@@ -5044,7 +5077,16 @@ function guardarCategoriaIA(catId, lang) {
     body: JSON.stringify(datos)
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
     if (respuesta.ok) {
-      msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+      if (esCambiado) {
+        msg.innerHTML = '<div style="background:#fff8e1;border:1px solid #ffe083;border-radius:8px;padding:10px 14px;font-size:13px;">' +
+          '✅ Español guardado. <strong>¿Este cambio afecta a las traducciones?</strong><br>' +
+          '<button class="boton-secundario" style="margin-top:8px;margin-right:8px;" onclick="document.getElementById(\'cat-ia-msg\').innerHTML = \'\'">⚠️ Sí, revisar traducciones</button>' +
+          '<button class="boton-primario" style="margin-top:8px;" onclick="noAfectaCategoriaIA(' + catId + ')">✔ No afecta, mantenerlas</button>' +
+          '</div>';
+      } else {
+        msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+      }
+      if (lang === 'es' && _catIACargado && _catIACargado.catId === catId) _catIACargado.d = datos.propuestas[0];
       // (29/10/2026) Las pestañas de la ficha abierta cambian de color al guardar, sin cerrarla
       cargarTablaCategoriasIA().then(function () { pintarPestanasCategoriaIA(catId); });
     } else {
