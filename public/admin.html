@@ -4927,6 +4927,37 @@ function abrirEditorCategoriaIA(catId) {
   editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// (29/10/2026) «💾 Guardar todo»: guarda la pestaña abierta (como «💾 Guardar») y después aprueba tal cual
+// todos los idiomas de esta ficha que tienen traducción (pasan a 🟢 sin cambiar su texto).
+function guardarTodoCategoriaIA(catId, lang) {
+  var msg = document.getElementById('cat-ia-msg');
+  var datos = {
+    lang: lang,
+    propuestas: [{
+      categoria_id: catId,
+      descripcion:      document.getElementById('cat-ia-descripcion').value,
+      subtitulo:        document.getElementById('cat-ia-subtitulo').value,
+      descripcion_larga: document.getElementById('cat-ia-desc-larga').value,
+      caracteristicas:  document.getElementById('cat-ia-caract').value
+    }]
+  };
+  msg.innerHTML = 'Guardando...';
+  fetch('/admin/categorias/guardar-ia-lote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos)
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (!respuesta.ok) throw new Error(respuesta.error || 'Error al guardar');
+    return fetch('/admin/categorias/' + catId + '/aprobar-fichas', { method: 'POST' }).then(function (r) { return r.json(); });
+  }).then(function (respuesta) {
+    if (!respuesta.ok) throw new Error(respuesta.error || 'Error al guardar');
+    msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+    cargarTablaCategoriasIA().then(function () { pintarPestanasCategoriaIA(catId); });
+  }).catch(function (e) {
+    msg.innerHTML = '<div class="aviso-error">' + escapar(e.message || 'Error al guardar') + '</div>';
+  });
+}
+
 // (29/10/2026) Vuelve a pintar el color de las pestañas de la ficha abierta (🟢 / 🔵 / 🔴) con el estado real,
 // sin cerrarla ni cambiar la pestaña elegida: al guardar el español, los demás idiomas pasan a 🔴 al momento;
 // al guardar un idioma, esa pestaña pasa a 🟢.
@@ -4966,7 +4997,8 @@ function cambiarIdiomaEditorCategoriaIA(catId, lang, botonTab) {
         '<div><label class="etiqueta">Características (una por línea)</label>' +
         '<textarea id="cat-ia-caract" class="campo" rows="3" style="width:100%;">' + escapar(d.caracteristicas || '') + '</textarea></div>' +
       '</div>' +
-      '<button class="boton-primario" style="margin-top:12px;" onclick="guardarCategoriaIA(' + catId + ', \'' + lang + '\')">💾 Guardar</button>';
+      '<button class="boton-primario" style="margin-top:12px;" onclick="guardarCategoriaIA(' + catId + ', \'' + lang + '\')">💾 Guardar</button>' +
+      '<button class="boton-primario" style="margin-top:12px;margin-left:8px;" onclick="guardarTodoCategoriaIA(' + catId + ', \'' + lang + '\')">💾 Guardar todo</button>';
   });
 }
 
