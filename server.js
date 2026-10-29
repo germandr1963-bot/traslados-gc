@@ -2063,6 +2063,10 @@ async function initSchema() {
       UNIQUE(destino_id, lang_code)
     );
   `);
+  // (29/10/2026) Regla de las traducciones: 🔴 sin traducir o español cambiado · 🔵 traducido, sin aprobar · 🟢 aprobada.
+  // Los nombres que ya existían quedan aprobados (revisado DEFAULT TRUE).
+  await pool.query(`ALTER TABLE destinos_traducciones ADD COLUMN IF NOT EXISTS revisado BOOLEAN NOT NULL DEFAULT TRUE`);
+  await pool.query(`ALTER TABLE destinos_traducciones ADD COLUMN IF NOT EXISTS desactualizado BOOLEAN NOT NULL DEFAULT FALSE`);
 
     // ─── Extras ───────────────────────────────────────────────────────────────
   await pool.query(`
@@ -10719,8 +10723,18 @@ app.post('/admin/destinos/:id/editar', requireAdmin, asyncHandler(async (req, re
     [nombre.trim(), req.params.id]
   );
   if (existe.rows.length) return res.status(400).json({ error: 'Ya existe un destino con ese nombre.' });
+  const anterior = await pool.query('SELECT nombre FROM destinos WHERE id = $1', [req.params.id]);
   await pool.query('UPDATE destinos SET nombre = $1 WHERE id = $2', [nombre.trim(), req.params.id]);
-  res.json({ ok: true });
+  // (29/10/2026) Si cambió el nombre en español, sus traducciones pasan a 🔴 (sin borrarse)
+  let conTraducciones = 0;
+  if (anterior.rows.length && (anterior.rows[0].nombre || '') !== nombre.trim()) {
+    const r = await pool.query(
+      `UPDATE destinos_traducciones SET desactualizado = TRUE WHERE destino_id = $1 AND nombre IS NOT NULL AND nombre <> ''`,
+      [req.params.id]
+    );
+    conTraducciones = r.rowCount;
+  }
+  res.json({ ok: true, conTraducciones });
 }));
 
 app.post('/admin/destinos/:id/activo', requireAdmin, asyncHandler(async (req, res) => {
@@ -11089,13 +11103,17 @@ app.get('/admin/destinos/traducciones/:lang', requireAdmin, asyncHandler(async (
   const { lang } = req.params;
   const destinos = await pool.query('SELECT id, nombre FROM destinos ORDER BY nombre');
   const traducciones = await pool.query(
-    'SELECT destino_id, nombre FROM destinos_traducciones WHERE lang_code = $1',
+    'SELECT destino_id, nombre, revisado, desactualizado FROM destinos_traducciones WHERE lang_code = $1',
     [lang]
   );
   const mapaTrads = {};
-  for (const t of traducciones.rows) mapaTrads[t.destino_id] = t.nombre;
+  for (const t of traducciones.rows) mapaTrads[t.destino_id] = t;
   const resultado = destinos.rows.map(function (d) {
-    return { id: d.id, nombre_es: d.nombre, nombre_traducido: mapaTrads[d.id] || '' };
+    const t = mapaTrads[d.id];
+    const nombre = t && t.nombre ? t.nombre : '';
+    // (29/10/2026) estado: 'ok' 🟢 · 'ia' 🔵 traducido, sin aprobar · 'desactualizado' 🔴 español cambiado · null 🔴 sin traducir
+    const estado = !nombre ? null : (t.desactualizado ? 'desactualizado' : (t.revisado ? 'ok' : 'ia'));
+    return { id: d.id, nombre_es: d.nombre, nombre_traducido: nombre, estado: estado };
   });
   res.json({ destinos: resultado });
 }));
@@ -11105,11 +11123,11 @@ app.post('/admin/destinos/:id/traduccion/:lang', requireAdmin, asyncHandler(asyn
   const { id, lang } = req.params;
   const { nombre } = req.body;
   await pool.query(
-    `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW()`,
+    `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre, revisado, desactualizado)
+     VALUES ($1, $2, $3, TRUE, FALSE)
+     ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW(), revisado = TRUE, desactualizado = FALSE`,
     [id, lang, nombre || '']
-  );
+  ); // (29/10/2026) guardar a mano = 🟢
   res.json({ ok: true });
 }));
 
@@ -11122,13 +11140,13 @@ app.post('/admin/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (
 
   const destinos = await pool.query('SELECT id, nombre FROM destinos WHERE activo = TRUE ORDER BY nombre');
   const traducciones = await pool.query(
-    'SELECT destino_id, nombre FROM destinos_traducciones WHERE lang_code = $1',
+    'SELECT destino_id, nombre, desactualizado FROM destinos_traducciones WHERE lang_code = $1',
     [lang]
   );
   const yaTraducidos = {};
-  for (const t of traducciones.rows) yaTraducidos[t.destino_id] = t.nombre;
+  for (const t of traducciones.rows) if (t.nombre && !t.desactualizado) yaTraducidos[t.destino_id] = t.nombre;
 
-  // Solo los que no tienen traducción todavía
+  // Solo los que no tienen traducción todavía o están en 🔴 (el español cambió) — (29/10/2026)
   const pendientes = destinos.rows.filter(function (d) { return !yaTraducidos[d.id]; });
   if (pendientes.length === 0) return res.json({ ok: true, propuestas: [] });
 
@@ -11154,6 +11172,19 @@ app.post('/admin/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (
   const limpio = texto.replace(/```json|```/g, '').trim();
   const propuestas = JSON.parse(limpio);
 
+  // (29/10/2026) Lo generado se guarda ya, en 🔵 (traducido, sin aprobar), como en las demás pantallas
+  const idsPendientes = {};
+  pendientes.forEach(function (d) { idsPendientes[d.id] = true; });
+  for (const p of (Array.isArray(propuestas) ? propuestas : [])) {
+    if (!p || !p.id || !idsPendientes[p.id] || !p.nombre || !String(p.nombre).trim()) continue;
+    await pool.query(
+      `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre, revisado, desactualizado)
+       VALUES ($1, $2, $3, FALSE, FALSE)
+       ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW(), revisado = FALSE, desactualizado = FALSE`,
+      [p.id, lang, String(p.nombre).trim()]
+    );
+  }
+
   res.json({ ok: true, propuestas });
 }));
 
@@ -11164,12 +11195,21 @@ app.post('/admin/destinos/traducciones/guardar-lote', requireAdmin, asyncHandler
   for (const p of propuestas) {
     if (!p.id || !p.nombre) continue;
     await pool.query(
-      `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW()`,
+      `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre, revisado, desactualizado)
+       VALUES ($1, $2, $3, TRUE, FALSE)
+       ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW(), revisado = TRUE, desactualizado = FALSE`,
       [p.id, lang, p.nombre]
-    );
+    ); // (29/10/2026) «💾 Guardar todo» = 🟢
   }
+  res.json({ ok: true });
+}));
+
+// (29/10/2026) «✔ No afecta, mantenerlas»: las traducciones de un destino vuelven a 🟢 tal cual
+app.post('/admin/destinos/:id/traducciones/aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query(
+    `UPDATE destinos_traducciones SET revisado = TRUE, desactualizado = FALSE WHERE destino_id = $1 AND nombre IS NOT NULL AND nombre <> ''`,
+    [req.params.id]
+  );
   res.json({ ok: true });
 }));
 
