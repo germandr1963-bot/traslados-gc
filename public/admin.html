@@ -10457,10 +10457,40 @@ function anadirGuiaIcono() {
   });
 }
 
-function cargarPlantillasCom() {
-  fetch('/admin/plantillas-comunicacion')
+// (29/10/2026) Estado de las traducciones de cada plantilla (el mismo que en Idiomas → Comunicaciones — Cliente),
+// para que el ✓ de Email y WhatsApp de esta lista diga el estado con los colores de la regla.
+var _estadosTradCom = null;
+function cargarEstadosTradCom() {
+  return fetch('/admin/plantillas-comunicacion-traducciones')
     .then(function(r) { return r.json(); })
-    .then(function(data) {
+    .then(function(d) { _estadosTradCom = d; })
+    .catch(function() {});
+}
+// Un ✓ por canal que resume los idiomas: 🔴 si falta alguno o cambió el español · 🔵 si hay alguno sin aprobar · 🟢 si todos aprobados.
+// Las plantillas de Chofer e Interno no se traducen: su ✓ es verde. «—» = esa plantilla no tiene mensaje en ese canal.
+function marcaCanalCom(p, canal) {
+  var tiene = canal === 'email' ? (p.cuerpo_email && p.cuerpo_email.trim()) : (p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim());
+  if (!tiene) return '<span style="color:#ccc;">\u2014</span>';
+  var verde = '<span style="color:#2e7d32;font-weight:600;" title="Aprobada">&#10003;</span>';
+  if (p.categoria !== 'cliente' || !_estadosTradCom) return verde;
+  var fila = (_estadosTradCom.plantillas || []).find(function(x) { return x.clave === p.clave; });
+  if (!fila) return verde;
+  var estados = canal === 'email' ? fila.estado_email : fila.estado_wa;
+  var idiomas = _estadosTradCom.idiomas || [];
+  var hayRojo = idiomas.some(function(l) { var e = estados[l]; return !e || e === 'desactualizado'; });
+  if (hayRojo) return '<span style="color:#c0392b;font-weight:600;" title="Sin traducir o español cambiado">&#10003;</span>';
+  var hayAzul = idiomas.some(function(l) { return estados[l] === 'ia'; });
+  if (hayAzul) return '<span style="color:#1565c0;font-weight:600;" title="Traducido, sin aprobar">&#10003;</span>';
+  return verde;
+}
+
+function cargarPlantillasCom() {
+  Promise.all([
+    fetch('/admin/plantillas-comunicacion').then(function(r) { return r.json(); }),
+    cargarEstadosTradCom()
+  ])
+    .then(function(res) {
+      var data = res[0];
       _plantillasCom = data.plantillas || [];
       renderPlantillasCom();
       cargarFrasesCom();
@@ -10510,12 +10540,10 @@ function renderPlantillasCom() {
     html += '<div class="tabla-envoltura"><table class="tabla-admin" style="font-size:0.85rem;width:100%;table-layout:fixed;">';
     html += '<thead><tr><th style="text-align:left;">Plantilla</th><th style="text-align:center;width:80px;">Email</th><th style="text-align:center;width:90px;">WhatsApp</th><th style="text-align:right;width:110px;"></th></tr></thead><tbody>';
     grupos[cat].forEach(function(p) {
-      var tieneEmail = p.cuerpo_email && p.cuerpo_email.trim();
-      var tieneWa = p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim();
       html += '<tr>';
       html += '<td style="white-space:normal;word-break:break-word;"><strong>' + p.nombre + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + p.clave + '</span></td>';
-      html += '<td style="text-align:center;">' + (tieneEmail ? '<span style="color:green;">&#10003;</span>' : '<span style="color:#ccc;">\u2014</span>') + '</td>';
-      html += '<td style="text-align:center;">' + (tieneWa ? '<span style="color:green;">&#10003;</span>' : '<span style="color:#ccc;">\u2014</span>') + '</td>';
+      html += '<td style="text-align:center;">' + marcaCanalCom(p, 'email') + '</td>';
+      html += '<td style="text-align:center;">' + marcaCanalCom(p, 'wa') + '</td>';
       html += '<td style="text-align:right;"><button class="boton-primario" style="font-size:0.8rem;padding:6px 12px;" onclick="abrirModalPlantilla(\'' + p.clave + '\')">&#9998; Editar</button></td>';
       html += '</tr>';
     });
@@ -10766,6 +10794,7 @@ function noAfectaPlantilla() {
   })).then(function(res) {
     if (res.some(function(x) { return !x || !x.ok; })) throw new Error('aprobar');
     caja.innerHTML = '<div class="aviso-ok">✅ Traducciones mantenidas</div>';
+    cargarEstadosTradCom().then(renderPlantillasCom);
     setTimeout(function() { caja.innerHTML = ''; }, 2500);
   }).catch(function() {
     caja.innerHTML = '<div class="aviso-error">Error al guardar. Inténtalo de nuevo.</div>';
@@ -10810,6 +10839,7 @@ function guardarPlantilla() {
         _plantillaComActual = _plantillasCom[idx];
       }
       renderPlantillasCom();
+      cargarEstadosTradCom().then(renderPlantillasCom); // (29/10/2026) el ✓ pasa a 🔴 al momento si cambió el español
     } else {
       msgErr.style.display = 'inline';
     }
