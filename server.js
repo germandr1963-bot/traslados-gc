@@ -8264,6 +8264,19 @@ app.post('/admin/categorias/guardar-ia-lote', requireAdmin, asyncHandler(async (
   res.json({ ok: true, guardadas });
 }));
 
+// (29/10/2026) «💾 Guardar todo» de la ficha de una categoría (Idiomas → «Página de flota — categorías» → ✏️ Editar):
+// aprueba tal cual (🟢) las traducciones de la ficha de esa categoría en todos los idiomas que tienen texto,
+// sin cambiar su texto. Para cuando cambia el español y las traducciones siguen valiendo. Los idiomas sin traducir siguen 🔴.
+app.post('/admin/categorias/:id/aprobar-fichas', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query(
+    `UPDATE categorias_vehiculos_traducciones
+     SET ficha_revisado = TRUE, ficha_desactualizado = FALSE
+     WHERE categoria_id = $1 AND descripcion IS NOT NULL AND descripcion <> ''`,
+    [req.params.id]
+  );
+  res.json({ ok: true, aprobadas: r.rowCount });
+}));
+
 // Lista todos los textos con su estado de traducción por idioma (para las
 // insignias de colores: verde traducido, rojo falta)
 // ─── Gestión de idiomas de la web ────────────────────────────────────────────
