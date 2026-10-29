@@ -651,6 +651,8 @@ table.tabla-precios input {
             </div>
             <button onclick="cerrarModalComFrase()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--texto-muted);">×</button>
           </div>
+          <!-- (29/10/2026) Pestañas de idioma con los colores de la regla (🟢 / 🔵 / 🔴), como en Email y WhatsApp -->
+          <div id="modal-com-frase-tabs" style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
             <div style="background:var(--gris-fondo);border:1px solid var(--borde);border-radius:8px;padding:14px 16px;">
               <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;font-weight:600;">📋 Original en español</p>
@@ -665,7 +667,8 @@ table.tabla-precios input {
           </div>
           <div style="display:flex;gap:10px;margin-top:20px;align-items:center;flex-wrap:wrap;">
             <button class="boton-primario" onclick="guardarComFrase()">💾 Guardar</button>
-            <button class="boton-secundario" onclick="cerrarModalComFrase()">Cancelar</button>
+            <button class="boton-primario" onclick="guardarTodoComFrase()">💾 Guardar todo</button>
+            <button class="boton-secundario" onclick="cerrarModalComFrase()">Cerrar</button>
             <span id="modal-com-frase-msg-ok" style="font-size:13px;color:green;display:none;">✓ Guardado</span>
             <span id="modal-com-frase-msg-err" style="font-size:13px;color:red;display:none;">Error al guardar</span>
           </div>
@@ -1752,6 +1755,8 @@ table.tabla-precios input {
             <span id="modal-frase-com-ok" style="font-size:13px;color:green;display:none;">&#10003; Guardado correctamente</span>
             <span id="modal-frase-com-err" style="font-size:13px;color:red;display:none;">Error al guardar</span>
           </div>
+          <!-- (29/10/2026) Recuadro «¿Este cambio afecta a las traducciones?», igual que en las demás pantallas -->
+          <div id="frase-aviso-traducciones" style="margin-top:12px;"></div>
         </div>
       </div>
 
@@ -5941,7 +5946,7 @@ function toggleComFrases() {
 }
 
 function cargarComFrases() {
-  fetch('/admin/frases-comunicacion-traducciones')
+  return fetch('/admin/frases-comunicacion-traducciones')
     .then(function(r) { return r.json(); })
     .then(function(data) {
       _comFrasesDatos = data;
@@ -6094,6 +6099,7 @@ function abrirModalComFrase(clave, lang) {
   var f = _comFrasesDatos && _comFrasesDatos.frases.find(function(x) { return x.clave === clave; });
   var canalTxt = f ? (f.canal === 'wa' ? 'WhatsApp' : f.canal === 'ambos' ? 'Email y WhatsApp' : 'Email') : '';
   document.getElementById('modal-com-frase-titulo').textContent = f ? f.texto_es : clave;
+  pintarPestanasComFrase();
   document.getElementById('modal-com-frase-subtitulo').textContent = clave + ' · ' + lang.toUpperCase() + (canalTxt ? ' · ' + canalTxt : '');
   document.getElementById('modal-com-frase-ref-texto').textContent = f ? f.texto_es : '';
   document.getElementById('modal-com-frase-ref-contexto').textContent = f && f.contexto ? 'Dónde aparece: ' + f.contexto : '';
@@ -6146,12 +6152,60 @@ function guardarComFrase() {
       if (d && d.ok) {
         document.getElementById('modal-com-frase-msg-ok').style.display = 'inline';
         _comFrasesDatos = null;
-        cargarComFrases();
+        // (29/10/2026) Las pestañas de la ficha cambian de color al guardar, sin cerrarla
+        cargarComFrases().then(pintarPestanasComFrase);
       } else if (d) {
         document.getElementById('modal-com-frase-msg-err').style.display = 'inline';
       }
     })
     .catch(function() { document.getElementById('modal-com-frase-msg-err').style.display = 'inline'; });
+}
+
+// (29/10/2026) Pestañas de idioma de la ficha de una frase, con su color (🟢 aprobada · 🔵 traducido, sin aprobar ·
+// 🔴 sin traducir o español cambiado). Al pulsar una, la ficha pasa a ese idioma sin cerrarse.
+function pintarPestanasComFrase() {
+  var cont = document.getElementById('modal-com-frase-tabs');
+  if (!cont || !_comFraseClaveTrad || !_comFrasesDatos) return;
+  var f = (_comFrasesDatos.frases || []).find(function(x) { return x.clave === _comFraseClaveTrad; });
+  if (!f) return;
+  cont.innerHTML = (_comFrasesDatos.idiomas || []).map(function(lang) {
+    var e = f.estado[lang];
+    var clase = (e === true || e === 'ok') ? 'tab-idioma-verde' : (e === 'ia' ? 'tab-idioma-azul' : 'tab-idioma-rojo');
+    var aviso = clase === 'tab-idioma-rojo' ? ' ⚠️' : '';
+    return '<button class="tab-idioma ' + clase + (lang === _comFraseLangTrad ? ' activo' : '') + '" ' +
+      'onclick="abrirModalComFrase(\'' + _comFraseClaveTrad + '\', \'' + lang + '\')">' + lang.toUpperCase() + aviso + '</button>';
+  }).join('');
+}
+// (29/10/2026) «💾 Guardar todo»: guarda el idioma abierto y aprueba tal cual todos los idiomas de esta frase.
+// No cambia ningún texto traducido; los idiomas sin traducción siguen 🔴.
+function guardarTodoComFrase() {
+  if (!_comFraseClaveTrad || !_comFraseLangTrad) return;
+  var clave = _comFraseClaveTrad, lang = _comFraseLangTrad;
+  var texto = document.getElementById('modal-com-frase-texto').value.trim();
+  var ok = document.getElementById('modal-com-frase-msg-ok');
+  var err = document.getElementById('modal-com-frase-msg-err');
+  ok.style.display = 'none'; err.style.display = 'none';
+  if (!texto) { err.style.display = 'inline'; return; }
+  fetch('/admin/frases-comunicacion/' + clave + '/traducciones/' + lang, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto: texto, generado_por_ia: false })
+  }).then(function(r) { return r.json(); }).then(function(g) {
+    if (!g.ok) throw new Error('guardar');
+    return fetch('/admin/frases-comunicacion/' + clave + '/traducciones').then(function(r) { return r.json(); });
+  }).then(function(d) {
+    var langs = (d.traducciones || []).filter(function(t) { return (t.texto || '').trim(); }).map(function(t) { return t.lang_code; });
+    if (langs.indexOf(lang) < 0) langs.push(lang);
+    return Promise.all(langs.map(function(l) {
+      return fetch('/admin/frases-comunicacion/' + clave + '/traducciones/' + l, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ solo_aprobar: true })
+      }).then(function(r) { return r.json(); });
+    }));
+  }).then(function(res) {
+    if (res.some(function(x) { return !x || !x.ok; })) throw new Error('aprobar');
+    ok.style.display = 'inline';
+    _comFrasesDatos = null;
+    cargarComFrases().then(pintarPestanasComFrase);
+  }).catch(function() { err.style.display = 'inline'; });
 }
 
 // (14/10/2026) Ventana de revisión tras "Generar Frases": aprobar una a una, todas de una vez,
@@ -10563,10 +10617,16 @@ function renderPlantillasCom() {
 var _frasesCom = [];
 var _fraseComActual = null;
 
+// (29/10/2026) Estado de las traducciones de cada frase (el mismo que en Idiomas → 🧩 Cliente — Frases), para la «vista de águila»
+var _estadosTradFrasesCom = null;
 function cargarFrasesCom() {
-  fetch('/admin/frases-comunicacion')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
+  Promise.all([
+    fetch('/admin/frases-comunicacion').then(function(r) { return r.json(); }),
+    fetch('/admin/frases-comunicacion-traducciones').then(function(r) { return r.json(); }).catch(function() { return null; })
+  ])
+    .then(function(res) {
+      var data = res[0];
+      _estadosTradFrasesCom = res[1];
       _frasesCom = data.frases || [];
       renderFrasesCom();
     })
@@ -10574,6 +10634,20 @@ function cargarFrasesCom() {
       var cont = document.getElementById('lista-frases-com');
       if (cont) cont.innerHTML = '<p style="color:red;">Error cargando frases.</p>';
     });
+}
+
+// Un ✓ que resume los idiomas de la frase: 🔴 si falta alguno o cambió el español · 🔵 si hay alguno sin aprobar · 🟢 si todos aprobados
+function marcaTraduccionFraseCom(clave) {
+  var verde = '<span style="color:#2e7d32;font-weight:600;" title="Aprobada">&#10003;</span>';
+  if (!_estadosTradFrasesCom) return '';
+  var fila = (_estadosTradFrasesCom.frases || []).find(function(x) { return x.clave === clave; });
+  if (!fila) return '';
+  var idiomas = _estadosTradFrasesCom.idiomas || [];
+  if (idiomas.some(function(l) { var e = fila.estado[l]; return !e || e === 'desactualizado'; }))
+    return '<span style="color:#c0392b;font-weight:600;" title="Sin traducir o español cambiado">&#10003;</span>';
+  if (idiomas.some(function(l) { return fila.estado[l] === 'ia'; }))
+    return '<span style="color:#1565c0;font-weight:600;" title="Traducido, sin aprobar">&#10003;</span>';
+  return verde;
 }
 
 function renderFrasesCom() {
@@ -10587,11 +10661,12 @@ function renderFrasesCom() {
   var html = '<h2 style="margin-top:20px;margin-bottom:4px;font-size:0.95rem;">&#129513; Frases dentro de los mensajes al cliente <span style="font-size:12px;font-weight:400;color:var(--texto-muted);">(' + _frasesCom.length + ' frases)</span></h2>';
   html += '<p style="font-size:12px;color:var(--texto-muted);margin:0 0 8px;">Botones, avisos y etiquetas que el sistema coloca dentro de los emails y WhatsApp.</p>';
   html += '<div class="tabla-envoltura"><table class="tabla-admin" style="font-size:0.85rem;width:100%;table-layout:fixed;">';
-  html += '<thead><tr><th style="text-align:left;">Frase</th><th style="text-align:center;width:170px;">Dónde se usa</th><th style="text-align:right;width:110px;"></th></tr></thead><tbody>';
+  html += '<thead><tr><th style="text-align:left;">Frase</th><th style="text-align:center;width:170px;">Dónde se usa</th><th style="text-align:center;width:90px;">Traducción</th><th style="text-align:right;width:110px;"></th></tr></thead><tbody>';
   _frasesCom.forEach(function(f) {
     html += '<tr>';
     html += '<td style="white-space:normal;word-break:break-word;"><strong>' + esc(f.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:monospace;">' + f.clave + '</span></td>';
     html += '<td style="text-align:center;font-size:12px;">' + canalTxt(f.canal) + '</td>';
+    html += '<td style="text-align:center;">' + marcaTraduccionFraseCom(f.clave) + '</td>';
     html += '<td style="text-align:right;"><button class="boton-primario" style="font-size:0.8rem;padding:6px 12px;" data-clave="' + f.clave + '" onclick="abrirModalFraseCom(this.dataset.clave)">&#9998; Editar</button></td>';
     html += '</tr>';
   });
@@ -10607,6 +10682,7 @@ function abrirModalFraseCom(clave) {
   document.getElementById('modal-frase-com-sub').textContent = f.clave + ' · ' + canal;
   document.getElementById('modal-frase-com-contexto').textContent = f.contexto ? 'Dónde aparece: ' + f.contexto : '';
   document.getElementById('modal-frase-com-texto').value = f.texto_es || '';
+  document.getElementById('frase-aviso-traducciones').innerHTML = ''; // (29/10/2026) sin el recuadro de la frase anterior
   document.getElementById('modal-frase-com-ok').style.display = 'none';
   document.getElementById('modal-frase-com-err').style.display = 'none';
   document.getElementById('modal-frase-com').classList.remove('oculto');
@@ -10619,12 +10695,50 @@ function cerrarModalFraseCom() {
   _fraseComActual = null;
 }
 
+// (29/10/2026) Al cambiar el español de una frase, sus traducciones pasan a 🔴 (lo hace el servidor). Si tiene traducciones,
+// sale el recuadro: «⚠️ Sí, revisar traducciones» (se quedan en 🔴) o «✔ No afecta, mantenerlas» (se aprueban tal cual).
+function mostrarAvisoTraduccionesFrase(clave) {
+  fetch('/admin/frases-comunicacion/' + clave + '/traducciones')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var langs = (d.traducciones || []).filter(function(t) { return (t.texto || '').trim(); }).map(function(t) { return t.lang_code; });
+      if (!langs.length) return;
+      window._avisoFrase = { clave: clave, langs: langs };
+      document.getElementById('frase-aviso-traducciones').innerHTML =
+        '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
+        '✅ Español guardado. <strong>¿Este cambio afecta a las traducciones?</strong><br>' +
+        '<button class="boton-secundario" style="margin-top:8px;margin-right:8px;" onclick="document.getElementById(\'frase-aviso-traducciones\').innerHTML = \'\'">⚠️ Sí, revisar traducciones</button>' +
+        '<button class="boton-primario" style="margin-top:8px;" onclick="noAfectaFrase()">✔ No afecta, mantenerlas</button>' +
+        '</div>';
+    });
+}
+function noAfectaFrase() {
+  var datos = window._avisoFrase;
+  var caja = document.getElementById('frase-aviso-traducciones');
+  if (!datos) return;
+  Promise.all(datos.langs.map(function(l) {
+    return fetch('/admin/frases-comunicacion/' + datos.clave + '/traducciones/' + l, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ solo_aprobar: true })
+    }).then(function(r) { return r.json(); });
+  })).then(function(res) {
+    if (res.some(function(x) { return !x || !x.ok; })) throw new Error('aprobar');
+    caja.innerHTML = '<div class="aviso-ok">✅ Traducciones mantenidas</div>';
+    setTimeout(function() { caja.innerHTML = ''; }, 2500);
+    cargarFrasesCom();
+  }).catch(function() {
+    caja.innerHTML = '<div class="aviso-error">Error al guardar. Inténtalo de nuevo.</div>';
+  });
+}
+
 function guardarFraseCom() {
   if (!_fraseComActual) return;
   var texto = document.getElementById('modal-frase-com-texto').value.trim();
   document.getElementById('modal-frase-com-ok').style.display = 'none';
   document.getElementById('modal-frase-com-err').style.display = 'none';
   if (!texto) { document.getElementById('modal-frase-com-err').style.display = 'inline'; return; }
+  var claveFrase = _fraseComActual.clave;
+  var cambiado = (_fraseComActual.texto_es || '').trim() !== texto; // (29/10/2026) ¿cambia el español?
+  document.getElementById('frase-aviso-traducciones').innerHTML = '';
   fetch('/admin/frases-comunicacion/' + _fraseComActual.clave, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -10634,6 +10748,8 @@ function guardarFraseCom() {
     .then(function(d) {
       if (d && d.ok) {
         document.getElementById('modal-frase-com-ok').style.display = 'inline';
+        if (_fraseComActual) _fraseComActual.texto_es = texto;
+        if (cambiado) mostrarAvisoTraduccionesFrase(claveFrase);
         cargarFrasesCom();
       } else {
         document.getElementById('modal-frase-com-err').style.display = 'inline';
