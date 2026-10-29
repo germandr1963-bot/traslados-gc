@@ -684,6 +684,8 @@ table.tabla-precios input {
             </div>
             <button onclick="cerrarModalComTrad()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--texto-muted);">×</button>
           </div>
+          <!-- (29/10/2026) Pestañas de idioma con los colores de la regla de las traducciones (🟢 / 🔵 / 🔴), como en las demás fichas -->
+          <div id="modal-com-trad-tabs" style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;"></div>
 
           <!-- Dos columnas -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
@@ -727,7 +729,8 @@ table.tabla-precios input {
           <!-- Botones -->
           <div style="display:flex;gap:10px;margin-top:20px;align-items:center;flex-wrap:wrap;">
             <button class="boton-primario" onclick="guardarComTrad()">💾 Guardar</button>
-            <button class="boton-secundario" onclick="cerrarModalComTrad()">Cancelar</button>
+            <button class="boton-primario" onclick="guardarTodoComTrad()">💾 Guardar todo</button>
+            <button class="boton-secundario" onclick="cerrarModalComTrad()">Cerrar</button>
             <span id="modal-com-trad-msg-ok" style="font-size:13px;color:green;display:none;">✓ Guardado</span>
             <span id="modal-com-trad-msg-err" style="font-size:13px;color:red;display:none;">Error al guardar</span>
           </div>
@@ -5368,7 +5371,7 @@ function toggleComWa() {
 }
 
 function cargarComunicacionesCliente() {
-  fetch('/admin/plantillas-comunicacion-traducciones')
+  return fetch('/admin/plantillas-comunicacion-traducciones')
     .then(function(r) { return r.json(); })
     .then(function(data) {
       _comClienteDatos = data;
@@ -5659,6 +5662,7 @@ function abrirModalComTrad(clave, tipo, lang) {
   var nombre = plantilla ? plantilla.nombre : clave;
 
   document.getElementById('modal-com-trad-titulo').textContent = nombre;
+  pintarPestanasComTrad();
   document.getElementById('modal-com-trad-subtitulo').textContent = clave + ' · ' + lang.toUpperCase() + ' · ' + (tipo === 'email' ? 'Email' : 'WhatsApp');
   document.getElementById('modal-com-trad-lang-label').textContent = lang.toUpperCase();
   document.getElementById('modal-com-trad-asunto').value = '';
@@ -5797,12 +5801,78 @@ function guardarComTrad() {
       if (d && d.ok) {
         document.getElementById('modal-com-trad-msg-ok').style.display = 'inline';
         _comClienteDatos = null;
-        cargarComunicacionesCliente();
+        // (29/10/2026) Las pestañas de la ficha cambian de color al guardar, sin cerrarla
+        cargarComunicacionesCliente().then(pintarPestanasComTrad);
       } else if (d) {
         document.getElementById('modal-com-trad-msg-err').style.display = 'inline';
       }
     })
     .catch(function() { document.getElementById('modal-com-trad-msg-err').style.display = 'inline'; });
+}
+
+// (29/10/2026) Pestañas de idioma de la ficha (Email o WhatsApp), con su color: 🟢 aprobada · 🔵 hecha por la IA,
+// sin aprobar · 🔴 sin traducir o español cambiado. Al pulsar una, la ficha pasa a ese idioma sin cerrarse.
+function pintarPestanasComTrad() {
+  var cont = document.getElementById('modal-com-trad-tabs');
+  if (!cont || !_comClienteClaveTrad || !_comClienteDatos) return;
+  var p = _comClienteDatos.plantillas.find(function(x) { return x.clave === _comClienteClaveTrad; });
+  if (!p) return;
+  var estados = _comClienteTipoTrad === 'wa' ? p.estado_wa : p.estado_email;
+  cont.innerHTML = (_comClienteDatos.idiomas || []).map(function(lang) {
+    var e = estados[lang];
+    var clase = (e === true || e === 'ok') ? 'tab-idioma-verde' : (e === 'ia' ? 'tab-idioma-azul' : 'tab-idioma-rojo');
+    var aviso = clase === 'tab-idioma-rojo' ? ' ⚠️' : '';
+    return '<button class="tab-idioma ' + clase + (lang === _comClienteLangTrad ? ' activo' : '') + '" ' +
+      'onclick="abrirModalComTrad(\'' + _comClienteClaveTrad + '\', \'' + _comClienteTipoTrad + '\', \'' + lang + '\')">' +
+      lang.toUpperCase() + aviso + '</button>';
+  }).join('');
+}
+
+// (29/10/2026) «💾 Guardar todo»: guarda el idioma abierto y aprueba tal cual todos los idiomas de esta plantilla
+// (solo el canal abierto: Email o WhatsApp). No cambia ningún texto traducido; los idiomas sin traducción siguen 🔴.
+function guardarTodoComTrad() {
+  if (!_comClienteClaveTrad || !_comClienteTipoTrad || !_comClienteLangTrad) return;
+  var clave = _comClienteClaveTrad, tipo = _comClienteTipoTrad, lang = _comClienteLangTrad;
+  var texto = document.getElementById('modal-com-trad-texto').value.trim();
+  var asunto = document.getElementById('modal-com-trad-asunto').value.trim();
+  var ok = document.getElementById('modal-com-trad-msg-ok');
+  var err = document.getElementById('modal-com-trad-msg-err');
+  ok.style.display = 'none'; err.style.display = 'none';
+  fetch('/admin/plantillas-comunicacion/' + clave + '/traducciones')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var lista = d.traducciones || [];
+      var trad = lista.find(function(t) { return t.lang_code === lang; }) || {};
+      var body = {
+        asunto_email:    tipo === 'email' ? asunto : (trad.asunto_email || ''),
+        cuerpo_email:    tipo === 'email' ? texto  : (trad.cuerpo_email || ''),
+        cuerpo_whatsapp: tipo === 'wa'    ? texto  : (trad.cuerpo_whatsapp || ''),
+        generado_por_ia: false
+      };
+      return fetch('/admin/plantillas-comunicacion/' + clave + '/traducciones/' + lang, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      }).then(function(r) { return r.json(); }).then(function(g) {
+        if (!g.ok) throw new Error('guardar');
+        // Aprobar tal cual los idiomas que tienen traducción en este canal (y el abierto)
+        var langs = lista.filter(function(t) {
+          return t.lang_code !== lang && (tipo === 'wa' ? (t.cuerpo_whatsapp || '').trim() : (t.cuerpo_email || '').trim());
+        }).map(function(t) { return t.lang_code; });
+        langs.push(lang);
+        return Promise.all(langs.map(function(l) {
+          return fetch('/admin/plantillas-comunicacion/' + clave + '/traducciones/' + l, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ solo_aprobar: true, tipo: tipo })
+          }).then(function(r) { return r.json(); });
+        }));
+      });
+    })
+    .then(function(res) {
+      if (res.some(function(x) { return !x || !x.ok; })) throw new Error('aprobar');
+      ok.style.display = 'inline';
+      _comClienteDatos = null;
+      cargarComunicacionesCliente().then(pintarPestanasComTrad);
+    })
+    .catch(function() { err.style.display = 'inline'; });
 }
 
 function generarComunicacionesClienteIA(tipo, selId, msgId) {
