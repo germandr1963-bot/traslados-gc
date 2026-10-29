@@ -314,7 +314,7 @@ table.tabla-precios input {
         <p class="subtitulo" style="margin-bottom:1rem;">Nombres de los destinos en cada idioma activo. Se usan en selectores y listados. El SEO de cada ruta se traduce por separado.</p>
         <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
           <select id="select-lang-destinos" class="campo" style="width:200px;height:40px;" onchange="cargarTraduccionesDestinos()"></select>
-          <button class="boton-costa" onclick="traducirDestinosIA()">✨ Sugerir con IA los que faltan</button>
+          <button class="boton-costa" id="btn-generar-destinos" onclick="traducirDestinosIA()">Generar lo que falta</button>
         </div>
         <div id="aviso-traducciones-destinos" style="margin-bottom:1rem;display:none;"></div>
         <table class="tabla-admin">
@@ -477,7 +477,7 @@ table.tabla-precios input {
       <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
         <span style="font-size:13px;">🤖 Generar textos de interfaz con IA:</span>
         <select id="select-idioma-ia" class="campo" style="height:34px;width:auto;"></select>
-        <button class="boton-costa" onclick="traducirConIA()">Generar lo que falta</button>
+        <button class="boton-costa" id="btn-generar-textos" onclick="traducirConIA()">Generar lo que falta</button>
       </div>
 
       <div id="mensaje-textos" style="margin-bottom:12px;"></div>
@@ -516,7 +516,7 @@ table.tabla-precios input {
           <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
             <span style="font-size:13px;">🤖 Generar contenido de categorías con IA:</span>
             <select id="select-idioma-categorias" class="campo" style="height:34px;width:auto;"></select>
-            <button class="boton-costa" onclick="generarCategoriasConIA()">Generar lo que falta</button>
+            <button class="boton-costa" id="btn-generar-categorias" onclick="generarCategoriasConIA()">Generar lo que falta</button>
           </div>
 
           <div id="mensaje-categorias-ia" style="margin-bottom:12px;"></div>
@@ -561,7 +561,7 @@ table.tabla-precios input {
                     <td style="padding:16px 14px 16px 32px;">
                       <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
                         <select id="select-com-email-ia" class="campo" style="height:34px;width:auto;"></select>
-                        <button class="boton-costa" onclick="generarComunicacionesClienteIA('email', 'select-com-email-ia', 'com-email-msg-ia')">🤖 Generar Emails</button>
+                        <button class="boton-costa" id="btn-generar-com-email" onclick="generarComunicacionesClienteIA('email', 'select-com-email-ia', 'com-email-msg-ia')">Generar lo que falta</button>
                         <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoComunicaciones('email')">✅ Aprobar todo</button>
                         <span id="com-email-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
                         <span id="com-email-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
@@ -588,7 +588,7 @@ table.tabla-precios input {
                     <td style="padding:16px 14px 16px 32px;">
                       <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
                         <select id="select-com-wa-ia" class="campo" style="height:34px;width:auto;"></select>
-                        <button class="boton-costa" onclick="generarComunicacionesClienteIA('wa', 'select-com-wa-ia', 'com-wa-msg-ia')">🤖 Generar WhatsApp</button>
+                        <button class="boton-costa" id="btn-generar-com-wa" onclick="generarComunicacionesClienteIA('wa', 'select-com-wa-ia', 'com-wa-msg-ia')">Generar lo que falta</button>
                         <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoComunicaciones('wa')">✅ Aprobar todo</button>
                         <span id="com-wa-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
                         <span id="com-wa-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
@@ -617,7 +617,7 @@ table.tabla-precios input {
                       <p style="font-size:12px;color:var(--texto-muted);margin:0 0 10px;">Botones, avisos y etiquetas que el sistema coloca dentro de los emails y WhatsApp. Cada frase indica dónde se usa.</p>
                       <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
                         <select id="select-com-frases-ia" class="campo" style="height:34px;width:auto;"></select>
-                        <button class="boton-costa" onclick="generarComFrasesIA()">🤖 Generar Frases</button>
+                        <button class="boton-costa" id="btn-generar-com-frases" onclick="generarComFrasesIA()">Generar lo que falta</button>
                         <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoComFrases()">✅ Aprobar todo</button>
                         <span id="com-frases-msg-ia" style="font-size:13px;color:var(--acento);display:none;"></span>
                         <span id="com-frases-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
@@ -4821,12 +4821,34 @@ function renderizarCabeceraTextos() {
     '<th>Acción</th></tr>';
 }
 
+// (29/10/2026) Botones «Generar lo que falta en <idioma>»: el botón dice el idioma que tiene elegido su selector
+// y cambia al momento al cambiar el selector. Solo cambia lo que dice el botón, no lo que hace.
+var BOTONES_GENERAR_IDIOMA = {
+  'select-idioma-ia': 'btn-generar-textos',
+  'select-idioma-categorias': 'btn-generar-categorias',
+  'select-com-email-ia': 'btn-generar-com-email',
+  'select-com-wa-ia': 'btn-generar-com-wa',
+  'select-com-frases-ia': 'btn-generar-com-frases',
+  'select-lang-destinos': 'btn-generar-destinos'
+};
+function rotularBotonGenerar(selectId) {
+  var sel = document.getElementById(selectId);
+  var btn = document.getElementById(BOTONES_GENERAR_IDIOMA[selectId]);
+  if (!sel || !btn) return;
+  var opcion = sel.options[sel.selectedIndex];
+  btn.textContent = 'Generar lo que falta' + (opcion ? ' en ' + opcion.text : '');
+}
+document.addEventListener('change', function (e) {
+  if (e.target && BOTONES_GENERAR_IDIOMA[e.target.id]) rotularBotonGenerar(e.target.id);
+});
+
 function renderizarSelectIA() {
   var select = document.getElementById('select-idioma-ia');
   if (!select) return;
   select.innerHTML = IDIOMAS_TEXTOS.map(function (l) {
     return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
   }).join('');
+  rotularBotonGenerar('select-idioma-ia');
   // Poblar también el selector del Bloque 2 — categorías de flota
   // IDIOMAS_TEXTOS ya incluye todos los idiomas activos (incluyendo español)
   var selectCats = document.getElementById('select-idioma-categorias');
@@ -4834,6 +4856,7 @@ function renderizarSelectIA() {
   selectCats.innerHTML = IDIOMAS_TEXTOS.map(function (l) {
     return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
   }).join('');
+  rotularBotonGenerar('select-idioma-categorias');
 }
 
 function cargarTextosInterfaz() {
@@ -5318,6 +5341,8 @@ function cargarComunicacionesCliente() {
       var selWa = document.getElementById('select-com-wa-ia');
       var langWaActual = selWa ? selWa.value : '';
       if (selWa) { selWa.innerHTML = opcionesIdioma; if (langWaActual) selWa.value = langWaActual; }
+      rotularBotonGenerar('select-com-email-ia');
+      rotularBotonGenerar('select-com-wa-ia');
       var plantillas = data.plantillas || [];
       var idiomas = data.idiomas || [];
       // Contador de textos en la cabecera del colapsable
@@ -5815,6 +5840,7 @@ function cargarComFrases() {
         }).join('');
         if (langActual) sel.value = langActual;
       }
+      rotularBotonGenerar('select-com-frases-ia');
       actualizarPctGlobalComCliente();
     })
     .catch(function() {
@@ -8232,6 +8258,7 @@ function cargarSelectorLangDestinos() {
     sel.innerHTML = activos.map(function(i) {
       return '<option value="' + i.codigo + '">' + i.nombre + '</option>';
     }).join('');
+    rotularBotonGenerar('select-lang-destinos');
     if (activos.length) cargarTraduccionesDestinos();
   });
 }
