@@ -344,14 +344,16 @@ async function cargarTextosCache() {
   const traducciones = await pool.query('SELECT texto_id, lang_code, texto FROM textos_interfaz_traducciones');
 
   const nuevaCache = {};
+  const porId = {}; // (29/10/2026) cada texto localizado por su número: guardar va mucho más rápido
   for (const fila of textos.rows) {
     nuevaCache[fila.clave] = {
       id: fila.id, modulo: fila.modulo, contexto: fila.contexto,
       texto_es: fila.texto_es, traducciones: {}
     };
+    porId[fila.id] = nuevaCache[fila.clave];
   }
   for (const fila of traducciones.rows) {
-    const entrada = Object.values(nuevaCache).find(function (e) { return e.id === fila.texto_id; });
+    const entrada = porId[fila.texto_id];
     if (entrada) entrada.traducciones[fila.lang_code] = fila.texto;
   }
   TEXTOS_CACHE = nuevaCache;
