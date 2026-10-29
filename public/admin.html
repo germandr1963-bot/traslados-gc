@@ -296,7 +296,8 @@ table.tabla-precios input {
         <button class="boton-costa" onclick="crearDestino()">+ Añadir destino</button>
       </div>
       <div id="error-destinos" style="color:#e07b5a;margin-bottom:1rem;display:none;"></div>
-
+      <!-- (29/10/2026) Recuadro «¿Este cambio afecta a las traducciones?» al cambiar el nombre en español de un destino -->
+      <div id="aviso-destino-traducciones" style="margin-bottom:1rem;"></div>
       <table class="tabla-admin">
         <thead>
           <tr>
@@ -8488,38 +8489,31 @@ function cargarTraduccionesDestinos() {
     });
 }
 
+function marcaTraduccionDestino(estado) {
+  if (estado === 'ok') return '<span style="color:#2e7d32;font-weight:600;" title="Aprobada">✓</span>';
+  if (estado === 'ia') return '<span style="color:#1565c0;font-weight:600;" title="Traducido, sin aprobar">✓</span>';
+  if (estado === 'desactualizado') return '<span style="color:#c0392b;font-weight:600;" title="Español cambiado">✓</span>';
+  return '<span style="color:#c0392b;" title="Sin traducir">·</span>';
+}
 function renderizarTablaTraduccionesDestinos(destinos, propuestasIA) {
   var mapaIA = {};
   propuestasIA.forEach(function(p) { mapaIA[p.id] = p.nombre; });
-
   var cuerpo = document.getElementById('cuerpo-traducciones-destinos');
   cuerpo.innerHTML = destinos.map(function(d) {
-    var tieneTraduccion = d.nombre_traducido && d.nombre_traducido.trim() !== '';
-    var tienePropuesta = !!mapaIA[d.id];
     var valorCampo = mapaIA[d.id] || d.nombre_traducido || '';
-    var badge, badgeColor;
-    if (tieneTraduccion) {
-      badge = '✔ Traducido';
-      badgeColor = '#2e7d32';
-    } else if (tienePropuesta) {
-      badge = '✨ Propuesta IA';
-      badgeColor = '#1565c0';
-    } else {
-      badge = '— Pendiente';
-      badgeColor = '#c0392b';
-    }
+    // (29/10/2026) Regla de las traducciones: el mismo ✓ de colores y las mismas etiquetas que en Idiomas
     return '<tr id="fila-dest-' + d.id + '">' +
       '<td>' + d.nombre_es + '</td>' +
       '<td style="text-align:center;">' +
-        '<span id="badge-dest-' + d.id + '" style="font-size:0.75rem;font-weight:600;color:' + badgeColor + ';">' + badge + '</span>' +
+        '<span id="badge-dest-' + d.id + '">' + marcaTraduccionDestino(d.estado) + '</span>' +
       '</td>' +
       '<td>' +
         '<input type="text" id="trad-dest-' + d.id + '" data-id="' + d.id + '" ' +
         'value="' + valorCampo.replace(/"/g, '&quot;') + '" class="campo" style="height:34px;">' +
       '</td>' +
       '<td>' +
-        '<button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.7rem;" ' +
-        'onclick="guardarTraduccionDestino(' + d.id + ')">Guardar</button>' +
+        '<button class="boton-primario" style="font-size:0.78rem;padding:0.25rem 0.7rem;margin-top:0;" ' +
+        'onclick="guardarTraduccionDestino(' + d.id + ')">💾 Guardar</button>' +
       '</td>' +
     '</tr>';
   }).join('');
@@ -8535,10 +8529,7 @@ function guardarTraduccionDestino(id) {
     body: JSON.stringify({ nombre: nombre })
   }).then(function(r) { return r.json(); }).then(function() {
     var badge = document.getElementById('badge-dest-' + id);
-    if (badge) {
-      badge.textContent = nombre ? '✔ Traducido' : '— Pendiente';
-      badge.style.color = nombre ? '#2e7d32' : '#c0392b';
-    }
+    if (badge) badge.innerHTML = marcaTraduccionDestino(nombre ? 'ok' : null); // (29/10/2026) guardar = 🟢
     var av = document.getElementById('aviso-traducciones-destinos');
     av.style.display = 'block';
     av.innerHTML = '<div class="aviso-ok">✔ Guardado.</div>';
@@ -8560,14 +8551,8 @@ function guardarTodasTraduccionesDestinos() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ lang: lang, propuestas: propuestas })
   }).then(function(r) { return r.json(); }).then(function() {
-    // Actualizar badges
-    propuestas.forEach(function(p) {
-      var badge = document.getElementById('badge-dest-' + p.id);
-      if (badge) {
-        badge.textContent = p.nombre ? '✔ Traducido' : '— Pendiente';
-        badge.style.color = p.nombre ? '#2e7d32' : '#c0392b';
-      }
-    });
+    // (29/10/2026) Se vuelve a cargar la tabla: lo guardado pasa a 🟢
+    cargarTraduccionesDestinos();
     var av = document.getElementById('aviso-traducciones-destinos');
     av.style.display = 'block';
     av.innerHTML = '<div class="aviso-ok">✔ Todas las traducciones guardadas.</div>';
@@ -8593,16 +8578,9 @@ function traducirDestinosIA() {
         setTimeout(function() { av.style.display = 'none'; }, 3000);
         return;
       }
-      // Mostrar propuestas en los campos SIN guardar — el usuario revisa y guarda una a una
-      data.propuestas.forEach(function(p) {
-        var inp = document.getElementById('trad-dest-' + p.id);
-        if (inp && !inp.value.trim()) {
-          inp.value = p.nombre;
-          var badge = document.getElementById('badge-dest-' + p.id);
-          if (badge) { badge.textContent = '✨ Propuesta IA'; badge.style.color = '#1565c0'; }
-        }
-      });
-      av.innerHTML = '<div class="aviso-ok">✨ La IA sugirió ' + data.propuestas.length + ' traducciones. Revisa cada una y pulsa Guardar.</div>';
+      // (29/10/2026) Lo generado ya está guardado en 🔵: se vuelve a cargar la tabla; se revisa en cada fila y se guarda (🟢)
+      cargarTraduccionesDestinos();
+      av.innerHTML = '<div class="aviso-ok">🤖 La IA tradujo ' + data.propuestas.length + ' nombre(s). Están en azul: revísalos y pulsa «💾 Guardar» en cada uno o «💾 Guardar todo».</div>';
     })
     .catch(function() {
       av.innerHTML = '<div class="aviso-error">Error de conexión con la IA.</div>';
@@ -8680,7 +8658,29 @@ function editarDestino(id, nombreActual) {
     .then(function(data) {
       if (data.error) { alert(data.error); return; }
       cargarDestinos();
+      // (29/10/2026) Si cambió el español y había traducciones, ya están en 🔴: ¿afecta?
+      var caja = document.getElementById('aviso-destino-traducciones');
+      if (caja && data.conTraducciones > 0) {
+        caja.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
+          '✅ «' + escapar(nuevoNombre) + '» guardado. <strong>¿Este cambio afecta a las traducciones?</strong><br>' +
+          '<button class="boton-secundario" style="margin-top:8px;margin-right:8px;" onclick="document.getElementById(\'aviso-destino-traducciones\').innerHTML = \'\'">⚠️ Sí, revisar traducciones</button>' +
+          '<button class="boton-primario" style="margin-top:8px;" onclick="noAfectaDestino(' + id + ')">✔ No afecta, mantenerlas</button>' +
+          '</div>';
+      }
+      if (document.getElementById('select-lang-destinos').value) cargarTraduccionesDestinos();
     });
+}
+function noAfectaDestino(id) {
+  var caja = document.getElementById('aviso-destino-traducciones');
+  fetch('/admin/destinos/' + id + '/traducciones/aprobar-todas', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) throw new Error('aprobar');
+      caja.innerHTML = '<div class="aviso-ok">✅ Traducciones mantenidas</div>';
+      setTimeout(function() { caja.innerHTML = ''; }, 2500);
+      cargarTraduccionesDestinos();
+    })
+    .catch(function() { caja.innerHTML = '<div class="aviso-error">Error al guardar. Inténtalo de nuevo.</div>'; });
 }
 
 function toggleDestinoActivo(id, nuevoEstado) {
