@@ -6195,8 +6195,6 @@ function abrirEditorTexto(textoId) {
     '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="texto-campo-editor"></div>' +
     '<div id="texto-mensaje-editor" style="margin-top:8px;"></div>' +
-    (texto.desact && IDIOMAS_TEXTOS.some(function (l) { return texto.desact[l]; }) ?
-      '<button class="boton-secundario" style="margin-top:10px;margin-right:8px;" onclick="aprobarTodasTexto(' + textoId + ')">✔ Aprobar todas tal cual</button>' : '') +
     (texto.modulo === 'Categorías de vehículo' ?
       '<button class="boton-peligro" style="margin-top:10px;margin-right:8px;font-size:0.82rem;" onclick="limpiarTraduccionesCategoria(' + textoId + ')">🗑 Limpiar todas las traducciones</button>' : '') +
     '<button class="boton-secundario" style="margin-top:10px;" onclick="document.getElementById(\'editor-texto-interfaz\').classList.add(\'oculto\')">Cerrar</button>';
@@ -6229,7 +6227,8 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
     campo.innerHTML =
       '<label class="etiqueta">Texto en Español</label>' +
       '<textarea class="campo" id="texto-traduccion" rows="3">' + escapar(valorEs) + '</textarea>' +
-      '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'es\')">💾 Guardar</button>';
+      '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'es\')">💾 Guardar</button>' +
+      '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="guardarTodoTexto(' + textoId + ', \'es\')">💾 Guardar todo</button>';
   } else {
     fetch('/admin/textos/' + textoId + '/idioma/' + lang)
       .then(function (r) { return r.json(); })
@@ -6238,20 +6237,16 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
         var texto = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
         var avisoDesact = datos.desactualizado
           ? '<div style="background:#fdecea;border:1px solid #f5b8b8;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#7a1e1e;">' +
-              '⚠️ <strong>El español ha cambiado.</strong> Revisa esta traducción: corrígela y guárdala, o apruébala tal cual si el cambio no le afecta.' +
+              '⚠️ <strong>El español ha cambiado.</strong> Revisa esta traducción: corrígela y guárdala, o pulsa «💾 Guardar» tal cual si el cambio no le afecta.' +
               (texto ? '<br><span style="color:#5b5347;">Español actual: <em>' + escapar(texto.texto_es || '') + '</em></span>' : '') +
             '</div>'
-          : '';
-        var sinAprobarLang = texto && texto.sinAprobar && texto.sinAprobar[lang]; // (28/10/2026) 🔵 también se aprueba aquí
-        var botonAprobar = (datos.desactualizado || sinAprobarLang)
-          ? '<button class="boton-secundario" style="margin-top:10px;margin-left:8px;" onclick="aprobarTraduccionTexto(' + textoId + ', \'' + lang + '\')">✔ Aprobar tal cual</button>'
           : '';
         campo.innerHTML =
           avisoDesact +
           '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
           '<textarea class="campo" id="texto-traduccion" rows="3" placeholder="Todavía sin traducir...">' + escapar(datos.texto || '') + '</textarea>' +
           '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar</button>' +
-          botonAprobar;
+          '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="guardarTodoTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar todo</button>';
       });
   }
 }
@@ -6287,6 +6282,57 @@ function aprobarTodasTexto(textoId) {
     .then(function () { recargarTextosYEditor(textoId); });
 }
 
+// (29/10/2026) Igual que la ficha de Página de flota: tras guardar, la tabla y las pestañas de la ficha abierta
+// cambian de color al momento (🟢 / 🔵 / 🔴), sin cerrarla ni cambiar la pestaña elegida.
+function pintarPestanasTexto(textoId) {
+  var texto = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
+  if (!texto) return;
+  var botones = document.querySelectorAll('#editor-texto-interfaz .tab-idioma');
+  IDIOMAS_TEXTOS.forEach(function (lang, i) {
+    var b = botones[i];
+    if (!b) return;
+    var ok = texto.estado[lang];
+    var azul = !ok && texto.sinAprobar && texto.sinAprobar[lang];
+    b.classList.remove('tab-idioma-verde', 'tab-idioma-azul', 'tab-idioma-rojo');
+    b.classList.add(ok ? 'tab-idioma-verde' : (azul ? 'tab-idioma-azul' : 'tab-idioma-rojo'));
+    b.textContent = lang.toUpperCase() + (ok || azul ? '' : ' ⚠️');
+  });
+}
+function refrescarTextosYPestanas(textoId, lang) {
+  return fetch('/admin/textos').then(function (r) { return r.json(); }).then(function (datos) {
+    textosCache = datos;
+    renderizarTablaTextos(datos);
+    pintarPestanasTexto(textoId);
+    // la pestaña abierta se vuelve a cargar: así desaparece el aviso «El español ha cambiado» si ya está aprobada
+    if (lang) cambiarIdiomaEditorTexto(textoId, lang, document.querySelector('#editor-texto-interfaz .tab-idioma.activo'));
+  });
+}
+// (29/10/2026) «💾 Guardar todo»: guarda la pestaña abierta y aprueba tal cual todos los idiomas de ese texto
+// (como «💾 Guardar todo» de Página de flota). No cambia ningún texto traducido; los idiomas sin traducción siguen 🔴.
+function guardarTodoTexto(textoId, lang) {
+  var valor = document.getElementById('texto-traduccion').value;
+  var msg = document.getElementById('texto-mensaje-editor');
+  var url = lang === 'es'
+    ? '/admin/textos/' + textoId + '/es'
+    : '/admin/textos/' + textoId + '/idioma/' + lang;
+  msg.innerHTML = 'Guardando...';
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto: valor })
+  }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (!respuesta.ok) throw new Error(respuesta.error || 'Error al guardar');
+    return fetch('/admin/textos/' + textoId + '/aprobar-todas', { method: 'POST' }).then(function (r) { return r.json(); });
+  }).then(function (respuesta) {
+    if (!respuesta.ok) throw new Error(respuesta.error || 'Error al guardar');
+    msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+    refrescarTextosYPestanas(textoId, lang);
+    setTimeout(function () { msg.innerHTML = ''; }, 2000);
+  }).catch(function (e) {
+    msg.innerHTML = '<div class="aviso-error">' + escapar(e.message || 'Error al guardar') + '</div>';
+  });
+}
+
 function guardarTraduccionTexto(textoId, lang) {
   var valor = document.getElementById('texto-traduccion').value;
   var msg = document.getElementById('texto-mensaje-editor');
@@ -6308,10 +6354,10 @@ function guardarTraduccionTexto(textoId, lang) {
         '<button class="boton-secundario" style="margin-top:8px;margin-right:8px;" onclick="recargarTextosYEditor(' + textoId + ')">⚠️ Sí, revisar traducciones</button>' +
         '<button class="boton-primario" style="margin-top:8px;" onclick="aprobarTodasTexto(' + textoId + ')">✔ No afecta, mantenerlas</button>' +
         '</div>';
-      cargarTextosInterfaz();
+      refrescarTextosYPestanas(textoId);
     } else if (respuesta.ok) {
       msg.innerHTML = '<div class="aviso-ok">✅ Guardado</div>';
-      cargarTextosInterfaz();
+      refrescarTextosYPestanas(textoId, lang);
       setTimeout(function () { msg.innerHTML = ''; }, 2000);
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
