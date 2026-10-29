@@ -4851,7 +4851,7 @@ function cargarTextosInterfaz() {
 
 function cargarTablaCategoriasIA() {
   document.getElementById('tabla-categorias-ia-cuerpo').innerHTML = '<tr><td colspan="12" style="color:var(--texto-muted)">Cargando...</td></tr>';
-  fetch('/admin/categorias/estado-ia')
+  return fetch('/admin/categorias/estado-ia')
     .then(function (r) { return r.json(); })
     .then(function (datos) {
       categoriasIACache = datos;
@@ -4927,6 +4927,25 @@ function abrirEditorCategoriaIA(catId) {
   editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// (29/10/2026) Vuelve a pintar el color de las pestañas de la ficha abierta (🟢 / 🔵 / 🔴) con el estado real,
+// sin cerrarla ni cambiar la pestaña elegida: al guardar el español, los demás idiomas pasan a 🔴 al momento;
+// al guardar un idioma, esa pestaña pasa a 🟢.
+function pintarPestanasCategoriaIA(catId) {
+  var datos = categoriasIACache;
+  var cat = datos && datos.categorias.find(function (c) { return c.id === catId; });
+  if (!cat) return;
+  var botones = document.querySelectorAll('#editor-categorias-ia .tab-idioma');
+  datos.idiomas.forEach(function (lang, i) {
+    var b = botones[i];
+    if (!b) return;
+    var ok = cat.estado[lang];
+    var azul = !ok && cat.sinAprobar && cat.sinAprobar[lang];
+    b.classList.remove('tab-idioma-verde', 'tab-idioma-azul', 'tab-idioma-rojo');
+    b.classList.add(ok ? 'tab-idioma-verde' : (azul ? 'tab-idioma-azul' : 'tab-idioma-rojo'));
+    b.textContent = lang.toUpperCase() + (ok || azul ? '' : ' ⚠️');
+  });
+}
+
 function cambiarIdiomaEditorCategoriaIA(catId, lang, botonTab) {
   document.querySelectorAll('#editor-categorias-ia .tab-idioma').forEach(function (b) { b.classList.remove('activo'); });
   if (botonTab) botonTab.classList.add('activo');
@@ -4971,7 +4990,8 @@ function guardarCategoriaIA(catId, lang) {
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
     if (respuesta.ok) {
       msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
-      cargarTablaCategoriasIA();
+      // (29/10/2026) Las pestañas de la ficha abierta cambian de color al guardar, sin cerrarla
+      cargarTablaCategoriasIA().then(function () { pintarPestanasCategoriaIA(catId); });
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
     }
