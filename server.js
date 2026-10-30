@@ -3921,6 +3921,10 @@ Un saludo cordial, 🙏
     )
   `);
 
+  // (30/10/2026) Modelo común de traducciones en los alt texts (igual que destinos_fotos_alt): existentes = 🟢
+  await pool.query(`ALTER TABLE rutas_fotos_alt ADD COLUMN IF NOT EXISTS revisado BOOLEAN NOT NULL DEFAULT TRUE`);
+  await pool.query(`ALTER TABLE rutas_fotos_alt ADD COLUMN IF NOT EXISTS desactualizado BOOLEAN NOT NULL DEFAULT FALSE`);
+
   // ─── Categorías fotos: galería de imágenes por categoría de vehículo ──────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS categorias_fotos (
@@ -3947,6 +3951,10 @@ Un saludo cordial, 🙏
       UNIQUE(foto_id, lang_code)
     )
   `);
+
+  // (30/10/2026) Modelo común de traducciones en los alt texts (igual que destinos_fotos_alt): existentes = 🟢
+  await pool.query(`ALTER TABLE categorias_fotos_alt ADD COLUMN IF NOT EXISTS revisado BOOLEAN NOT NULL DEFAULT TRUE`);
+  await pool.query(`ALTER TABLE categorias_fotos_alt ADD COLUMN IF NOT EXISTS desactualizado BOOLEAN NOT NULL DEFAULT FALSE`);
 
   if (process.env.ADMIN_USUARIO && process.env.ADMIN_PASSWORD) {
     const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
@@ -7130,6 +7138,8 @@ app.get('/admin/categorias/:id/fotos', requireAdmin, asyncHandler(async (req, re
     `SELECT id, alt_texto, nombre_archivo, orden, es_principal FROM categorias_fotos WHERE categoria_id = $1 ORDER BY orden`,
     [req.params.id]
   );
+  // (30/10/2026) Vista de águila: estado de los alt texts de cada foto (igual que en las fotos de destinos)
+  await ponerEstadoAltFotos('categorias_fotos_alt', result.rows);
   res.json({ fotos: result.rows });
 }));
 
@@ -7244,23 +7254,33 @@ app.get('/admin/categorias/:id/fotos/:fotoId/imagen-base64', requireAdmin, async
 app.get('/admin/categorias/:id/fotos/:fotoId/alt', requireAdmin, asyncHandler(async (req, res) => {
   const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
   const alts = await pool.query(
-    'SELECT lang_code, alt_texto FROM categorias_fotos_alt WHERE foto_id = $1',
+    'SELECT lang_code, alt_texto, revisado, desactualizado FROM categorias_fotos_alt WHERE foto_id = $1',
     [req.params.fotoId]
   );
   const mapa = {};
-  for (const a of alts.rows) mapa[a.lang_code] = a.alt_texto;
-  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa });
+  const estados = {}; // (30/10/2026) 'ok' 🟢 · 'ia' 🔵 · 'desactualizado' 🔴 · sin texto 🔴
+  for (const a of alts.rows) {
+    mapa[a.lang_code] = a.alt_texto;
+    if (a.alt_texto && a.alt_texto.trim()) estados[a.lang_code] = a.desactualizado ? 'desactualizado' : (a.revisado ? 'ok' : 'ia');
+  }
+  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa, estados: estados });
 }));
 
 // Guarda el alt text de una foto de categoría en un idioma concreto
 app.post('/admin/categorias/:id/fotos/:fotoId/alt/:lang', requireAdmin, asyncHandler(async (req, res) => {
-  const { alt_texto } = req.body;
-  await pool.query(
-    `INSERT INTO categorias_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
-     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
-    [req.params.fotoId, req.params.lang, alt_texto || '']
+  // (30/10/2026) «💾 Guardar» guarda y aprueba (🟢); si cambia el español, los demás idiomas pasan a 🔴 (igual que en destinos)
+  const conTraducciones = await guardarAltFotoModelo('categorias_fotos_alt', req.params.fotoId, req.params.lang, req.body.alt_texto);
+  res.json({ ok: true, conTraducciones: conTraducciones });
+}));
+
+// (30/10/2026) «💾 Guardar todo» y «✔ No afecta, mantenerlas»: aprueba tal cual todos los idiomas con texto de esa foto
+app.post('/admin/categorias/:id/fotos/:fotoId/alt-aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query(
+    `UPDATE categorias_fotos_alt SET revisado = TRUE, desactualizado = FALSE
+     WHERE foto_id = $1 AND alt_texto IS NOT NULL AND TRIM(alt_texto) <> ''`,
+    [req.params.fotoId]
   );
-  res.json({ ok: true });
+  res.json({ ok: true, aprobadas: r.rowCount });
 }));
 
 // Sugiere con IA el alt text de una foto de categoría en el idioma activo
@@ -7294,6 +7314,113 @@ app.post('/admin/categorias/:id/fotos/:fotoId/alt/:lang/sugerir-ia', requireAdmi
   const altTexto = data.content.map(function(b) { return b.text || ''; }).join('').trim().replace(/^["“”]+|["“”]+$/g, '');
   res.json({ ok: true, alt_texto: altTexto });
 }));
+
+// (30/10/2026) «Generar lo que falta» de los alt texts de una foto de categoría: la IA mira la foto y escribe SOLO los idiomas
+// sin texto o en 🔴, con las mismas reglas que «✨ Sugerir con IA» de cada idioma, pero para varios idiomas a la vez. Quedan en 🔵.
+app.post('/admin/categorias/:id/fotos/:fotoId/alt-generar-falta', requireAdmin, asyncHandler(async (req, res) => {
+  const cat = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
+  if (cat.rows.length === 0) return res.status(404).json({ error: 'Categoría no encontrada.' });
+  const nombreCategoria = cat.rows[0].nombre;
+  const resultado = await generarFaltaAltFotoModelo('categorias_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) {
+    const listaIdiomas = pendientes.map(function (i) { return i.codigo + ' (' + (NOMBRE_IDIOMA_ES[i.codigo] || i.nombre) + ')'; }).join(', ');
+    const codigos = pendientes.map(function (i) { return '"' + i.codigo + '": "..."'; }).join(', ');
+    return `Eres un experto en SEO de imágenes para webs de transporte premium. Analiza esta imagen del vehículo de categoría "${nombreCategoria}" y escribe un alt text para cada uno de estos idiomas: ${listaIdiomas}.
+
+Para cada idioma:
+- Escribe de forma completamente nativa, describe lo que se ve e incluye el nombre de la categoría
+- Máximo 125 caracteres
+
+Responde ÚNICAMENTE con JSON válido, sin markdown:
+{${codigos}}`;
+  });
+  if (resultado.error) return res.status(resultado.status || 500).json({ error: resultado.error });
+  res.json({ ok: true, generadas: resultado.generadas });
+}));
+
+// ─── Ayudas comunes de los alt texts de fotos (rutas y categorías), modelo común del 30/10/2026 ───
+// Vista de águila: rojo si algún idioma activo falta o cambió el español, azul si alguno está sin aprobar, verde si todos aprobados
+async function ponerEstadoAltFotos(tablaAlt, fotos) {
+  if (!fotos.length) return;
+  const idiomasAct = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE');
+  const alts = await pool.query(
+    `SELECT foto_id, lang_code, alt_texto, revisado, desactualizado FROM ${tablaAlt} WHERE foto_id = ANY($1::int[])`,
+    [fotos.map(function (f) { return f.id; })]
+  );
+  for (const foto of fotos) {
+    let estado = 'ok';
+    for (const i of idiomasAct.rows) {
+      const a = alts.rows.find(function (x) { return x.foto_id === foto.id && x.lang_code === i.codigo; });
+      if (!a || !a.alt_texto || !a.alt_texto.trim() || a.desactualizado) { estado = 'rojo'; break; }
+      if (!a.revisado) estado = 'ia';
+    }
+    foto.estado_alt = estado;
+  }
+}
+// Guardar = aprobar ese idioma. Si cambia el español, los demás idiomas con texto pasan a 🔴; devuelve cuántos.
+async function guardarAltFotoModelo(tablaAlt, fotoId, lang, altTexto) {
+  const nuevo = (altTexto || '').trim();
+  let conTraducciones = 0;
+  if (lang === 'es') {
+    const antes = await pool.query(`SELECT alt_texto FROM ${tablaAlt} WHERE foto_id = $1 AND lang_code = 'es'`, [fotoId]);
+    const textoAntes = antes.rows.length ? (antes.rows[0].alt_texto || '').trim() : '';
+    if (textoAntes && textoAntes !== nuevo) {
+      const r = await pool.query(
+        `UPDATE ${tablaAlt} SET desactualizado = TRUE
+         WHERE foto_id = $1 AND lang_code <> 'es' AND alt_texto IS NOT NULL AND TRIM(alt_texto) <> ''`,
+        [fotoId]
+      );
+      conTraducciones = r.rowCount;
+    }
+  }
+  await pool.query(
+    `INSERT INTO ${tablaAlt} (foto_id, lang_code, alt_texto, revisado, desactualizado) VALUES ($1, $2, $3, TRUE, FALSE)
+     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = TRUE, desactualizado = FALSE`,
+    [fotoId, lang, nuevo]
+  );
+  return conTraducciones;
+}
+// Genera con IA solo los idiomas activos sin texto o en 🔴 y los guarda en 🔵
+async function generarFaltaAltFotoModelo(tablaAlt, fotoId, imagen, hacerPrompt) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Falta ANTHROPIC_API_KEY.' };
+  if (!imagen || !imagen.startsWith('data:image/')) return { status: 400, error: 'Imagen no válida.' };
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return { status: 400, error: 'Formato no válido.' };
+  const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
+  const existentes = await pool.query(`SELECT lang_code, alt_texto, desactualizado FROM ${tablaAlt} WHERE foto_id = $1`, [fotoId]);
+  const pendientes = idiomas.rows.filter(function (i) {
+    const a = existentes.rows.find(function (x) { return x.lang_code === i.codigo; });
+    return !a || !a.alt_texto || !a.alt_texto.trim() || a.desactualizado;
+  });
+  if (pendientes.length === 0) return { generadas: 0 };
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: 800,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+        { type: 'text', text: hacerPrompt(pendientes) }
+      ]}]
+    })
+  });
+  if (!response.ok) return { error: 'Error IA: ' + (await response.text()).slice(0, 200) };
+  const data = await response.json();
+  const texto = data.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  const resultado = JSON.parse(texto);
+  let generadas = 0;
+  for (const i of pendientes) {
+    const alt = resultado[i.codigo];
+    if (!alt || !String(alt).trim()) continue;
+    await pool.query(
+      `INSERT INTO ${tablaAlt} (foto_id, lang_code, alt_texto, revisado, desactualizado) VALUES ($1, $2, $3, FALSE, FALSE)
+       ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = FALSE, desactualizado = FALSE`,
+      [fotoId, i.codigo, String(alt).trim()]
+    );
+    generadas++;
+  }
+  return { generadas: generadas };
+}
 
 // ─── ENDPOINTS DE FOTOS DE RUTAS ─────────────────────────────────────────────
 
@@ -7480,6 +7607,8 @@ app.get('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, res
     `SELECT id, alt_texto, nombre_archivo, orden, es_principal FROM rutas_fotos WHERE ruta_id = $1 ORDER BY orden`,
     [req.params.id]
   );
+  // (30/10/2026) Vista de águila: estado de los alt texts de cada foto (igual que en las fotos de destinos)
+  await ponerEstadoAltFotos('rutas_fotos_alt', result.rows);
   res.json({ fotos: result.rows });
 }));
 
@@ -7593,23 +7722,48 @@ app.post('/admin/seo/rutas/:id/fotos/:fotoId/orden', requireAdmin, asyncHandler(
 app.get('/admin/seo/rutas/:id/fotos/:fotoId/alt', requireAdmin, asyncHandler(async (req, res) => {
   const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
   const alts = await pool.query(
-    'SELECT lang_code, alt_texto FROM rutas_fotos_alt WHERE foto_id = $1',
+    'SELECT lang_code, alt_texto, revisado, desactualizado FROM rutas_fotos_alt WHERE foto_id = $1',
     [req.params.fotoId]
   );
   const mapa = {};
-  for (const a of alts.rows) mapa[a.lang_code] = a.alt_texto;
-  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa });
+  const estados = {}; // (30/10/2026) 'ok' 🟢 · 'ia' 🔵 · 'desactualizado' 🔴 · sin texto 🔴
+  for (const a of alts.rows) {
+    mapa[a.lang_code] = a.alt_texto;
+    if (a.alt_texto && a.alt_texto.trim()) estados[a.lang_code] = a.desactualizado ? 'desactualizado' : (a.revisado ? 'ok' : 'ia');
+  }
+  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa, estados: estados });
 }));
 
 // Guarda el alt text de una foto de ruta en un idioma concreto
 app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt/:lang', requireAdmin, asyncHandler(async (req, res) => {
-  const { alt_texto } = req.body;
-  await pool.query(
-    `INSERT INTO rutas_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
-     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
-    [req.params.fotoId, req.params.lang, alt_texto || '']
+  // (30/10/2026) «💾 Guardar» guarda y aprueba (🟢); si cambia el español, los demás idiomas pasan a 🔴 (igual que en destinos)
+  const conTraducciones = await guardarAltFotoModelo('rutas_fotos_alt', req.params.fotoId, req.params.lang, req.body.alt_texto);
+  res.json({ ok: true, conTraducciones: conTraducciones });
+}));
+
+// (30/10/2026) «💾 Guardar todo» y «✔ No afecta, mantenerlas»: aprueba tal cual todos los idiomas con texto de esa foto
+app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt-aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query(
+    `UPDATE rutas_fotos_alt SET revisado = TRUE, desactualizado = FALSE
+     WHERE foto_id = $1 AND alt_texto IS NOT NULL AND TRIM(alt_texto) <> ''`,
+    [req.params.fotoId]
   );
-  res.json({ ok: true });
+  res.json({ ok: true, aprobadas: r.rowCount });
+}));
+
+// (30/10/2026) «Generar lo que falta» de los alt texts de una foto de ruta: la IA mira la foto y escribe SOLO los idiomas
+// sin texto o en 🔴, con el mismo texto de IA que «Generar todos los idiomas» (GENERADOR_ALT_FOTO_RUTA_TODOS). Quedan en 🔵.
+app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt-generar-falta', requireAdmin, asyncHandler(async (req, res) => {
+  const ruta = await pool.query('SELECT origen, destino FROM rutas WHERE id = $1', [req.params.id]);
+  if (ruta.rows.length === 0) return res.status(404).json({ error: 'Ruta no encontrada.' });
+  const r = ruta.rows[0];
+  const resultado = await generarFaltaAltFotoModelo('rutas_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) {
+    const listaIdiomas = pendientes.map(function (i) { return i.codigo + ' (' + i.nombre + ')'; }).join(', ');
+    const codigos = pendientes.map(function (i) { return '"' + i.codigo + '": "..."'; }).join(', ');
+    return iaPrompts.GENERADOR_ALT_FOTO_RUTA_TODOS(r.origen, r.destino, listaIdiomas, codigos);
+  });
+  if (resultado.error) return res.status(resultado.status || 500).json({ error: resultado.error });
+  res.json({ ok: true, generadas: resultado.generadas });
 }));
 
 // ─── FIN ENDPOINTS FOTOS RUTAS ────────────────────────────────────────────────
