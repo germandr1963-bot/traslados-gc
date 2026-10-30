@@ -173,6 +173,7 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="modelo">🏢 Modelo de negocio</button>
       <button class="item-menu activo" data-seccion="fondos">Fondos de portada</button>
       <button class="item-menu" data-seccion="categorias">Categorías</button>
+      <button class="item-menu" data-seccion="islas">🏝️ Islas / Localidades</button>
       <button class="item-menu" data-seccion="conductores">Conductores</button>
       <button class="item-menu" data-seccion="destinos">Destino Inicial</button>
       <button class="item-menu" data-seccion="precios">Rutas y precios</button>
@@ -218,29 +219,24 @@ table.tabla-precios input {
       </div>
     </div>
 
+    <div id="seccion-islas" class="oculto">
+      <h1>🏝️ Islas / Localidades</h1>
+      <p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Cada isla o localidad tiene un slug que forma parte de las URLs públicas de las categorías de vehículo (ej: <code>/flota/gran-canaria/business-class</code>).</p>
+      <div class="tarjeta">
+        <div id="mensaje-islas" style="margin-bottom:10px;"></div>
+        <table class="tabla-admin">
+          <thead>
+            <tr><th>Nombre</th><th>Slug (URL)</th><th>Activa</th><th>Orden</th><th>Acción</th></tr>
+          </thead>
+          <tbody id="tabla-islas"></tbody>
+        </table>
+        <button class="boton-primario" style="margin-top:14px;" onclick="abrirNuevaIsla()">➕ Añadir isla</button>
+        <div id="editor-isla-casa"><div id="editor-isla" class="tarjeta oculto" style="margin-top:16px;max-width:480px;"></div></div>
+      </div>
+    </div>
+
     <div id="seccion-categorias" class="oculto">
       <h1>Categorías de vehículos</h1>
-
-      <!-- ─── BLOQUE ISLAS ─────────────────────────────────────────────────── -->
-      <div class="tarjeta" style="margin-bottom:20px;">
-        <div style="cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none;" onclick="toggleBloqueIslas()">
-          <span id="bloque-islas-icono" style="font-size:14px;">▶</span>
-          <h2 style="font-size:17px;margin:0;">🏝️ Islas / Localidades</h2>
-          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
-        </div>
-        <div id="bloque-islas-contenido" style="display:none;margin-top:16px;">
-          <p style="font-size:13px;color:var(--texto-muted);margin-bottom:14px;">Cada isla o localidad tiene un slug que forma parte de las URLs públicas de las categorías de vehículo (ej: <code>/flota/gran-canaria/business-class</code>).</p>
-          <div id="mensaje-islas" style="margin-bottom:10px;"></div>
-          <table class="tabla-admin">
-            <thead>
-              <tr><th>Nombre</th><th>Slug (URL)</th><th>Activa</th><th>Orden</th><th>Acción</th></tr>
-            </thead>
-            <tbody id="tabla-islas"></tbody>
-          </table>
-          <button class="boton-primario" style="margin-top:14px;" onclick="abrirNuevaIsla()">➕ Añadir isla</button>
-          <div id="editor-isla" class="tarjeta oculto" style="margin-top:16px;max-width:480px;"></div>
-        </div>
-      </div>
 
       <!-- ─── BLOQUE CATEGORÍAS ─────────────────────────────────────────────── -->
       <div class="tarjeta" style="margin-bottom:20px;">
@@ -2305,10 +2301,11 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
-    ['fondos', 'categorias', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo', 'valoraciones', 'comunicaciones', 'contabilidad', 'pagina-rutas'].forEach(function (s) {
+    ['fondos', 'categorias', 'islas', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo', 'valoraciones', 'comunicaciones', 'contabilidad', 'pagina-rutas'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
+    if (boton.dataset.seccion === 'islas') cargarIslas();
     if (boton.dataset.seccion === 'seo') cargarSEO();
     if (boton.dataset.seccion === 'idiomas') { cargarTextosInterfaz(); cargarComunicacionesCliente(); }
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
@@ -2429,31 +2426,73 @@ function cargarIslas() {
       window._islasCache = d.islas || [];
       var tbody = document.getElementById('tabla-islas');
       if (!tbody) return;
+      // (30/10) La ficha vuelve a su sitio antes de repintar la lista
+      var _ed = document.getElementById('editor-isla'); var _casa = document.getElementById('editor-isla-casa');
+      if (_ed && _casa && _ed.parentNode !== _casa) _casa.appendChild(_ed);
       if (!d.islas || d.islas.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="color:var(--texto-muted);font-size:13px;">Sin islas configuradas.</td></tr>';
         return;
       }
       tbody.innerHTML = d.islas.map(function(i) {
-        return '<tr>' +
-          '<td><strong>' + escapar(i.nombre) + '</strong></td>' +
+        var abierta = window._islaAbierta === i.id;
+        return '<tr id="fila-isla-' + i.id + '" style="cursor:pointer;" onclick="editarIsla(' + i.id + ')">' +
+          '<td><span id="icono-isla-' + i.id + '" style="font-size:12px;margin-right:6px;">' + (abierta ? '▼' : '▶') + '</span><strong>' + escapar(i.nombre) + '</strong></td>' +
           '<td><code style="font-size:12px;">' + escapar(i.slug) + '</code></td>' +
           '<td><span class="insignia ' + (i.activa ? 'insignia-ok' : 'insignia-no') + '">' + (i.activa ? 'ACTIVA' : 'inactiva') + '</span></td>' +
           '<td>' + i.orden + '</td>' +
           '<td>' +
-            '<button class="boton-costa" style="padding:5px 10px;font-size:0.8rem;" onclick="editarIsla(' + i.id + ')">✏️ Editar</button>' +
+            '<button class="boton-costa" style="padding:5px 10px;font-size:0.8rem;" onclick="event.stopPropagation();editarIsla(' + i.id + ')">✏️ Editar</button>' +
           '</td>' +
         '</tr>';
       }).join('');
+      // (30/10) Si había una isla abierta, su ficha sigue abierta debajo de ella
+      if (window._islaAbierta) colocarEditorIsla(window._islaAbierta);
     });
 }
 
+// (30/10) Cada isla se abre y se cierra al tocarla; su ficha sale justo debajo
+function colocarEditorIsla(id) {
+  var fila = document.getElementById('fila-isla-' + id);
+  var ed = document.getElementById('editor-isla');
+  if (!fila || !ed) return;
+  var tr = document.createElement('tr');
+  tr.id = 'fila-editor-isla';
+  var td = document.createElement('td');
+  td.colSpan = 5;
+  tr.appendChild(td);
+  fila.parentNode.insertBefore(tr, fila.nextSibling);
+  td.appendChild(ed);
+}
+
+function cerrarEditorIsla() {
+  var ed = document.getElementById('editor-isla');
+  var casa = document.getElementById('editor-isla-casa');
+  if (ed) ed.classList.add('oculto');
+  if (ed && casa && ed.parentNode !== casa) casa.appendChild(ed);
+  var vieja = document.getElementById('fila-editor-isla');
+  if (vieja) vieja.parentNode.removeChild(vieja);
+  if (window._islaAbierta) {
+    var ic = document.getElementById('icono-isla-' + window._islaAbierta);
+    if (ic) ic.textContent = '▶';
+  }
+  window._islaAbierta = null;
+}
+
 function abrirNuevaIsla() {
+  cerrarEditorIsla();
   renderizarEditorIsla(null);
 }
 
 function editarIsla(id) {
   var isla = (window._islasCache || []).find(function(i) { return i.id === id; });
   if (!isla) return;
+  var yaAbierta = window._islaAbierta === id;
+  cerrarEditorIsla();
+  if (yaAbierta) return;
+  window._islaAbierta = id;
+  var ic = document.getElementById('icono-isla-' + id);
+  if (ic) ic.textContent = '▼';
+  colocarEditorIsla(id);
   renderizarEditorIsla(isla);
 }
 
@@ -2473,7 +2512,7 @@ function renderizarEditorIsla(isla) {
     '<input class="campo" id="isla-orden" type="number" min="1" max="99" value="' + (isla ? isla.orden : 1) + '" style="margin-bottom:14px;width:80px;">' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">' +
       '<button class="boton-primario" onclick="guardarIsla(' + (isla ? isla.id : 'null') + ')">💾 Guardar</button>' +
-      '<button class="boton-secundario" onclick="document.getElementById(\'editor-isla\').classList.add(\'oculto\')">Cancelar</button>' +
+      '<button class="boton-secundario" onclick="cerrarEditorIsla()">Cancelar</button>' +
     '</div>' +
     '<div id="msg-isla" style="margin-bottom:8px;font-size:13px;"></div>';
 
