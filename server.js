@@ -8353,6 +8353,17 @@ app.post('/admin/categorias/:id/aprobar-fichas', requireAdmin, asyncHandler(asyn
   res.json({ ok: true, aprobadas: r.rowCount });
 }));
 
+// (30/10/2026) «✅ Aprobar todo» de Idiomas → «Página de flota — categorías»: aprueba (🟢) las fichas en 🔵
+// de todas las categorías y todos los idiomas. Los 🔴 (español cambiado o sin traducir) no se tocan.
+app.post('/admin/categorias/aprobar-azules', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query(
+    `UPDATE categorias_vehiculos_traducciones SET ficha_revisado = TRUE
+     WHERE ficha_revisado = FALSE AND COALESCE(ficha_desactualizado, FALSE) = FALSE
+       AND descripcion IS NOT NULL AND descripcion <> ''`
+  );
+  res.json({ ok: true, aprobadas: r.rowCount });
+}));
+
 // Lista todos los textos con su estado de traducción por idioma (para las
 // insignias de colores: verde traducido, rojo falta)
 // ─── Gestión de idiomas de la web ────────────────────────────────────────────
@@ -8824,6 +8835,17 @@ app.post('/admin/textos/:id/idioma/:lang/aprobar', requireAdmin, asyncHandler(as
 app.post('/admin/textos/:id/aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('UPDATE textos_interfaz_traducciones SET desactualizado = FALSE, revisado = TRUE WHERE texto_id = $1', [req.params.id]);
   res.json({ ok: true });
+}));
+
+// (30/10/2026) «✅ Aprobar todo» de Idiomas → Textos de interfaz: aprueba (🟢) todo lo que está en 🔵
+// (traducido, sin aprobar) en todos los idiomas. Los 🔴 (español cambiado o sin traducir) no se tocan.
+app.post('/admin/textos/aprobar-azules', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query(
+    `UPDATE textos_interfaz_traducciones SET revisado = TRUE
+     WHERE revisado = FALSE AND COALESCE(desactualizado, FALSE) = FALSE
+       AND texto IS NOT NULL AND TRIM(texto) <> ''`
+  );
+  res.json({ ok: true, aprobadas: r.rowCount });
 }));
 
 // Traduce con IA (Claude) todos los textos que falten en un idioma — no
@@ -11281,6 +11303,17 @@ app.post('/admin/destinos/:id/traducciones/aprobar-todas', requireAdmin, asyncHa
     [req.params.id]
   );
   res.json({ ok: true });
+}));
+
+// (30/10/2026) «✅ Aprobar todo» de Destinos → Traducciones de destinos: aprueba (🟢) los nombres en 🔵
+// de todos los destinos y todos los idiomas. Los 🔴 (español cambiado o sin traducir) no se tocan.
+app.post('/admin/destinos/traducciones/aprobar-azules', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query(
+    `UPDATE destinos_traducciones SET revisado = TRUE
+     WHERE revisado = FALSE AND COALESCE(desactualizado, FALSE) = FALSE
+       AND nombre IS NOT NULL AND TRIM(nombre) <> ''`
+  );
+  res.json({ ok: true, aprobadas: r.rowCount });
 }));
 
 // ─── Admin: reservas ─────────────────────────────────────────────────────────
