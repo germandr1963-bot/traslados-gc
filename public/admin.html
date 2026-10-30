@@ -11906,7 +11906,7 @@ function cargarFotosDestino(destinoId) {
               '<span id="msg-orden-' + f.id + '" style="font-size:10px;"></span>')
           ) +
           '</div>' +
-          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;margin-bottom:4px;" onclick="abrirAltTextosFoto(' + destinoId + ',' + f.id + ',\'' + (esPrincipal ? 'Cabecera' : 'Foto ' + f.orden) + '\')">&#9998; Alt texts por idioma</button>' +
+          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;margin-bottom:4px;" onclick="abrirAltTextosFoto(' + destinoId + ',' + f.id + ',\'' + (esPrincipal ? 'Cabecera' : 'Foto ' + f.orden) + '\')">&#9998; Alt texts por idioma ' + checkEstadoAltFoto(f.estado_alt) + '</button>' +
           '<button style="width:100%;font-size:10px;padding:3px 6px;border:1px solid ' + (esPrincipal ? 'var(--terracota)' : 'var(--gris-borde)') + ';border-radius:6px;cursor:pointer;background:' + (esPrincipal ? '#fff5f2' : 'var(--gris-fondo)') + ';color:' + (esPrincipal ? 'var(--terracota)' : 'var(--texto-muted)') + ';" ' +
           'onclick="marcarCabeceraFoto(' + destinoId + ',' + f.id + ')">' + (esPrincipal ? '&#11088; Cabecera actual' : 'Marcar como cabecera') + '</button>' +
           '</div>' +
@@ -12073,30 +12073,67 @@ function abrirAltTextosFoto(destinoId, fotoId, etiqueta) {
     .then(function(d) { renderizarAltTextosFoto(destinoId, fotoId, d, panel, etiqueta); });
 }
 
+// (30/10/2026) Modelo común: ✓ de la vista de águila y pestañas 🟢 / 🔵 / 🔴
+function checkEstadoAltFoto(e) {
+  if (e === 'ok') return '<span style="color:#2e7d32;font-weight:600;" title="Aprobada">✓</span>';
+  if (e === 'ia') return '<span style="color:#1565c0;font-weight:600;" title="Traducido, sin aprobar">✓</span>';
+  return '<span style="color:#c0392b;font-weight:600;" title="Falta algo">✓</span>';
+}
+function clasePestanaAltFoto(e) {
+  return e === 'ok' ? 'tab-idioma-verde' : (e === 'ia' ? 'tab-idioma-azul' : 'tab-idioma-rojo');
+}
+function textoPestanaAltFoto(lang, e) {
+  return lang.toUpperCase() + ((e === 'ok' || e === 'ia') ? '' : ' ⚠️');
+}
+function pintarPestanasAltFoto(fotoId) {
+  var panel = document.getElementById('panel-alt-foto-' + fotoId);
+  if (!panel || !panel._altData) return;
+  var estados = panel._altData.estados || {};
+  (panel._altData.idiomas || []).forEach(function(i) {
+    var b = document.getElementById('tab-alt-foto-' + fotoId + '-' + i.codigo);
+    if (!b) return;
+    b.classList.remove('tab-idioma-verde', 'tab-idioma-azul', 'tab-idioma-rojo');
+    b.classList.add(clasePestanaAltFoto(estados[i.codigo]));
+    b.textContent = textoPestanaAltFoto(i.codigo, estados[i.codigo]);
+  });
+}
+// Vuelve a leer los alt texts de la foto: repinta pestañas (sin cerrar), el campo del idioma abierto y la lista de fotos
+function recargarAltTextosFoto(destinoId, fotoId) {
+  return fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/alt')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var panel = document.getElementById('panel-alt-foto-' + fotoId);
+      if (!panel) return;
+      panel._altData = d;
+      pintarPestanasAltFoto(fotoId);
+      var activa = panel.querySelector('.tab-idioma.activo');
+      if (activa) cambiarTabAltFoto(fotoId, activa.dataset.lang, activa, d);
+      cargarFotosDestino(destinoId);
+    });
+}
+
 function renderizarAltTextosFoto(destinoId, fotoId, d, panel, etiqueta) {
   var idiomas = d.idiomas || [];
-  var alts = d.alts || {};
+  var estados = d.estados || {};
   var tabs = idiomas.map(function(i, idx) {
-    var tieneTexto = !!(alts[i.codigo] && alts[i.codigo].trim());
-    var estiloTab = tieneTexto
-      ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
-      : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
-    var icono = tieneTexto ? ' ✓' : ' ⚠️';
-    return '<button class="tab-idioma' + (idx === 0 ? ' activo' : '') + '" ' +
+    return '<button class="tab-idioma ' + clasePestanaAltFoto(estados[i.codigo]) + (idx === 0 ? ' activo' : '') + '" ' +
       'id="tab-alt-foto-' + fotoId + '-' + i.codigo + '" ' +
-      'style="' + estiloTab + '" ' +
       'data-fotoid="' + fotoId + '" data-lang="' + i.codigo + '" ' +
       'onclick="cambiarTabAltFotoBtn(this)">' +
-      i.codigo.toUpperCase() + icono + '</button>';
+      textoPestanaAltFoto(i.codigo, estados[i.codigo]) + '</button>';
   }).join('');
   panel.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+    '<div style="margin-bottom:10px;">' +
     '<strong style="font-size:12px;">Alt texts por idioma — ' + (etiqueta || 'foto #' + fotoId) + '</strong>' +
-    '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" data-panelid="panel-alt-foto-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">&#10005; Cerrar</button>' +
+    '</div>' +
+    '<div style="margin-bottom:12px;">' +
+    '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" onclick="generarFaltaAltFotoBtn(this)">Generar lo que falta</button>' +
+    '<span id="alt-foto-ia-msg-' + fotoId + '" style="font-size:12px;color:var(--texto-muted);margin-left:10px;"></span>' +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="alt-foto-campos-' + fotoId + '"></div>' +
-    '<div id="alt-foto-msg-' + fotoId + '" style="margin-top:8px;font-size:12px;"></div>';
+    '<div id="alt-foto-msg-' + fotoId + '" style="margin-top:8px;font-size:12px;"></div>' +
+    '<button class="boton-secundario" style="margin-top:10px;font-size:0.78rem;padding:5px 12px;" data-panelid="panel-alt-foto-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">Cerrar</button>';
   panel._altData = d;
   panel._destinoId = destinoId;
   if (idiomas.length > 0) cambiarTabAltFoto(fotoId, idiomas[0].codigo, panel.querySelector('.tab-idioma'), d);
@@ -12143,8 +12180,8 @@ function cambiarTabAltFoto(fotoId, lang, boton, dataOverride) {
     'style="margin-bottom:4px;">' +
     '<div id="cnt-alt-foto-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:var(--texto-muted);">' + n + '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-    '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="sugerirAltFotoIABtn(this)">&#10024; Sugerir con IA</button>' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoBtn(this)">&#128190; Guardar</button>' +
+    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarTodoAltFotoBtn(this)">&#128190; Guardar todo</button>' +
     '</div>';
 }
 
@@ -12182,32 +12219,88 @@ function sugerirAltFotoIA(destinoId, fotoId, lang) {
     });
 }
 
-function guardarAltFoto(destinoId, fotoId, lang) {
+function guardarAltFoto(destinoId, fotoId, lang, despues) {
   var input = document.getElementById('alt-foto-input-' + fotoId);
   var altTexto = input ? input.value.trim() : '';
   var msg = document.getElementById('alt-foto-msg-' + fotoId);
-  fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/alt/' + lang, {
+  return fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/alt/' + lang, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ alt_texto: altTexto })
   }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.ok) {
-      var panel = document.getElementById('panel-alt-foto-' + fotoId);
-      if (panel && panel._altData) panel._altData.alts[lang] = altTexto;
-      var tab = document.getElementById('tab-alt-foto-' + fotoId + '-' + lang);
-      if (tab) {
-        if (altTexto) {
-          tab.textContent = lang.toUpperCase() + ' ✓';
-          tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
-        } else {
-          tab.textContent = lang.toUpperCase() + ' ⚠️';
-          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
-        }
-      }
-      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado'; setTimeout(function() { if (msg) msg.textContent = ''; }, 2000); }
-    } else {
+    if (!d.ok) {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
+      return;
     }
+    if (despues) return despues();
+    if (lang === 'es' && d.conTraducciones > 0) {
+      // (30/10/2026) Recuadro «¿Este cambio afecta a las traducciones?», igual que en las demás pantallas
+      if (msg) msg.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
+        '✅ Español guardado. <strong>¿Este cambio afecta a las traducciones?</strong><br>' +
+        '<button class="boton-secundario" style="margin-top:8px;margin-right:8px;" onclick="document.getElementById(\'alt-foto-msg-' + fotoId + '\').innerHTML = \'\'">⚠️ Sí, revisar traducciones</button>' +
+        '<button class="boton-primario" style="margin-top:8px;" onclick="noAfectaAltFoto(' + destinoId + ',' + fotoId + ')">✔ No afecta, mantenerlas</button>' +
+        '</div>';
+    } else if (msg) {
+      msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado';
+      setTimeout(function() { if (msg && msg.textContent === '✓ Guardado') msg.textContent = ''; }, 2000);
+    }
+    recargarAltTextosFoto(destinoId, fotoId);
   });
+}
+
+// «💾 Guardar todo»: guarda la pestaña abierta y aprueba tal cual todos los idiomas con texto de esta foto
+function guardarTodoAltFotoBtn(boton) {
+  var destinoId = parseInt(boton.dataset.destinoid);
+  var fotoId = parseInt(boton.dataset.fotoid);
+  var lang = boton.dataset.lang;
+  guardarAltFoto(destinoId, fotoId, lang, function() { return aprobarTodasAltFoto(destinoId, fotoId); });
+}
+
+function noAfectaAltFoto(destinoId, fotoId) {
+  aprobarTodasAltFoto(destinoId, fotoId);
+}
+
+function aprobarTodasAltFoto(destinoId, fotoId) {
+  var msg = document.getElementById('alt-foto-msg-' + fotoId);
+  return fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/alt-aprobar-todas', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (msg) {
+        if (d.ok) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado y aprobado'; }
+        else { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al aprobar.'; }
+      }
+      recargarAltTextosFoto(destinoId, fotoId);
+    });
+}
+
+// «Generar lo que falta»: la IA mira la foto y escribe solo los idiomas sin texto o en 🔴; quedan guardados en 🔵
+function generarFaltaAltFotoBtn(boton) {
+  var destinoId = parseInt(boton.dataset.destinoid);
+  var fotoId = parseInt(boton.dataset.fotoid);
+  var msg = document.getElementById('alt-foto-ia-msg-' + fotoId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = '🤖 Generando con IA, puede tardar unos segundos...'; }
+  fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/imagen-base64')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) throw new Error(d.error || 'No se pudo leer la foto.');
+      return fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/alt-generar-falta', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imagen: d.imagen })
+      });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) throw new Error(d.error || 'Error al generar.');
+      if (msg) {
+        msg.style.color = 'var(--verde-ok)';
+        msg.textContent = d.generadas > 0
+          ? '✅ ' + d.generadas + ' idioma(s) generado(s). Están en azul: revísalos y pulsa «💾 Guardar» o «💾 Guardar todo».'
+          : '✅ Ya estaba todo escrito.';
+      }
+      recargarAltTextosFoto(destinoId, fotoId);
+    })
+    .catch(function(e) {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = e.message || 'Error de conexión.'; }
+    });
 }
 
 function previsualizarFotoDestino(destinoId, input) {
