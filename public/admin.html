@@ -12303,6 +12303,108 @@ function generarFaltaAltFotoBtn(boton) {
     });
 }
 
+// ─── (30/10/2026) Alt texts de fotos de RUTAS y CATEGORÍAS con el modelo común (igual que las fotos de destinos) ───
+var ALT_GEN = {
+  ruta: { base: function(p) { return '/admin/seo/rutas/' + p; }, pre: 'alt-foto-ruta-', panel: 'panel-alt-foto-ruta-', tab: 'tab-alt-foto-ruta-',
+          cambiarTab: function(f, l, b, d) { cambiarTabAltFotoRuta(f, l, b, d); }, recargarLista: function(p) { cargarFotosRuta(p); } },
+  cat:  { base: function(p) { return '/admin/categorias/' + p; }, pre: 'alt-foto-cat-', panel: 'panel-alt-foto-cat-', tab: 'tab-alt-foto-cat-',
+          cambiarTab: function(f, l, b, d) { cambiarTabAltFotoCat(f, l, b, d); }, recargarLista: function(p) { cargarFotosCat(p); } }
+};
+function recargarAltGen(tipo, padreId, fotoId) {
+  var c = ALT_GEN[tipo];
+  return fetch(c.base(padreId) + '/fotos/' + fotoId + '/alt')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var panel = document.getElementById(c.panel + fotoId);
+      if (!panel) return;
+      panel._altData = d;
+      var estados = d.estados || {};
+      (d.idiomas || []).forEach(function(i) {
+        var b = document.getElementById(c.tab + fotoId + '-' + i.codigo);
+        if (!b) return;
+        b.classList.remove('tab-idioma-verde', 'tab-idioma-azul', 'tab-idioma-rojo');
+        b.classList.add(clasePestanaAltFoto(estados[i.codigo]));
+        b.textContent = textoPestanaAltFoto(i.codigo, estados[i.codigo]);
+      });
+      var activa = panel.querySelector('.tab-idioma.activo');
+      if (activa) c.cambiarTab(fotoId, activa.dataset.lang, activa, d);
+      c.recargarLista(padreId);
+    });
+}
+function guardarAltGen(tipo, padreId, fotoId, lang, despues) {
+  var c = ALT_GEN[tipo];
+  var input = document.getElementById(c.pre + 'input-' + fotoId);
+  var altTexto = input ? input.value.trim() : '';
+  var msg = document.getElementById(c.pre + 'msg-' + fotoId);
+  return fetch(c.base(padreId) + '/fotos/' + fotoId + '/alt/' + lang, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alt_texto: altTexto })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.ok) {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
+      return;
+    }
+    if (despues) return despues();
+    if (lang === 'es' && d.conTraducciones > 0) {
+      if (msg) msg.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
+        '✅ Español guardado. <strong>¿Este cambio afecta a las traducciones?</strong><br>' +
+        '<button class="boton-secundario" style="margin-top:8px;margin-right:8px;" onclick="document.getElementById(\'' + c.pre + 'msg-' + fotoId + '\').innerHTML = \'\'">⚠️ Sí, revisar traducciones</button>' +
+        '<button class="boton-primario" style="margin-top:8px;" onclick="aprobarTodasAltGen(\'' + tipo + '\',' + padreId + ',' + fotoId + ')">✔ No afecta, mantenerlas</button>' +
+        '</div>';
+    } else if (msg) {
+      msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado';
+      setTimeout(function() { if (msg && msg.textContent === '✓ Guardado') msg.textContent = ''; }, 2000);
+    }
+    recargarAltGen(tipo, padreId, fotoId);
+  });
+}
+function guardarTodoAltGenBtn(boton) {
+  var tipo = boton.dataset.tipo, padreId = parseInt(boton.dataset.padreid), fotoId = parseInt(boton.dataset.fotoid);
+  guardarAltGen(tipo, padreId, fotoId, boton.dataset.lang, function() { return aprobarTodasAltGen(tipo, padreId, fotoId); });
+}
+function aprobarTodasAltGen(tipo, padreId, fotoId) {
+  var c = ALT_GEN[tipo];
+  var msg = document.getElementById(c.pre + 'msg-' + fotoId);
+  return fetch(c.base(padreId) + '/fotos/' + fotoId + '/alt-aprobar-todas', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (msg) {
+        if (d.ok) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado y aprobado'; }
+        else { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al aprobar.'; }
+      }
+      recargarAltGen(tipo, padreId, fotoId);
+    });
+}
+function generarFaltaAltGenBtn(boton) {
+  var tipo = boton.dataset.tipo, padreId = parseInt(boton.dataset.padreid), fotoId = parseInt(boton.dataset.fotoid);
+  var c = ALT_GEN[tipo];
+  var msg = document.getElementById(c.pre + 'ia-msg-' + fotoId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = '🤖 Generando con IA, puede tardar unos segundos...'; }
+  fetch(c.base(padreId) + '/fotos/' + fotoId + '/imagen-base64')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) throw new Error(d.error || 'No se pudo leer la foto.');
+      return fetch(c.base(padreId) + '/fotos/' + fotoId + '/alt-generar-falta', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imagen: d.imagen })
+      });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) throw new Error(d.error || 'Error al generar.');
+      if (msg) {
+        msg.style.color = 'var(--verde-ok)';
+        msg.textContent = d.generadas > 0
+          ? '✅ ' + d.generadas + ' idioma(s) generado(s). Están en azul: revísalos y pulsa «💾 Guardar» o «💾 Guardar todo».'
+          : '✅ Ya estaba todo escrito.';
+      }
+      recargarAltGen(tipo, padreId, fotoId);
+    })
+    .catch(function(e) {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = e.message || 'Error de conexión.'; }
+    });
+}
+
 function previsualizarFotoDestino(destinoId, input) {
   var file = input.files[0];
   if (!file) return;
@@ -12934,7 +13036,7 @@ function cargarFotosRuta(rutaId) {
               '<span id="msg-orden-ruta-' + f.id + '" style="font-size:10px;"></span>')
           ) +
           '</div>' +
-          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;margin-bottom:4px;" onclick="abrirAltTextosFotoRuta(' + rutaId + ',' + f.id + ',\'' + (esPrincipal ? 'Cabecera' : 'Foto ' + f.orden) + '\')">✎ Alt texts por idioma</button>' +
+          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;margin-bottom:4px;" onclick="abrirAltTextosFotoRuta(' + rutaId + ',' + f.id + ',\'' + (esPrincipal ? 'Cabecera' : 'Foto ' + f.orden) + '\')">✎ Alt texts por idioma ' + checkEstadoAltFoto(f.estado_alt) + '</button>' +
           '<button style="width:100%;font-size:10px;padding:3px 6px;border:1px solid ' + (esPrincipal ? 'var(--terracota)' : 'var(--gris-borde)') + ';border-radius:6px;cursor:pointer;background:' + (esPrincipal ? '#fff5f2' : 'var(--gris-fondo)') + ';color:' + (esPrincipal ? 'var(--terracota)' : 'var(--texto-muted)') + ';" ' +
           'onclick="marcarCabeceraFotoRuta(' + rutaId + ',' + f.id + ')">' + (esPrincipal ? '⭐ Cabecera actual' : 'Marcar como cabecera') + '</button>' +
           '</div>' +
@@ -13003,29 +13105,29 @@ function abrirAltTextosFotoRuta(rutaId, fotoId, etiqueta) {
 }
 
 function renderizarAltTextosFotoRuta(rutaId, fotoId, d, panel, etiqueta) {
+  var padreId = rutaId;
   var idiomas = d.idiomas || [];
-  var alts = d.alts || {};
+  var estados = d.estados || {};
+  // (30/10/2026) Modelo común: pestañas 🟢 / 🔵 / 🔴, «Generar lo que falta» arriba y «Cerrar» abajo (igual que en las fotos de destinos)
   var tabs = idiomas.map(function(i, idx) {
-    var tieneTexto = !!(alts[i.codigo] && alts[i.codigo].trim());
-    var estiloTab = tieneTexto
-      ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
-      : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
-    var icono = tieneTexto ? ' ✓' : ' ⚠️';
-    return '<button class="tab-idioma' + (idx === 0 ? ' activo' : '') + '" ' +
+    return '<button class="tab-idioma ' + clasePestanaAltFoto(estados[i.codigo]) + (idx === 0 ? ' activo' : '') + '" ' +
       'id="tab-alt-foto-ruta-' + fotoId + '-' + i.codigo + '" ' +
-      'style="' + estiloTab + '" ' +
       'data-fotoid="' + fotoId + '" data-lang="' + i.codigo + '" data-rutaid="' + rutaId + '" ' +
       'onclick="cambiarTabAltFotoRutaBtn(this)">' +
-      i.codigo.toUpperCase() + icono + '</button>';
+      textoPestanaAltFoto(i.codigo, estados[i.codigo]) + '</button>';
   }).join('');
   panel.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+    '<div style="margin-bottom:10px;">' +
     '<strong style="font-size:12px;">Alt texts por idioma — ' + (etiqueta || 'foto #' + fotoId) + '</strong>' +
-    '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" data-panelid="panel-alt-foto-ruta-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">✕ Cerrar</button>' +
+    '</div>' +
+    '<div style="margin-bottom:12px;">' +
+    '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" data-tipo="ruta" data-padreid="' + padreId + '" data-fotoid="' + fotoId + '" onclick="generarFaltaAltGenBtn(this)">Generar lo que falta</button>' +
+    '<span id="alt-foto-ruta-ia-msg-' + fotoId + '" style="font-size:12px;color:var(--texto-muted);margin-left:10px;"></span>' +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="alt-foto-ruta-campos-' + fotoId + '"></div>' +
-    '<div id="alt-foto-ruta-msg-' + fotoId + '" style="margin-top:8px;font-size:12px;"></div>';
+    '<div id="alt-foto-ruta-msg-' + fotoId + '" style="margin-top:8px;font-size:12px;"></div>' +
+    '<button class="boton-secundario" style="margin-top:10px;font-size:0.78rem;padding:5px 12px;" data-panelid="panel-alt-foto-ruta-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">Cerrar</button>';
   panel._altData = d;
   panel._rutaId = rutaId;
   if (idiomas.length > 0) cambiarTabAltFotoRuta(fotoId, idiomas[0].codigo, panel.querySelector('.tab-idioma'), d);
@@ -13057,8 +13159,8 @@ function cambiarTabAltFotoRuta(fotoId, lang, boton, dataOverride) {
     'style="margin-bottom:4px;">' +
     '<div id="cnt-alt-foto-ruta-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:var(--texto-muted);">' + n + '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-    '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" data-rutaid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="sugerirAltFotoRutaIABtn(this)">&#10024; Sugerir con IA</button>' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-rutaid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoRutaBtn(this)">&#128190; Guardar</button>' +
+    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-tipo="ruta" data-padreid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarTodoAltGenBtn(this)">&#128190; Guardar todo</button>' +
     '</div>';
 }
 
@@ -13112,34 +13214,8 @@ function sugerirAltFotoRutaIA(rutaId, fotoId, lang) {
 }
 
 function guardarAltFotoRutaBtn(boton) {
-  var rutaId = parseInt(boton.dataset.rutaid);
-  var fotoId = parseInt(boton.dataset.fotoid);
-  var lang = boton.dataset.lang;
-  var input = document.getElementById('alt-foto-ruta-input-' + fotoId);
-  var altTexto = input ? input.value.trim() : '';
-  var msg = document.getElementById('alt-foto-ruta-msg-' + fotoId);
-  fetch('/admin/seo/rutas/' + rutaId + '/fotos/' + fotoId + '/alt/' + lang, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ alt_texto: altTexto })
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.ok) {
-      var panel = document.getElementById('panel-alt-foto-ruta-' + fotoId);
-      if (panel && panel._altData) panel._altData.alts[lang] = altTexto;
-      var tab = document.getElementById('tab-alt-foto-ruta-' + fotoId + '-' + lang);
-      if (tab) {
-        if (altTexto) {
-          tab.textContent = lang.toUpperCase() + ' ✓';
-          tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
-        } else {
-          tab.textContent = lang.toUpperCase() + ' ⚠️';
-          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
-        }
-      }
-      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado'; setTimeout(function() { if (msg) msg.textContent = ''; }, 2000); }
-    } else {
-      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
-    }
-  });
+  // (30/10/2026) Modelo común: guarda y aprueba; si cambia el español, recuadro rojo
+  guardarAltGen('ruta', parseInt(boton.dataset.rutaid), parseInt(boton.dataset.fotoid), boton.dataset.lang);
 }
 
 // ─── FUNCIONES AUXILIARES PARA RUTAS ──────────────────────────────────────────
@@ -13708,7 +13784,7 @@ function cargarFotosCat(catId) {
           'style="font-size:10px;padding:2px 6px;border:1px solid var(--gris-borde);border-radius:4px;cursor:pointer;background:var(--gris-fondo);">OK</button>' +
           '<span id="msg-orden-cat-' + f.id + '" style="font-size:10px;"></span>' +
           '</div>' +
-          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;" onclick="abrirAltTextosFotoCat(' + catId + ',' + f.id + ')">&#9998; Alt texts por idioma</button>' +
+          '<button class="boton-secundario" style="width:100%;font-size:10px;padding:3px 6px;" onclick="abrirAltTextosFotoCat(' + catId + ',' + f.id + ')">&#9998; Alt texts por idioma ' + checkEstadoAltFoto(f.estado_alt) + '</button>' +
           '</div></div>';
       }).join('');
     });
@@ -13754,29 +13830,29 @@ function abrirAltTextosFotoCat(catId, fotoId) {
 }
 
 function renderizarAltTextosFotoCat(catId, fotoId, d, panel) {
+  var padreId = catId;
   var idiomas = d.idiomas || [];
-  var alts = d.alts || {};
+  var estados = d.estados || {};
+  // (30/10/2026) Modelo común: pestañas 🟢 / 🔵 / 🔴, «Generar lo que falta» arriba y «Cerrar» abajo (igual que en las fotos de destinos)
   var tabs = idiomas.map(function(i, idx) {
-    var tieneTexto = !!(alts[i.codigo] && alts[i.codigo].trim());
-    var estiloTab = tieneTexto
-      ? 'background:#e8f5e9;color:#2e7d32;border-color:#81c784;'
-      : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
-    var icono = tieneTexto ? ' ✓' : ' ⚠️';
-    return '<button class="tab-idioma' + (idx === 0 ? ' activo' : '') + '" ' +
+    return '<button class="tab-idioma ' + clasePestanaAltFoto(estados[i.codigo]) + (idx === 0 ? ' activo' : '') + '" ' +
       'id="tab-alt-foto-cat-' + fotoId + '-' + i.codigo + '" ' +
-      'style="' + estiloTab + '" ' +
       'data-catid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + i.codigo + '" ' +
       'onclick="cambiarTabAltFotoCatBtn(this)">' +
-      i.codigo.toUpperCase() + icono + '</button>';
+      textoPestanaAltFoto(i.codigo, estados[i.codigo]) + '</button>';
   }).join('');
   panel.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-    '<strong style="font-size:12px;">Alt texts por idioma — foto #' + fotoId + '</strong>' +
-    '<button class="boton-secundario" style="font-size:11px;padding:3px 8px;" data-panelid="panel-alt-foto-cat-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">&#10005; Cerrar</button>' +
+    '<div style="margin-bottom:10px;">' +
+    '<strong style="font-size:12px;">Alt texts por idioma — ' + 'foto #' + fotoId + '</strong>' +
+    '</div>' +
+    '<div style="margin-bottom:12px;">' +
+    '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" data-tipo="cat" data-padreid="' + padreId + '" data-fotoid="' + fotoId + '" onclick="generarFaltaAltGenBtn(this)">Generar lo que falta</button>' +
+    '<span id="alt-foto-cat-ia-msg-' + fotoId + '" style="font-size:12px;color:var(--texto-muted);margin-left:10px;"></span>' +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="alt-foto-cat-campos-' + fotoId + '"></div>' +
-    '<div id="alt-foto-cat-msg-' + fotoId + '" style="margin-top:8px;font-size:12px;"></div>';
+    '<div id="alt-foto-cat-msg-' + fotoId + '" style="margin-top:8px;font-size:12px;"></div>' +
+    '<button class="boton-secundario" style="margin-top:10px;font-size:0.78rem;padding:5px 12px;" data-panelid="panel-alt-foto-cat-' + fotoId + '" onclick="var el=document.getElementById(this.dataset.panelid);if(el)el.remove()">Cerrar</button>';
   panel._altData = d;
   panel._catId = catId;
   if (idiomas.length > 0) cambiarTabAltFotoCat(fotoId, idiomas[0].codigo, panel.querySelector('.tab-idioma'), d);
@@ -13805,8 +13881,8 @@ function cambiarTabAltFotoCat(fotoId, lang, boton, dataOverride) {
     'oninput="actualizarContadorAltFotoCat(this,' + fotoId + ')" style="margin-bottom:4px;">' +
     '<div id="cnt-alt-foto-cat-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:' + colorCont + ';">' + n + ' / 125</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-    '<button class="boton-costa" style="font-size:0.78rem;padding:5px 12px;" data-catid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="sugerirAltFotoCatIABtn(this)">&#10024; Sugerir con IA</button>' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-catid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoCatBtn(this)">&#128190; Guardar</button>' +
+    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-tipo="cat" data-padreid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarTodoAltGenBtn(this)">&#128190; Guardar todo</button>' +
     '</div>';
 }
 
@@ -13851,34 +13927,8 @@ function sugerirAltFotoCatIABtn(boton) {
 }
 
 function guardarAltFotoCatBtn(boton) {
-  var catId = parseInt(boton.dataset.catid);
-  var fotoId = parseInt(boton.dataset.fotoid);
-  var lang = boton.dataset.lang;
-  var input = document.getElementById('alt-foto-cat-input-' + fotoId);
-  var altTexto = input ? input.value.trim() : '';
-  var msg = document.getElementById('alt-foto-cat-msg-' + fotoId);
-  fetch('/admin/categorias/' + catId + '/fotos/' + fotoId + '/alt/' + lang, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ alt_texto: altTexto })
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.ok) {
-      var panel = document.getElementById('panel-alt-foto-cat-' + fotoId);
-      if (panel && panel._altData) panel._altData.alts[lang] = altTexto;
-      var tab = document.getElementById('tab-alt-foto-cat-' + fotoId + '-' + lang);
-      if (tab) {
-        if (altTexto) {
-          tab.textContent = lang.toUpperCase() + ' ✓';
-          tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
-        } else {
-          tab.textContent = lang.toUpperCase() + ' ⚠️';
-          tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
-        }
-      }
-      if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado'; setTimeout(function() { if (msg) msg.textContent = ''; }, 2000); }
-    } else {
-      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
-    }
-  });
+  // (30/10/2026) Modelo común: guarda y aprueba; si cambia el español, recuadro rojo
+  guardarAltGen('cat', parseInt(boton.dataset.catid), parseInt(boton.dataset.fotoid), boton.dataset.lang);
 }
 
 function cambiarIdiomaEditorSEOCat(catId, lang, tabEl) {
