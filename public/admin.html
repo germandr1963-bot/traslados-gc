@@ -226,7 +226,7 @@ table.tabla-precios input {
         <div id="mensaje-islas" style="margin-bottom:10px;"></div>
         <table class="tabla-admin">
           <thead>
-            <tr><th>Nombre</th><th>Slug (URL)</th><th>Traducción</th><th>Activa</th><th>Orden</th><th>Acción</th></tr>
+            <tr><th>Nombre</th><th>Slug (URL)</th><th style="text-align:center;">Traducción</th><th>Activa</th><th style="text-align:center;">Orden</th><th>Acción</th></tr>
           </thead>
           <tbody id="tabla-islas"></tbody>
         </table>
@@ -2438,9 +2438,9 @@ function cargarIslas() {
         return '<tr id="fila-isla-' + i.id + '" style="cursor:pointer;" onclick="editarIsla(' + i.id + ')">' +
           '<td><span id="icono-isla-' + i.id + '" style="font-size:12px;margin-right:6px;">' + (abierta ? '▼' : '▶') + '</span><strong>' + escapar(i.nombre) + '</strong></td>' +
           '<td><code style="font-size:12px;">' + escapar(i.slug) + '</code></td>' +
-          '<td>' + marcaTraduccionIsla(i.estado_trad) + '</td>' +
-          '<td><span class="insignia ' + (i.activa ? 'insignia-ok' : 'insignia-no') + '" style="cursor:pointer;" title="Pulsa para ' + (i.activa ? 'desactivar' : 'activar') + '" onclick="event.stopPropagation();cambiarActivaIsla(' + i.id + ', ' + (!i.activa) + ')">' + (i.activa ? 'ACTIVA' : 'DESACTIVADA') + '</span></td>' +
-          '<td>' + i.orden + '</td>' +
+          '<td style="text-align:center;">' + marcaTraduccionIsla(i.estado_trad) + '</td>' +
+          '<td><span class="insignia" style="cursor:pointer;' + (i.activa ? 'background:#e8f5e9;color:#2e7d32;border-color:#2e7d32;' : 'background:#fdecea;color:#c0392b;border-color:#c0392b;') + '" title="Pulsa para ' + (i.activa ? 'desactivar' : 'activar') + '" onclick="event.stopPropagation();cambiarActivaIsla(' + i.id + ', ' + (!i.activa) + ')">' + (i.activa ? 'ACTIVA' : 'DESACTIVADA') + '</span></td>' +
+          '<td style="text-align:center;">' + i.orden + '</td>' +
           '<td>' +
             '<button class="boton-costa" style="padding:5px 10px;font-size:0.8rem;" onclick="event.stopPropagation();editarIsla(' + i.id + ')">✏️ Editar</button>' +
           '</td>' +
@@ -2568,14 +2568,12 @@ function estadoTradIsla(t) {
   return t.revisado ? 'ok' : 'ia';
 }
 
-// ✓ de la lista (vista de águila): rojo si alguno falta o cambió el español, azul si alguno está sin aprobar, verde si todos aprobados
+// (30/10/2026) Círculo de la lista (decisión de Germán): verde si los 9 idiomas están aprobados; rojo si falta algo, sea lo que sea.
+// Los tres colores siguen dentro de la ficha de cada isla.
 function marcaTraduccionIsla(estados) {
   estados = estados || {};
-  if (IDIOMAS_ISLA.some(function(l) { var e = estados[l]; return !e || e === 'desactualizado'; }))
-    return '<span style="color:#c0392b;font-weight:600;" title="Sin traducir o español cambiado">&#10003;</span>';
-  if (IDIOMAS_ISLA.some(function(l) { return estados[l] === 'ia'; }))
-    return '<span style="color:#1565c0;font-weight:600;" title="Traducido, sin aprobar">&#10003;</span>';
-  return '<span style="color:#2e7d32;font-weight:600;" title="Aprobada">&#10003;</span>';
+  var todo = IDIOMAS_ISLA.every(function(l) { return estados[l] === 'ok'; });
+  return '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + (todo ? '#2e7d32' : '#c0392b') + ';" title="' + (todo ? 'Todo aprobado' : 'Falta algo') + '"></span>';
 }
 
 // Pestañas con los colores de la regla; cambian al guardar sin cerrar la ficha
