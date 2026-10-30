@@ -306,6 +306,8 @@ table.tabla-precios input {
         <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
           <select id="select-lang-destinos" class="campo" style="width:200px;height:40px;" onchange="cargarTraduccionesDestinos()"></select>
           <button class="boton-costa" id="btn-generar-destinos" onclick="traducirDestinosIA()">Generar lo que falta</button>
+          <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoDestinos()">✅ Aprobar todo</button>
+          <span id="destinos-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
         </div>
         <div id="aviso-traducciones-destinos" style="margin-bottom:1rem;display:none;"></div>
         <table class="tabla-admin">
@@ -469,6 +471,8 @@ table.tabla-precios input {
         <span style="font-size:13px;">🤖 Generar textos de interfaz con IA:</span>
         <select id="select-idioma-ia" class="campo" style="height:34px;width:auto;"></select>
         <button class="boton-costa" id="btn-generar-textos" onclick="traducirConIA()">Generar lo que falta</button>
+        <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoTextos()">✅ Aprobar todo</button>
+        <span id="textos-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
       </div>
 
       <div id="mensaje-textos" style="margin-bottom:12px;"></div>
@@ -508,6 +512,8 @@ table.tabla-precios input {
             <span style="font-size:13px;">🤖 Generar contenido de categorías con IA:</span>
             <select id="select-idioma-categorias" class="campo" style="height:34px;width:auto;"></select>
             <button class="boton-costa" id="btn-generar-categorias" onclick="generarCategoriasConIA()">Generar lo que falta</button>
+            <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoCategorias()">✅ Aprobar todo</button>
+            <span id="categorias-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
           </div>
 
           <div id="mensaje-categorias-ia" style="margin-bottom:12px;"></div>
@@ -6358,8 +6364,7 @@ function generarComFrasesIA() {
         msg.style.color = '#2e7d32';
         _comFrasesDatos = null;
         cargarComFrases();
-        // (14/10/2026) Se abre la ventana de revisión con las frases recién traducidas
-        if (respuesta.lista && respuesta.lista.length) mostrarRevisionComFrases(lang, respuesta.lista);
+        // (30/10/2026) Forma A: sin ventana de revisión. Lo generado queda en 🔵; se revisa en cada frase o con «✅ Aprobar todo»
       } else {
         msg.textContent = '';
       }
@@ -6790,8 +6795,8 @@ function traducirConIA() {
         msg.innerHTML = '<div class="aviso-ok">✅ Ya estaba todo traducido en ' + lang.toUpperCase() + '.</div>';
         return;
       }
-      msg.innerHTML = '';
-      mostrarRevisionIA(lang, respuesta.propuestas);
+      // (30/10/2026) Forma A: sin ventana de revisión. Lo generado queda en 🔵; se revisa en cada texto o con «✅ Aprobar todo»
+      msg.innerHTML = '<div class="aviso-ok">🤖 La IA tradujo ' + respuesta.propuestas.length + ' texto(s) en ' + lang.toUpperCase() + '. Están en azul: revísalos en cada texto o pulsa «✅ Aprobar todo».</div>';
       // (28/10/2026) Lo generado ya está guardado en 🔵: se refresca la tabla (sin tocar el selector de idioma)
       fetch('/admin/textos').then(function (r) { return r.json(); }).then(function (datos) {
         textosCache = datos;
@@ -6866,6 +6871,44 @@ function celdaTextoInterfaz(t, lang) {
   return '<td style="text-align:center"><span style="color:#c0392b;" title="Sin traducir">·</span></td>';
 }
 
+// (30/10/2026) «✅ Aprobar todo» — mismo botón y mismo funcionamiento que en Email, WhatsApp y Frases:
+// aprueba (🟢) todo lo que está en 🔵 en todos los idiomas; los 🔴 no se tocan.
+function aprobarTodoAzules(url, msgId, alTerminar) {
+  var msg = document.getElementById(msgId);
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Aprobando…'; msg.style.display = 'inline'; }
+  fetch(url, { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (respuesta) {
+      if (!respuesta.ok) {
+        if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error al aprobar.'; }
+        return;
+      }
+      if (msg) {
+        msg.style.color = 'var(--verde-ok)';
+        msg.textContent = respuesta.aprobadas > 0 ? '✅ ' + respuesta.aprobadas + ' traducción(es) aprobada(s).' : '✅ Todo ya estaba aprobado.';
+        setTimeout(function () { msg.style.display = 'none'; }, 4000);
+      }
+      if (alTerminar) alTerminar();
+    })
+    .catch(function () {
+      if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'No se pudo conectar.'; }
+    });
+}
+function aprobarTodoTextos() {
+  aprobarTodoAzules('/admin/textos/aprobar-azules', 'textos-aprobar-msg', function () {
+    fetch('/admin/textos').then(function (r) { return r.json(); }).then(function (datos) {
+      textosCache = datos;
+      renderizarTablaTextos(datos);
+    });
+  });
+}
+function aprobarTodoCategorias() {
+  aprobarTodoAzules('/admin/categorias/aprobar-azules', 'categorias-aprobar-msg', function () { cargarTablaCategoriasIA(); });
+}
+function aprobarTodoDestinos() {
+  aprobarTodoAzules('/admin/destinos/traducciones/aprobar-azules', 'destinos-aprobar-msg', function () { cargarTraduccionesDestinos(); });
+}
+
 // ─── Generador IA — Contenido de categorías de flota ─────────────────────────
 function generarCategoriasConIA() {
   var lang = document.getElementById('select-idioma-categorias').value;
@@ -6888,8 +6931,14 @@ function generarCategoriasConIA() {
         msg.innerHTML = '<div class="aviso-ok">✅ Ya está todo generado en ' + lang.toUpperCase() + '.</div>';
         return;
       }
-      msg.innerHTML = '';
-      mostrarRevisionCategorias(lang, respuesta.propuestas);
+      // (30/10/2026) En ESPAÑOL se sigue abriendo la ventana: ahí se escribe el texto de origen y solo se guarda al aprobarlo.
+      if (lang === 'es') {
+        msg.innerHTML = '';
+        mostrarRevisionCategorias(lang, respuesta.propuestas);
+        return;
+      }
+      // (30/10/2026) Forma A: sin ventana de revisión. Lo generado queda en 🔵; se revisa en la ficha de cada categoría o con «✅ Aprobar todo»
+      msg.innerHTML = '<div class="aviso-ok">🤖 La IA generó ' + respuesta.propuestas.length + ' categoría(s) en ' + lang.toUpperCase() + '. Están en azul: revísalas en «✏️ Editar» o pulsa «✅ Aprobar todo».</div>';
       cargarTablaCategoriasIA(); // (28/10/2026) lo generado ya está guardado en 🔵
     })
     .catch(function () {
