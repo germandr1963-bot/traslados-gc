@@ -237,16 +237,10 @@ table.tabla-precios input {
 
     <div id="seccion-categorias" class="oculto">
       <h1>Categorías de vehículos</h1>
-
-      <!-- ─── BLOQUE CATEGORÍAS ─────────────────────────────────────────────── -->
+      <!-- (30/10/2026) Ya no es plegable: la pantalla es solo de Categorías (Islas tiene la suya) -->
+      <p class="subtitulo" style="margin-bottom:14px;">Activa = existe en el sistema (se ofrece a los choferes en el alta). Disponible = se ofrece HOY al cliente en el selector de vehículo.</p>
       <div class="tarjeta" style="margin-bottom:20px;">
-        <div style="cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none;" onclick="toggleBloqueCategorias()">
-          <span id="bloque-categorias-icono" style="font-size:14px;">▶</span>
-          <h2 style="font-size:17px;margin:0;">🚗 Categorías de vehículo</h2>
-          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
-        </div>
-        <div id="bloque-categorias-contenido" style="display:none;margin-top:16px;">
-          <p class="subtitulo" style="margin-bottom:14px;">Activa = existe en el sistema (se ofrece a los choferes en el alta). Disponible = se ofrece HOY al cliente en el selector de vehículo.</p>
+        <div id="bloque-categorias-contenido">
 
 
 
@@ -2306,6 +2300,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
     if (boton.dataset.seccion === 'islas') cargarIslas();
+    if (boton.dataset.seccion === 'categorias') cargarCategorias();
     if (boton.dataset.seccion === 'seo') cargarSEO();
     if (boton.dataset.seccion === 'idiomas') { cargarTextosInterfaz(); cargarComunicacionesCliente(); }
     if (boton.dataset.seccion === 'calculador') iniciarCalculador();
