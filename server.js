@@ -517,6 +517,8 @@ async function initSchema() {
       UNIQUE(isla_id, lang_code)
     )
   `);
+  // (30/10/2026) Regla de las traducciones: 🔴 cuando cambia el nombre en español de la isla
+  await pool.query(`ALTER TABLE islas_traducciones ADD COLUMN IF NOT EXISTS desactualizado BOOLEAN NOT NULL DEFAULT FALSE`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS categorias_vehiculos (
@@ -4767,6 +4769,14 @@ app.delete('/admin/fondos/:id', requireAdmin, asyncHandler(async (req, res) => {
 
 app.get('/admin/islas', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT id, nombre, slug, activa, orden FROM islas ORDER BY orden, nombre');
+  // (30/10/2026) Vista de águila: estado de las traducciones de cada isla
+  const trads = await pool.query('SELECT isla_id, lang_code, revisado, desactualizado FROM islas_traducciones');
+  for (const isla of result.rows) {
+    isla.estado_trad = {};
+    for (const t of trads.rows) {
+      if (t.isla_id === isla.id) isla.estado_trad[t.lang_code] = t.desactualizado ? 'desactualizado' : (t.revisado ? 'ok' : 'ia');
+    }
+  }
   res.json({ islas: result.rows });
 }));
 
@@ -4789,11 +4799,18 @@ app.post('/admin/islas/:id/editar', requireAdmin, asyncHandler(async (req, res) 
   const { nombre, slug, orden } = req.body;
   if (!nombre || !slug) return res.status(400).json({ error: 'Nombre y slug son obligatorios.' });
   try {
+    const antes = await pool.query('SELECT nombre FROM islas WHERE id = $1', [req.params.id]);
     await pool.query(
       'UPDATE islas SET nombre = $1, slug = $2, orden = $3 WHERE id = $4',
       [nombre.trim(), slug.trim().toLowerCase(), parseInt(orden) || 1, req.params.id]
     );
-    res.json({ ok: true });
+    // (30/10/2026) Si cambia el nombre en español, sus traducciones pasan a 🔴
+    let conTraducciones = 0;
+    if (antes.rows.length && antes.rows[0].nombre !== nombre.trim()) {
+      const r = await pool.query('UPDATE islas_traducciones SET desactualizado = TRUE WHERE isla_id = $1', [req.params.id]);
+      conTraducciones = r.rowCount;
+    }
+    res.json({ ok: true, conTraducciones });
   } catch(e) {
     if (e.code === '23505') return res.status(400).json({ error: 'Ya existe una isla con ese slug.' });
     throw e;
@@ -4816,6 +4833,14 @@ app.post('/admin/islas/:id/traducciones/aprobar', requireAdmin, asyncHandler(asy
 
 app.get('/admin/islas', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT id, nombre, slug, activa, orden FROM islas ORDER BY orden, nombre');
+  // (30/10/2026) Vista de águila: estado de las traducciones de cada isla
+  const trads = await pool.query('SELECT isla_id, lang_code, revisado, desactualizado FROM islas_traducciones');
+  for (const isla of result.rows) {
+    isla.estado_trad = {};
+    for (const t of trads.rows) {
+      if (t.isla_id === isla.id) isla.estado_trad[t.lang_code] = t.desactualizado ? 'desactualizado' : (t.revisado ? 'ok' : 'ia');
+    }
+  }
   res.json({ islas: result.rows });
 }));
 
@@ -4838,11 +4863,18 @@ app.post('/admin/islas/:id/editar', requireAdmin, asyncHandler(async (req, res) 
   const { nombre, slug, orden } = req.body;
   if (!nombre || !slug) return res.status(400).json({ error: 'Nombre y slug son obligatorios.' });
   try {
+    const antes = await pool.query('SELECT nombre FROM islas WHERE id = $1', [req.params.id]);
     await pool.query(
       'UPDATE islas SET nombre = $1, slug = $2, orden = $3 WHERE id = $4',
       [nombre.trim(), slug.trim().toLowerCase(), parseInt(orden) || 1, req.params.id]
     );
-    res.json({ ok: true });
+    // (30/10/2026) Si cambia el nombre en español, sus traducciones pasan a 🔴
+    let conTraducciones = 0;
+    if (antes.rows.length && antes.rows[0].nombre !== nombre.trim()) {
+      const r = await pool.query('UPDATE islas_traducciones SET desactualizado = TRUE WHERE isla_id = $1', [req.params.id]);
+      conTraducciones = r.rowCount;
+    }
+    res.json({ ok: true, conTraducciones });
   } catch(e) {
     if (e.code === '23505') return res.status(400).json({ error: 'Ya existe una isla con ese slug.' });
     throw e;
@@ -4853,7 +4885,7 @@ app.post('/admin/islas/:id/editar', requireAdmin, asyncHandler(async (req, res) 
 
 app.get('/admin/islas/:id/traducciones', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
-    'SELECT lang_code, nombre, slug, revisado FROM islas_traducciones WHERE isla_id = $1 ORDER BY lang_code',
+    'SELECT lang_code, nombre, slug, revisado, desactualizado FROM islas_traducciones WHERE isla_id = $1 ORDER BY lang_code',
     [req.params.id]
   );
   res.json({ traducciones: result.rows });
@@ -4884,7 +4916,31 @@ app.post('/admin/islas/:id/traducir-ia', requireAdmin, asyncHandler(async (req, 
     return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' });
   }
 
-  res.json({ ok: true, traducciones });
+  // (30/10/2026) Lo generado queda GUARDADO en 🔵, solo en los idiomas que faltan o están en 🔴.
+  // Si un idioma ya tiene su palabra de dirección (slug), se conserva: la IA solo cambia el nombre.
+  const existentes = await pool.query('SELECT lang_code, desactualizado FROM islas_traducciones WHERE isla_id = $1', [isla.id]);
+  const yaHay = {};
+  for (const e of existentes.rows) yaHay[e.lang_code] = e;
+  let generados = 0;
+  for (const lang of ['en','de','sv','no','nl','it','fr','fi','ru']) {
+    const t = traducciones[lang];
+    if (!t || !t.nombre || !t.slug) continue;
+    if (yaHay[lang] && !yaHay[lang].desactualizado) continue;
+    if (yaHay[lang]) {
+      await pool.query(
+        'UPDATE islas_traducciones SET nombre = $1, revisado = FALSE, desactualizado = FALSE WHERE isla_id = $2 AND lang_code = $3',
+        [String(t.nombre).trim(), isla.id, lang]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO islas_traducciones (isla_id, lang_code, nombre, slug, revisado, desactualizado)
+         VALUES ($1, $2, $3, $4, FALSE, FALSE) ON CONFLICT (isla_id, lang_code) DO NOTHING`,
+        [isla.id, lang, String(t.nombre).trim(), String(t.slug).trim().toLowerCase()]
+      );
+    }
+    generados++;
+  }
+  res.json({ ok: true, generados });
 }));
 
 app.post('/admin/islas/:id/traducciones/guardar', requireAdmin, asyncHandler(async (req, res) => {
@@ -4897,10 +4953,24 @@ app.post('/admin/islas/:id/traducciones/guardar', requireAdmin, asyncHandler(asy
     await pool.query(
       `INSERT INTO islas_traducciones (isla_id, lang_code, nombre, slug, revisado)
        VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (isla_id, lang_code) DO UPDATE SET nombre = $3, slug = $4, revisado = $5`,
+       ON CONFLICT (isla_id, lang_code) DO UPDATE SET nombre = $3, slug = $4, revisado = $5, desactualizado = FALSE`,
       [req.params.id, lang, nombre.trim(), slug.trim().toLowerCase(), traducciones[lang].revisado === true]
     );
   }
+  res.json({ ok: true });
+}));
+
+// (30/10/2026) Activa / Desactivada: se cambia al pulsar la etiqueta en la lista de islas.
+// De momento solo guarda el estado; esconder en la web todo lo de una isla desactivada es el pendiente N33.
+app.post('/admin/islas/:id/activa', requireAdmin, asyncHandler(async (req, res) => {
+  const activa = req.body.activa === true;
+  await pool.query('UPDATE islas SET activa = $1 WHERE id = $2', [activa, req.params.id]);
+  res.json({ ok: true, activa });
+}));
+
+// (30/10/2026) «💾 Guardar todo» y «✔ No afecta, mantenerlas»: aprueba tal cual todas las traducciones de la isla
+app.post('/admin/islas/:id/traducciones/aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('UPDATE islas_traducciones SET revisado = TRUE, desactualizado = FALSE WHERE isla_id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
 
