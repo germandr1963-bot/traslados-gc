@@ -3882,6 +3882,11 @@ Un saludo cordial, 🙏
       UNIQUE(foto_id, lang_code)
     )
   `);
+  // (30/10/2026) Modelo común de traducciones en los alt texts de las fotos de destinos:
+  // revisado = aprobado (🟢; FALSE = 🔵 escrito por la IA sin aprobar); desactualizado = español cambiado (🔴).
+  // Los textos que ya existían quedan aprobados (DEFAULT TRUE).
+  await pool.query(`ALTER TABLE destinos_fotos_alt ADD COLUMN IF NOT EXISTS revisado BOOLEAN NOT NULL DEFAULT TRUE`);
+  await pool.query(`ALTER TABLE destinos_fotos_alt ADD COLUMN IF NOT EXISTS desactualizado BOOLEAN NOT NULL DEFAULT FALSE`);
 
   // ─── Rutas fotos: carrusel de imágenes por ruta (idéntico a destinos_fotos) ──
   await pool.query(`
@@ -6631,6 +6636,23 @@ app.get('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req, 
     `SELECT id, alt_texto, nombre_archivo, orden, es_principal FROM destinos_fotos WHERE destino_id = $1 ORDER BY orden`,
     [req.params.id]
   );
+  // (30/10/2026) Vista de águila: estado de los alt texts de cada foto en todos los idiomas activos
+  // (rojo si alguno falta o cambió el español, azul si alguno está sin aprobar, verde si todos aprobados)
+  const idiomasAct = await pool.query('SELECT codigo FROM idiomas_web WHERE activo = TRUE');
+  const altsTodas = await pool.query(
+    `SELECT a.foto_id, a.lang_code, a.alt_texto, a.revisado, a.desactualizado
+     FROM destinos_fotos_alt a JOIN destinos_fotos f ON f.id = a.foto_id WHERE f.destino_id = $1`,
+    [req.params.id]
+  );
+  for (const foto of result.rows) {
+    let estado = 'ok';
+    for (const i of idiomasAct.rows) {
+      const a = altsTodas.rows.find(function (x) { return x.foto_id === foto.id && x.lang_code === i.codigo; });
+      if (!a || !a.alt_texto || !a.alt_texto.trim() || a.desactualizado) { estado = 'rojo'; break; }
+      if (!a.revisado) estado = 'ia';
+    }
+    foto.estado_alt = estado;
+  }
   res.json({ fotos: result.rows });
 }));
 
@@ -6812,23 +6834,121 @@ app.post('/admin/seo/destinos/:id/fotos/nueva/alt/generar-todos', requireAdmin, 
 app.get('/admin/seo/destinos/:id/fotos/:fotoId/alt', requireAdmin, asyncHandler(async (req, res) => {
   const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
   const alts = await pool.query(
-    'SELECT lang_code, alt_texto FROM destinos_fotos_alt WHERE foto_id = $1',
+    'SELECT lang_code, alt_texto, revisado, desactualizado FROM destinos_fotos_alt WHERE foto_id = $1',
     [req.params.fotoId]
   );
   const mapa = {};
-  for (const a of alts.rows) mapa[a.lang_code] = a.alt_texto;
-  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa });
+  const estados = {}; // (30/10/2026) 'ok' 🟢 · 'ia' 🔵 · 'desactualizado' 🔴 · sin texto 🔴
+  for (const a of alts.rows) {
+    mapa[a.lang_code] = a.alt_texto;
+    if (a.alt_texto && a.alt_texto.trim()) estados[a.lang_code] = a.desactualizado ? 'desactualizado' : (a.revisado ? 'ok' : 'ia');
+  }
+  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa, estados: estados });
 }));
 
 // Guarda el alt text de una foto en un idioma concreto
 app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const { alt_texto } = req.body;
+  const nuevo = (alt_texto || '').trim();
+  // (30/10/2026) «💾 Guardar» guarda y aprueba ese idioma (🟢). Si cambia el ESPAÑOL, los demás idiomas con texto pasan a 🔴
+  // y se avisa (conTraducciones) para enseñar el recuadro «¿Este cambio afecta a las traducciones?».
+  let conTraducciones = 0;
+  if (req.params.lang === 'es') {
+    const antes = await pool.query(`SELECT alt_texto FROM destinos_fotos_alt WHERE foto_id = $1 AND lang_code = 'es'`, [req.params.fotoId]);
+    const textoAntes = antes.rows.length ? (antes.rows[0].alt_texto || '').trim() : '';
+    if (textoAntes && textoAntes !== nuevo) {
+      const r = await pool.query(
+        `UPDATE destinos_fotos_alt SET desactualizado = TRUE
+         WHERE foto_id = $1 AND lang_code <> 'es' AND alt_texto IS NOT NULL AND TRIM(alt_texto) <> ''`,
+        [req.params.fotoId]
+      );
+      conTraducciones = r.rowCount;
+    }
+  }
   await pool.query(
-    `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
-     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
-    [req.params.fotoId, req.params.lang, alt_texto || '']
+    `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto, revisado, desactualizado) VALUES ($1, $2, $3, TRUE, FALSE)
+     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = TRUE, desactualizado = FALSE`,
+    [req.params.fotoId, req.params.lang, nuevo]
   );
-  res.json({ ok: true });
+  res.json({ ok: true, conTraducciones: conTraducciones });
+}));
+
+// (30/10/2026) «💾 Guardar todo» y «✔ No afecta, mantenerlas»: aprueba tal cual (🟢) todos los idiomas con texto de esa foto.
+// Los idiomas sin texto siguen 🔴.
+app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt-aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query(
+    `UPDATE destinos_fotos_alt SET revisado = TRUE, desactualizado = FALSE
+     WHERE foto_id = $1 AND alt_texto IS NOT NULL AND TRIM(alt_texto) <> ''`,
+    [req.params.fotoId]
+  );
+  res.json({ ok: true, aprobadas: r.rowCount });
+}));
+
+// (30/10/2026) «Generar lo que falta» de los alt texts de una foto: la IA mira la foto y escribe, de forma nativa,
+// SOLO los idiomas activos sin texto o en 🔴 (español cambiado). Lo deja GUARDADO en 🔵. Lo demás no se toca.
+app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt-generar-falta', requireAdmin, asyncHandler(async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
+  const { imagen } = req.body;
+  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
+  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado.' });
+  const d = destino.rows[0];
+  const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
+  const existentes = await pool.query(
+    'SELECT lang_code, alt_texto, desactualizado FROM destinos_fotos_alt WHERE foto_id = $1',
+    [req.params.fotoId]
+  );
+  const pendientes = idiomas.rows.filter(function (i) {
+    const a = existentes.rows.find(function (x) { return x.lang_code === i.codigo; });
+    return !a || !a.alt_texto || !a.alt_texto.trim() || a.desactualizado;
+  });
+  if (pendientes.length === 0) return res.json({ ok: true, generadas: 0 });
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
+  const listaIdiomas = pendientes.map(function (i) {
+    return i.codigo + ' (' + (NOMBRE_IDIOMA_ES[i.codigo] || i.nombre) + ')';
+  }).join(', ');
+  const codigos = pendientes.map(function (i) { return '"' + i.codigo + '": "..."'; }).join(', ');
+  // Mismo texto que «Generar todos los idiomas» (generar-todos), solo con los idiomas pendientes
+  const prompt = `Eres un experto en SEO de imágenes para webs de turismo y transporte. Trabajas para múltiples mercados europeos.
+Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text para cada uno de estos idiomas: ${listaIdiomas}.
+
+Para cada idioma:
+- Escribe de forma completamente nativa — como lo escribiría un SEO local de ese mercado, NO como una traducción del español
+- Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino
+- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto
+- Máximo 125 caracteres
+
+Responde ÚNICAMENTE con JSON válido, sin markdown:
+{${codigos}}`;
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: 600,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+        { type: 'text', text: prompt }
+      ]}]
+    })
+  });
+  if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
+  const data = await response.json();
+  const texto = data.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  const resultado = JSON.parse(texto);
+  let generadas = 0;
+  for (const i of pendientes) {
+    const alt = resultado[i.codigo];
+    if (!alt || !String(alt).trim()) continue;
+    await pool.query(
+      `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto, revisado, desactualizado) VALUES ($1, $2, $3, FALSE, FALSE)
+       ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = FALSE, desactualizado = FALSE`,
+      [req.params.fotoId, i.codigo, String(alt).trim()]
+    );
+    generadas++;
+  }
+  res.json({ ok: true, generadas: generadas });
 }));
 
 // Sugiere con IA el alt text de una foto en el idioma activo
