@@ -369,6 +369,74 @@ function obtenerTexto(clave, lang) {
   return entrada.texto_es;
 }
 
+// (02/11/2026) «El rojo al guardar»: lo que se escribe en Categorías, Extras, Preferencias,
+// Servicios incluidos e Idiomas pasa a Idiomas → Textos de interfaz AL GUARDAR (antes, solo al
+// arrancar). Si el español cambia, el trigger trg_textos_es_cambiado pone sus traducciones en 🔴.
+// Devuelve el id del texto y si cambió un español que ya tenía traducciones (para el recuadro rojo).
+async function sincronizarTextoAlGuardar(clave, modulo, contexto, textoEs) {
+  const antes = await pool.query('SELECT texto_es FROM textos_interfaz WHERE clave = $1', [clave]);
+  const r = await pool.query(
+    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (clave) DO UPDATE SET texto_es = $4
+     RETURNING id`,
+    [clave, modulo, contexto, textoEs]
+  );
+  const id = r.rows[0].id;
+  let cambiado = false;
+  if (antes.rows.length && antes.rows[0].texto_es !== textoEs) {
+    const c = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM textos_interfaz_traducciones
+       WHERE texto_id = $1 AND texto IS NOT NULL AND texto <> ''`, [id]);
+    cambiado = c.rows[0].n > 0;
+  }
+  return { id, cambiado };
+}
+
+// (02/11/2026) Textos de una categoría: nombre y maletas (flota_cap_<id> ya no se crea: ninguna página lo usa).
+async function sincronizarTextosCategoria(catId) {
+  const r = await pool.query('SELECT id, nombre, capacidad_pasajeros, capacidad_maletas FROM categorias_vehiculos WHERE id = $1', [catId]);
+  if (!r.rows.length) return [];
+  const cat = r.rows[0];
+  const cambiados = [];
+  const t1 = await sincronizarTextoAlGuardar('categoria_nombre_' + cat.id, 'Categorías de vehículo',
+    'Nombre de la categoría "' + cat.nombre + '" tal como aparece en emails y páginas públicas', cat.nombre);
+  if (t1.cambiado) cambiados.push(t1.id);
+  const maletasTxt = (cat.capacidad_maletas || '').trim();
+  if (maletasTxt && maletasTxt !== '—') {
+    const t2 = await sincronizarTextoAlGuardar('categoria_maletas_' + cat.id, 'Categorías de vehículo',
+      'Texto de maletas de la categoría "' + cat.nombre + '" tal como aparece en la web pública', maletasTxt);
+    if (t2.cambiado) cambiados.push(t2.id);
+  }
+  return cambiados;
+}
+
+// (02/11/2026) Texto de un extra: solo extra_web_<id> (extra_nombre_<id> no lo usa ninguna página).
+// El español del extra se escribe SOLO en Extras (N28).
+async function sincronizarTextosExtra(extraId) {
+  const r = await pool.query('SELECT id, nombre FROM extras WHERE id = $1', [extraId]);
+  if (!r.rows.length) return [];
+  const ex = r.rows[0];
+  const t = await sincronizarTextoAlGuardar('extra_web_' + ex.id, 'Extras',
+    'Descripción del extra "' + ex.nombre + '" para el cliente y el chofer', ex.nombre);
+  return t.cambiado ? [t.id] : [];
+}
+
+// (02/11/2026) Textos de una preferencia del pasajero: nombre y opciones.
+async function sincronizarTextosPreferencia(prefId) {
+  const r = await pool.query('SELECT id, nombre, opciones FROM preferencias_catalogo WHERE id = $1', [prefId]);
+  if (!r.rows.length) return [];
+  const pf = r.rows[0];
+  const cambiados = [];
+  const t1 = await sincronizarTextoAlGuardar('pref_nombre_' + pf.id, 'Preferencias del pasajero',
+    'Nombre de la preferencia del pasajero "' + pf.nombre + '" en el portal del cliente', pf.nombre);
+  if (t1.cambiado) cambiados.push(t1.id);
+  const t2 = await sincronizarTextoAlGuardar('pref_opciones_' + pf.id, 'Preferencias del pasajero',
+    'Opciones de la preferencia "' + pf.nombre + '", separadas por " / ". Traducir cada opción manteniendo el separador " / ", el mismo número de opciones, el mismo orden y los emojis', pf.opciones);
+  if (t2.cambiado) cambiados.push(t2.id);
+  return cambiados;
+}
+
 // (27/10/2026) "N pasajeros" bien escrito en cada idioma, para cualquier número (igual que en las páginas):
 // sale de los textos de Flota «1 pasajero» (flota_pax_1), «2 pasajeros» (flota_pax_2) y «5 pasajeros» (flota_pax_5);
 // el idioma decide cuál toca (en ruso: 1/21 → пассажир, 2–4/22 → пассажира, 5–20 → пассажиров) y se pone el número.
@@ -1322,28 +1390,14 @@ async function initSchema() {
          ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
         [claveMaletas, 'Texto de maletas de la categoría "' + cat.nombre + '" tal como aparece en la web pública', maletasTxt]
       );
-      // Texto completo de capacidad para la página de flota — traducible como texto completo
-      const claveFlotaCap = 'flota_cap_' + cat.id;
-      const textoFlotaCap = 'Hasta ' + cat.capacidad_pasajeros + ' pasajeros · ' + maletasTxt + ' maletas';
-      await pool.query(
-        `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
-         VALUES ($1, 'Página de flota', $2, $3)
-         ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
-        [claveFlotaCap, 'Capacidad de la categoría "' + cat.nombre + '" tal como aparece en la página de flota — traducir el texto completo', textoFlotaCap]
-      );
+      // (02/11/2026) Ya no se crea flota_cap_<id>: ninguna página lo usa (se borra en la limpieza, paso 5).
     }
   }
 
   // Sincronizar nombres de extras activos como textos traducibles
   const extrasActivos = await pool.query('SELECT id, nombre FROM extras WHERE activo = TRUE ORDER BY bloque, orden, id');
   for (const ex of extrasActivos.rows) {
-    const claveExtra = 'extra_nombre_' + ex.id;
-    await pool.query(
-      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
-       VALUES ($1, 'Extras', $2, $3)
-       ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
-      [claveExtra, 'Nombre del extra "' + ex.nombre + '" tal como aparece en la página de reserva', ex.nombre]
-    );
+    // (02/11/2026) Ya no se crea extra_nombre_<id>: ninguna página lo usa (la web usa extra_web_<id>).
     const claveWeb = 'extra_web_' + ex.id;
     await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
@@ -5010,17 +5064,21 @@ app.post('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'La categoría necesita un nombre.' });
   }
   try {
-    await pool.query(
+    const nueva = await pool.query(
       `INSERT INTO categorias_vehiculos
          (nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas, descripcion,
           bajada_diurna, bajada_nocturna, descripcion_larga, caracteristicas, activa, disponible, isla_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, FALSE, $10)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, FALSE, $10)
+       RETURNING id`,
       [nombre, parseInt(d.capacidad_pasajeros, 10) || 4, (d.capacidad_maletas || '').trim() || '—',
        parseInt(d.limite_sillas, 10) || 0, (d.descripcion || '').trim(),
        parseFloat(d.bajada_diurna) || 0, parseFloat(d.bajada_nocturna) || 0,
        (d.descripcion_larga || '').trim(), (d.caracteristicas || '').trim(),
        d.isla_id ? parseInt(d.isla_id) : null]
     );
+    // (02/11/2026) Sus textos traducibles se crean ya, aunque nazca inactiva: se pueden traducir antes de abrirla.
+    await sincronizarTextosCategoria(nueva.rows[0].id);
+    await cargarTextosCache();
     res.json({ ok: true });
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ error: 'Ya existe una categoría con ese nombre.' });
@@ -5058,7 +5116,10 @@ app.post('/admin/categorias/:id/editar', requireAdmin, asyncHandler(async (req, 
        (d.subtitulo || '').trim(), d.isla_id ? parseInt(d.isla_id) : null,
        parseInt(d.orden, 10) || 0, !!d.en_promo, req.params.id]
     );
-    res.json({ ok: true });
+    // (02/11/2026) «El rojo al guardar»: nombre y maletas pasan a Textos de interfaz al momento.
+    const textosCambiados = await sincronizarTextosCategoria(req.params.id);
+    await cargarTextosCache();
+    res.json({ ok: true, conTraducciones: textosCambiados.length, textosCambiados });
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ error: 'Ya existe una categoría con ese nombre.' });
     throw err;
@@ -5067,6 +5128,11 @@ app.post('/admin/categorias/:id/editar', requireAdmin, asyncHandler(async (req, 
 
 app.post('/admin/categorias/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
+  // (02/11/2026) Sus textos se quitan también de Textos de interfaz (como Servicios incluidos).
+  const idCat = parseInt(req.params.id, 10);
+  await pool.query('DELETE FROM textos_interfaz WHERE clave = ANY($1)',
+    [['categoria_nombre_' + idCat, 'categoria_maletas_' + idCat, 'flota_cap_' + idCat]]);
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
@@ -5117,6 +5183,9 @@ app.get('/admin/categorias/:id/foto', asyncHandler(async (req, res) => {
 
 app.post('/admin/categorias/:id/activa', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('UPDATE categorias_vehiculos SET activa = $1 WHERE id = $2', [!!req.body.activa, req.params.id]);
+  // (02/11/2026) Al activarla, sus textos ya existen al momento (sin esperar a un deploy).
+  await sincronizarTextosCategoria(req.params.id);
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
@@ -8679,6 +8748,11 @@ app.post('/admin/idiomas', requireAdmin, asyncHandler(async (req, res) => {
   );
 
   await cargarIdiomasCache();
+
+  // (02/11/2026) El nombre del idioma nuevo pasa ya a Textos de interfaz (antes, solo al arrancar).
+  await sincronizarTextoAlGuardar('idioma_nombre_' + codigo, 'Nombres de idiomas',
+    'Nombre del idioma "' + nombre + '" en los selectores de idioma de la web (ej. en inglés: Spanish, English, German…)', nombre);
+  await cargarTextosCache();
 
   // Crear la ficha SEO vacía de este idioma nuevo en todas las rutas existentes
   const rutas = await pool.query('SELECT id, origen, destino FROM rutas');
@@ -13959,11 +14033,14 @@ app.post('/admin/extras', requireAdmin, asyncHandler(async (req, res) => {
   if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
   const p = parseFloat(precio);
   if (isNaN(p) || p < 0) return res.status(400).json({ error: 'El precio no es válido.' });
-  await pool.query(
-    'INSERT INTO extras (nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer, activo, en_asistente) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8)',
+  const nuevo = await pool.query(
+    'INSERT INTO extras (nombre, precio, bloque, orden, tipo_seleccion, notas_chofer, depende_chofer, activo, en_asistente) VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8) RETURNING id',
     [nombre.trim(), p, (bloque || 'F').trim(), parseInt(orden, 10) || 0,
      (tipo_seleccion || 'checkbox').trim(), notas_chofer ? notas_chofer.trim() : null, depende_chofer !== false, !!en_asistente]
   );
+  // (02/11/2026) Su texto traducible se crea ya, aunque nazca como borrador.
+  await sincronizarTextosExtra(nuevo.rows[0].id);
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
@@ -13986,11 +14063,16 @@ app.post('/admin/extras/:id/editar', requireAdmin, asyncHandler(async (req, res)
      (tipo_seleccion || '').trim(), notas_chofer !== undefined ? (notas_chofer ? notas_chofer.trim() : '') : null,
      depende_chofer !== false, !!en_asistente, req.params.id]
   );
-  res.json({ ok: true });
+  // (02/11/2026) «El rojo al guardar».
+  const textosCambiados = await sincronizarTextosExtra(req.params.id);
+  await cargarTextosCache();
+  res.json({ ok: true, conTraducciones: textosCambiados.length, textosCambiados });
 }));
 
 app.post('/admin/extras/:id/activo', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('UPDATE extras SET activo = $1 WHERE id = $2', [!!req.body.activo, req.params.id]);
+  await sincronizarTextosExtra(req.params.id);
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
@@ -14005,6 +14087,10 @@ app.post('/admin/extras/:id/eliminar', requireAdmin, asyncHandler(async (req, re
     return res.status(400).json({ error: 'Este extra está asociado a una o más reservas y no se puede eliminar.' });
   }
   await pool.query('DELETE FROM extras WHERE id = $1', [req.params.id]);
+  // (02/11/2026) Sus textos se quitan también de Textos de interfaz.
+  const idEx = parseInt(req.params.id, 10);
+  await pool.query('DELETE FROM textos_interfaz WHERE clave = ANY($1)', [['extra_nombre_' + idEx, 'extra_web_' + idEx]]);
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
@@ -14059,10 +14145,13 @@ app.post('/admin/preferencias', requireAdmin, asyncHandler(async (req, res) => {
   const { nombre, opciones, orden } = req.body;
   if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
   if (!opciones || !opciones.trim()) return res.status(400).json({ error: 'Las opciones son obligatorias.' });
-  await pool.query(
-    'INSERT INTO preferencias_catalogo (nombre, opciones, orden, activo) VALUES ($1, $2, $3, FALSE)',
+  const nueva = await pool.query(
+    'INSERT INTO preferencias_catalogo (nombre, opciones, orden, activo) VALUES ($1, $2, $3, FALSE) RETURNING id',
     [nombre.trim(), opciones.trim(), parseInt(orden, 10) || 0]
   );
+  // (02/11/2026) Sus textos traducibles se crean ya, aunque nazca como borrador.
+  await sincronizarTextosPreferencia(nueva.rows[0].id);
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
@@ -14075,16 +14164,25 @@ app.post('/admin/preferencias/:id/editar', requireAdmin, asyncHandler(async (req
     [nombre.trim(), opciones.trim(),
      (orden !== undefined && orden !== null && orden !== '') ? parseInt(orden, 10) : null, req.params.id]
   );
-  res.json({ ok: true });
+  // (02/11/2026) «El rojo al guardar».
+  const textosCambiados = await sincronizarTextosPreferencia(req.params.id);
+  await cargarTextosCache();
+  res.json({ ok: true, conTraducciones: textosCambiados.length, textosCambiados });
 }));
 
 app.post('/admin/preferencias/:id/activo', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('UPDATE preferencias_catalogo SET activo = $1 WHERE id = $2', [!!req.body.activo, req.params.id]);
+  await sincronizarTextosPreferencia(req.params.id);
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
 app.post('/admin/preferencias/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM preferencias_catalogo WHERE id = $1', [req.params.id]);
+  // (02/11/2026) Sus textos se quitan también de Textos de interfaz.
+  const idPf = parseInt(req.params.id, 10);
+  await pool.query('DELETE FROM textos_interfaz WHERE clave = ANY($1)', [['pref_nombre_' + idPf, 'pref_opciones_' + idPf]]);
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
@@ -14230,14 +14328,11 @@ app.post('/admin/servicios-incluidos/:id/editar', requireAdmin, asyncHandler(asy
     'UPDATE servicios_incluidos SET icono = $1, texto = $2, orden = $3 WHERE id = $4',
     [(icono || '').trim(), texto.trim(), parseInt(orden, 10) || 0, req.params.id]
   );
-  const clave = 'servicio_incluido_' + req.params.id;
-  await pool.query(
-    `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
-     VALUES ($1, 'Servicios incluidos', $2, $3)
-     ON CONFLICT (clave) DO UPDATE SET texto_es = $3`,
-    [clave, (icono || '').trim() + ' ' + texto.trim() + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', texto.trim()]
-  );
-  res.json({ ok: true });
+  // (02/11/2026) Misma función común que las demás pantallas: devuelve si el español cambió (recuadro rojo).
+  const tsv = await sincronizarTextoAlGuardar('servicio_incluido_' + req.params.id, 'Servicios incluidos',
+    (icono || '').trim() + ' ' + texto.trim() + ' — texto que aparece en el bloque de servicios incluidos del paso 3 de reserva', texto.trim());
+  await cargarTextosCache();
+  res.json({ ok: true, conTraducciones: tsv.cambiado ? 1 : 0, textosCambiados: tsv.cambiado ? [tsv.id] : [] });
 }));
 
 app.post('/admin/servicios-incluidos/:id/activo', requireAdmin, asyncHandler(async (req, res) => {
