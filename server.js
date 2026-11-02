@@ -379,7 +379,21 @@ ORDER BY 1
   `);
   const n = {};
   for (const fila of r.rows) n[fila.pantalla.slice(0, 2)] = parseInt(fila.con_rojo, 10) || 0;
+  // Detalle de las fotos con alt texts pendientes, para marcar la fila en cada lista (📷 N)
+  const fotos = { cat: {}, ruta: {}, destino: {} };
+  for (const [tipo, tFotos, tAlt, col] of [['cat', 'categorias_fotos', 'categorias_fotos_alt', 'categoria_id'],
+                                          ['ruta', 'rutas_fotos', 'rutas_fotos_alt', 'ruta_id'],
+                                          ['destino', 'destinos_fotos', 'destinos_fotos_alt', 'destino_id']]) {
+    const d = await pool.query(`
+      WITH la AS (SELECT codigo FROM idiomas_web WHERE activo = TRUE)
+      SELECT f.${col} AS id, COUNT(*)::int AS n FROM ${tFotos} f
+      WHERE EXISTS (SELECT 1 FROM la WHERE NOT EXISTS (SELECT 1 FROM ${tAlt} x WHERE x.foto_id = f.id AND x.lang_code = la.codigo
+                    AND TRIM(COALESCE(x.alt_texto,'')) <> '' AND NOT COALESCE(x.desactualizado,FALSE)))
+      GROUP BY f.${col}`);
+    for (const fila of d.rows) fotos[tipo][fila.id] = fila.n;
+  }
   res.json({
+    fotos,
     idiomas: (n['01'] || 0) + (n['02'] || 0) + (n['03'] || 0) + (n['04'] || 0) + (n['05'] || 0),
     islas: n['06'] || 0,
     destinos: n['07'] || 0,
