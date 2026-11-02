@@ -173,12 +173,12 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="modelo">🏢 Modelo de negocio</button>
       <button class="item-menu activo" data-seccion="fondos">Fondos de portada</button>
       <button class="item-menu" data-seccion="categorias">Categorías</button>
-      <button class="item-menu" data-seccion="islas">🏝️ Islas / Localidades</button>
+      <button class="item-menu" data-seccion="islas">🏝️ Islas / Localidades <span class="badge-pend-trad" id="badge-pend-islas" title="Traducciones pendientes (en rojo)" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
       <button class="item-menu" data-seccion="conductores">Conductores</button>
-      <button class="item-menu" data-seccion="destinos">Destino Inicial</button>
+      <button class="item-menu" data-seccion="destinos">Destino Inicial <span class="badge-pend-trad" id="badge-pend-destinos" title="Traducciones pendientes (en rojo)" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
       <button class="item-menu" data-seccion="precios">Rutas y precios</button>
-      <button class="item-menu" data-seccion="seo">SEO</button>
-      <button class="item-menu" data-seccion="idiomas">Idiomas</button>
+      <button class="item-menu" data-seccion="seo">SEO <span class="badge-pend-trad" id="badge-pend-seo" title="Traducciones pendientes (en rojo)" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
+      <button class="item-menu" data-seccion="idiomas">Idiomas <span class="badge-pend-trad" id="badge-pend-idiomas" title="Traducciones pendientes (en rojo)" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
       <button class="item-menu" data-seccion="calculador">Calculador</button>
       <button class="item-menu" data-seccion="configuracion">No-Show</button>
       <button class="item-menu" data-seccion="contacto">Contacto</button>
@@ -193,7 +193,7 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="valoraciones">Valoraciones</button>
        <button class="item-menu" data-seccion="comunicaciones">Comunicaciones</button>
       <button class="item-menu" data-seccion="contabilidad">&#128210; Contabilidad</button>
-      <button class="item-menu" data-seccion="pagina-rutas">&#127758; Páginas Destino</button>
+      <button class="item-menu" data-seccion="pagina-rutas">&#127758; Páginas Destino <span class="badge-pend-trad" id="badge-pend-pagina-rutas" title="Traducciones pendientes (en rojo)" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
     </div>
     <button id="boton-salir" style="margin-top:16px;opacity:0.5;width:100%;">Cerrar sesión</button>
   </div>
@@ -2249,6 +2249,9 @@ function mostrarAdmin() {
   // (15/10/2026) Estado del WhatsApp automático: marca "parado" en el menú, comprobada cada 30 s
   setTimeout(function() { cargarEstadoWhatsapp(); }, 700);
   if (!window._intervaloEstadoWa) window._intervaloEstadoWa = setInterval(cargarEstadoWhatsapp, 30000);
+  // (02/11/2026) N36 — Señal de traducciones pendientes en el menú, comprobada cada 60 s y al cambiar de pantalla
+  setTimeout(function() { cargarPendientesTraduccion(); }, 900);
+  if (!window._intervaloPendTrad) window._intervaloPendTrad = setInterval(cargarPendientesTraduccion, 60000);
   // Tras "🔄 Actualizar" (o la franja de versión nueva): volver a la sección en la que estaba
   try {
     var seccionGuardada = sessionStorage.getItem('adminSeccion');
@@ -2258,6 +2261,22 @@ function mostrarAdmin() {
       if (botonSeccion) botonSeccion.click();
     }
   } catch (e) {}
+}
+
+// (02/11/2026) N36 — Señal roja en el menú (como «parado» de WhatsApp) con cuántas cosas tienen
+// algún idioma en 🔴 en esa pantalla. Si no hay nada pendiente, no sale.
+function cargarPendientesTraduccion() {
+  fetch('/admin/pendientes-traduccion')
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      ['idiomas', 'islas', 'destinos', 'pagina-rutas', 'seo'].forEach(function (sec) {
+        var b = document.getElementById('badge-pend-' + sec);
+        if (!b) return;
+        var n = d && d[sec] ? parseInt(d[sec], 10) : 0;
+        if (n > 0) { b.textContent = n; b.style.display = 'inline'; } else { b.style.display = 'none'; }
+      });
+    })
+    .catch(function () {});
 }
 
 // "🔄 Actualizar": recarga la página completa (trae siempre la última versión) y vuelve a la misma sección
@@ -2305,6 +2324,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
   boton.addEventListener('click', function () {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
+    cargarPendientesTraduccion();
     ['fondos', 'categorias', 'islas', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo', 'valoraciones', 'comunicaciones', 'contabilidad', 'pagina-rutas'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
