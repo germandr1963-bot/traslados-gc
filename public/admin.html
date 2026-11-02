@@ -239,6 +239,7 @@ table.tabla-precios input {
       <h1>Categorías de vehículos</h1>
       <!-- (30/10/2026) Ya no es plegable: la pantalla es solo de Categorías (Islas tiene la suya) -->
       <p class="subtitulo" style="margin-bottom:14px;">Activa = existe en el sistema (se ofrece a los choferes en el alta). Disponible = se ofrece HOY al cliente en el selector de vehículo.</p>
+      <div id="aviso-categoria-traducciones" style="margin-bottom:1rem;"></div>
       <div class="tarjeta" style="margin-bottom:20px;">
         <div id="bloque-categorias-contenido">
 
@@ -1831,6 +1832,7 @@ table.tabla-precios input {
       <div class="tarjeta" style="margin-bottom:20px;">
         <button class="boton-primario" onclick="abrirFormularioExtra(null)">+ Añadir extra</button>
       </div>
+      <div id="aviso-extra-traducciones" style="margin-bottom:1rem;"></div>
 
       <h2 style="margin-bottom:4px;">Extras del chofer</h2>
       <p class="subtitulo" style="margin-top:0;">Dependen de lo que ese chofer tenga en su coche.</p>
@@ -1852,6 +1854,7 @@ table.tabla-precios input {
       <div class="tarjeta" style="margin-bottom:12px;">
         <button class="boton-primario" onclick="abrirFormularioPreferencia(null)">+ Añadir preferencia</button>
       </div>
+      <div id="aviso-preferencia-traducciones" style="margin-bottom:1rem;"></div>
       <div id="lista-preferencias"></div>
 
       <h2 style="margin-bottom:4px;margin-top:32px;">Servicios incluidos</h2>
@@ -1859,6 +1862,7 @@ table.tabla-precios input {
       <div class="tarjeta" style="margin-bottom:12px;">
         <button class="boton-primario" onclick="abrirFormularioServicio(null)">+ Añadir servicio</button>
       </div>
+      <div id="aviso-servicio-traducciones" style="margin-bottom:1rem;"></div>
       <div id="lista-servicios-incluidos"></div>
 
       <!-- Modal formulario servicio incluido -->
@@ -2804,7 +2808,7 @@ function formularioCategoria(cat) {
     }).join('') +
     '</select>' +
     '<label class="etiqueta">Pasajeros (capacidad)</label>' +
-    '<input class="campo" id="cat-pasajeros" type="number" min="1" max="12" value="' + (cat.capacidad_pasajeros || 4) + '" style="margin-bottom:10px">' +
+    '<input class="campo" id="cat-pasajeros" type="number" min="1" value="' + (cat.capacidad_pasajeros || 4) + '" style="margin-bottom:10px">' +
     '<label class="etiqueta">Maletas (texto libre, ej.: "3 grandes")</label>' +
     '<input class="campo" id="cat-maletas" type="text" value="' + escapar(cat.capacidad_maletas || '') + '" style="margin-bottom:10px">' +
     '<label class="etiqueta">Sillas de bebé (máximo)</label>' +
@@ -2854,6 +2858,33 @@ function nuevaCategoria() {
 
 document.getElementById('boton-nueva-categoria').addEventListener('click', nuevaCategoria);
 
+// (02/11/2026) «El rojo al guardar»: recuadro rojo del modelo común en Categorías, Extras,
+// Preferencias y Servicios incluidos. Sale solo si cambió un español que ya tenía traducciones
+// (en Idiomas → Textos de interfaz ya están en 🔴). «✔ No afecta» las aprueba tal cual.
+function mostrarAvisoTextosGuardar(cajaId, nombre, d) {
+  var caja = document.getElementById(cajaId);
+  if (!caja) return;
+  if (!d || !(d.conTraducciones > 0) || !d.textosCambiados) { caja.innerHTML = ''; return; }
+  caja.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
+    '✅ «' + escapar(nombre || '') + '» guardado. <strong>¿Este cambio afecta a las traducciones?</strong><br>' +
+    '<button class="boton-secundario" style="margin-top:8px;margin-right:8px;" onclick="document.getElementById(\'' + cajaId + '\').innerHTML = \'\'">⚠️ Sí, revisar traducciones</button>' +
+    '<button class="boton-primario" style="margin-top:8px;" onclick="noAfectaTextosGuardar(\'' + cajaId + '\', [' + d.textosCambiados.map(Number).join(',') + '])">✔ No afecta, mantenerlas</button>' +
+    '</div>';
+  caja.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function noAfectaTextosGuardar(cajaId, ids) {
+  var caja = document.getElementById(cajaId);
+  Promise.all(ids.map(function (id) {
+    return fetch('/admin/textos/' + id + '/aprobar-todas', { method: 'POST' }).then(function (r) { return r.json(); });
+  }))
+    .then(function (rs) {
+      if (rs.some(function (x) { return !x.ok; })) throw new Error('aprobar');
+      caja.innerHTML = '<div class="aviso-ok">✅ Traducciones mantenidas</div>';
+      setTimeout(function () { caja.innerHTML = ''; }, 2500);
+    })
+    .catch(function () { caja.innerHTML = '<div class="aviso-error">Error al guardar. Inténtalo de nuevo.</div>'; });
+}
+
 function guardarCategoria(id) {
   var datos = {
     orden: document.getElementById('cat-orden').value,
@@ -2880,6 +2911,7 @@ function guardarCategoria(id) {
       document.getElementById('editor-categoria').classList.add('oculto');
       cargarCategorias();
       cargarPreciosGrid();
+      mostrarAvisoTextosGuardar('aviso-categoria-traducciones', datos.nombre, respuesta);
     } else {
       alert(respuesta.error);
     }
@@ -10119,6 +10151,7 @@ function guardarPreferencia() {
     if (d.ok) {
       cerrarModalPreferencia();
       cargarPreferencias();
+      mostrarAvisoTextosGuardar('aviso-preferencia-traducciones', nombre, d);
     } else {
       msg.textContent = d.error || 'Error al guardar.';
     }
@@ -10228,7 +10261,7 @@ function guardarServicio() {
   })
     .then(function (r) { return r.json(); })
     .then(function (d) {
-      if (d.ok) { cerrarModalServicio(); cargarServiciosIncluidos(); }
+      if (d.ok) { cerrarModalServicio(); cargarServiciosIncluidos(); mostrarAvisoTextosGuardar('aviso-servicio-traducciones', texto, d); }
       else { msg.textContent = d.error || 'No se pudo guardar.'; }
     });
 }
@@ -10351,6 +10384,7 @@ function guardarExtra() {
     if (d.ok) {
       cerrarModalExtra();
       cargarExtras();
+      mostrarAvisoTextosGuardar('aviso-extra-traducciones', nombre, d);
     } else {
       msg.textContent = d.error || 'Error al guardar.';
     }
