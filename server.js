@@ -18590,22 +18590,41 @@ app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandle
             r.nombre_cliente, r.telefono_cliente, r.lang_cliente,
             cv.nombre AS categoria_nombre,
             COALESCE(r.reasignacion_en_curso, FALSE) AS reasignacion,
-            r.reasignacion_excluir_id
+            r.reasignacion_excluir_id, r.categoria_id, r.num_pasajeros
      FROM reservas r
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
      WHERE r.estado_aviso_whatsapp = 'pendiente'
      ORDER BY r.id ASC`
   );
-  // R2-A: un servicio liberado se ofrece a TODOS los choferes APROBADOS (estén o no disponibles
-  // hoy), nunca al chofer que lo liberó. puente.js usa esta lista en lugar de la de siempre.
+  // (02/11/2026) A quién se envía cada reserva, en este orden: 1) la categoría que pidió el cliente,
+  // 2) choferes con plazas iguales o mayores que sus pasajeros, 3) choferes con «Disponible hoy»
+  // (la disponibilidad se revisará con el sistema de días laborables). La reasignación (servicio
+  // liberado) sigue la misma regla y nunca va al chofer que lo liberó.
+  // puente.js usa choferes_aviso (reserva nueva) y choferes_reasignacion (reasignación).
+  // Sin categoría en la reserva, como antes: la reserva nueva va a todos los «Disponible hoy».
   for (const r of result.rows) {
-    if (!r.reasignacion) continue;
+    if (!r.categoria_id) {
+      if (r.reasignacion) {
+        const ch = await pool.query(
+          `SELECT id, nombre, telefono FROM conductores
+           WHERE estado = 'aprobado' AND telefono IS NOT NULL AND telefono <> '' AND id <> COALESCE($1, 0)
+           ORDER BY nombre`, [r.reasignacion_excluir_id]
+        );
+        r.choferes_reasignacion = ch.rows;
+      }
+      continue;
+    }
     const ch = await pool.query(
       `SELECT id, nombre, telefono FROM conductores
-       WHERE estado = 'aprobado' AND telefono IS NOT NULL AND telefono <> '' AND id <> COALESCE($1, 0)
-       ORDER BY nombre`, [r.reasignacion_excluir_id]
+       WHERE estado = 'aprobado' AND disponible_hoy = TRUE
+         AND telefono IS NOT NULL AND telefono <> ''
+         AND categoria_id = $1
+         AND COALESCE(plazas, 0) >= COALESCE($2, 0)
+         AND id <> COALESCE($3, 0)
+       ORDER BY nombre`, [r.categoria_id, r.num_pasajeros, r.reasignacion ? r.reasignacion_excluir_id : null]
     );
-    r.choferes_reasignacion = ch.rows;
+    if (r.reasignacion) r.choferes_reasignacion = ch.rows;
+    else r.choferes_aviso = ch.rows;
   }
   res.json(result.rows);
 }));
