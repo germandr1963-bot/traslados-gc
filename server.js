@@ -4251,13 +4251,19 @@ app.get('/api/categorias', asyncHandler(async (req, res) => {
       filtroDisponible = '';
     }
   }
+  // (02/11/2026) Pasajeros: el mayor de plazas de los choferes de esa categoría que cuentan para esa fecha
+  // (nunca más que la capacidad máxima de Admin → Categorías). Ej.: Económico 6 con un chofer de 4 y otro
+  // de 6 → 6; si solo trabaja el de 4 → 4.
   const result = await pool.query(
-    `SELECT DISTINCT cv.id, cv.nombre, cv.capacidad_pasajeros, cv.capacidad_maletas, cv.descripcion, cv.limite_sillas, cv.foto, cv.orden
+    `SELECT cv.id, cv.nombre,
+            LEAST(cv.capacidad_pasajeros, MAX(COALESCE(c.plazas, cv.capacidad_pasajeros)))::int AS capacidad_pasajeros,
+            cv.capacidad_maletas, cv.descripcion, cv.limite_sillas, cv.foto, cv.orden
      FROM categorias_vehiculos cv
      JOIN conductores c ON c.categoria_id = cv.id
                        AND c.estado = 'aprobado'
                        ${filtroDisponible}
      WHERE cv.disponible = TRUE
+     GROUP BY cv.id
      ORDER BY cv.orden, cv.nombre`
   );
 
@@ -4615,6 +4621,23 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     if (_fechaRes < _hoyRes) return res.status(400).json({ error: obtenerTexto('reserva_err_fecha', _langErr) });
     if (_fechaRes === _hoyRes && (await leerModeloNegocio()).no_mismo_dia) {
       return res.status(400).json({ error: obtenerTexto('home_aviso_mismo_dia', _langErr) });
+    }
+  }
+  // (02/11/2026) Pasajeros: como máximo las plazas del chofer más grande de esa categoría que trabaja ese día
+  // (misma regla que el buscador). Si ese día no hay choferes, no se cambia nada de lo de siempre.
+  if (num_pasajeros) {
+    const _f = String(fecha).slice(0, 10);
+    const _hoy = hoyCanarias();
+    const _q = await pool.query(
+      `SELECT LEAST(cv.capacidad_pasajeros, MAX(COALESCE(c.plazas, cv.capacidad_pasajeros)))::int AS maximo
+       FROM categorias_vehiculos cv
+       JOIN conductores c ON c.categoria_id = cv.id AND c.estado = 'aprobado'
+                         ${_f === _hoy ? 'AND c.disponible_hoy = TRUE' : ''}
+       WHERE cv.id = $1
+       GROUP BY cv.id`, [parseInt(categoria_id, 10) || 0]);
+    if (_q.rows.length && parseInt(num_pasajeros, 10) > _q.rows[0].maximo) {
+      const _l = (lang_cliente && IDIOMAS_PERMITIDOS.includes(lang_cliente)) ? lang_cliente : 'es';
+      return res.status(400).json({ error: obtenerTexto('home_sin_categorias_fecha', _l) });
     }
   }
   if (es_para_otra_persona && (!nombre_pasajero_otro || !nombre_pasajero_otro.trim())) {
