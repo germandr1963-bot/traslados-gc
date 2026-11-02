@@ -339,6 +339,55 @@ async function generarCodigoCorto(tipo, reservaId, tokenValoracion, urlDestino) 
 // servidor y cada vez que se guarda o importa una traducción desde el admin.
 let TEXTOS_CACHE = {};
 
+// (02/11/2026) N36 — Señal de pendientes en el menú del Admin: cuántas cosas tienen algún idioma
+// en 🔴 (sin traducir o español cambiado) en cada pantalla de traducción. Misma regla que dentro de cada pantalla.
+app.get('/admin/pendientes-traduccion', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query(`
+WITH l AS (SELECT codigo FROM idiomas_web WHERE activo = TRUE AND codigo <> 'es'),
+la AS (SELECT codigo FROM idiomas_web WHERE activo = TRUE)
+SELECT '01 Idiomas - Textos de interfaz' AS pantalla, COUNT(*) AS con_rojo FROM textos_interfaz t
+ WHERE EXISTS (SELECT 1 FROM l WHERE NOT EXISTS (SELECT 1 FROM textos_interfaz_traducciones x WHERE x.texto_id = t.id AND x.lang_code = l.codigo AND TRIM(COALESCE(x.texto,'')) <> '' AND NOT COALESCE(x.desactualizado,FALSE)))
+UNION ALL
+SELECT '02 Idiomas - Pagina de flota', COUNT(*) FROM categorias_vehiculos c
+ WHERE c.activa = TRUE AND EXISTS (SELECT 1 FROM l WHERE NOT EXISTS (SELECT 1 FROM categorias_vehiculos_traducciones x WHERE x.categoria_id = c.id AND x.lang_code = l.codigo AND TRIM(COALESCE(x.descripcion,'')) <> '' AND NOT COALESCE(x.ficha_desactualizado,FALSE)))
+UNION ALL
+SELECT '03 Idiomas - Email', COUNT(*) FROM plantillas_comunicacion p
+ WHERE p.categoria = 'cliente' AND TRIM(COALESCE(p.cuerpo_email,'')) <> '' AND EXISTS (SELECT 1 FROM l WHERE NOT EXISTS (SELECT 1 FROM plantillas_comunicacion_traducciones x WHERE x.plantilla_clave = p.clave AND x.lang_code = l.codigo AND TRIM(COALESCE(x.cuerpo_email,'')) <> '' AND NOT COALESCE(x.desactualizado_email,FALSE)))
+UNION ALL
+SELECT '04 Idiomas - WhatsApp', COUNT(*) FROM plantillas_comunicacion p
+ WHERE p.categoria = 'cliente' AND TRIM(COALESCE(p.cuerpo_whatsapp,'')) <> '' AND EXISTS (SELECT 1 FROM l WHERE NOT EXISTS (SELECT 1 FROM plantillas_comunicacion_traducciones x WHERE x.plantilla_clave = p.clave AND x.lang_code = l.codigo AND TRIM(COALESCE(x.cuerpo_whatsapp,'')) <> '' AND NOT COALESCE(x.desactualizado_wa,FALSE)))
+UNION ALL
+SELECT '05 Idiomas - Frases', COUNT(*) FROM frases_comunicacion f
+ WHERE EXISTS (SELECT 1 FROM l WHERE NOT EXISTS (SELECT 1 FROM frases_comunicacion_traducciones x WHERE x.frase_clave = f.clave AND x.lang_code = l.codigo AND TRIM(COALESCE(x.texto,'')) <> '' AND NOT COALESCE(x.desactualizado,FALSE)))
+UNION ALL
+SELECT '06 Islas / Localidades', COUNT(*) FROM islas i
+ WHERE EXISTS (SELECT 1 FROM l WHERE NOT EXISTS (SELECT 1 FROM islas_traducciones x WHERE x.isla_id = i.id AND x.lang_code = l.codigo AND TRIM(COALESCE(x.nombre,'')) <> '' AND NOT COALESCE(x.desactualizado,FALSE)))
+UNION ALL
+SELECT '07 Destino Inicial - nombres', COUNT(*) FROM destinos d
+ WHERE EXISTS (SELECT 1 FROM l WHERE NOT EXISTS (SELECT 1 FROM destinos_traducciones x WHERE x.destino_id = d.id AND x.lang_code = l.codigo AND TRIM(COALESCE(x.nombre,'')) <> '' AND NOT COALESCE(x.desactualizado,FALSE)))
+UNION ALL
+SELECT '08 Paginas Destino - fotos', COUNT(*) FROM destinos_fotos f
+ WHERE EXISTS (SELECT 1 FROM la WHERE NOT EXISTS (SELECT 1 FROM destinos_fotos_alt x WHERE x.foto_id = f.id AND x.lang_code = la.codigo AND TRIM(COALESCE(x.alt_texto,'')) <> '' AND NOT COALESCE(x.desactualizado,FALSE)))
+UNION ALL
+SELECT '09 SEO - fotos de rutas', COUNT(*) FROM rutas_fotos f
+ WHERE EXISTS (SELECT 1 FROM la WHERE NOT EXISTS (SELECT 1 FROM rutas_fotos_alt x WHERE x.foto_id = f.id AND x.lang_code = la.codigo AND TRIM(COALESCE(x.alt_texto,'')) <> '' AND NOT COALESCE(x.desactualizado,FALSE)))
+UNION ALL
+SELECT '10 SEO - fotos de categorias', COUNT(*) FROM categorias_fotos f
+ WHERE EXISTS (SELECT 1 FROM la WHERE NOT EXISTS (SELECT 1 FROM categorias_fotos_alt x WHERE x.foto_id = f.id AND x.lang_code = la.codigo AND TRIM(COALESCE(x.alt_texto,'')) <> '' AND NOT COALESCE(x.desactualizado,FALSE)))
+ORDER BY 1
+
+  `);
+  const n = {};
+  for (const fila of r.rows) n[fila.pantalla.slice(0, 2)] = parseInt(fila.con_rojo, 10) || 0;
+  res.json({
+    idiomas: (n['01'] || 0) + (n['02'] || 0) + (n['03'] || 0) + (n['04'] || 0) + (n['05'] || 0),
+    islas: n['06'] || 0,
+    destinos: n['07'] || 0,
+    'pagina-rutas': n['08'] || 0,
+    seo: (n['09'] || 0) + (n['10'] || 0)
+  });
+}));
+
 async function cargarTextosCache() {
   const textos = await pool.query('SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz');
   const traducciones = await pool.query('SELECT texto_id, lang_code, texto FROM textos_interfaz_traducciones');
