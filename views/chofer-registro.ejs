@@ -210,11 +210,7 @@
         <input id="r-numero-taxi" type="text" placeholder="Ej.: 154">
         <label for="r-plazas">Plazas para pasajeros</label>
         <select id="r-plazas">
-          <option value="4" selected>4</option>
-          <option value="5">5</option>
-          <option value="6">6</option>
-          <option value="7">7</option>
-          <option value="8">8</option>
+          <% for (var _p = 1; _p <= 25; _p++) { %><option value="<%= _p %>"<%= _p === 4 ? ' selected' : '' %>><%= _p %></option><% } %>
         </select>
         <label for="r-isla">Isla</label>
         <select id="r-isla">
@@ -379,7 +375,7 @@
       .then(function(r) { return r.json(); })
       .then(function(cats) {
         var html = cats.map(function(c) {
-          return '<div class="cat-opcion" data-id="' + c.id + '" data-nombre="' + c.nombre + '" onclick="selCat(this)">'
+          return '<div class="cat-opcion" data-id="' + c.id + '" data-nombre="' + c.nombre + '" data-max="' + c.capacidad_pasajeros + '" onclick="selCat(this)">'
             + '<div class="cn">' + c.nombre + '</div>'
             + '<div class="cd">' + c.capacidad_pasajeros + ' pas. · ' + TXT_MALETAS + ' ' + c.capacidad_maletas + '</div></div>';
         }).join('') + '<div class="cat-otra" data-id="otra" onclick="selCat(this)"><div class="cn">Otro vehículo</div></div>';
@@ -392,6 +388,13 @@
       el.classList.add('sel');
       categoriaSeleccionada = el.dataset.id;
       document.getElementById('aviso-otra').style.display = categoriaSeleccionada === 'otra' ? 'block' : 'none';
+      // (02/11/2026) Plazas: como máximo las de la categoría elegida (Otro vehículo: hasta 25)
+      var max = parseInt(el.dataset.max, 10) || 25;
+      var sel = document.getElementById('r-plazas');
+      var act = Math.min(parseInt(sel.value, 10) || 4, max);
+      var html = '';
+      for (var i = 1; i <= max; i++) html += '<option value="' + i + '"' + (i === act ? ' selected' : '') + '>' + i + '</option>';
+      sel.innerHTML = html;
     }
 
     fetch('/api/marcas-vehiculos')
