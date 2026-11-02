@@ -5126,6 +5126,13 @@ app.post('/admin/categorias', requireAdmin, asyncHandler(async (req, res) => {
   if (!nombre) {
     return res.status(400).json({ error: 'La categoría necesita un nombre.' });
   }
+  // (02/11/2026) Pasajeros (capacidad máxima): de 1 a 25
+  {
+    const paxCat = parseInt(d.capacidad_pasajeros, 10);
+    if (isNaN(paxCat) || paxCat < 1 || paxCat > MAX_PASAJEROS_CATEGORIA) {
+      return res.status(400).json({ error: 'Los pasajeros (capacidad máxima) van de 1 a ' + MAX_PASAJEROS_CATEGORIA + '.' });
+    }
+  }
   try {
     const nueva = await pool.query(
       `INSERT INTO categorias_vehiculos
@@ -5154,6 +5161,13 @@ app.post('/admin/categorias/:id/editar', requireAdmin, asyncHandler(async (req, 
   const nombre = (d.nombre || '').trim();
   if (!nombre) {
     return res.status(400).json({ error: 'La categoría necesita un nombre.' });
+  }
+  // (02/11/2026) Pasajeros (capacidad máxima): de 1 a 25
+  {
+    const paxCat = parseInt(d.capacidad_pasajeros, 10);
+    if (isNaN(paxCat) || paxCat < 1 || paxCat > MAX_PASAJEROS_CATEGORIA) {
+      return res.status(400).json({ error: 'Los pasajeros (capacidad máxima) van de 1 a ' + MAX_PASAJEROS_CATEGORIA + '.' });
+    }
   }
   const ordenNuevo = parseInt(d.orden, 10) || 0;
   if (ordenNuevo > 0) {
@@ -5259,7 +5273,7 @@ app.post('/admin/categorias/:id/disponible', requireAdmin, asyncHandler(async (r
 
 app.get('/admin/catalogo-vehiculos', requireAdmin, asyncHandler(async (req, res) => {
   const categorias = await pool.query(
-    `SELECT id, nombre FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre`
+    `SELECT id, nombre, capacidad_pasajeros FROM categorias_vehiculos WHERE activa = TRUE ORDER BY orden, nombre`
   );
   const marcas = await pool.query(`SELECT id, nombre FROM marcas_vehiculos ORDER BY nombre`);
   const modelos = await pool.query(`SELECT id, marca_id, nombre FROM modelos_vehiculos ORDER BY nombre`);
@@ -5293,6 +5307,27 @@ function telefonoConPrefijo(tel) {
 }
 const AVISO_TELEFONO_PREFIJO = 'El teléfono debe llevar el prefijo del país (por ejemplo +34 600 000 000).';
 
+// (02/11/2026) Admin → Categorías manda en las plazas: el chofer nunca puede tener más plazas
+// que la capacidad máxima de su categoría. Sin categoría («Otro vehículo»), el tope general de 25.
+const MAX_PASAJEROS_CATEGORIA = 25;
+async function comprobarPlazasChofer(plazas, categoriaId) {
+  const n = parseInt(plazas, 10);
+  let max = MAX_PASAJEROS_CATEGORIA;
+  let nombreCat = null;
+  const catId = parseInt(categoriaId, 10);
+  if (!isNaN(catId)) {
+    const r = await pool.query('SELECT nombre, capacidad_pasajeros FROM categorias_vehiculos WHERE id = $1', [catId]);
+    if (r.rows.length) { max = r.rows[0].capacidad_pasajeros; nombreCat = r.rows[0].nombre; }
+  }
+  if (isNaN(n) || n < 1) return { error: 'Elige las plazas del vehículo.' };
+  if (n > max) {
+    return { error: nombreCat
+      ? 'La categoría ' + nombreCat + ' admite hasta ' + max + ' plazas. Si el vehículo tiene más, primero hay que subir la capacidad en Admin → Categorías.'
+      : 'El máximo son ' + max + ' plazas.' };
+  }
+  return { plazas: n };
+}
+
 app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   const d = req.body;
   if (!d.nombre || !d.email || !d.telefono || !d.password || d.password.length < 6) {
@@ -5317,6 +5352,8 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   if (!d.matricula) {
     return res.status(400).json({ error: 'Falta la matrícula.' });
   }
+  const plazasOk = await comprobarPlazasChofer(d.plazas, categoriaId);
+  if (plazasOk.error) return res.status(400).json({ error: plazasOk.error });
   const hash = await bcrypt.hash(d.password, 10);
   const foto = d.foto || null;
   const fotoEstado = foto ? 'pendiente' : 'sin_foto';
@@ -5334,7 +5371,7 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
         d.documento.trim().toUpperCase(), d.direccion.trim(), d.cp.trim(), d.municipio.trim(),
         d.municipio_licencia.trim(), d.numero_licencia.trim(), (d.central_flota || '').trim(),
         categoriaId, vehiculo.marcaNombre, vehiculo.modeloNombre,
-        d.matricula.trim().toUpperCase(), (d.numero_taxi || '').trim(), parseInt(d.plazas, 10) || 4,
+        d.matricula.trim().toUpperCase(), (d.numero_taxi || '').trim(), plazasOk.plazas,
         d.isla || 'Gran Canaria', foto, fotoEstado
       ]
     );
@@ -5474,6 +5511,22 @@ app.post('/admin/conductores/:id/editar', requireAdmin, asyncHandler(async (req,
     cambios.push(`categoria_id = $${valores.length}`);
   }
   if (!cambios.length) return res.status(400).json({ error: 'No hay cambios que guardar.' });
+  // (02/11/2026) Las plazas no pueden pasar de la capacidad de su categoría. Solo se comprueba si
+  // cambian las plazas o la categoría: un chofer que ya tenía más plazas se puede seguir guardando
+  // (sale marcado con ⚠️ en su ficha) hasta que el Admin decida.
+  {
+    const act = await pool.query('SELECT plazas, categoria_id FROM conductores WHERE id = $1', [req.params.id]);
+    if (act.rows.length) {
+      const plazasNuevas = req.body.plazas !== undefined ? (parseInt(req.body.plazas, 10) || 4) : act.rows[0].plazas;
+      const catNueva = req.body.categoria_id !== undefined ? parseInt(req.body.categoria_id, 10) : act.rows[0].categoria_id;
+      const catVieja = act.rows[0].categoria_id;
+      const cambiaCat = (isNaN(catNueva) ? null : catNueva) !== (catVieja == null ? null : catVieja);
+      if (plazasNuevas !== act.rows[0].plazas || cambiaCat) {
+        const plazasOk = await comprobarPlazasChofer(plazasNuevas, catNueva);
+        if (plazasOk.error) return res.status(400).json({ error: plazasOk.error });
+      }
+    }
+  }
   valores.push(req.params.id);
   try {
     await pool.query(`UPDATE conductores SET ${cambios.join(', ')} WHERE id = $${valores.length}`, valores);
@@ -5500,6 +5553,12 @@ app.post('/admin/conductores/:id/cambios/decidir', requireAdmin, asyncHandler(as
     return res.json({ ok: true });
   }
 
+  // (02/11/2026) Si el chofer propone más plazas de las que admite su categoría, no se aprueba
+  if (propuesta.plazas) {
+    const catQ = await pool.query('SELECT categoria_id FROM conductores WHERE id = $1', [req.params.id]);
+    const plazasOk = await comprobarPlazasChofer(propuesta.plazas.nuevo, catQ.rows.length ? catQ.rows[0].categoria_id : null);
+    if (plazasOk.error) return res.status(400).json({ error: plazasOk.error + ' O rechaza el cambio.' });
+  }
   const campos = Object.keys(propuesta);
   const cambios = [];
   const valores = [];
@@ -10248,6 +10307,14 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
 
   const hash = await bcrypt.hash(password, 10);
   const catId = categoria_id ? parseInt(categoria_id) : null;
+  // (02/11/2026) Plazas como máximo las de la categoría elegida (si no llegan, 4 o el máximo si es menor)
+  let plazasAlta = parseInt(plazas, 10);
+  if (isNaN(plazasAlta)) {
+    const cq = catId ? await pool.query('SELECT capacidad_pasajeros FROM categorias_vehiculos WHERE id = $1', [catId]) : { rows: [] };
+    plazasAlta = Math.min(4, cq.rows.length ? cq.rows[0].capacidad_pasajeros : 4);
+  }
+  const plazasAltaOk = await comprobarPlazasChofer(plazasAlta, catId);
+  if (plazasAltaOk.error) return res.status(400).json({ error: plazasAltaOk.error });
 
   await pool.query(
     `INSERT INTO conductores (
@@ -10264,7 +10331,7 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
       municipio_licencia||'', numero_licencia||'',
       central_flota||'', catId,
       vehiculo_marca||'', vehiculo_modelo||'', matricula||'',
-      numero_taxi||'', plazas ? parseInt(plazas) : 4,
+      numero_taxi||'', plazasAltaOk.plazas,
       isla||'Gran Canaria', observaciones||'',
       foto||null, foto ? 'pendiente' : 'sin_foto'
     ]
@@ -10397,7 +10464,7 @@ app.get('/chofer/me', requireChofer, asyncHandler(async (req, res) => {
             c.vehiculo_marca, c.vehiculo_modelo, c.matricula, c.numero_taxi, c.plazas, c.isla,
             c.estado, c.foto, c.foto_estado, c.foto_motivo, c.permitir_edicion_ficha, c.cambios_pendientes,
             c.disponible_hoy,
-            cat.nombre AS categoria
+            cat.nombre AS categoria, cat.capacidad_pasajeros AS categoria_max_plazas
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
      WHERE c.id = $1`,
@@ -10481,6 +10548,17 @@ app.post('/chofer/mi-perfil', requireChofer, asyncHandler(async (req, res) => {
 
   if (Object.keys(propuesta).length === 0) {
     return res.status(400).json({ error: 'No hay ningún cambio que enviar.' });
+  }
+  // (02/11/2026) El chofer no puede proponer más plazas de las que admite su categoría
+  if (propuesta.plazas) {
+    const plazasOk = await comprobarPlazasChofer(propuesta.plazas.nuevo, c.categoria_id);
+    if (plazasOk.error) {
+      const maxQ = await pool.query('SELECT capacidad_pasajeros FROM categorias_vehiculos WHERE id = $1', [c.categoria_id]);
+      return res.status(400).json({ error: maxQ.rows.length
+        ? 'Tu categoría admite hasta ' + maxQ.rows[0].capacidad_pasajeros + ' plazas. Si tu vehículo tiene más, comunícalo a la administración.'
+        : plazasOk.error });
+    }
+    propuesta.plazas.nuevo = String(plazasOk.plazas);
   }
 
   await pool.query(
