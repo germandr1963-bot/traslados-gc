@@ -731,6 +731,14 @@
       return { telefono: pref + ' ' + num.replace(/\s/g, '') };
     }
 
+    function opcionesPlazasPerfil(max, actual) {
+      var html = '';
+      var act = parseInt(actual, 10);
+      for (var i = 1; i <= max; i++) html += '<option value="' + i + '"' + (i === act ? ' selected' : '') + '>' + i + '</option>';
+      if (act > max) html += '<option value="' + act + '" selected>' + act + '</option>';
+      return html;
+    }
+
     function campoPerfil(etiqueta, id, valor) {
       return '<label class="etiqueta" style="display:block;margin-top:10px">' + etiqueta + '</label>' +
         '<input class="campo" id="p-' + id + '" type="text" value="' + escapar(valor == null ? '' : valor) + '" style="width:100%;box-sizing:border-box">';
@@ -798,7 +806,9 @@
           '</div>' +
           campoPerfil('Matrícula', 'matricula', conductor.matricula) +
           campoPerfil('Nº de taxi', 'numero_taxi', conductor.numero_taxi) +
-          campoPerfil('Plazas', 'plazas', conductor.plazas) +
+          // (02/11/2026) Plazas en selector, como máximo las de su categoría (Admin → Categorías manda)
+          '<label class="etiqueta" style="display:block;margin-top:10px">Plazas</label>' +
+          '<select class="campo" id="p-plazas" style="width:100%;box-sizing:border-box">' + opcionesPlazasPerfil(conductor.categoria_max_plazas || 25, conductor.plazas) + '</select>' +
           campoPerfil('Isla', 'isla', conductor.isla) +
           '<div id="aviso-mi-perfil" style="display:none;margin-top:10px;font-size:13px"></div>' +
           '<button class="boton-cartel" style="margin-top:14px" onclick="guardarMiPerfil()">💾 Guardar cambios</button>';

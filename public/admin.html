@@ -2860,8 +2860,8 @@ function formularioCategoria(cat) {
       return '<option value="' + i.id + '"' + (cat.isla_id === i.id ? ' selected' : '') + '>' + escapar(i.nombre) + '</option>';
     }).join('') +
     '</select>' +
-    '<label class="etiqueta">Pasajeros (capacidad)</label>' +
-    '<input class="campo" id="cat-pasajeros" type="number" min="1" value="' + (cat.capacidad_pasajeros || 4) + '" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Pasajeros (capacidad máxima)</label>' +
+    '<select class="campo" id="cat-pasajeros" style="margin-bottom:10px">' + opcionesPlazas(25, cat.capacidad_pasajeros || 4) + '</select>' +
     '<label class="etiqueta">Maletas (texto libre, ej.: "3 grandes")</label>' +
     '<input class="campo" id="cat-maletas" type="text" value="' + escapar(cat.capacidad_maletas || '') + '" style="margin-bottom:10px">' +
     '<label class="etiqueta">Sillas de bebé (máximo)</label>' +
@@ -2939,6 +2939,7 @@ function noAfectaTextosGuardar(cajaId, ids) {
 }
 
 function guardarCategoria(id) {
+  catalogoConductorCache = null; // (02/11/2026) las fichas de choferes vuelven a leer los máximos de cada categoría
   var datos = {
     orden: document.getElementById('cat-orden').value,
     nombre: document.getElementById('cat-nombre').value,
@@ -3203,6 +3204,31 @@ function leerTelefonoPrefijo(idNum) {
   return { telefono: pref + ' ' + num.replace(/\s/g, '') };
 }
 
+// (02/11/2026) Admin → Categorías manda: las plazas se eligen en un selector de 1 al máximo.
+// Si el valor guardado pasa del máximo (chofer de antes), sale marcado con ⚠️ para que el Admin decida.
+function opcionesPlazas(max, actual) {
+  var html = '';
+  var act = parseInt(actual, 10);
+  for (var i = 1; i <= max; i++) {
+    html += '<option value="' + i + '"' + (i === act ? ' selected' : '') + '>' + i + '</option>';
+  }
+  if (act > max) html += '<option value="' + act + '" selected>⚠️ ' + act + ' — más que su categoría (' + max + ')</option>';
+  return html;
+}
+function maxPlazasCategoria(catId) {
+  var cat = (catalogoConductorCache && catalogoConductorCache.categorias || []).find(function (c) { return String(c.id) === String(catId); });
+  return cat ? (parseInt(cat.capacidad_pasajeros, 10) || 25) : 25;
+}
+function ajustarSelectorPlazas(idPlazas, idCategoria) {
+  var sel = document.getElementById(idPlazas);
+  var catEl = document.getElementById(idCategoria);
+  if (!sel || !catEl) return;
+  var max = maxPlazasCategoria(catEl.value);
+  var act = parseInt(sel.value, 10) || 4;
+  if (act > max) act = sel.dataset.guardadas && parseInt(sel.dataset.guardadas, 10) === act && catEl.value === sel.dataset.categoria ? act : max;
+  sel.innerHTML = opcionesPlazas(max, act);
+}
+
 function campoFicha(etiqueta, idCampo, valor, tipo) {
   return '<label class="etiqueta" style="margin:0;white-space:nowrap">' + etiqueta + '</label>' +
     '<input class="campo" id="f-' + idCampo + '" type="' + (tipo || 'text') + '" value="' + escapar(valor == null ? '' : String(valor)) + '">';
@@ -3314,12 +3340,13 @@ function verFichaConductor(id) {
           '<select class="campo" id="f-vehiculo_modelo" onchange="cambioModeloFicha()">' + modeloInfo.opts + '</select>' +
           campoFicha('Matrícula', 'matricula', c.matricula) +
           campoFicha('Nº de taxi', 'numero_taxi', c.numero_taxi) +
-          campoFicha('Plazas', 'plazas', c.plazas, 'number') +
+          '<label class="etiqueta" style="margin:0;white-space:nowrap">Plazas</label>' +
+          '<select class="campo" id="f-plazas" data-guardadas="' + (c.plazas || '') + '" data-categoria="' + (c.categoria_id || '') + '">' + opcionesPlazas(maxPlazasCategoria(c.categoria_id), c.plazas || 4) + '</select>' +
           '<label class="etiqueta" style="margin:0;white-space:nowrap">Isla</label>' +
           '<select class="campo" id="f-isla">' + opcionesIslaFicha(c.isla) + '</select>' +
           // (13/10/2026) Categoría dentro de la misma rejilla: mide lo mismo que los demás campos
           '<label class="etiqueta" style="margin:0;white-space:nowrap">Categoría del vehículo</label>' +
-          '<select class="campo" id="f-categoria_id">' +
+          '<select class="campo" id="f-categoria_id" onchange="ajustarSelectorPlazas(\'f-plazas\', \'f-categoria_id\')">' +
             // (13/10/2026) Sin categoría (eligió "Otro vehículo" en el alta): no se asigna ninguna por error
             '<option value=""' + (c.categoria_id ? '' : ' selected') + '>— Sin categoría (Otro vehículo) —</option>' +
             catalogoConductorCache.categorias.map(function(cat) {
@@ -3511,7 +3538,7 @@ function formularioConductor() {
     '<label class="etiqueta">Municipio de la licencia</label><input class="campo" id="ac-municipio-licencia" type="text" style="margin-bottom:10px">' +
     '<label class="etiqueta">Número de licencia</label><input class="campo" id="ac-numero-licencia" type="text" style="margin-bottom:10px">' +
     '<label class="etiqueta">Central de flota (opcional)</label><input class="campo" id="ac-central" type="text" style="margin-bottom:10px">' +
-    '<label class="etiqueta">Categoría del vehículo</label><select class="campo" id="ac-categoria" style="margin-bottom:10px">' + opcionesCategoria + '</select>' +
+    '<label class="etiqueta">Categoría del vehículo</label><select class="campo" id="ac-categoria" onchange="ajustarSelectorPlazas(\'ac-plazas\', \'ac-categoria\')" style="margin-bottom:10px">' + opcionesCategoria + '</select>' +
     '<label class="etiqueta">Marca</label>' +
     '<select class="campo" id="ac-marca" onchange="cargarModelosConductor()" style="margin-bottom:10px"><option value="">Selecciona marca…</option>' + opcionesMarca + '<option value="__nueva">➕ Otra marca</option></select>' +
     '<div id="ac-marca-nueva-caja" class="oculto"><label class="etiqueta">Nueva marca</label><input class="campo" id="ac-marca-nueva" type="text" style="margin-bottom:10px"></div>' +
@@ -3520,7 +3547,9 @@ function formularioConductor() {
     '<div id="ac-modelo-nuevo-caja" class="oculto"><label class="etiqueta">Nuevo modelo</label><input class="campo" id="ac-modelo-nuevo" type="text" style="margin-bottom:10px"></div>' +
     '<label class="etiqueta">Matrícula</label><input class="campo" id="ac-matricula" type="text" style="margin-bottom:10px">' +
     '<label class="etiqueta">Número de taxi (opcional)</label><input class="campo" id="ac-numero-taxi" type="text" style="margin-bottom:10px">' +
-    '<label class="etiqueta">Plazas</label><input class="campo" id="ac-plazas" type="number" min="1" max="12" value="4" style="margin-bottom:10px">' +
+    '<label class="etiqueta">Plazas</label><select class="campo" id="ac-plazas" style="margin-bottom:10px">' +
+      opcionesPlazas(maxPlazasCategoria(catalogoConductorCache.categorias.length ? catalogoConductorCache.categorias[0].id : ''),
+        Math.min(4, maxPlazasCategoria(catalogoConductorCache.categorias.length ? catalogoConductorCache.categorias[0].id : ''))) + '</select>' +
     '<label class="etiqueta">Isla</label><select class="campo" id="ac-isla" style="margin-bottom:10px">' +
       '<option>Gran Canaria</option><option>Tenerife</option><option>Lanzarote</option>' +
       '<option>Fuerteventura</option><option>La Palma</option><option>La Gomera</option><option>El Hierro</option>' +
