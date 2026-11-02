@@ -2275,8 +2275,27 @@ function cargarPendientesTraduccion() {
         var n = d && d[sec] ? parseInt(d[sec], 10) : 0;
         if (n > 0) { b.textContent = n; b.style.display = 'inline'; } else { b.style.display = 'none'; }
       });
+      window._pendFotos = (d && d.fotos) || { cat: {}, ruta: {}, destino: {} };
+      pintarBadgesFotosPend();
     })
     .catch(function () {});
+}
+
+// (02/11/2026) N36 — En las listas con fotos (SEO de categorías, SEO de rutas, Páginas Destino), la fila
+// lleva la misma etiqueta roja «📷 N» si N fotos tienen algún alt text en 🔴.
+function badgeFotosPend(tipo, id) {
+  return '<span class="badge-foto-pend" data-tipo="' + tipo + '" data-id="' + id + '" title="" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:6px;font-weight:600;"></span>';
+}
+function pintarBadgesFotosPend() {
+  var p = window._pendFotos || { cat: {}, ruta: {}, destino: {} };
+  document.querySelectorAll('.badge-foto-pend').forEach(function (b) {
+    var n = (p[b.dataset.tipo] || {})[b.dataset.id] || 0;
+    if (n > 0) {
+      b.textContent = '📷 ' + n;
+      b.title = n + (n === 1 ? ' foto con alt texts pendientes' : ' fotos con alt texts pendientes');
+      b.style.display = 'inline';
+    } else { b.style.display = 'none'; }
+  });
 }
 
 // "🔄 Actualizar": recarga la página completa (trae siempre la última versión) y vuelve a la misma sección
@@ -3847,13 +3866,14 @@ function renderizarTablaSEO(datos) {
       ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#e8f5e9;color:#2e7d32;">✓ Visible</span>'
       : '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#f5f5f5;color:#aaa;">Oculto</span>';
     return '<tr>' +
-      '<td><strong>' + escapar(ruta.origen) + ' → ' + escapar(ruta.destino) + '</strong></td>' +
+      '<td><strong>' + escapar(ruta.origen) + ' → ' + escapar(ruta.destino) + '</strong>' + badgeFotosPend('ruta', ruta.id) + '</td>' +
       celdas +
       '<td style="text-align:center;">' + visibleBadge + '</td>' +
       '<td style="text-align:center;font-weight:600;">' + (ruta.num_fotos || 0) + '</td>' +
       '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorSEO(' + ruta.id + ')">✏️ Editar</button></td>' +
     '</tr>';
   }).join('');
+  pintarBadgesFotosPend();
 }
 
 var editorSEOCache = {}; // rutaId -> { lang: {..., excede} }
@@ -11762,7 +11782,7 @@ function cargarPaginaRutas() {
           ? '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#e8f5e9;color:#2e7d32;">✓ Visible</span>'
           : '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:#f5f5f5;color:#aaa;">Oculto</span>';
         html += '<tr>' +
-          '<td style="max-width:220px;"><strong>' + escapar(dest.nombre) + '</strong><br><div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:2px;">' + badgesIdioma + '</div></td>' +
+          '<td style="max-width:220px;"><strong>' + escapar(dest.nombre) + '</strong>' + badgeFotosPend('destino', dest.id) + '<br><div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:2px;">' + badgesIdioma + '</div></td>' +
           '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(dest.isla || 'Gran Canaria') + '</td>' +
           '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(dest.zona || '—') + '</td>' +
           '<td style="text-align:center">' + visibleBadge + '</td>' +
@@ -11773,6 +11793,7 @@ function cargarPaginaRutas() {
           '</tr>';
       });
       cuerpo.innerHTML = html;
+      pintarBadgesFotosPend();
     })
     .catch(function() {
       cuerpo.innerHTML = '<tr><td colspan="5" style="color:var(--rojo-error)">Error al cargar.</td></tr>';
@@ -12153,6 +12174,7 @@ function pintarPestanasAltFoto(fotoId) {
 }
 // Vuelve a leer los alt texts de la foto: repinta pestañas (sin cerrar), el campo del idioma abierto y la lista de fotos
 function recargarAltTextosFoto(destinoId, fotoId) {
+  cargarPendientesTraduccion(); // (02/11/2026) N36: el menú y la fila se actualizan al guardar
   return fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/alt')
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -12366,6 +12388,7 @@ var ALT_GEN = {
 };
 function recargarAltGen(tipo, padreId, fotoId) {
   var c = ALT_GEN[tipo];
+  cargarPendientesTraduccion(); // (02/11/2026) N36: el menú y la fila se actualizan al guardar
   return fetch(c.base(padreId) + '/fotos/' + fotoId + '/alt')
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -13655,11 +13678,12 @@ function renderizarTablaSEOCat(datos) {
       return '<td style="text-align:center">' + badgeSEOCat(seoCat[lang]) + '</td>';
     }).join('');
     return '<tr>' +
-      '<td><strong>' + escapar(cat.nombre) + '</strong></td>' +
+      '<td><strong>' + escapar(cat.nombre) + '</strong>' + badgeFotosPend('cat', cat.id) + '</td>' +
       celdas +
       '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorSEOCat(' + cat.id + ')">✏️ Editar</button></td>' +
     '</tr>';
   }).join('');
+  pintarBadgesFotosPend();
 }
 
 function abrirEditorSEOCat(catId) {
