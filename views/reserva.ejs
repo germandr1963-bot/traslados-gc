@@ -1091,20 +1091,37 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
           }
         });
     });
-    fetch('/api/categorias?lang=' + LANG).then(function(r){ return r.json(); }).then(function(cats){
-      var cat = cats.find(function(c){ return String(c.id) === String(paramCategoriaId); });
-      if (!cat) return;
+    // (02/11/2026) Pasajeros según los choferes de esa categoría que trabajan en la fecha elegida
+    // (igual que el buscador); si cambia la fecha, se vuelve a calcular.
+    cargarMaxPasajeros();
+    document.getElementById('fecha').addEventListener('change', cargarMaxPasajeros);
+    function cargarMaxPasajeros() {
+      var f = document.getElementById('fecha').value;
+      var conFecha = /^\d{4}-\d{2}-\d{2}$/.test(f);
+      fetch('/api/categorias?lang=' + LANG + (conFecha ? '&fecha=' + encodeURIComponent(f) : '')).then(function(r){ return r.json(); }).then(function(cats){
+        var cat = cats.find(function(c){ return String(c.id) === String(paramCategoriaId); });
+        if (cat) return pintarMaxPasajeros(cat);
+        // Ese día no hay choferes de esta categoría: la capacidad de la categoría, como hasta ahora
+        fetch('/api/categorias-publicas?lang=' + LANG).then(function(r){ return r.json(); }).then(function(todas){
+          var c2 = todas.find(function(c){ return String(c.id) === String(paramCategoriaId); });
+          if (c2) pintarMaxPasajeros(c2);
+        }).catch(function(){});
+      });
+    }
+    function pintarMaxPasajeros(cat) {
       categoriaNombre = cat.nombre_traducido || cat.nombre;
       document.getElementById('tbl-categoria').textContent = (cat.nombre_traducido || cat.nombre) + ' · ' + textoPax(cat.capacidad_pasajeros);
       var maxPax = parseInt(cat.capacidad_pasajeros) || 8;
       var sel = document.getElementById('num-pasajeros');
+      var antes = parseInt(sel.value, 10) || 1;
       sel.innerHTML = '';
       for (var i = 1; i <= maxPax; i++) {
         var opt = document.createElement('option');
         opt.value = i; opt.textContent = i;
+        if (i === Math.min(antes, maxPax)) opt.selected = true;
         sel.appendChild(opt);
       }
-    });
+    }
   } else {
     // Sin categoría: pasajeros por defecto
     var sel = document.getElementById('num-pasajeros');
