@@ -391,7 +391,8 @@
     input.addEventListener('change', function () { if (!input._horaTecleando) input._horaBuf = ''; refrescarFH(input); });
     // (03/11/2026) Si se sale de la casilla con la hora a medias, se descarta lo escrito
     input.addEventListener('blur', function () { input._horaBuf = ''; refrescarFH(input); });
-    input.addEventListener('click', function () { abrirFH(input); });
+    // (03/11/2026) En la HORA, pulsar en la casilla deja escribir; el reloj se abre con su icono 🕐 (el del navegador)
+    input.addEventListener('click', function () { if (input.type !== 'time') abrirFH(input); });
     // En el ordenador la FECHA no se teclea (no se vería): se elige en el calendario. Borrar la vacía.
     // (03/11/2026) La HORA sí se puede escribir: «2125» → 21:25 (los «:» ya están puestos). El reloj sigue igual.
     function ponerHora(v) {
