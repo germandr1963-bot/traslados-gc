@@ -3465,8 +3465,8 @@ Pulsa el botón para crear una nueva contraseña:
     { clave: 'chofer_respuesta_ya_asignada', nombre: 'Respuesta al SI: ya asignada a otro compañero', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'ℹ️ La reserva *{numero_reserva}* ya ha sido asignada a otro compañero. Gracias por tu disponibilidad.' },
     { clave: 'chofer_respuesta_rechazo', nombre: 'Respuesta al NO: rechazo recibido', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '👍 Recibido, gracias por avisar.' },
     // (03/11/2026) Reserva cerrada antes de que nadie la acepte: a todos los choferes avisados (y a quien responda SI después)
-    { clave: 'chofer_aviso_cancelada', nombre: 'Reserva cancelada por el cliente (a los choferes avisados)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '❌ *Reserva cancelada*\nLa reserva *{numero_reserva}* ({origen} → {destino}, {fecha} · {hora}) ha sido cancelada por el cliente. Ya no está disponible.' },
-    { clave: 'chofer_aviso_anulada', nombre: 'Reserva anulada sin chofer (a los choferes avisados)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '❌ *Reserva anulada*\nLa reserva *{numero_reserva}* ({origen} → {destino}, {fecha} · {hora}) ha sido anulada. Ya no está disponible.' },
+    { clave: 'chofer_aviso_cancelada', nombre: 'Reserva cancelada por el cliente (a los choferes avisados)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n❌ *Reserva cancelada:* {numero_reserva}\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nLa reserva ha sido cancelada por el cliente. Ya no está disponible.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+    { clave: 'chofer_aviso_anulada', nombre: 'Reserva anulada sin chofer (a los choferes avisados)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n❌ *Reserva anulada:* {numero_reserva}\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nLa reserva ha sido anulada. Ya no está disponible.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_enlace_mensaje_cliente', nombre: 'Enlace: mensaje del cliente (al chofer)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '📩 *Mensaje del cliente*\n🔖 *Reserva:* {numero_reserva}\n👤 *Cliente:* {nombre_cliente} ({idioma})\n\n«{mensaje}»\n{original}\n\nPara responder, escribe aquí tu mensaje. Si tienes varios servicios a la vez, empieza por *{numero_reserva}*.' },
     { clave: 'chofer_enlace_enviado', nombre: 'Enlace: enviado al cliente', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '✅ Enviado al cliente · *{numero_reserva}*' },
     { clave: 'chofer_enlace_sin_servicio', nombre: 'Enlace: no encuentro servicio en curso', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'ℹ️ No encuentro ningún servicio tuyo en curso. Para escribir a un cliente, empieza tu mensaje con el número de reserva, por ejemplo: *ABC123* Estoy en la puerta 2. El enlace funciona desde 2 horas antes hasta 2 horas después del servicio.' },
@@ -12272,8 +12272,8 @@ const RESPALDO_PLANTILLAS_CHOFER = {
   chofer_respuesta_confirmado: '✅ *Servicio confirmado*\nLa reserva *{numero_reserva}* es tuya. Revisa todos los detalles en tu panel.',
   chofer_respuesta_ya_asignada: 'ℹ️ La reserva *{numero_reserva}* ya ha sido asignada a otro compañero. Gracias por tu disponibilidad.',
   chofer_respuesta_rechazo: '👍 Recibido, gracias por avisar.',
-  chofer_aviso_cancelada: '❌ *Reserva cancelada*\nLa reserva *{numero_reserva}* ({origen} → {destino}, {fecha} · {hora}) ha sido cancelada por el cliente. Ya no está disponible.',
-  chofer_aviso_anulada: '❌ *Reserva anulada*\nLa reserva *{numero_reserva}* ({origen} → {destino}, {fecha} · {hora}) ha sido anulada. Ya no está disponible.',
+  chofer_aviso_cancelada: 'Hola, *{nombre_chofer}* 👋\n\n❌ *Reserva cancelada:* {numero_reserva}\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nLa reserva ha sido cancelada por el cliente. Ya no está disponible.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*',
+  chofer_aviso_anulada: 'Hola, *{nombre_chofer}* 👋\n\n❌ *Reserva anulada:* {numero_reserva}\n📍 *Ruta:* {origen} → {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nLa reserva ha sido anulada. Ya no está disponible.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*',
   chofer_enlace_mensaje_cliente: '📩 *Mensaje del cliente*\n🔖 *Reserva:* {numero_reserva}\n👤 *Cliente:* {nombre_cliente} ({idioma})\n\n«{mensaje}»\n{original}\n\nPara responder, escribe aquí tu mensaje. Si tienes varios servicios a la vez, empieza por *{numero_reserva}*.',
   chofer_enlace_enviado: '✅ Enviado al cliente · *{numero_reserva}*',
   chofer_enlace_sin_servicio: 'ℹ️ No encuentro ningún servicio tuyo en curso. Para escribir a un cliente, empieza tu mensaje con el número de reserva, por ejemplo: *ABC123* Estoy en la puerta 2. El enlace funciona desde 2 horas antes hasta 2 horas después del servicio.',
@@ -12307,15 +12307,17 @@ async function avisarChoferesReservaCerrada(reservaId, clave, soloConductorId) {
   const r = q.rows[0];
   const ids = soloConductorId ? [Number(soloConductorId)] : (r.conductor_id ? [] : (r.choferes_avisados || []));
   if (!ids.length) return;
-  const texto = await plantillaChoferWa(clave, {
-    numero_reserva: r.numero_reserva,
-    origen: r.origen || '—',
-    destino: r.destino || '—',
-    fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—',
-    hora: r.hora ? String(r.hora).slice(0, 5) : '—'
-  }, '❌ La reserva ' + r.numero_reserva + ' ya no está disponible.');
-  const ch = await pool.query("SELECT telefono FROM conductores WHERE id = ANY($1::int[]) AND telefono IS NOT NULL AND telefono <> ''", [ids]);
+  const ch = await pool.query("SELECT nombre, telefono FROM conductores WHERE id = ANY($1::int[]) AND telefono IS NOT NULL AND telefono <> ''", [ids]);
   for (const c of ch.rows) {
+    // Mismo formato que «Cancelación asignada (al chofer)»: con el nombre de cada chofer
+    const texto = await plantillaChoferWa(clave, {
+      nombre_chofer: c.nombre || '',
+      numero_reserva: r.numero_reserva,
+      origen: r.origen || '—',
+      destino: r.destino || '—',
+      fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—',
+      hora: r.hora ? String(r.hora).slice(0, 5) : '—'
+    }, '❌ La reserva ' + r.numero_reserva + ' ya no está disponible.');
     await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [c.telefono, texto]);
   }
   if (!soloConductorId) await pool.query('UPDATE reservas SET choferes_avisados = NULL WHERE id = $1', [reservaId]);
@@ -18910,8 +18912,8 @@ const VARIABLES_PLANTILLAS = {
   interno_registro_chofer:       { email: ['nombre_chofer', 'email_chofer', 'telefono_chofer', 'vehiculo', 'isla'], wa: null },
   chofer_respuesta_confirmado:   { email: null, wa: ['numero_reserva'] },
   chofer_respuesta_rechazo:      { email: null, wa: [] },
-  chofer_aviso_cancelada:        { email: null, wa: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora'] },
-  chofer_aviso_anulada:          { email: null, wa: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora'] },
+  chofer_aviso_cancelada:        { email: null, wa: _VCH },
+  chofer_aviso_anulada:          { email: null, wa: _VCH },
   chofer_respuesta_ya_asignada:  { email: null, wa: ['numero_reserva'] },
   chofer_servicio_asignado:      { email: null, wa: _VCH.concat(['pasajeros', 'idioma']) },
   chofer_servicio_reasignado:    { email: null, wa: _VCH },
