@@ -3455,8 +3455,8 @@ Pulsa el botón para crear una nueva contraseña:
       cuerpo_email: '{"nombre":"Traslados GC","subtitulo":"Gran Canaria","colorCabecera":"#2c2c2c","colorNombre":"#d4956a","pie":"Traslados GC \u00b7 Gran Canaria"}',
       cuerpo_whatsapp: null },
     // ── Mensajes al chofer e internos (30/09/2026): antes estaban fijos en el programa. Solo en español. ──
-    { clave: 'chofer_aviso_reserva', nombre: 'Aviso de servicio nuevo (a los choferes)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '🚖 *Nuevo traslado disponible*\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n\nResponde *SI* para aceptar o *NO* para rechazar.' },
-    { clave: 'chofer_aviso_reasignacion', nombre: 'Servicio a reasignar (a los choferes)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '🔄 *SERVICIO A REASIGNAR*\n_Un compañero no puede hacer este servicio._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n\nResponde *SI* para aceptar o *NO* para rechazar.' },
+    { clave: 'chofer_aviso_reserva', nombre: 'Aviso de servicio nuevo (a los choferes)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '🚖 *Nuevo traslado disponible*\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n👥 *Pasajeros:* {pasajeros}\n\nResponde *SI* para aceptar o *NO* para rechazar.' },
+    { clave: 'chofer_aviso_reasignacion', nombre: 'Servicio a reasignar (a los choferes)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '🔄 *SERVICIO A REASIGNAR*\n_Un compañero no puede hacer este servicio._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n👥 *Pasajeros:* {pasajeros}\n\nResponde *SI* para aceptar o *NO* para rechazar.' },
     { clave: 'chofer_servicio_asignado', nombre: 'Servicio asignado en sustitución (al chofer nuevo)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n✅ *Servicio asignado*\n_Se te asigna este servicio en sustitución de un compañero._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n👥 *Pasajeros:* {pasajeros}\n🌐 *Idioma del cliente:* {idioma}\n\nRevisa todos los detalles en tu panel. El cartel de recogida te llegará cuando el cliente haya pagado el depósito.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_servicio_reasignado', nombre: 'Servicio reasignado a otro compañero (al chofer anterior)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\nℹ️ *Servicio reasignado*\n_Este servicio se ha asignado a otro compañero. Ya no tienes que hacerlo._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nQueda liberado de tu agenda. Gracias.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_respuesta_confirmado', nombre: 'Respuesta al SI: servicio confirmado', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '✅ *Servicio confirmado*\nLa reserva *{numero_reserva}* es tuya. Revisa todos los detalles en tu panel.' },
@@ -12260,8 +12260,8 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
 // Respaldo de las plantillas de chofer (30/09/2026): el MISMO texto y los mismos iconos que en
 // Admin → Comunicaciones → Chofer. Solo se usa si la plantilla no existe o está desactivada.
 const RESPALDO_PLANTILLAS_CHOFER = {
-  chofer_aviso_reserva: '🚖 *Nuevo traslado disponible*\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n\nResponde *SI* para aceptar o *NO* para rechazar.',
-  chofer_aviso_reasignacion: '🔄 *SERVICIO A REASIGNAR*\n_Un compañero no puede hacer este servicio._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n\nResponde *SI* para aceptar o *NO* para rechazar.',
+  chofer_aviso_reserva: '🚖 *Nuevo traslado disponible*\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n👥 *Pasajeros:* {pasajeros}\n\nResponde *SI* para aceptar o *NO* para rechazar.',
+  chofer_aviso_reasignacion: '🔄 *SERVICIO A REASIGNAR*\n_Un compañero no puede hacer este servicio._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n👥 *Pasajeros:* {pasajeros}\n\nResponde *SI* para aceptar o *NO* para rechazar.',
   chofer_servicio_asignado: 'Hola, *{nombre_chofer}* 👋\n\n✅ *Servicio asignado*\n_Se te asigna este servicio en sustitución de un compañero._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n👥 *Pasajeros:* {pasajeros}\n🌐 *Idioma del cliente:* {idioma}\n\nRevisa todos los detalles en tu panel. El cartel de recogida te llegará cuando el cliente haya pagado el depósito.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*',
   chofer_servicio_reasignado: 'Hola, *{nombre_chofer}* 👋\n\nℹ️ *Servicio reasignado*\n_Este servicio se ha asignado a otro compañero. Ya no tienes que hacerlo._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nQueda liberado de tu agenda. Gracias.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*',
   chofer_respuesta_confirmado: '✅ *Servicio confirmado*\nLa reserva *{numero_reserva}* es tuya. Revisa todos los detalles en tu panel.',
@@ -18182,6 +18182,17 @@ app.get('/api/whatsapp/plantilla/:clave', requierePuenteWhatsapp, asyncHandler(a
       console.warn('Datos del traslado para el WhatsApp de "Seguimos gestionando":', eGest.message);
     }
   }
+  // (03/11/2026) Aviso a los choferes (nuevo y reasignación): puente.js no envía los pasajeros,
+  // así que el servidor los añade (el número, igual que en el voucher) para que el chofer sepa cuántos son.
+  if ((req.params.clave === 'chofer_aviso_reserva' || req.params.clave === 'chofer_aviso_reasignacion') && varsPlantilla.pasajeros === undefined && varsPlantilla.numero_reserva) {
+    try {
+      const rp = await pool.query('SELECT num_pasajeros FROM reservas WHERE numero_reserva = $1', [varsPlantilla.numero_reserva]);
+      varsPlantilla.pasajeros = (rp.rows.length && rp.rows[0].num_pasajeros) ? String(rp.rows[0].num_pasajeros) : '—';
+    } catch (ePax) {
+      console.warn('Pasajeros para el aviso a los choferes:', ePax.message);
+      varsPlantilla.pasajeros = '—';
+    }
+  }
   const resultado = await obtenerPlantilla(req.params.clave, varsPlantilla, lang);
   if (!resultado) return res.json({ ok: false });
   res.json({ ok: true, whatsapp: resultado.whatsapp });
@@ -18817,8 +18828,8 @@ const _VCONF = _V6.concat(['categoria', 'chofer', 'importe_deposito', 'horas_can
 const VARIABLES_PLANTILLAS = {
   // Chofer
   chofer_alta_datos_acceso:      { email: ['nombre_chofer', 'email_chofer', 'password_temporal', 'url_portal'], wa: null },
-  chofer_aviso_reserva:          { email: null, wa: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora', 'categoria'] },
-  chofer_aviso_reasignacion:     { email: null, wa: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora', 'categoria'] },
+  chofer_aviso_reserva:          { email: null, wa: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora', 'categoria', 'pasajeros'] },
+  chofer_aviso_reasignacion:     { email: null, wa: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora', 'categoria', 'pasajeros'] },
   chofer_bienvenida:             { email: ['nombre_chofer', 'url_portal'], wa: null },
   chofer_cancelacion:            { email: null, wa: _VCH },
   chofer_cancelacion_no_pago:    { email: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'], wa: ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha'] },
