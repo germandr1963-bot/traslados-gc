@@ -4813,6 +4813,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
       destino: destino || '—',
       fecha: fechaTexto,
       hora: horaTexto,
+      pasajeros: num_pasajeros ? String(num_pasajeros) : '—', // (03/11/2026)
       extras: _extrasAcuse
     }, _langCliente);
     const htmlEmail = plantillaEmail(
@@ -12175,6 +12176,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         hora: r.hora ? r.hora.slice(0,5) : '—',
         categoria: r.categoria_nombre || '—',
         conductor: r.conductor_nombre || '',
+        pasajeros: r.num_pasajeros ? String(r.num_pasajeros) : '—', // (03/11/2026)
         importe_deposito: importe,
         horas_cancelacion: horas,
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
@@ -12241,6 +12243,7 @@ async function asignarChoferAReserva(reservaIdParam, conductor_id, motivo) {
         hora: r.hora ? r.hora.slice(0,5) : '—',
         categoria: r.categoria_nombre || '—',
         conductor: r.conductor_nombre || '',
+        pasajeros: r.num_pasajeros ? String(r.num_pasajeros) : '—', // (03/11/2026)
         importe_deposito: importe,
         horas_cancelacion: horas,
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
@@ -13369,6 +13372,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
     hora: r.hora ? r.hora.slice(0,5) : '—',
     categoria: r.categoria_nombre || '—',
     conductor: r.conductor_nombre || '',
+    pasajeros: r.num_pasajeros ? String(r.num_pasajeros) : '—', // (03/11/2026)
     importe_deposito: importe,
     horas_cancelacion: horas,
     fecha_limite_cancelacion: _textoLimiteCancelEmail,
@@ -13428,6 +13432,7 @@ app.post('/admin/reservas/:id/email-confirmacion', requireAdmin, asyncHandler(as
         hora: r.hora ? r.hora.slice(0,5) : '—',
         categoria: r.categoria_nombre || '—',
         conductor: r.conductor_nombre || '',
+        pasajeros: r.num_pasajeros ? String(r.num_pasajeros) : '—', // (03/11/2026)
         importe_deposito: importe,
         horas_cancelacion: horas,
         fecha_limite_cancelacion: _textoLimiteCancelEmail,
@@ -18220,6 +18225,16 @@ app.get('/api/whatsapp/plantilla/:clave', requierePuenteWhatsapp, asyncHandler(a
       console.warn('Datos del traslado para el WhatsApp de "Seguimos gestionando":', eGest.message);
     }
   }
+  // (03/11/2026) Acuse de recibo al cliente por WhatsApp: puente.js no envía los pasajeros; el servidor los añade.
+  if (req.params.clave === 'cliente_acuse_recibo' && varsPlantilla.pasajeros === undefined && varsPlantilla.numero_reserva) {
+    try {
+      const rpc = await pool.query('SELECT num_pasajeros FROM reservas WHERE numero_reserva = $1', [varsPlantilla.numero_reserva]);
+      varsPlantilla.pasajeros = (rpc.rows.length && rpc.rows[0].num_pasajeros) ? String(rpc.rows[0].num_pasajeros) : '—';
+    } catch (ePc) {
+      console.warn('Pasajeros para el acuse del cliente:', ePc.message);
+      varsPlantilla.pasajeros = '—';
+    }
+  }
   // (03/11/2026) Aviso a los choferes (nuevo y reasignación): puente.js no envía los pasajeros,
   // así que el servidor los añade (el número, igual que en el voucher) para que el chofer sepa cuántos son.
   if ((req.params.clave === 'chofer_aviso_reserva' || req.params.clave === 'chofer_aviso_reasignacion') && varsPlantilla.pasajeros === undefined && varsPlantilla.numero_reserva) {
@@ -18920,11 +18935,11 @@ const VARIABLES_PLANTILLAS = {
   chofer_solicitud_recibida:     { email: ['nombre_chofer'], wa: null },
   // Cliente
   cliente_acceso_reserva:        { email: _V6.concat(['password_temporal', 'url_portal']), wa: _V6.concat(['password_temporal', 'url_portal']) },
-  cliente_acuse_recibo:          { email: _V6.concat(['extras']), wa: _V6.concat(['extras']) },
+  cliente_acuse_recibo:          { email: _V6.concat(['pasajeros', 'extras']), wa: _V6.concat(['pasajeros', 'extras']) },
   cliente_cambio_conductor:      { email: _V6.concat(['nombre_chofer', 'nombre_conductor']), wa: _V6.concat(['nombre_chofer', 'nombre_conductor']) },
   cliente_cancelacion:           { email: _V6.concat(['aviso_deposito']), wa: _V6.concat(['aviso_deposito']) },
   cliente_cancelacion_no_pago:   { email: _V6, wa: _V6 },
-  cliente_confirmacion:          { email: _VCONF.concat(['boton_pago']), wa: _VCONF.concat(['url_pago']) },
+  cliente_confirmacion:          { email: _VCONF.concat(['pasajeros', 'boton_pago']), wa: _VCONF.concat(['pasajeros', 'url_pago']) },
   cliente_deposito_liberado:     { email: ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'numero_factura'], wa: ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'numero_factura'] },
   cliente_deposito_noshow:       { email: _V6.concat(['importe']), wa: _V6.concat(['importe']) },
   cliente_en_gestion:            { email: _V6, wa: _V6 },
