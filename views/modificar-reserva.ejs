@@ -350,6 +350,8 @@
   var valorNativo = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
   function textoFH(input) {
     var v = valorNativo.get.call(input);
+    // (03/11/2026) Hora a medio escribir: se ve con los «:» ya puestos (2-:-- · 21:-- · 21:2-)
+    if (input.type === 'time' && input._horaBuf) return (input._horaBuf + '----').slice(0, 2) + ':' + (input._horaBuf + '----').slice(2, 4);
     if (!v) return input.type === 'date' ? FH_FORMATO : '--:--';
     if (input.type === 'time') return v.slice(0, 5);
     var p = v.split('-');
@@ -362,7 +364,7 @@
     var s = input._fhTexto;
     if (!s) return;
     s.textContent = textoFH(input);
-    s.classList.toggle('fh-vacio', !valorNativo.get.call(input));
+    s.classList.toggle('fh-vacio', !valorNativo.get.call(input) && !input._horaBuf);
   }
   function abrirFH(input) { try { if (input.showPicker) input.showPicker(); } catch (e) {} }
   function prepararFH(input) {
@@ -386,13 +388,41 @@
       set: function (v) { valorNativo.set.call(this, v); refrescarFH(this); }
     });
     input.addEventListener('input', function () { refrescarFH(input); });
-    input.addEventListener('change', function () { refrescarFH(input); });
-    input.addEventListener('blur', function () { refrescarFH(input); });
+    input.addEventListener('change', function () { if (!input._horaTecleando) input._horaBuf = ''; refrescarFH(input); });
+    // (03/11/2026) Si se sale de la casilla con la hora a medias, se descarta lo escrito
+    input.addEventListener('blur', function () { input._horaBuf = ''; refrescarFH(input); });
     input.addEventListener('click', function () { abrirFH(input); });
-    // En el ordenador no se teclea (no se vería): se elige en el calendario/reloj. Borrar la vacía.
+    // En el ordenador la FECHA no se teclea (no se vería): se elige en el calendario. Borrar la vacía.
+    // (03/11/2026) La HORA sí se puede escribir: «2125» → 21:25 (los «:» ya están puestos). El reloj sigue igual.
+    function ponerHora(v) {
+      input._horaTecleando = true;
+      valorNativo.set.call(input, v);
+      refrescarFH(input);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      input._horaTecleando = false;
+    }
     input.addEventListener('keydown', function (e) {
       if (e.key === 'Tab') return;
       e.preventDefault();
+      if (input.type === 'time' && /^[0-9]$/.test(e.key)) {
+        var buf = (input._horaBuf || '').length >= 4 ? '' : (input._horaBuf || '');
+        var d = e.key;
+        if (buf.length === 0 && d > '2') buf = '0';                  // 9 → 09
+        else if (buf.length === 1 && buf === '2' && d > '3') return; // la hora llega hasta 23
+        else if (buf.length === 2 && d > '5') return;                // los minutos hasta 59
+        buf += d;
+        input._horaBuf = buf;
+        if (buf.length === 4) { ponerHora(buf.slice(0, 2) + ':' + buf.slice(2)); input._horaBuf = ''; }
+        else if (valorNativo.get.call(input)) ponerHora('');
+        else refrescarFH(input);
+        return;
+      }
+      if (input.type === 'time' && (e.key === 'Backspace' || e.key === 'Delete') && input._horaBuf) {
+        input._horaBuf = input._horaBuf.slice(0, -1);
+        refrescarFH(input);
+        return;
+      }
       if (e.key === 'Backspace' || e.key === 'Delete') {
         valorNativo.set.call(input, '');
         refrescarFH(input);
