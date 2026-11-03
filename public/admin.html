@@ -2358,7 +2358,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
     cargarPendientesTraduccion();
-    ['fondos', 'categorias', 'islas', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo', 'valoraciones', 'comunicaciones', 'contabilidad', 'pagina-rutas'].forEach(function (s) {
+    ['fondos', 'categorias', 'islas', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo', 'valoraciones', 'comunicaciones', 'contabilidad', 'pagina-rutas', 'modelo'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
