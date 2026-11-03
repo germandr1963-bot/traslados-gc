@@ -2507,6 +2507,8 @@ async function initSchema() {
   `);
 
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS email_confirmacion_enviado BOOLEAN DEFAULT FALSE`);
+  // (03/11/2026) Choferes a los que se envió el aviso de la reserva (para avisarles si se cancela antes de que nadie la acepte)
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS choferes_avisados INT[]`);
 
   // Historial de cambios de chofer
   await pool.query(`
@@ -3462,6 +3464,9 @@ Pulsa el botón para crear una nueva contraseña:
     { clave: 'chofer_respuesta_confirmado', nombre: 'Respuesta al SI: servicio confirmado', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '✅ *Servicio confirmado*\nLa reserva *{numero_reserva}* es tuya. Revisa todos los detalles en tu panel.' },
     { clave: 'chofer_respuesta_ya_asignada', nombre: 'Respuesta al SI: ya asignada a otro compañero', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'ℹ️ La reserva *{numero_reserva}* ya ha sido asignada a otro compañero. Gracias por tu disponibilidad.' },
     { clave: 'chofer_respuesta_rechazo', nombre: 'Respuesta al NO: rechazo recibido', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '👍 Recibido, gracias por avisar.' },
+    // (03/11/2026) Reserva cerrada antes de que nadie la acepte: a todos los choferes avisados (y a quien responda SI después)
+    { clave: 'chofer_aviso_cancelada', nombre: 'Reserva cancelada por el cliente (a los choferes avisados)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '❌ *Reserva cancelada*\nLa reserva *{numero_reserva}* ({origen} → {destino}, {fecha} · {hora}) ha sido cancelada por el cliente. Ya no está disponible.' },
+    { clave: 'chofer_aviso_anulada', nombre: 'Reserva anulada sin chofer (a los choferes avisados)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '❌ *Reserva anulada*\nLa reserva *{numero_reserva}* ({origen} → {destino}, {fecha} · {hora}) ha sido anulada. Ya no está disponible.' },
     { clave: 'chofer_enlace_mensaje_cliente', nombre: 'Enlace: mensaje del cliente (al chofer)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '📩 *Mensaje del cliente*\n🔖 *Reserva:* {numero_reserva}\n👤 *Cliente:* {nombre_cliente} ({idioma})\n\n«{mensaje}»\n{original}\n\nPara responder, escribe aquí tu mensaje. Si tienes varios servicios a la vez, empieza por *{numero_reserva}*.' },
     { clave: 'chofer_enlace_enviado', nombre: 'Enlace: enviado al cliente', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '✅ Enviado al cliente · *{numero_reserva}*' },
     { clave: 'chofer_enlace_sin_servicio', nombre: 'Enlace: no encuentro servicio en curso', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'ℹ️ No encuentro ningún servicio tuyo en curso. Para escribir a un cliente, empieza tu mensaje con el número de reserva, por ejemplo: *ABC123* Estoy en la puerta 2. El enlace funciona desde 2 horas antes hasta 2 horas después del servicio.' },
@@ -12267,6 +12272,8 @@ const RESPALDO_PLANTILLAS_CHOFER = {
   chofer_respuesta_confirmado: '✅ *Servicio confirmado*\nLa reserva *{numero_reserva}* es tuya. Revisa todos los detalles en tu panel.',
   chofer_respuesta_ya_asignada: 'ℹ️ La reserva *{numero_reserva}* ya ha sido asignada a otro compañero. Gracias por tu disponibilidad.',
   chofer_respuesta_rechazo: '👍 Recibido, gracias por avisar.',
+  chofer_aviso_cancelada: '❌ *Reserva cancelada*\nLa reserva *{numero_reserva}* ({origen} → {destino}, {fecha} · {hora}) ha sido cancelada por el cliente. Ya no está disponible.',
+  chofer_aviso_anulada: '❌ *Reserva anulada*\nLa reserva *{numero_reserva}* ({origen} → {destino}, {fecha} · {hora}) ha sido anulada. Ya no está disponible.',
   chofer_enlace_mensaje_cliente: '📩 *Mensaje del cliente*\n🔖 *Reserva:* {numero_reserva}\n👤 *Cliente:* {nombre_cliente} ({idioma})\n\n«{mensaje}»\n{original}\n\nPara responder, escribe aquí tu mensaje. Si tienes varios servicios a la vez, empieza por *{numero_reserva}*.',
   chofer_enlace_enviado: '✅ Enviado al cliente · *{numero_reserva}*',
   chofer_enlace_sin_servicio: 'ℹ️ No encuentro ningún servicio tuyo en curso. Para escribir a un cliente, empieza tu mensaje con el número de reserva, por ejemplo: *ABC123* Estoy en la puerta 2. El enlace funciona desde 2 horas antes hasta 2 horas después del servicio.',
@@ -12288,6 +12295,30 @@ async function plantillaChoferWa(clave, vars, respaldo) {
   const base = RESPALDO_PLANTILLAS_CHOFER[clave];
   if (base) return base.replace(/\{([^}]+)\}/g, function (m, k) { return (vars && vars[k] !== undefined && vars[k] !== null) ? String(vars[k]) : ''; });
   return respaldo;
+}
+
+// (03/11/2026) Reserva cancelada o anulada ANTES de que ningún chofer la acepte: a todos los choferes
+// a los que se envió el aviso les llega «Reserva cancelada / anulada… Ya no está disponible»
+// (por la cola de WhatsApp que envía el Puente). soloConductorId: solo a ese chofer (el que responde SI tarde).
+async function avisarChoferesReservaCerrada(reservaId, clave, soloConductorId) {
+  const q = await pool.query(
+    'SELECT numero_reserva, origen, destino, fecha, hora, conductor_id, choferes_avisados FROM reservas WHERE id = $1', [reservaId]);
+  if (!q.rows.length) return;
+  const r = q.rows[0];
+  const ids = soloConductorId ? [Number(soloConductorId)] : (r.conductor_id ? [] : (r.choferes_avisados || []));
+  if (!ids.length) return;
+  const texto = await plantillaChoferWa(clave, {
+    numero_reserva: r.numero_reserva,
+    origen: r.origen || '—',
+    destino: r.destino || '—',
+    fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—',
+    hora: r.hora ? String(r.hora).slice(0, 5) : '—'
+  }, '❌ La reserva ' + r.numero_reserva + ' ya no está disponible.');
+  const ch = await pool.query("SELECT telefono FROM conductores WHERE id = ANY($1::int[]) AND telefono IS NOT NULL AND telefono <> ''", [ids]);
+  for (const c of ch.rows) {
+    await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [c.telefono, texto]);
+  }
+  if (!soloConductorId) await pool.query('UPDATE reservas SET choferes_avisados = NULL WHERE id = $1', [reservaId]);
 }
 
 // Cartel de recogida al chofer asignado: email con el PDF y WhatsApp, con la plantilla "Cartel de
@@ -16614,6 +16645,11 @@ async function procesoCancelacionCliente(r, porEquipo, decisionEquipo) {
   const fueraDePlazo = (porEquipo && plazoVencido && decisionEquipo === 'dentro') ? false : plazoVencido;
 
   await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', ['cancelada', r.id]);
+  // (03/11/2026) Si aún no la había aceptado nadie: aviso a todos los choferes a los que se envió
+  if (!r.conductor_id) {
+    try { await avisarChoferesReservaCerrada(r.id, 'chofer_aviso_cancelada'); }
+    catch (eAv) { console.warn('Aviso de cancelación a los choferes avisados:', eAv.message); }
+  }
 
   const devolucionPendiente = r.deposito_pagado && !fueraDePlazo;
   if (devolucionPendiente) {
@@ -18636,6 +18672,8 @@ app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandle
     );
     if (r.reasignacion) r.choferes_reasignacion = ch.rows;
     else r.choferes_aviso = ch.rows;
+    // (03/11/2026) Se apunta a quién se envía, para avisarles si la reserva se cancela antes de que nadie la acepte
+    await pool.query('UPDATE reservas SET choferes_avisados = $1 WHERE id = $2', [ch.rows.map(function (c) { return c.id; }), r.id]);
   }
   res.json(result.rows);
 }));
@@ -18751,6 +18789,9 @@ app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asy
     [req.params.id]
   );
   if (!reserva.rows.length) return res.json({ ok: true, ya_cancelada: true });
+  // (03/11/2026) Anulada sin chofer: aviso a todos los choferes a los que se envió
+  try { await avisarChoferesReservaCerrada(req.params.id, 'chofer_aviso_anulada'); }
+  catch (eAv) { console.warn('Aviso de anulación a los choferes avisados:', eAv.message); }
 
   const { numero_reserva, nombre_cliente, email_cliente, lang_cliente } = reserva.rows[0];
   const _rAnul = reserva.rows[0];
@@ -18786,6 +18827,17 @@ app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asy
 app.post('/api/whatsapp/asignar/:id', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const { conductor_id } = req.body;
   if (!conductor_id) return res.status(400).json({ error: 'Falta conductor_id.' });
+  // (03/11/2026) Una reserva cancelada o anulada nunca se puede aceptar: al chofer que responde SI
+  // le llega «Reserva cancelada / anulada… Ya no está disponible» y no se le asigna.
+  {
+    const est = await pool.query('SELECT estado, estado_aviso_whatsapp FROM reservas WHERE id = $1', [req.params.id]);
+    if (est.rows.length && est.rows[0].estado === 'cancelada') {
+      const claveCerrada = est.rows[0].estado_aviso_whatsapp === 'cancelada_sin_respuesta' ? 'chofer_aviso_anulada' : 'chofer_aviso_cancelada';
+      try { await avisarChoferesReservaCerrada(req.params.id, claveCerrada, conductor_id); }
+      catch (eAv) { console.warn('Aviso de reserva cerrada al chofer que respondió SI:', eAv.message); }
+      return res.status(409).json({ error: 'La reserva está cancelada: no se puede aceptar.' });
+    }
+  }
 
   // R2-A: si el servicio lo había liberado su chofer, se avisa como un CAMBIO DE CHOFER (chofer nuevo
   // con datos y cartel; cliente con "Cambio de chofer" y voucher), sin repetir la primera asignación.
@@ -18858,6 +18910,8 @@ const VARIABLES_PLANTILLAS = {
   interno_registro_chofer:       { email: ['nombre_chofer', 'email_chofer', 'telefono_chofer', 'vehiculo', 'isla'], wa: null },
   chofer_respuesta_confirmado:   { email: null, wa: ['numero_reserva'] },
   chofer_respuesta_rechazo:      { email: null, wa: [] },
+  chofer_aviso_cancelada:        { email: null, wa: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora'] },
+  chofer_aviso_anulada:          { email: null, wa: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora'] },
   chofer_respuesta_ya_asignada:  { email: null, wa: ['numero_reserva'] },
   chofer_servicio_asignado:      { email: null, wa: _VCH.concat(['pasajeros', 'idioma']) },
   chofer_servicio_reasignado:    { email: null, wa: _VCH },
