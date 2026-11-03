@@ -718,6 +718,8 @@ var TXT = {
   pax1:          '<%- t("flota_pax_1").replace(/'/g, "\\'") %>',
   pax2:          '<%- t("flota_pax_2").replace(/'/g, "\\'") %>',
   pax5:          '<%- t("flota_pax_5").replace(/'/g, "\\'") %>',
+  hasta:          '<%- t("flota_catalogo_hasta").replace(/'/g, "\\'") %>',
+  paxPlural:          '<%- t("flota_catalogo_pasajeros").replace(/'/g, "\\'") %>',
   maletas:       '<%- t("home_maletas").replace(/'/g, "\\'") %>',
   enviando:      '<%- t("home_modal_enviando").replace(/'/g, "\\'") %>',
   cerrar:        '<%- t("home_modal_cerrar").replace(/'/g, "\\'") %>',
@@ -742,6 +744,14 @@ function textoPax(n) {
   var modelo = forma === 'one' ? TXT.pax1 : (forma === 'few' ? TXT.pax2 : TXT.pax5);
   if (!/[0-9]+/.test(modelo)) return n + ' ' + TXT.paxSufijo;
   return modelo.replace(/[0-9]+/, String(n));
+}
+// (03/11/2026) «hasta N pasajeros» en el buscador, con las MISMAS palabras de Admin que Flota: «Hasta» (flota_catalogo_hasta)
+// y «pasajeros» (flota_catalogo_pasajeros), ya traducidas. Dentro del paréntesis, «hasta» en minúscula; en la tarjeta, «Hasta».
+// Si alguno de los dos textos está vacío (o es 1 pasajero), sale como antes: «N pasajeros».
+function textoHastaPax(n, mayuscula) {
+  if (!TXT.hasta || !TXT.paxPlural || Number(n) <= 1) return textoPax(n);
+  var hasta = mayuscula ? TXT.hasta : TXT.hasta.charAt(0).toLocaleLowerCase(LANG) + TXT.hasta.slice(1);
+  return hasta + ' ' + n + ' ' + TXT.paxPlural;
 }
 
 function cargarFondo() {
@@ -1028,7 +1038,7 @@ function pintarCategoriaFlota(categorias, paramCategoria) {
       categorias.forEach(function (c) {
         var opt = document.createElement('option');
         opt.value = c.id;
-        opt.textContent = (c.nombre_traducido || c.nombre) + ' (' + textoPax(c.capacidad_pasajeros) + ')';
+        opt.textContent = (c.nombre_traducido || c.nombre) + ' (' + textoHastaPax(c.capacidad_pasajeros) + ')';
         if (String(c.id) === String(elegida)) opt.selected = true;
         select.appendChild(opt);
       });
@@ -1061,7 +1071,7 @@ function actualizarCategoriasSegunRuta() {
   categoriasRuta.forEach(function (c) {
     var opt = document.createElement('option');
     opt.value = c.id;
-    opt.textContent = (c.nombre_traducido || c.nombre) + ' (' + textoPax(c.capacidad_pasajeros) + ')';
+    opt.textContent = (c.nombre_traducido || c.nombre) + ' (' + textoHastaPax(c.capacidad_pasajeros) + ')';
     if (String(c.id) === String(valorActual)) opt.selected = true;
     select.appendChild(opt);
   });
@@ -1111,7 +1121,7 @@ function verPrecio() {
       var paxHtml = catData
         ? '<div class="tarjeta-resultado-dato">' +
             '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D9A441" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
-            textoPax(catData.capacidad_pasajeros) +
+            textoHastaPax(catData.capacidad_pasajeros, true) +
           '</div>' +
           (catData.capacidad_maletas
             ? '<div class="tarjeta-resultado-dato">' +
