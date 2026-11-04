@@ -314,14 +314,18 @@
           '<div><strong style="font-size:12px;color:#5a6c79;text-transform:uppercase;">Tu conductor</strong><br>' + r.conductor_nombre + '</div></div>';
       }
 
-      // Depósito
+      // Depósito (04/11/2026: si se canceló sin pagarlo, el apartado no sale; retenido por cancelación fuera de plazo o por no-show, con su motivo)
+      if (!(r.estado === 'cancelada' && !r.deposito_pagado)) {
       html += '<div class="seccion-titulo">Depósito de garantía</div>';
       if (r.deposito_liberado) {
         html += '<p style="color:#2e7d32;font-size:14px;">✅ Depósito liberado.</p>';
+      } else if (r.deposito_retenido_noshow) {
+        html += '<p style="color:#856404;font-size:14px;">🔒 Depósito retenido de <strong>' + r.noshow.importe + ' €</strong>. ' + (r.estado === 'cancelada' ? 'Cancelación fuera de plazo.' : 'No se presentó.') + '</p>';
       } else if (r.deposito_pagado) {
         html += '<p style="color:#856404;font-size:14px;">🔒 Depósito retenido de <strong>' + r.noshow.importe + ' €</strong>. Se liberará al completar el servicio.</p>';
       } else {
         html += '<p style="color:#5a6c79;font-size:14px;">⏳ Depósito pendiente de pago.</p>';
+      }
       }
 
       // Factura disponible (también cuando el viaje ya ha pasado)
