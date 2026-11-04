@@ -12041,6 +12041,12 @@ app.get('/admin/reservas/:id', requireAdmin, asyncHandler(async (req, res) => {
   // Idioma del portal del cliente (en el que se le escribe desde el Admin)
   try { reserva.idioma_portal = await idiomaPortalPorEmail(reserva.email_cliente); } catch (e) { reserva.idioma_portal = null; }
   reserva.nota_cancelacion = notaCancelacion(reserva, 'es', true); // (04/11/2026)
+  // (04/11/2026) Preferencias de este viaje (las mismas que ve el chofer), salvo en canceladas y no-show
+  reserva.preferencias_viaje = null;
+  if (!['cancelada', 'no_show'].includes(reserva.estado)) {
+    const _pv = await pool.query('SELECT nombre, opcion, detalle FROM preferencias_reserva WHERE reserva_id = $1 ORDER BY id', [reserva.id]);
+    reserva.preferencias_viaje = _pv.rows;
+  }
   res.json({ reserva });
 }));
 
@@ -16101,9 +16107,24 @@ async function reservaViajeEditable(req, reservaId) {
   return r;
 }
 
+// (04/11/2026) Para VER las preferencias del viaje: la reserva editable o un viaje ya realizado (completada),
+// que el cliente ve solo para leer. Cancelada y no-show: no.
+async function reservaViajeLectura(req, reservaId) {
+  const r = await reservaViajeEditable(req, reservaId);
+  if (r) return Object.assign({ editable: true }, r);
+  const email = await emailClienteSesion(req);
+  if (!email) return null;
+  const q = await pool.query(
+    `SELECT id, fecha, hora, estado FROM reservas
+     WHERE id = $1 AND LOWER(email_cliente) = LOWER($2) AND archivada = FALSE AND estado = 'completada'`,
+    [reservaId, email]
+  );
+  return q.rows.length ? Object.assign({ editable: false }, q.rows[0]) : null;
+}
+
 // Portal: preferencias de un viaje (lo marcado en esa reserva, con los textos en el idioma del portal)
 app.get('/api/cliente/viaje-preferencias', asyncHandler(async (req, res) => {
-  const r = await reservaViajeEditable(req, req.query.reserva_id);
+  const r = await reservaViajeLectura(req, req.query.reserva_id);
   if (!r) return res.status(404).json({ error: 'Reserva no disponible.' });
   const cat = await pool.query('SELECT id, nombre, opciones FROM preferencias_catalogo WHERE activo = TRUE ORDER BY orden, id');
   const viaje = await pool.query('SELECT nombre, opcion, detalle FROM preferencias_reserva WHERE reserva_id = $1', [r.id]);
@@ -16111,6 +16132,7 @@ app.get('/api/cliente/viaje-preferencias', asyncHandler(async (req, res) => {
   viaje.rows.forEach(function (v) { porNombre[v.nombre] = v; });
   const langPref = await idiomaPortalCliente(req);
   res.json({
+    editable: r.editable,
     preferencias: cat.rows.map(function (p) {
       const n = langPref === 'es' ? p.nombre : obtenerTexto('pref_nombre_' + p.id, langPref);
       const o = langPref === 'es' ? p.opciones : obtenerTexto('pref_opciones_' + p.id, langPref);
