@@ -16776,11 +16776,12 @@ async function procesoCancelacionCliente(r, porEquipo, decisionEquipo, operario)
     try { _langPortal = await idiomaPortalPorEmail(r.email_cliente); } catch (e) { _langPortal = 'es'; }
     const _notaEs = notaCancelacion(_rc, 'es', true) || (porEquipo ? 'Reserva cancelada a petición del cliente.' : 'Reserva cancelada por el cliente.');
     const _notaCli = notaCancelacion(_rc, _langPortal, false);
+    const _msgAdmin = '❌ ' + _notaEs + ((porEquipo && plazoVencido) ? (fueraDePlazo ? ' (solicitud fuera de plazo)' : ' (solicitud recibida dentro de plazo)') : '');
+    // Versión del cliente solo si es distinta de la del Admin (si es igual, el Admin la enseñaría dos veces)
+    const _msgCli = _notaCli ? '❌ ' + _notaCli : null;
     await pool.query(
-      'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje, mensaje_cliente) VALUES ($1, $2, $3, $4)',
-      [r.id, 'admin',
-       '❌ ' + _notaEs + ((porEquipo && plazoVencido) ? (fueraDePlazo ? ' (solicitud fuera de plazo)' : ' (solicitud recibida dentro de plazo)') : ''),
-       _notaCli ? '❌ ' + _notaCli : null]
+      'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje, mensaje_cliente, lang) VALUES ($1, $2, $3, $4, $5)',
+      [r.id, 'admin', _msgAdmin, (_msgCli && _msgCli !== _msgAdmin) ? _msgCli : null, _langPortal]
     );
   }
 
