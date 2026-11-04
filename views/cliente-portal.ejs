@@ -119,17 +119,6 @@
     .msg-cliente { background: #fff3e0; border: 1px solid #ffe0b2; margin-left: auto; }
     .msg-equipo { background: #e8f5e9; border: 1px solid #c8e6c9; }
     .msg-fecha { font-size: 11px; color: #999; margin-top: 4px; }
-    .etiqueta-seccion {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 10px;
-      margin-bottom: 12px;
-      text-transform: uppercase;
-    }
-    .etiqueta-activa { background: #e8f5e9; color: #2e7d32; }
-    .etiqueta-historial { background: #fbe9e7; color: #c62828; }
   </style>
 </head>
 <body>
@@ -279,7 +268,6 @@
         var esHistorial = r.es_historial;
         var dotClass = esHistorial ? 'dot-historial' : (r.estado === 'cancelada' ? 'dot-historial' : r.estado === 'pendiente' ? 'dot-pendiente' : r.estado === 'modificacion_pendiente' ? 'dot-pendiente' : 'dot-activa');
         var dotHTML = r.estado === 'completada' ? '<span style="font-size:14px;line-height:1;flex-shrink:0;">✅</span>' : '<div class="estado-dot ' + dotClass + '"></div>';
-        var etiqueta = esHistorial ? '<span class="etiqueta-seccion etiqueta-historial">' + tx('por_realizado') + '</span>' : '<span class="etiqueta-seccion etiqueta-activa">' + tx('por_activo') + '</span>';
         return '<div class="reserva-card' + (esHistorial ? ' historial' : '') + '" id="card-' + i + '">' +
           '<div class="reserva-resumen" onclick="toggleDetalle(' + i + ')">' +
             dotHTML +
@@ -296,7 +284,6 @@
             '<span class="reserva-chevron" id="chev-' + i + '">▼</span>' +
           '</div>' +
           '<div class="reserva-detalle" id="detalle-' + i + '">' +
-            etiqueta +
             renderDetalle(r, i) +
           '</div>' +
         '</div>';
@@ -304,7 +291,7 @@
     }
 
     function renderDetalle(r, i) {
-      var estadoBadge = { pendiente: tx('por_estado_pendiente'), confirmada: tx('por_estado_confirmada'), completada: tx('por_estado_completada'), cancelada: tx('por_estado_cancelada'), modificacion_pendiente: tx('por_estado_modificacion') };
+      var estadoBadge = { pendiente: tx('por_estado_pendiente'), confirmada: tx('por_estado_confirmada'), completada: tx('por_estado_completada'), cancelada: tx('por_estado_cancelada'), modificacion_pendiente: tx('por_estado_modificacion'), no_show: tx('por_estado_noshow') };
       var extrasIncluidos = (r.extras || []).filter(function(e) { return !parseFloat(e.precio_en_reserva) || parseFloat(e.precio_en_reserva) === 0; });
       var extrasACobrar = (r.extras || []).filter(function(e) { return parseFloat(e.precio_en_reserva) > 0; });
       var totalExtras = extrasACobrar.reduce(function(sum, e) { return sum + parseFloat(e.precio_en_reserva); }, 0);
