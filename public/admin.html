@@ -9295,6 +9295,11 @@ function abrirDetalleReserva(id, sinScroll) {
           '<tr><th>Fecha y hora</th><td>' + fecha + ' a las ' + (r.hora ? r.hora.slice(0,5) : '—') + '</td></tr>' +
           '<tr><th>Categoría</th><td>' + (r.categoria_nombre || '—') + '</td></tr>' +
           operativaHtml +
+          // — PREFERENCIAS DEL VIAJE — (04/11/2026) Las mismas que ve el chofer; no salen en canceladas ni no-show
+          (r.preferencias_viaje ? '<tr><td colspan="2" style="background:#f5f0ea;font-size:0.75rem;font-weight:700;color:#888;letter-spacing:0.05em;padding:6px 10px;">PREFERENCIAS DEL VIAJE</td></tr>' +
+            (r.preferencias_viaje.length ? r.preferencias_viaje.map(function(p) {
+              return '<tr><th>' + p.nombre + '</th><td>' + p.opcion + (p.detalle ? ' — ' + p.detalle : '') + '</td></tr>';
+            }).join('') : '<tr><td colspan="2" style="color:#888;padding:8px 10px;">Sin marcar</td></tr>') : '') +
           // — NOTAS DEL CLIENTE —
           (r.notas_cliente ? '<tr><td colspan="2" style="background:#f5f0ea;font-size:0.75rem;font-weight:700;color:#888;letter-spacing:0.05em;padding:6px 10px;">COMENTARIOS DEL CLIENTE</td></tr>' +
           '<tr><td colspan="2" style="white-space:pre-wrap;padding:10px;font-style:italic;">' + r.notas_cliente + '</td></tr>' : '') +
