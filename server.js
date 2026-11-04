@@ -1771,6 +1771,12 @@ async function initSchema() {
     { clave: 'por_viaje_pref_nota', contexto: 'Explicación dentro del recuadro de preferencias de un viaje', es: 'Solo para este viaje: tu chofer verá estas preferencias. Tus preferencias generales ("Mis preferencias") no cambian.' },
     { clave: 'por_viaje_pref_guardar', contexto: 'Botón para guardar las preferencias de un viaje', es: 'Guardar las preferencias de este viaje' },
     { clave: 'por_viaje_pref_guardadas', contexto: 'Aviso tras guardar las preferencias de un viaje', es: '✓ Preferencias de este viaje guardadas' },
+    // (04/11/2026) Nota de la cancelación en la ficha de la reserva y en «Mensajes del equipo». {fecha} y {hora} los pone el programa en el formato del idioma: no traducir las marcas entre llaves
+    { clave: 'por_cancelada_cliente', contexto: 'Nota de una reserva cancelada por el cliente desde su portal. {fecha} = fecha, {hora} = hora (no traducir las marcas entre llaves)', es: 'Reserva cancelada por el cliente el {fecha} a las {hora}' },
+    { clave: 'por_cancelada_peticion', contexto: 'Nota de una reserva cancelada por el equipo a petición del cliente. {fecha} = fecha, {hora} = hora (no traducir las marcas entre llaves)', es: 'Reserva cancelada a petición del cliente el {fecha} a las {hora}' },
+    { clave: 'por_anulada_sin_chofer', contexto: 'Nota de una reserva anulada porque ningún chofer la aceptó a tiempo. {fecha} = fecha, {hora} = hora (no traducir las marcas entre llaves)', es: 'Reserva anulada: no se encontró chofer disponible. {fecha}, {hora}' },
+    { clave: 'por_cancelada_sin_pago', contexto: 'Nota de una reserva cancelada sola porque no se pagó el depósito a tiempo. {fecha} = fecha, {hora} = hora (no traducir las marcas entre llaves)', es: 'Reserva cancelada por falta de pago del depósito el {fecha} a las {hora}' },
+    { clave: 'por_cancelada_equipo', contexto: 'Nota de una reserva cancelada por el equipo. {fecha} = fecha, {hora} = hora (no traducir las marcas entre llaves)', es: 'Reserva cancelada por el equipo el {fecha} a las {hora}' },
   ];
   for (const tx of TEXTOS_PORTAL_CLIENTE) {
     await pool.query(
@@ -2818,6 +2824,10 @@ async function initSchema() {
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS completada_en TIMESTAMPTZ`);
   // (14/10/2026) Hora en que se marcó "cliente no se presentó" (el portal del chofer la muestra 24 h más)
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS no_show_en TIMESTAMPTZ`);
+  // (04/11/2026) Cancelación: cuándo, por qué camino y qué operario (si fue desde el Admin)
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cancelada_en TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cancelada_por TEXT`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS cancelada_operario TEXT`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS aviso_pago_fallido_enviado BOOLEAN DEFAULT FALSE`);
 
   // \u2500\u2500\u2500 Tabla de plantillas de comunicaci\u00f3n \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -12027,6 +12037,7 @@ app.get('/admin/reservas/:id', requireAdmin, asyncHandler(async (req, res) => {
   reserva.total_estimado = (parseFloat(reserva.precio_estimado) || 0) + totalExtras;
   // Idioma del portal del cliente (en el que se le escribe desde el Admin)
   try { reserva.idioma_portal = await idiomaPortalPorEmail(reserva.email_cliente); } catch (e) { reserva.idioma_portal = null; }
+  reserva.nota_cancelacion = notaCancelacion(reserva, 'es', true); // (04/11/2026)
   res.json({ reserva });
 }));
 
@@ -12038,8 +12049,12 @@ app.post('/admin/reservas/:id/estado', requireAdmin, asyncHandler(async (req, re
   await pool.query(
     `UPDATE reservas SET estado = $1,
        completada_en = CASE WHEN $1::text = 'completada' THEN COALESCE(completada_en, NOW()) ELSE completada_en END,
-       no_show_en = CASE WHEN $1::text = 'no_show' THEN COALESCE(no_show_en, NOW()) ELSE no_show_en END
-     WHERE id = $2`, [estado, req.params.id]);
+       no_show_en = CASE WHEN $1::text = 'no_show' THEN COALESCE(no_show_en, NOW()) ELSE no_show_en END,
+       -- (04/11/2026) Al pasar a «cancelada» desde el Admin: cuándo y qué operario; al salir de «cancelada», se borra
+       cancelada_en = CASE WHEN $1::text = 'cancelada' THEN (CASE WHEN estado = 'cancelada' THEN cancelada_en ELSE NOW() END) ELSE NULL END,
+       cancelada_por = CASE WHEN $1::text = 'cancelada' THEN (CASE WHEN estado = 'cancelada' THEN cancelada_por ELSE 'equipo' END) ELSE NULL END,
+       cancelada_operario = CASE WHEN $1::text = 'cancelada' THEN (CASE WHEN estado = 'cancelada' THEN cancelada_operario ELSE $3 END) ELSE NULL END
+     WHERE id = $2`, [estado, req.params.id, await usuarioAdmin(req)]);
   res.json({ ok: true });
 }));
 
@@ -13780,6 +13795,35 @@ function fechaHoraCliente(d, lang) {
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric', timeZone: ZONA_HORARIA }) + ' a las ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: ZONA_HORARIA });
   }
   return d.toLocaleString(LOCALE_CLIENTE[lang], { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: ZONA_HORARIA });
+}
+
+// (04/11/2026) Nota de la cancelación («Reserva cancelada por el cliente el … a las …»), con la fecha y la hora
+// en el formato del idioma (hora de Canarias). Admin: en español y con el operario al final, si lo hay.
+const CLAVES_NOTA_CANCELACION = {
+  cliente: 'por_cancelada_cliente', peticion: 'por_cancelada_peticion', sin_chofer: 'por_anulada_sin_chofer',
+  sin_pago: 'por_cancelada_sin_pago', equipo: 'por_cancelada_equipo'
+};
+function notaCancelacion(r, lang, conOperario) {
+  if (!r || r.estado !== 'cancelada' || !r.cancelada_en || !CLAVES_NOTA_CANCELACION[r.cancelada_por]) return null;
+  // Si ese idioma aún no tiene la frase traducida, sale entera en español (también la fecha)
+  const _ent = TEXTOS_CACHE[CLAVES_NOTA_CANCELACION[r.cancelada_por]];
+  if (lang !== 'es' && !(_ent && _ent.traducciones && _ent.traducciones[lang])) lang = 'es';
+  const loc = LOCALE_CLIENTE[lang] || 'es-ES';
+  const d = new Date(r.cancelada_en);
+  const fecha = d.toLocaleDateString(loc, { day: 'numeric', month: 'long', year: 'numeric', timeZone: ZONA_HORARIA });
+  const hora = d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: ZONA_HORARIA });
+  const plantilla = obtenerTexto(CLAVES_NOTA_CANCELACION[r.cancelada_por], lang);
+  if (!plantilla || plantilla.indexOf('[[') === 0) return null;
+  let nota = plantilla.split('{fecha}').join(fecha).split('{hora}').join(hora);
+  if (conOperario && r.cancelada_operario) nota += ' — operario: ' + r.cancelada_operario;
+  return nota;
+}
+async function usuarioAdmin(req) {
+  try {
+    if (!req.session || !req.session.adminId) return null;
+    const q = await pool.query('SELECT usuario FROM admins WHERE id = $1', [req.session.adminId]);
+    return q.rows.length ? q.rows[0].usuario : null;
+  } catch (e) { return null; }
 }
 
 // Frase (🧩) en el idioma del cliente: traducción aprobada; si no hay, el español
@@ -16244,6 +16288,7 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
             r.estado, r.deposito_pagado, r.deposito_liberado, r.deposito_devolucion_pendiente, r.deposito_retenido_noshow,
             r.precio_estimado,
             r.email_confirmacion_enviado, r.email_voucher_enviado,
+            r.cancelada_en, r.cancelada_por,
             cv.nombre AS categoria_nombre,
             c.nombre AS conductor_nombre, c.foto AS conductor_foto, c.foto_estado AS conductor_foto_estado,
             (SELECT COUNT(*)::int FROM reservas_mensajes rm
@@ -16257,6 +16302,10 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
      ORDER BY r.fecha DESC, r.hora DESC`,
     [emailCliente]
   );
+
+  // (04/11/2026) Idioma del portal (para la nota de la cancelación)
+  let langPortal = 'es';
+  try { langPortal = await idiomaPortalCliente(req); } catch (e) { langPortal = 'es'; }
 
   // Para cada reserva obtener extras y noshow
   const reservas = await Promise.all(result.rows.map(async function(r) {
@@ -16286,6 +16335,7 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
       fecha_cliente: r.fecha ? new Date(r.fecha).toLocaleDateString(localeR, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : null,
       locale_cliente: localeR,
       tiene_factura: facturaQ.rows.length > 0,
+      nota_cancelacion: notaCancelacion(r, langPortal, false),
       noshow: {
         importe: parseFloat(cfgNoshow.importe_deposito).toFixed(2),
         horas: cfgNoshow.horas_cancelacion,
@@ -16323,6 +16373,8 @@ app.post('/api/cliente/modificar', asyncHandler(async (req, res) => {
   if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
   const r = reserva.rows[0];
   if (r.email_cliente.toLowerCase() !== emailCliente.toLowerCase()) return res.status(403).json({ error: 'No autorizado.' });
+  // (04/11/2026) Una reserva cancelada no se puede modificar
+  if (r.estado === 'cancelada') return res.status(403).json({ error: 'Esta reserva está cancelada.' });
 
   const cfgNoshow = await obtenerConfigNoshow(r.fecha);
   const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
@@ -16483,6 +16535,11 @@ app.get('/api/cliente/datos-modificacion', asyncHandler(async (req, res) => {
   );
   if (!result.rows.length) return res.status(404).json({ error: await textoModificar(req, 'mod_srv_no_encontrada', 'Reserva no encontrada.') });
   const r = result.rows[0];
+  // (04/11/2026) Una reserva cancelada no se puede modificar: se responde con su nota, en el idioma del portal
+  if (r.estado === 'cancelada') {
+    let _lp = 'es'; try { _lp = await idiomaPortalCliente(req); } catch (e) { _lp = 'es'; }
+    return res.status(403).json({ error: '❌ ' + (notaCancelacion(r, _lp, false) || obtenerTexto('por_estado_cancelada', _lp)) });
+  }
 
   const extras = await pool.query(
     `SELECT re.extra_id, e.nombre, re.precio_en_reserva FROM reservas_extras re
@@ -16522,6 +16579,11 @@ app.post('/api/cliente/modificar-completo', asyncHandler(async (req, res) => {
   );
   if (!reservaQ.rows.length) return res.status(404).json({ error: await textoModificar(req, 'mod_srv_no_encontrada', 'Reserva no encontrada.') });
   const r = reservaQ.rows[0];
+  // (04/11/2026) Una reserva cancelada no se puede modificar: se responde con su nota, en el idioma del portal
+  if (r.estado === 'cancelada') {
+    let _lp = 'es'; try { _lp = await idiomaPortalCliente(req); } catch (e) { _lp = 'es'; }
+    return res.status(403).json({ error: '❌ ' + (notaCancelacion(r, _lp, false) || obtenerTexto('por_estado_cancelada', _lp)) });
+  }
 
   const cfgNoshow = await obtenerConfigNoshow(r.fecha);
   const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
@@ -16644,14 +16706,19 @@ app.post('/api/cliente/modificar-completo', asyncHandler(async (req, res) => {
 // Lo usan el portal del cliente y el Admin ("📞 Cancelación manual").
 // A tiempo: se devuelve el depósito. Fuera de plazo: se retiene. Avisa al chofer, al equipo y al cliente (en su idioma).
 // decisionEquipo (solo Admin, cuando el plazo ya venció): 'dentro' = el cliente lo pidió a tiempo; 'fuera' = no.
-async function procesoCancelacionCliente(r, porEquipo, decisionEquipo) {
+async function procesoCancelacionCliente(r, porEquipo, decisionEquipo, operario) {
   // Verificar política de cancelación (no-show)
   const cfgNoshow = await obtenerConfigNoshow(r.fecha);
   const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
   const plazoVencido = new Date() >= fechaCancelacion;
   const fueraDePlazo = (porEquipo && plazoVencido && decisionEquipo === 'dentro') ? false : plazoVencido;
 
-  await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', ['cancelada', r.id]);
+  // (04/11/2026) Se guarda cuándo, por qué camino y qué operario
+  const _canc = await pool.query(
+    `UPDATE reservas SET estado = 'cancelada', cancelada_en = NOW(), cancelada_por = $2, cancelada_operario = $3
+     WHERE id = $1 RETURNING *`,
+    [r.id, porEquipo ? 'peticion' : 'cliente', porEquipo ? (operario || null) : null]
+  );
   // (03/11/2026) Si aún no la había aceptado nadie: aviso a todos los choferes a los que se envió
   if (!r.conductor_id) {
     try { await avisarChoferesReservaCerrada(r.id, 'chofer_aviso_cancelada'); }
@@ -16701,12 +16768,21 @@ async function procesoCancelacionCliente(r, porEquipo, decisionEquipo) {
   }
 
 
-  await pool.query(
-    'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje) VALUES ($1, $2, $3)',
-    [r.id, 'admin', porEquipo
-      ? ('❌ Reserva cancelada por el equipo por petición telefónica del cliente.' + (plazoVencido ? (fueraDePlazo ? ' (solicitud fuera de plazo)' : ' (solicitud recibida dentro de plazo)') : ''))
-      : '❌ Reserva cancelada por el cliente.']
-  );
+  // (04/11/2026) El mensaje dice lo mismo que la nota: en el Admin, en español con el operario (y el plazo);
+  // al cliente, en el idioma de su portal y sin operario
+  {
+    const _rc = _canc.rows[0] || r;
+    let _langPortal = 'es';
+    try { _langPortal = await idiomaPortalPorEmail(r.email_cliente); } catch (e) { _langPortal = 'es'; }
+    const _notaEs = notaCancelacion(_rc, 'es', true) || (porEquipo ? 'Reserva cancelada a petición del cliente.' : 'Reserva cancelada por el cliente.');
+    const _notaCli = notaCancelacion(_rc, _langPortal, false);
+    await pool.query(
+      'INSERT INTO reservas_mensajes (reserva_id, autor, mensaje, mensaje_cliente) VALUES ($1, $2, $3, $4)',
+      [r.id, 'admin',
+       '❌ ' + _notaEs + ((porEquipo && plazoVencido) ? (fueraDePlazo ? ' (solicitud fuera de plazo)' : ' (solicitud recibida dentro de plazo)') : ''),
+       _notaCli ? '❌ ' + _notaCli : null]
+    );
+  }
 
   // Notificar al equipo
   try {
@@ -16805,7 +16881,7 @@ app.post('/admin/reservas/:id/cancelar-peticion-cliente', requireAdmin, asyncHan
   if (plazoVencido && decision !== 'dentro' && decision !== 'fuera') {
     return res.json({ ok: false, necesita_decision: true });
   }
-  const fueraDePlazo = await procesoCancelacionCliente(r, true, decision);
+  const fueraDePlazo = await procesoCancelacionCliente(r, true, decision, await usuarioAdmin(req));
   res.json({ ok: true, fuera_de_plazo: fueraDePlazo });
 }));
 
@@ -18800,7 +18876,8 @@ app.post('/api/whatsapp/marcar-sin-respuesta/:id', requierePuenteWhatsapp, async
 // respuesta). Aquí cancelamos la reserva y mandamos el email equivalente.
 app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const reserva = await pool.query(
-    `UPDATE reservas SET estado = 'cancelada', estado_aviso_whatsapp = 'cancelada_sin_respuesta'
+    `UPDATE reservas SET estado = 'cancelada', estado_aviso_whatsapp = 'cancelada_sin_respuesta',
+       cancelada_en = NOW(), cancelada_por = 'sin_chofer', cancelada_operario = NULL
      WHERE id = $1 AND estado NOT IN ('cancelada', 'completada')
      RETURNING numero_reserva, nombre_cliente, email_cliente, lang_cliente, origen, destino, fecha, hora`,
     [req.params.id]
@@ -19582,7 +19659,8 @@ async function cancelarReservasSinPago() {
 
         // Cancelar la reserva
         await pool.query(
-          `UPDATE reservas SET estado = 'cancelada', estado_aviso_whatsapp = 'cancelada_sin_pago' WHERE id = $1`,
+          `UPDATE reservas SET estado = 'cancelada', estado_aviso_whatsapp = 'cancelada_sin_pago',
+             cancelada_en = NOW(), cancelada_por = 'sin_pago', cancelada_operario = NULL WHERE id = $1`,
           [r.id]
         );
 
