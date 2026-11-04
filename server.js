@@ -1729,6 +1729,7 @@ async function initSchema() {
     { clave: 'por_estado_completada', contexto: 'Estado de la reserva', es: '✅ Completada' },
     { clave: 'por_estado_cancelada', contexto: 'Estado de la reserva', es: '🔴 Cancelada' },
     { clave: 'por_estado_modificacion', contexto: 'Estado de la reserva', es: '🟠 Modificación pendiente' },
+    { clave: 'por_estado_noshow', contexto: 'Estado de la reserva: el cliente no se presentó (no-show)', es: '🚫 No se presentó' }, // (04/11/2026)
     { clave: 'por_estado', contexto: 'Etiqueta en los datos de la reserva', es: 'Estado:' },
     { clave: 'por_categoria', contexto: 'Etiqueta en los datos de la reserva', es: 'Categoría:' },
     { clave: 'por_pasajeros', contexto: 'Etiqueta en los datos de la reserva', es: 'Pasajeros:' },
