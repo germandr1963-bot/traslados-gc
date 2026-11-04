@@ -308,6 +308,8 @@
 
       var html = '<div class="dato-fila">' +
         '<div><strong>Estado:</strong> ' + (estadoBadge[r.estado] || r.estado) + '</div>' +
+        // (04/11/2026) Nota de la cancelación (quién y cuándo)
+        (r.estado === 'cancelada' && r.nota_cancelacion ? '<div style="color:#c62828;">❌ ' + r.nota_cancelacion + '</div>' : '') +
         '<div><strong>Categoría:</strong> ' + (r.categoria_nombre || '—') + '</div>' +
         '<div><strong>Pasajeros:</strong> ' + (r.num_pasajeros || '—') + '</div>' +
         '<div><strong>Precio estimado:</strong> ' + (r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—') + '</div>' +
@@ -344,6 +346,8 @@
 
       // Solo si no es historial: modificar y mensajes
       if (!r.es_historial) {
+        // (04/11/2026) Una reserva cancelada no enseña «Modificar reserva» ni «Cancelar reserva»
+        if (r.estado !== 'cancelada') {
         html += '<div class="seccion-titulo">Gestionar reserva</div>';
         html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">' +
           '<a href="/modificar-reserva?pnr=' + r.numero_reserva + '" style="text-decoration:none;flex:1;min-width:140px;">' +
@@ -362,6 +366,9 @@
           '</div>' +
           '</div>';
         html += '<div id="aviso-cancelar-' + i + '" style="display:none;font-size:13px;margin-bottom:12px;"></div>';
+        } else {
+          html += '<div style="height:12px;"></div>';
+        }
 
         // Mensajes — colapsado por defecto
         var numMsg = r.mensajes_sin_leer || 0;

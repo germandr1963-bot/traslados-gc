@@ -9283,6 +9283,8 @@ function abrirDetalleReserva(id, sinScroll) {
           // — DATOS DEL CLIENTE —
           '<tr><td colspan="2" style="background:#f5f0ea;font-size:0.75rem;font-weight:700;color:#888;letter-spacing:0.05em;padding:6px 10px;">CLIENTE</td></tr>' +
           '<tr><th style="width:180px">Estado</th><td><span class="badge-estado-reserva badge-' + r.estado + '">' + (r.estado === 'no_show' ? '🚫 No-show' : r.estado) + '</span></td></tr>' +
+          // (04/11/2026) Quién canceló la reserva y cuándo (y el operario, si fue desde el Admin)
+          (r.estado === 'cancelada' && r.nota_cancelacion ? '<tr><th>Cancelación</th><td style="color:#c62828;">❌ ' + r.nota_cancelacion + '</td></tr>' : '') +
           '<tr><th>Nombre</th><td>' + r.nombre_cliente + '</td></tr>' +
           '<tr><th>Teléfono</th><td>' + r.telefono_cliente + '</td></tr>' +
           '<tr><th>Email</th><td>' + r.email_cliente + '</td></tr>' +
