@@ -329,6 +329,8 @@
 
       var html = '<div class="dato-fila">' +
         '<div><strong>' + tx('por_estado') + '</strong> ' + (estadoBadge[r.estado] || r.estado) + '</div>' +
+        // (04/11/2026) Nota de la cancelación (quién y cuándo), ya en el idioma del portal
+        (r.estado === 'cancelada' && r.nota_cancelacion ? '<div style="color:#c62828;">❌ ' + r.nota_cancelacion + '</div>' : '') +
         '<div><strong>' + tx('por_categoria') + '</strong> ' + (r.categoria_cliente || r.categoria_nombre || '—') + '</div>' +
         '<div><strong>' + tx('por_pasajeros') + '</strong> ' + (r.num_pasajeros || '—') + '</div>' +
         '<div><strong>' + TXT_PRECIO_ESTIMADO + '</strong> ' + (r.precio_estimado ? parseFloat(r.precio_estimado).toFixed(2) + ' €' : '—') + '</div>' +
@@ -365,6 +367,8 @@
 
       // Solo si no es historial: modificar (los mensajes van aparte, más abajo)
       if (!r.es_historial) {
+        // (04/11/2026) Una reserva cancelada no enseña «Modificar reserva» ni «Cancelar reserva»
+        if (r.estado !== 'cancelada') {
         html += '<div class="seccion-titulo">' + tx('por_gestionar') + '</div>';
         html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">' +
           '<a href="/modificar-reserva?pnr=' + r.numero_reserva + '" style="text-decoration:none;flex:1;min-width:140px;">' +
@@ -383,6 +387,9 @@
           '</div>' +
           '</div>';
         html += '<div id="aviso-cancelar-' + i + '" style="display:none;font-size:13px;margin-bottom:12px;"></div>';
+        } else {
+          html += '<div style="height:12px;"></div>';
+        }
 
         // Preferencias de este viaje — colapsado por defecto (26/09/2026)
         html += '<div style="border:1px solid #d4c4b0;border-radius:10px;overflow:hidden;margin-bottom:12px;">' +
