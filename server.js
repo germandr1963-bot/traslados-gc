@@ -1749,6 +1749,8 @@ async function initSchema() {
     { clave: 'por_deposito_liberado', contexto: 'Estado del depósito', es: '✅ Depósito liberado.' },
     { clave: 'por_deposito_retenido', contexto: 'Estado del depósito pagado. {importe} = cantidad con €', es: '🔒 Depósito retenido de {importe}. Se liberará al completar el servicio.' },
     { clave: 'por_deposito_pendiente', contexto: 'Estado del depósito sin pagar', es: '⏳ Depósito pendiente de pago.' },
+    { clave: 'por_deposito_retenido_fuera_plazo', contexto: 'Estado del depósito retenido porque el cliente canceló fuera de plazo. {importe} = cantidad con € (no traducir la marca entre llaves)', es: '🔒 Depósito retenido de {importe}. Cancelación fuera de plazo.' }, // (04/11/2026)
+    { clave: 'por_deposito_retenido_noshow', contexto: 'Estado del depósito retenido porque el cliente no se presentó (no-show). {importe} = cantidad con € (no traducir la marca entre llaves)', es: '🔒 Depósito retenido de {importe}. No se presentó.' }, // (04/11/2026)
     { clave: 'por_descargar_factura', contexto: 'Botón para descargar la factura', es: '📄 Descargar factura' },
     { clave: 'por_gestionar', contexto: 'Título del bloque para modificar o cancelar', es: 'Gestionar reserva' },
     { clave: 'por_modificar', contexto: 'Botón para modificar la reserva', es: 'Modificar reserva' },
