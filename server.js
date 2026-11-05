@@ -13901,6 +13901,15 @@ function urlMiReservaCliente(lang) {
   return (_l === 'es' || !_palabra) ? BASE_URL + '/mi-reserva' : BASE_URL + '/' + _l + '/' + _palabra;
 }
 
+// (05/11/2026) Enlace a la página de Contacto en el idioma del cliente (Admin → Palabras de URL).
+// Variable {url_contacto} de las plantillas: la página de Contacto es la que manda (email, teléfono, horario).
+function urlContactoCliente(lang) {
+  const _l = (lang && IDIOMAS_PERMITIDOS.includes(lang)) ? lang : 'es';
+  if (_l === 'es') return BASE_URL + '/contacto';
+  const _palabra = PALABRAS_PAGINAS[_l] && PALABRAS_PAGINAS[_l].contacto;
+  return BASE_URL + '/' + _l + '/' + (_palabra || 'contacto');
+}
+
 // (07/10/2026) Texto único "Precio estimado" (Textos de interfaz → "Textos comunes"), en el idioma pedido.
 function textoPrecioEstimado(lang) {
   const t = obtenerTexto('precio_estimado', lang || 'es');
@@ -14163,6 +14172,8 @@ async function obtenerPlantilla(clave, vars, lang) {
   if (vars.conductor !== undefined && vars.chofer === undefined) vars.chofer = vars.conductor;
   if (vars.chofer !== undefined && vars.conductor === undefined) vars.conductor = vars.chofer;
   if (vars.nombre_conductor !== undefined && vars.nombre_chofer === undefined) vars.nombre_chofer = vars.nombre_conductor;
+  // (05/11/2026) {url_contacto}: enlace a Contacto en el idioma del mensaje, en cualquier plantilla
+  if (vars.url_contacto === undefined) vars.url_contacto = urlContactoCliente(lang);
   try {
     const r = await pool.query(
       'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion WHERE clave = $1',
@@ -19040,11 +19051,11 @@ const VARIABLES_PLANTILLAS = {
   cliente_acceso_reserva:        { email: _V6.concat(['password_temporal', 'url_portal']), wa: _V6.concat(['password_temporal', 'url_portal']) },
   cliente_acuse_recibo:          { email: _V6.concat(['pasajeros', 'extras']), wa: _V6.concat(['pasajeros', 'extras']) },
   cliente_cambio_conductor:      { email: _V6.concat(['nombre_chofer', 'nombre_conductor']), wa: _V6.concat(['nombre_chofer', 'nombre_conductor']) },
-  cliente_cancelacion:           { email: _V6.concat(['aviso_deposito']), wa: _V6.concat(['aviso_deposito']) },
-  cliente_cancelacion_no_pago:   { email: _V6, wa: _V6 },
+  cliente_cancelacion:           { email: _V6.concat(['aviso_deposito', 'url_contacto']), wa: _V6.concat(['aviso_deposito', 'url_contacto']) },
+  cliente_cancelacion_no_pago:   { email: _V6.concat(['url_contacto']), wa: _V6.concat(['url_contacto']) },
   cliente_confirmacion:          { email: _VCONF.concat(['pasajeros', 'boton_pago']), wa: _VCONF.concat(['pasajeros', 'url_pago']) },
   cliente_deposito_liberado:     { email: ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'numero_factura'], wa: ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'numero_factura'] },
-  cliente_deposito_noshow:       { email: _V6.concat(['importe']), wa: _V6.concat(['importe']) },
+  cliente_deposito_noshow:       { email: _V6.concat(['importe', 'url_contacto']), wa: _V6.concat(['importe', 'url_contacto']) },
   cliente_en_gestion:            { email: _V6, wa: _V6 },
   cliente_enlace_pago:           { email: _V6.concat(['importe', 'url_pago', 'boton_pago']), wa: _V6.concat(['importe', 'url_pago', 'url_corta']) },
   cliente_factura:               { email: _V6.concat(['numero_factura']), wa: _V6.concat(['numero_factura']) },
