@@ -19234,6 +19234,135 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
   res.json({ plantillas: lista, idiomas });
 }));
 
+// ─── (06/11/2026) N51 — Email y WhatsApp: freno del ruso y «🔄 Volver a traducir» ──
+// Llamada a la IA de los Generadores 15 (email) y 16 (WhatsApp) para UNA plantilla en un idioma.
+// La usan «Generar lo que falta» y «🔄 Volver a traducir». Devuelve el JSON de la IA.
+async function llamarIAPlantilla(p, tipo, nombreIdioma) {
+  const prompt = tipo === 'email'
+    ? iaPrompts.GENERADOR_EMAIL_COMUNICACIONES(nombreIdioma, p.asunto_email || '', p.cuerpo_email)
+    : iaPrompts.GENERADOR_WA_COMUNICACIONES(nombreIdioma, p.cuerpo_whatsapp);
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if (!response.ok) {
+    const cuerpoError = await response.text();
+    throw new Error('API error ' + response.status + ': ' + cuerpoError.slice(0, 200));
+  }
+  const data = await response.json();
+  const textoRespuesta = data.content.map(function(b) { return b.text || ''; }).join('');
+  const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
+  console.log('[GEN' + (tipo === 'email' ? '15' : '16') + '] ' + p.clave + ' → ' + nombreIdioma + ':', limpio.slice(0, 200));
+  return JSON.parse(limpio);
+}
+
+// Texto de una traducción de plantilla que se revisa en un canal (email: asunto + cuerpo; wa: cuerpo).
+function textoPlantillaCanal(t, tipo) {
+  if (!t) return '';
+  return tipo === 'wa' ? (t.cuerpo_whatsapp || '') : ((t.asunto_email || '') + '\n' + (t.cuerpo_email || ''));
+}
+
+// Qué impide guardar lo que ha devuelto la IA para una plantilla (null = se puede guardar).
+function problemaTraduccionPlantilla(p, parsed, tipo, lang) {
+  const cuerpo = tipo === 'wa' ? (parsed && parsed.cuerpo_whatsapp) : (parsed && parsed.cuerpo_email);
+  if (!cuerpo || typeof cuerpo !== 'string' || !cuerpo.trim()) return 'Sin traducción en la respuesta';
+  const original = tipo === 'wa' ? p.cuerpo_whatsapp : p.cuerpo_email;
+  if (cuerpo.trim() === (original || '').trim()) return 'Volvió sin traducir';
+  if (lang === 'ru') {
+    const rr = revisarRuso(textoPlantillaCanal(parsed, tipo));
+    if (!rr.ok) return rr.sinRuso ? 'Ruso sin letras rusas' : 'Ruso con palabras en letras latinas: ' + rr.latinas.join(', ');
+  }
+  return null;
+}
+
+// Guarda lo que ha devuelto la IA en 🔵 (traducido, sin aprobar), solo en el canal pedido.
+async function guardarPlantillaIA(clave, lang, tipo, parsed) {
+  if (tipo === 'email') {
+    await pool.query(
+      `INSERT INTO plantillas_comunicacion_traducciones
+         (plantilla_clave, lang_code, asunto_email, cuerpo_email, generado_por_ia, revisado_email, actualizado_en)
+       VALUES ($1, $2, $3, $4, TRUE, FALSE, NOW())
+       ON CONFLICT (plantilla_clave, lang_code) DO UPDATE
+         SET asunto_email = EXCLUDED.asunto_email,
+             cuerpo_email = EXCLUDED.cuerpo_email,
+             generado_por_ia = TRUE,
+             revisado_email = FALSE,
+             desactualizado_email = FALSE,
+             actualizado_en = NOW()`,
+      [clave, lang, parsed.asunto_email || null, parsed.cuerpo_email || null]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO plantillas_comunicacion_traducciones
+         (plantilla_clave, lang_code, cuerpo_whatsapp, generado_por_ia, revisado_wa, actualizado_en)
+       VALUES ($1, $2, $3, TRUE, FALSE, NOW())
+       ON CONFLICT (plantilla_clave, lang_code) DO UPDATE
+         SET cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp,
+             generado_por_ia = TRUE,
+             revisado_wa = FALSE,
+             desactualizado_wa = FALSE,
+             actualizado_en = NOW()`,
+      [clave, lang, parsed.cuerpo_whatsapp || null]
+    );
+  }
+}
+
+// «🔄 Volver a traducir»: la IA traduce otra vez UNA plantilla en UN idioma y UN canal, aunque esté aprobada.
+// Dos intentos. Si sale bien, se guarda en 🔵. Si es un ruso con palabras en letras latinas (y lo demás bien),
+// se devuelve SIN guardarlo para que el operario decida en la ficha («💾 Guardar así» o «🔄 Volver a traducir»).
+app.post('/admin/plantillas-comunicacion/:clave/traducciones/:lang/retraducir', requireAdmin, asyncHandler(async (req, res) => {
+  const { clave, lang } = req.params;
+  const { tipo } = req.body;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) return res.status(400).json({ ok: false, error: 'Idioma no válido' });
+  if (tipo !== 'email' && tipo !== 'wa') return res.status(400).json({ ok: false, error: 'Tipo no válido — debe ser email o wa' });
+  if (!process.env.ANTHROPIC_API_KEY) return res.status(500).json({ ok: false, error: 'Falta ANTHROPIC_API_KEY en las variables de entorno.' });
+  const pl = await pool.query(
+    `SELECT clave, asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion WHERE clave = $1 AND categoria = 'cliente'`, [clave]
+  );
+  if (!pl.rows.length) return res.status(404).json({ ok: false, error: 'Plantilla no encontrada' });
+  const p = pl.rows[0];
+  const original = tipo === 'wa' ? p.cuerpo_whatsapp : p.cuerpo_email;
+  if (!original || !original.trim()) return res.json({ ok: false, error: 'Esta plantilla no tiene texto en español en este canal.' });
+  const nombreIdioma = await getNombreIdioma(lang);
+  let ultima = null, ultimoProblema = null;
+  for (let intento = 1; intento <= 2; intento++) {
+    let parsed;
+    try { parsed = await llamarIAPlantilla(p, tipo, nombreIdioma); }
+    catch (err) { ultimoProblema = err.message; continue; }
+    const problema = problemaTraduccionPlantilla(p, parsed, tipo, lang);
+    if (!problema) {
+      await guardarPlantillaIA(clave, lang, tipo, parsed);
+      return res.json({ ok: true, asunto_email: parsed.asunto_email || '', cuerpo_email: parsed.cuerpo_email || '', cuerpo_whatsapp: parsed.cuerpo_whatsapp || '' });
+    }
+    console.warn('[GEN' + (tipo === 'email' ? '15' : '16') + '] Volver a traducir ' + clave + ' (' + lang + '), intento ' + intento + ': ' + problema);
+    ultima = parsed;
+    ultimoProblema = problema;
+  }
+  // Ruso con palabras en letras latinas como ÚNICO problema: se enseña para que decida el operario
+  if (lang === 'ru' && ultima && problemaTraduccionPlantilla(p, ultima, tipo, 'es') === null) {
+    const rr = revisarRuso(textoPlantillaCanal(ultima, tipo));
+    if (!rr.ok && !rr.sinRuso) {
+      return res.json({ ok: false, ruso: rr, asunto_email: ultima.asunto_email || '', cuerpo_email: ultima.cuerpo_email || '', cuerpo_whatsapp: ultima.cuerpo_whatsapp || '' });
+    }
+  }
+  let error;
+  if (ultimoProblema === 'Ruso sin letras rusas' || ultimoProblema === 'Volvió sin traducir') {
+    error = 'La IA no ha devuelto el texto traducido (lo ha intentado dos veces). No se ha guardado nada: vuelve a pulsar «🔄 Volver a traducir».';
+  } else {
+    error = 'No se ha podido traducir (' + (ultimoProblema || 'error desconocido') + '). No se ha guardado nada.';
+  }
+  res.json({ ok: false, error: error });
+}));
+
 // POST — generar con IA las traducciones que faltan (email o WhatsApp)
 // Llamado desde Admin → Idiomas → Comunicaciones Cliente → 🤖 Generar Emails / 🤖 Generar WhatsApp
 app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
@@ -19254,7 +19383,7 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
 
   // Leer todas las plantillas de categoría cliente
   const plantillas = await pool.query(
-    `SELECT clave, asunto_email, cuerpo_email, cuerpo_whatsapp
+    `SELECT clave, nombre, asunto_email, cuerpo_email, cuerpo_whatsapp
      FROM plantillas_comunicacion
      WHERE categoria = 'cliente'
      ORDER BY clave`
@@ -19262,7 +19391,7 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
 
   // Leer qué traducciones ya existen para este idioma
   const yaExisten = await pool.query(
-    `SELECT plantilla_clave, cuerpo_email, cuerpo_whatsapp, desactualizado_email, desactualizado_wa
+    `SELECT plantilla_clave, asunto_email, cuerpo_email, cuerpo_whatsapp, desactualizado_email, desactualizado_wa
      FROM plantillas_comunicacion_traducciones
      WHERE lang_code = $1`,
     [lang]
@@ -19270,8 +19399,10 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
   const mapaExistentes = {};
   for (const t of yaExisten.rows) {
     mapaExistentes[t.plantilla_clave] = {
-      tieneEmail: !!(t.cuerpo_email && t.cuerpo_email.trim()) && !t.desactualizado_email,
-      tieneWa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()) && !t.desactualizado_wa
+      tieneEmail: !!(t.cuerpo_email && t.cuerpo_email.trim()) && !t.desactualizado_email &&
+                  !(lang === 'ru' && revisarRuso(textoPlantillaCanal(t, 'email')).sinRuso), // (06/11/2026) un ruso sin ruso se vuelve a generar
+      tieneWa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()) && !t.desactualizado_wa &&
+                  !(lang === 'ru' && revisarRuso(textoPlantillaCanal(t, 'wa')).sinRuso)
     };
   }
 
@@ -19295,79 +19426,32 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
 
   for (const p of pendientes) {
     try {
-      let prompt, campoRespuesta;
+      // No generar si no hay cuerpo original
+      if (tipo === 'email' && (!p.cuerpo_email || !p.cuerpo_email.trim())) continue;
+      if (tipo === 'wa' && (!p.cuerpo_whatsapp || !p.cuerpo_whatsapp.trim())) continue;
 
-      if (tipo === 'email') {
-        // No generar si no hay cuerpo original
-        if (!p.cuerpo_email || !p.cuerpo_email.trim()) continue;
-        prompt = iaPrompts.GENERADOR_EMAIL_COMUNICACIONES(nombreIdioma, p.asunto_email || '', p.cuerpo_email);
-        campoRespuesta = 'email';
-      } else {
-        // No generar si no hay cuerpo original
-        if (!p.cuerpo_whatsapp || !p.cuerpo_whatsapp.trim()) continue;
-        prompt = iaPrompts.GENERADOR_WA_COMUNICACIONES(nombreIdioma, p.cuerpo_whatsapp);
-        campoRespuesta = 'wa';
+      let parsed = await llamarIAPlantilla(p, tipo, nombreIdioma);
+      // (06/11/2026) N51: en ruso, lo que no vuelve bien (sin ruso, igual al español, letras latinas)
+      // se pide otra vez a la IA, una vez. Si vuelve a fallar, no se guarda y queda en 🔴.
+      if (lang === 'ru') {
+        let problema = problemaTraduccionPlantilla(p, parsed, tipo, lang);
+        if (problema) {
+          console.warn('[GEN' + (tipo === 'email' ? '15' : '16') + '] ru: ' + p.clave + ' — ' + problema + ' — se pide otra vez a la IA.');
+          parsed = await llamarIAPlantilla(p, tipo, nombreIdioma);
+          problema = problemaTraduccionPlantilla(p, parsed, tipo, lang);
+          if (problema) {
+            console.warn('[GEN' + (tipo === 'email' ? '15' : '16') + '] ru: ' + p.clave + ' — ' + problema + ' (2.º intento) — no se guarda.');
+            errores.push({ clave: p.clave, nombre: p.nombre, error: problema, ruso: true });
+            continue;
+          }
+        }
       }
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 4000,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
-
-      if (!response.ok) {
-        const cuerpoError = await response.text();
-        errores.push({ clave: p.clave, error: 'API error ' + response.status + ': ' + cuerpoError.slice(0, 200) });
-        continue;
-      }
-
-      const data = await response.json();
-      const textoRespuesta = data.content.map(function(b) { return b.text || ''; }).join('');
-      const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
-      console.log('[GEN' + (tipo === 'email' ? '15' : '16') + '] ' + p.clave + ' → ' + lang + ':', limpio.slice(0, 200));
-      const parsed = JSON.parse(limpio);
-
-      if (tipo === 'email') {
-        await pool.query(
-          `INSERT INTO plantillas_comunicacion_traducciones
-             (plantilla_clave, lang_code, asunto_email, cuerpo_email, generado_por_ia, revisado_email, actualizado_en)
-           VALUES ($1, $2, $3, $4, TRUE, FALSE, NOW())
-           ON CONFLICT (plantilla_clave, lang_code) DO UPDATE
-             SET asunto_email = EXCLUDED.asunto_email,
-                 cuerpo_email = EXCLUDED.cuerpo_email,
-                 generado_por_ia = TRUE,
-                 revisado_email = FALSE,
-                 desactualizado_email = FALSE,
-                 actualizado_en = NOW()`,
-          [p.clave, lang, parsed.asunto_email || null, parsed.cuerpo_email || null]
-        );
-      } else {
-        await pool.query(
-          `INSERT INTO plantillas_comunicacion_traducciones
-             (plantilla_clave, lang_code, cuerpo_whatsapp, generado_por_ia, revisado_wa, actualizado_en)
-           VALUES ($1, $2, $3, TRUE, FALSE, NOW())
-           ON CONFLICT (plantilla_clave, lang_code) DO UPDATE
-             SET cuerpo_whatsapp = EXCLUDED.cuerpo_whatsapp,
-                 generado_por_ia = TRUE,
-                 revisado_wa = FALSE,
-                 desactualizado_wa = FALSE,
-                 actualizado_en = NOW()`,
-          [p.clave, lang, parsed.cuerpo_whatsapp || null]
-        );
-      }
-
+      await guardarPlantillaIA(p.clave, lang, tipo, parsed);
       generadas++;
     } catch (err) {
       console.error('[GEN15/16] Error en ' + p.clave + ':', err.message);
-      errores.push({ clave: p.clave, error: err.message });
+      errores.push({ clave: p.clave, nombre: p.nombre, error: err.message });
     }
   }
 
@@ -19377,7 +19461,37 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
 // PUT — guardar o actualizar una traducción
 app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const { clave, lang } = req.params;
-  const { asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, solo_aprobar, tipo } = req.body;
+  const { asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, solo_aprobar, tipo, confirmar_latinas } = req.body;
+
+  // (06/11/2026) N51 — Freno del ruso (solo en el canal que se guarda o se aprueba): un ruso sin letras rusas
+  // nunca se guarda ni se aprueba (si se intenta aprobar, pasa a 🔴); con palabras en letras latinas,
+  // solo si se confirma a propósito.
+  if (lang === 'ru' && (tipo === 'email' || tipo === 'wa')) {
+    let textoRu = textoPlantillaCanal({ asunto_email, cuerpo_email, cuerpo_whatsapp }, tipo);
+    if (solo_aprobar) {
+      const actual = await pool.query(
+        'SELECT asunto_email, cuerpo_email, cuerpo_whatsapp FROM plantillas_comunicacion_traducciones WHERE plantilla_clave = $1 AND lang_code = $2',
+        [clave, lang]
+      );
+      textoRu = actual.rows.length ? textoPlantillaCanal(actual.rows[0], tipo) : '';
+    }
+    if (textoRu && textoRu.trim()) {
+      const rr = revisarRuso(textoRu);
+      if (!rr.ok && (rr.sinRuso || !confirmar_latinas)) {
+        if (solo_aprobar && rr.sinRuso) {
+          await pool.query(
+            tipo === 'wa'
+              ? `UPDATE plantillas_comunicacion_traducciones SET desactualizado_wa = TRUE, revisado_wa = FALSE, actualizado_en = NOW()
+                 WHERE plantilla_clave = $1 AND lang_code = $2`
+              : `UPDATE plantillas_comunicacion_traducciones SET desactualizado_email = TRUE, revisado_email = FALSE, actualizado_en = NOW()
+                 WHERE plantilla_clave = $1 AND lang_code = $2`,
+            [clave, lang]
+          );
+        }
+        return res.json({ ok: false, ruso: rr });
+      }
+    }
+  }
 
   if (solo_aprobar) {
     // Solo marca como revisado — nunca toca el contenido
@@ -19418,9 +19532,10 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
 // ─── (06/11/2026) N51 — Freno del ruso ────────────────────────────────────────
 // Un texto ruso tiene que estar escrito en ruso (letras cirílicas). No cuentan: las variables {…},
 // los enlaces, los correos, las etiquetas HTML, los números de reserva (3 letras y 3 cifras, p. ej. ABC123)
-// y las palabras de la lista RUSO_PALABRAS_PERMITIDAS (decididas por Germán).
+// y las palabras de la lista RUSO_PALABRAS_PERMITIDAS (decididas por Germán; sin distinguir mayúsculas:
+// «email», «Email», «E-mail»… cuentan igual).
 // Devuelve { ok: true } o { ok: false, sinRuso, latinas: [palabras en letras latinas] }.
-const RUSO_PALABRAS_PERMITIDAS = ['Traslados GC', 'WhatsApp'];
+const RUSO_PALABRAS_PERMITIDAS = ['traslados', 'gc', 'whatsapp', 'email', 'e-mail'];
 function revisarRuso(texto) {
   let t = String(texto || '')
     .replace(/\{[a-z_]+\}/g, ' ')
@@ -19429,9 +19544,9 @@ function revisarRuso(texto) {
     .replace(/<[^>]+>/g, ' ')
     .replace(/&[a-z]+;/g, ' ')
     .replace(/\b[A-Z]{3}[0-9]{3}\b/g, ' ');
-  RUSO_PALABRAS_PERMITIDAS.forEach(function(pal) { t = t.split(pal).join(' '); });
   const cirilicas = (t.match(/[Ѐ-ӿ]/g) || []).length;
-  const latinas = Array.from(new Set(t.match(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ-]*/g) || []));
+  const latinas = Array.from(new Set(t.match(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ-]*/g) || []))
+    .filter(function(pal) { return RUSO_PALABRAS_PERMITIDAS.indexOf(pal.toLowerCase()) < 0; });
   if (!cirilicas && !latinas.length) return { ok: true }; // sin letras (solo variables, cifras…)
   if (!cirilicas) return { ok: false, sinRuso: true, latinas: latinas };
   if (latinas.length) return { ok: false, sinRuso: false, latinas: latinas };
