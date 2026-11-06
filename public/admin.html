@@ -732,10 +732,13 @@ table.tabla-precios input {
             </div>
           </div>
 
+          <!-- (06/11/2026) N51 — Aviso del ruso (sin letras rusas o con palabras en letras latinas) y de «🔄 Volver a traducir» -->
+          <div id="modal-com-trad-aviso" style="margin-top:16px;"></div>
           <!-- Botones -->
           <div style="display:flex;gap:10px;margin-top:20px;align-items:center;flex-wrap:wrap;">
             <button class="boton-primario" onclick="guardarComTrad()">💾 Guardar</button>
             <button class="boton-primario" onclick="guardarTodoComTrad()">💾 Guardar todo</button>
+            <button class="boton-primario" onclick="retraducirComTrad()">🔄 Volver a traducir</button>
             <button class="boton-secundario" onclick="cerrarModalComTrad()">Cerrar</button>
             <span id="modal-com-trad-msg-ok" style="font-size:13px;color:green;display:none;">✓ Guardado</span>
             <span id="modal-com-trad-msg-err" style="font-size:13px;color:red;display:none;">Error al guardar</span>
@@ -5714,9 +5717,14 @@ function aprobarTodoComunicaciones(tipo) {
   });
 
   Promise.all(promesas).then(function(resultados) {
-    var errores = resultados.filter(function(r) { return !r || !r.ok; });
+    // (06/11/2026) N51: un ruso que no está en ruso o lleva palabras en letras latinas no se aprueba
+    var frenados = resultados.filter(function(r) { return r && r.ruso; }).length;
+    var errores = resultados.filter(function(r) { return !r || (!r.ok && !r.ruso); });
+    var aprobadas = pendientes.length - frenados - errores.length;
     if (errores.length > 0) {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error en ' + errores.length + ' traducción(es).'; msg.style.display = 'inline'; }
+    } else if (frenados > 0) {
+      if (msg) { msg.style.color = '#c0392b'; msg.textContent = '✅ ' + aprobadas + ' traducción(es) aprobada(s). ⚠️ ' + frenados + ' en ruso NO aprobada(s): no están en ruso o llevan palabras en letras latinas. Ábrelas en su ficha (pestaña RU).'; msg.style.display = 'inline'; }
     } else {
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ ' + pendientes.length + ' traducción(es) aprobada(s).'; msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 4000); }
     }
@@ -5837,6 +5845,7 @@ function abrirModalComTrad(clave, tipo, lang) {
   document.getElementById('modal-com-trad-texto').value = '';
   document.getElementById('modal-com-trad-msg-ok').style.display = 'none';
   document.getElementById('modal-com-trad-msg-err').style.display = 'none';
+  document.getElementById('modal-com-trad-aviso').innerHTML = ''; // (06/11/2026) sin el aviso de la pestaña anterior
 
   // Mostrar campo asunto solo en email
   document.getElementById('modal-com-trad-campo-asunto').style.display = tipo === 'email' ? 'block' : 'none';
@@ -5931,12 +5940,14 @@ function cerrarModalComTrad() {
   _comClienteLangTrad = null;
 }
 
-function guardarComTrad() {
+function guardarComTrad(confirmarLatinas) {
   if (!_comClienteClaveTrad || !_comClienteTipoTrad || !_comClienteLangTrad) return;
   var texto = document.getElementById('modal-com-trad-texto').value.trim();
   var asunto = document.getElementById('modal-com-trad-asunto').value.trim();
+  var confirmar = confirmarLatinas === true;
   document.getElementById('modal-com-trad-msg-ok').style.display = 'none';
   document.getElementById('modal-com-trad-msg-err').style.display = 'none';
+  document.getElementById('modal-com-trad-aviso').innerHTML = '';
 
   // Leer traducción existente para no borrar el otro campo
   fetch('/admin/plantillas-comunicacion/' + _comClienteClaveTrad + '/traducciones')
@@ -5947,7 +5958,9 @@ function guardarComTrad() {
         asunto_email:    _comClienteTipoTrad === 'email' ? asunto : (trad.asunto_email || ''),
         cuerpo_email:    _comClienteTipoTrad === 'email' ? texto  : (trad.cuerpo_email || ''),
         cuerpo_whatsapp: _comClienteTipoTrad === 'wa'    ? texto  : (trad.cuerpo_whatsapp || ''),
-        generado_por_ia: false
+        generado_por_ia: false,
+        tipo: _comClienteTipoTrad,          // (06/11/2026) N51: el freno del ruso mira solo el canal que se guarda
+        confirmar_latinas: confirmar
       };
       return fetch('/admin/plantillas-comunicacion/' + _comClienteClaveTrad + '/traducciones/' + _comClienteLangTrad, {
         method: 'PUT',
@@ -5957,15 +5970,17 @@ function guardarComTrad() {
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
+      if (d.ruso) { avisoRusoComTrad(d.ruso); return; } // (06/11/2026) N51
       if (!d.ok) { document.getElementById('modal-com-trad-msg-err').style.display = 'inline'; return; }
       return fetch('/admin/plantillas-comunicacion/' + _comClienteClaveTrad + '/traducciones/' + _comClienteLangTrad, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ solo_aprobar: true, tipo: _comClienteTipoTrad })
+        body: JSON.stringify({ solo_aprobar: true, tipo: _comClienteTipoTrad, confirmar_latinas: confirmar })
       });
     })
     .then(function(r) { if (r) return r.json(); })
     .then(function(d) {
+      if (d && d.ruso) { avisoRusoComTrad(d.ruso); return; } // (06/11/2026) N51
       if (d && d.ok) {
         document.getElementById('modal-com-trad-msg-ok').style.display = 'inline';
         _comClienteDatos = null;
@@ -6006,6 +6021,7 @@ function guardarTodoComTrad() {
   var ok = document.getElementById('modal-com-trad-msg-ok');
   var err = document.getElementById('modal-com-trad-msg-err');
   ok.style.display = 'none'; err.style.display = 'none';
+  document.getElementById('modal-com-trad-aviso').innerHTML = '';
   fetch('/admin/plantillas-comunicacion/' + clave + '/traducciones')
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -6015,11 +6031,13 @@ function guardarTodoComTrad() {
         asunto_email:    tipo === 'email' ? asunto : (trad.asunto_email || ''),
         cuerpo_email:    tipo === 'email' ? texto  : (trad.cuerpo_email || ''),
         cuerpo_whatsapp: tipo === 'wa'    ? texto  : (trad.cuerpo_whatsapp || ''),
-        generado_por_ia: false
+        generado_por_ia: false,
+        tipo: tipo                          // (06/11/2026) N51
       };
       return fetch('/admin/plantillas-comunicacion/' + clave + '/traducciones/' + lang, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       }).then(function(r) { return r.json(); }).then(function(g) {
+        if (g.ruso) { avisoRusoComTrad(g.ruso); throw new Error('ruso'); } // (06/11/2026) N51: la pestaña abierta es el ruso
         if (!g.ok) throw new Error('guardar');
         // Aprobar tal cual los idiomas que tienen traducción en este canal (y el abierto)
         var langs = lista.filter(function(t) {
@@ -6035,12 +6053,87 @@ function guardarTodoComTrad() {
       });
     })
     .then(function(res) {
-      if (res.some(function(x) { return !x || !x.ok; })) throw new Error('aprobar');
+      var frenados = res.filter(function(x) { return x && x.ruso; }).length;
+      if (res.some(function(x) { return !x || (!x.ok && !x.ruso); })) throw new Error('aprobar');
       ok.style.display = 'inline';
+      if (frenados) {
+        document.getElementById('modal-com-trad-aviso').innerHTML =
+          '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
+          '⚠️ <strong>El ruso no se ha aprobado.</strong> Ábrelo en su pestaña RU para revisarlo: no está en ruso o lleva palabras en letras latinas.</div>';
+      }
       _comClienteDatos = null;
       cargarComunicacionesCliente().then(pintarPestanasComTrad);
     })
-    .catch(function() { err.style.display = 'inline'; });
+    .catch(function(e) { if (!e || e.message !== 'ruso') err.style.display = 'inline'; });
+}
+
+// (06/11/2026) N51 — Recuadro rojo del ruso en la ficha de Email / WhatsApp (mismo formato que en Frases).
+function avisoRusoComTrad(rr) {
+  var caja = document.getElementById('modal-com-trad-aviso');
+  function esc(t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  if (rr.sinRuso) {
+    caja.innerHTML =
+      '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
+      '⚠️ <strong>Este texto no está en ruso.</strong> No se ha guardado ni aprobado. Pulsa «🔄 Volver a traducir».' +
+      '</div>';
+  } else {
+    caja.innerHTML =
+      '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
+      '⚠️ <strong>Este texto ruso lleva palabras en letras latinas:</strong> ' + esc((rr.latinas || []).join(', ')) + '<br>' +
+      '¿Lo guardas así? Si no, pulsa «🔄 Volver a traducir».<br>' +
+      '<button class="boton-secundario" style="margin-top:8px;" onclick="guardarComTrad(true)">💾 Guardar así</button>' +
+      '</div>';
+  }
+}
+
+// (06/11/2026) N51 — «🔄 Volver a traducir»: la IA traduce otra vez esta plantilla solo en el idioma de la pestaña abierta
+// y solo en el canal abierto (Email o WhatsApp), aunque esté aprobada. Lo nuevo queda en 🔵; se aprueba con «💾 Guardar».
+function retraducirComTrad() {
+  if (!_comClienteClaveTrad || !_comClienteTipoTrad || !_comClienteLangTrad) return;
+  var clave = _comClienteClaveTrad, tipo = _comClienteTipoTrad, lang = _comClienteLangTrad;
+  var caja = document.getElementById('modal-com-trad-aviso');
+  document.getElementById('modal-com-trad-msg-ok').style.display = 'none';
+  document.getElementById('modal-com-trad-msg-err').style.display = 'none';
+  caja.innerHTML = '<p style="font-size:13px;color:var(--texto-muted);margin:0;">🤖 Traduciendo de nuevo con IA, puede tardar unos segundos...</p>';
+  fetch('/admin/plantillas-comunicacion/' + clave + '/traducciones/' + lang + '/retraducir', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo: tipo })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (clave !== _comClienteClaveTrad || tipo !== _comClienteTipoTrad || lang !== _comClienteLangTrad) return; // se cambió de pestaña
+      if (d.ok || d.ruso) {
+        // Se pone el texto nuevo en la ficha y en la vista previa
+        var textarea = document.getElementById('modal-com-trad-texto');
+        var refAsuntoTrad = document.getElementById('modal-com-trad-ref-asunto-trad');
+        if (tipo === 'email') {
+          document.getElementById('modal-com-trad-asunto').value = d.asunto_email || '';
+          textarea.value = d.cuerpo_email || '';
+          if (refAsuntoTrad) {
+            refAsuntoTrad.innerHTML = d.asunto_email ? '<strong>Asunto:</strong> ' + String(d.asunto_email).replace(/</g, '&lt;') : '';
+            refAsuntoTrad.style.display = d.asunto_email ? 'block' : 'none';
+          }
+          pintarEmailReal('modal-com-trad-ref-trad', d.cuerpo_email || '', lang);
+        } else {
+          textarea.value = d.cuerpo_whatsapp || '';
+          pintarWhatsappReal('modal-com-trad-ref-trad', d.cuerpo_whatsapp || '');
+        }
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight + 20) + 'px';
+      }
+      if (d.ok) {
+        caja.innerHTML = '<div class="aviso-ok">🤖 Traducido de nuevo. Está en azul: revísalo y pulsa «💾 Guardar».</div>';
+        _comClienteDatos = null;
+        cargarComunicacionesCliente().then(pintarPestanasComTrad);
+      } else if (d.ruso) {
+        avisoRusoComTrad(d.ruso);
+      } else {
+        caja.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">⚠️ ' +
+          String(d.error || 'No se ha podido traducir.').replace(/</g, '&lt;') + '</div>';
+      }
+    })
+    .catch(function() {
+      caja.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">⚠️ No se pudo conectar con la IA. Inténtalo de nuevo.</div>';
+    });
 }
 
 function generarComunicacionesClienteIA(tipo, selId, msgId) {
@@ -6069,7 +6162,9 @@ function generarComunicacionesClienteIA(tipo, selId, msgId) {
         msg.style.color = 'var(--rojo-error)';
         return;
       }
-      if (respuesta.generadas === 0) {
+      if (respuesta.generadas === 0 && respuesta.errores && respuesta.errores.length) {
+        msg.textContent = ''; // (06/11/2026) N51: no se generó nada; abajo se dice por qué
+      } else if (respuesta.generadas === 0) {
         msg.textContent = '✅ Ya estaba todo generado en ' + lang.toUpperCase() + '.';
         msg.style.color = '#2e7d32';
       } else {
@@ -6080,7 +6175,16 @@ function generarComunicacionesClienteIA(tipo, selId, msgId) {
       }
       if (respuesta.errores && respuesta.errores.length > 0) {
         console.warn('[GEN15/16] Errores parciales:', respuesta.errores);
-        msg.textContent += ' (' + respuesta.errores.length + ' con error — ver consola)';
+        // (06/11/2026) N51: plantillas que no han vuelto bien en ruso ni al segundo intento
+        var rusas = respuesta.errores.filter(function(e) { return e.ruso; });
+        if (rusas.length) {
+          msg.textContent += ' ⚠️ El ruso de ' + rusas.length + ' plantilla(s) no se ha podido traducir y sigue en rojo: ' +
+            rusas.map(function(e) { return '«' + (e.nombre || e.clave) + '»'; }).join(' · ') + '. Ábrela y pulsa «🔄 Volver a traducir».';
+          msg.style.color = '#c0392b';
+        }
+        if (respuesta.errores.length > rusas.length) {
+          msg.textContent += ' (' + (respuesta.errores.length - rusas.length) + ' con error — ver consola)';
+        }
       }
     })
     .catch(function() {
