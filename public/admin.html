@@ -665,9 +665,12 @@ table.tabla-precios input {
               <textarea id="modal-com-frase-texto" class="campo" style="font-family:monospace;font-size:13px;resize:vertical;width:100%;overflow:hidden;"></textarea>
             </div>
           </div>
+          <!-- (06/11/2026) N51 — Aviso del ruso (sin letras rusas o con palabras en letras latinas) y de «🔄 Volver a traducir» -->
+          <div id="modal-com-frase-aviso" style="margin-top:16px;"></div>
           <div style="display:flex;gap:10px;margin-top:20px;align-items:center;flex-wrap:wrap;">
             <button class="boton-primario" onclick="guardarComFrase()">💾 Guardar</button>
             <button class="boton-primario" onclick="guardarTodoComFrase()">💾 Guardar todo</button>
+            <button class="boton-primario" onclick="retraducirComFrase()">🔄 Volver a traducir</button>
             <button class="boton-secundario" onclick="cerrarModalComFrase()">Cerrar</button>
             <span id="modal-com-frase-msg-ok" style="font-size:13px;color:green;display:none;">✓ Guardado</span>
             <span id="modal-com-frase-msg-err" style="font-size:13px;color:red;display:none;">Error al guardar</span>
@@ -6231,9 +6234,14 @@ function aprobarTodoComFrases() {
     }).then(function(r) { return r.json(); });
   });
   Promise.all(promesas).then(function(resultados) {
-    var errores = resultados.filter(function(r) { return !r || !r.ok; });
+    // (06/11/2026) N51: un ruso que no está en ruso o lleva palabras en letras latinas no se aprueba
+    var frenados = resultados.filter(function(r) { return r && r.ruso; }).length;
+    var errores = resultados.filter(function(r) { return !r || (!r.ok && !r.ruso); });
+    var aprobadas = pendientes.length - frenados - errores.length;
     if (errores.length > 0) {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error en ' + errores.length + ' traducción(es).'; msg.style.display = 'inline'; }
+    } else if (frenados > 0) {
+      if (msg) { msg.style.color = '#c0392b'; msg.textContent = '✅ ' + aprobadas + ' traducción(es) aprobada(s). ⚠️ ' + frenados + ' en ruso NO aprobada(s): no están en ruso o llevan palabras en letras latinas. Ábrelas en su ficha (pestaña RU).'; msg.style.display = 'inline'; }
     } else {
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ ' + pendientes.length + ' traducción(es) aprobada(s).'; msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 4000); }
     }
@@ -6264,6 +6272,7 @@ function abrirModalComFrase(clave, lang) {
   document.getElementById('modal-com-frase-campo-label').textContent = 'Traducción (' + lang.toUpperCase() + ')';
   document.getElementById('modal-com-frase-msg-ok').style.display = 'none';
   document.getElementById('modal-com-frase-msg-err').style.display = 'none';
+  document.getElementById('modal-com-frase-aviso').innerHTML = ''; // (06/11/2026) sin el aviso de la pestaña anterior
   var textarea = document.getElementById('modal-com-frase-texto');
   textarea.value = '';
   fetch('/admin/frases-comunicacion/' + clave + '/traducciones')
@@ -6284,29 +6293,33 @@ function cerrarModalComFrase() {
 }
 
 // Guardar = guarda la traducción y la marca aprobada (verde), igual que en Email / WhatsApp
-function guardarComFrase() {
+function guardarComFrase(confirmarLatinas) {
   if (!_comFraseClaveTrad || !_comFraseLangTrad) return;
   var texto = document.getElementById('modal-com-frase-texto').value.trim();
   document.getElementById('modal-com-frase-msg-ok').style.display = 'none';
   document.getElementById('modal-com-frase-msg-err').style.display = 'none';
+  document.getElementById('modal-com-frase-aviso').innerHTML = '';
   if (!texto) { document.getElementById('modal-com-frase-msg-err').style.display = 'inline'; return; }
   var clave = _comFraseClaveTrad, lang = _comFraseLangTrad;
+  var confirmar = confirmarLatinas === true;
   fetch('/admin/frases-comunicacion/' + clave + '/traducciones/' + lang, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ texto: texto, generado_por_ia: false })
+    body: JSON.stringify({ texto: texto, generado_por_ia: false, confirmar_latinas: confirmar })
   })
     .then(function(r) { return r.json(); })
     .then(function(d) {
+      if (d.ruso) { avisoRusoComFrase(d.ruso); return; } // (06/11/2026) N51
       if (!d.ok) { document.getElementById('modal-com-frase-msg-err').style.display = 'inline'; return; }
       return fetch('/admin/frases-comunicacion/' + clave + '/traducciones/' + lang, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ solo_aprobar: true })
+        body: JSON.stringify({ solo_aprobar: true, confirmar_latinas: confirmar })
       });
     })
     .then(function(r) { if (r) return r.json(); })
     .then(function(d) {
+      if (d && d.ruso) { avisoRusoComFrase(d.ruso); return; } // (06/11/2026) N51
       if (d && d.ok) {
         document.getElementById('modal-com-frase-msg-ok').style.display = 'inline';
         _comFrasesDatos = null;
@@ -6344,10 +6357,12 @@ function guardarTodoComFrase() {
   var err = document.getElementById('modal-com-frase-msg-err');
   ok.style.display = 'none'; err.style.display = 'none';
   if (!texto) { err.style.display = 'inline'; return; }
+  document.getElementById('modal-com-frase-aviso').innerHTML = '';
   fetch('/admin/frases-comunicacion/' + clave + '/traducciones/' + lang, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto: texto, generado_por_ia: false })
   }).then(function(r) { return r.json(); }).then(function(g) {
+    if (g.ruso) { avisoRusoComFrase(g.ruso); throw new Error('ruso'); } // (06/11/2026) N51: la pestaña abierta es el ruso
     if (!g.ok) throw new Error('guardar');
     return fetch('/admin/frases-comunicacion/' + clave + '/traducciones').then(function(r) { return r.json(); });
   }).then(function(d) {
@@ -6359,11 +6374,73 @@ function guardarTodoComFrase() {
       }).then(function(r) { return r.json(); });
     }));
   }).then(function(res) {
-    if (res.some(function(x) { return !x || !x.ok; })) throw new Error('aprobar');
+    var frenados = res.filter(function(x) { return x && x.ruso; }).length;
+    if (res.some(function(x) { return !x || (!x.ok && !x.ruso); })) throw new Error('aprobar');
     ok.style.display = 'inline';
+    if (frenados) {
+      document.getElementById('modal-com-frase-aviso').innerHTML =
+        '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
+        '⚠️ <strong>El ruso no se ha aprobado.</strong> Ábrelo en su pestaña RU para revisarlo: no está en ruso o lleva palabras en letras latinas.</div>';
+    }
     _comFrasesDatos = null;
     cargarComFrases().then(pintarPestanasComFrase);
-  }).catch(function() { err.style.display = 'inline'; });
+  }).catch(function(e) { if (!e || e.message !== 'ruso') err.style.display = 'inline'; });
+}
+
+// (06/11/2026) N51 — Recuadro rojo del ruso en la ficha de una frase (mismo formato que «¿Este cambio afecta a las traducciones?»).
+// Sin letras rusas: no se guarda (se rehace con «🔄 Volver a traducir»). Con palabras en letras latinas: «💾 Guardar así» o «🔄 Volver a traducir».
+function avisoRusoComFrase(rr) {
+  var caja = document.getElementById('modal-com-frase-aviso');
+  function esc(t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  if (rr.sinRuso) {
+    caja.innerHTML =
+      '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
+      '⚠️ <strong>Este texto no está en ruso.</strong> No se ha guardado ni aprobado. Pulsa «🔄 Volver a traducir».' +
+      '</div>';
+  } else {
+    caja.innerHTML =
+      '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
+      '⚠️ <strong>Este texto ruso lleva palabras en letras latinas:</strong> ' + esc((rr.latinas || []).join(', ')) + '<br>' +
+      '¿Lo guardas así? Si no, pulsa «🔄 Volver a traducir».<br>' +
+      '<button class="boton-secundario" style="margin-top:8px;" onclick="guardarComFrase(true)">💾 Guardar así</button>' +
+      '</div>';
+  }
+}
+
+// (06/11/2026) N51 — «🔄 Volver a traducir»: la IA traduce otra vez esta frase solo en el idioma de la pestaña abierta,
+// aunque esté aprobada. Lo nuevo queda en 🔵 para revisarlo y aprobarlo con «💾 Guardar».
+function retraducirComFrase() {
+  if (!_comFraseClaveTrad || !_comFraseLangTrad) return;
+  var clave = _comFraseClaveTrad, lang = _comFraseLangTrad;
+  var caja = document.getElementById('modal-com-frase-aviso');
+  document.getElementById('modal-com-frase-msg-ok').style.display = 'none';
+  document.getElementById('modal-com-frase-msg-err').style.display = 'none';
+  caja.innerHTML = '<p style="font-size:13px;color:var(--texto-muted);margin:0;">🤖 Traduciendo de nuevo con IA, puede tardar unos segundos...</p>';
+  fetch('/admin/frases-comunicacion/' + clave + '/traducciones/' + lang + '/retraducir', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (clave !== _comFraseClaveTrad || lang !== _comFraseLangTrad) return; // se cambió de pestaña mientras tanto
+      var textarea = document.getElementById('modal-com-frase-texto');
+      if (d.ok) {
+        textarea.value = d.texto;
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight + 20) + 'px';
+        caja.innerHTML = '<div class="aviso-ok">🤖 Traducido de nuevo. Está en azul: revísalo y pulsa «💾 Guardar».</div>';
+        _comFrasesDatos = null;
+        cargarComFrases().then(pintarPestanasComFrase);
+      } else if (d.ruso) {
+        textarea.value = d.texto;
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight + 20) + 'px';
+        avisoRusoComFrase(d.ruso);
+      } else {
+        caja.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">⚠️ ' +
+          String(d.error || 'No se ha podido traducir.').replace(/</g, '&lt;') + '</div>';
+      }
+    })
+    .catch(function() {
+      caja.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">⚠️ No se pudo conectar con la IA. Inténtalo de nuevo.</div>';
+    });
 }
 
 // (14/10/2026) Ventana de revisión tras "Generar Frases": aprobar una a una, todas de una vez,
@@ -6485,7 +6562,15 @@ function generarComFrasesIA() {
       }
       if (nErr > 0) {
         console.warn('[GEN17] Frases no guardadas:', respuesta.errores);
-        msg.textContent += (msg.textContent ? ' ' : '') + '⚠️ ' + nErr + ' frase(s) no se han guardado (sin traducir o con variables alteradas) — vuelve a pulsar Generar.';
+        var rusas = respuesta.errores.filter(function(e) { return e.ruso; });
+        if (rusas.length) {
+          // (06/11/2026) N51: frases que no han vuelto bien en ruso ni al segundo intento
+          msg.textContent += (msg.textContent ? ' ' : '') + '⚠️ El ruso de ' + rusas.length + ' frase(s) no se ha podido traducir y sigue en rojo: ' +
+            rusas.map(function(e) { return '«' + (e.texto_es || e.clave) + '»'; }).join(' · ') + '. Ábrela y pulsa «🔄 Volver a traducir».';
+        }
+        if (nErr > rusas.length) {
+          msg.textContent += (msg.textContent ? ' ' : '') + '⚠️ ' + (nErr - rusas.length) + ' frase(s) no se han guardado (sin traducir o con variables alteradas) — vuelve a pulsar Generar.';
+        }
         if (respuesta.generadas === 0) msg.style.color = '#b45309';
       }
     })
