@@ -19415,6 +19415,115 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
   res.json({ ok: true });
 }));
 
+// ─── (06/11/2026) N51 — Freno del ruso ────────────────────────────────────────
+// Un texto ruso tiene que estar escrito en ruso (letras cirílicas). No cuentan: las variables {…},
+// los enlaces, los correos, las etiquetas HTML, los números de reserva (3 letras y 3 cifras, p. ej. ABC123)
+// y las palabras de la lista RUSO_PALABRAS_PERMITIDAS (decididas por Germán).
+// Devuelve { ok: true } o { ok: false, sinRuso, latinas: [palabras en letras latinas] }.
+const RUSO_PALABRAS_PERMITIDAS = ['Traslados GC', 'WhatsApp'];
+function revisarRuso(texto) {
+  let t = String(texto || '')
+    .replace(/\{[a-z_]+\}/g, ' ')
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/\S+@\S+/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[a-z]+;/g, ' ')
+    .replace(/\b[A-Z]{3}[0-9]{3}\b/g, ' ');
+  RUSO_PALABRAS_PERMITIDAS.forEach(function(pal) { t = t.split(pal).join(' '); });
+  const cirilicas = (t.match(/[Ѐ-ӿ]/g) || []).length;
+  const latinas = Array.from(new Set(t.match(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ-]*/g) || []));
+  if (!cirilicas && !latinas.length) return { ok: true }; // sin letras (solo variables, cifras…)
+  if (!cirilicas) return { ok: false, sinRuso: true, latinas: latinas };
+  if (latinas.length) return { ok: false, sinRuso: false, latinas: latinas };
+  return { ok: true };
+}
+
+// Una frase de 3 palabras o más idéntica al español no está traducida
+// (palabras sueltas como "Extras" pueden coincidir en algunos idiomas y se aceptan).
+function fraseSinTraducir(traduccion, textoEs) {
+  const a = (traduccion || '').trim(), b = (textoEs || '').trim();
+  return a === b && b.split(/\s+/).length >= 3;
+}
+
+// Qué impide guardar la traducción de una frase que ha hecho la IA (null = se puede guardar).
+function problemaTraduccionFrase(f, traduccion, lang) {
+  if (!traduccion || typeof traduccion !== 'string' || !traduccion.trim()) return 'Sin traducción en la respuesta';
+  if (fraseSinTraducir(traduccion, f.texto_es)) return 'Volvió sin traducir';
+  const varsEs = ((f.texto_es || '').match(/\{[a-z_]+\}/g) || []).sort().join(',');
+  const varsTr = (traduccion.match(/\{[a-z_]+\}/g) || []).sort().join(',');
+  if (varsEs !== varsTr) return 'Variables alteradas';
+  if (lang === 'ru') {
+    const rr = revisarRuso(traduccion);
+    if (!rr.ok) return rr.sinRuso ? 'Ruso sin letras rusas' : 'Ruso con palabras en letras latinas: ' + rr.latinas.join(', ');
+  }
+  return null;
+}
+
+// Llamada a la IA del Generador 17 (frases) para una lista de frases en un idioma.
+// La usan «Generar lo que falta» y «🔄 Volver a traducir». Devuelve { parsed, textoCompleto, nombreIdioma }.
+async function llamarIAFrases(lang, lista) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const nombreIdioma = await getNombreIdioma(lang);
+  console.log('[GEN17] ' + lang + ': idioma enviado a la IA = ' + nombreIdioma + ', frases pendientes = ' + lista.length);
+  const prompt = iaPrompts.GENERADOR_FRASES_COMUNICACIONES(nombreIdioma, lista);
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if (!response.ok) {
+    const cuerpoError = await response.text();
+    throw new Error('API error ' + response.status + ': ' + cuerpoError.slice(0, 200));
+  }
+  const data = await response.json();
+  const textoRespuesta = data.content.map(function(b) { return b.text || ''; }).join('');
+  const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
+  console.log('[GEN17] ' + lang + ':', limpio.slice(0, 200));
+  // Se leen TODOS los objetos JSON completos de la respuesta (la IA a veces escribe primero
+  // las frases originales y después la traducción) y se ignora cualquier comentario suyo.
+  const objetos = [];
+  let ini = -1, prof = 0, enTexto = false, escape = false;
+  for (let i = 0; i < limpio.length; i++) {
+    const ch = limpio[i];
+    if (enTexto) {
+      if (escape) escape = false;
+      else if (ch === '\\') escape = true;
+      else if (ch === '"') enTexto = false;
+    } else if (ch === '"') { if (prof > 0) enTexto = true; }
+    else if (ch === '{') { if (prof === 0) ini = i; prof++; }
+    else if (ch === '}' && prof > 0) {
+      prof--;
+      if (prof === 0) {
+        try { objetos.push(JSON.parse(limpio.slice(ini, i + 1))); } catch (eObj) { /* no era JSON válido */ }
+      }
+    }
+  }
+  if (!objetos.length) {
+    console.error('[GEN17] Respuesta completa de la IA (' + lang + '):', limpio.slice(0, 6000));
+    throw new Error('La respuesta de la IA no contiene un JSON válido');
+  }
+  // Se elige el objeto con más frases realmente traducidas (distintas del español)
+  const traducidasEn = function(obj) {
+    return lista.filter(function(f) {
+      const t = obj[f.clave];
+      return typeof t === 'string' && t.trim() && t.trim() !== (f.texto_es || '').trim();
+    }).length;
+  };
+  const parsed = objetos.reduce(function(mejor, obj) { return traducidasEn(obj) > traducidasEn(mejor) ? obj : mejor; }, objetos[0]);
+  if (objetos.length > 1) {
+    console.log('[GEN17] ' + lang + ': la IA escribió ' + objetos.length + ' respuestas; se usa la que tiene ' + traducidasEn(parsed) + ' frases traducidas.');
+  }
+  return { parsed: parsed, textoCompleto: limpio, nombreIdioma: nombreIdioma };
+}
+
 // ─── Frases dentro de los mensajes al cliente (🧩) ─────────────────────────────
 // Mismo funcionamiento que las traducciones de plantillas de comunicación:
 // la IA guarda con marca "pendiente" (naranja) y solo cuentan las aprobadas (verde).
@@ -19490,7 +19599,31 @@ app.get('/admin/frases-comunicacion/:clave/traducciones', requireAdmin, asyncHan
 // PUT — guardar una traducción, o solo aprobarla (solo_aprobar: nunca toca el contenido)
 app.put('/admin/frases-comunicacion/:clave/traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const { clave, lang } = req.params;
-  const { texto, generado_por_ia, solo_aprobar } = req.body;
+  const { texto, generado_por_ia, solo_aprobar, confirmar_latinas } = req.body;
+
+  // (06/11/2026) N51 — Freno del ruso: un ruso sin letras rusas nunca se guarda ni se aprueba
+  // (si se intenta aprobar, pasa a 🔴); con palabras en letras latinas, solo si se confirma a propósito.
+  if (lang === 'ru') {
+    let textoRu = texto;
+    if (solo_aprobar) {
+      const actual = await pool.query(
+        'SELECT texto FROM frases_comunicacion_traducciones WHERE frase_clave = $1 AND lang_code = $2', [clave, lang]
+      );
+      textoRu = actual.rows.length ? actual.rows[0].texto : '';
+    }
+    if (textoRu && textoRu.trim()) {
+      const rr = revisarRuso(textoRu);
+      if (!rr.ok && (rr.sinRuso || !confirmar_latinas)) {
+        if (solo_aprobar && rr.sinRuso) {
+          await pool.query(
+            `UPDATE frases_comunicacion_traducciones SET desactualizado = TRUE, revisado = FALSE, actualizado_en = NOW()
+             WHERE frase_clave = $1 AND lang_code = $2`, [clave, lang]
+          );
+        }
+        return res.json({ ok: false, ruso: rr });
+      }
+    }
+  }
 
   if (solo_aprobar) {
     await pool.query(
@@ -19513,6 +19646,55 @@ app.put('/admin/frases-comunicacion/:clave/traducciones/:lang', requireAdmin, as
   res.json({ ok: true });
 }));
 
+// (06/11/2026) N51 — «🔄 Volver a traducir»: la IA traduce otra vez UNA frase en UN idioma, aunque esté aprobada.
+// Dos intentos. Si sale bien, se guarda en 🔵 (traducido, sin aprobar).
+// Si es un ruso con palabras en letras latinas (y todo lo demás bien), se devuelve el texto SIN guardarlo
+// para que el operario decida en la ficha («💾 Guardar así» o «🔄 Volver a traducir»).
+app.post('/admin/frases-comunicacion/:clave/traducciones/:lang/retraducir', requireAdmin, asyncHandler(async (req, res) => {
+  const { clave, lang } = req.params;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) return res.status(400).json({ ok: false, error: 'Idioma no válido' });
+  if (!process.env.ANTHROPIC_API_KEY) return res.status(500).json({ ok: false, error: 'Falta ANTHROPIC_API_KEY en las variables de entorno.' });
+  const fr = await pool.query('SELECT clave, contexto, texto_es FROM frases_comunicacion WHERE clave = $1', [clave]);
+  if (!fr.rows.length) return res.status(404).json({ ok: false, error: 'Frase no encontrada' });
+  const f = fr.rows[0];
+  let ultimaTraduccion = null, ultimoProblema = null;
+  for (let intento = 1; intento <= 2; intento++) {
+    let parsed;
+    try { parsed = (await llamarIAFrases(lang, [f])).parsed; }
+    catch (err) { ultimoProblema = err.message; continue; }
+    const traduccion = parsed[f.clave];
+    const problema = problemaTraduccionFrase(f, traduccion, lang);
+    if (!problema) {
+      await pool.query(
+        `INSERT INTO frases_comunicacion_traducciones
+           (frase_clave, lang_code, texto, generado_por_ia, revisado, actualizado_en)
+         VALUES ($1, $2, $3, TRUE, FALSE, NOW())
+         ON CONFLICT (frase_clave, lang_code) DO UPDATE
+           SET texto = EXCLUDED.texto, generado_por_ia = TRUE, revisado = FALSE, desactualizado = FALSE, actualizado_en = NOW()`,
+        [clave, lang, traduccion.trim()]
+      );
+      return res.json({ ok: true, texto: traduccion.trim() });
+    }
+    console.warn('[GEN17] Volver a traducir ' + clave + ' (' + lang + '), intento ' + intento + ': ' + problema);
+    ultimaTraduccion = typeof traduccion === 'string' ? traduccion.trim() : null;
+    ultimoProblema = problema;
+  }
+  // Ruso con palabras en letras latinas como ÚNICO problema: se enseña para que decida el operario
+  if (lang === 'ru' && ultimaTraduccion && problemaTraduccionFrase(f, ultimaTraduccion, 'es') === null) {
+    const rr = revisarRuso(ultimaTraduccion);
+    if (!rr.ok && !rr.sinRuso) return res.json({ ok: false, texto: ultimaTraduccion, ruso: rr });
+  }
+  let error;
+  if (ultimoProblema === 'Ruso sin letras rusas' || ultimoProblema === 'Volvió sin traducir') {
+    error = 'La IA no ha devuelto el texto traducido (lo ha intentado dos veces). No se ha guardado nada: vuelve a pulsar «🔄 Volver a traducir».';
+  } else if (ultimoProblema === 'Variables alteradas') {
+    error = 'La IA ha cambiado las variables {…} (lo ha intentado dos veces). No se ha guardado nada: vuelve a pulsar «🔄 Volver a traducir».';
+  } else {
+    error = 'No se ha podido traducir (' + (ultimoProblema || 'error desconocido') + '). No se ha guardado nada.';
+  }
+  res.json({ ok: false, error: error });
+}));
+
 // POST — generar con IA (Generador 17) las frases que faltan en un idioma
 app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const lang = req.params.lang;
@@ -19531,12 +19713,7 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
     'SELECT frase_clave, texto, desactualizado, revisado FROM frases_comunicacion_traducciones WHERE lang_code = $1',
     [lang]
   );
-  // Una frase de 3 palabras o más idéntica al español no está traducida
-  // (palabras sueltas como "Extras" pueden coincidir en algunos idiomas y se aceptan).
-  const sinTraducir = function(traduccion, textoEs) {
-    const a = (traduccion || '').trim(), b = (textoEs || '').trim();
-    return a === b && b.split(/\s+/).length >= 3;
-  };
+  const sinTraducir = fraseSinTraducir;
   const textoEsDe = {};
   for (const f of frases.rows) textoEsDe[f.clave] = f.texto_es;
   // "tiene" = traducción existente y al día; se vuelven a generar las desactualizadas
@@ -19544,75 +19721,21 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
   const tiene = {};
   for (const t of yaExisten.rows) {
     tiene[t.frase_clave] = !!(t.texto && t.texto.trim()) && !t.desactualizado &&
-      !(!t.revisado && sinTraducir(t.texto, textoEsDe[t.frase_clave]));
+      !(!t.revisado && sinTraducir(t.texto, textoEsDe[t.frase_clave])) &&
+      !(lang === 'ru' && revisarRuso(t.texto).sinRuso); // (06/11/2026) un ruso sin ruso se vuelve a generar
   }
   const pendientes = frases.rows.filter(function(f) { return !tiene[f.clave] && f.texto_es && f.texto_es.trim(); });
 
   if (pendientes.length === 0) return res.json({ ok: true, generadas: 0, errores: [] });
 
-  const nombreIdioma = await getNombreIdioma(lang);
-  console.log('[GEN17] ' + lang + ': idioma enviado a la IA = ' + nombreIdioma + ', frases pendientes = ' + pendientes.length);
-  const prompt = iaPrompts.GENERADOR_FRASES_COMUNICACIONES(nombreIdioma, pendientes);
-
   let parsed;
   let textoRespuestaCompleta = '';
+  let nombreIdioma = lang;
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    if (!response.ok) {
-      const cuerpoError = await response.text();
-      return res.json({ ok: false, error: 'API error ' + response.status + ': ' + cuerpoError.slice(0, 200) });
-    }
-    const data = await response.json();
-    const textoRespuesta = data.content.map(function(b) { return b.text || ''; }).join('');
-    const limpio = textoRespuesta.replace(/```json|```/g, '').trim();
-    console.log('[GEN17] ' + lang + ':', limpio.slice(0, 200));
-    textoRespuestaCompleta = limpio;
-    // Se leen TODOS los objetos JSON completos de la respuesta (la IA a veces escribe primero
-    // las frases originales y después la traducción) y se ignora cualquier comentario suyo.
-    const objetos = [];
-    let ini = -1, prof = 0, enTexto = false, escape = false;
-    for (let i = 0; i < limpio.length; i++) {
-      const ch = limpio[i];
-      if (enTexto) {
-        if (escape) escape = false;
-        else if (ch === '\\') escape = true;
-        else if (ch === '"') enTexto = false;
-      } else if (ch === '"') { if (prof > 0) enTexto = true; }
-      else if (ch === '{') { if (prof === 0) ini = i; prof++; }
-      else if (ch === '}' && prof > 0) {
-        prof--;
-        if (prof === 0) {
-          try { objetos.push(JSON.parse(limpio.slice(ini, i + 1))); } catch (eObj) { /* no era JSON válido */ }
-        }
-      }
-    }
-    if (!objetos.length) {
-      console.error('[GEN17] Respuesta completa de la IA (' + lang + '):', limpio.slice(0, 6000));
-      throw new Error('La respuesta de la IA no contiene un JSON válido');
-    }
-    // Se elige el objeto con más frases realmente traducidas (distintas del español)
-    const traducidasEn = function(obj) {
-      return pendientes.filter(function(f) {
-        const t = obj[f.clave];
-        return typeof t === 'string' && t.trim() && t.trim() !== (f.texto_es || '').trim();
-      }).length;
-    };
-    parsed = objetos.reduce(function(mejor, obj) { return traducidasEn(obj) > traducidasEn(mejor) ? obj : mejor; }, objetos[0]);
-    if (objetos.length > 1) {
-      console.log('[GEN17] ' + lang + ': la IA escribió ' + objetos.length + ' respuestas; se usa la que tiene ' + traducidasEn(parsed) + ' frases traducidas.');
-    }
+    const r = await llamarIAFrases(lang, pendientes);
+    parsed = r.parsed;
+    textoRespuestaCompleta = r.textoCompleto;
+    nombreIdioma = r.nombreIdioma;
   } catch (err) {
     console.error('[GEN17] Error:', err.message);
     return res.json({ ok: false, error: err.message });
@@ -19633,26 +19756,7 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
   let generadas = 0;
   const errores = [];
   const lista = []; // (14/10/2026) para la ventana de revisión del Admin
-  for (const f of pendientes) {
-    const traduccion = parsed[f.clave];
-    if (!traduccion || typeof traduccion !== 'string' || !traduccion.trim()) {
-      errores.push({ clave: f.clave, error: 'Sin traducción en la respuesta' });
-      continue;
-    }
-    // No se guarda una frase que vuelve igual que en español
-    if (sinTraducir(traduccion, f.texto_es)) {
-      console.warn('[GEN17] ' + lang + ': ' + f.clave + ' volvió sin traducir — no se guarda.');
-      errores.push({ clave: f.clave, error: 'Volvió sin traducir' });
-      continue;
-    }
-    // No se guarda una frase que pierde o cambia sus variables {entre_llaves}
-    const varsEs = ((f.texto_es || '').match(/\{[a-z_]+\}/g) || []).sort().join(',');
-    const varsTr = (traduccion.match(/\{[a-z_]+\}/g) || []).sort().join(',');
-    if (varsEs !== varsTr) {
-      console.warn('[GEN17] ' + lang + ': ' + f.clave + ' con variables alteradas (' + varsTr + ' en vez de ' + varsEs + ') — no se guarda.');
-      errores.push({ clave: f.clave, error: 'Variables alteradas' });
-      continue;
-    }
+  const guardarFraseIA = async function(f, traduccion) {
     await pool.query(
       `INSERT INTO frases_comunicacion_traducciones
          (frase_clave, lang_code, texto, generado_por_ia, revisado, actualizado_en)
@@ -19663,6 +19767,36 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
     );
     generadas++;
     lista.push({ clave: f.clave, texto_es: f.texto_es, texto: traduccion.trim() });
+  };
+  // (06/11/2026) N51: en ruso, lo que no vuelve bien (sin ruso, igual al español, letras latinas, variables…)
+  // se pide otra vez a la IA, una vez. Si vuelve a fallar, no se guarda y queda en 🔴.
+  const reintentar = [];
+  for (const f of pendientes) {
+    const traduccion = parsed[f.clave];
+    const problema = problemaTraduccionFrase(f, traduccion, lang);
+    if (problema) {
+      if (lang === 'ru' && problema !== 'Sin traducción en la respuesta') { reintentar.push(f); continue; }
+      console.warn('[GEN17] ' + lang + ': ' + f.clave + ' — ' + problema + ' — no se guarda.');
+      errores.push({ clave: f.clave, texto_es: f.texto_es, error: problema });
+      continue;
+    }
+    await guardarFraseIA(f, traduccion);
+  }
+  if (reintentar.length) {
+    console.warn('[GEN17] ru: ' + reintentar.length + ' frase(s) no han vuelto bien en ruso — se piden otra vez a la IA.');
+    let parsed2 = {};
+    try { parsed2 = (await llamarIAFrases(lang, reintentar)).parsed; }
+    catch (err2) { console.error('[GEN17] Error en el segundo intento:', err2.message); }
+    for (const f of reintentar) {
+      const traduccion2 = parsed2[f.clave];
+      const problema2 = problemaTraduccionFrase(f, traduccion2, lang);
+      if (problema2) {
+        console.warn('[GEN17] ru: ' + f.clave + ' — ' + problema2 + ' (2.º intento) — no se guarda.');
+        errores.push({ clave: f.clave, texto_es: f.texto_es, error: problema2, ruso: true });
+        continue;
+      }
+      await guardarFraseIA(f, traduccion2);
+    }
   }
   res.json({ ok: true, generadas, errores, lista });
 }));
