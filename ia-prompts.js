@@ -8,6 +8,30 @@
 // Para mejorar un prompt, edítalo aquí. No tocar server.js para eso.
 // =============================================================================
 
+// ─── (07/11/2026) N51/N53 — REGLAS COMUNES DE LETRAS Y DE RUSO ─────────────────
+// REGLA_LETRAS: va en TODOS los generadores (las palabras con letras rusas y latinas
+// mezcladas, como «Тауrito» o «parasоller», salieron en ruso, finés, sueco, noruego y español).
+// REGLA_RUSO: va en los generadores que no tenían regla de ruso; solo se añade cuando el
+// idioma pedido es el ruso. Con conSaludo, añade el saludo decidido por Germán (mensajes al cliente).
+function REGLA_LETRAS() {
+  return 'REGLA DE LETRAS (obligatoria en todos los idiomas): cada palabra se escribe entera en un solo alfabeto. ' +
+    'Nunca mezcles letras latinas y cirílicas dentro de una misma palabra (mal: «Тауrito», «parasоller»; bien: «Таурито», «parasoller»).';
+}
+function esIdiomaRuso(nombreIdioma) {
+  return /rus|рус/i.test(String(nombreIdioma || ''));
+}
+function REGLA_RUSO(nombreIdioma, conSaludo) {
+  if (!esIdiomaRuso(nombreIdioma)) return '';
+  return '\n\nREGLA DEL RUSO (obligatoria):\n' +
+    '- Escribe en ruso, con alfabeto cirílico. Nunca devuelvas el texto en español ni en inglés.\n' +
+    '- Traduce al ruso las palabras comunes (playa → пляж, puerto → порт, aeropuerto → аэропорт).\n' +
+    '- Translitera al cirílico los nombres propios de lugares (Maspalomas → Маспаломас, Taurito → Таурито, Gran Canaria → Гран-Канария).\n' +
+    '- Solo se quedan en letras latinas: las variables entre llaves {…}, los enlaces, los correos, los números de reserva y los nombres de marca (Traslados GC, WhatsApp, Visa, Mastercard).\n' +
+    '- Si un nombre propio de verdad no se puede transliterar, déjalo entero en letras latinas, nunca a medias.\n' +
+    '- Los slugs, las palabras de las direcciones web y los nombres de archivo siguen su propia regla: siempre en letras latinas.' +
+    (conSaludo ? '\n- El saludo es siempre «Здравствуйте», nunca «Привет».' : '');
+}
+
 
 // ─── GENERADOR 1 ─────────────────────────────────────────────────────────────────
 // Alt text foto nueva — 1 idioma (Destinos)
@@ -22,6 +46,7 @@ REGLAS DE SALIDA:
 2. alt_texto: Texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe la escena visual concreta (luz, paisaje, elementos) integrando de forma natural el destino y la ubicación (${isla}).
 - RESTRICCIÓN RÍGIDA DE LONGITUD: Debe tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125.
 - PROHIBIDO: Usar muletillas como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción.
+${REGLA_LETRAS()}${REGLA_RUSO(lang === 'es' ? 'español' : nombreIdioma)}
 FORMATO DE RESPUESTA:
 Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo adicional:
 {"nombre_archivo": "...", "alt_texto": "..."}`;
@@ -42,6 +67,7 @@ REGLAS OBLIGATORIAS POR IDIOMA:
 3. RESTRICCIÓN RÍGIDA DE LONGITUD: Cada texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125 caracteres por idioma.
 4. Sin Muletillas: PROHIBIDO usar fórmulas como "fotografía de", "imagen de", "vista de" en cualquier idioma. Empieza directamente con la descripción visual.
 5. Normas para Ruso (ru): Traduce las palabras comunes (playa, faro, puerto, etc.) al ruso. Translitera los nombres propios al alfabeto cirílico (ej. Maspalomas -> Маспаломас, Gran Canaria -> Гран-Канария). Cero caracteres latinos en la clave de ruso.
+${REGLA_LETRAS()}
 FORMATO DE RESPUESTA:
 Responde EXCLUSIVAMENTE con un objeto JSON válido conteniendo las claves solicitadas, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo:
 {${codigos}}`;
@@ -67,6 +93,7 @@ INSTRUCCIÓN DE CONTROL DE CONTEO:
 Antes de responder, cuenta mentalmente cada carácter (letras, espacios y puntuación). Si tu borrador tiene menos de 100 o más de 125 caracteres, ajústalo hasta estar exactamente en el rango [100-125].
 REGLA DE MEJORA: El objetivo es siempre acercarse a 125 caracteres, nunca alejarse. Si ya tienes un texto en el rango, mejora la riqueza descriptiva añadiendo detalles visuales concretos hasta acercarte al máximo. PROHIBIDO reducir caracteres respecto al texto anterior.
 FORMATO DE RESPUESTA:
+${REGLA_LETRAS()}
 Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea ni explicaciones:
 {"alt_texto": "..."}`;
 }
@@ -78,7 +105,7 @@ Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markd
 // Botón admin: 🤖 Generar todo con IA
 // Línea original server.js: ~4231
 function GENERADOR_DESTINO_TODO(nombre, isla, nombreIdioma, reglasSlug) {
-  return `# INSTRUCCIONES GENERALES DE REDACCIÓN SEO LOCAL Y METADATOS MULTIIDIOMA\n\nActúa como un Experto en SEO Local y Redactor Creativo Nativo. Tu trabajo consiste en redactar metadatos y contenidos altamente persuasivos, escritos de "humano a humano", para una página de captación del destino "${nombre}" (${isla}, Islas Canarias) de una empresa de traslados y transportes privados intermunicipales.\n\nREGLA DE NATIVIDAD (NO TRADUCIR):\nNo traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo busca, piensa y reserva un usuario real de ese idioma cuando planifica su viaje a "${nombre}".\n\n---\n\n## CONCEPTO Y OBJETIVO DE LA PÁGINA\nEsta página es una landing de atracción/captación. Su objetivo es inspirar al cliente a visitar "${nombre}" y presentar el servicio de traslado/transporte privado como la opción más cómoda, rápida y directa para llegar hasta allí (desde aeropuertos, hoteles u otros puntos).\n\n---\n\n## REGLAS DE ORO Y ESTILO (HUMAN-LIKE)\n\n1. ENFOQUE HACIA EL DESTINO:\nTodo el contenido (Título, Descripción, Tarjeta y Texto Principal) debe enfocar el viaje y transporte privado HACIA "${nombre}".\n\n2. LÍMITES ESTRICTOS DE CARACTERES (INFRANQUEABLES):\nLos límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido para aprovechar el espacio SEO, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO en ${nombreIdioma}. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter.\n\nLímites de caracteres por idioma:\n- Español (ES): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)\n- Inglés (EN): Título (54-60 chars | MÁX 62) | Descripción (150-157 chars | MÁX 160)\n- Alemán (DE): Título (48-53 chars | MÁX 55) | Descripción (130-137 chars | MÁX 140)\n- Francés (FR): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)\n- Italiano (IT): Título (52-58 chars | MÁX 60) | Descripción (148-155 chars | MÁX 158)\n- Neerlandés (NL): Título (50-55 chars | MÁX 57) | Descripción (138-145 chars | MÁX 148)\n- Sueco (SV): Título (50-55 chars | MÁX 57) | Descripción (140-147 chars | MÁX 150)\n- Noruego (NO): Título (50-55 chars | MÁX 57) | Descripción (142-149 chars | MÁX 152)\n- Finlandés (FI): Título (46-52 chars | MÁX 54) | Descripción (128-135 chars | MÁX 138)\n- Ruso (RU): Título (42-48 chars | MÁX 50) | Descripción (118-125 chars | MÁX 128)\n\n3. ESTILO NATURAL Y PROHIBICIONES DE IA:\n- Prohibido usar palabras y clichés típicos de IA como: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido".\n- Usa un tono cercano, natural y conversacional (de persona local a viajero).\n- Alterna la longitud de las frases (cortas y directas con explicativas) para dar un ritmo de lectura 100% humano.\n\n### REGLAS OBLIGATORIAS SOBRE PRECIOS Y TARIFAS:\n1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):\n   Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.\n2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:\n   "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".\n3. PROHIBICIÓN ABSOLUTA — PRECIOS (¡CRÍTICO, NO IGNORAR!):\n   NUNCA, bajo ninguna circunstancia, uses frases que sugieran que el precio se conoce de antemano, que es fijo, cerrado o visible antes de reservar. Esto incluye frases como: \"precio fijo\", \"tarifa fija\", \"precio cerrado\", \"conoce el precio antes de reservar\", \"ves la cantidad al reservar\", \"pagas exactamente esa cantidad\" o cualquier variante similar.\n\n### REGLA PARA IDIOMA RUSO — NOMBRES PROPIOS:\nCuando generes contenido en ruso, las palabras comunes (faro, playa, duna, centro comercial, puerto, parque, calle...) deben traducirse al ruso (ejemplo: "Faro" → "Маяк", "Playa" → "Пляж"). Los nombres propios (Maspalomas, Inglés, Canaria...) deben transliterarse completamente al cirílico (ejemplo: "Maspalomas" → "Маспаломас"). Nunca dejes ninguna palabra en caracteres latinos dentro de un texto en ruso.\n\n---\n\n## ESTRUCTURA DE LOS CONTENIDOS A GENERAR\n\n1. SLUG:\nURL amigable para este destino. ${reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.\n\n2. PALABRA_DESTINO:\nLa palabra "destino" (lugar al que se viaja) traducida a ${nombreIdioma}, en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico. Solo la palabra.\n\n3. NOMBRE_ISLA:\nEl nombre de la isla "${isla}" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente.\n\n4. META_TITLE (campo: meta_title):\n- Usa el separador "|" para estructurar en 2 o 3 bloques visuales.\n- Formato habitual: [Traslado / Taxi Privado a ${nombre}] | [Propuesta de Valor] | [CTA o Garantía]\n\n5. META_DESCRIPTION (campo: meta_description):\n- Redactada como una solución persuasiva de transporte para el viajero.\n- Formato habitual: [Solución/Promesa de llegada a ${nombre}] + [Ventajas: tarifas competitivas, comodidad, sin colas] + [Llamada a la Acción corta].\n\n6. TEXTO INTRODUCTORIO PARA TARJETA DE DESTINO (campo: texto_tarjeta):\n- EXTENSIÓN: Entre 150 y 200 caracteres (MÁXIMO ABSOLUTO: 200 caracteres, incluidos espacios).\n- OBJETIVO: Pincelada corta y atractiva para la ficha previa del destino con botón hacia la página completa.\n- ESTRUCTURA (2 frases): [Frase 1: Atractivo principal de ${nombre}] + [Frase 2: Ventaja del traslado privado + CTA de clic].\n\n7. TEXTO PRINCIPAL DEL DESTINO (campo: texto_descripcion):\nEXTENSIÓN TOTAL OBLIGATORIA: Entre 400 y 550 palabras (LÍMITE MÁXIMO ABSOLUTO: 600 palabras).\nFORMATO: HTML válido. Usa <h2>, <h3>, <p>, <ul>, <li>, <strong>. NUNCA <h1>. NUNCA Markdown.\nESTRUCTURA:\n- <h2> Encabezado Principal: 1 frase potente.\n- <h2> Descubre ${nombre} + <p>: Máximo 1 párrafo (aprox. 60-80 palabras).\n- <h2> Qué ver y hacer en ${nombre} + <p> o <ul><li>: Máximo 2-3 bloques breves (aprox. 120-150 palabras).\n- <h2> La mejor forma de llegar a ${nombre} + <p>: Máximo 2 párrafos (aprox. 100-120 palabras).\n- <h2> Consejos del Local + <ul><li>: 2-3 tips breves (aprox. 60-80 palabras).\n- <h2> Reserva tu traslado + <p>: 1 párrafo final con CTA (aprox. 40-50 palabras).\n\n---\n\n## AUTOCONTROL DE CARACTERES\nAntes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) del meta_title, meta_description y texto_tarjeta. Si superan por 1 solo carácter el límite máximo, reescríbelos.\n\n---\n\n## FORMATO DE SALIDA (OBLIGATORIO)\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"slug": "...", "palabra_destino": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "texto_tarjeta": "...", "texto_descripcion": "..."}`;
+  return `# INSTRUCCIONES GENERALES DE REDACCIÓN SEO LOCAL Y METADATOS MULTIIDIOMA\n\nActúa como un Experto en SEO Local y Redactor Creativo Nativo. Tu trabajo consiste en redactar metadatos y contenidos altamente persuasivos, escritos de "humano a humano", para una página de captación del destino "${nombre}" (${isla}, Islas Canarias) de una empresa de traslados y transportes privados intermunicipales.\n\nREGLA DE NATIVIDAD (NO TRADUCIR):\nNo traduzcas nunca literalmente desde otro idioma. Redacta de forma 100% nativa desde cero en ${nombreIdioma}, pensando en cómo busca, piensa y reserva un usuario real de ese idioma cuando planifica su viaje a "${nombre}".\n\n---\n\n## CONCEPTO Y OBJETIVO DE LA PÁGINA\nEsta página es una landing de atracción/captación. Su objetivo es inspirar al cliente a visitar "${nombre}" y presentar el servicio de traslado/transporte privado como la opción más cómoda, rápida y directa para llegar hasta allí (desde aeropuertos, hoteles u otros puntos).\n\n---\n\n## REGLAS DE ORO Y ESTILO (HUMAN-LIKE)\n\n1. ENFOQUE HACIA EL DESTINO:\nTodo el contenido (Título, Descripción, Tarjeta y Texto Principal) debe enfocar el viaje y transporte privado HACIA "${nombre}".\n\n2. LÍMITES ESTRICTOS DE CARACTERES (INFRANQUEABLES):\nLos límites indicados son MÁXIMOS ABSOLUTOS (incluyendo espacios, letras y signos de puntuación). Aproxímate lo máximo posible al rango sugerido para aprovechar el espacio SEO, pero NUNCA, bajo ninguna circunstancia, sobrepases el LÍMITE MÁXIMO en ${nombreIdioma}. Es preferible quedarse 3 o 4 caracteres por debajo antes que pasarse por 1 solo carácter.\n\nLímites de caracteres por idioma:\n- Español (ES): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)\n- Inglés (EN): Título (54-60 chars | MÁX 62) | Descripción (150-157 chars | MÁX 160)\n- Alemán (DE): Título (48-53 chars | MÁX 55) | Descripción (130-137 chars | MÁX 140)\n- Francés (FR): Título (52-58 chars | MÁX 60) | Descripción (145-152 chars | MÁX 155)\n- Italiano (IT): Título (52-58 chars | MÁX 60) | Descripción (148-155 chars | MÁX 158)\n- Neerlandés (NL): Título (50-55 chars | MÁX 57) | Descripción (138-145 chars | MÁX 148)\n- Sueco (SV): Título (50-55 chars | MÁX 57) | Descripción (140-147 chars | MÁX 150)\n- Noruego (NO): Título (50-55 chars | MÁX 57) | Descripción (142-149 chars | MÁX 152)\n- Finlandés (FI): Título (46-52 chars | MÁX 54) | Descripción (128-135 chars | MÁX 138)\n- Ruso (RU): Título (42-48 chars | MÁX 50) | Descripción (118-125 chars | MÁX 128)\n\n3. ESTILO NATURAL Y PROHIBICIONES DE IA:\n- Prohibido usar palabras y clichés típicos de IA como: "oasis de", "un sinfín de", "sumérgete", "en conclusión", "en resumen", "tesoro escondido".\n- Usa un tono cercano, natural y conversacional (de persona local a viajero).\n- Alterna la longitud de las frases (cortas y directas con explicativas) para dar un ritmo de lectura 100% humano.\n\n### REGLAS OBLIGATORIAS SOBRE PRECIOS Y TARIFAS:\n1. PROHIBICIÓN ABSOLUTA (¡MUY IMPORTANTE!):\n   Está ESTRICTAMENTE PROHIBIDO usar las palabras o conceptos: "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía.\n2. CONCEPTOS Y ALTERNATIVAS PERMITIDAS:\n   "Precios ajustados", "tarifas competitivas", "precios económicos", "los mejores precios locales", "tarifas transparentes", "sin costes ocultos", "precio oficial".\n3. PROHIBICIÓN ABSOLUTA — PRECIOS (¡CRÍTICO, NO IGNORAR!):\n   NUNCA, bajo ninguna circunstancia, uses frases que sugieran que el precio se conoce de antemano, que es fijo, cerrado o visible antes de reservar. Esto incluye frases como: \"precio fijo\", \"tarifa fija\", \"precio cerrado\", \"conoce el precio antes de reservar\", \"ves la cantidad al reservar\", \"pagas exactamente esa cantidad\" o cualquier variante similar.\n\n### REGLA PARA IDIOMA RUSO — NOMBRES PROPIOS:\nCuando generes contenido en ruso, las palabras comunes (faro, playa, duna, centro comercial, puerto, parque, calle...) deben traducirse al ruso (ejemplo: "Faro" → "Маяк", "Playa" → "Пляж"). Los nombres propios (Maspalomas, Inglés, Canaria...) deben transliterarse completamente al cirílico (ejemplo: "Maspalomas" → "Маспаломас"). Nunca dejes ninguna palabra en caracteres latinos dentro de un texto en ruso.\n\n---\n\n## ESTRUCTURA DE LOS CONTENIDOS A GENERAR\n\n1. SLUG:\nURL amigable para este destino. ${reglasSlug} Solo letras minúsculas a-z y guiones. Sin números salvo que sean parte del nombre propio.\n\n2. PALABRA_DESTINO:\nLa palabra "destino" (lugar al que se viaja) traducida a ${nombreIdioma}, en caracteres latinos a-z y guiones únicamente. Sin tildes, sin caracteres especiales, sin cirílico. Solo la palabra.\n\n3. NOMBRE_ISLA:\nEl nombre de la isla "${isla}" traducido o transliterado a ${nombreIdioma} en caracteres latinos a-z y guiones únicamente.\n\n4. META_TITLE (campo: meta_title):\n- Usa el separador "|" para estructurar en 2 o 3 bloques visuales.\n- Formato habitual: [Traslado / Taxi Privado a ${nombre}] | [Propuesta de Valor] | [CTA o Garantía]\n\n5. META_DESCRIPTION (campo: meta_description):\n- Redactada como una solución persuasiva de transporte para el viajero.\n- Formato habitual: [Solución/Promesa de llegada a ${nombre}] + [Ventajas: tarifas competitivas, comodidad, sin colas] + [Llamada a la Acción corta].\n\n6. TEXTO INTRODUCTORIO PARA TARJETA DE DESTINO (campo: texto_tarjeta):\n- EXTENSIÓN: Entre 150 y 200 caracteres (MÁXIMO ABSOLUTO: 200 caracteres, incluidos espacios).\n- OBJETIVO: Pincelada corta y atractiva para la ficha previa del destino con botón hacia la página completa.\n- ESTRUCTURA (2 frases): [Frase 1: Atractivo principal de ${nombre}] + [Frase 2: Ventaja del traslado privado + CTA de clic].\n\n7. TEXTO PRINCIPAL DEL DESTINO (campo: texto_descripcion):\nEXTENSIÓN TOTAL OBLIGATORIA: Entre 400 y 550 palabras (LÍMITE MÁXIMO ABSOLUTO: 600 palabras).\nFORMATO: HTML válido. Usa <h2>, <h3>, <p>, <ul>, <li>, <strong>. NUNCA <h1>. NUNCA Markdown.\nESTRUCTURA:\n- <h2> Encabezado Principal: 1 frase potente.\n- <h2> Descubre ${nombre} + <p>: Máximo 1 párrafo (aprox. 60-80 palabras).\n- <h2> Qué ver y hacer en ${nombre} + <p> o <ul><li>: Máximo 2-3 bloques breves (aprox. 120-150 palabras).\n- <h2> La mejor forma de llegar a ${nombre} + <p>: Máximo 2 párrafos (aprox. 100-120 palabras).\n- <h2> Consejos del Local + <ul><li>: 2-3 tips breves (aprox. 60-80 palabras).\n- <h2> Reserva tu traslado + <p>: 1 párrafo final con CTA (aprox. 40-50 palabras).\n\n---\n\n## AUTOCONTROL DE CARACTERES\nAntes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacios) del meta_title, meta_description y texto_tarjeta. Si superan por 1 solo carácter el límite máximo, reescríbelos.\n\n---\n\n${REGLA_LETRAS()}\n\n## FORMATO DE SALIDA (OBLIGATORIO)\nResponde ÚNICAMENTE con JSON válido, sin markdown:\n{"slug": "...", "palabra_destino": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "texto_tarjeta": "...", "texto_descripcion": "..."}`;
 }
 
 
@@ -88,7 +115,7 @@ function GENERADOR_DESTINO_TODO(nombre, isla, nombreIdioma, reglasSlug) {
 // Botón admin: Generar lo que falte
 // Línea original server.js: ~4438
 function GENERADOR_DESTINO_LOTE(nombreIdioma, items) {
-  return `Eres un experto en SEO de destinos turísticos. Tu tarea es escribir contenido SEO en ${nombreIdioma} para una web de traslados privados intermunicipales en Gran Canaria (Islas Canarias, España).\n\nEscribe como lo haría un profesional SEO nativo de ${nombreIdioma} — con el ritmo, las expresiones y las palabras clave que usa de verdad alguien de ese mercado cuando busca un traslado privado en Gran Canaria. No traduces. Creas desde cero.\n\nPara cada destino genera:\n- meta_title: Título para Google. Límites de caracteres por idioma (MÁXIMOS ABSOLUTOS, nunca superarlos):\n  Español (ES): MÁX 60 | Inglés (EN): MÁX 62 | Alemán (DE): MÁX 55 | Francés (FR): MÁX 60 | Italiano (IT): MÁX 60 | Neerlandés (NL): MÁX 57 | Sueco (SV): MÁX 57 | Noruego (NO): MÁX 57 | Finlandés (FI): MÁX 54 | Ruso (RU): MÁX 50\n  Usa términos de búsqueda reales de ese mercado. En idiomas con palabras largas (alemán, neerlandés, finés) usa menos palabras.\n- meta_description: Descripción para Google. Límites de caracteres por idioma (MÁXIMOS ABSOLUTOS, nunca superarlos):\n  Español (ES): MÁX 155 | Inglés (EN): MÁX 160 | Alemán (DE): MÁX 140 | Francés (FR): MÁX 155 | Italiano (IT): MÁX 158 | Neerlandés (NL): MÁX 148 | Sueco (SV): MÁX 150 | Noruego (NO): MÁX 152 | Finlandés (FI): MÁX 138 | Ruso (RU): MÁX 128\n  Invita al clic con tono natural de ese mercado. NUNCA superes el límite de tu idioma.\n- PROHIBICIÓN ABSOLUTA: Está ESTRICTAMENTE PROHIBIDO usar "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía. Alternativas permitidas: "tarifas competitivas", "sin costes ocultos", "precio oficial".\n- texto_descripcion: Exactamente 3 párrafos para la página pública del destino. Contenido:\n  Párrafo 1 — Describe el destino: qué se puede ver, qué hacer, gastronomía, ambiente, qué lo hace especial. Concreto y sensorial, nada genérico.\n  Párrafo 2 — Cómo llegar: menciona que se puede llegar desde cualquier punto de Gran Canaria con nuestro servicio de traslado privado. Cómodo, sin esperas, ideal con equipaje o en familia. Sin inventar tiempos ni precios.\n  Párrafo 3 — Invitación a reservar: cálida y directa. El precio depende del tipo de vehículo elegido, siempre asequible. Que reserves y nosotros nos encargamos del trayecto.\n  Sin listas. Solo párrafos fluidos. Sin frases hechas tipo "joya escondida" o "paraíso".\n\nDestinos (JSON con id, nombre, isla, zona):\n${JSON.stringify(items, null, 2)}\n\nResponde EXCLUSIVAMENTE con JSON válido, sin markdown, con esta estructura exacta donde la clave es el destino_id:\n{"1": {"meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}, "2": {...}}`;
+  return `Eres un experto en SEO de destinos turísticos. Tu tarea es escribir contenido SEO en ${nombreIdioma} para una web de traslados privados intermunicipales en Gran Canaria (Islas Canarias, España).\n\nEscribe como lo haría un profesional SEO nativo de ${nombreIdioma} — con el ritmo, las expresiones y las palabras clave que usa de verdad alguien de ese mercado cuando busca un traslado privado en Gran Canaria. No traduces. Creas desde cero.\n\nPara cada destino genera:\n- meta_title: Título para Google. Límites de caracteres por idioma (MÁXIMOS ABSOLUTOS, nunca superarlos):\n  Español (ES): MÁX 60 | Inglés (EN): MÁX 62 | Alemán (DE): MÁX 55 | Francés (FR): MÁX 60 | Italiano (IT): MÁX 60 | Neerlandés (NL): MÁX 57 | Sueco (SV): MÁX 57 | Noruego (NO): MÁX 57 | Finlandés (FI): MÁX 54 | Ruso (RU): MÁX 50\n  Usa términos de búsqueda reales de ese mercado. En idiomas con palabras largas (alemán, neerlandés, finés) usa menos palabras.\n- meta_description: Descripción para Google. Límites de caracteres por idioma (MÁXIMOS ABSOLUTOS, nunca superarlos):\n  Español (ES): MÁX 155 | Inglés (EN): MÁX 160 | Alemán (DE): MÁX 140 | Francés (FR): MÁX 155 | Italiano (IT): MÁX 158 | Neerlandés (NL): MÁX 148 | Sueco (SV): MÁX 150 | Noruego (NO): MÁX 152 | Finlandés (FI): MÁX 138 | Ruso (RU): MÁX 128\n  Invita al clic con tono natural de ese mercado. NUNCA superes el límite de tu idioma.\n- PROHIBICIÓN ABSOLUTA: Está ESTRICTAMENTE PROHIBIDO usar "precio fijo", "tarifa fija", "precio cerrado" o cualquier frase que sugiera que el coste final no varía. Alternativas permitidas: "tarifas competitivas", "sin costes ocultos", "precio oficial".\n- texto_descripcion: Exactamente 3 párrafos para la página pública del destino. Contenido:\n  Párrafo 1 — Describe el destino: qué se puede ver, qué hacer, gastronomía, ambiente, qué lo hace especial. Concreto y sensorial, nada genérico.\n  Párrafo 2 — Cómo llegar: menciona que se puede llegar desde cualquier punto de Gran Canaria con nuestro servicio de traslado privado. Cómodo, sin esperas, ideal con equipaje o en familia. Sin inventar tiempos ni precios.\n  Párrafo 3 — Invitación a reservar: cálida y directa. El precio depende del tipo de vehículo elegido, siempre asequible. Que reserves y nosotros nos encargamos del trayecto.\n  Sin listas. Solo párrafos fluidos. Sin frases hechas tipo "joya escondida" o "paraíso".\n\nDestinos (JSON con id, nombre, isla, zona):\n${JSON.stringify(items, null, 2)}\n\n${REGLA_LETRAS()}${REGLA_RUSO(nombreIdioma)}\n\nResponde EXCLUSIVAMENTE con JSON válido, sin markdown, con esta estructura exacta donde la clave es el destino_id:\n{"1": {"meta_title": "...", "meta_description": "...", "texto_descripcion": "..."}, "2": {...}}`;
 }
 
 
@@ -198,6 +225,8 @@ Antes de entregar la respuesta, cuenta los caracteres exactos (incluidos espacio
 
 ---
 
+${REGLA_LETRAS()}
+
 ## FORMATO DE SALIDA (OBLIGATORIO)
 Responde ÚNICAMENTE con JSON válido, sin markdown:
 {"slug": "...", "palabra_ruta": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "resena_breve": "...", "texto_descripcion": "..."}`;
@@ -218,6 +247,7 @@ function GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items) {
     '- Para claves extra_web_X: es el nombre de un extra que ve el cliente al reservar — tradúcelo de forma 100% nativa en ' + nombreIdioma + ', como lo escribiría un local, nunca de forma literal.\n' +
     '- Si un texto contiene marcas entre llaves, como {fecha} o {importe}, cópialas exactamente igual, sin traducirlas ni cambiarlas: el programa pone ahí un dato real.\n\n' +
     'Textos a traducir (JSON):\n' + JSON.stringify(items, null, 2) + '\n\n' +
+    REGLA_LETRAS() + REGLA_RUSO(nombreIdioma) + '\n\n' +
     'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, ' +
     'sin bloques de markdown ni comillas triples, con esta forma exacta: ' +
     '{"clave1": "traducción1", "clave2": "traducción2"}';
@@ -232,8 +262,9 @@ function GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items) {
 function GENERADOR_NOMBRES_DESTINOS(nombreIdioma, pendientes) {
   return 'Traduce los siguientes nombres de lugares turísticos de Gran Canaria del español al ' + nombreIdioma + '.\n' +
     'Usa la forma más natural y reconocida en ese idioma (ej: "Aeropuerto de Gran Canaria" → "Gran Canaria Airport" en inglés).\n' +
-    'Si el nombre no tiene traducción establecida, devuélvelo igual en español.\n\n' +
+    'Si el nombre no tiene traducción establecida, devuélvelo igual que en español (en ruso, transliterado al cirílico: Taurito → Таурито).\n\n' +
     'Lugares a traducir (JSON con id y nombre en español):\n' + JSON.stringify(pendientes) + '\n\n' +
+    REGLA_LETRAS() + REGLA_RUSO(nombreIdioma) + '\n\n' +
     'Responde EXCLUSIVAMENTE con un JSON válido, sin texto adicional, sin markdown, con esta forma exacta:\n' +
     '[{"id": 1, "nombre": "..."}, {"id": 2, "nombre": "..."}]';
 }
@@ -257,6 +288,7 @@ REGLAS DE SALIDA:
 - PROHIBIDO: Usar muletillas como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción visual.
 
 FORMATO DE RESPUESTA:
+${REGLA_LETRAS()}${REGLA_RUSO(lang === 'es' ? 'español' : nombreIdioma)}
 Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown (\`\`\`json), sin saltos de línea innecesarios ni texto explicativo adicional:
 {"nombre_archivo": "...", "alt_texto": "..."}`;
 }
@@ -278,6 +310,7 @@ REGLAS OBLIGATORIAS POR IDIOMA:
 4. Sin Muletillas: PROHIBIDO usar fórmulas como "fotografía de", "imagen de", "vista de" en cualquier idioma. Empieza directo con la descripción.
 5. Normas para Ruso (ru): Traduce las palabras comunes al ruso. Translitera los nombres propios al alfabeto cirílico (ej. Las Palmas de Gran Canaria -> Лас-Пальмас-де-Гран-Канария, Gran Canaria -> Гран-Канария). Cero caracteres latinos en la clave de ruso.
 
+${REGLA_LETRAS()}
 FORMATO DE RESPUESTA:
 Responde EXCLUSIVAMENTE con un objeto JSON válido conteniendo las claves solicitadas, sin bloques de código markdown (\`\`\`json), sin saltos de línea innecesarios ni texto explicativo:
 {${codigos}}`;
@@ -306,6 +339,7 @@ INSTRUCCIÓN DE CONTROL DE CONTEO:
 Cuenta mentalmente cada carácter antes de emitir el resultado. El texto final debe encajar perfectamente dentro del rango [110-145]. Si te pasas de 145 caracteres, recorta adjetivos secundarios, no elimines la coletilla ni el destino.
 
 FORMATO DE RESPUESTA:
+${REGLA_LETRAS()}
 Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown (\`\`\`json), sin saltos de línea ni explicaciones:
 {"alt_texto": "...", "longitud": 128}`;
 }
@@ -443,6 +477,8 @@ ${BLOQUE_ADAPTADO}${BLOQUE_SHUTTLE}
 ## CATEGORÍA A GENERAR
 JSON con id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas:
 ${JSON.stringify(item, null, 2)}
+
+${REGLA_LETRAS()}${REGLA_RUSO(nombreIdioma)}
 
 ## FORMATO DE SALIDA (OBLIGATORIO — LEE ESTO CON ATENCIÓN)
 Tu respuesta completa es ÚNICAMENTE el objeto JSON. Nada antes, nada después.
@@ -615,6 +651,8 @@ Antes de responder, verifica internamente que meta_title y meta_description cump
 ## CATEGORÍA A TRABAJAR
 ${JSON.stringify(item, null, 2)}
 
+${REGLA_LETRAS()}${REGLA_RUSO(nombreIdioma)}
+
 ## FORMATO DE SALIDA (OBLIGATORIO — LEE ESTO CON ATENCIÓN)
 Tu respuesta completa es ÚNICAMENTE el objeto JSON. Nada antes, nada después.
 PROHIBIDO: borradores, conteos, explicaciones, pasos intermedios, markdown, texto de ningún tipo.
@@ -649,6 +687,8 @@ Ejemplos correctos para "Lanzarote":
 
 ## ISLA A TRABAJAR
 Nombre original: "${nombreIsla}"
+
+${REGLA_LETRAS()}
 
 ## FORMATO DE SALIDA (OBLIGATORIO)
 Tu respuesta completa es ÚNICAMENTE el objeto JSON. Nada antes, nada después.
@@ -771,6 +811,8 @@ Antes de entregar la respuesta, cuenta los caracteres exactos de meta_title, met
 
 ---
 
+${REGLA_LETRAS()}
+
 ## FORMATO DE SALIDA (OBLIGATORIO)
 Responde ÚNICAMENTE con JSON válido, sin markdown:
 {"slug": "...", "palabra_destino": "...", "nombre_isla": "...", "meta_title": "...", "meta_description": "...", "texto_tarjeta": "...", "texto_descripcion": "..."}`;
@@ -799,6 +841,8 @@ Asunto original en español: ${asunto_es}
 
 Cuerpo del email original en español:
 ${cuerpo_es}
+
+${REGLA_LETRAS()}${REGLA_RUSO(nombreIdioma, true)}
 
 Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin texto adicional:
 {"asunto_email": "asunto traducido", "cuerpo_email": "cuerpo traducido"}`;
@@ -830,6 +874,8 @@ Contexto del negocio: Traslados GC ofrece traslados intermunicipales privados de
 
 Texto de WhatsApp original en español:
 ${cuerpo_wa_es}
+
+${REGLA_LETRAS()}${REGLA_RUSO(nombreIdioma, true)}
 
 Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin texto adicional:
 {"cuerpo_whatsapp": "texto traducido o null si el original era null o vacío"}`;
@@ -863,6 +909,8 @@ Contexto del negocio: Traslados GC ofrece traslados intermunicipales privados de
 
 Frases a traducir del español al ${nombreIdioma} (JSON):
 ${lista}
+
+${REGLA_LETRAS()}
 
 Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, sin bloques de markdown ni comillas triples, con todas las frases traducidas al ${nombreIdioma} y con esta forma exacta:
 {"clave1": "traducción1", "clave2": "traducción2"}`;
