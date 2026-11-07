@@ -5098,16 +5098,8 @@ app.post('/admin/islas/:id/traducir-ia', requireAdmin, asyncHandler(async (req, 
   if (idiomasIsla.some(nombreMal)) {
     console.warn('[GEN14] ' + isla.nombre + ': algún nombre no ha vuelto bien — se pide otra vez a la IA.');
     try {
-      const r2 = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
-      });
-      if (r2.ok) {
-        const d2 = await r2.json();
-        const t2 = JSON.parse(d2.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim());
-        idiomasIsla.filter(nombreMal).forEach(function (lang) { if (t2[lang] && t2[lang].nombre) traducciones[lang] = Object.assign({}, traducciones[lang], { nombre: t2[lang].nombre }); });
-      }
+      const t2 = await pedirIslaIA(apiKey, prompt);
+      idiomasIsla.filter(nombreMal).forEach(function (lang) { if (t2[lang] && t2[lang].nombre) traducciones[lang] = Object.assign({}, traducciones[lang], { nombre: t2[lang].nombre }); });
     } catch (err2) { console.error('[GEN14] Error en el segundo intento:', err2.message); }
   }
   const frenadas = [], avisos = [];
@@ -5140,6 +5132,57 @@ app.post('/admin/islas/:id/traducir-ia', requireAdmin, asyncHandler(async (req, 
     generados++;
   }
   res.json({ ok: true, generados, frenadas, avisos });
+}));
+
+// (07/11/2026) Llamada a la IA (GENERADOR 14) — la usan el segundo intento de «Generar lo que falta» y «🔄 Volver a traducir»
+async function pedirIslaIA(apiKey, prompt) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!response.ok) throw new Error('Error al conectar con la IA.');
+  const data = await response.json();
+  return JSON.parse(data.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim());
+}
+
+// (07/11/2026) N51 — «🔄 Volver a traducir» de la ficha de una isla: la IA traduce otra vez su nombre SOLO en el idioma
+// de la pestaña abierta, aunque esté aprobado. La palabra de la dirección (slug) que ya existe NO se cambia (regla del 30/10).
+// Dos intentos. Lo grave no se guarda; lo demás queda en 🔵 (con aviso si lleva palabras en letras latinas).
+app.post('/admin/islas/:id/retraducir/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) return res.status(400).json({ ok: false, error: 'Idioma no válido' });
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ ok: false, error: 'Falta ANTHROPIC_API_KEY.' });
+  const iq = await pool.query('SELECT id, nombre FROM islas WHERE id = $1', [req.params.id]);
+  if (!iq.rows.length) return res.status(404).json({ ok: false, error: 'Isla no encontrada.' });
+  const isla = iq.rows[0];
+  const prompt = iaPrompts.GENERADOR_ISLAS(isla.nombre);
+  let ultimoProblema = null;
+  for (let intento = 1; intento <= 2; intento++) {
+    let t;
+    try { t = (await pedirIslaIA(apiKey, prompt))[lang]; }
+    catch (err) { ultimoProblema = err.message; continue; }
+    const nombre = t && t.nombre ? String(t.nombre).trim() : '';
+    const rr = revisarTraduccion(nombre, lang);
+    if (nombre && !rr.grave) {
+      const existe = await pool.query('SELECT slug FROM islas_traducciones WHERE isla_id = $1 AND lang_code = $2', [isla.id, lang]);
+      if (existe.rows.length) {
+        await pool.query('UPDATE islas_traducciones SET nombre = $1, revisado = FALSE, desactualizado = FALSE WHERE isla_id = $2 AND lang_code = $3', [nombre, isla.id, lang]);
+      } else {
+        if (!t.slug) { ultimoProblema = 'La IA no ha devuelto la palabra de la dirección.'; continue; }
+        await pool.query(
+          `INSERT INTO islas_traducciones (isla_id, lang_code, nombre, slug, revisado, desactualizado)
+           VALUES ($1, $2, $3, $4, FALSE, FALSE) ON CONFLICT (isla_id, lang_code) DO NOTHING`,
+          [isla.id, lang, nombre, String(t.slug).trim().toLowerCase()]
+        );
+      }
+      return res.json({ ok: true, nombre: nombre, aviso: rr.latinas.length ? mensajeFreno(rr) : '' });
+    }
+    ultimoProblema = nombre ? mensajeFreno(rr) : 'La IA no ha devuelto el nombre.';
+    console.warn('[GEN14] Volver a traducir ' + isla.nombre + ' (' + lang + '), intento ' + intento + ': ' + ultimoProblema);
+  }
+  res.json({ ok: false, error: 'No se ha podido traducir bien (lo ha intentado dos veces): ' + (ultimoProblema || 'error desconocido') + ' No se ha guardado nada: vuelve a pulsar «🔄 Volver a traducir».' });
 }));
 
 app.post('/admin/islas/:id/traducciones/guardar', requireAdmin, asyncHandler(async (req, res) => {
@@ -7201,26 +7244,7 @@ app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt-generar-falta', requireAdmin
   const d = destino.rows[0];
   // (07/11/2026) N51: usa la función común de los alt texts (la misma que Rutas y Categorías), con el mismo texto de IA
   // que tenía aquí; así tiene también el freno y el segundo intento.
-  const resultado = await generarFaltaAltFotoModelo('destinos_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) {
-    const listaIdiomas = pendientes.map(function (i) {
-      return i.codigo + ' (' + (NOMBRE_IDIOMA_ES[i.codigo] || i.nombre) + ')';
-    }).join(', ');
-    const codigos = pendientes.map(function (i) { return '"' + i.codigo + '": "..."'; }).join(', ');
-    // Mismo texto que «Generar todos los idiomas» (generar-todos), solo con los idiomas pendientes
-    return `Eres un experto en SEO de imágenes para webs de turismo y transporte. Trabajas para múltiples mercados europeos.
-Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text para cada uno de estos idiomas: ${listaIdiomas}.
-
-Para cada idioma:
-- Escribe de forma completamente nativa — como lo escribiría un SEO local de ese mercado, NO como una traducción del español
-- Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino
-- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto
-- Máximo 125 caracteres
-
-${iaPrompts.REGLA_LETRAS()}${iaPrompts.REGLA_RUSO(pendientes.some(function (i) { return i.codigo === 'ru'; }) ? 'ruso' : '')}
-
-Responde ÚNICAMENTE con JSON válido, sin markdown:
-{${codigos}}`;
-  });
+  const resultado = await generarFaltaAltFotoModelo('destinos_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) { return promptAltDestino(d, pendientes); });
   if (resultado.error) return res.status(resultado.status || 500).json({ error: resultado.error });
   res.json({ ok: true, generadas: resultado.generadas, frenadas: resultado.frenadas || [], avisos: resultado.avisos || [] });
 }));
@@ -7586,20 +7610,7 @@ app.post('/admin/categorias/:id/fotos/:fotoId/alt-generar-falta', requireAdmin, 
   const cat = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
   if (cat.rows.length === 0) return res.status(404).json({ error: 'Categoría no encontrada.' });
   const nombreCategoria = cat.rows[0].nombre;
-  const resultado = await generarFaltaAltFotoModelo('categorias_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) {
-    const listaIdiomas = pendientes.map(function (i) { return i.codigo + ' (' + (NOMBRE_IDIOMA_ES[i.codigo] || i.nombre) + ')'; }).join(', ');
-    const codigos = pendientes.map(function (i) { return '"' + i.codigo + '": "..."'; }).join(', ');
-    return `Eres un experto en SEO de imágenes para webs de transporte premium. Analiza esta imagen del vehículo de categoría "${nombreCategoria}" y escribe un alt text para cada uno de estos idiomas: ${listaIdiomas}.
-
-Para cada idioma:
-- Escribe de forma completamente nativa, describe lo que se ve e incluye el nombre de la categoría
-- Máximo 125 caracteres
-
-${iaPrompts.REGLA_LETRAS()}${iaPrompts.REGLA_RUSO(pendientes.some(function (i) { return i.codigo === 'ru'; }) ? 'ruso' : '')}
-
-Responde ÚNICAMENTE con JSON válido, sin markdown:
-{${codigos}}`;
-  });
+  const resultado = await generarFaltaAltFotoModelo('categorias_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) { return promptAltCategoria(nombreCategoria, pendientes); });
   if (resultado.error) return res.status(resultado.status || 500).json({ error: resultado.error });
   res.json({ ok: true, generadas: resultado.generadas, frenadas: resultado.frenadas || [], avisos: resultado.avisos || [] });
 }));
@@ -7659,6 +7670,120 @@ async function guardarAltFotoModelo(tablaAlt, fotoId, lang, altTexto, enAzul) {
   );
   return conTraducciones;
 }
+// (07/11/2026) Texto de la IA de los alt texts de una foto de DESTINO (el de siempre), para «Generar lo que falta» y «🔄 Volver a traducir»
+function promptAltDestino(d, pendientes) {
+    const listaIdiomas = pendientes.map(function (i) {
+      return i.codigo + ' (' + (NOMBRE_IDIOMA_ES[i.codigo] || i.nombre) + ')';
+    }).join(', ');
+    const codigos = pendientes.map(function (i) { return '"' + i.codigo + '": "..."'; }).join(', ');
+    // Mismo texto que «Generar todos los idiomas» (generar-todos), solo con los idiomas pendientes
+    return `Eres un experto en SEO de imágenes para webs de turismo y transporte. Trabajas para múltiples mercados europeos.
+Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text para cada uno de estos idiomas: ${listaIdiomas}.
+
+Para cada idioma:
+- Escribe de forma completamente nativa — como lo escribiría un SEO local de ese mercado, NO como una traducción del español
+- Describe lo que se ve en la imagen de forma natural e incluye el nombre del destino
+- Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto
+- Máximo 125 caracteres
+
+${iaPrompts.REGLA_LETRAS()}${iaPrompts.REGLA_RUSO(pendientes.some(function (i) { return i.codigo === 'ru'; }) ? 'ruso' : '')}
+
+Responde ÚNICAMENTE con JSON válido, sin markdown:
+{${codigos}}`;
+}
+// (07/11/2026) Texto de la IA de los alt texts de una foto de CATEGORÍA (el de siempre), para «Generar lo que falta» y «🔄 Volver a traducir»
+function promptAltCategoria(nombreCategoria, pendientes) {
+    const listaIdiomas = pendientes.map(function (i) { return i.codigo + ' (' + (NOMBRE_IDIOMA_ES[i.codigo] || i.nombre) + ')'; }).join(', ');
+    const codigos = pendientes.map(function (i) { return '"' + i.codigo + '": "..."'; }).join(', ');
+    return `Eres un experto en SEO de imágenes para webs de transporte premium. Analiza esta imagen del vehículo de categoría "${nombreCategoria}" y escribe un alt text para cada uno de estos idiomas: ${listaIdiomas}.
+
+Para cada idioma:
+- Escribe de forma completamente nativa, describe lo que se ve e incluye el nombre de la categoría
+- Máximo 125 caracteres
+
+${iaPrompts.REGLA_LETRAS()}${iaPrompts.REGLA_RUSO(pendientes.some(function (i) { return i.codigo === 'ru'; }) ? 'ruso' : '')}
+
+Responde ÚNICAMENTE con JSON válido, sin markdown:
+{${codigos}}`;
+}
+// (07/11/2026) Texto de la IA de los alt texts de una foto de RUTA (el de siempre), para «Generar lo que falta» y «🔄 Volver a traducir»
+function promptAltRuta(r, pendientes) {
+  const listaIdiomas = pendientes.map(function (i) { return i.codigo + ' (' + i.nombre + ')'; }).join(', ');
+  const codigos = pendientes.map(function (i) { return '"' + i.codigo + '": "..."'; }).join(', ');
+  return iaPrompts.GENERADOR_ALT_FOTO_RUTA_TODOS(r.origen, r.destino, listaIdiomas, codigos);
+}
+// (07/11/2026) Llamada a la IA con la foto para una lista de idiomas (la usan «Generar lo que falta» y «🔄 Volver a traducir»)
+async function pedirAltsIA(apiKey, matches, lista, hacerPrompt) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6', max_tokens: 800,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+        { type: 'text', text: hacerPrompt(lista) }
+      ]}]
+    })
+  });
+  if (!response.ok) return { error: 'Error IA: ' + (await response.text()).slice(0, 200) };
+  const data = await response.json();
+  const texto = data.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+  return JSON.parse(texto);
+}
+// (07/11/2026) N51 — «🔄 Volver a traducir» del alt text de una foto en UN idioma, aunque esté aprobado. Dos intentos.
+// Lo grave no se guarda; lo demás queda en 🔵 (con aviso si lleva palabras en letras latinas).
+async function retraducirAltFotoModelo(tablaAlt, fotoId, imagen, lang, hacerPrompt) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { error: 'Falta ANTHROPIC_API_KEY.' };
+  if (!imagen || !imagen.startsWith('data:image/')) return { status: 400, error: 'Imagen no válida.' };
+  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) return { status: 400, error: 'Formato no válido.' };
+  const idi = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE codigo = $1', [lang]);
+  if (!idi.rows.length) return { status: 400, error: 'Idioma no válido.' };
+  let ultimoProblema = null;
+  for (let intento = 1; intento <= 2; intento++) {
+    let resultado;
+    try { resultado = await pedirAltsIA(apiKey, matches, idi.rows, hacerPrompt); }
+    catch (err) { ultimoProblema = err.message; continue; }
+    if (resultado.error) { ultimoProblema = resultado.error; continue; }
+    const alt = String(resultado[lang] || '').trim();
+    const rr = revisarTraduccion(alt, lang);
+    if (alt && !rr.grave) {
+      await pool.query(
+        `INSERT INTO ${tablaAlt} (foto_id, lang_code, alt_texto, revisado, desactualizado) VALUES ($1, $2, $3, FALSE, FALSE)
+         ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = FALSE, desactualizado = FALSE`,
+        [fotoId, lang, alt]
+      );
+      return { ok: true, alt_texto: alt, aviso: rr.latinas.length ? mensajeFreno(rr) : '' };
+    }
+    ultimoProblema = alt ? mensajeFreno(rr) : 'La IA no ha devuelto el texto.';
+    console.warn('[ALT] Volver a traducir ' + tablaAlt + ' foto ' + fotoId + ' (' + lang + '), intento ' + intento + ': ' + ultimoProblema);
+  }
+  return { ok: false, error: 'No se ha podido traducir bien (lo ha intentado dos veces): ' + (ultimoProblema || 'error desconocido') + ' No se ha guardado nada: vuelve a pulsar «🔄 Volver a traducir».' };
+}
+// (07/11/2026) N51 — «🔄 Volver a traducir» del alt text de una foto (Destinos, Rutas y Categorías), en el idioma de la pestaña
+app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt/:lang/retraducir', requireAdmin, asyncHandler(async (req, res) => {
+  const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
+  if (!destino.rows.length) return res.status(404).json({ ok: false, error: 'Destino no encontrado.' });
+  const r = await retraducirAltFotoModelo('destinos_fotos_alt', req.params.fotoId, req.body.imagen, req.params.lang,
+    function (lista) { return promptAltDestino(destino.rows[0], lista); });
+  res.status(r.status || 200).json(r.error && !('ok' in r) ? { ok: false, error: r.error } : r);
+}));
+app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt/:lang/retraducir', requireAdmin, asyncHandler(async (req, res) => {
+  const ruta = await pool.query('SELECT origen, destino FROM rutas WHERE id = $1', [req.params.id]);
+  if (!ruta.rows.length) return res.status(404).json({ ok: false, error: 'Ruta no encontrada.' });
+  const r = await retraducirAltFotoModelo('rutas_fotos_alt', req.params.fotoId, req.body.imagen, req.params.lang,
+    function (lista) { return promptAltRuta(ruta.rows[0], lista); });
+  res.status(r.status || 200).json(r.error && !('ok' in r) ? { ok: false, error: r.error } : r);
+}));
+app.post('/admin/categorias/:id/fotos/:fotoId/alt/:lang/retraducir', requireAdmin, asyncHandler(async (req, res) => {
+  const cat = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
+  if (!cat.rows.length) return res.status(404).json({ ok: false, error: 'Categoría no encontrada.' });
+  const r = await retraducirAltFotoModelo('categorias_fotos_alt', req.params.fotoId, req.body.imagen, req.params.lang,
+    function (lista) { return promptAltCategoria(cat.rows[0].nombre, lista); });
+  res.status(r.status || 200).json(r.error && !('ok' in r) ? { ok: false, error: r.error } : r);
+}));
+
 // Genera con IA solo los idiomas activos sin texto o en 🔴 y los guarda en 🔵
 async function generarFaltaAltFotoModelo(tablaAlt, fotoId, imagen, hacerPrompt) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -7673,24 +7798,7 @@ async function generarFaltaAltFotoModelo(tablaAlt, fotoId, imagen, hacerPrompt) 
     return !a || !a.alt_texto || !a.alt_texto.trim() || a.desactualizado;
   });
   if (pendientes.length === 0) return { generadas: 0 };
-  // (07/11/2026) La llamada a la IA va en una función para poder pedir otra vez lo que vuelve mal (N51)
-  async function pedirAlts(lista) {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6', max_tokens: 800,
-        messages: [{ role: 'user', content: [
-          { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
-          { type: 'text', text: hacerPrompt(lista) }
-        ]}]
-      })
-    });
-    if (!response.ok) return { error: 'Error IA: ' + (await response.text()).slice(0, 200) };
-    const data = await response.json();
-    const texto = data.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-    return JSON.parse(texto);
-  }
+  const pedirAlts = function (lista) { return pedirAltsIA(apiKey, matches, lista, hacerPrompt); };
   const resultado = await pedirAlts(pendientes);
   if (resultado.error) return resultado;
   // (07/11/2026) N51: los idiomas que vuelven mal (ruso sin ruso, letras mezcladas) se piden otra vez, una vez
@@ -8061,11 +8169,7 @@ app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt-generar-falta', requireAdmin, a
   const ruta = await pool.query('SELECT origen, destino FROM rutas WHERE id = $1', [req.params.id]);
   if (ruta.rows.length === 0) return res.status(404).json({ error: 'Ruta no encontrada.' });
   const r = ruta.rows[0];
-  const resultado = await generarFaltaAltFotoModelo('rutas_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) {
-    const listaIdiomas = pendientes.map(function (i) { return i.codigo + ' (' + i.nombre + ')'; }).join(', ');
-    const codigos = pendientes.map(function (i) { return '"' + i.codigo + '": "..."'; }).join(', ');
-    return iaPrompts.GENERADOR_ALT_FOTO_RUTA_TODOS(r.origen, r.destino, listaIdiomas, codigos);
-  });
+  const resultado = await generarFaltaAltFotoModelo('rutas_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) { return promptAltRuta(r, pendientes); });
   if (resultado.error) return res.status(resultado.status || 500).json({ error: resultado.error });
   res.json({ ok: true, generadas: resultado.generadas, frenadas: resultado.frenadas || [], avisos: resultado.avisos || [] });
 }));
@@ -8883,6 +8987,51 @@ function textoFichaCategoria(p) {
   return [p.descripcion, p.subtitulo, p.descripcion_larga, p.caracteristicas].map(function (x) { return x || ''; }).join('\n');
 }
 
+// (07/11/2026) N51 — «🔄 Volver a traducir» de la ficha de una categoría (Idiomas → «Página de flota — categorías»):
+// la IA escribe otra vez la ficha SOLO en el idioma de la pestaña abierta, aunque esté aprobada, con los mismos datos que
+// «Generar lo que falta» (GENERADOR 12). Dos intentos. Lo grave no se guarda; lo demás queda en 🔵.
+app.post('/admin/categorias/:id/retraducir/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) return res.status(400).json({ ok: false, error: 'Idioma no válido' });
+  const cq = await pool.query(
+    `SELECT id, nombre, capacidad_pasajeros, capacidad_maletas, limite_sillas, descripcion FROM categorias_vehiculos WHERE id = $1`,
+    [req.params.id]
+  );
+  if (!cq.rows.length) return res.status(404).json({ ok: false, error: 'Categoría no encontrada' });
+  const c = cq.rows[0];
+  const nt = await pool.query(
+    `SELECT tit.texto FROM textos_interfaz ti JOIN textos_interfaz_traducciones tit ON tit.texto_id = ti.id AND tit.lang_code = $1
+     WHERE ti.clave = $2`, [lang, 'categoria_nombre_' + c.id]
+  );
+  const nombreLang = nt.rows.length && nt.rows[0].texto && nt.rows[0].texto.trim() ? nt.rows[0].texto.trim() : c.nombre;
+  const item = Object.assign({}, c, { nombre: nombreLang, nombre_es: c.nombre });
+  const nombreIdioma = await getNombreIdioma(lang);
+  let ultimoProblema = null;
+  for (let intento = 1; intento <= 2; intento++) {
+    let f;
+    try { f = (await generarCategoriasConIA([item], nombreIdioma))[String(c.id)] || {}; }
+    catch (err) { ultimoProblema = err.message; continue; }
+    const ficha = { descripcion: (f.descripcion || '').trim(), subtitulo: (f.subtitulo || '').trim(),
+                    descripcion_larga: (f.descripcion_larga || '').trim(), caracteristicas: (f.caracteristicas || '').trim() };
+    const rr = revisarTraduccion(textoFichaCategoria(ficha), lang);
+    if (ficha.descripcion && !rr.grave) {
+      await pool.query(
+        `INSERT INTO categorias_vehiculos_traducciones
+           (categoria_id, lang_code, descripcion, subtitulo, descripcion_larga, caracteristicas, updated_at, ficha_revisado, ficha_desactualizado)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), FALSE, FALSE)
+         ON CONFLICT (categoria_id, lang_code) DO UPDATE
+           SET descripcion = $3, subtitulo = $4, descripcion_larga = $5,
+               caracteristicas = $6, updated_at = NOW(), ficha_revisado = FALSE, ficha_desactualizado = FALSE`,
+        [c.id, lang, ficha.descripcion, ficha.subtitulo, ficha.descripcion_larga, ficha.caracteristicas]
+      );
+      return res.json(Object.assign({ ok: true, aviso: rr.latinas.length ? mensajeFreno(rr) : '' }, ficha));
+    }
+    ultimoProblema = ficha.descripcion ? mensajeFreno(rr) : 'La IA no ha devuelto la ficha.';
+    console.warn('[GEN12] Volver a traducir categoría ' + c.id + ' (' + lang + '), intento ' + intento + ': ' + ultimoProblema);
+  }
+  res.json({ ok: false, error: 'No se ha podido traducir bien (lo ha intentado dos veces): ' + (ultimoProblema || 'error desconocido') + ' No se ha guardado nada: vuelve a pulsar «🔄 Volver a traducir».' });
+}));
+
 // Guarda en bloque el contenido de categorías revisado tras la propuesta de IA.
 // Para español guarda en categorias_vehiculos directamente.
 // Para otros idiomas guarda en categorias_vehiculos_traducciones.
@@ -9512,6 +9661,39 @@ app.post('/admin/textos/aprobar-azules', requireAdmin, asyncHandler(async (req, 
   }));
   await aprobarTextosSeparados(null, sep);
   res.json({ ok: true, aprobadas: sep.aprobar.length, frenadas: sep.frenadas });
+}));
+
+// (07/11/2026) N51 — «🔄 Volver a traducir» de la ficha de un texto: la IA traduce otra vez ese texto SOLO en el idioma
+// de la pestaña abierta, aunque esté aprobado. Dos intentos. Lo grave (ruso sin ruso, letras mezcladas) no se guarda;
+// lo demás queda en 🔵 (con aviso si lleva palabras en letras latinas) para revisarlo y aprobarlo con «💾 Guardar».
+app.post('/admin/textos/:id/idioma/:lang/retraducir', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) return res.status(400).json({ ok: false, error: 'Idioma no válido' });
+  const tx = await pool.query('SELECT id, clave, contexto, texto_es FROM textos_interfaz WHERE id = $1', [req.params.id]);
+  if (!tx.rows.length) return res.status(404).json({ ok: false, error: 'Texto no encontrado' });
+  const t = tx.rows[0];
+  if (!t.texto_es || !t.texto_es.trim()) return res.json({ ok: false, error: 'Este texto no tiene español.' });
+  const item = { clave: t.clave, contexto: t.contexto || '', texto_es: t.texto_es };
+  let ultimoProblema = null;
+  for (let intento = 1; intento <= 2; intento++) {
+    let sugerencia = '';
+    try { sugerencia = String((await traducirConClaudeIA([item], NOMBRE_IDIOMA_ES[lang] || lang))[t.clave] || '').trim(); }
+    catch (err) { ultimoProblema = err.message; continue; }
+    const rr = revisarTraduccion(sugerencia, lang);
+    if (sugerencia && !rr.grave) {
+      await pool.query(
+        `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto, revisado)
+         VALUES ($1, $2, $3, FALSE)
+         ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE, revisado = FALSE`,
+        [t.id, lang, sugerencia]
+      );
+      await cargarTextosCache();
+      return res.json({ ok: true, texto: sugerencia, aviso: rr.latinas.length ? mensajeFreno(rr) : '' });
+    }
+    ultimoProblema = sugerencia ? mensajeFreno(rr) : 'La IA no ha devuelto el texto.';
+    console.warn('[GEN7] Volver a traducir ' + t.clave + ' (' + lang + '), intento ' + intento + ': ' + ultimoProblema);
+  }
+  res.json({ ok: false, error: 'No se ha podido traducir bien (lo ha intentado dos veces): ' + (ultimoProblema || 'error desconocido') + ' No se ha guardado nada: vuelve a pulsar «🔄 Volver a traducir».' });
 }));
 
 // Traduce con IA (Claude) todos los textos que falten en un idioma — no
@@ -11951,23 +12133,7 @@ app.post('/admin/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY en Render.' });
 
-  // (07/11/2026) La llamada a la IA va en una función para poder pedir otra vez lo que vuelve mal (N51)
-  async function pedirNombres(lista) {
-    const prompt = iaPrompts.GENERADOR_NOMBRES_DESTINOS(nombreIdioma, lista);
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
-    });
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error('Error API Claude: ' + err.slice(0, 200));
-    }
-    const data = await response.json();
-    const texto = data.content.map(function (b) { return b.text || ''; }).join('');
-    const limpio = texto.replace(/```json|```/g, '').trim();
-    return JSON.parse(limpio);
-  }
+  const pedirNombres = function (lista) { return pedirNombresDestinosIA(apiKey, nombreIdioma, lista); };
 
   let propuestas;
   try { propuestas = await pedirNombres(pendientes); }
@@ -12011,6 +12177,58 @@ app.post('/admin/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (
   }
 
   res.json({ ok: true, propuestas: guardados, frenadas, avisos });
+}));
+
+// (07/11/2026) Llamada a la IA (GENERADOR 8) para una lista de destinos (la usan «Generar lo que falta» y «🔄 Volver a traducir»)
+async function pedirNombresDestinosIA(apiKey, nombreIdioma, lista) {
+  const prompt = iaPrompts.GENERADOR_NOMBRES_DESTINOS(nombreIdioma, lista);
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error('Error API Claude: ' + err.slice(0, 200));
+  }
+  const data = await response.json();
+  const texto = data.content.map(function (b) { return b.text || ''; }).join('');
+  const limpio = texto.replace(/```json|```/g, '').trim();
+  return JSON.parse(limpio);
+}
+
+// (07/11/2026) N51 — «🔄 Volver a traducir» de la fila de un destino: la IA traduce otra vez su nombre en el idioma elegido,
+// aunque esté aprobado. Dos intentos. Lo grave no se guarda; lo demás queda en 🔵 (con aviso si lleva palabras latinas).
+app.post('/admin/destinos/:id/retraducir/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) return res.status(400).json({ ok: false, error: 'Idioma no válido' });
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ ok: false, error: 'Falta ANTHROPIC_API_KEY en Render.' });
+  const dq = await pool.query('SELECT id, nombre FROM destinos WHERE id = $1', [req.params.id]);
+  if (!dq.rows.length) return res.status(404).json({ ok: false, error: 'Destino no encontrado' });
+  const d = dq.rows[0];
+  let ultimoProblema = null;
+  for (let intento = 1; intento <= 2; intento++) {
+    let nombre = '';
+    try {
+      const lista = await pedirNombresDestinosIA(apiKey, NOMBRE_IDIOMA_ES[lang] || lang, [{ id: d.id, nombre: d.nombre }]);
+      const n = (Array.isArray(lista) ? lista : []).find(function (x) { return x && Number(x.id) === d.id; });
+      nombre = n && n.nombre ? String(n.nombre).trim() : '';
+    } catch (err) { ultimoProblema = err.message; continue; }
+    const rr = revisarTraduccion(nombre, lang);
+    if (nombre && !rr.grave) {
+      await pool.query(
+        `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre, revisado, desactualizado)
+         VALUES ($1, $2, $3, FALSE, FALSE)
+         ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW(), revisado = FALSE, desactualizado = FALSE`,
+        [d.id, lang, nombre]
+      );
+      return res.json({ ok: true, nombre: nombre, aviso: rr.latinas.length ? mensajeFreno(rr) : '' });
+    }
+    ultimoProblema = nombre ? mensajeFreno(rr) : 'La IA no ha devuelto el nombre.';
+    console.warn('[GEN8] Volver a traducir destino ' + d.id + ' (' + lang + '), intento ' + intento + ': ' + ultimoProblema);
+  }
+  res.json({ ok: false, error: 'No se ha podido traducir bien (lo ha intentado dos veces): ' + (ultimoProblema || 'error desconocido') + ' No se ha guardado nada: vuelve a pulsar «🔄 Volver a traducir».' });
 }));
 
 // Guarda en bloque las propuestas de traducciones de destinos revisadas
