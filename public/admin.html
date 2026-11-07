@@ -2692,6 +2692,8 @@ function renderizarCamposIdiomaIsla(islaId, lang, datos) {
     '<div>' +
       '<button class="boton-primario" onclick="guardarTraduccionIsla(' + islaId + ', \'' + lang + '\')">💾 Guardar</button>' +
       '<button class="boton-primario" style="margin-left:8px;" onclick="guardarTodoIsla(' + islaId + ', \'' + lang + '\')">💾 Guardar todo</button>' +
+      // (07/11/2026) N51: rehace con la IA solo el nombre de esta pestaña (la palabra de la dirección no cambia)
+      '<button class="boton-primario" style="margin-left:8px;" onclick="retraducirIsla(' + islaId + ', \'' + lang + '\')">🔄 Volver a traducir</button>' +
     '</div>';
 }
 
@@ -5214,7 +5216,9 @@ function cambiarIdiomaEditorCategoriaIA(catId, lang, botonTab) {
         '<textarea id="cat-ia-caract" class="campo" rows="3" style="width:100%;">' + escapar(d.caracteristicas || '') + '</textarea></div>' +
       '</div>' +
       '<button class="boton-primario" style="margin-top:12px;" onclick="guardarCategoriaIA(' + catId + ', \'' + lang + '\')">💾 Guardar</button>' +
-      '<button class="boton-primario" style="margin-top:12px;margin-left:8px;" onclick="guardarTodoCategoriaIA(' + catId + ', \'' + lang + '\')">💾 Guardar todo</button>';
+      '<button class="boton-primario" style="margin-top:12px;margin-left:8px;" onclick="guardarTodoCategoriaIA(' + catId + ', \'' + lang + '\')">💾 Guardar todo</button>' +
+      // (07/11/2026) N51: rehace con la IA solo el idioma de esta pestaña, aunque esté aprobado (no en ES: es el original)
+      (lang !== 'es' ? '<button class="boton-primario" style="margin-top:12px;margin-left:8px;" onclick="retraducirCategoriaIA(' + catId + ', \'' + lang + '\')">🔄 Volver a traducir</button>' : '');
   });
 }
 
@@ -6749,9 +6753,120 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
           '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
           '<textarea class="campo" id="texto-traduccion" rows="3" placeholder="Todavía sin traducir...">' + escapar(datos.texto || '') + '</textarea>' +
           '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar</button>' +
-          '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="guardarTodoTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar todo</button>';
+          '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="guardarTodoTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar todo</button>' +
+          // (07/11/2026) N51: rehace con la IA solo el idioma de esta pestaña, aunque esté aprobado (como en Frases)
+          '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="retraducirTexto(' + textoId + ', \'' + lang + '\')">🔄 Volver a traducir</button>';
       });
   }
+}
+
+// (07/11/2026) N51 — «🔄 Volver a traducir»: la IA traduce otra vez este texto solo en el idioma de la pestaña abierta,
+// aunque esté aprobado. Lo nuevo queda en 🔵 para revisarlo y aprobarlo con «💾 Guardar».
+function retraducirTexto(textoId, lang) {
+  var msg = document.getElementById('texto-mensaje-editor');
+  msg.innerHTML = '<p style="font-size:13px;color:var(--texto-muted);margin:0;">🤖 Traduciendo de nuevo con IA, puede tardar unos segundos...</p>';
+  fetch('/admin/textos/' + textoId + '/idioma/' + lang + '/retraducir', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.ok) {
+        msg.innerHTML = '<div class="aviso-ok">🤖 Traducido de nuevo. Está en azul: revísalo y pulsa «💾 Guardar».</div>' +
+          (d.aviso ? '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">⚠️ ' + escapar(d.aviso) + ' Revísalo antes de aprobarlo.</div>' : '');
+        refrescarTextosYPestanas(textoId, lang); // la pestaña se pone azul y el recuadro trae el texto nuevo
+      } else {
+        msg.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">⚠️ ' + escapar(d.error || 'No se ha podido traducir.') + '</div>';
+      }
+    })
+    .catch(function () {
+      msg.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">⚠️ No se pudo conectar con la IA. Inténtalo de nuevo.</div>';
+    });
+}
+
+// (07/11/2026) N51 — Avisos comunes de «🔄 Volver a traducir» (mismo texto en todas las fichas)
+function htmlRetraducidoOk(d) {
+  return '<div class="aviso-ok">🤖 Traducido de nuevo. Está en azul: revísalo y pulsa «💾 Guardar».</div>' +
+    (d && d.aviso ? '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">⚠️ ' + escFreno(d.aviso) + ' Revísalo antes de aprobarlo.</div>' : '');
+}
+function htmlRetraducidoError(d) {
+  return '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">⚠️ ' + escFreno((d && d.error) || 'No se ha podido traducir.') + '</div>';
+}
+var HTML_RETRADUCIENDO = '<p style="font-size:13px;color:var(--texto-muted);margin:0;">🤖 Traduciendo de nuevo con IA, puede tardar unos segundos...</p>';
+
+// Página de flota — ficha de una categoría
+function retraducirCategoriaIA(catId, lang) {
+  var msg = document.getElementById('cat-ia-msg');
+  msg.innerHTML = HTML_RETRADUCIENDO;
+  fetch('/admin/categorias/' + catId + '/retraducir/' + lang, { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) { msg.innerHTML = htmlRetraducidoError(d); return; }
+      document.getElementById('cat-ia-descripcion').value = d.descripcion || '';
+      document.getElementById('cat-ia-subtitulo').value = d.subtitulo || '';
+      document.getElementById('cat-ia-desc-larga').value = d.descripcion_larga || '';
+      document.getElementById('cat-ia-caract').value = d.caracteristicas || '';
+      msg.innerHTML = htmlRetraducidoOk(d);
+      cargarTablaCategoriasIA().then(function () { pintarPestanasCategoriaIA(catId); });
+    })
+    .catch(function () { msg.innerHTML = htmlRetraducidoError({ error: 'No se pudo conectar con la IA. Inténtalo de nuevo.' }); });
+}
+
+// Islas / Localidades — ficha de una isla (solo el nombre; la palabra de la dirección no cambia)
+function retraducirIsla(islaId, lang) {
+  var msg = document.getElementById('isla-msg-guardar');
+  if (msg) msg.innerHTML = HTML_RETRADUCIENDO;
+  fetch('/admin/islas/' + islaId + '/retraducir/' + lang, { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) { if (msg) msg.innerHTML = htmlRetraducidoError(d); return; }
+      if (msg) msg.innerHTML = htmlRetraducidoOk(d);
+      recargarTraduccionesIsla(islaId, lang); // la pestaña se pone azul y el campo trae el nombre nuevo
+      cargarIslas();
+    })
+    .catch(function () { if (msg) msg.innerHTML = htmlRetraducidoError({ error: 'No se pudo conectar con la IA. Inténtalo de nuevo.' }); });
+}
+
+// Destino Inicial → Traducciones de destinos — fila de un destino, en el idioma elegido arriba
+function retraducirDestino(id) {
+  var lang = document.getElementById('select-lang-destinos').value;
+  var av = document.getElementById('aviso-traducciones-destinos');
+  var fila = document.getElementById('fila-dest-' + id);
+  var nombreEs = fila ? fila.cells[0].textContent : '';
+  av.style.display = 'block';
+  av.innerHTML = HTML_RETRADUCIENDO;
+  fetch('/admin/destinos/' + id + '/retraducir/' + lang, { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var titulo = '<div style="font-size:13px;font-weight:600;margin-top:4px;">' + escFreno(nombreEs) + '</div>';
+      if (!d.ok) { av.innerHTML = titulo + htmlRetraducidoError(d); return; }
+      var inp = document.getElementById('trad-dest-' + id);
+      if (inp) inp.value = d.nombre || '';
+      var badge = document.getElementById('badge-dest-' + id);
+      if (badge) badge.innerHTML = marcaTraduccionDestino('ia');
+      av.innerHTML = titulo + htmlRetraducidoOk(d);
+    })
+    .catch(function () { av.innerHTML = htmlRetraducidoError({ error: 'No se pudo conectar con la IA. Inténtalo de nuevo.' }); });
+}
+
+// Textos de las fotos (Páginas Destino, SEO de rutas y SEO de categorías) — la IA vuelve a mirar la foto
+function retraducirAltBtn(boton) {
+  var tipo = boton.dataset.tipo, padreId = parseInt(boton.dataset.padreid), fotoId = parseInt(boton.dataset.fotoid), lang = boton.dataset.lang;
+  var base = tipo === 'dest' ? '/admin/seo/destinos/' + padreId : ALT_GEN[tipo].base(padreId);
+  var msg = document.getElementById(tipo === 'dest' ? 'alt-foto-msg-' + fotoId : ALT_GEN[tipo].pre + 'msg-' + fotoId);
+  if (msg) msg.innerHTML = HTML_RETRADUCIENDO;
+  fetch(base + '/fotos/' + fotoId + '/imagen-base64')
+    .then(function (r) { return r.json(); })
+    .then(function (img) {
+      if (!img.ok) throw new Error(img.error || 'No se pudo leer la foto.');
+      return fetch(base + '/fotos/' + fotoId + '/alt/' + lang + '/retraducir', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imagen: img.imagen })
+      });
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) { if (msg) msg.innerHTML = htmlRetraducidoError(d); return; }
+      if (msg) msg.innerHTML = htmlRetraducidoOk(d);
+      if (tipo === 'dest') recargarAltTextosFoto(padreId, fotoId); else recargarAltGen(tipo, padreId, fotoId); // pestaña en azul y texto nuevo
+    })
+    .catch(function (e) { if (msg) msg.innerHTML = htmlRetraducidoError({ error: (e && e.message) || 'No se pudo conectar con la IA.' }); });
 }
 
 // (07/10/2026) "✔ Aprobar tal cual": la traducción sigue valiendo aunque haya cambiado el español
@@ -8978,6 +9093,9 @@ function renderizarTablaTraduccionesDestinos(destinos, propuestasIA) {
       '<td>' +
         '<button class="boton-primario" style="font-size:0.78rem;padding:0.25rem 0.7rem;margin-top:0;" ' +
         'onclick="guardarTraduccionDestino(' + d.id + ')">💾 Guardar</button>' +
+        // (07/11/2026) N51: rehace con la IA el nombre de este destino en el idioma elegido, aunque esté aprobado
+        '<button class="boton-primario" style="font-size:0.78rem;padding:0.25rem 0.7rem;margin-top:0;margin-left:6px;" ' +
+        'onclick="retraducirDestino(' + d.id + ')">🔄 Volver a traducir</button>' +
       '</td>' +
     '</tr>';
   }).join('');
@@ -12589,6 +12707,8 @@ function cambiarTabAltFoto(fotoId, lang, boton, dataOverride) {
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoBtn(this)">&#128190; Guardar</button>' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarTodoAltFotoBtn(this)">&#128190; Guardar todo</button>' +
+    // (07/11/2026) N51: rehace con la IA solo el idioma de esta pestaña, aunque esté aprobado (no en ES)
+    (lang !== 'es' ? '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-base="/admin/seo/destinos/' + destinoId + '" data-tipo="dest" data-padreid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="retraducirAltBtn(this)">🔄 Volver a traducir</button>' : '') +
     '</div>';
 }
 
@@ -13585,6 +13705,8 @@ function cambiarTabAltFotoRuta(fotoId, lang, boton, dataOverride) {
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-rutaid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoRutaBtn(this)">&#128190; Guardar</button>' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-tipo="ruta" data-padreid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarTodoAltGenBtn(this)">&#128190; Guardar todo</button>' +
+    // (07/11/2026) N51: rehace con la IA solo el idioma de esta pestaña, aunque esté aprobado (no en ES)
+    (lang !== 'es' ? '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-tipo="ruta" data-padreid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="retraducirAltBtn(this)">🔄 Volver a traducir</button>' : '') +
     '</div>';
 }
 
@@ -14308,6 +14430,8 @@ function cambiarTabAltFotoCat(fotoId, lang, boton, dataOverride) {
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-catid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoCatBtn(this)">&#128190; Guardar</button>' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-tipo="cat" data-padreid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarTodoAltGenBtn(this)">&#128190; Guardar todo</button>' +
+    // (07/11/2026) N51: rehace con la IA solo el idioma de esta pestaña, aunque esté aprobado (no en ES)
+    (lang !== 'es' ? '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-tipo="cat" data-padreid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="retraducirAltBtn(this)">🔄 Volver a traducir</button>' : '') +
     '</div>';
 }
 
