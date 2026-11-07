@@ -19510,7 +19510,7 @@ const VARIABLES_PLANTILLAS = {
   cliente_problema_pago:         { email: _V6, wa: _V6 },
   cliente_recuperar_password:    { email: ['nombre_cliente', 'enlace_recuperacion'], wa: ['nombre_cliente', 'enlace_recuperacion'] },
   cliente_reserva_actualizada:   { email: ['nombre_cliente', 'numero_reserva', 'resumen', 'url_portal'], wa: ['nombre_cliente', 'numero_reserva', 'resumen', 'url_portal'] },
-  cliente_reserva_anulada:       { email: _V6, wa: _V6 },
+  cliente_reserva_anulada:       { email: _V6.concat(['url_contacto']), wa: _V6.concat(['url_contacto']) },
   cliente_valoracion:            { email: ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'boton_valoracion'], wa: ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'url_valoracion'] },
   cliente_voucher:               { email: _V6, wa: _V6, solo_asunto_email: true },
   // Interno
