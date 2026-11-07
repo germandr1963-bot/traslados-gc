@@ -2696,7 +2696,7 @@ function renderizarCamposIdiomaIsla(islaId, lang, datos) {
 }
 
 // «💾 Guardar»: guarda y aprueba ese idioma (🟢)
-function guardarTraduccionIsla(islaId, lang, despues) {
+function guardarTraduccionIsla(islaId, lang, despues, confirmarLatinas) {
   var nombre = (document.getElementById('isla-trad-nombre') || {}).value || '';
   var slug   = (document.getElementById('isla-trad-slug')   || {}).value || '';
   var msg    = document.getElementById('isla-msg-guardar');
@@ -2710,12 +2710,15 @@ function guardarTraduccionIsla(islaId, lang, despues) {
   fetch('/admin/islas/' + islaId + '/traducciones/guardar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ traducciones: traducciones })
+    // (07/11/2026) N51: con «💾 Guardar todo» (despues), un ruso con palabras latinas se guarda en 🔵
+    body: JSON.stringify({ traducciones: traducciones, confirmar_latinas: confirmarLatinas === true, guardar_en_azul: !!despues })
   }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.freno) { pintarFreno(msg, d, despues ? null : function () { guardarTraduccionIsla(islaId, lang, null, true); }); return; } // (07/11/2026) N51
     if (!d.ok) { if (msg) msg.innerHTML = '<div class="aviso-error">' + escapar(d.error || 'Error al guardar.') + '</div>'; return; }
     if (despues) return despues();
     if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
-    setTimeout(function() { if (msg) msg.innerHTML = ''; }, 2500);
+    var esteMsgIsla = msg ? msg.innerHTML : ''; // (07/11/2026) solo se borra su propio mensaje
+    setTimeout(function() { if (msg && msg.innerHTML === esteMsgIsla) msg.innerHTML = ''; }, 2500);
     recargarTraduccionesIsla(islaId, lang);
     cargarIslas();
   });
@@ -2727,9 +2730,10 @@ function guardarTodoIsla(islaId, lang) {
   guardarTraduccionIsla(islaId, lang, function() {
     fetch('/admin/islas/' + islaId + '/traducciones/aprobar-todas', { method: 'POST' })
       .then(function(r) { return r.json(); })
-      .then(function() {
-        if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
-        setTimeout(function() { if (msg) msg.innerHTML = ''; }, 2500);
+      .then(function(d) {
+        var frenadas = textoFrenoLote(d, 'No aprobado'); // (07/11/2026) N51
+        if (msg) msg.innerHTML = avisoGuardadoConFreno(d);
+        if (!frenadas) setTimeout(function() { if (msg) msg.innerHTML = ''; }, 2500);
         recargarTraduccionesIsla(islaId, lang);
         cargarIslas();
       });
@@ -2748,11 +2752,14 @@ function traducirIslaIA(islaId) {
       if (btn) btn.disabled = false;
       if (!d.ok) { if (msg) msg.textContent = d.error || 'Error al generar.'; return; }
       if (msg) msg.textContent = d.generados ? '✓ Generado. Revisa cada idioma y guarda.' : 'No falta nada por traducir.';
+      // (07/11/2026) N51: lo que no se ha guardado y lo guardado en azul con palabras en letras latinas (no se borra solo)
+      var frenoTxtI = textoFrenoLote(d, 'No se ha guardado (sigue en rojo)');
+      if (frenoTxtI && msg) { msg.textContent += ' ' + frenoTxtI; msg.style.color = '#c0392b'; }
       var tabActiva = document.querySelector('#editor-isla .tab-idioma.activo');
       var langActivo = tabActiva ? tabActiva.id.replace('isla-tab-', '') : IDIOMAS_ISLA[0];
       recargarTraduccionesIsla(islaId, langActivo);
       cargarIslas();
-      setTimeout(function() { if (msg) msg.textContent = ''; }, 5000);
+      if (!frenoTxtI) setTimeout(function() { if (msg) msg.textContent = ''; }, 5000);
     })
     .catch(function() {
       if (btn) btn.disabled = false;
@@ -2764,9 +2771,10 @@ function noAfectaIsla(islaId) {
   var msg = document.getElementById('msg-isla');
   fetch('/admin/islas/' + islaId + '/traducciones/aprobar-todas', { method: 'POST' })
     .then(function(r) { return r.json(); })
-    .then(function() {
-      if (msg) msg.innerHTML = '<div class="aviso-ok">✅ Traducciones mantenidas</div>';
-      setTimeout(function() { if (msg) msg.innerHTML = ''; }, 2500);
+    .then(function(d) {
+      var frenadas = textoFrenoLote(d, 'No aprobado'); // (07/11/2026) N51
+      if (msg) msg.innerHTML = frenadas ? avisoGuardadoConFreno(d) : '<div class="aviso-ok">✅ Traducciones mantenidas</div>';
+      if (!frenadas) setTimeout(function() { if (msg) msg.innerHTML = ''; }, 2500);
       var tabActiva = document.querySelector('#editor-isla .tab-idioma.activo');
       recargarTraduccionesIsla(islaId, tabActiva ? tabActiva.id.replace('isla-tab-', '') : IDIOMAS_ISLA[0]);
       cargarIslas();
@@ -4365,7 +4373,7 @@ function validarSlug(slug) {
   return null;
 }
 
-function guardarSEO(rutaId, lang) {
+function guardarSEO(rutaId, lang, confirmarLatinas) {
   var slugInput = document.getElementById('seo-slug');
   var slugVal = slugInput ? slugInput.value.trim() : '';
   var errorSlug = validarSlug(slugVal);
@@ -4386,11 +4394,13 @@ function guardarSEO(rutaId, lang) {
     resena_breve:     (document.getElementById('seo-resena') || {}).value || '',
     texto_descripcion: (document.getElementById('seo-texto') || {}).value || ''
   };
+  datos.confirmar_latinas = confirmarLatinas === true; // (07/11/2026) N51
   fetch('/admin/seo/rutas/' + rutaId + '/idioma/' + lang, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(datos)
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.freno) { pintarFreno(msg, respuesta, function () { guardarSEO(rutaId, lang, true); }); return; } // (07/11/2026) N51
     if (respuesta.ok) {
       var pxTitulo = medirPx(datos.meta_title, '20px arial');
       var pxDesc = medirPx(datos.meta_description, '13px arial');
@@ -4512,6 +4522,11 @@ function importarSEO() {
         var textoErrores = respuesta.errores && respuesta.errores.length
           ? ' (' + respuesta.errores.length + ' errores)' : '';
         var html = '<div class="aviso-ok">✅ Importado: ' + respuesta.actualizadas + ' filas actualizadas' + textoErrores + '</div>';
+        // (07/11/2026) N51: qué no se ha importado (ruso sin ruso, letras mezcladas) o lleva palabras en letras latinas
+        if (respuesta.errores && respuesta.errores.length) {
+          html += '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">⚠️ ' +
+            respuesta.errores.slice(0, 10).map(escapar).join('<br>') + (respuesta.errores.length > 10 ? '<br>… y ' + (respuesta.errores.length - 10) + ' más.' : '') + '</div>';
+        }
 
         var avisos = respuesta.avisosPixeles || [];
         if (avisos.length) {
@@ -5130,6 +5145,7 @@ function guardarTodoCategoriaIA(catId, lang) {
   var msg = document.getElementById('cat-ia-msg');
   var datos = {
     lang: lang,
+    guardar_en_azul: true, // (07/11/2026) N51: con palabras latinas, la pestaña abierta se guarda en 🔵
     propuestas: [{
       categoria_id: catId,
       descripcion:      document.getElementById('cat-ia-descripcion').value,
@@ -5144,13 +5160,15 @@ function guardarTodoCategoriaIA(catId, lang) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(datos)
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.freno) { pintarFreno(msg, respuesta); throw new Error('freno'); } // (07/11/2026) N51
     if (!respuesta.ok) throw new Error(respuesta.error || 'Error al guardar');
     return fetch('/admin/categorias/' + catId + '/aprobar-fichas', { method: 'POST' }).then(function (r) { return r.json(); });
   }).then(function (respuesta) {
     if (!respuesta.ok) throw new Error(respuesta.error || 'Error al guardar');
-    msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+    msg.innerHTML = avisoGuardadoConFreno(respuesta);
     cargarTablaCategoriasIA().then(function () { pintarPestanasCategoriaIA(catId); });
   }).catch(function (e) {
+    if (e && e.message === 'freno') return;
     msg.innerHTML = '<div class="aviso-error">' + escapar(e.message || 'Error al guardar') + '</div>';
   });
 }
@@ -5224,14 +5242,14 @@ function noAfectaCategoriaIA(catId) {
     .then(function (r) { return r.json(); })
     .then(function (respuesta) {
       if (!respuesta.ok) throw new Error(respuesta.error || 'Error al guardar');
-      msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+      msg.innerHTML = avisoGuardadoConFreno(respuesta); // (07/11/2026) N51
       cargarTablaCategoriasIA().then(function () { pintarPestanasCategoriaIA(catId); });
     }).catch(function (e) {
       msg.innerHTML = '<div class="aviso-error">' + escapar(e.message || 'Error al guardar') + '</div>';
     });
 }
 
-function guardarCategoriaIA(catId, lang) {
+function guardarCategoriaIA(catId, lang, confirmarLatinas) {
   var msg = document.getElementById('cat-ia-msg');
   var esCambiado = espanolCategoriaCambiado(catId, lang) && categoriaTieneTraducciones(catId);
   var datos = {
@@ -5244,12 +5262,14 @@ function guardarCategoriaIA(catId, lang) {
       caracteristicas:  document.getElementById('cat-ia-caract').value
     }]
   };
+  datos.confirmar_latinas = confirmarLatinas === true; // (07/11/2026) N51
   msg.innerHTML = 'Guardando...';
   fetch('/admin/categorias/guardar-ia-lote', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(datos)
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.freno) { pintarFreno(msg, respuesta, function () { guardarCategoriaIA(catId, lang, true); }); return; } // (07/11/2026) N51
     if (respuesta.ok) {
       if (esCambiado) {
         msg.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
@@ -5718,13 +5738,13 @@ function aprobarTodoComunicaciones(tipo) {
 
   Promise.all(promesas).then(function(resultados) {
     // (06/11/2026) N51: un ruso que no está en ruso o lleva palabras en letras latinas no se aprueba
-    var frenados = resultados.filter(function(r) { return r && r.ruso; }).length;
-    var errores = resultados.filter(function(r) { return !r || (!r.ok && !r.ruso); });
+    var frenados = resultados.filter(function(r) { return r && r.freno; }).length;
+    var errores = resultados.filter(function(r) { return !r || (!r.ok && !r.freno); });
     var aprobadas = pendientes.length - frenados - errores.length;
     if (errores.length > 0) {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error en ' + errores.length + ' traducción(es).'; msg.style.display = 'inline'; }
     } else if (frenados > 0) {
-      if (msg) { msg.style.color = '#c0392b'; msg.textContent = '✅ ' + aprobadas + ' traducción(es) aprobada(s). ⚠️ ' + frenados + ' en ruso NO aprobada(s): no están en ruso o llevan palabras en letras latinas. Ábrelas en su ficha (pestaña RU).'; msg.style.display = 'inline'; }
+      if (msg) { msg.style.color = '#c0392b'; msg.textContent = '✅ ' + aprobadas + ' traducción(es) aprobada(s). ⚠️ ' + frenados + ' NO aprobada(s): no están en ruso, tienen palabras con letras mezcladas o llevan palabras en letras latinas. Siguen en azul o en rojo: ábrelas en su ficha.'; msg.style.display = 'inline'; }
     } else {
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ ' + pendientes.length + ' traducción(es) aprobada(s).'; msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 4000); }
     }
@@ -5970,7 +5990,7 @@ function guardarComTrad(confirmarLatinas) {
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      if (d.ruso) { avisoRusoComTrad(d.ruso); return; } // (06/11/2026) N51
+      if (d.freno) { pintarFreno('modal-com-trad-aviso', d, function () { guardarComTrad(true); }); return; } // (07/11/2026) N51
       if (!d.ok) { document.getElementById('modal-com-trad-msg-err').style.display = 'inline'; return; }
       return fetch('/admin/plantillas-comunicacion/' + _comClienteClaveTrad + '/traducciones/' + _comClienteLangTrad, {
         method: 'PUT',
@@ -5980,7 +6000,7 @@ function guardarComTrad(confirmarLatinas) {
     })
     .then(function(r) { if (r) return r.json(); })
     .then(function(d) {
-      if (d && d.ruso) { avisoRusoComTrad(d.ruso); return; } // (06/11/2026) N51
+      if (d && d.freno) { pintarFreno('modal-com-trad-aviso', d, function () { guardarComTrad(true); }); _comClienteDatos = null; cargarComunicacionesCliente().then(pintarPestanasComTrad); return; } // (07/11/2026) N51
       if (d && d.ok) {
         document.getElementById('modal-com-trad-msg-ok').style.display = 'inline';
         _comClienteDatos = null;
@@ -6037,7 +6057,7 @@ function guardarTodoComTrad() {
       return fetch('/admin/plantillas-comunicacion/' + clave + '/traducciones/' + lang, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       }).then(function(r) { return r.json(); }).then(function(g) {
-        if (g.ruso) { avisoRusoComTrad(g.ruso); throw new Error('ruso'); } // (06/11/2026) N51: la pestaña abierta es el ruso
+        if (g.freno) { pintarFreno('modal-com-trad-aviso', g); throw new Error('ruso'); } // (07/11/2026) N51: la pestaña abierta no se puede guardar
         if (!g.ok) throw new Error('guardar');
         // Aprobar tal cual los idiomas que tienen traducción en este canal (y el abierto)
         var langs = lista.filter(function(t) {
@@ -6053,37 +6073,18 @@ function guardarTodoComTrad() {
       });
     })
     .then(function(res) {
-      var frenados = res.filter(function(x) { return x && x.ruso; }).length;
-      if (res.some(function(x) { return !x || (!x.ok && !x.ruso); })) throw new Error('aprobar');
+      var frenados = res.filter(function(x) { return x && x.freno; }).length;
+      if (res.some(function(x) { return !x || (!x.ok && !x.freno); })) throw new Error('aprobar');
       ok.style.display = 'inline';
       if (frenados) {
         document.getElementById('modal-com-trad-aviso').innerHTML =
           '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
-          '⚠️ <strong>El ruso no se ha aprobado.</strong> Ábrelo en su pestaña RU para revisarlo: no está en ruso o lleva palabras en letras latinas.</div>';
+          '⚠️ <strong>' + frenados + ' idioma(s) no se han aprobado.</strong> Ábrelos en su pestaña para revisarlos: no están en ruso, tienen palabras con letras mezcladas o llevan palabras en letras latinas.</div>';
       }
       _comClienteDatos = null;
       cargarComunicacionesCliente().then(pintarPestanasComTrad);
     })
     .catch(function(e) { if (!e || e.message !== 'ruso') err.style.display = 'inline'; });
-}
-
-// (06/11/2026) N51 — Recuadro rojo del ruso en la ficha de Email / WhatsApp (mismo formato que en Frases).
-function avisoRusoComTrad(rr) {
-  var caja = document.getElementById('modal-com-trad-aviso');
-  function esc(t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-  if (rr.sinRuso) {
-    caja.innerHTML =
-      '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
-      '⚠️ <strong>Este texto no está en ruso.</strong> No se ha guardado ni aprobado. Pulsa «🔄 Volver a traducir».' +
-      '</div>';
-  } else {
-    caja.innerHTML =
-      '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
-      '⚠️ <strong>Este texto ruso lleva palabras en letras latinas:</strong> ' + esc((rr.latinas || []).join(', ')) + '<br>' +
-      '¿Lo guardas así? Si no, pulsa «🔄 Volver a traducir».<br>' +
-      '<button class="boton-secundario" style="margin-top:8px;" onclick="guardarComTrad(true)">💾 Guardar así</button>' +
-      '</div>';
-  }
 }
 
 // (06/11/2026) N51 — «🔄 Volver a traducir»: la IA traduce otra vez esta plantilla solo en el idioma de la pestaña abierta
@@ -6101,7 +6102,7 @@ function retraducirComTrad() {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (clave !== _comClienteClaveTrad || tipo !== _comClienteTipoTrad || lang !== _comClienteLangTrad) return; // se cambió de pestaña
-      if (d.ok || d.ruso) {
+      if (d.ok) {
         // Se pone el texto nuevo en la ficha y en la vista previa
         var textarea = document.getElementById('modal-com-trad-texto');
         var refAsuntoTrad = document.getElementById('modal-com-trad-ref-asunto-trad');
@@ -6121,11 +6122,10 @@ function retraducirComTrad() {
         textarea.style.height = (textarea.scrollHeight + 20) + 'px';
       }
       if (d.ok) {
-        caja.innerHTML = '<div class="aviso-ok">🤖 Traducido de nuevo. Está en azul: revísalo y pulsa «💾 Guardar».</div>';
+        caja.innerHTML = '<div class="aviso-ok">🤖 Traducido de nuevo. Está en azul: revísalo y pulsa «💾 Guardar».</div>' +
+          (d.aviso ? '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">⚠️ ' + escFreno(d.aviso) + ' Revísalo antes de aprobarlo.</div>' : '');
         _comClienteDatos = null;
         cargarComunicacionesCliente().then(pintarPestanasComTrad);
-      } else if (d.ruso) {
-        avisoRusoComTrad(d.ruso);
       } else {
         caja.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">⚠️ ' +
           String(d.error || 'No se ha podido traducir.').replace(/</g, '&lt;') + '</div>';
@@ -6176,15 +6176,21 @@ function generarComunicacionesClienteIA(tipo, selId, msgId) {
       if (respuesta.errores && respuesta.errores.length > 0) {
         console.warn('[GEN15/16] Errores parciales:', respuesta.errores);
         // (06/11/2026) N51: plantillas que no han vuelto bien en ruso ni al segundo intento
-        var rusas = respuesta.errores.filter(function(e) { return e.ruso; });
+        var rusas = respuesta.errores.filter(function(e) { return e.frenada; });
         if (rusas.length) {
-          msg.textContent += ' ⚠️ El ruso de ' + rusas.length + ' plantilla(s) no se ha podido traducir y sigue en rojo: ' +
-            rusas.map(function(e) { return '«' + (e.nombre || e.clave) + '»'; }).join(' · ') + '. Ábrela y pulsa «🔄 Volver a traducir».';
+          msg.textContent += ' ⚠️ ' + rusas.length + ' plantilla(s) no se han podido traducir bien y siguen en rojo: ' +
+            rusas.map(function(e) { return '«' + (e.nombre || e.clave) + '» (' + e.error + ')'; }).join(' · ') + '. Ábrela y pulsa «🔄 Volver a traducir».';
           msg.style.color = '#c0392b';
         }
         if (respuesta.errores.length > rusas.length) {
           msg.textContent += ' (' + (respuesta.errores.length - rusas.length) + ' con error — ver consola)';
         }
+      }
+      // (07/11/2026) N51: guardadas en azul con palabras en letras latinas
+      if (respuesta.avisos && respuesta.avisos.length) {
+        msg.textContent += ' ⚠️ Guardadas en azul con palabras en letras latinas, revísalas: ' +
+          respuesta.avisos.map(function(e) { return '«' + (e.nombre || e.clave) + '»'; }).join(' · ') + '.';
+        msg.style.color = '#c0392b';
       }
     })
     .catch(function() {
@@ -6339,13 +6345,13 @@ function aprobarTodoComFrases() {
   });
   Promise.all(promesas).then(function(resultados) {
     // (06/11/2026) N51: un ruso que no está en ruso o lleva palabras en letras latinas no se aprueba
-    var frenados = resultados.filter(function(r) { return r && r.ruso; }).length;
-    var errores = resultados.filter(function(r) { return !r || (!r.ok && !r.ruso); });
+    var frenados = resultados.filter(function(r) { return r && r.freno; }).length;
+    var errores = resultados.filter(function(r) { return !r || (!r.ok && !r.freno); });
     var aprobadas = pendientes.length - frenados - errores.length;
     if (errores.length > 0) {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error en ' + errores.length + ' traducción(es).'; msg.style.display = 'inline'; }
     } else if (frenados > 0) {
-      if (msg) { msg.style.color = '#c0392b'; msg.textContent = '✅ ' + aprobadas + ' traducción(es) aprobada(s). ⚠️ ' + frenados + ' en ruso NO aprobada(s): no están en ruso o llevan palabras en letras latinas. Ábrelas en su ficha (pestaña RU).'; msg.style.display = 'inline'; }
+      if (msg) { msg.style.color = '#c0392b'; msg.textContent = '✅ ' + aprobadas + ' traducción(es) aprobada(s). ⚠️ ' + frenados + ' NO aprobada(s): no están en ruso, tienen palabras con letras mezcladas o llevan palabras en letras latinas. Siguen en azul o en rojo: ábrelas en su ficha.'; msg.style.display = 'inline'; }
     } else {
       if (msg) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✅ ' + pendientes.length + ' traducción(es) aprobada(s).'; msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 4000); }
     }
@@ -6413,7 +6419,7 @@ function guardarComFrase(confirmarLatinas) {
   })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      if (d.ruso) { avisoRusoComFrase(d.ruso); return; } // (06/11/2026) N51
+      if (d.freno) { pintarFreno('modal-com-frase-aviso', d, function () { guardarComFrase(true); }); return; } // (07/11/2026) N51
       if (!d.ok) { document.getElementById('modal-com-frase-msg-err').style.display = 'inline'; return; }
       return fetch('/admin/frases-comunicacion/' + clave + '/traducciones/' + lang, {
         method: 'PUT',
@@ -6423,7 +6429,7 @@ function guardarComFrase(confirmarLatinas) {
     })
     .then(function(r) { if (r) return r.json(); })
     .then(function(d) {
-      if (d && d.ruso) { avisoRusoComFrase(d.ruso); return; } // (06/11/2026) N51
+      if (d && d.freno) { pintarFreno('modal-com-frase-aviso', d, function () { guardarComFrase(true); }); _comFrasesDatos = null; cargarComFrases().then(pintarPestanasComFrase); return; } // (07/11/2026) N51
       if (d && d.ok) {
         document.getElementById('modal-com-frase-msg-ok').style.display = 'inline';
         _comFrasesDatos = null;
@@ -6466,7 +6472,7 @@ function guardarTodoComFrase() {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto: texto, generado_por_ia: false })
   }).then(function(r) { return r.json(); }).then(function(g) {
-    if (g.ruso) { avisoRusoComFrase(g.ruso); throw new Error('ruso'); } // (06/11/2026) N51: la pestaña abierta es el ruso
+    if (g.freno) { pintarFreno('modal-com-frase-aviso', g); throw new Error('ruso'); } // (07/11/2026) N51: la pestaña abierta no se puede guardar
     if (!g.ok) throw new Error('guardar');
     return fetch('/admin/frases-comunicacion/' + clave + '/traducciones').then(function(r) { return r.json(); });
   }).then(function(d) {
@@ -6478,37 +6484,17 @@ function guardarTodoComFrase() {
       }).then(function(r) { return r.json(); });
     }));
   }).then(function(res) {
-    var frenados = res.filter(function(x) { return x && x.ruso; }).length;
-    if (res.some(function(x) { return !x || (!x.ok && !x.ruso); })) throw new Error('aprobar');
+    var frenados = res.filter(function(x) { return x && x.freno; }).length;
+    if (res.some(function(x) { return !x || (!x.ok && !x.freno); })) throw new Error('aprobar');
     ok.style.display = 'inline';
     if (frenados) {
       document.getElementById('modal-com-frase-aviso').innerHTML =
         '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
-        '⚠️ <strong>El ruso no se ha aprobado.</strong> Ábrelo en su pestaña RU para revisarlo: no está en ruso o lleva palabras en letras latinas.</div>';
+        '⚠️ <strong>' + frenados + ' idioma(s) no se han aprobado.</strong> Ábrelos en su pestaña para revisarlos: no están en ruso, tienen palabras con letras mezcladas o llevan palabras en letras latinas.</div>';
     }
     _comFrasesDatos = null;
     cargarComFrases().then(pintarPestanasComFrase);
   }).catch(function(e) { if (!e || e.message !== 'ruso') err.style.display = 'inline'; });
-}
-
-// (06/11/2026) N51 — Recuadro rojo del ruso en la ficha de una frase (mismo formato que «¿Este cambio afecta a las traducciones?»).
-// Sin letras rusas: no se guarda (se rehace con «🔄 Volver a traducir»). Con palabras en letras latinas: «💾 Guardar así» o «🔄 Volver a traducir».
-function avisoRusoComFrase(rr) {
-  var caja = document.getElementById('modal-com-frase-aviso');
-  function esc(t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-  if (rr.sinRuso) {
-    caja.innerHTML =
-      '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
-      '⚠️ <strong>Este texto no está en ruso.</strong> No se ha guardado ni aprobado. Pulsa «🔄 Volver a traducir».' +
-      '</div>';
-  } else {
-    caja.innerHTML =
-      '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
-      '⚠️ <strong>Este texto ruso lleva palabras en letras latinas:</strong> ' + esc((rr.latinas || []).join(', ')) + '<br>' +
-      '¿Lo guardas así? Si no, pulsa «🔄 Volver a traducir».<br>' +
-      '<button class="boton-secundario" style="margin-top:8px;" onclick="guardarComFrase(true)">💾 Guardar así</button>' +
-      '</div>';
-  }
 }
 
 // (06/11/2026) N51 — «🔄 Volver a traducir»: la IA traduce otra vez esta frase solo en el idioma de la pestaña abierta,
@@ -6529,14 +6515,10 @@ function retraducirComFrase() {
         textarea.value = d.texto;
         textarea.style.height = 'auto';
         textarea.style.height = (textarea.scrollHeight + 20) + 'px';
-        caja.innerHTML = '<div class="aviso-ok">🤖 Traducido de nuevo. Está en azul: revísalo y pulsa «💾 Guardar».</div>';
+        caja.innerHTML = '<div class="aviso-ok">🤖 Traducido de nuevo. Está en azul: revísalo y pulsa «💾 Guardar».</div>' +
+          (d.aviso ? '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">⚠️ ' + escFreno(d.aviso) + ' Revísalo antes de aprobarlo.</div>' : '');
         _comFrasesDatos = null;
         cargarComFrases().then(pintarPestanasComFrase);
-      } else if (d.ruso) {
-        textarea.value = d.texto;
-        textarea.style.height = 'auto';
-        textarea.style.height = (textarea.scrollHeight + 20) + 'px';
-        avisoRusoComFrase(d.ruso);
       } else {
         caja.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">⚠️ ' +
           String(d.error || 'No se ha podido traducir.').replace(/</g, '&lt;') + '</div>';
@@ -6666,16 +6648,23 @@ function generarComFrasesIA() {
       }
       if (nErr > 0) {
         console.warn('[GEN17] Frases no guardadas:', respuesta.errores);
-        var rusas = respuesta.errores.filter(function(e) { return e.ruso; });
+        var rusas = respuesta.errores.filter(function(e) { return e.frenada; });
         if (rusas.length) {
-          // (06/11/2026) N51: frases que no han vuelto bien en ruso ni al segundo intento
-          msg.textContent += (msg.textContent ? ' ' : '') + '⚠️ El ruso de ' + rusas.length + ' frase(s) no se ha podido traducir y sigue en rojo: ' +
-            rusas.map(function(e) { return '«' + (e.texto_es || e.clave) + '»'; }).join(' · ') + '. Ábrela y pulsa «🔄 Volver a traducir».';
+          // (07/11/2026) N51: frases que no han vuelto bien ni al segundo intento
+          msg.textContent += (msg.textContent ? ' ' : '') + '⚠️ ' + rusas.length + ' frase(s) no se han podido traducir bien y siguen en rojo: ' +
+            rusas.map(function(e) { return '«' + (e.texto_es || e.clave) + '» (' + e.error + ')'; }).join(' · ') + '. Ábrela y pulsa «🔄 Volver a traducir».';
         }
         if (nErr > rusas.length) {
           msg.textContent += (msg.textContent ? ' ' : '') + '⚠️ ' + (nErr - rusas.length) + ' frase(s) no se han guardado (sin traducir o con variables alteradas) — vuelve a pulsar Generar.';
         }
         if (respuesta.generadas === 0) msg.style.color = '#b45309';
+        if (rusas.length) msg.style.color = '#c0392b';
+      }
+      // (07/11/2026) N51: guardadas en azul con palabras en letras latinas
+      if (respuesta.avisos && respuesta.avisos.length) {
+        msg.textContent += (msg.textContent ? ' ' : '') + '⚠️ Guardadas en azul con palabras en letras latinas, revísalas: ' +
+          respuesta.avisos.map(function(e) { return '«' + (e.texto_es || e.clave) + '»'; }).join(' · ') + '.';
+        msg.style.color = '#c0392b';
       }
     })
     .catch(function() {
@@ -6793,7 +6782,15 @@ function recargarTextosYEditor(textoId) {
 function aprobarTodasTexto(textoId) {
   fetch('/admin/textos/' + textoId + '/aprobar-todas', { method: 'POST' })
     .then(function (r) { return r.json(); })
-    .then(function () { recargarTextosYEditor(textoId); });
+    .then(function (respuesta) {
+      recargarTextosYEditor(textoId);
+      // (07/11/2026) N51: lo que no se ha aprobado se dice (tras recargar la ficha)
+      var frenadas = textoFrenoLote(respuesta, 'No aprobado');
+      if (frenadas) setTimeout(function () {
+        var msg = document.getElementById('texto-mensaje-editor');
+        if (msg) msg.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' + escapar(frenadas) + '</div>';
+      }, 600);
+    });
 }
 
 // (29/10/2026) Igual que la ficha de Página de flota: tras guardar, la tabla y las pestañas de la ficha abierta
@@ -6833,21 +6830,26 @@ function guardarTodoTexto(textoId, lang) {
   fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ texto: valor })
+    body: JSON.stringify({ texto: valor, guardar_en_azul: true }) // (07/11/2026) N51: con palabras latinas, en 🔵
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    if (respuesta.freno) { pintarFreno(msg, respuesta); throw new Error('freno'); } // (07/11/2026) N51
     if (!respuesta.ok) throw new Error(respuesta.error || 'Error al guardar');
     return fetch('/admin/textos/' + textoId + '/aprobar-todas', { method: 'POST' }).then(function (r) { return r.json(); });
   }).then(function (respuesta) {
     if (!respuesta.ok) throw new Error(respuesta.error || 'Error al guardar');
-    msg.innerHTML = '<div class="aviso-ok">✅ Guardado correctamente</div>';
+    var frenadas = textoFrenoLote(respuesta, 'No aprobado'); // (07/11/2026) N51
+    msg.innerHTML = frenadas
+      ? '<div class="aviso-ok">✅ Guardado.</div><div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">' + escapar(frenadas) + '</div>'
+      : '<div class="aviso-ok">✅ Guardado correctamente</div>';
     refrescarTextosYPestanas(textoId, lang);
-    setTimeout(function () { msg.innerHTML = ''; }, 2000);
+    if (!frenadas) setTimeout(function () { msg.innerHTML = ''; }, 2000);
   }).catch(function (e) {
+    if (e && e.message === 'freno') return;
     msg.innerHTML = '<div class="aviso-error">' + escapar(e.message || 'Error al guardar') + '</div>';
   });
 }
 
-function guardarTraduccionTexto(textoId, lang) {
+function guardarTraduccionTexto(textoId, lang, confirmarLatinas) {
   var valor = document.getElementById('texto-traduccion').value;
   var msg = document.getElementById('texto-mensaje-editor');
   var _textoAntes = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
@@ -6859,8 +6861,10 @@ function guardarTraduccionTexto(textoId, lang) {
   fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ texto: valor })
+    body: JSON.stringify({ texto: valor, confirmar_latinas: confirmarLatinas === true })
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
+    // (07/11/2026) N51 — Freno de las traducciones
+    if (respuesta.freno) { pintarFreno(msg, respuesta, function () { guardarTraduccionTexto(textoId, lang, true); }); return; }
     if (respuesta.ok && _esCambiado && _tieneTraducciones) {
       // (07/10/2026) El español ha cambiado: ¿afecta a las traducciones?
       msg.innerHTML = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;">' +
@@ -6872,7 +6876,8 @@ function guardarTraduccionTexto(textoId, lang) {
     } else if (respuesta.ok) {
       msg.innerHTML = '<div class="aviso-ok">✅ Guardado</div>';
       refrescarTextosYPestanas(textoId, lang);
-      setTimeout(function () { msg.innerHTML = ''; }, 2000);
+      var esteMsg = msg.innerHTML; // (07/11/2026) solo se borra su propio mensaje, no un aviso que haya salido después
+      setTimeout(function () { if (msg.innerHTML === esteMsg) msg.innerHTML = ''; }, 2000);
     } else {
       msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al guardar') + '</div>';
     }
@@ -6892,7 +6897,10 @@ function importarTextosInterfaz() {
       if (respuesta.ok) {
         var textoErrores = respuesta.errores && respuesta.errores.length
           ? ' (' + respuesta.errores.length + ' errores)' : '';
-        msg.innerHTML = '<div class="aviso-ok">✅ Importado: ' + respuesta.actualizadas + ' traducciones actualizadas' + textoErrores + '</div>';
+        msg.innerHTML = '<div class="aviso-ok">✅ Importado: ' + respuesta.actualizadas + ' traducciones actualizadas' + textoErrores + '</div>' +
+          // (07/11/2026) N51: se enseña qué no se ha importado o ha quedado en azul
+          (respuesta.errores && respuesta.errores.length ? '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">⚠️ ' +
+            respuesta.errores.slice(0, 10).map(escapar).join('<br>') + (respuesta.errores.length > 10 ? '<br>… y ' + (respuesta.errores.length - 10) + ' más.' : '') + '</div>' : '');
         cargarTextosInterfaz();
       } else {
         msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error en la importación') + '</div>';
@@ -7095,12 +7103,15 @@ function traducirConIA() {
         msg.innerHTML = '<div class="aviso-error">' + escapar(respuesta.error || 'Error al traducir') + '</div>';
         return;
       }
+      // (07/11/2026) N51: lo que no se ha guardado y lo guardado en azul con palabras en letras latinas
+      var frenoTxt = textoFrenoLote(respuesta, 'No se ha guardado (sigue en rojo)');
+      var frenoHtml = frenoTxt ? '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">' + escapar(frenoTxt) + '</div>' : '';
       if (respuesta.propuestas.length === 0) {
-        msg.innerHTML = '<div class="aviso-ok">✅ Ya estaba todo traducido en ' + lang.toUpperCase() + '.</div>';
+        msg.innerHTML = frenoHtml || '<div class="aviso-ok">✅ Ya estaba todo traducido en ' + lang.toUpperCase() + '.</div>';
         return;
       }
       // (30/10/2026) Forma A: sin ventana de revisión. Lo generado queda en 🔵; se revisa en cada texto o con «✅ Aprobar todo»
-      msg.innerHTML = '<div class="aviso-ok">🤖 La IA tradujo ' + respuesta.propuestas.length + ' texto(s) en ' + lang.toUpperCase() + '. Están en azul: revísalos en cada texto o pulsa «✅ Aprobar todo».</div>';
+      msg.innerHTML = '<div class="aviso-ok">🤖 La IA tradujo ' + respuesta.propuestas.length + ' texto(s) en ' + lang.toUpperCase() + '. Están en azul: revísalos en cada texto o pulsa «✅ Aprobar todo».</div>' + frenoHtml;
       // (28/10/2026) Lo generado ya está guardado en 🔵: se refresca la tabla (sin tocar el selector de idioma)
       fetch('/admin/textos').then(function (r) { return r.json(); }).then(function (datos) {
         textosCache = datos;
@@ -7175,6 +7186,64 @@ function celdaTextoInterfaz(t, lang) {
   return '<td style="text-align:center"><span style="color:#c0392b;" title="Sin traducir">·</span></td>';
 }
 
+// ─── (07/11/2026) N51 — FRENO DE LAS TRADUCCIONES: avisos comunes de todas las pantallas de traducción ───
+// El servidor no guarda ni aprueba: un ruso sin letras rusas, una palabra con letras rusas y latinas mezcladas
+// (en cualquier idioma) ni — sin confirmarlo — un ruso con palabras en letras latinas. Aquí se enseña el aviso.
+var _frenoGuardarAsi = null;
+function escFreno(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+// Recuadro rojo (mismo formato que «¿Este cambio afecta a las traducciones?»). Si el único problema son palabras
+// en letras latinas y hay alGuardarAsi, sale «💾 Guardar así»: solo así pasa a 🟢.
+function htmlFreno(d, alGuardarAsi) {
+  var f = (d && d.freno) || {};
+  var caja = '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:10px;">';
+  if (f.sinRuso) {
+    return caja + '⚠️ <strong>Este texto no está escrito en ruso.</strong> No se ha guardado ni aprobado. Corrígelo a mano o vuelve a traducirlo con la IA.</div>';
+  }
+  if (f.mezcladas && f.mezcladas.length) {
+    return caja + '⚠️ <strong>Hay palabras con letras rusas y latinas mezcladas:</strong> ' + escFreno(f.mezcladas.join(', ')) +
+      '<br>No se ha guardado ni aprobado. Corrígelas a mano o vuelve a traducirlo con la IA.</div>';
+  }
+  if (f.latinas && f.latinas.length) {
+    _frenoGuardarAsi = alGuardarAsi || null;
+    return caja + '⚠️ <strong>Este texto ruso lleva palabras en letras latinas:</strong> ' + escFreno(f.latinas.join(', ')) +
+      '<br>' + (alGuardarAsi ? '¿Lo guardas así? Si no, corrígelo.<br><button class="boton-secundario" style="margin-top:8px;" onclick="frenoGuardarAsi()">💾 Guardar así</button>'
+                            : 'No se ha aprobado: revísalo.') + '</div>';
+  }
+  return caja + '⚠️ ' + escFreno(d && d.error || 'No se ha guardado.') + '</div>';
+}
+// «✅ Guardado correctamente» y, si algo no se ha aprobado por el freno, el recuadro rojo con cuáles (no se borra solo)
+function avisoGuardadoConFreno(respuesta) {
+  var frenadas = textoFrenoLote(respuesta, 'No aprobado');
+  return frenadas
+    ? '<div class="aviso-ok">✅ Guardado.</div><div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">' + escFreno(frenadas) + '</div>'
+    : '<div class="aviso-ok">✅ Guardado correctamente</div>';
+}
+// Foto nueva: la ventana de subida se cierra al subir, así que lo que el freno no ha guardado se dice en un aviso del navegador
+function avisoFrenoFotoNueva(d) {
+  var txt = textoFrenoLote(d, 'Foto subida, pero este texto no se ha guardado', 'Foto subida; este texto queda en azul, revísalo');
+  if (txt) alert(txt);
+}
+function frenoGuardarAsi() { var f = _frenoGuardarAsi; _frenoGuardarAsi = null; if (f) f(); }
+// Pinta el recuadro en una caja (id o elemento)
+function pintarFreno(caja, d, alGuardarAsi) {
+  var el = typeof caja === 'string' ? document.getElementById(caja) : caja;
+  if (el) el.innerHTML = htmlFreno(d, alGuardarAsi);
+}
+// Una línea con lo que no se ha aprobado o guardado («frenadas») y lo guardado en 🔵 con palabras latinas («avisos»).
+// Hasta 5 con su nombre; si hay más, «y N más».
+function textoListaFreno(titulo, lista) {
+  if (!lista || !lista.length) return '';
+  var partes = lista.slice(0, 5).map(function (f) {
+    var codigo = String(f.lang || '').toUpperCase();
+    return '«' + f.donde + '»' + (codigo && String(f.donde).indexOf(codigo) < 0 ? ' (' + codigo + ')' : '') + ': ' + f.motivo;
+  });
+  return '⚠️ ' + titulo + ' (' + lista.length + '): ' + partes.join(' · ') + (lista.length > 5 ? ' · y ' + (lista.length - 5) + ' más.' : '');
+}
+function textoFrenoLote(d, tituloFrenadas, tituloAvisos) {
+  return [textoListaFreno(tituloFrenadas, d && d.frenadas), textoListaFreno(tituloAvisos || 'Guardado en azul, revísalo', d && d.avisos)]
+    .filter(Boolean).join(' ');
+}
+
 // (30/10/2026) «✅ Aprobar todo» — mismo botón y mismo funcionamiento que en Email, WhatsApp y Frases:
 // aprueba (🟢) todo lo que está en 🔵 en todos los idiomas; los 🔴 no se tocan.
 function aprobarTodoAzules(url, msgId, alTerminar) {
@@ -7188,9 +7257,11 @@ function aprobarTodoAzules(url, msgId, alTerminar) {
         return;
       }
       if (msg) {
-        msg.style.color = 'var(--verde-ok)';
-        msg.textContent = respuesta.aprobadas > 0 ? '✅ ' + respuesta.aprobadas + ' traducción(es) aprobada(s).' : '✅ Todo ya estaba aprobado.';
-        setTimeout(function () { msg.style.display = 'none'; }, 4000);
+        var frenadas = textoFrenoLote(respuesta, 'No aprobado'); // (07/11/2026) N51
+        msg.style.color = frenadas ? '#c0392b' : 'var(--verde-ok)';
+        msg.textContent = (respuesta.aprobadas > 0 ? '✅ ' + respuesta.aprobadas + ' traducción(es) aprobada(s).' : (frenadas ? '' : '✅ Todo ya estaba aprobado.')) +
+          (frenadas ? ' ' + frenadas : '');
+        if (!frenadas) setTimeout(function () { msg.style.display = 'none'; }, 4000);
       }
       if (alTerminar) alTerminar();
     })
@@ -7242,7 +7313,11 @@ function generarCategoriasConIA() {
         return;
       }
       // (30/10/2026) Forma A: sin ventana de revisión. Lo generado queda en 🔵; se revisa en la ficha de cada categoría o con «✅ Aprobar todo»
-      msg.innerHTML = '<div class="aviso-ok">🤖 La IA generó ' + respuesta.propuestas.length + ' categoría(s) en ' + lang.toUpperCase() + '. Están en azul: revísalas en «✏️ Editar» o pulsa «✅ Aprobar todo».</div>';
+      // (07/11/2026) N51: lo que no se ha guardado y lo guardado en azul con palabras en letras latinas
+      var frenoTxtCat = textoFrenoLote(respuesta, 'No se ha guardado (sigue en rojo)');
+      var nGuardadas = respuesta.propuestas.length - ((respuesta.frenadas || []).length);
+      msg.innerHTML = (nGuardadas > 0 ? '<div class="aviso-ok">🤖 La IA generó ' + nGuardadas + ' categoría(s) en ' + lang.toUpperCase() + '. Están en azul: revísalas en «✏️ Editar» o pulsa «✅ Aprobar todo».</div>' : '') +
+        (frenoTxtCat ? '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">' + escapar(frenoTxtCat) + '</div>' : '');
       cargarTablaCategoriasIA(); // (28/10/2026) lo generado ya está guardado en 🔵
     })
     .catch(function () {
@@ -8908,21 +8983,31 @@ function renderizarTablaTraduccionesDestinos(destinos, propuestasIA) {
   }).join('');
 }
 
-function guardarTraduccionDestino(id) {
+function guardarTraduccionDestino(id, confirmarLatinas) {
   var lang = document.getElementById('select-lang-destinos').value;
   var inp = document.getElementById('trad-dest-' + id);
   var nombre = inp ? inp.value.trim() : '';
   fetch('/admin/destinos/' + id + '/traduccion/' + lang, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nombre: nombre })
-  }).then(function(r) { return r.json(); }).then(function() {
+    body: JSON.stringify({ nombre: nombre, confirmar_latinas: confirmarLatinas === true })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    // (07/11/2026) N51 — Freno de las traducciones: el aviso, encima de la tabla, con el nombre del destino
+    if (d && d.freno) {
+      var avF = document.getElementById('aviso-traducciones-destinos');
+      var fila = document.getElementById('fila-dest-' + id);
+      avF.style.display = 'block';
+      avF.innerHTML = '<div style="font-size:13px;font-weight:600;margin-top:4px;">' + escFreno(fila ? fila.cells[0].textContent : '') + '</div>' +
+        htmlFreno(d, function () { guardarTraduccionDestino(id, true); });
+      return;
+    }
     var badge = document.getElementById('badge-dest-' + id);
     if (badge) badge.innerHTML = marcaTraduccionDestino(nombre ? 'ok' : null); // (29/10/2026) guardar = 🟢
     var av = document.getElementById('aviso-traducciones-destinos');
     av.style.display = 'block';
     av.innerHTML = '<div class="aviso-ok">✔ Guardado.</div>';
-    setTimeout(function() { av.style.display = 'none'; }, 2000);
+    var esteAv = av.innerHTML; // (07/11/2026) solo se esconde su propio mensaje, no un aviso que haya salido después
+    setTimeout(function() { if (av.innerHTML === esteAv) av.style.display = 'none'; }, 2000);
   });
 }
 
@@ -8932,20 +9017,23 @@ function guardarTodasTraduccionesDestinos() {
   var inputs = document.querySelectorAll('#cuerpo-traducciones-destinos input[type="text"]');
   var propuestas = [];
   inputs.forEach(function(inp) {
-    if (inp.dataset.id) propuestas.push({ id: Number(inp.dataset.id), nombre: inp.value.trim() });
+    var fila = document.getElementById('fila-dest-' + inp.dataset.id);
+    if (inp.dataset.id) propuestas.push({ id: Number(inp.dataset.id), nombre: inp.value.trim(), nombre_es: fila ? fila.cells[0].textContent : '' });
   });
   if (!propuestas.length) return;
   fetch('/admin/destinos/traducciones/guardar-lote', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ lang: lang, propuestas: propuestas })
-  }).then(function(r) { return r.json(); }).then(function() {
+  }).then(function(r) { return r.json(); }).then(function(d) {
     // (29/10/2026) Se vuelve a cargar la tabla: lo guardado pasa a 🟢
     cargarTraduccionesDestinos();
     var av = document.getElementById('aviso-traducciones-destinos');
     av.style.display = 'block';
-    av.innerHTML = '<div class="aviso-ok">✔ Todas las traducciones guardadas.</div>';
-    setTimeout(function() { av.style.display = 'none'; }, 3000);
+    // (07/11/2026) N51: lo que no se ha guardado o se ha quedado en azul, con su nombre (no se borra solo)
+    var frenadas = textoFrenoLote(d, 'No aprobado');
+    av.innerHTML = frenadas ? avisoGuardadoConFreno(d) : '<div class="aviso-ok">✔ Todas las traducciones guardadas.</div>';
+    if (!frenadas) setTimeout(function() { av.style.display = 'none'; }, 3000);
   });
 }
 
@@ -8962,14 +9050,17 @@ function traducirDestinosIA() {
         av.innerHTML = '<div class="aviso-error">Error: ' + data.error + '</div>';
         return;
       }
+      // (07/11/2026) N51: lo que no se ha guardado y lo guardado en azul con palabras en letras latinas
+      var frenoTxtD = textoFrenoLote(data, 'No se ha guardado (sigue en rojo)');
+      var frenoHtmlD = frenoTxtD ? '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">' + escFreno(frenoTxtD) + '</div>' : '';
       if (!data.propuestas || data.propuestas.length === 0) {
-        av.innerHTML = '<div class="aviso-ok">✔ Todos los destinos ya tienen traducción.</div>';
-        setTimeout(function() { av.style.display = 'none'; }, 3000);
+        av.innerHTML = frenoHtmlD || '<div class="aviso-ok">✔ Todos los destinos ya tienen traducción.</div>';
+        if (!frenoHtmlD) setTimeout(function() { av.style.display = 'none'; }, 3000);
         return;
       }
       // (29/10/2026) Lo generado ya está guardado en 🔵: se vuelve a cargar la tabla; se revisa en cada fila y se guarda (🟢)
       cargarTraduccionesDestinos();
-      av.innerHTML = '<div class="aviso-ok">🤖 La IA tradujo ' + data.propuestas.length + ' nombre(s). Están en azul: revísalos y pulsa «💾 Guardar» en cada uno o «💾 Guardar todo».</div>';
+      av.innerHTML = '<div class="aviso-ok">🤖 La IA tradujo ' + data.propuestas.length + ' nombre(s). Están en azul: revísalos y pulsa «💾 Guardar» en cada uno o «💾 Guardar todo».</div>' + frenoHtmlD;
     })
     .catch(function() {
       av.innerHTML = '<div class="aviso-error">Error de conexión con la IA.</div>';
@@ -9065,8 +9156,9 @@ function noAfectaDestino(id) {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (!d.ok) throw new Error('aprobar');
-      caja.innerHTML = '<div class="aviso-ok">✅ Traducciones mantenidas</div>';
-      setTimeout(function() { caja.innerHTML = ''; }, 2500);
+      var frenadas = textoFrenoLote(d, 'No aprobado'); // (07/11/2026) N51
+      caja.innerHTML = frenadas ? avisoGuardadoConFreno(d) : '<div class="aviso-ok">✅ Traducciones mantenidas</div>';
+      if (!frenadas) setTimeout(function() { caja.innerHTML = ''; }, 2500);
       cargarTraduccionesDestinos();
     })
     .catch(function() { caja.innerHTML = '<div class="aviso-error">Error al guardar. Inténtalo de nuevo.</div>'; });
@@ -12534,14 +12626,16 @@ function sugerirAltFotoIA(destinoId, fotoId, lang) {
     });
 }
 
-function guardarAltFoto(destinoId, fotoId, lang, despues) {
+function guardarAltFoto(destinoId, fotoId, lang, despues, confirmarLatinas) {
   var input = document.getElementById('alt-foto-input-' + fotoId);
   var altTexto = input ? input.value.trim() : '';
   var msg = document.getElementById('alt-foto-msg-' + fotoId);
   return fetch('/admin/seo/destinos/' + destinoId + '/fotos/' + fotoId + '/alt/' + lang, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ alt_texto: altTexto })
+    // (07/11/2026) N51: con «💾 Guardar todo» (despues), un ruso con palabras latinas se guarda en 🔵
+    body: JSON.stringify({ alt_texto: altTexto, confirmar_latinas: confirmarLatinas === true, guardar_en_azul: !!despues })
   }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.freno) { pintarFreno(msg, d, despues ? null : function () { guardarAltFoto(destinoId, fotoId, lang, null, true); }); return; } // (07/11/2026) N51
     if (!d.ok) {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
       return;
@@ -12580,7 +12674,8 @@ function aprobarTodasAltFoto(destinoId, fotoId) {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (msg) {
-        if (d.ok) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado y aprobado'; }
+        if (d.ok && textoFrenoLote(d, 'No aprobado')) msg.innerHTML = avisoGuardadoConFreno(d); // (07/11/2026) N51
+        else if (d.ok) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado y aprobado'; }
         else { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al aprobar.'; }
       }
       recargarAltTextosFoto(destinoId, fotoId);
@@ -12610,6 +12705,9 @@ function generarFaltaAltFotoBtn(boton) {
         msg.textContent = d.generadas > 0
           ? '✅ ' + d.generadas + ' idioma(s) generado(s). Están en azul: revísalos y pulsa «💾 Guardar» o «💾 Guardar todo».'
           : '✅ Ya estaba todo escrito.';
+        // (07/11/2026) N51: lo que no se ha guardado y lo guardado en azul con palabras en letras latinas
+        var frenoTxtAlt = textoFrenoLote(d, 'No se ha guardado (sigue en rojo)');
+        if (frenoTxtAlt) { msg.style.color = '#c0392b'; msg.textContent = (d.generadas > 0 ? msg.textContent + ' ' : '') + frenoTxtAlt; }
       }
       recargarAltTextosFoto(destinoId, fotoId);
     })
@@ -12647,15 +12745,17 @@ function recargarAltGen(tipo, padreId, fotoId) {
       c.recargarLista(padreId);
     });
 }
-function guardarAltGen(tipo, padreId, fotoId, lang, despues) {
+function guardarAltGen(tipo, padreId, fotoId, lang, despues, confirmarLatinas) {
   var c = ALT_GEN[tipo];
   var input = document.getElementById(c.pre + 'input-' + fotoId);
   var altTexto = input ? input.value.trim() : '';
   var msg = document.getElementById(c.pre + 'msg-' + fotoId);
   return fetch(c.base(padreId) + '/fotos/' + fotoId + '/alt/' + lang, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ alt_texto: altTexto })
+    // (07/11/2026) N51: con «💾 Guardar todo» (despues), un ruso con palabras latinas se guarda en 🔵
+    body: JSON.stringify({ alt_texto: altTexto, confirmar_latinas: confirmarLatinas === true, guardar_en_azul: !!despues })
   }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.freno) { pintarFreno(msg, d, despues ? null : function () { guardarAltGen(tipo, padreId, fotoId, lang, null, true); }); return; } // (07/11/2026) N51
     if (!d.ok) {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
       return;
@@ -12685,7 +12785,8 @@ function aprobarTodasAltGen(tipo, padreId, fotoId) {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (msg) {
-        if (d.ok) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado y aprobado'; }
+        if (d.ok && textoFrenoLote(d, 'No aprobado')) msg.innerHTML = avisoGuardadoConFreno(d); // (07/11/2026) N51
+        else if (d.ok) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado y aprobado'; }
         else { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al aprobar.'; }
       }
       recargarAltGen(tipo, padreId, fotoId);
@@ -12713,6 +12814,9 @@ function generarFaltaAltGenBtn(boton) {
         msg.textContent = d.generadas > 0
           ? '✅ ' + d.generadas + ' idioma(s) generado(s). Están en azul: revísalos y pulsa «💾 Guardar» o «💾 Guardar todo».'
           : '✅ Ya estaba todo escrito.';
+        // (07/11/2026) N51: lo que no se ha guardado y lo guardado en azul con palabras en letras latinas
+        var frenoTxtAlt = textoFrenoLote(d, 'No se ha guardado (sigue en rojo)');
+        if (frenoTxtAlt) { msg.style.color = '#c0392b'; msg.textContent = (d.generadas > 0 ? msg.textContent + ' ' : '') + frenoTxtAlt; }
       }
       recargarAltGen(tipo, padreId, fotoId);
     })
@@ -12787,6 +12891,7 @@ function confirmarSubidaFoto(destinoId) {
       }
       cancelarNuevaFoto(destinoId);
       cargarFotosDestino(destinoId);
+      avisoFrenoFotoNueva(d); // (07/11/2026) N51
     }
     else { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; } }
   }).catch(function() {
@@ -12995,7 +13100,7 @@ function contarCharsResena() {
   cnt.style.color = n > 200 ? 'var(--rojo-error)' : 'var(--texto-muted)';
 }
 
-function guardarDestinoSEO(destinoId, lang) {
+function guardarDestinoSEO(destinoId, lang, confirmarLatinas) {
   var slugInput = document.getElementById('dest-slug');
   var slugVal = slugInput ? slugInput.value.trim() : '';
   var errorSlug = validarSlug(slugVal);
@@ -13014,9 +13119,11 @@ function guardarDestinoSEO(destinoId, lang) {
     texto_descripcion: (document.getElementById('dest-texto') || {}).value || '',
     isla: 'Gran Canaria'
   };
+  datos.confirmar_latinas = confirmarLatinas === true; // (07/11/2026) N51
   fetch('/admin/seo/destinos/' + destinoId + '/idioma/' + lang, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos)
   }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.freno) { if (msg) pintarFreno(msg, d, function () { guardarDestinoSEO(destinoId, lang, true); }); return; } // (07/11/2026) N51: el aviso no se borra solo
     if (!d.ok) {
       if (msg) { msg.innerHTML = '<div class="aviso-error">' + escapar(d.error || 'Error') + '</div>'; setTimeout(function() { msg.innerHTML = ''; }, 4000); }
       return;
@@ -13255,6 +13362,7 @@ function confirmarSubidaFotoRuta(rutaId) {
       }
       cancelarNuevaFotoRuta(rutaId);
       cargarFotosRuta(rutaId);
+      avisoFrenoFotoNueva(d); // (07/11/2026) N51
     }
     else { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; } }
   }).catch(function() {
@@ -14060,7 +14168,7 @@ function confirmarSubidaFotoCat(catId) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ imagen: imagen, alt_texto: alt, nombre_archivo: nombre })
   }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.ok) { cancelarNuevaFotoCat(catId); cargarFotosCat(catId); }
+    if (d.ok) { cancelarNuevaFotoCat(catId); cargarFotosCat(catId); avisoFrenoFotoNueva(d); } // (07/11/2026) N51
     else { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; } }
   }).catch(function() {
     if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error de conexión.'; }
@@ -14434,7 +14542,7 @@ function copiarEnlaceCat(boton) {
   }).catch(function() { prompt('Copia el enlace manualmente:', url); });
 }
 
-function guardarSEOCat(catId, lang) {
+function guardarSEOCat(catId, lang, confirmarLatinas) {
   var slugInput = document.getElementById('seo-cat-slug');
   var slugVal   = slugInput ? slugInput.value.trim() : '';
   var msg       = document.getElementById('seo-cat-mensaje-editor');
@@ -14456,11 +14564,13 @@ function guardarSEOCat(catId, lang) {
     resena_breve:      (document.getElementById('seo-cat-resena') || {}).value || '',
     texto_descripcion: (document.getElementById('seo-cat-texto') || {}).value || ''
   };
+  datos.confirmar_latinas = confirmarLatinas === true; // (07/11/2026) N51
   fetch('/admin/seo/categorias/' + catId + '/idioma/' + lang, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(datos)
   }).then(function(r) { return r.json(); }).then(function(respuesta) {
+    if (respuesta.freno) { pintarFreno(msg, respuesta, function () { guardarSEOCat(catId, lang, true); }); return; } // (07/11/2026) N51
     if (respuesta.ok) {
       var pxTitulo = medirPx(datos.meta_title, '20px arial');
       var pxDesc   = medirPx(datos.meta_description, '13px arial');
