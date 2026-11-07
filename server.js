@@ -4992,6 +4992,10 @@ app.post('/admin/islas/:id/editar', requireAdmin, asyncHandler(async (req, res) 
 app.post('/admin/islas/:id/traducciones/aprobar', requireAdmin, asyncHandler(async (req, res) => {
   const { lang } = req.body;
   if (!lang) return res.status(400).json({ error: 'Falta lang.' });
+  // (07/11/2026) N51 — Freno de las traducciones (sobre el nombre guardado)
+  const actualIsla = await pool.query('SELECT nombre FROM islas_traducciones WHERE isla_id = $1 AND lang_code = $2', [req.params.id, lang]);
+  const rrIsla = revisarTraduccion(actualIsla.rows.length ? actualIsla.rows[0].nombre : '', lang);
+  if (frenoBloquea(rrIsla, req.body.confirmar_latinas)) return res.json(respuestaFreno(rrIsla));
   await pool.query(
     `UPDATE islas_traducciones SET revisado = TRUE WHERE isla_id = $1 AND lang_code = $2`,
     [req.params.id, lang]
@@ -5088,6 +5092,26 @@ app.post('/admin/islas/:id/traducir-ia', requireAdmin, asyncHandler(async (req, 
     return res.status(500).json({ error: 'La IA devolvió un formato inesperado. Inténtalo de nuevo.' });
   }
 
+  // (07/11/2026) N51: si algún nombre vuelve mal (ruso sin ruso, letras mezcladas) se pide otra vez a la IA, una vez
+  const idiomasIsla = ['en','de','sv','no','nl','it','fr','fi','ru'];
+  const nombreMal = function (lang) { const t = traducciones[lang]; return t && t.nombre && revisarTraduccion(String(t.nombre), lang).grave; };
+  if (idiomasIsla.some(nombreMal)) {
+    console.warn('[GEN14] ' + isla.nombre + ': algún nombre no ha vuelto bien — se pide otra vez a la IA.');
+    try {
+      const r2 = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
+      });
+      if (r2.ok) {
+        const d2 = await r2.json();
+        const t2 = JSON.parse(d2.content.map(function(b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim());
+        idiomasIsla.filter(nombreMal).forEach(function (lang) { if (t2[lang] && t2[lang].nombre) traducciones[lang] = Object.assign({}, traducciones[lang], { nombre: t2[lang].nombre }); });
+      }
+    } catch (err2) { console.error('[GEN14] Error en el segundo intento:', err2.message); }
+  }
+  const frenadas = [], avisos = [];
+
   // (30/10/2026) Lo generado queda GUARDADO en 🔵, solo en los idiomas que faltan o están en 🔴.
   // Si un idioma ya tiene su palabra de dirección (slug), se conserva: la IA solo cambia el nombre.
   const existentes = await pool.query('SELECT lang_code, desactualizado FROM islas_traducciones WHERE isla_id = $1', [isla.id]);
@@ -5098,6 +5122,9 @@ app.post('/admin/islas/:id/traducir-ia', requireAdmin, asyncHandler(async (req, 
     const t = traducciones[lang];
     if (!t || !t.nombre || !t.slug) continue;
     if (yaHay[lang] && !yaHay[lang].desactualizado) continue;
+    const rr = revisarTraduccion(String(t.nombre), lang); // (07/11/2026) N51
+    if (rr.grave) { frenadas.push({ donde: isla.nombre, lang: lang, motivo: mensajeFreno(rr) }); continue; }
+    if (rr.latinas.length) avisos.push({ donde: isla.nombre, lang: lang, motivo: mensajeFreno(rr) });
     if (yaHay[lang]) {
       await pool.query(
         'UPDATE islas_traducciones SET nombre = $1, revisado = FALSE, desactualizado = FALSE WHERE isla_id = $2 AND lang_code = $3',
@@ -5112,13 +5139,25 @@ app.post('/admin/islas/:id/traducir-ia', requireAdmin, asyncHandler(async (req, 
     }
     generados++;
   }
-  res.json({ ok: true, generados });
+  res.json({ ok: true, generados, frenadas, avisos });
 }));
 
 app.post('/admin/islas/:id/traducciones/guardar', requireAdmin, asyncHandler(async (req, res) => {
   const { traducciones } = req.body;
   if (!traducciones) return res.status(400).json({ error: 'Sin datos.' });
   const langs = Object.keys(traducciones);
+  // (07/11/2026) N51 — Freno de las traducciones (el nombre; la palabra de la dirección va siempre en letras latinas)
+  for (const lang of langs) {
+    const { nombre, slug } = traducciones[lang];
+    if (!nombre || !slug) continue;
+    const rr = revisarTraduccion(nombre, lang);
+    if (rr.grave) return res.json(respuestaFreno(rr));
+    if (traducciones[lang].revisado === true && frenoBloquea(rr, req.body.confirmar_latinas)) {
+      // Con «💾 Guardar todo» (guardar_en_azul) se guarda en 🔵 sin aprobar; con «💾 Guardar», se pregunta
+      if (req.body.guardar_en_azul === true) traducciones[lang].revisado = false;
+      else return res.json(respuestaFreno(rr));
+    }
+  }
   for (const lang of langs) {
     const { nombre, slug } = traducciones[lang];
     if (!nombre || !slug) continue;
@@ -5142,8 +5181,16 @@ app.post('/admin/islas/:id/activa', requireAdmin, asyncHandler(async (req, res) 
 
 // (30/10/2026) «💾 Guardar todo» y «✔ No afecta, mantenerlas»: aprueba tal cual todas las traducciones de la isla
 app.post('/admin/islas/:id/traducciones/aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query('UPDATE islas_traducciones SET revisado = TRUE, desactualizado = FALSE WHERE isla_id = $1', [req.params.id]);
-  res.json({ ok: true });
+  // (07/11/2026) N51: se aprueba lo que pasa el freno; el ruso sin ruso pasa a 🔴; lo demás se queda como está
+  const filas = await pool.query('SELECT lang_code, nombre FROM islas_traducciones WHERE isla_id = $1', [req.params.id]);
+  const sep = separarParaAprobar(filas.rows.map(function (f) { return { lang: f.lang_code, texto: f.nombre, donde: f.lang_code.toUpperCase() }; }));
+  for (const f of sep.aprobar) {
+    await pool.query('UPDATE islas_traducciones SET revisado = TRUE, desactualizado = FALSE WHERE isla_id = $1 AND lang_code = $2', [req.params.id, f.lang]);
+  }
+  for (const f of sep.rojo) {
+    await pool.query('UPDATE islas_traducciones SET revisado = FALSE, desactualizado = TRUE WHERE isla_id = $1 AND lang_code = $2', [req.params.id, f.lang]);
+  }
+  res.json({ ok: true, aprobadas: sep.aprobar.length, frenadas: sep.frenadas });
 }));
 
 // ─── Endpoints de categorías de vehículo ─────────────────────────────────────
@@ -5829,6 +5876,9 @@ app.post('/admin/seo/categorias/:id/idioma/:lang', requireAdmin, asyncHandler(as
     return res.status(400).json({ error: 'Idioma no válido' });
   }
   const { slug_url, meta_title, meta_description, canonical_url, resena_breve, texto_descripcion, h1_seo, subtitulo_seo } = req.body;
+  // (07/11/2026) N51 — Freno de las traducciones (los textos de la página; la dirección va siempre en letras latinas)
+  const rrSeo = revisarTraduccion([meta_title, meta_description, resena_breve, texto_descripcion, h1_seo, subtitulo_seo].join('\n'), req.params.lang);
+  if (frenoBloquea(rrSeo, req.body.confirmar_latinas)) return res.json(respuestaFreno(rrSeo));
   const slugLimpio = slug_url ? slugify(slug_url) : null;
   // (18/10/2026) La URL pública se monta SIEMPRE aquí: palabra de Flota + isla de Islas/localidades en ese idioma + slug
   const catIsla = await pool.query(
@@ -6258,6 +6308,9 @@ app.post('/admin/seo/rutas/:id/idioma/:lang', requireAdmin, asyncHandler(async (
     return res.status(400).json({ error: 'Idioma no válido' });
   }
   const { slug_url, meta_title, meta_description, og_title, og_description, robots_status, canonical_url, resena_breve, texto_descripcion } = req.body;
+  // (07/11/2026) N51 — Freno de las traducciones (los textos de la página; la dirección va siempre en letras latinas)
+  const rrSeo = revisarTraduccion([meta_title, meta_description, og_title, og_description, resena_breve, texto_descripcion].join('\n'), req.params.lang);
+  if (frenoBloquea(rrSeo, req.body.confirmar_latinas)) return res.json(respuestaFreno(rrSeo));
   const slugLimpio = slug_url ? slugify(slug_url) : null;
   // Si el admin envía una URL pública manual se respeta; si no, se genera automáticamente
   const canonical = '/' + req.params.lang + '/' + SECCIONES_TRASLADO[req.params.lang] + '/' + (slugLimpio || '');
@@ -6426,6 +6479,7 @@ app.post('/admin/seo/guardar-lote', requireAdmin, asyncHandler(async (req, res) 
   let guardadas = 0;
   for (const p of propuestas) {
     if (!p.route_id) continue;
+    if (revisarTraduccion((p.meta_title || '') + '\n' + (p.meta_description || ''), lang).grave) continue; // (07/11/2026) N51
     await pool.query(
       `UPDATE route_seo_settings
        SET meta_title = $1, meta_description = $2, og_title = $1, og_description = $2, updated_at = NOW()
@@ -6530,6 +6584,10 @@ app.post('/admin/seo/importar', requireAdmin, upload.single('archivo'), asyncHan
 
   for (const f of filas) {
     if (!f.rutaId || !IDIOMAS_PERMITIDOS.includes(f.langCode)) continue;
+    // (07/11/2026) N51: lo grave (ruso sin ruso, palabras con letras mezcladas) no se importa; lo demás, con aviso
+    const rrImp = revisarTraduccion([f.metaTitle, f.metaDescription, f.ogTitle, f.ogDescription].join('\n'), f.langCode);
+    if (rrImp.grave) { errores.push((nombreRuta[f.rutaId] || f.rutaId) + ' (' + f.langCode + '): ' + mensajeFreno(rrImp)); continue; }
+    if (rrImp.latinas.length) errores.push((nombreRuta[f.rutaId] || f.rutaId) + ' (' + f.langCode + '): ' + mensajeFreno(rrImp) + ' Se ha importado: revísalo.');
     try {
       const slugLimpio = slugify(f.slugUrl);
       const canonical = BASE_URL + '/' + f.langCode + '/' + SECCIONES_TRASLADO[f.langCode] + '/' + slugLimpio;
@@ -6682,6 +6740,9 @@ app.get('/admin/seo/destinos/:id/completo', requireAdmin, asyncHandler(async (re
 app.post('/admin/seo/destinos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req, res) => {
   if (!IDIOMAS_PERMITIDOS.includes(req.params.lang)) return res.status(400).json({ error: 'Idioma no válido' });
   const { slug_url, canonical_url, meta_title, meta_description, og_title, og_description, robots_status, texto_descripcion } = req.body;
+  // (07/11/2026) N51 — Freno de las traducciones (los textos de la página; la dirección va siempre en letras latinas)
+  const rrSeo = revisarTraduccion([meta_title, meta_description, og_title, og_description, texto_descripcion, req.body.resena_breve].join('\n'), req.params.lang);
+  if (frenoBloquea(rrSeo, req.body.confirmar_latinas)) return res.json(respuestaFreno(rrSeo));
   const slugLimpio = slug_url ? slugify(slug_url) : null;
   // La canónica siempre se reconstruye desde el slug — nunca se usa el valor editado del formulario
   const islaDestino = await pool.query('SELECT isla FROM destinos WHERE id = $1', [req.params.id]);
@@ -6817,9 +6878,14 @@ app.post('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req,
     [req.params.id, webpHex, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1, cloudinaryUrl]
   );
   const fotoId = inserted.rows[0] && inserted.rows[0].id;
+  // (07/11/2026) N51: lo grave (ruso sin ruso, palabras con letras mezcladas) no se guarda; un ruso con palabras
+  // en letras latinas se guarda en 🔵 (sin aprobar). La foto se sube igual.
+  const frenadas = [], avisos = [];
   if (fotoId) {
     if (alt_texto) {
-      await pool.query(
+      const rrEs = revisarTraduccion(alt_texto, 'es');
+      if (rrEs.grave) frenadas.push({ donde: 'ES', lang: 'es', motivo: mensajeFreno(rrEs) });
+      else await pool.query(
         `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, 'es', $2)
          ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $2`,
         [fotoId, alt_texto]
@@ -6828,15 +6894,18 @@ app.post('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req,
     if (alts_idiomas && typeof alts_idiomas === 'object') {
       for (const [lang, texto] of Object.entries(alts_idiomas)) {
         if (!texto || !texto.trim()) continue;
+        const rr = revisarTraduccion(texto, lang);
+        if (rr.grave) { frenadas.push({ donde: lang.toUpperCase(), lang: lang, motivo: mensajeFreno(rr) }); continue; }
+        if (rr.latinas.length) avisos.push({ donde: lang.toUpperCase(), lang: lang, motivo: mensajeFreno(rr) });
         await pool.query(
-          `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
-           ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
-          [fotoId, lang, texto.trim()]
+          `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto, revisado) VALUES ($1, $2, $3, $4)
+           ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = $4`,
+          [fotoId, lang, texto.trim(), rr.ok]
         );
       }
     }
   }
-  res.json({ ok: true });
+  res.json({ ok: true, frenadas: frenadas, avisos: avisos });
 }));
 
 // Sugiere con IA el nombre de archivo SEO y el alt text para una foto
@@ -7091,6 +7160,10 @@ app.get('/admin/seo/destinos/:id/fotos/:fotoId/alt', requireAdmin, asyncHandler(
 app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const { alt_texto } = req.body;
   const nuevo = (alt_texto || '').trim();
+  // (07/11/2026) N51 — Freno de las traducciones
+  const rrAlt = revisarTraduccion(nuevo, req.params.lang);
+  const enAzulAlt = !rrAlt.grave && !rrAlt.ok && !req.body.confirmar_latinas && req.body.guardar_en_azul === true;
+  if (!enAzulAlt && frenoBloquea(rrAlt, req.body.confirmar_latinas)) return res.json(respuestaFreno(rrAlt));
   // (30/10/2026) «💾 Guardar» guarda y aprueba ese idioma (🟢). Si cambia el ESPAÑOL, los demás idiomas con texto pasan a 🔴
   // y se avisa (conTraducciones) para enseñar el recuadro «¿Este cambio afecta a las traducciones?».
   let conTraducciones = 0;
@@ -7107,9 +7180,9 @@ app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt/:lang', requireAdmin, asyncH
     }
   }
   await pool.query(
-    `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto, revisado, desactualizado) VALUES ($1, $2, $3, TRUE, FALSE)
-     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = TRUE, desactualizado = FALSE`,
-    [req.params.fotoId, req.params.lang, nuevo]
+    `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto, revisado, desactualizado) VALUES ($1, $2, $3, $4, FALSE)
+     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = $4, desactualizado = FALSE`,
+    [req.params.fotoId, req.params.lang, nuevo, !enAzulAlt]
   );
   res.json({ ok: true, conTraducciones: conTraducciones });
 }));
@@ -7117,42 +7190,24 @@ app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt/:lang', requireAdmin, asyncH
 // (30/10/2026) «💾 Guardar todo» y «✔ No afecta, mantenerlas»: aprueba tal cual (🟢) todos los idiomas con texto de esa foto.
 // Los idiomas sin texto siguen 🔴.
 app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt-aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
-  const r = await pool.query(
-    `UPDATE destinos_fotos_alt SET revisado = TRUE, desactualizado = FALSE
-     WHERE foto_id = $1 AND alt_texto IS NOT NULL AND TRIM(alt_texto) <> ''`,
-    [req.params.fotoId]
-  );
-  res.json({ ok: true, aprobadas: r.rowCount });
+  res.json(await aprobarAltsConFreno('destinos_fotos_alt', req.params.fotoId)); // (07/11/2026) N51
 }));
 
 // (30/10/2026) «Generar lo que falta» de los alt texts de una foto: la IA mira la foto y escribe, de forma nativa,
 // SOLO los idiomas activos sin texto o en 🔴 (español cambiado). Lo deja GUARDADO en 🔵. Lo demás no se toca.
 app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt-generar-falta', requireAdmin, asyncHandler(async (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY.' });
-  const { imagen } = req.body;
-  if (!imagen || !imagen.startsWith('data:image/')) return res.status(400).json({ error: 'Imagen no válida.' });
   const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
   if (destino.rows.length === 0) return res.status(404).json({ error: 'Destino no encontrado.' });
   const d = destino.rows[0];
-  const idiomas = await pool.query('SELECT codigo, nombre FROM idiomas_web WHERE activo = TRUE ORDER BY orden, codigo');
-  const existentes = await pool.query(
-    'SELECT lang_code, alt_texto, desactualizado FROM destinos_fotos_alt WHERE foto_id = $1',
-    [req.params.fotoId]
-  );
-  const pendientes = idiomas.rows.filter(function (i) {
-    const a = existentes.rows.find(function (x) { return x.lang_code === i.codigo; });
-    return !a || !a.alt_texto || !a.alt_texto.trim() || a.desactualizado;
-  });
-  if (pendientes.length === 0) return res.json({ ok: true, generadas: 0 });
-  const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
-  if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
-  const listaIdiomas = pendientes.map(function (i) {
-    return i.codigo + ' (' + (NOMBRE_IDIOMA_ES[i.codigo] || i.nombre) + ')';
-  }).join(', ');
-  const codigos = pendientes.map(function (i) { return '"' + i.codigo + '": "..."'; }).join(', ');
-  // Mismo texto que «Generar todos los idiomas» (generar-todos), solo con los idiomas pendientes
-  const prompt = `Eres un experto en SEO de imágenes para webs de turismo y transporte. Trabajas para múltiples mercados europeos.
+  // (07/11/2026) N51: usa la función común de los alt texts (la misma que Rutas y Categorías), con el mismo texto de IA
+  // que tenía aquí; así tiene también el freno y el segundo intento.
+  const resultado = await generarFaltaAltFotoModelo('destinos_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) {
+    const listaIdiomas = pendientes.map(function (i) {
+      return i.codigo + ' (' + (NOMBRE_IDIOMA_ES[i.codigo] || i.nombre) + ')';
+    }).join(', ');
+    const codigos = pendientes.map(function (i) { return '"' + i.codigo + '": "..."'; }).join(', ');
+    // Mismo texto que «Generar todos los idiomas» (generar-todos), solo con los idiomas pendientes
+    return `Eres un experto en SEO de imágenes para webs de turismo y transporte. Trabajas para múltiples mercados europeos.
 Analiza esta imagen del destino "${d.nombre}" en ${d.isla} y escribe un alt text para cada uno de estos idiomas: ${listaIdiomas}.
 
 Para cada idioma:
@@ -7161,35 +7216,13 @@ Para cada idioma:
 - Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto
 - Máximo 125 caracteres
 
+${iaPrompts.REGLA_LETRAS()}${iaPrompts.REGLA_RUSO(pendientes.some(function (i) { return i.codigo === 'ru'; }) ? 'ruso' : '')}
+
 Responde ÚNICAMENTE con JSON válido, sin markdown:
 {${codigos}}`;
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6', max_tokens: 600,
-      messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
-        { type: 'text', text: prompt }
-      ]}]
-    })
   });
-  if (!response.ok) return res.status(500).json({ error: 'Error IA: ' + (await response.text()).slice(0, 200) });
-  const data = await response.json();
-  const texto = data.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-  const resultado = JSON.parse(texto);
-  let generadas = 0;
-  for (const i of pendientes) {
-    const alt = resultado[i.codigo];
-    if (!alt || !String(alt).trim()) continue;
-    await pool.query(
-      `INSERT INTO destinos_fotos_alt (foto_id, lang_code, alt_texto, revisado, desactualizado) VALUES ($1, $2, $3, FALSE, FALSE)
-       ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = FALSE, desactualizado = FALSE`,
-      [req.params.fotoId, i.codigo, String(alt).trim()]
-    );
-    generadas++;
-  }
-  res.json({ ok: true, generadas: generadas });
+  if (resultado.error) return res.status(resultado.status || 500).json({ error: resultado.error });
+  res.json({ ok: true, generadas: resultado.generadas, frenadas: resultado.frenadas || [], avisos: resultado.avisos || [] });
 }));
 
 // Sugiere con IA el alt text de una foto en el idioma activo
@@ -7305,7 +7338,8 @@ app.post('/admin/categorias/:id/fotos', requireAdmin, asyncHandler(async (req, r
      VALUES ($1, $2::bytea, 'image/webp', $3, $4, $5) RETURNING id`,
     [req.params.id, webpHex, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1]
   );
-  if (alt_texto && inserted.rows[0]) {
+  const rrEsCat = revisarTraduccion(alt_texto || '', 'es'); // (07/11/2026) N51: palabras con letras mezcladas, no
+  if (alt_texto && inserted.rows[0] && !rrEsCat.grave) {
     await pool.query(
       `INSERT INTO categorias_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, 'es', $2)
        ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $2`,
@@ -7327,7 +7361,7 @@ app.post('/admin/categorias/:id/fotos', requireAdmin, asyncHandler(async (req, r
       console.error('Cloudinary upload error (categorias):', e.message);
     }
   }
-  res.json({ ok: true });
+  res.json({ ok: true, frenadas: rrEsCat.grave ? [{ donde: 'ES', lang: 'es', motivo: mensajeFreno(rrEsCat) }] : [], avisos: [] });
 }));
 
 // Sugiere con IA el nombre de archivo SEO y el alt text para una foto nueva de categoría
@@ -7502,18 +7536,16 @@ app.get('/admin/categorias/:id/fotos/:fotoId/alt', requireAdmin, asyncHandler(as
 // Guarda el alt text de una foto de categoría en un idioma concreto
 app.post('/admin/categorias/:id/fotos/:fotoId/alt/:lang', requireAdmin, asyncHandler(async (req, res) => {
   // (30/10/2026) «💾 Guardar» guarda y aprueba (🟢); si cambia el español, los demás idiomas pasan a 🔴 (igual que en destinos)
-  const conTraducciones = await guardarAltFotoModelo('categorias_fotos_alt', req.params.fotoId, req.params.lang, req.body.alt_texto);
+  const rrAlt = revisarTraduccion(req.body.alt_texto || '', req.params.lang); // (07/11/2026) N51
+  const enAzulAlt = !rrAlt.grave && !rrAlt.ok && !req.body.confirmar_latinas && req.body.guardar_en_azul === true;
+  if (!enAzulAlt && frenoBloquea(rrAlt, req.body.confirmar_latinas)) return res.json(respuestaFreno(rrAlt));
+  const conTraducciones = await guardarAltFotoModelo('categorias_fotos_alt', req.params.fotoId, req.params.lang, req.body.alt_texto, enAzulAlt);
   res.json({ ok: true, conTraducciones: conTraducciones });
 }));
 
 // (30/10/2026) «💾 Guardar todo» y «✔ No afecta, mantenerlas»: aprueba tal cual todos los idiomas con texto de esa foto
 app.post('/admin/categorias/:id/fotos/:fotoId/alt-aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
-  const r = await pool.query(
-    `UPDATE categorias_fotos_alt SET revisado = TRUE, desactualizado = FALSE
-     WHERE foto_id = $1 AND alt_texto IS NOT NULL AND TRIM(alt_texto) <> ''`,
-    [req.params.fotoId]
-  );
-  res.json({ ok: true, aprobadas: r.rowCount });
+  res.json(await aprobarAltsConFreno('categorias_fotos_alt', req.params.fotoId)); // (07/11/2026) N51
 }));
 
 // Sugiere con IA el alt text de una foto de categoría en el idioma activo
@@ -7563,11 +7595,13 @@ Para cada idioma:
 - Escribe de forma completamente nativa, describe lo que se ve e incluye el nombre de la categoría
 - Máximo 125 caracteres
 
+${iaPrompts.REGLA_LETRAS()}${iaPrompts.REGLA_RUSO(pendientes.some(function (i) { return i.codigo === 'ru'; }) ? 'ruso' : '')}
+
 Responde ÚNICAMENTE con JSON válido, sin markdown:
 {${codigos}}`;
   });
   if (resultado.error) return res.status(resultado.status || 500).json({ error: resultado.error });
-  res.json({ ok: true, generadas: resultado.generadas });
+  res.json({ ok: true, generadas: resultado.generadas, frenadas: resultado.frenadas || [], avisos: resultado.avisos || [] });
 }));
 
 // ─── Ayudas comunes de los alt texts de fotos (rutas y categorías), modelo común del 30/10/2026 ───
@@ -7589,8 +7623,21 @@ async function ponerEstadoAltFotos(tablaAlt, fotos) {
     foto.estado_alt = estado;
   }
 }
+// (07/11/2026) N51 — «💾 Guardar todo» / «✔ No afecta» de los alt texts de una foto: se aprueba lo que pasa el freno;
+// el ruso sin ruso pasa a 🔴; lo demás se queda como está.
+async function aprobarAltsConFreno(tablaAlt, fotoId) {
+  const filas = await pool.query(`SELECT lang_code, alt_texto FROM ${tablaAlt} WHERE foto_id = $1 AND alt_texto IS NOT NULL AND TRIM(alt_texto) <> ''`, [fotoId]);
+  const sep = separarParaAprobar(filas.rows.map(function (f) { return { lang: f.lang_code, texto: f.alt_texto, donde: f.lang_code.toUpperCase() }; }));
+  for (const f of sep.aprobar) {
+    await pool.query(`UPDATE ${tablaAlt} SET revisado = TRUE, desactualizado = FALSE WHERE foto_id = $1 AND lang_code = $2`, [fotoId, f.lang]);
+  }
+  for (const f of sep.rojo) {
+    await pool.query(`UPDATE ${tablaAlt} SET revisado = FALSE, desactualizado = TRUE WHERE foto_id = $1 AND lang_code = $2`, [fotoId, f.lang]);
+  }
+  return { ok: true, aprobadas: sep.aprobar.length, frenadas: sep.frenadas };
+}
 // Guardar = aprobar ese idioma. Si cambia el español, los demás idiomas con texto pasan a 🔴; devuelve cuántos.
-async function guardarAltFotoModelo(tablaAlt, fotoId, lang, altTexto) {
+async function guardarAltFotoModelo(tablaAlt, fotoId, lang, altTexto, enAzul) {
   const nuevo = (altTexto || '').trim();
   let conTraducciones = 0;
   if (lang === 'es') {
@@ -7606,9 +7653,9 @@ async function guardarAltFotoModelo(tablaAlt, fotoId, lang, altTexto) {
     }
   }
   await pool.query(
-    `INSERT INTO ${tablaAlt} (foto_id, lang_code, alt_texto, revisado, desactualizado) VALUES ($1, $2, $3, TRUE, FALSE)
-     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = TRUE, desactualizado = FALSE`,
-    [fotoId, lang, nuevo]
+    `INSERT INTO ${tablaAlt} (foto_id, lang_code, alt_texto, revisado, desactualizado) VALUES ($1, $2, $3, $4, FALSE)
+     ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = $4, desactualizado = FALSE`,
+    [fotoId, lang, nuevo, !enAzul] // (07/11/2026) N51: en 🔵 si lleva palabras latinas sin confirmar («💾 Guardar todo»)
   );
   return conTraducciones;
 }
@@ -7626,25 +7673,43 @@ async function generarFaltaAltFotoModelo(tablaAlt, fotoId, imagen, hacerPrompt) 
     return !a || !a.alt_texto || !a.alt_texto.trim() || a.desactualizado;
   });
   if (pendientes.length === 0) return { generadas: 0 };
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6', max_tokens: 800,
-      messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
-        { type: 'text', text: hacerPrompt(pendientes) }
-      ]}]
-    })
-  });
-  if (!response.ok) return { error: 'Error IA: ' + (await response.text()).slice(0, 200) };
-  const data = await response.json();
-  const texto = data.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
-  const resultado = JSON.parse(texto);
+  // (07/11/2026) La llamada a la IA va en una función para poder pedir otra vez lo que vuelve mal (N51)
+  async function pedirAlts(lista) {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6', max_tokens: 800,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
+          { type: 'text', text: hacerPrompt(lista) }
+        ]}]
+      })
+    });
+    if (!response.ok) return { error: 'Error IA: ' + (await response.text()).slice(0, 200) };
+    const data = await response.json();
+    const texto = data.content.map(function (b) { return b.text || ''; }).join('').replace(/```json|```/g, '').trim();
+    return JSON.parse(texto);
+  }
+  const resultado = await pedirAlts(pendientes);
+  if (resultado.error) return resultado;
+  // (07/11/2026) N51: los idiomas que vuelven mal (ruso sin ruso, letras mezcladas) se piden otra vez, una vez
+  const malos = pendientes.filter(function (i) { return resultado[i.codigo] && revisarTraduccion(String(resultado[i.codigo]), i.codigo).grave; });
+  if (malos.length) {
+    console.warn('[ALT] ' + tablaAlt + ' foto ' + fotoId + ': ' + malos.length + ' idioma(s) no han vuelto bien — se piden otra vez a la IA.');
+    try {
+      const segunda = await pedirAlts(malos);
+      if (!segunda.error) malos.forEach(function (i) { if (segunda[i.codigo]) resultado[i.codigo] = segunda[i.codigo]; });
+    } catch (err2) { console.error('[ALT] Error en el segundo intento:', err2.message); }
+  }
   let generadas = 0;
+  const frenadas = [], avisos = [];
   for (const i of pendientes) {
     const alt = resultado[i.codigo];
     if (!alt || !String(alt).trim()) continue;
+    const rr = revisarTraduccion(String(alt), i.codigo);
+    if (rr.grave) { frenadas.push({ donde: i.codigo.toUpperCase(), lang: i.codigo, motivo: mensajeFreno(rr) }); continue; }
+    if (rr.latinas.length) avisos.push({ donde: i.codigo.toUpperCase(), lang: i.codigo, motivo: mensajeFreno(rr) });
     await pool.query(
       `INSERT INTO ${tablaAlt} (foto_id, lang_code, alt_texto, revisado, desactualizado) VALUES ($1, $2, $3, FALSE, FALSE)
        ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = FALSE, desactualizado = FALSE`,
@@ -7652,7 +7717,7 @@ async function generarFaltaAltFotoModelo(tablaAlt, fotoId, imagen, hacerPrompt) 
     );
     generadas++;
   }
-  return { generadas: generadas };
+  return { generadas: generadas, frenadas: frenadas, avisos: avisos };
 }
 
 // ─── ENDPOINTS DE FOTOS DE RUTAS ─────────────────────────────────────────────
@@ -7812,9 +7877,14 @@ app.post('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, re
     [req.params.id, webpHex, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1, cloudinaryUrl]
   );
   const fotoId = inserted.rows[0] && inserted.rows[0].id;
+  // (07/11/2026) N51: lo grave (ruso sin ruso, palabras con letras mezcladas) no se guarda; un ruso con palabras
+  // en letras latinas se guarda en 🔵 (sin aprobar). La foto se sube igual.
+  const frenadas = [], avisos = [];
   if (fotoId) {
     if (alt_texto) {
-      await pool.query(
+      const rrEs = revisarTraduccion(alt_texto, 'es');
+      if (rrEs.grave) frenadas.push({ donde: 'ES', lang: 'es', motivo: mensajeFreno(rrEs) });
+      else await pool.query(
         `INSERT INTO rutas_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, 'es', $2)
          ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $2`,
         [fotoId, alt_texto]
@@ -7823,15 +7893,18 @@ app.post('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, re
     if (alts_idiomas && typeof alts_idiomas === 'object') {
       for (const [lang, texto] of Object.entries(alts_idiomas)) {
         if (!texto || !texto.trim()) continue;
+        const rr = revisarTraduccion(texto, lang);
+        if (rr.grave) { frenadas.push({ donde: lang.toUpperCase(), lang: lang, motivo: mensajeFreno(rr) }); continue; }
+        if (rr.latinas.length) avisos.push({ donde: lang.toUpperCase(), lang: lang, motivo: mensajeFreno(rr) });
         await pool.query(
-          `INSERT INTO rutas_fotos_alt (foto_id, lang_code, alt_texto) VALUES ($1, $2, $3)
-           ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3`,
-          [fotoId, lang, texto.trim()]
+          `INSERT INTO rutas_fotos_alt (foto_id, lang_code, alt_texto, revisado) VALUES ($1, $2, $3, $4)
+           ON CONFLICT (foto_id, lang_code) DO UPDATE SET alt_texto = $3, revisado = $4`,
+          [fotoId, lang, texto.trim(), rr.ok]
         );
       }
     }
   }
-  res.json({ ok: true });
+  res.json({ ok: true, frenadas: frenadas, avisos: avisos });
 }));
 
 // Lista las fotos del carrusel de una ruta
@@ -7970,18 +8043,16 @@ app.get('/admin/seo/rutas/:id/fotos/:fotoId/alt', requireAdmin, asyncHandler(asy
 // Guarda el alt text de una foto de ruta en un idioma concreto
 app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt/:lang', requireAdmin, asyncHandler(async (req, res) => {
   // (30/10/2026) «💾 Guardar» guarda y aprueba (🟢); si cambia el español, los demás idiomas pasan a 🔴 (igual que en destinos)
-  const conTraducciones = await guardarAltFotoModelo('rutas_fotos_alt', req.params.fotoId, req.params.lang, req.body.alt_texto);
+  const rrAlt = revisarTraduccion(req.body.alt_texto || '', req.params.lang); // (07/11/2026) N51
+  const enAzulAlt = !rrAlt.grave && !rrAlt.ok && !req.body.confirmar_latinas && req.body.guardar_en_azul === true;
+  if (!enAzulAlt && frenoBloquea(rrAlt, req.body.confirmar_latinas)) return res.json(respuestaFreno(rrAlt));
+  const conTraducciones = await guardarAltFotoModelo('rutas_fotos_alt', req.params.fotoId, req.params.lang, req.body.alt_texto, enAzulAlt);
   res.json({ ok: true, conTraducciones: conTraducciones });
 }));
 
 // (30/10/2026) «💾 Guardar todo» y «✔ No afecta, mantenerlas»: aprueba tal cual todos los idiomas con texto de esa foto
 app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt-aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
-  const r = await pool.query(
-    `UPDATE rutas_fotos_alt SET revisado = TRUE, desactualizado = FALSE
-     WHERE foto_id = $1 AND alt_texto IS NOT NULL AND TRIM(alt_texto) <> ''`,
-    [req.params.fotoId]
-  );
-  res.json({ ok: true, aprobadas: r.rowCount });
+  res.json(await aprobarAltsConFreno('rutas_fotos_alt', req.params.fotoId)); // (07/11/2026) N51
 }));
 
 // (30/10/2026) «Generar lo que falta» de los alt texts de una foto de ruta: la IA mira la foto y escribe SOLO los idiomas
@@ -7996,7 +8067,7 @@ app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt-generar-falta', requireAdmin, a
     return iaPrompts.GENERADOR_ALT_FOTO_RUTA_TODOS(r.origen, r.destino, listaIdiomas, codigos);
   });
   if (resultado.error) return res.status(resultado.status || 500).json({ error: resultado.error });
-  res.json({ ok: true, generadas: resultado.generadas });
+  res.json({ ok: true, generadas: resultado.generadas, frenadas: resultado.frenadas || [], avisos: resultado.avisos || [] });
 }));
 
 // ─── FIN ENDPOINTS FOTOS RUTAS ────────────────────────────────────────────────
@@ -8759,6 +8830,17 @@ app.post('/admin/categorias/generar-ia/:lang', requireAdmin, asyncHandler(async 
     return res.status(500).json({ error: err.message });
   }
 
+  // (07/11/2026) N51: las fichas que vuelven mal (ruso sin ruso, palabras con letras mezcladas) se piden otra vez, una vez
+  const malas = itemsIA.filter(function (c) { return revisarTraduccion(textoFichaCategoria(generado[String(c.id)] || {}), lang).grave; });
+  if (malas.length) {
+    console.warn('[GEN12] ' + lang + ': ' + malas.length + ' ficha(s) no han vuelto bien — se piden otra vez a la IA.');
+    try {
+      const segunda = await generarCategoriasConIA(malas, nombreIdioma);
+      malas.forEach(function (c) { if (segunda[String(c.id)]) generado[String(c.id)] = segunda[String(c.id)]; });
+    } catch (err2) { console.error('[GEN12] Error en el segundo intento:', err2.message); }
+  }
+  const frenadas = [], avisos = [];
+
   // Construir propuestas para revisión
   const propuestas = pendientes.map(function (c) {
     const resultado = generado[String(c.id)] || {};
@@ -8777,6 +8859,9 @@ app.post('/admin/categorias/generar-ia/:lang', requireAdmin, asyncHandler(async 
   if (lang !== 'es') {
     for (const p of propuestas) {
       if (!p.descripcion || !p.descripcion.trim()) continue;
+      const rr = revisarTraduccion(textoFichaCategoria(p), lang); // (07/11/2026) N51
+      if (rr.grave) { frenadas.push({ donde: p.nombre, lang: lang, motivo: mensajeFreno(rr) }); continue; }
+      if (rr.latinas.length) avisos.push({ donde: p.nombre, lang: lang, motivo: mensajeFreno(rr) });
       await pool.query(
         `INSERT INTO categorias_vehiculos_traducciones
            (categoria_id, lang_code, descripcion, subtitulo, descripcion_larga, caracteristicas, updated_at, ficha_revisado, ficha_desactualizado)
@@ -8790,8 +8875,13 @@ app.post('/admin/categorias/generar-ia/:lang', requireAdmin, asyncHandler(async 
     }
   }
 
-  res.json({ ok: true, propuestas, lang });
+  res.json({ ok: true, propuestas, lang, frenadas, avisos });
 }));
+
+// (07/11/2026) N51: texto de la ficha de una categoría que revisa el freno (los cuatro campos)
+function textoFichaCategoria(p) {
+  return [p.descripcion, p.subtitulo, p.descripcion_larga, p.caracteristicas].map(function (x) { return x || ''; }).join('\n');
+}
 
 // Guarda en bloque el contenido de categorías revisado tras la propuesta de IA.
 // Para español guarda en categorias_vehiculos directamente.
@@ -8805,8 +8895,18 @@ app.post('/admin/categorias/guardar-ia-lote', requireAdmin, asyncHandler(async (
   }
 
   let guardadas = 0;
+  const frenadas = [];
   for (const p of propuestas) {
     if (!p.categoria_id) continue;
+    // (07/11/2026) N51 — Freno de las traducciones (en español solo frena las palabras con letras mezcladas)
+    const rr = revisarTraduccion(textoFichaCategoria(p), lang);
+    // Con «💾 Guardar todo» (guardar_en_azul), un ruso con palabras latinas se guarda en 🔵 sin aprobar
+    p._enAzul = lang !== 'es' && !rr.grave && !rr.ok && !req.body.confirmar_latinas && req.body.guardar_en_azul === true;
+    if (!p._enAzul && frenoBloquea(rr, req.body.confirmar_latinas)) {
+      if (propuestas.length === 1) return res.json(respuestaFreno(rr));
+      frenadas.push({ donde: String(p.categoria_id), lang: lang, motivo: mensajeFreno(rr) });
+      continue;
+    }
     if (lang === 'es') {
       // Guardar en la tabla principal
       await pool.query(
@@ -8830,45 +8930,65 @@ app.post('/admin/categorias/guardar-ia-lote', requireAdmin, asyncHandler(async (
          ON CONFLICT (categoria_id, lang_code) DO UPDATE
            SET descripcion = $3, subtitulo = $4, descripcion_larga = $5,
                caracteristicas = $6, updated_at = NOW(),
-               ficha_revisado = TRUE, ficha_desactualizado = FALSE`, // (28/10/2026) guardar a mano o «✅ Aprobar todas» = 🟢
+               ficha_revisado = $7, ficha_desactualizado = FALSE`, // (28/10/2026) guardar a mano o «✅ Aprobar todas» = 🟢
         [
           p.categoria_id,
           lang,
           (p.descripcion || '').trim(),
           (p.subtitulo || '').trim(),
           (p.descripcion_larga || '').trim(),
-          (p.caracteristicas || '').trim()
+          (p.caracteristicas || '').trim(),
+          !p._enAzul // (07/11/2026) N51: en 🔵 si lleva palabras latinas sin confirmar («💾 Guardar todo»)
         ]
       );
     }
     guardadas++;
   }
 
-  res.json({ ok: true, guardadas });
+  res.json({ ok: true, guardadas, frenadas });
 }));
 
 // (29/10/2026) «💾 Guardar todo» de la ficha de una categoría (Idiomas → «Página de flota — categorías» → ✏️ Editar):
 // aprueba tal cual (🟢) las traducciones de la ficha de esa categoría en todos los idiomas que tienen texto,
 // sin cambiar su texto. Para cuando cambia el español y las traducciones siguen valiendo. Los idiomas sin traducir siguen 🔴.
 app.post('/admin/categorias/:id/aprobar-fichas', requireAdmin, asyncHandler(async (req, res) => {
-  const r = await pool.query(
-    `UPDATE categorias_vehiculos_traducciones
-     SET ficha_revisado = TRUE, ficha_desactualizado = FALSE
-     WHERE categoria_id = $1 AND descripcion IS NOT NULL AND descripcion <> ''`,
+  // (07/11/2026) N51: se aprueba lo que pasa el freno; el ruso sin ruso pasa a 🔴; lo demás se queda como está
+  const filas = await pool.query(
+    `SELECT categoria_id, lang_code, descripcion, subtitulo, descripcion_larga, caracteristicas
+     FROM categorias_vehiculos_traducciones WHERE categoria_id = $1 AND descripcion IS NOT NULL AND descripcion <> ''`,
     [req.params.id]
   );
-  res.json({ ok: true, aprobadas: r.rowCount });
+  const sep = separarParaAprobar(filas.rows.map(function (f) {
+    return { categoria_id: f.categoria_id, lang: f.lang_code, texto: textoFichaCategoria(f), donde: f.lang_code.toUpperCase() };
+  }));
+  await aprobarFichasSeparadas(sep);
+  res.json({ ok: true, aprobadas: sep.aprobar.length, frenadas: sep.frenadas });
 }));
+// (07/11/2026) Aplica en las fichas de Página de flota lo separado por el freno
+async function aprobarFichasSeparadas(sep) {
+  for (const f of sep.aprobar) {
+    await pool.query('UPDATE categorias_vehiculos_traducciones SET ficha_revisado = TRUE, ficha_desactualizado = FALSE WHERE categoria_id = $1 AND lang_code = $2', [f.categoria_id, f.lang]);
+  }
+  for (const f of sep.rojo) {
+    await pool.query('UPDATE categorias_vehiculos_traducciones SET ficha_revisado = FALSE, ficha_desactualizado = TRUE WHERE categoria_id = $1 AND lang_code = $2', [f.categoria_id, f.lang]);
+  }
+}
 
 // (30/10/2026) «✅ Aprobar todo» de Idiomas → «Página de flota — categorías»: aprueba (🟢) las fichas en 🔵
 // de todas las categorías y todos los idiomas. Los 🔴 (español cambiado o sin traducir) no se tocan.
 app.post('/admin/categorias/aprobar-azules', requireAdmin, asyncHandler(async (req, res) => {
-  const r = await pool.query(
-    `UPDATE categorias_vehiculos_traducciones SET ficha_revisado = TRUE
-     WHERE ficha_revisado = FALSE AND COALESCE(ficha_desactualizado, FALSE) = FALSE
-       AND descripcion IS NOT NULL AND descripcion <> ''`
+  // (07/11/2026) N51: antes de aprobar, cada 🔵 pasa por el freno
+  const azules = await pool.query(
+    `SELECT t.categoria_id, t.lang_code, t.descripcion, t.subtitulo, t.descripcion_larga, t.caracteristicas, cv.nombre
+     FROM categorias_vehiculos_traducciones t JOIN categorias_vehiculos cv ON cv.id = t.categoria_id
+     WHERE t.ficha_revisado = FALSE AND COALESCE(t.ficha_desactualizado, FALSE) = FALSE
+       AND t.descripcion IS NOT NULL AND t.descripcion <> ''`
   );
-  res.json({ ok: true, aprobadas: r.rowCount });
+  const sep = separarParaAprobar(azules.rows.map(function (f) {
+    return { categoria_id: f.categoria_id, lang: f.lang_code, texto: textoFichaCategoria(f), donde: f.nombre + ' (' + f.lang_code.toUpperCase() + ')' };
+  }));
+  await aprobarFichasSeparadas(sep);
+  res.json({ ok: true, aprobadas: sep.aprobar.length, frenadas: sep.frenadas });
 }));
 
 // Lista todos los textos con su estado de traducción por idioma (para las
@@ -9276,13 +9396,17 @@ app.post('/admin/textos/importar', requireAdmin, upload.single('archivo'), async
 
   for (const f of filas) {
     if (!f.textoId || !IDIOMAS_TRADUCIBLES.includes(f.langCode)) continue;
+    // (07/11/2026) N51: lo grave no se importa; un ruso con palabras en letras latinas entra en 🔵 (sin aprobar)
+    const rr = revisarTraduccion(f.traduccion, f.langCode);
+    if (rr.grave) { errores.push('Texto ' + f.textoId + '/' + f.langCode + ': ' + mensajeFreno(rr)); continue; }
     try {
       await pool.query(
-        `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE, revisado = TRUE`,
-        [f.textoId, f.langCode, f.traduccion]
+        `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto, revisado)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE, revisado = $4`,
+        [f.textoId, f.langCode, f.traduccion, rr.ok]
       );
+      if (!rr.ok) errores.push('Texto ' + f.textoId + '/' + f.langCode + ': ' + mensajeFreno(rr) + ' Queda en azul, sin aprobar.');
       actualizadas++;
     } catch (err) {
       errores.push('Texto ' + f.textoId + '/' + f.langCode + ': ' + err.message);
@@ -9321,20 +9445,32 @@ app.post('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req
   if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
     return res.status(400).json({ error: 'Idioma no válido' });
   }
+  // (07/11/2026) N51 — Freno de las traducciones
+  // Con «💾 Guardar todo» (guardar_en_azul), un ruso con palabras latinas se guarda en 🔵 sin aprobar.
+  const rr = revisarTraduccion(req.body.texto || '', req.params.lang);
+  const enAzul = !rr.grave && !rr.ok && !req.body.confirmar_latinas && req.body.guardar_en_azul === true;
+  if (!enAzul && frenoBloquea(rr, req.body.confirmar_latinas)) return res.json(respuestaFreno(rr));
   await pool.query(
-    `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE, revisado = TRUE`,
-    [req.params.id, req.params.lang, req.body.texto || '']
+    `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto, revisado)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE, revisado = $4`,
+    [req.params.id, req.params.lang, req.body.texto || '', !enAzul]
   );
   await cargarTextosCache();
-  res.json({ ok: true });
+  res.json({ ok: true, enAzul: enAzul });
 }));
 
 // (07/10/2026) "✔ Aprobar tal cual": la traducción sigue valiendo aunque haya cambiado el español
 app.post('/admin/textos/:id/idioma/:lang/aprobar', requireAdmin, asyncHandler(async (req, res) => {
   if (!IDIOMAS_TRADUCIBLES.includes(req.params.lang)) {
     return res.status(400).json({ error: 'Idioma no válido' });
+  }
+  // (07/11/2026) N51 — Freno de las traducciones (sobre el texto guardado)
+  const actualTxt = await pool.query('SELECT texto FROM textos_interfaz_traducciones WHERE texto_id = $1 AND lang_code = $2', [req.params.id, req.params.lang]);
+  const rrA = revisarTraduccion(actualTxt.rows.length ? actualTxt.rows[0].texto : '', req.params.lang);
+  if (frenoBloquea(rrA, req.body && req.body.confirmar_latinas)) {
+    if (rrA.sinRuso) await pool.query('UPDATE textos_interfaz_traducciones SET desactualizado = TRUE, revisado = FALSE WHERE texto_id = $1 AND lang_code = $2', [req.params.id, req.params.lang]);
+    return res.json(respuestaFreno(rrA));
   }
   await pool.query(
     'UPDATE textos_interfaz_traducciones SET desactualizado = FALSE, revisado = TRUE WHERE texto_id = $1 AND lang_code = $2',
@@ -9345,19 +9481,37 @@ app.post('/admin/textos/:id/idioma/:lang/aprobar', requireAdmin, asyncHandler(as
 
 // (07/10/2026) "No afecta, mantenerlas" / "✔ Aprobar todas tal cual": todas las traducciones de un texto vuelven a verde
 app.post('/admin/textos/:id/aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query('UPDATE textos_interfaz_traducciones SET desactualizado = FALSE, revisado = TRUE WHERE texto_id = $1', [req.params.id]);
-  res.json({ ok: true });
+  // (07/11/2026) N51: se aprueba lo que pasa el freno; el ruso sin ruso pasa a 🔴; lo demás se queda como está
+  const filas = await pool.query('SELECT lang_code, texto FROM textos_interfaz_traducciones WHERE texto_id = $1', [req.params.id]);
+  const sep = separarParaAprobar(filas.rows.map(function (f) { return { lang: f.lang_code, texto: f.texto, donde: f.lang_code.toUpperCase() }; }));
+  await aprobarTextosSeparados(req.params.id, sep);
+  res.json({ ok: true, aprobadas: sep.aprobar.length, frenadas: sep.frenadas });
 }));
+// (07/11/2026) Aplica en Textos de interfaz lo separado por el freno (una fila por texto e idioma)
+async function aprobarTextosSeparados(textoId, sep) {
+  for (const f of sep.aprobar) {
+    await pool.query('UPDATE textos_interfaz_traducciones SET desactualizado = FALSE, revisado = TRUE WHERE texto_id = $1 AND lang_code = $2', [f.texto_id || textoId, f.lang]);
+  }
+  for (const f of sep.rojo) {
+    await pool.query('UPDATE textos_interfaz_traducciones SET desactualizado = TRUE, revisado = FALSE WHERE texto_id = $1 AND lang_code = $2', [f.texto_id || textoId, f.lang]);
+  }
+}
 
 // (30/10/2026) «✅ Aprobar todo» de Idiomas → Textos de interfaz: aprueba (🟢) todo lo que está en 🔵
 // (traducido, sin aprobar) en todos los idiomas. Los 🔴 (español cambiado o sin traducir) no se tocan.
 app.post('/admin/textos/aprobar-azules', requireAdmin, asyncHandler(async (req, res) => {
-  const r = await pool.query(
-    `UPDATE textos_interfaz_traducciones SET revisado = TRUE
-     WHERE revisado = FALSE AND COALESCE(desactualizado, FALSE) = FALSE
-       AND texto IS NOT NULL AND TRIM(texto) <> ''`
+  // (07/11/2026) N51: antes de aprobar, cada 🔵 pasa por el freno
+  const azules = await pool.query(
+    `SELECT tit.texto_id, tit.lang_code, tit.texto, ti.clave
+     FROM textos_interfaz_traducciones tit JOIN textos_interfaz ti ON ti.id = tit.texto_id
+     WHERE tit.revisado = FALSE AND COALESCE(tit.desactualizado, FALSE) = FALSE
+       AND tit.texto IS NOT NULL AND TRIM(tit.texto) <> ''`
   );
-  res.json({ ok: true, aprobadas: r.rowCount });
+  const sep = separarParaAprobar(azules.rows.map(function (f) {
+    return { texto_id: f.texto_id, lang: f.lang_code, texto: f.texto, donde: f.clave + ' (' + f.lang_code.toUpperCase() + ')' };
+  }));
+  await aprobarTextosSeparados(null, sep);
+  res.json({ ok: true, aprobadas: sep.aprobar.length, frenadas: sep.frenadas });
 }));
 
 // Traduce con IA (Claude) todos los textos que falten en un idioma — no
@@ -9376,7 +9530,8 @@ app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (re
   const yaTraducidos = {};
   for (const fila of traducciones.rows) {
     // (07/10/2026) Las que están en rojo (cambió el español) también se proponen de nuevo
-    if (!fila.desactualizado) yaTraducidos[fila.texto_id] = fila.texto;
+    // (07/11/2026) N51: y un ruso escrito sin ruso
+    if (!fila.desactualizado && !revisarTraduccion(fila.texto, lang).sinRuso) yaTraducidos[fila.texto_id] = fila.texto;
   }
 
   const pendientes = textos.rows.filter(function (t) {
@@ -9399,14 +9554,30 @@ app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (re
     return res.status(500).json({ error: err.message });
   }
 
-  const propuestas = pendientes.map(function (t) {
-    return {
+  // (07/11/2026) N51: lo que vuelve mal (ruso sin ruso, palabras con letras mezcladas) se pide otra vez a la IA, una vez.
+  // Si vuelve a fallar, no se guarda (sigue como estaba, en 🔴). Un ruso con palabras en letras latinas se guarda en 🔵 con aviso.
+  const malos = items.filter(function (it) { return revisarTraduccion(traduccionesIA[it.clave] || '', lang).grave; });
+  if (malos.length) {
+    console.warn('[GEN7] ' + lang + ': ' + malos.length + ' texto(s) no han vuelto bien — se piden otra vez a la IA.');
+    try {
+      const segunda = await traducirConClaudeIA(malos, NOMBRE_IDIOMA_ES[lang] || lang);
+      malos.forEach(function (it) { if (segunda[it.clave]) traduccionesIA[it.clave] = segunda[it.clave]; });
+    } catch (err2) { console.error('[GEN7] Error en el segundo intento:', err2.message); }
+  }
+  const frenadas = [], avisos = [];
+  const propuestas = [];
+  pendientes.forEach(function (t) {
+    const sugerencia = traduccionesIA[t.clave] || '';
+    const rr = revisarTraduccion(sugerencia, lang);
+    if (sugerencia.trim() && rr.grave) { frenadas.push({ donde: t.clave, lang: lang, motivo: mensajeFreno(rr) }); return; }
+    if (sugerencia.trim() && rr.latinas.length) avisos.push({ donde: t.clave, lang: lang, motivo: mensajeFreno(rr) });
+    propuestas.push({
       texto_id: t.id,
       clave: t.clave,
       contexto: t.contexto,
       texto_es: t.texto_es,
-      sugerencia: traduccionesIA[t.clave] || ''
-    };
+      sugerencia: sugerencia
+    });
   });
 
   // (28/10/2026) Lo que genera la IA se guarda ya como 🔵 sin aprobar: si se cierra la ventana sin aprobar,
@@ -9421,7 +9592,7 @@ app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (re
     );
   }
   await cargarTextosCache();
-  res.json({ ok: true, propuestas });
+  res.json({ ok: true, propuestas, frenadas, avisos });
 }));
 
 // Guarda en bloque las traducciones revisadas (a mano o tras la propuesta de IA)
@@ -11745,6 +11916,9 @@ app.get('/admin/destinos/traducciones/:lang', requireAdmin, asyncHandler(async (
 app.post('/admin/destinos/:id/traduccion/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const { id, lang } = req.params;
   const { nombre } = req.body;
+  // (07/11/2026) N51 — Freno de las traducciones
+  const rr = revisarTraduccion(nombre || '', lang);
+  if (frenoBloquea(rr, req.body.confirmar_latinas)) return res.json(respuestaFreno(rr));
   await pool.query(
     `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre, revisado, desactualizado)
      VALUES ($1, $2, $3, TRUE, FALSE)
@@ -11777,29 +11951,57 @@ app.post('/admin/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'Falta ANTHROPIC_API_KEY en Render.' });
 
-  const prompt = iaPrompts.GENERADOR_NOMBRES_DESTINOS(nombreIdioma, pendientes);
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    return res.status(500).json({ error: 'Error API Claude: ' + err.slice(0, 200) });
+  // (07/11/2026) La llamada a la IA va en una función para poder pedir otra vez lo que vuelve mal (N51)
+  async function pedirNombres(lista) {
+    const prompt = iaPrompts.GENERADOR_NOMBRES_DESTINOS(nombreIdioma, lista);
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error('Error API Claude: ' + err.slice(0, 200));
+    }
+    const data = await response.json();
+    const texto = data.content.map(function (b) { return b.text || ''; }).join('');
+    const limpio = texto.replace(/```json|```/g, '').trim();
+    return JSON.parse(limpio);
   }
 
-  const data = await response.json();
-  const texto = data.content.map(function (b) { return b.text || ''; }).join('');
-  const limpio = texto.replace(/```json|```/g, '').trim();
-  const propuestas = JSON.parse(limpio);
+  let propuestas;
+  try { propuestas = await pedirNombres(pendientes); }
+  catch (err) { return res.status(500).json({ error: err.message }); }
+  if (!Array.isArray(propuestas)) propuestas = [];
+
+  // (07/11/2026) N51: los nombres que vuelven mal (ruso sin ruso, letras mezcladas) se piden otra vez, una vez
+  const malos = propuestas.filter(function (p) { return p && p.nombre && revisarTraduccion(String(p.nombre), lang).grave; });
+  if (malos.length) {
+    console.warn('[GEN8] ' + lang + ': ' + malos.length + ' nombre(s) no han vuelto bien — se piden otra vez a la IA.');
+    const idsMalos = {};
+    malos.forEach(function (p) { idsMalos[p.id] = true; });
+    try {
+      const segunda = await pedirNombres(pendientes.filter(function (d) { return idsMalos[d.id]; }));
+      (Array.isArray(segunda) ? segunda : []).forEach(function (n) {
+        const i = propuestas.findIndex(function (p) { return p && p.id === n.id; });
+        if (i >= 0 && n.nombre) propuestas[i] = n;
+      });
+    } catch (err2) { console.error('[GEN8] Error en el segundo intento:', err2.message); }
+  }
+  const frenadas = [], avisos = [];
+  const nombreEsDe = {};
+  pendientes.forEach(function (d) { nombreEsDe[d.id] = d.nombre; });
 
   // (29/10/2026) Lo generado se guarda ya, en 🔵 (traducido, sin aprobar), como en las demás pantallas
   const idsPendientes = {};
   pendientes.forEach(function (d) { idsPendientes[d.id] = true; });
-  for (const p of (Array.isArray(propuestas) ? propuestas : [])) {
+  const guardados = [];
+  for (const p of propuestas) {
     if (!p || !p.id || !idsPendientes[p.id] || !p.nombre || !String(p.nombre).trim()) continue;
+    const rr = revisarTraduccion(String(p.nombre), lang); // (07/11/2026) N51
+    if (rr.grave) { frenadas.push({ donde: nombreEsDe[p.id] || String(p.id), lang: lang, motivo: mensajeFreno(rr) }); continue; }
+    if (rr.latinas.length) avisos.push({ donde: nombreEsDe[p.id] || String(p.id), lang: lang, motivo: mensajeFreno(rr) });
+    guardados.push(p);
     await pool.query(
       `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre, revisado, desactualizado)
        VALUES ($1, $2, $3, FALSE, FALSE)
@@ -11808,43 +12010,66 @@ app.post('/admin/destinos/traducir-ia/:lang', requireAdmin, asyncHandler(async (
     );
   }
 
-  res.json({ ok: true, propuestas });
+  res.json({ ok: true, propuestas: guardados, frenadas, avisos });
 }));
 
 // Guarda en bloque las propuestas de traducciones de destinos revisadas
 app.post('/admin/destinos/traducciones/guardar-lote', requireAdmin, asyncHandler(async (req, res) => {
   const { lang, propuestas } = req.body;
   if (!lang || !Array.isArray(propuestas)) return res.status(400).json({ error: 'Datos no válidos' });
+  const frenadas = [];
   for (const p of propuestas) {
     if (!p.id || !p.nombre) continue;
+    // (07/11/2026) N51: lo grave no se guarda; un ruso con palabras en letras latinas se guarda en 🔵 (no pasa a 🟢)
+    const rr = revisarTraduccion(p.nombre, lang);
+    if (!rr.ok) frenadas.push({ donde: p.nombre_es || String(p.id), lang: lang, motivo: mensajeFreno(rr) });
+    if (rr.grave) continue;
     await pool.query(
       `INSERT INTO destinos_traducciones (destino_id, lang_code, nombre, revisado, desactualizado)
-       VALUES ($1, $2, $3, TRUE, FALSE)
-       ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW(), revisado = TRUE, desactualizado = FALSE`,
-      [p.id, lang, p.nombre]
+       VALUES ($1, $2, $3, $4, FALSE)
+       ON CONFLICT (destino_id, lang_code) DO UPDATE SET nombre = $3, updated_at = NOW(), revisado = $4, desactualizado = FALSE`,
+      [p.id, lang, p.nombre, rr.ok]
     ); // (29/10/2026) «💾 Guardar todo» = 🟢
   }
-  res.json({ ok: true });
+  res.json({ ok: true, frenadas });
 }));
 
 // (29/10/2026) «✔ No afecta, mantenerlas»: las traducciones de un destino vuelven a 🟢 tal cual
 app.post('/admin/destinos/:id/traducciones/aprobar-todas', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query(
-    `UPDATE destinos_traducciones SET revisado = TRUE, desactualizado = FALSE WHERE destino_id = $1 AND nombre IS NOT NULL AND nombre <> ''`,
+  // (07/11/2026) N51: se aprueba lo que pasa el freno; el ruso sin ruso pasa a 🔴; lo demás se queda como está
+  const filas = await pool.query(
+    `SELECT destino_id, lang_code, nombre FROM destinos_traducciones WHERE destino_id = $1 AND nombre IS NOT NULL AND nombre <> ''`,
     [req.params.id]
   );
-  res.json({ ok: true });
+  const sep = separarParaAprobar(filas.rows.map(function (f) { return { destino_id: f.destino_id, lang: f.lang_code, texto: f.nombre, donde: f.lang_code.toUpperCase() }; }));
+  await aprobarDestinosSeparados(sep);
+  res.json({ ok: true, aprobadas: sep.aprobar.length, frenadas: sep.frenadas });
 }));
+// (07/11/2026) Aplica en los nombres de destinos lo separado por el freno
+async function aprobarDestinosSeparados(sep) {
+  for (const f of sep.aprobar) {
+    await pool.query('UPDATE destinos_traducciones SET revisado = TRUE, desactualizado = FALSE WHERE destino_id = $1 AND lang_code = $2', [f.destino_id, f.lang]);
+  }
+  for (const f of sep.rojo) {
+    await pool.query('UPDATE destinos_traducciones SET revisado = FALSE, desactualizado = TRUE WHERE destino_id = $1 AND lang_code = $2', [f.destino_id, f.lang]);
+  }
+}
 
 // (30/10/2026) «✅ Aprobar todo» de Destinos → Traducciones de destinos: aprueba (🟢) los nombres en 🔵
 // de todos los destinos y todos los idiomas. Los 🔴 (español cambiado o sin traducir) no se tocan.
 app.post('/admin/destinos/traducciones/aprobar-azules', requireAdmin, asyncHandler(async (req, res) => {
-  const r = await pool.query(
-    `UPDATE destinos_traducciones SET revisado = TRUE
-     WHERE revisado = FALSE AND COALESCE(desactualizado, FALSE) = FALSE
-       AND nombre IS NOT NULL AND TRIM(nombre) <> ''`
+  // (07/11/2026) N51: antes de aprobar, cada 🔵 pasa por el freno
+  const azules = await pool.query(
+    `SELECT dt.destino_id, dt.lang_code, dt.nombre, d.nombre AS nombre_es
+     FROM destinos_traducciones dt JOIN destinos d ON d.id = dt.destino_id
+     WHERE dt.revisado = FALSE AND COALESCE(dt.desactualizado, FALSE) = FALSE
+       AND dt.nombre IS NOT NULL AND TRIM(dt.nombre) <> ''`
   );
-  res.json({ ok: true, aprobadas: r.rowCount });
+  const sep = separarParaAprobar(azules.rows.map(function (f) {
+    return { destino_id: f.destino_id, lang: f.lang_code, texto: f.nombre, donde: f.nombre_es + ' (' + f.lang_code.toUpperCase() + ')' };
+  }));
+  await aprobarDestinosSeparados(sep);
+  res.json({ ok: true, aprobadas: sep.aprobar.length, frenadas: sep.frenadas });
 }));
 
 // ─── Admin: reservas ─────────────────────────────────────────────────────────
@@ -19277,11 +19502,17 @@ function problemaTraduccionPlantilla(p, parsed, tipo, lang) {
   if (!cuerpo || typeof cuerpo !== 'string' || !cuerpo.trim()) return 'Sin traducción en la respuesta';
   const original = tipo === 'wa' ? p.cuerpo_whatsapp : p.cuerpo_email;
   if (cuerpo.trim() === (original || '').trim()) return 'Volvió sin traducir';
-  if (lang === 'ru') {
-    const rr = revisarRuso(textoPlantillaCanal(parsed, tipo));
-    if (!rr.ok) return rr.sinRuso ? 'Ruso sin letras rusas' : 'Ruso con palabras en letras latinas: ' + rr.latinas.join(', ');
-  }
+  // (07/11/2026) N51: lo grave (ruso sin ruso, palabras con letras mezcladas) no se guarda.
+  // Un ruso con palabras enteras en letras latinas SÍ se guarda, en 🔵 y con aviso (regla de Germán del 07/11).
+  const rr = revisarTraduccion(textoPlantillaCanal(parsed, tipo), lang);
+  if (rr.sinRuso) return 'Ruso sin letras rusas';
+  if (rr.mezcladas.length) return 'Palabras con letras mezcladas: ' + rr.mezcladas.join(', ');
   return null;
+}
+// (07/11/2026) Aviso de lo guardado en 🔵 que lleva palabras en letras latinas (para que se revise)
+function avisoLatinasPlantilla(parsed, tipo, lang) {
+  const rr = revisarTraduccion(textoPlantillaCanal(parsed, tipo), lang);
+  return rr.latinas.length ? mensajeFreno(rr) : '';
 }
 
 // Guarda lo que ha devuelto la IA en 🔵 (traducido, sin aprobar), solo en el canal pedido.
@@ -19341,21 +19572,16 @@ app.post('/admin/plantillas-comunicacion/:clave/traducciones/:lang/retraducir', 
     const problema = problemaTraduccionPlantilla(p, parsed, tipo, lang);
     if (!problema) {
       await guardarPlantillaIA(clave, lang, tipo, parsed);
-      return res.json({ ok: true, asunto_email: parsed.asunto_email || '', cuerpo_email: parsed.cuerpo_email || '', cuerpo_whatsapp: parsed.cuerpo_whatsapp || '' });
+      return res.json({ ok: true, aviso: avisoLatinasPlantilla(parsed, tipo, lang),
+        asunto_email: parsed.asunto_email || '', cuerpo_email: parsed.cuerpo_email || '', cuerpo_whatsapp: parsed.cuerpo_whatsapp || '' });
     }
     console.warn('[GEN' + (tipo === 'email' ? '15' : '16') + '] Volver a traducir ' + clave + ' (' + lang + '), intento ' + intento + ': ' + problema);
     ultima = parsed;
     ultimoProblema = problema;
   }
-  // Ruso con palabras en letras latinas como ÚNICO problema: se enseña para que decida el operario
-  if (lang === 'ru' && ultima && problemaTraduccionPlantilla(p, ultima, tipo, 'es') === null) {
-    const rr = revisarRuso(textoPlantillaCanal(ultima, tipo));
-    if (!rr.ok && !rr.sinRuso) {
-      return res.json({ ok: false, ruso: rr, asunto_email: ultima.asunto_email || '', cuerpo_email: ultima.cuerpo_email || '', cuerpo_whatsapp: ultima.cuerpo_whatsapp || '' });
-    }
-  }
   let error;
-  if (ultimoProblema === 'Ruso sin letras rusas' || ultimoProblema === 'Volvió sin traducir') {
+  if (ultimoProblema === 'Ruso sin letras rusas' || ultimoProblema === 'Volvió sin traducir' ||
+      String(ultimoProblema || '').indexOf('Palabras con letras mezcladas') === 0) {
     error = 'La IA no ha devuelto el texto traducido (lo ha intentado dos veces). No se ha guardado nada: vuelve a pulsar «🔄 Volver a traducir».';
   } else {
     error = 'No se ha podido traducir (' + (ultimoProblema || 'error desconocido') + '). No se ha guardado nada.';
@@ -19400,9 +19626,9 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
   for (const t of yaExisten.rows) {
     mapaExistentes[t.plantilla_clave] = {
       tieneEmail: !!(t.cuerpo_email && t.cuerpo_email.trim()) && !t.desactualizado_email &&
-                  !(lang === 'ru' && revisarRuso(textoPlantillaCanal(t, 'email')).sinRuso), // (06/11/2026) un ruso sin ruso se vuelve a generar
+                  !revisarTraduccion(textoPlantillaCanal(t, 'email'), lang).sinRuso, // (06/11/2026) un ruso sin ruso se vuelve a generar
       tieneWa:    !!(t.cuerpo_whatsapp && t.cuerpo_whatsapp.trim()) && !t.desactualizado_wa &&
-                  !(lang === 'ru' && revisarRuso(textoPlantillaCanal(t, 'wa')).sinRuso)
+                  !revisarTraduccion(textoPlantillaCanal(t, 'wa'), lang).sinRuso
     };
   }
 
@@ -19423,6 +19649,7 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
   const nombreIdioma = await getNombreIdioma(lang);
   let generadas = 0;
   const errores = [];
+  const avisos = []; // (07/11/2026) guardadas en 🔵 con palabras en letras latinas
 
   for (const p of pendientes) {
     try {
@@ -19431,31 +19658,32 @@ app.post('/admin/plantillas-comunicacion/generar-ia/:lang', requireAdmin, asyncH
       if (tipo === 'wa' && (!p.cuerpo_whatsapp || !p.cuerpo_whatsapp.trim())) continue;
 
       let parsed = await llamarIAPlantilla(p, tipo, nombreIdioma);
-      // (06/11/2026) N51: en ruso, lo que no vuelve bien (sin ruso, igual al español, letras latinas)
-      // se pide otra vez a la IA, una vez. Si vuelve a fallar, no se guarda y queda en 🔴.
-      if (lang === 'ru') {
-        let problema = problemaTraduccionPlantilla(p, parsed, tipo, lang);
+      // (07/11/2026) N51: lo que no vuelve bien (ruso sin ruso, igual al español, palabras con letras mezcladas)
+      // se pide otra vez a la IA, una vez. Si vuelve a fallar, no se guarda (sigue como estaba, en 🔴).
+      let problema = problemaTraduccionPlantilla(p, parsed, tipo, lang);
+      if (problema) {
+        console.warn('[GEN' + (tipo === 'email' ? '15' : '16') + '] ' + lang + ': ' + p.clave + ' — ' + problema + ' — se pide otra vez a la IA.');
+        parsed = await llamarIAPlantilla(p, tipo, nombreIdioma);
+        problema = problemaTraduccionPlantilla(p, parsed, tipo, lang);
         if (problema) {
-          console.warn('[GEN' + (tipo === 'email' ? '15' : '16') + '] ru: ' + p.clave + ' — ' + problema + ' — se pide otra vez a la IA.');
-          parsed = await llamarIAPlantilla(p, tipo, nombreIdioma);
-          problema = problemaTraduccionPlantilla(p, parsed, tipo, lang);
-          if (problema) {
-            console.warn('[GEN' + (tipo === 'email' ? '15' : '16') + '] ru: ' + p.clave + ' — ' + problema + ' (2.º intento) — no se guarda.');
-            errores.push({ clave: p.clave, nombre: p.nombre, error: problema, ruso: true });
-            continue;
-          }
+          console.warn('[GEN' + (tipo === 'email' ? '15' : '16') + '] ' + lang + ': ' + p.clave + ' — ' + problema + ' (2.º intento) — no se guarda.');
+          errores.push({ clave: p.clave, nombre: p.nombre, error: problema, frenada: true });
+          continue;
         }
       }
 
       await guardarPlantillaIA(p.clave, lang, tipo, parsed);
       generadas++;
+      // Palabras en letras latinas en ruso: se guarda en 🔵 y se avisa
+      const avisoLat = avisoLatinasPlantilla(parsed, tipo, lang);
+      if (avisoLat) avisos.push({ clave: p.clave, nombre: p.nombre, aviso: avisoLat });
     } catch (err) {
       console.error('[GEN15/16] Error en ' + p.clave + ':', err.message);
       errores.push({ clave: p.clave, nombre: p.nombre, error: err.message });
     }
   }
 
-  res.json({ ok: true, generadas, errores });
+  res.json({ ok: true, generadas, errores, avisos });
 }));
 
 // PUT — guardar o actualizar una traducción
@@ -19463,10 +19691,10 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
   const { clave, lang } = req.params;
   const { asunto_email, cuerpo_email, cuerpo_whatsapp, generado_por_ia, solo_aprobar, tipo, confirmar_latinas } = req.body;
 
-  // (06/11/2026) N51 — Freno del ruso (solo en el canal que se guarda o se aprueba): un ruso sin letras rusas
-  // nunca se guarda ni se aprueba (si se intenta aprobar, pasa a 🔴); con palabras en letras latinas,
-  // solo si se confirma a propósito.
-  if (lang === 'ru' && (tipo === 'email' || tipo === 'wa')) {
+  // (07/11/2026) N51 — Freno de las traducciones (solo en el canal que se guarda o se aprueba), en todos los idiomas:
+  // un ruso sin letras rusas o una palabra con letras mezcladas nunca se guarda ni se aprueba (al aprobar, el ruso
+  // sin ruso pasa a 🔴); un ruso con palabras en letras latinas, solo si se confirma con «💾 Guardar así».
+  if (lang !== 'es' && (tipo === 'email' || tipo === 'wa')) {
     let textoRu = textoPlantillaCanal({ asunto_email, cuerpo_email, cuerpo_whatsapp }, tipo);
     if (solo_aprobar) {
       const actual = await pool.query(
@@ -19476,8 +19704,11 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
       textoRu = actual.rows.length ? textoPlantillaCanal(actual.rows[0], tipo) : '';
     }
     if (textoRu && textoRu.trim()) {
-      const rr = revisarRuso(textoRu);
-      if (!rr.ok && (rr.sinRuso || !confirmar_latinas)) {
+      const rr = revisarTraduccion(textoRu, lang);
+      // Guardar el texto: solo lo grave lo impide (con palabras latinas se guarda, pero en 🔵 hasta «💾 Guardar así»).
+      // Aprobar: lo grave y las palabras latinas sin confirmar lo impiden.
+      if (!solo_aprobar && rr.latinas.length && !rr.grave && !confirmar_latinas) req._pasarAAzul = true;
+      if (solo_aprobar ? frenoBloquea(rr, confirmar_latinas) : rr.grave) {
         if (solo_aprobar && rr.sinRuso) {
           await pool.query(
             tipo === 'wa'
@@ -19488,7 +19719,7 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
             [clave, lang]
           );
         }
-        return res.json({ ok: false, ruso: rr });
+        return res.json(respuestaFreno(rr));
       }
     }
   }
@@ -19526,31 +19757,101 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
        actualizado_en = NOW()`,
     [clave, lang, asunto_email || null, cuerpo_email || null, cuerpo_whatsapp || null, !!generado_por_ia]
   );
+  // (07/11/2026) N51: un ruso con palabras en letras latinas guardado sin confirmar queda en 🔵 (no se queda en 🟢 de antes)
+  if (req._pasarAAzul) {
+    await pool.query(
+      tipo === 'wa'
+        ? 'UPDATE plantillas_comunicacion_traducciones SET revisado_wa = FALSE WHERE plantilla_clave = $1 AND lang_code = $2'
+        : 'UPDATE plantillas_comunicacion_traducciones SET revisado_email = FALSE WHERE plantilla_clave = $1 AND lang_code = $2',
+      [clave, lang]
+    );
+  }
   res.json({ ok: true });
 }));
 
-// ─── (06/11/2026) N51 — Freno del ruso ────────────────────────────────────────
-// Un texto ruso tiene que estar escrito en ruso (letras cirílicas). No cuentan: las variables {…},
-// los enlaces, los correos, las etiquetas HTML, los números de reserva (3 letras y 3 cifras, p. ej. ABC123)
-// y las palabras de la lista RUSO_PALABRAS_PERMITIDAS (decididas por Germán; sin distinguir mayúsculas:
-// «email», «Email», «E-mail»… cuentan igual).
-// Devuelve { ok: true } o { ok: false, sinRuso, latinas: [palabras en letras latinas] }.
-const RUSO_PALABRAS_PERMITIDAS = ['traslados', 'gc', 'whatsapp', 'email', 'e-mail'];
-function revisarRuso(texto) {
-  let t = String(texto || '')
+// ─── (07/11/2026) N51 — FRENO DE LAS TRADUCCIONES (común a todas las pantallas de traducción) ──
+// Reglas decididas por Germán (06–07/11/2026):
+//  · Ruso sin letras rusas (escrito en español o en inglés): nunca se guarda ni se aprueba.
+//  · Palabra con letras rusas y latinas mezcladas («Тауrito», «parasоller»), en CUALQUIER idioma: nunca.
+//  · Ruso con una palabra entera en letras latinas que no está en la lista (p. ej. «Guiniguada»): al generar
+//    se guarda en 🔵 con aviso; con «Aprobar todo» / «Guardar todo» no pasa a 🟢; en la ficha, solo con «💾 Guardar así».
+// No cuentan: variables {…}, enlaces, correos, etiquetas HTML y números de reserva (3 letras y 3 cifras).
+// Lista de palabras en letras latinas permitidas en ruso (decididas por Germán; sin distinguir mayúsculas).
+const RUSO_PALABRAS_PERMITIDAS = ['traslados', 'gc', 'whatsapp', 'email', 'e-mail',
+  'visa', 'mastercard', 'maestro', 'apple', 'google', 'pay', 'wi-fi', 'no-show', 'c', 'f', 'euro', 'd',
+  'lpa', 'ib', 'abc', 'gca', 'pnr', 'eurotaxi', 'eurotaxis', 'vt', 'msc', 'bellísima'];
+// Devuelve { ok, grave, sinRuso, mezcladas: [...], latinas: [...] }.
+function revisarTraduccion(texto, lang) {
+  const t = String(texto || '')
     .replace(/\{[a-z_]+\}/g, ' ')
     .replace(/https?:\/\/\S+/g, ' ')
     .replace(/\S+@\S+/g, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&[a-z]+;/g, ' ')
     .replace(/\b[A-Z]{3}[0-9]{3}\b/g, ' ');
-  const cirilicas = (t.match(/[Ѐ-ӿ]/g) || []).length;
-  const latinas = Array.from(new Set(t.match(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ-]*/g) || []))
-    .filter(function(pal) { return RUSO_PALABRAS_PERMITIDAS.indexOf(pal.toLowerCase()) < 0; });
-  if (!cirilicas && !latinas.length) return { ok: true }; // sin letras (solo variables, cifras…)
-  if (!cirilicas) return { ok: false, sinRuso: true, latinas: latinas };
-  if (latinas.length) return { ok: false, sinRuso: false, latinas: latinas };
-  return { ok: true };
+  // Palabras con los dos alfabetos (se mira cada trozo entre guiones: «VIP-трансфер» es correcto)
+  const trozos = t.match(/[A-Za-zÀ-ÖØ-öø-ÿЀ-ӿ]+/g) || [];
+  const mezcladas = Array.from(new Set(trozos.filter(function (w) {
+    return /[Ѐ-ӿ]/.test(w) && /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(w);
+  })));
+  let sinRuso = false, latinas = [];
+  if (lang === 'ru') {
+    const cirilicas = (t.match(/[Ѐ-ӿ]/g) || []).length;
+    const palLatinas = (t.match(/[A-Za-zÀ-ÖØ-öø-ÿЀ-ӿ]+(?:-[A-Za-zÀ-ÖØ-öø-ÿЀ-ӿ]+)*/g) || [])
+      .map(function (w) { return w.split('-').filter(function (x) { return x && !/[Ѐ-ӿ]/.test(x); }); })
+      .reduce(function (a, b) { return a.concat(b); }, []);
+    // Las permitidas se comparan enteras (Wi-Fi, e-mail, No-show) y también por trozos
+    const enteras = (t.match(/[A-Za-zÀ-ÖØ-öø-ÿ]+(?:-[A-Za-zÀ-ÖØ-öø-ÿ]+)*/g) || []);
+    const permitidaEntera = {};
+    enteras.forEach(function (w) {
+      if (RUSO_PALABRAS_PERMITIDAS.indexOf(w.toLowerCase()) >= 0) w.split('-').forEach(function (x) { permitidaEntera[x] = true; });
+    });
+    latinas = Array.from(new Set(palLatinas.filter(function (w) {
+      return !permitidaEntera[w] && RUSO_PALABRAS_PERMITIDAS.indexOf(w.toLowerCase()) < 0 &&
+        mezcladas.indexOf(w) < 0;
+    })));
+    sinRuso = !cirilicas && latinas.length > 0; // solo palabras permitidas (p. ej. «Wi-Fi») no es «sin ruso»
+    // Un nombre propio suelto en letras latinas («Guiniguada», «Anfi del Mar») no es «sin ruso»: es una palabra
+    // latina que decide Germán. Una frase en español o en inglés («Taurito beach», «Traslados en Gran Canaria») sí.
+    if (sinRuso) {
+      const unidas = ['de', 'del', 'la', 'las', 'los', 'el', 'y'];
+      const pals = palLatinas;
+      const mayus = pals.filter(function (w) { return /^[A-ZÀ-ÖØ-Þ]/.test(w); });
+      const nombrePropio = pals.length <= 5 && mayus.length > 0 &&
+        pals.every(function (w) { return /^[A-ZÀ-ÖØ-Þ]/.test(w) || unidas.indexOf(w) >= 0; }) &&
+        !/[.!?¿¡:;]/.test(t.trim());
+      if (nombrePropio) sinRuso = false;
+    }
+  }
+  const grave = sinRuso || mezcladas.length > 0;
+  return { ok: !grave && !latinas.length, grave: grave, sinRuso: sinRuso, mezcladas: mezcladas, latinas: latinas };
+}
+// ¿Impide guardar o aprobar? Lo grave, siempre; las palabras latinas, si no se ha confirmado «💾 Guardar así».
+function frenoBloquea(r, confirmarLatinas) {
+  return r.grave || (r.latinas.length > 0 && !confirmarLatinas);
+}
+// Texto del aviso en español (Admin)
+function mensajeFreno(r) {
+  if (r.sinRuso) return 'Este texto no está escrito en ruso. No se ha guardado ni aprobado.';
+  if (r.mezcladas.length) return 'Hay palabras con letras rusas y latinas mezcladas: ' + r.mezcladas.join(', ') + '. No se ha guardado ni aprobado.';
+  if (r.latinas.length) return 'Este texto ruso lleva palabras en letras latinas: ' + r.latinas.join(', ') + '.';
+  return '';
+}
+// Respuesta de un guardado frenado (la entiende el Admin: recuadro rojo y, si son solo palabras latinas, «💾 Guardar así»)
+function respuestaFreno(r) {
+  return { ok: false, freno: { grave: r.grave, sinRuso: r.sinRuso, mezcladas: r.mezcladas, latinas: r.latinas }, error: mensajeFreno(r) };
+}
+// Aprobación masiva: separa lo que se puede aprobar (🟢), lo que pasa a 🔴 (ruso sin ruso) y lo que se queda como está.
+// filas: [{ ..., texto, lang, donde }] → { aprobar: [...], rojo: [...], quedan: [...], frenadas: [{ donde, lang, motivo }] }
+function separarParaAprobar(filas) {
+  const out = { aprobar: [], rojo: [], quedan: [], frenadas: [] };
+  for (const f of filas) {
+    const r = revisarTraduccion(f.texto, f.lang);
+    if (r.ok) { out.aprobar.push(f); continue; }
+    if (r.sinRuso) out.rojo.push(f); else out.quedan.push(f);
+    out.frenadas.push({ donde: f.donde || '', lang: f.lang, motivo: mensajeFreno(r) });
+  }
+  return out;
 }
 
 // Una frase de 3 palabras o más idéntica al español no está traducida
@@ -19567,11 +19868,16 @@ function problemaTraduccionFrase(f, traduccion, lang) {
   const varsEs = ((f.texto_es || '').match(/\{[a-z_]+\}/g) || []).sort().join(',');
   const varsTr = (traduccion.match(/\{[a-z_]+\}/g) || []).sort().join(',');
   if (varsEs !== varsTr) return 'Variables alteradas';
-  if (lang === 'ru') {
-    const rr = revisarRuso(traduccion);
-    if (!rr.ok) return rr.sinRuso ? 'Ruso sin letras rusas' : 'Ruso con palabras en letras latinas: ' + rr.latinas.join(', ');
-  }
+  // (07/11/2026) N51: lo grave no se guarda; un ruso con palabras en letras latinas se guarda en 🔵 con aviso
+  const rr = revisarTraduccion(traduccion, lang);
+  if (rr.sinRuso) return 'Ruso sin letras rusas';
+  if (rr.mezcladas.length) return 'Palabras con letras mezcladas: ' + rr.mezcladas.join(', ');
   return null;
+}
+// (07/11/2026) Aviso de una frase guardada en 🔵 con palabras en letras latinas
+function avisoLatinasFrase(traduccion, lang) {
+  const rr = revisarTraduccion(traduccion, lang);
+  return rr.latinas.length ? mensajeFreno(rr) : '';
 }
 
 // Llamada a la IA del Generador 17 (frases) para una lista de frases en un idioma.
@@ -19716,9 +20022,10 @@ app.put('/admin/frases-comunicacion/:clave/traducciones/:lang', requireAdmin, as
   const { clave, lang } = req.params;
   const { texto, generado_por_ia, solo_aprobar, confirmar_latinas } = req.body;
 
-  // (06/11/2026) N51 — Freno del ruso: un ruso sin letras rusas nunca se guarda ni se aprueba
-  // (si se intenta aprobar, pasa a 🔴); con palabras en letras latinas, solo si se confirma a propósito.
-  if (lang === 'ru') {
+  // (07/11/2026) N51 — Freno de las traducciones, en todos los idiomas: un ruso sin letras rusas o una palabra con
+  // letras mezcladas nunca se guarda ni se aprueba (al aprobar, el ruso sin ruso pasa a 🔴); un ruso con palabras
+  // en letras latinas, solo si se confirma con «💾 Guardar así».
+  if (lang !== 'es') {
     let textoRu = texto;
     if (solo_aprobar) {
       const actual = await pool.query(
@@ -19727,15 +20034,18 @@ app.put('/admin/frases-comunicacion/:clave/traducciones/:lang', requireAdmin, as
       textoRu = actual.rows.length ? actual.rows[0].texto : '';
     }
     if (textoRu && textoRu.trim()) {
-      const rr = revisarRuso(textoRu);
-      if (!rr.ok && (rr.sinRuso || !confirmar_latinas)) {
+      const rr = revisarTraduccion(textoRu, lang);
+      // Guardar el texto: solo lo grave lo impide (con palabras latinas se guarda, pero en 🔵 hasta «💾 Guardar así»).
+      // Aprobar: lo grave y las palabras latinas sin confirmar lo impiden.
+      if (!solo_aprobar && rr.latinas.length && !rr.grave && !confirmar_latinas) req._pasarAAzul = true;
+      if (solo_aprobar ? frenoBloquea(rr, confirmar_latinas) : rr.grave) {
         if (solo_aprobar && rr.sinRuso) {
           await pool.query(
             `UPDATE frases_comunicacion_traducciones SET desactualizado = TRUE, revisado = FALSE, actualizado_en = NOW()
              WHERE frase_clave = $1 AND lang_code = $2`, [clave, lang]
           );
         }
-        return res.json({ ok: false, ruso: rr });
+        return res.json(respuestaFreno(rr));
       }
     }
   }
@@ -19758,6 +20068,10 @@ app.put('/admin/frases-comunicacion/:clave/traducciones/:lang', requireAdmin, as
      DO UPDATE SET texto = EXCLUDED.texto, generado_por_ia = EXCLUDED.generado_por_ia, actualizado_en = NOW()`,
     [clave, lang, texto || null, !!generado_por_ia]
   );
+  // (07/11/2026) N51: un ruso con palabras en letras latinas guardado sin confirmar queda en 🔵 (no se queda en 🟢 de antes)
+  if (req._pasarAAzul) {
+    await pool.query('UPDATE frases_comunicacion_traducciones SET revisado = FALSE WHERE frase_clave = $1 AND lang_code = $2', [clave, lang]);
+  }
   res.json({ ok: true });
 }));
 
@@ -19788,19 +20102,15 @@ app.post('/admin/frases-comunicacion/:clave/traducciones/:lang/retraducir', requ
            SET texto = EXCLUDED.texto, generado_por_ia = TRUE, revisado = FALSE, desactualizado = FALSE, actualizado_en = NOW()`,
         [clave, lang, traduccion.trim()]
       );
-      return res.json({ ok: true, texto: traduccion.trim() });
+      return res.json({ ok: true, texto: traduccion.trim(), aviso: avisoLatinasFrase(traduccion, lang) });
     }
     console.warn('[GEN17] Volver a traducir ' + clave + ' (' + lang + '), intento ' + intento + ': ' + problema);
     ultimaTraduccion = typeof traduccion === 'string' ? traduccion.trim() : null;
     ultimoProblema = problema;
   }
-  // Ruso con palabras en letras latinas como ÚNICO problema: se enseña para que decida el operario
-  if (lang === 'ru' && ultimaTraduccion && problemaTraduccionFrase(f, ultimaTraduccion, 'es') === null) {
-    const rr = revisarRuso(ultimaTraduccion);
-    if (!rr.ok && !rr.sinRuso) return res.json({ ok: false, texto: ultimaTraduccion, ruso: rr });
-  }
   let error;
-  if (ultimoProblema === 'Ruso sin letras rusas' || ultimoProblema === 'Volvió sin traducir') {
+  if (ultimoProblema === 'Ruso sin letras rusas' || ultimoProblema === 'Volvió sin traducir' ||
+      String(ultimoProblema || '').indexOf('Palabras con letras mezcladas') === 0) {
     error = 'La IA no ha devuelto el texto traducido (lo ha intentado dos veces). No se ha guardado nada: vuelve a pulsar «🔄 Volver a traducir».';
   } else if (ultimoProblema === 'Variables alteradas') {
     error = 'La IA ha cambiado las variables {…} (lo ha intentado dos veces). No se ha guardado nada: vuelve a pulsar «🔄 Volver a traducir».';
@@ -19837,7 +20147,7 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
   for (const t of yaExisten.rows) {
     tiene[t.frase_clave] = !!(t.texto && t.texto.trim()) && !t.desactualizado &&
       !(!t.revisado && sinTraducir(t.texto, textoEsDe[t.frase_clave])) &&
-      !(lang === 'ru' && revisarRuso(t.texto).sinRuso); // (06/11/2026) un ruso sin ruso se vuelve a generar
+      !revisarTraduccion(t.texto, lang).sinRuso; // (06/11/2026) un ruso sin ruso se vuelve a generar
   }
   const pendientes = frases.rows.filter(function(f) { return !tiene[f.clave] && f.texto_es && f.texto_es.trim(); });
 
@@ -19882,15 +20192,18 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
     );
     generadas++;
     lista.push({ clave: f.clave, texto_es: f.texto_es, texto: traduccion.trim() });
+    const avisoLat = avisoLatinasFrase(traduccion, lang); // (07/11/2026) guardada en 🔵 con palabras en letras latinas
+    if (avisoLat) avisos.push({ clave: f.clave, texto_es: f.texto_es, aviso: avisoLat });
   };
-  // (06/11/2026) N51: en ruso, lo que no vuelve bien (sin ruso, igual al español, letras latinas, variables…)
-  // se pide otra vez a la IA, una vez. Si vuelve a fallar, no se guarda y queda en 🔴.
+  const avisos = [];
+  // (07/11/2026) N51: lo que no vuelve bien (ruso sin ruso, igual al español, palabras con letras mezcladas, variables…)
+  // se pide otra vez a la IA, una vez, en cualquier idioma. Si vuelve a fallar, no se guarda (sigue como estaba, en 🔴).
   const reintentar = [];
   for (const f of pendientes) {
     const traduccion = parsed[f.clave];
     const problema = problemaTraduccionFrase(f, traduccion, lang);
     if (problema) {
-      if (lang === 'ru' && problema !== 'Sin traducción en la respuesta') { reintentar.push(f); continue; }
+      if (problema !== 'Sin traducción en la respuesta') { reintentar.push(f); continue; }
       console.warn('[GEN17] ' + lang + ': ' + f.clave + ' — ' + problema + ' — no se guarda.');
       errores.push({ clave: f.clave, texto_es: f.texto_es, error: problema });
       continue;
@@ -19898,7 +20211,7 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
     await guardarFraseIA(f, traduccion);
   }
   if (reintentar.length) {
-    console.warn('[GEN17] ru: ' + reintentar.length + ' frase(s) no han vuelto bien en ruso — se piden otra vez a la IA.');
+    console.warn('[GEN17] ' + lang + ': ' + reintentar.length + ' frase(s) no han vuelto bien — se piden otra vez a la IA.');
     let parsed2 = {};
     try { parsed2 = (await llamarIAFrases(lang, reintentar)).parsed; }
     catch (err2) { console.error('[GEN17] Error en el segundo intento:', err2.message); }
@@ -19906,14 +20219,14 @@ app.post('/admin/frases-comunicacion/generar-ia/:lang', requireAdmin, asyncHandl
       const traduccion2 = parsed2[f.clave];
       const problema2 = problemaTraduccionFrase(f, traduccion2, lang);
       if (problema2) {
-        console.warn('[GEN17] ru: ' + f.clave + ' — ' + problema2 + ' (2.º intento) — no se guarda.');
-        errores.push({ clave: f.clave, texto_es: f.texto_es, error: problema2, ruso: true });
+        console.warn('[GEN17] ' + lang + ': ' + f.clave + ' — ' + problema2 + ' (2.º intento) — no se guarda.');
+        errores.push({ clave: f.clave, texto_es: f.texto_es, error: problema2, frenada: true });
         continue;
       }
       await guardarFraseIA(f, traduccion2);
     }
   }
-  res.json({ ok: true, generadas, errores, lista });
+  res.json({ ok: true, generadas, errores, lista, avisos });
 }));
 
 // ─── Tarea automática: cancelar reservas confirmadas sin pago de depósito ────
