@@ -28,8 +28,23 @@ function REGLA_RUSO(nombreIdioma, conSaludo) {
     '- Translitera al cirílico los nombres propios de lugares (Maspalomas → Маспаломас, Taurito → Таурито, Gran Canaria → Гран-Канария).\n' +
     '- Solo se quedan en letras latinas: las variables entre llaves {…}, los enlaces, los correos, los números de reserva y los nombres de marca (Traslados GC, WhatsApp, Visa, Mastercard).\n' +
     '- Si un nombre propio de verdad no se puede transliterar, déjalo entero en letras latinas, nunca a medias.\n' +
-    '- Los slugs, las palabras de las direcciones web y los nombres de archivo siguen su propia regla: siempre en letras latinas.' +
-    (conSaludo ? '\n- El saludo es siempre «Здравствуйте», nunca «Привет».' : '');
+    '- Los slugs, las palabras de las direcciones web y los nombres de archivo siguen su propia regla: siempre en letras latinas.\n' +
+    '- «Личный кабинет» (el área del cliente) va siempre con mayúscula: «войдите в раздел «Личный кабинет»», o declinado dentro de la frase: «в Личном кабинете».' +
+    (conSaludo ? '\n- El saludo es siempre «Здравствуйте», nunca «Привет».' +
+      '\n- La frase del horario es siempre exactamente «Мы ответим вам в рабочее время.»' +
+      '\n- «Счёт-фактура» se declina según la frase: «Прилагаем счёт-фактуру», «Скачать счёт-фактуру».' : '');
+}
+
+// (08/11/2026) N53 — Nombres de la pantalla: cuando un texto cita un botón o un apartado de la web
+// («Acceso clientes», «Mensajes del equipo»), la traducción usa el nombre EXACTO que ve el cliente en su idioma.
+// Los nombres los da server.js (glosarioBotonesIA) desde Admin → Idiomas → Textos de interfaz: el Admin manda.
+function GLOSARIO_BOTONES(nombreIdioma, pares) {
+  const lineas = (pares || []).filter(function(p) { return p && p.es && p.tr; })
+    .map(function(p) { return '- «' + p.es + '» → «' + p.tr + '»'; });
+  if (!lineas.length) return '';
+  return '\n\nNOMBRES DE LA PANTALLA (obligatorio):\n' +
+    'Si el texto en español cita alguno de estos botones o apartados de la web, escríbelo en ' + nombreIdioma +
+    ' exactamente con este nombre, tal como lo ve el cliente en su pantalla, sin traducirlo de otra forma:\n' + lineas.join('\n');
 }
 
 
@@ -238,7 +253,7 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
 // Función: traducirConClaudeIA()
 // Botón admin: Traducir con IA — pestaña Idiomas
 // Línea original server.js: ~4691
-function GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items) {
+function GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items, glosario) {
   return 'Traduce los siguientes textos de una web de traslados privados en Gran Canaria, ' +
     'del español al ' + nombreIdioma + '. Cada texto incluye una clave única y un contexto que explica ' +
     'dónde aparece en la web — úsalo para elegir la traducción más natural (por ejemplo, un botón necesita ' +
@@ -247,7 +262,7 @@ function GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items) {
     '- Para claves extra_web_X: es el nombre de un extra que ve el cliente al reservar — tradúcelo de forma 100% nativa en ' + nombreIdioma + ', como lo escribiría un local, nunca de forma literal.\n' +
     '- Si un texto contiene marcas entre llaves, como {fecha} o {importe}, cópialas exactamente igual, sin traducirlas ni cambiarlas: el programa pone ahí un dato real.\n\n' +
     'Textos a traducir (JSON):\n' + JSON.stringify(items, null, 2) + '\n\n' +
-    REGLA_LETRAS() + REGLA_RUSO(nombreIdioma) + '\n\n' +
+    REGLA_LETRAS() + REGLA_RUSO(nombreIdioma) + (glosario || '') + '\n\n' +
     'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, ' +
     'sin bloques de markdown ni comillas triples, con esta forma exacta: ' +
     '{"clave1": "traducción1", "clave2": "traducción2"}';
@@ -822,7 +837,7 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
 // Endpoint: POST /admin/plantillas-comunicacion/generar-ia/:lang
 // Botón admin: 🤖 Generar lo que falta (Admin → Idiomas → Comunicaciones Cliente)
 // Línea server.js: ~13892
-function GENERADOR_EMAIL_COMUNICACIONES(nombreIdioma, asunto_es, cuerpo_es) {
+function GENERADOR_EMAIL_COMUNICACIONES(nombreIdioma, asunto_es, cuerpo_es, glosario) {
   return `Eres un traductor especializado en comunicaciones profesionales para una empresa de traslados privados de lujo en Gran Canaria (España) llamada Traslados GC. Tu tarea es traducir emails de comunicación con clientes al idioma indicado: ${nombreIdioma}.
 
 Reglas estrictas que nunca puedes romper:
@@ -842,7 +857,7 @@ Asunto original en español: ${asunto_es}
 Cuerpo del email original en español:
 ${cuerpo_es}
 
-${REGLA_LETRAS()}${REGLA_RUSO(nombreIdioma, true)}
+${REGLA_LETRAS()}${REGLA_RUSO(nombreIdioma, true)}${glosario || ''}
 
 Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin texto adicional:
 {"asunto_email": "asunto traducido", "cuerpo_email": "cuerpo traducido"}`;
@@ -855,7 +870,7 @@ Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin t
 // Endpoint: POST /admin/plantillas-comunicacion/generar-ia/:lang
 // Botón admin: 🤖 Generar lo que falta (Admin → Idiomas → Comunicaciones Cliente)
 // Línea server.js: ~13892
-function GENERADOR_WA_COMUNICACIONES(nombreIdioma, cuerpo_wa_es) {
+function GENERADOR_WA_COMUNICACIONES(nombreIdioma, cuerpo_wa_es, glosario) {
   return `Eres un especialista en comunicación por WhatsApp para una empresa de traslados privados de lujo en Gran Canaria (España) llamada Traslados GC. Tu tarea es traducir mensajes de WhatsApp al idioma indicado: ${nombreIdioma}.
 
 Reglas estrictas que nunca puedes romper:
@@ -875,7 +890,7 @@ Contexto del negocio: Traslados GC ofrece traslados intermunicipales privados de
 Texto de WhatsApp original en español:
 ${cuerpo_wa_es}
 
-${REGLA_LETRAS()}${REGLA_RUSO(nombreIdioma, true)}
+${REGLA_LETRAS()}${REGLA_RUSO(nombreIdioma, true)}${glosario || ''}
 
 Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin texto adicional:
 {"cuerpo_whatsapp": "texto traducido o null si el original era null o vacío"}`;
@@ -886,7 +901,7 @@ Responde EXCLUSIVAMENTE con JSON válido, sin bloques de código markdown, sin t
 // Endpoint: POST /admin/frases-comunicacion/generar-ia/:lang
 // Botón admin: 🤖 Generar Frases (Admin → Idiomas → Comunicaciones Cliente → 🧩 Cliente — Frases)
 // Línea server.js: ~14380
-function GENERADOR_FRASES_COMUNICACIONES(nombreIdioma, items) {
+function GENERADOR_FRASES_COMUNICACIONES(nombreIdioma, items, glosario) {
   // Mismo formato que GENERADOR_INTERFAZ_TEXTOS: los textos se entregan en JSON (clave, contexto, texto)
   const lista = JSON.stringify(items.map(function(f) {
     return { clave: f.clave, contexto: f.contexto || '', texto: f.texto_es };
@@ -910,7 +925,7 @@ Contexto del negocio: Traslados GC ofrece traslados intermunicipales privados de
 Frases a traducir del español al ${nombreIdioma} (JSON):
 ${lista}
 
-${REGLA_LETRAS()}
+${REGLA_LETRAS()}${REGLA_RUSO(nombreIdioma, true)}${glosario || ''}
 
 Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, sin bloques de markdown ni comillas triples, con todas las frases traducidas al ${nombreIdioma} y con esta forma exacta:
 {"clave1": "traducción1", "clave2": "traducción2"}`;
@@ -918,6 +933,7 @@ Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni
 
 // =============================================================================
 module.exports = {
+  GLOSARIO_BOTONES,
   GENERADOR_ALT_NUEVO_ES,
   GENERADOR_ALT_NUEVO_TODOS,
   GENERADOR_ALT_EXISTENTE_LANG,

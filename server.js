@@ -8773,7 +8773,7 @@ async function traducirConClaudeIA(items, nombreIdioma) {
     throw new Error('Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.');
   }
 
-  const prompt = iaPrompts.GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items);
+  const prompt = iaPrompts.GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items, await glosarioBotonesIA(nombreIdioma)); // (08/11/2026) N53
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -19693,10 +19693,32 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
 // ─── (06/11/2026) N51 — Email y WhatsApp: freno del ruso y «🔄 Volver a traducir» ──
 // Llamada a la IA de los Generadores 15 (email) y 16 (WhatsApp) para UNA plantilla en un idioma.
 // La usan «Generar lo que falta» y «🔄 Volver a traducir». Devuelve el JSON de la IA.
+// (08/11/2026) N53 — Nombres de la pantalla para los traductores de IA: «Acceso clientes» y «Mensajes del equipo»
+// con el nombre que ve el cliente en ese idioma (Admin → Idiomas → Textos de interfaz). Sin emoji delante.
+// Si el idioma aún no tiene el botón traducido, no se añade nada.
+async function glosarioBotonesIA(nombreIdioma) {
+  try {
+    const r = await pool.query('SELECT codigo FROM idiomas_web WHERE nombre = $1 LIMIT 1', [nombreIdioma]);
+    const lang = r.rows.length ? r.rows[0].codigo : null;
+    if (!lang || lang === 'es') return '';
+    const limpio = function(t) { return String(t || '').replace(/^[^\p{L}]+/u, '').trim(); };
+    const par = function(clave) {
+      const e = TEXTOS_CACHE[clave];
+      if (!e) return null;
+      return { es: limpio(e.texto_es), tr: limpio(e.traducciones && e.traducciones[lang]) };
+    };
+    return iaPrompts.GLOSARIO_BOTONES(nombreIdioma, [par('home_nav_acceso_clientes'), par('por_mensajes_titulo')]);
+  } catch (e) {
+    console.warn('Glosario de botones para la IA:', e.message);
+    return '';
+  }
+}
+
 async function llamarIAPlantilla(p, tipo, nombreIdioma) {
+  const glosario = await glosarioBotonesIA(nombreIdioma); // (08/11/2026) N53
   const prompt = tipo === 'email'
-    ? iaPrompts.GENERADOR_EMAIL_COMUNICACIONES(nombreIdioma, p.asunto_email || '', p.cuerpo_email)
-    : iaPrompts.GENERADOR_WA_COMUNICACIONES(nombreIdioma, p.cuerpo_whatsapp);
+    ? iaPrompts.GENERADOR_EMAIL_COMUNICACIONES(nombreIdioma, p.asunto_email || '', p.cuerpo_email, glosario)
+    : iaPrompts.GENERADOR_WA_COMUNICACIONES(nombreIdioma, p.cuerpo_whatsapp, glosario);
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -20117,7 +20139,7 @@ async function llamarIAFrases(lang, lista) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const nombreIdioma = await getNombreIdioma(lang);
   console.log('[GEN17] ' + lang + ': idioma enviado a la IA = ' + nombreIdioma + ', frases pendientes = ' + lista.length);
-  const prompt = iaPrompts.GENERADOR_FRASES_COMUNICACIONES(nombreIdioma, lista);
+  const prompt = iaPrompts.GENERADOR_FRASES_COMUNICACIONES(nombreIdioma, lista, await glosarioBotonesIA(nombreIdioma)); // (08/11/2026) N53
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
