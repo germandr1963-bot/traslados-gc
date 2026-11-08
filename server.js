@@ -7096,15 +7096,42 @@ app.post('/admin/destinos/migrar-cloudinary', requireAdmin, asyncHandler(async (
   res.json({ ok, errores, total: fotos.rows.length });
 }));
 
+// (08/11/2026) N68 punto 4: al eliminar una foto en el Admin se borra también su archivo de Cloudinary.
+// Solo si ninguna otra foto (rutas, destinos, categorías o foto principal de categoría) usa ese mismo archivo.
+// Un fallo de Cloudinary nunca impide eliminar la foto en el Admin: solo se apunta en el registro.
+function publicIdCloudinary(url) {
+  const m = String(url || '').match(/\/image\/upload\/(?:v\d+\/)?(.+)\.[a-z0-9]+$/i);
+  return m ? m[1] : null;
+}
+async function borrarFotosCloudinarySinUso(urls) {
+  for (const url of (urls || [])) {
+    const pid = publicIdCloudinary(url);
+    if (!pid) continue;
+    try {
+      const uso = await pool.query(`
+        SELECT 1 FROM (
+          SELECT cloudinary_url AS u FROM rutas_fotos UNION ALL SELECT cloudinary_url FROM destinos_fotos
+          UNION ALL SELECT cloudinary_url FROM categorias_fotos UNION ALL SELECT cloudinary_url FROM categorias_vehiculos
+        ) t WHERE u IS NOT NULL AND regexp_replace(u, '/v[0-9]+/', '/') = regexp_replace($1, '/v[0-9]+/', '/') LIMIT 1`, [url]);
+      if (uso.rows.length) continue;
+      await cloudinary.uploader.destroy(pid, { invalidate: true });
+    } catch (e) {
+      console.warn('No se pudo borrar de Cloudinary ' + pid + ':', e.message);
+    }
+  }
+}
+
 // Elimina una foto del carrusel
 // Elimina todas las fotos de un destino
 app.post('/admin/seo/destinos/:id/fotos/eliminar-todas', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query('DELETE FROM destinos_fotos WHERE destino_id = $1', [req.params.id]);
+  const borradas = await pool.query('DELETE FROM destinos_fotos WHERE destino_id = $1 RETURNING cloudinary_url', [req.params.id]);
+  await borrarFotosCloudinarySinUso(borradas.rows.map(function(x) { return x.cloudinary_url; })); // (08/11/2026) N68
   res.json({ ok: true });
 }));
 
 app.post('/admin/seo/destinos/:id/fotos/:fotoId/eliminar', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query('DELETE FROM destinos_fotos WHERE id = $1 AND destino_id = $2', [req.params.fotoId, req.params.id]);
+  const borradas = await pool.query('DELETE FROM destinos_fotos WHERE id = $1 AND destino_id = $2 RETURNING cloudinary_url', [req.params.fotoId, req.params.id]);
+  await borrarFotosCloudinarySinUso(borradas.rows.map(function(x) { return x.cloudinary_url; })); // (08/11/2026) N68
   res.json({ ok: true });
 }));
 
@@ -7548,7 +7575,8 @@ app.post('/admin/categorias/migrar-cloudinary', requireAdmin, asyncHandler(async
 
 // Elimina una foto de la galería de categoría
 app.post('/admin/categorias/:id/fotos/:fotoId/eliminar', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query('DELETE FROM categorias_fotos WHERE id = $1 AND categoria_id = $2', [req.params.fotoId, req.params.id]);
+  const borradas = await pool.query('DELETE FROM categorias_fotos WHERE id = $1 AND categoria_id = $2 RETURNING cloudinary_url', [req.params.fotoId, req.params.id]);
+  await borrarFotosCloudinarySinUso(borradas.rows.map(function(x) { return x.cloudinary_url; })); // (08/11/2026) N68
   res.json({ ok: true });
 }));
 
@@ -8131,12 +8159,14 @@ app.post('/admin/rutas/migrar-cloudinary', requireAdmin, asyncHandler(async (req
 // Elimina una foto del carrusel de una ruta
 // Elimina todas las fotos de una ruta
 app.post('/admin/seo/rutas/:id/fotos/eliminar-todas', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query('DELETE FROM rutas_fotos WHERE ruta_id = $1', [req.params.id]);
+  const borradas = await pool.query('DELETE FROM rutas_fotos WHERE ruta_id = $1 RETURNING cloudinary_url', [req.params.id]);
+  await borrarFotosCloudinarySinUso(borradas.rows.map(function(x) { return x.cloudinary_url; })); // (08/11/2026) N68
   res.json({ ok: true });
 }));
 
 app.post('/admin/seo/rutas/:id/fotos/:fotoId/eliminar', requireAdmin, asyncHandler(async (req, res) => {
-  await pool.query('DELETE FROM rutas_fotos WHERE id = $1 AND ruta_id = $2', [req.params.fotoId, req.params.id]);
+  const borradas = await pool.query('DELETE FROM rutas_fotos WHERE id = $1 AND ruta_id = $2 RETURNING cloudinary_url', [req.params.fotoId, req.params.id]);
+  await borrarFotosCloudinarySinUso(borradas.rows.map(function(x) { return x.cloudinary_url; })); // (08/11/2026) N68
   res.json({ ok: true });
 }));
 
