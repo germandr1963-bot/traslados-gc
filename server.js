@@ -16911,69 +16911,6 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
   res.json({ reservas, nombre });
 }));
 
-// Modificar datos de la reserva (cliente)
-app.post('/api/cliente/modificar', asyncHandler(async (req, res) => {
-  if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
-
-  const reservaId = req.body.reserva_id || req.session.clienteReservaId;
-
-  // El email lo leemos de la sesión directamente — no de la reserva de acceso
-  // (que puede haber sido eliminada desde el admin).
-  const emailCliente = req.session.clienteEmail;
-
-  const reserva = await pool.query(
-    'SELECT fecha, hora, estado, email_cliente FROM reservas WHERE id = $1',
-    [reservaId]
-  );
-  if (!reserva.rows.length) return res.status(404).json({ error: 'Reserva no encontrada.' });
-  const r = reserva.rows[0];
-  if (r.email_cliente.toLowerCase() !== emailCliente.toLowerCase()) return res.status(403).json({ error: 'No autorizado.' });
-  // (04/11/2026) Una reserva cancelada no se puede modificar
-  if (r.estado === 'cancelada') return res.status(403).json({ error: 'Esta reserva está cancelada.' });
-
-  const cfgNoshow = await obtenerConfigNoshow(r.fecha);
-  const fechaCancelacion = calcularFechaCancelacion(new Date(r.fecha), r.hora, cfgNoshow.horas_cancelacion);
-  if (new Date() >= fechaCancelacion) {
-    return res.status(403).json({ error: 'El plazo de modificación ha vencido. El servicio está cerrado a cambios.' });
-  }
-
-  const { hora, numero_vuelo, hora_llegada_vuelo, nombre_barco, hora_atraque, direccion_recogida, direccion_destino, notas_cliente } = req.body;
-  await pool.query(
-    `UPDATE reservas SET
-      hora = COALESCE($1, hora),
-      numero_vuelo = COALESCE($2, numero_vuelo),
-      hora_llegada_vuelo = COALESCE($3, hora_llegada_vuelo),
-      nombre_barco = COALESCE($4, nombre_barco),
-      hora_atraque = COALESCE($5, hora_atraque),
-      direccion_recogida = COALESCE($6, direccion_recogida),
-      direccion_destino = COALESCE($7, direccion_destino),
-      notas_cliente = COALESCE($8, notas_cliente)
-     WHERE id = $9`,
-    [hora||null, numero_vuelo||null, hora_llegada_vuelo||null, nombre_barco||null,
-     hora_atraque||null, direccion_recogida||null, direccion_destino||null, notas_cliente||null,
-     reservaId]
-  );
-
-  // Notificar al equipo
-  try {
-    const emails = await obtenerEmailsNotificacion();
-    const pnr = req.session.clientePnr;
-    if (emails.length) {
-      for (const em of emails) {
-        // (14/10/2026) Plantilla "[Admin] Cliente modificó datos de reserva"; si faltara, el texto de antes
-        const _pMod = await obtenerPlantilla('interno_cliente_modifico', { numero_reserva: pnr }, 'es');
-        await enviarEmail({
-          to: em,
-          subject: (_pMod && _pMod.email && _pMod.asunto) || ('✏️ Cliente modificó datos — ' + pnr),
-          html: (_pMod && _pMod.email) ? plantillaEmail(_pMod.email) : plantillaEmail(`<p>El cliente de la reserva <strong>${pnr}</strong> ha modificado los datos de su traslado.</p><p>Accede al panel de administración para ver los cambios.</p>`)
-        });
-      }
-    }
-  } catch(e) { console.warn('Error notificando modificación:', e.message); }
-
-  res.json({ ok: true });
-}));
-
 // Enviar mensaje al operador (siempre disponible)
 app.post('/api/cliente/mensaje', asyncHandler(async (req, res) => {
   if (!req.session || !req.session.clienteReservaId) return res.status(401).json({ error: 'No autenticado.' });
