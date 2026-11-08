@@ -7036,14 +7036,19 @@ app.get('/destino-foto/:fotoId', asyncHandler(async (req, res) => {
 // La IA puede dar el mismo nombre a dos fotos parecidas; antes Cloudinary guardaba la nueva ENCIMA de la anterior
 // (overwrite) y la web enseñaba la misma foto varias veces. Ahora, si el nombre ya lo usa otra foto del mismo
 // sitio, se le añade -2, -3… Se quita la extensión (Cloudinary pone la suya: antes salía «.webp.webp»).
+// Categorías: todas comparten la carpeta traslados-gc/categorias, así que el nombre se compara con TODAS
+// las fotos de galería de todas las categorías (colPadre = null).
 function baseNombreFoto(nombre) {
   return String(nombre || '').trim().toLowerCase().replace(/(\.(webp|jpe?g|png))+$/i, '');
 }
 async function nombreFotoUnico(tabla, colPadre, padreId, nombre, fotoIdExcluir) {
-  if (['rutas_fotos', 'destinos_fotos'].indexOf(tabla) < 0 || ['ruta_id', 'destino_id'].indexOf(colPadre) < 0) throw new Error('Tabla no válida');
+  const valido = (tabla === 'rutas_fotos' && colPadre === 'ruta_id') || (tabla === 'destinos_fotos' && colPadre === 'destino_id') || (tabla === 'categorias_fotos' && colPadre === null);
+  if (!valido) throw new Error('Tabla no válida');
   const base = baseNombreFoto(nombre);
   if (!base) return '';
-  const r = await pool.query('SELECT nombre_archivo FROM ' + tabla + ' WHERE ' + colPadre + ' = $1 AND id <> $2', [padreId, fotoIdExcluir || 0]);
+  const r = colPadre
+    ? await pool.query('SELECT nombre_archivo FROM ' + tabla + ' WHERE ' + colPadre + ' = $1 AND id <> $2', [padreId, fotoIdExcluir || 0])
+    : await pool.query('SELECT nombre_archivo FROM ' + tabla + ' WHERE id <> $1', [fotoIdExcluir || 0]);
   const usados = new Set(r.rows.map(function(x) { return baseNombreFoto(x.nombre_archivo); }));
   let candidato = base, n = 2;
   while (usados.has(candidato)) { candidato = base + '-' + n; n++; }
@@ -7383,10 +7388,12 @@ app.post('/admin/categorias/:id/fotos', requireAdmin, asyncHandler(async (req, r
   const webpBuffer = await sharp(buffer).webp({ quality: 92 }).toBuffer();
   const webpHex = '\\x' + webpBuffer.toString('hex');
   const maxOrden = await pool.query('SELECT COALESCE(MAX(orden), 0) AS m FROM categorias_fotos WHERE categoria_id = $1', [req.params.id]);
+  // (08/11/2026) N68: nombre único en la carpeta común de categorías (se calcula antes de guardar la foto)
+  const nombreUnico = await nombreFotoUnico('categorias_fotos', null, null, nombre_archivo);
   const inserted = await pool.query(
     `INSERT INTO categorias_fotos (categoria_id, imagen, mime_type, nombre_archivo, alt_texto, orden)
      VALUES ($1, $2::bytea, 'image/webp', $3, $4, $5) RETURNING id`,
-    [req.params.id, webpHex, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1]
+    [req.params.id, webpHex, nombreUnico ? nombreUnico + '.webp' : (nombre_archivo || ''), alt_texto || '', maxOrden.rows[0].m + 1]
   );
   const rrEsCat = revisarTraduccion(alt_texto || '', 'es'); // (07/11/2026) N51: palabras con letras mezcladas, no
   if (alt_texto && inserted.rows[0] && !rrEsCat.grave) {
@@ -7401,7 +7408,7 @@ app.post('/admin/categorias/:id/fotos', requireAdmin, asyncHandler(async (req, r
     try {
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: 'traslados-gc/categorias', public_id: nombre_archivo || `categoria-${req.params.id}-${inserted.rows[0].id}`, overwrite: true },
+          { folder: 'traslados-gc/categorias', public_id: nombreUnico || `categoria-${req.params.id}-${inserted.rows[0].id}`, overwrite: true },
           (error, result) => { if (error) reject(error); else resolve(result); }
         );
         stream.end(webpBuffer);
@@ -7508,7 +7515,7 @@ app.post('/admin/categorias/migrar-cloudinary', requireAdmin, asyncHandler(async
   }
 
   // 2. Fotos de galería de categorias_fotos
-  const galeria = await pool.query('SELECT id, imagen, nombre_archivo FROM categorias_fotos WHERE cloudinary_url IS NULL');
+  const galeria = await pool.query('SELECT id, imagen, nombre_archivo FROM categorias_fotos WHERE cloudinary_url IS NULL ORDER BY id');
   for (const foto of galeria.rows) {
     try {
       let imgBuffer;
@@ -7516,9 +7523,14 @@ app.post('/admin/categorias/migrar-cloudinary', requireAdmin, asyncHandler(async
       if (Buffer.isBuffer(raw)) { imgBuffer = raw; }
       else if (typeof raw === 'string' && raw.startsWith('\\x')) { imgBuffer = Buffer.from(raw.slice(2), 'hex'); }
       else { imgBuffer = Buffer.from(raw); }
+      // (08/11/2026) N68: nombre único en la carpeta común de categorías (se guarda para que la siguiente foto lo vea)
+      const nombreUnico = await nombreFotoUnico('categorias_fotos', null, null, foto.nombre_archivo, foto.id);
+      if (nombreUnico && nombreUnico + '.webp' !== foto.nombre_archivo) {
+        await pool.query('UPDATE categorias_fotos SET nombre_archivo = $1 WHERE id = $2', [nombreUnico + '.webp', foto.id]);
+      }
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: 'traslados-gc/categorias', public_id: foto.nombre_archivo || `categoria-galeria-${foto.id}`, overwrite: true },
+          { folder: 'traslados-gc/categorias', public_id: nombreUnico || `categoria-galeria-${foto.id}`, overwrite: true },
           (error, result) => { if (error) reject(error); else resolve(result); }
         );
         stream.end(imgBuffer);
