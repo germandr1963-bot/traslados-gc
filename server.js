@@ -6899,13 +6899,15 @@ app.post('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req,
   const webpHex = '\\x' + webpBuffer.toString('hex');
   // Subir a Cloudinary en subcarpeta con el nombre del destino
   let cloudinaryUrl = null;
+  let nombreUnico = ''; // (08/11/2026) N68: nombre único en Cloudinary
   try {
     const destinoRes = await pool.query('SELECT nombre FROM destinos WHERE id = $1', [req.params.id]);
     const destinoNombre = destinoRes.rows[0] ? destinoRes.rows[0].nombre : `destino-${req.params.id}`;
+    nombreUnico = await nombreFotoUnico('destinos_fotos', 'destino_id', req.params.id, nombre_archivo); // (08/11/2026) N68
     const subcarpeta = destinoNombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const uploadResult = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        { folder: `traslados-gc/destinos/${subcarpeta}`, public_id: nombre_archivo || `destino-foto-${req.params.id}-${Date.now()}`, overwrite: true },
+        { folder: `traslados-gc/destinos/${subcarpeta}`, public_id: nombreUnico || `destino-foto-${req.params.id}-${Date.now()}`, overwrite: true },
         (error, result) => { if (error) reject(error); else resolve(result); }
       );
       stream.end(webpBuffer);
@@ -6918,7 +6920,7 @@ app.post('/admin/seo/destinos/:id/fotos', requireAdmin, asyncHandler(async (req,
   const inserted = await pool.query(
     `INSERT INTO destinos_fotos (destino_id, imagen, mime_type, nombre_archivo, alt_texto, orden, cloudinary_url)
      VALUES ($1, $2::bytea, 'image/webp', $3, $4, $5, $6) RETURNING id`,
-    [req.params.id, webpHex, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1, cloudinaryUrl]
+    [req.params.id, webpHex, nombreUnico ? nombreUnico + '.webp' : (nombre_archivo || ''), alt_texto || '', maxOrden.rows[0].m + 1, cloudinaryUrl]
   );
   const fotoId = inserted.rows[0] && inserted.rows[0].id;
   // (07/11/2026) N51: lo grave (ruso sin ruso, palabras con letras mezcladas) no se guarda; un ruso con palabras
@@ -7030,6 +7032,24 @@ app.get('/destino-foto/:fotoId', asyncHandler(async (req, res) => {
   res.send(imgBuffer);
 }));
 
+// (08/11/2026) N68: nombre de archivo ÚNICO para Cloudinary dentro de la carpeta de su ruta o destino.
+// La IA puede dar el mismo nombre a dos fotos parecidas; antes Cloudinary guardaba la nueva ENCIMA de la anterior
+// (overwrite) y la web enseñaba la misma foto varias veces. Ahora, si el nombre ya lo usa otra foto del mismo
+// sitio, se le añade -2, -3… Se quita la extensión (Cloudinary pone la suya: antes salía «.webp.webp»).
+function baseNombreFoto(nombre) {
+  return String(nombre || '').trim().toLowerCase().replace(/(\.(webp|jpe?g|png))+$/i, '');
+}
+async function nombreFotoUnico(tabla, colPadre, padreId, nombre, fotoIdExcluir) {
+  if (['rutas_fotos', 'destinos_fotos'].indexOf(tabla) < 0 || ['ruta_id', 'destino_id'].indexOf(colPadre) < 0) throw new Error('Tabla no válida');
+  const base = baseNombreFoto(nombre);
+  if (!base) return '';
+  const r = await pool.query('SELECT nombre_archivo FROM ' + tabla + ' WHERE ' + colPadre + ' = $1 AND id <> $2', [padreId, fotoIdExcluir || 0]);
+  const usados = new Set(r.rows.map(function(x) { return baseNombreFoto(x.nombre_archivo); }));
+  let candidato = base, n = 2;
+  while (usados.has(candidato)) { candidato = base + '-' + n; n++; }
+  return candidato;
+}
+
 // Migra fotos de destinos a Cloudinary organizadas por subcarpeta de destino
 app.post('/admin/destinos/migrar-cloudinary', requireAdmin, asyncHandler(async (req, res) => {
   let ok = 0, errores = 0;
@@ -7038,6 +7058,7 @@ app.post('/admin/destinos/migrar-cloudinary', requireAdmin, asyncHandler(async (
     FROM destinos_fotos df
     JOIN destinos d ON d.id = df.destino_id
     WHERE df.cloudinary_url IS NULL
+    ORDER BY df.id
   `);
   for (const foto of fotos.rows) {
     try {
@@ -7048,9 +7069,14 @@ app.post('/admin/destinos/migrar-cloudinary', requireAdmin, asyncHandler(async (
       else { imgBuffer = Buffer.from(raw); }
       // Subcarpeta con el nombre del destino (slugificado)
       const subcarpeta = foto.destino_nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      // (08/11/2026) N68: nombre único dentro de la carpeta del destino (se guarda para que la siguiente foto lo vea)
+      const nombreUnico = await nombreFotoUnico('destinos_fotos', 'destino_id', foto.destino_id, foto.nombre_archivo, foto.id);
+      if (nombreUnico && nombreUnico + '.webp' !== foto.nombre_archivo) {
+        await pool.query('UPDATE destinos_fotos SET nombre_archivo = $1 WHERE id = $2', [nombreUnico + '.webp', foto.id]);
+      }
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: `traslados-gc/destinos/${subcarpeta}`, public_id: (foto.nombre_archivo || `destino-foto-${foto.id}`).replace(/\.[^.]+$/, ''), overwrite: true },
+          { folder: `traslados-gc/destinos/${subcarpeta}`, public_id: nombreUnico || `destino-foto-${foto.id}`, overwrite: true },
           (error, result) => { if (error) reject(error); else resolve(result); }
         );
         stream.end(imgBuffer);
@@ -7963,13 +7989,15 @@ app.post('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, re
   const webpHex = '\\x' + webpBuffer.toString('hex');
   // Subir a Cloudinary en subcarpeta con el nombre de la ruta
   let cloudinaryUrl = null;
+  let nombreUnico = ''; // (08/11/2026) N68: nombre único en Cloudinary
   try {
     const rutaRes = await pool.query('SELECT origen, destino FROM rutas WHERE id = $1', [req.params.id]);
     const rutaNombre = rutaRes.rows[0] ? `${rutaRes.rows[0].origen}-${rutaRes.rows[0].destino}` : `ruta-${req.params.id}`;
     const subcarpeta = rutaNombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    nombreUnico = await nombreFotoUnico('rutas_fotos', 'ruta_id', req.params.id, nombre_archivo); // (08/11/2026) N68
     const uploadResult = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        { folder: `traslados-gc/rutas/${subcarpeta}`, public_id: nombre_archivo || `ruta-foto-${req.params.id}-${Date.now()}`, overwrite: true },
+        { folder: `traslados-gc/rutas/${subcarpeta}`, public_id: nombreUnico || `ruta-foto-${req.params.id}-${Date.now()}`, overwrite: true },
         (error, result) => { if (error) reject(error); else resolve(result); }
       );
       stream.end(webpBuffer);
@@ -7982,7 +8010,7 @@ app.post('/admin/seo/rutas/:id/fotos', requireAdmin, asyncHandler(async (req, re
   const inserted = await pool.query(
     `INSERT INTO rutas_fotos (ruta_id, imagen, mime_type, nombre_archivo, alt_texto, orden, cloudinary_url)
      VALUES ($1, $2::bytea, 'image/webp', $3, $4, $5, $6) RETURNING id`,
-    [req.params.id, webpHex, nombre_archivo || '', alt_texto || '', maxOrden.rows[0].m + 1, cloudinaryUrl]
+    [req.params.id, webpHex, nombreUnico ? nombreUnico + '.webp' : (nombre_archivo || ''), alt_texto || '', maxOrden.rows[0].m + 1, cloudinaryUrl]
   );
   const fotoId = inserted.rows[0] && inserted.rows[0].id;
   // (07/11/2026) N51: lo grave (ruso sin ruso, palabras con letras mezcladas) no se guarda; un ruso con palabras
@@ -8055,6 +8083,7 @@ app.post('/admin/rutas/migrar-cloudinary', requireAdmin, asyncHandler(async (req
     FROM rutas_fotos rf
     JOIN rutas r ON r.id = rf.ruta_id
     WHERE rf.cloudinary_url IS NULL
+    ORDER BY rf.id
   `);
   for (const foto of fotos.rows) {
     try {
@@ -8065,9 +8094,14 @@ app.post('/admin/rutas/migrar-cloudinary', requireAdmin, asyncHandler(async (req
       else { imgBuffer = Buffer.from(raw); }
       const rutaNombre = `${foto.origen}-${foto.destino}`;
       const subcarpeta = rutaNombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      // (08/11/2026) N68: nombre único dentro de la carpeta de la ruta (se guarda para que la siguiente foto lo vea)
+      const nombreUnico = await nombreFotoUnico('rutas_fotos', 'ruta_id', foto.ruta_id, foto.nombre_archivo, foto.id);
+      if (nombreUnico && nombreUnico + '.webp' !== foto.nombre_archivo) {
+        await pool.query('UPDATE rutas_fotos SET nombre_archivo = $1 WHERE id = $2', [nombreUnico + '.webp', foto.id]);
+      }
       const uploadResult = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: `traslados-gc/rutas/${subcarpeta}`, public_id: (foto.nombre_archivo || `ruta-foto-${foto.id}`).replace(/\.[^.]+$/, ''), overwrite: true },
+          { folder: `traslados-gc/rutas/${subcarpeta}`, public_id: nombreUnico || `ruta-foto-${foto.id}`, overwrite: true },
           (error, result) => { if (error) reject(error); else resolve(result); }
         );
         stream.end(imgBuffer);
