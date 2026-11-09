@@ -660,8 +660,12 @@ async function initSchema() {
       creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
-  for (const w of RUSO_PALABRAS_PERMITIDAS) {
-    await pool.query(`INSERT INTO ruso_palabras_permitidas (palabra, origen) VALUES ($1, 'lista de partida') ON CONFLICT (palabra) DO NOTHING`, [w]);
+  // La lista de partida solo se pone si la tabla está vacía: así una palabra quitada desde el Admin no vuelve con cada deploy
+  const hayPalabrasRu = await pool.query('SELECT COUNT(*)::int AS n FROM ruso_palabras_permitidas');
+  if (hayPalabrasRu.rows[0].n === 0) {
+    for (const w of RUSO_PALABRAS_PERMITIDAS) {
+      await pool.query(`INSERT INTO ruso_palabras_permitidas (palabra, origen) VALUES ($1, 'lista de partida') ON CONFLICT (palabra) DO NOTHING`, [w]);
+    }
   }
   await cargarPalabrasPermitidasRu();
 
@@ -20121,6 +20125,39 @@ app.post('/admin/ruso-palabras-permitidas', requireAdmin, asyncHandler(async (re
   await cargarPalabrasPermitidasRu();
   res.json({ ok: true, añadidas: validas });
 }));
+// (09/11/2026) Admin → Idiomas → «🔤 Palabras latinas permitidas en ruso»: ver, quitar y descargar la lista
+app.get('/admin/ruso-palabras-permitidas', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query(`SELECT palabra, origen, to_char(creado_en AT TIME ZONE 'Atlantic/Canary', 'DD/MM/YYYY HH24:MI') AS fecha FROM ruso_palabras_permitidas ORDER BY palabra`);
+  res.json(r.rows);
+}));
+app.post('/admin/ruso-palabras-permitidas/quitar', requireAdmin, asyncHandler(async (req, res) => {
+  const w = String(req.body.palabra || '').trim().toLowerCase();
+  if (!w) return res.status(400).json({ error: 'Falta la palabra' });
+  const r = await pool.query('DELETE FROM ruso_palabras_permitidas WHERE palabra = $1', [w]);
+  await cargarPalabrasPermitidasRu();
+  res.json({ ok: true, quitada: r.rowCount > 0 });
+}));
+app.get('/admin/ruso-palabras-permitidas/exportar', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query(`SELECT palabra, origen, to_char(creado_en AT TIME ZONE 'Atlantic/Canary', 'DD/MM/YYYY HH24:MI') AS fecha FROM ruso_palabras_permitidas ORDER BY palabra`);
+  const workbook = new ExcelJS.Workbook();
+  const hoja = workbook.addWorksheet('Palabras latinas ruso');
+  hoja.columns = [
+    { header: 'Palabra', key: 'palabra', width: 24 },
+    { header: 'De dónde viene', key: 'origen', width: 26 },
+    { header: 'Fecha', key: 'fecha', width: 18 }
+  ];
+  hoja.getRow(1).font = { bold: true };
+  r.rows.forEach(function (x) { hoja.addRow({ palabra: x.palabra, origen: origenPalabraRu(x.origen), fecha: x.fecha }); });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="palabras-latinas-ruso.xlsx"');
+  await workbook.xlsx.write(res);
+  res.end();
+}));
+function origenPalabraRu(o) {
+  if (o === 'lista de partida') return 'Lista de partida';
+  if (o === 'a mano') return 'Añadida a mano';
+  return 'Aprobada en una ficha';
+}
 // Devuelve { ok, grave, sinRuso, mezcladas: [...], latinas: [...] }.
 function revisarTraduccion(texto, lang) {
   const t = String(texto || '')
