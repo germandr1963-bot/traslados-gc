@@ -7339,6 +7339,42 @@ function avisoFrenoFotoNueva(d) {
   if (txt) alert(txt);
 }
 function frenoGuardarAsi() { var f = _frenoGuardarAsi; _frenoGuardarAsi = null; if (f) f(); }
+
+// ─── (09/11/2026) Palabras en letras latinas en ruso: se preguntan, y si se aprueban pasan a la lista ───
+// El aviso va pegado a su idioma: sale en la pestaña de ese idioma mientras no esté aprobado.
+var _latinasSi = null;
+function latinasSi() { var f = _latinasSi; _latinasSi = null; if (f) f(); }
+function latinasNo(boton) { var caja = boton.closest('.aviso-latinas'); if (caja) caja.remove(); _latinasSi = null; }
+function aprobarPalabrasLatinas(palabras, origen) {
+  return fetch('/admin/ruso-palabras-permitidas', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ palabras: palabras || [], origen: origen || '' })
+  }).then(function (r) { return r.json(); });
+}
+// lista: [{ lang, latinas: [...] }]; alSi: lo que se hace tras añadir las palabras a la lista
+function htmlPreguntaLatinas(lista, alSi) {
+  var palabras = [];
+  lista.forEach(function (x) { (x.latinas || []).forEach(function (w) { if (palabras.indexOf(w) < 0) palabras.push(w); }); });
+  var idiomas = lista.map(function (x) { return String(x.lang || '').toUpperCase(); }).filter(Boolean).join(', ');
+  _latinasSi = function () { aprobarPalabrasLatinas(palabras, idiomas).then(function () { if (alSi) alSi(); }); };
+  return '<div class="aviso-latinas" style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:10px;">' +
+    '⚠️ <strong>El texto en ' + escFreno(idiomas) + ' lleva palabras en letras latinas:</strong> ' + escFreno(palabras.join(', ')) +
+    '<br>¿Las apruebas? Si dices que sí, el texto queda aprobado y estas palabras ya no se volverán a preguntar en ningún texto.' +
+    '<br><button class="boton-primario" style="margin-top:8px;margin-right:8px;font-size:0.78rem;padding:5px 12px;" onclick="latinasSi()">✅ Sí, aprobar</button>' +
+    '<button class="boton-secundario" style="margin-top:8px;font-size:0.78rem;padding:5px 12px;" onclick="latinasNo(this)">No</button></div>';
+}
+// Aviso de la pestaña abierta de una ficha de alt texts (d = datos de la ficha; guardarAsi = guarda y aprueba ese idioma)
+function avisoIdiomaAlt(msg, d, lang, guardarAsi) {
+  var f = d && d.frenos && d.frenos[lang];
+  var est = d && d.estados && d.estados[lang];
+  if (!msg || !f || est === 'ok') return;
+  if (f.grave) { msg.innerHTML = htmlFreno({ freno: f }, null); return; }
+  if (f.latinas && f.latinas.length) msg.innerHTML = htmlPreguntaLatinas([{ lang: lang, latinas: f.latinas }], guardarAsi);
+}
+// Tras «💾 Guardar todo»: si algún idioma no se aprobó solo por palabras latinas, se pregunta
+function latinasDeFrenadas(d) {
+  return ((d && d.frenadas) || []).filter(function (f) { return f.latinas && f.latinas.length; });
+}
 // Pinta el recuadro en una caja (id o elemento)
 function pintarFreno(caja, d, alGuardarAsi) {
   var el = typeof caja === 'string' ? document.getElementById(caja) : caja;
@@ -12705,11 +12741,15 @@ function cambiarTabAltFoto(fotoId, lang, boton, dataOverride) {
     'style="margin-bottom:4px;">' +
     '<div id="cnt-alt-foto-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:var(--texto-muted);">' + n + '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoBtn(this)">&#128190; Guardar</button>' +
+    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoBtn(this)">&#128190; Guardar en ' + lang.toUpperCase() + '</button>' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-destinoid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarTodoAltFotoBtn(this)">&#128190; Guardar todo</button>' +
     // (07/11/2026) N51: rehace con la IA solo el idioma de esta pestaña, aunque esté aprobado (no en ES)
-    (lang !== 'es' ? '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-base="/admin/seo/destinos/' + destinoId + '" data-tipo="dest" data-padreid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="retraducirAltBtn(this)">🔄 Volver a traducir</button>' : '') +
+    (lang !== 'es' ? '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-base="/admin/seo/destinos/' + destinoId + '" data-tipo="dest" data-padreid="' + destinoId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="retraducirAltBtn(this)">🔄 Volver a traducir ' + lang.toUpperCase() + '</button>' : '') +
     '</div>';
+  // (09/11/2026) El aviso del freno va pegado a su idioma: al cambiar de pestaña se quita y, si este idioma lo tiene, se enseña
+  var msgIdioma = document.getElementById('alt-foto-msg-' + fotoId);
+  if (panel._langAbierto !== lang) { if (msgIdioma) msgIdioma.innerHTML = ''; panel._langAbierto = lang; }
+  avisoIdiomaAlt(msgIdioma, d, lang, function () { guardarAltFoto(destinoId, fotoId, lang, null, true); });
 }
 
 function sugerirAltFotoIA(destinoId, fotoId, lang) {
@@ -12755,7 +12795,14 @@ function guardarAltFoto(destinoId, fotoId, lang, despues, confirmarLatinas) {
     // (07/11/2026) N51: con «💾 Guardar todo» (despues), un ruso con palabras latinas se guarda en 🔵
     body: JSON.stringify({ alt_texto: altTexto, confirmar_latinas: confirmarLatinas === true, guardar_en_azul: !!despues })
   }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.freno) { pintarFreno(msg, d, despues ? null : function () { guardarAltFoto(destinoId, fotoId, lang, null, true); }); return; } // (07/11/2026) N51
+    if (d.freno) {
+      // (09/11/2026) Palabras latinas: se preguntan y, si se aprueban, pasan a la lista
+      if (!d.freno.grave && d.freno.latinas && d.freno.latinas.length && !despues) {
+        if (msg) msg.innerHTML = htmlPreguntaLatinas([{ lang: lang, latinas: d.freno.latinas }], function () { guardarAltFoto(destinoId, fotoId, lang, null, true); });
+        return;
+      }
+      pintarFreno(msg, d, despues ? null : function () { guardarAltFoto(destinoId, fotoId, lang, null, true); }); return;
+    } // (07/11/2026) N51
     if (!d.ok) {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
       return;
@@ -12794,7 +12841,8 @@ function aprobarTodasAltFoto(destinoId, fotoId) {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (msg) {
-        if (d.ok && textoFrenoLote(d, 'No aprobado')) msg.innerHTML = avisoGuardadoConFreno(d); // (07/11/2026) N51
+        if (d.ok && latinasDeFrenadas(d).length) msg.innerHTML = htmlPreguntaLatinas(latinasDeFrenadas(d), function () { aprobarTodasAltFoto(destinoId, fotoId); }); // (09/11/2026)
+        else if (d.ok && textoFrenoLote(d, 'No aprobado')) msg.innerHTML = avisoGuardadoConFreno(d); // (07/11/2026) N51
         else if (d.ok) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado y aprobado'; }
         else { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al aprobar.'; }
       }
@@ -12875,7 +12923,14 @@ function guardarAltGen(tipo, padreId, fotoId, lang, despues, confirmarLatinas) {
     // (07/11/2026) N51: con «💾 Guardar todo» (despues), un ruso con palabras latinas se guarda en 🔵
     body: JSON.stringify({ alt_texto: altTexto, confirmar_latinas: confirmarLatinas === true, guardar_en_azul: !!despues })
   }).then(function(r) { return r.json(); }).then(function(d) {
-    if (d.freno) { pintarFreno(msg, d, despues ? null : function () { guardarAltGen(tipo, padreId, fotoId, lang, null, true); }); return; } // (07/11/2026) N51
+    if (d.freno) {
+      // (09/11/2026) Palabras latinas: se preguntan y, si se aprueban, pasan a la lista
+      if (!d.freno.grave && d.freno.latinas && d.freno.latinas.length && !despues) {
+        if (msg) msg.innerHTML = htmlPreguntaLatinas([{ lang: lang, latinas: d.freno.latinas }], function () { guardarAltGen(tipo, padreId, fotoId, lang, null, true); });
+        return;
+      }
+      pintarFreno(msg, d, despues ? null : function () { guardarAltGen(tipo, padreId, fotoId, lang, null, true); }); return;
+    } // (07/11/2026) N51
     if (!d.ok) {
       if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al guardar.'; }
       return;
@@ -12905,7 +12960,8 @@ function aprobarTodasAltGen(tipo, padreId, fotoId) {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (msg) {
-        if (d.ok && textoFrenoLote(d, 'No aprobado')) msg.innerHTML = avisoGuardadoConFreno(d); // (07/11/2026) N51
+        if (d.ok && latinasDeFrenadas(d).length) msg.innerHTML = htmlPreguntaLatinas(latinasDeFrenadas(d), function () { aprobarTodasAltGen(tipo, padreId, fotoId); }); // (09/11/2026)
+        else if (d.ok && textoFrenoLote(d, 'No aprobado')) msg.innerHTML = avisoGuardadoConFreno(d); // (07/11/2026) N51
         else if (d.ok) { msg.style.color = 'var(--verde-ok)'; msg.textContent = '✓ Guardado y aprobado'; }
         else { msg.style.color = 'var(--rojo-error)'; msg.textContent = d.error || 'Error al aprobar.'; }
       }
@@ -13703,11 +13759,15 @@ function cambiarTabAltFotoRuta(fotoId, lang, boton, dataOverride) {
     'style="margin-bottom:4px;">' +
     '<div id="cnt-alt-foto-ruta-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:var(--texto-muted);">' + n + '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-rutaid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoRutaBtn(this)">&#128190; Guardar</button>' +
+    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-rutaid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoRutaBtn(this)">&#128190; Guardar en ' + lang.toUpperCase() + '</button>' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-tipo="ruta" data-padreid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarTodoAltGenBtn(this)">&#128190; Guardar todo</button>' +
     // (07/11/2026) N51: rehace con la IA solo el idioma de esta pestaña, aunque esté aprobado (no en ES)
-    (lang !== 'es' ? '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-tipo="ruta" data-padreid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="retraducirAltBtn(this)">🔄 Volver a traducir</button>' : '') +
+    (lang !== 'es' ? '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-tipo="ruta" data-padreid="' + rutaId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="retraducirAltBtn(this)">🔄 Volver a traducir ' + lang.toUpperCase() + '</button>' : '') +
     '</div>';
+  // (09/11/2026) El aviso del freno va pegado a su idioma: al cambiar de pestaña se quita y, si este idioma lo tiene, se enseña
+  var msgIdioma = document.getElementById('alt-foto-ruta-msg-' + fotoId);
+  if (panel._langAbierto !== lang) { if (msgIdioma) msgIdioma.innerHTML = ''; panel._langAbierto = lang; }
+  avisoIdiomaAlt(msgIdioma, d, lang, function () { guardarAltGen('ruta', rutaId, fotoId, lang, null, true); });
 }
 
 function actualizarContadorAltFotoRuta(input, fotoId) {
@@ -14428,11 +14488,15 @@ function cambiarTabAltFotoCat(fotoId, lang, boton, dataOverride) {
     'oninput="actualizarContadorAltFotoCat(this,' + fotoId + ')" style="margin-bottom:4px;">' +
     '<div id="cnt-alt-foto-cat-' + fotoId + '" style="text-align:right;font-size:11px;margin-bottom:10px;color:' + colorCont + ';">' + n + ' / 125</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-catid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoCatBtn(this)">&#128190; Guardar</button>' +
+    '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-catid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarAltFotoCatBtn(this)">&#128190; Guardar en ' + lang.toUpperCase() + '</button>' +
     '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-tipo="cat" data-padreid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="guardarTodoAltGenBtn(this)">&#128190; Guardar todo</button>' +
     // (07/11/2026) N51: rehace con la IA solo el idioma de esta pestaña, aunque esté aprobado (no en ES)
-    (lang !== 'es' ? '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-tipo="cat" data-padreid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="retraducirAltBtn(this)">🔄 Volver a traducir</button>' : '') +
+    (lang !== 'es' ? '<button class="boton-primario" style="font-size:0.78rem;padding:5px 12px;" data-tipo="cat" data-padreid="' + catId + '" data-fotoid="' + fotoId + '" data-lang="' + lang + '" onclick="retraducirAltBtn(this)">🔄 Volver a traducir ' + lang.toUpperCase() + '</button>' : '') +
     '</div>';
+  // (09/11/2026) El aviso del freno va pegado a su idioma: al cambiar de pestaña se quita y, si este idioma lo tiene, se enseña
+  var msgIdioma = document.getElementById('alt-foto-cat-msg-' + fotoId);
+  if (panel._langAbierto !== lang) { if (msgIdioma) msgIdioma.innerHTML = ''; panel._langAbierto = lang; }
+  avisoIdiomaAlt(msgIdioma, d, lang, function () { guardarAltGen('cat', catId, fotoId, lang, null, true); });
 }
 
 function actualizarContadorAltFotoCat(input, fotoId) {
