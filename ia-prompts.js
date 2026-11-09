@@ -26,6 +26,16 @@ function REGLA_FOTOS() {
     '- El lugar es el que se te indica. No lo cambies ni añadas otros lugares que la foto no permita asegurar.\n' +
     '- Ante la duda, una descripción sencilla y cierta es mejor que una atractiva con un dato inventado.';
 }
+// (09/11/2026) Nombres oficiales de nuestra web (Destinos, Rutas, Categorías) en cada idioma, para las fotos.
+// pares: [{ lang: 'en', nombre: 'Port of La Luz – Santa Catalina Quay' }]
+function REGLA_NOMBRES_OFICIALES(pares) {
+  if (!pares || !pares.length) return '';
+  return '\n\nNOMBRES OFICIALES (obligatorio):\n' +
+    'Estos son los nombres oficiales del lugar, la ruta o la categoría en cada idioma. Úsalos exactamente así. ' +
+    'No los traduzcas de otra manera ni los dejes en español. ' +
+    'En los idiomas que declinan (ruso, finés y otros) puedes declinarlo según la gramática de la frase, partiendo siempre de este nombre.\n' +
+    pares.map(function (p) { return '- ' + p.lang + ': ' + p.nombre; }).join('\n');
+}
 // (09/11/2026) ¿La lista de idiomas («en (Inglés), ru (Ruso)…») incluye el ruso?
 function listaConRuso(listaIdiomas) {
   return /(^|,\s*)ru\s*\(/.test(String(listaIdiomas || '')) ? 'ruso' : '';
@@ -966,5 +976,6 @@ module.exports = {
   // (07/11/2026) Reglas comunes, también para los textos de IA que están dentro de server.js
   REGLA_LETRAS,
   REGLA_RUSO,
-  REGLA_FOTOS // (09/11/2026)
+  REGLA_FOTOS, // (09/11/2026)
+  REGLA_NOMBRES_OFICIALES // (09/11/2026)
 };

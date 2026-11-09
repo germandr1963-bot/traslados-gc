@@ -6979,7 +6979,7 @@ app.post('/admin/seo/destinos/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(
   const nombreIdioma = await getNombreIdioma(lang);
   const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
-  const prompt = iaPrompts.GENERADOR_ALT_NUEVO_ES(d.nombre, d.isla, lang, nombreIdioma);
+  const prompt = await conNombresOficiales(iaPrompts.GENERADOR_ALT_NUEVO_ES(d.nombre, d.isla, lang, nombreIdioma), 'destino', req.params.id, [lang || 'es']); // (09/11/2026)
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -7235,7 +7235,7 @@ app.post('/admin/seo/destinos/:id/fotos/nueva/alt/generar-todos', requireAdmin, 
     return i.codigo + ' (' + i.nombre + ')';
   }).join(', ');
   const codigos = idiomas.rows.map(function(i) { return '"' + i.codigo + '": "..."'; }).join(', ');
-  const prompt = iaPrompts.GENERADOR_ALT_NUEVO_TODOS(d.nombre, d.isla, listaIdiomas, codigos);
+  const prompt = await conNombresOficiales(iaPrompts.GENERADOR_ALT_NUEVO_TODOS(d.nombre, d.isla, listaIdiomas, codigos), 'destino', req.params.id, codigosDe(idiomas.rows)); // (09/11/2026)
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -7316,7 +7316,7 @@ app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt-generar-falta', requireAdmin
   const d = destino.rows[0];
   // (07/11/2026) N51: usa la función común de los alt texts (la misma que Rutas y Categorías), con el mismo texto de IA
   // que tenía aquí; así tiene también el freno y el segundo intento.
-  const resultado = await generarFaltaAltFotoModelo('destinos_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) { return promptAltDestino(d, pendientes); });
+  const resultado = await generarFaltaAltFotoModelo('destinos_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) { return conNombresOficiales(promptAltDestino(d, pendientes), 'destino', req.params.id, codigosDe(pendientes)); });
   if (resultado.error) return res.status(resultado.status || 500).json({ error: resultado.error });
   res.json({ ok: true, generadas: resultado.generadas, frenadas: resultado.frenadas || [], avisos: resultado.avisos || [] });
 }));
@@ -7474,11 +7474,12 @@ app.post('/admin/categorias/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(as
   const nombreIdioma = await getNombreIdioma(lang || 'es');
   const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
-  const prompt = `Eres un experto en SEO de imágenes para webs de transporte premium. Analiza esta imagen del vehículo de categoría "${nombreCategoria}" y sugiere:
+  let prompt = `Eres un experto en SEO de imágenes para webs de transporte premium. Analiza esta imagen del vehículo de categoría "${nombreCategoria}" y sugiere:
 1. Un nombre de archivo SEO en español (ej: business-class-interior-gran-canaria.webp), en minúsculas, sin espacios, con guiones, extensión .webp
 2. Un alt text en ${nombreIdioma} — describe lo que se ve en la imagen de forma natural e incluye el nombre de la categoría. Máximo 125 caracteres.
 ${iaPrompts.REGLA_LETRAS()}${iaPrompts.REGLA_RUSO(nombreIdioma)}${iaPrompts.REGLA_FOTOS()}
 Responde ÚNICAMENTE con JSON válido, sin markdown: {"nombre_archivo": "...", "alt_texto": "..."}`;
+  prompt = await conNombresOficiales(prompt, 'categoria', req.params.id, [lang || 'es']); // (09/11/2026)
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -7691,7 +7692,7 @@ app.post('/admin/categorias/:id/fotos/:fotoId/alt-generar-falta', requireAdmin, 
   const cat = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
   if (cat.rows.length === 0) return res.status(404).json({ error: 'Categoría no encontrada.' });
   const nombreCategoria = cat.rows[0].nombre;
-  const resultado = await generarFaltaAltFotoModelo('categorias_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) { return promptAltCategoria(nombreCategoria, pendientes); });
+  const resultado = await generarFaltaAltFotoModelo('categorias_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) { return conNombresOficiales(promptAltCategoria(nombreCategoria, pendientes), 'categoria', req.params.id, codigosDe(pendientes)); });
   if (resultado.error) return res.status(resultado.status || 500).json({ error: resultado.error });
   res.json({ ok: true, generadas: resultado.generadas, frenadas: resultado.frenadas || [], avisos: resultado.avisos || [] });
 }));
@@ -7793,6 +7794,47 @@ function promptAltRuta(r, pendientes) {
   const codigos = pendientes.map(function (i) { return '"' + i.codigo + '": "..."'; }).join(', ');
   return iaPrompts.GENERADOR_ALT_FOTO_RUTA_TODOS(r.origen, r.destino, listaIdiomas, codigos);
 }
+// (09/11/2026) Nombres oficiales (los de nuestro Admin) en cada idioma, para que la IA de las fotos no se los invente.
+// tipo 'destino' (ref = id del destino) · 'ruta' (ref = { origen, destino }, nombres en español) · 'categoria' (ref = id).
+// langs: códigos de idioma. Si un idioma no tiene traducción, se usa el español.
+async function trDestinoPorNombre(nombreEs) {
+  const r = await pool.query(
+    `SELECT dt.lang_code, dt.nombre FROM destinos d JOIN destinos_traducciones dt ON dt.destino_id = d.id
+     WHERE d.nombre = $1 AND TRIM(COALESCE(dt.nombre,'')) <> ''`, [nombreEs]);
+  const m = {};
+  r.rows.forEach(function (x) { m[x.lang_code] = x.nombre.trim(); });
+  return m;
+}
+async function nombresOficialesFoto(tipo, ref, langs) {
+  const pares = [];
+  if (tipo === 'destino') {
+    const d = await pool.query('SELECT nombre FROM destinos WHERE id = $1', [ref]);
+    if (!d.rows.length) return pares;
+    const tr = await trDestinoPorNombre(d.rows[0].nombre);
+    langs.forEach(function (l) { pares.push({ lang: l, nombre: (l !== 'es' && tr[l]) || d.rows[0].nombre }); });
+  } else if (tipo === 'ruta') {
+    const o = await trDestinoPorNombre(ref.origen), de = await trDestinoPorNombre(ref.destino);
+    langs.forEach(function (l) {
+      pares.push({ lang: l, nombre: ((l !== 'es' && o[l]) || ref.origen) + ' → ' + ((l !== 'es' && de[l]) || ref.destino) });
+    });
+  } else if (tipo === 'categoria') {
+    const c = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [ref]);
+    if (!c.rows.length) return pares;
+    langs.forEach(function (l) {
+      const t = obtenerTexto('categoria_nombre_' + ref, l);
+      pares.push({ lang: l, nombre: (t && t.indexOf('[[') !== 0) ? t : c.rows[0].nombre });
+    });
+  }
+  return pares;
+}
+// Añade los nombres oficiales a la instrucción de la IA, antes de su «Responde…» final
+async function conNombresOficiales(prompt, tipo, ref, langs) {
+  const bloque = iaPrompts.REGLA_NOMBRES_OFICIALES(await nombresOficialesFoto(tipo, ref, langs));
+  if (!bloque) return prompt;
+  const i = prompt.lastIndexOf('\nResponde');
+  return i >= 0 ? prompt.slice(0, i) + bloque + '\n' + prompt.slice(i) : prompt + bloque;
+}
+function codigosDe(lista) { return (lista || []).map(function (i) { return i.codigo || i; }); }
 // (07/11/2026) Llamada a la IA con la foto para una lista de idiomas (la usan «Generar lo que falta» y «🔄 Volver a traducir»)
 async function pedirAltsIA(apiKey, matches, lista, hacerPrompt) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -7802,7 +7844,7 @@ async function pedirAltsIA(apiKey, matches, lista, hacerPrompt) {
       model: 'claude-sonnet-4-6', max_tokens: 800,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: matches[1], data: matches[2] } },
-        { type: 'text', text: hacerPrompt(lista) }
+        { type: 'text', text: await hacerPrompt(lista) } // (09/11/2026) puede ser una promesa (nombres oficiales)
       ]}]
     })
   });
@@ -7847,21 +7889,21 @@ app.post('/admin/seo/destinos/:id/fotos/:fotoId/alt/:lang/retraducir', requireAd
   const destino = await pool.query('SELECT nombre, isla, zona FROM destinos WHERE id = $1', [req.params.id]);
   if (!destino.rows.length) return res.status(404).json({ ok: false, error: 'Destino no encontrado.' });
   const r = await retraducirAltFotoModelo('destinos_fotos_alt', req.params.fotoId, req.body.imagen, req.params.lang,
-    function (lista) { return promptAltDestino(destino.rows[0], lista); });
+    function (lista) { return conNombresOficiales(promptAltDestino(destino.rows[0], lista), 'destino', req.params.id, codigosDe(lista)); });
   res.status(r.status || 200).json(r.error && !('ok' in r) ? { ok: false, error: r.error } : r);
 }));
 app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt/:lang/retraducir', requireAdmin, asyncHandler(async (req, res) => {
   const ruta = await pool.query('SELECT origen, destino FROM rutas WHERE id = $1', [req.params.id]);
   if (!ruta.rows.length) return res.status(404).json({ ok: false, error: 'Ruta no encontrada.' });
   const r = await retraducirAltFotoModelo('rutas_fotos_alt', req.params.fotoId, req.body.imagen, req.params.lang,
-    function (lista) { return promptAltRuta(ruta.rows[0], lista); });
+    function (lista) { return conNombresOficiales(promptAltRuta(ruta.rows[0], lista), 'ruta', ruta.rows[0], codigosDe(lista)); });
   res.status(r.status || 200).json(r.error && !('ok' in r) ? { ok: false, error: r.error } : r);
 }));
 app.post('/admin/categorias/:id/fotos/:fotoId/alt/:lang/retraducir', requireAdmin, asyncHandler(async (req, res) => {
   const cat = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [req.params.id]);
   if (!cat.rows.length) return res.status(404).json({ ok: false, error: 'Categoría no encontrada.' });
   const r = await retraducirAltFotoModelo('categorias_fotos_alt', req.params.fotoId, req.body.imagen, req.params.lang,
-    function (lista) { return promptAltCategoria(cat.rows[0].nombre, lista); });
+    function (lista) { return conNombresOficiales(promptAltCategoria(cat.rows[0].nombre, lista), 'categoria', req.params.id, codigosDe(lista)); });
   res.status(r.status || 200).json(r.error && !('ok' in r) ? { ok: false, error: r.error } : r);
 }));
 
@@ -7923,7 +7965,7 @@ app.post('/admin/seo/rutas/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(asy
   const nombreIdioma = await getNombreIdioma(lang || 'es');
   const matches = imagen.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
-  const prompt = iaPrompts.GENERADOR_ALT_FOTO_RUTA(r.origen, r.destino, lang || 'es', nombreIdioma);
+  const prompt = await conNombresOficiales(iaPrompts.GENERADOR_ALT_FOTO_RUTA(r.origen, r.destino, lang || 'es', nombreIdioma), 'ruta', r, [lang || 'es']); // (09/11/2026)
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
@@ -7956,7 +7998,7 @@ app.post('/admin/seo/rutas/:id/fotos/nueva/alt/generar-todos', requireAdmin, asy
   if (!matches) return res.status(400).json({ error: 'Formato no válido.' });
   const listaIdiomas = idiomas.rows.map(function(i) { return i.codigo + ' (' + i.nombre + ')'; }).join(', ');
   const codigos = idiomas.rows.map(function(i) { return '"' + i.codigo + '": "..."'; }).join(', ');
-  const prompt = iaPrompts.GENERADOR_ALT_FOTO_RUTA_TODOS(r.origen, r.destino, listaIdiomas, codigos);
+  const prompt = await conNombresOficiales(iaPrompts.GENERADOR_ALT_FOTO_RUTA_TODOS(r.origen, r.destino, listaIdiomas, codigos), 'ruta', r, codigosDe(idiomas.rows)); // (09/11/2026)
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
@@ -8260,7 +8302,7 @@ app.post('/admin/seo/rutas/:id/fotos/:fotoId/alt-generar-falta', requireAdmin, a
   const ruta = await pool.query('SELECT origen, destino FROM rutas WHERE id = $1', [req.params.id]);
   if (ruta.rows.length === 0) return res.status(404).json({ error: 'Ruta no encontrada.' });
   const r = ruta.rows[0];
-  const resultado = await generarFaltaAltFotoModelo('rutas_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) { return promptAltRuta(r, pendientes); });
+  const resultado = await generarFaltaAltFotoModelo('rutas_fotos_alt', req.params.fotoId, req.body.imagen, function (pendientes) { return conNombresOficiales(promptAltRuta(r, pendientes), 'ruta', r, codigosDe(pendientes)); });
   if (resultado.error) return res.status(resultado.status || 500).json({ error: resultado.error });
   res.json({ ok: true, generadas: resultado.generadas, frenadas: resultado.frenadas || [], avisos: resultado.avisos || [] });
 }));
