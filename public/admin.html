@@ -12598,10 +12598,10 @@ function abrirAltTextosFoto(destinoId, fotoId, etiqueta) {
 }
 
 // (30/10/2026) Modelo común: ✓ de la vista de águila y pestañas 🟢 / 🔵 / 🔴
+// (09/11/2026) Círculo relleno de color (como el de Islas) en vez del ✓: el color se distingue mejor en el botón pequeño
 function checkEstadoAltFoto(e) {
-  if (e === 'ok') return '<span style="color:#2e7d32;font-weight:600;" title="Aprobada">✓</span>';
-  if (e === 'ia') return '<span style="color:#1565c0;font-weight:600;" title="Traducido, sin aprobar">✓</span>';
-  return '<span style="color:#c0392b;font-weight:600;" title="Falta algo">✓</span>';
+  var c = e === 'ok' ? ['#2e7d32', 'Aprobada'] : (e === 'ia' ? ['#1565c0', 'Traducido, sin aprobar'] : ['#c0392b', 'Falta algo']);
+  return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;margin-left:3px;background:' + c[0] + ';" title="' + c[1] + '"></span>';
 }
 function clasePestanaAltFoto(e) {
   return e === 'ok' ? 'tab-idioma-verde' : (e === 'ia' ? 'tab-idioma-azul' : 'tab-idioma-rojo');
