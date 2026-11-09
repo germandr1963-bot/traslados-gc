@@ -464,11 +464,13 @@ table.tabla-precios input {
         </label>
         <button class="boton-secundario" onclick="abrirPanelIdiomas()">🌐 Gestionar idiomas de la web</button>
         <button class="boton-secundario" onclick="abrirPanelPalabrasURL()">🔗 Palabras de URL por página</button>
+        <button class="boton-secundario" onclick="abrirPanelPalabrasLatinasRu()">🔤 Palabras latinas permitidas en ruso</button>
         <button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button>
       </div>
 
       <div id="panel-gestion-idiomas" class="tarjeta oculto" style="margin-bottom:18px;"></div>
       <div id="panel-palabras-url" class="tarjeta oculto" style="margin-bottom:18px;"></div>
+      <div id="panel-palabras-latinas-ru" class="tarjeta oculto" style="margin-bottom:18px;"></div>
 
       <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
         <span style="font-size:13px;">🤖 Generar textos de interfaz con IA:</span>
@@ -7137,6 +7139,92 @@ function abrirPanelPalabrasURL() {
       '</table></div>' +
       '<button class="boton-secundario" style="margin-top:8px;" onclick="document.getElementById(\'panel-palabras-url\').classList.add(\'oculto\')">Cerrar</button>';
   });
+}
+
+// ─── (09/11/2026) Idiomas → «🔤 Palabras latinas permitidas en ruso»: ver, añadir a mano, quitar, descargar e imprimir ───
+var _palabrasLatinasRu = [];
+function origenPalabraLatinaRu(o) {
+  if (o === 'lista de partida') return 'Lista de partida';
+  if (o === 'a mano') return 'Añadida a mano';
+  return 'Aprobada en una ficha';
+}
+function abrirPanelPalabrasLatinasRu(recargar) {
+  var panel = document.getElementById('panel-palabras-latinas-ru');
+  if (!recargar && !panel.classList.contains('oculto')) {
+    panel.classList.add('oculto');
+    return;
+  }
+  panel.classList.remove('oculto');
+  if (!recargar) {
+    panel.innerHTML = '<p style="color:var(--texto-muted)">Cargando...</p>';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  fetch('/admin/ruso-palabras-permitidas').then(function (r) { return r.json(); }).then(function (lista) {
+    _palabrasLatinasRu = lista || [];
+    var filas = _palabrasLatinasRu.map(function (x) {
+      return '<tr><td style="font-family:monospace;font-size:13px;"><strong>' + escapar(x.palabra) + '</strong></td>' +
+        '<td>' + escapar(origenPalabraLatinaRu(x.origen)) + '</td>' +
+        '<td style="font-size:12px;color:var(--texto-muted)">' + escapar(x.fecha || '') + '</td>' +
+        '<td style="text-align:center"><button class="boton-secundario" style="padding:2px 8px;font-size:0.72rem;" ' +
+        'data-palabra="' + escapar(x.palabra) + '" onclick="quitarPalabraLatinaRu(this.dataset.palabra)">✕ Quitar</button></td></tr>';
+    }).join('');
+    panel.innerHTML =
+      '<h3 style="margin-top:0">🔤 Palabras latinas permitidas en ruso</h3>' +
+      '<p style="font-size:12px;color:var(--texto-muted);margin-bottom:12px;">Palabras en letras latinas que se aceptan en los textos rusos (marcas, nombres, siglas). Las que están aquí ya no se preguntan en ningún texto. Hoy hay ' + _palabrasLatinasRu.length + '.</p>' +
+      '<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">' +
+      '<input type="text" id="nueva-palabra-latina-ru" placeholder="Nueva palabra (p. ej. mercedes)" style="max-width:260px;margin:0;" onkeydown="if(event.key===\'Enter\')anadirPalabraLatinaRu()">' +
+      '<button class="boton-primario" onclick="anadirPalabraLatinaRu()">➕ Añadir</button>' +
+      '<span style="flex:1"></span>' +
+      '<a href="/admin/ruso-palabras-permitidas/exportar" class="boton-secundario" style="text-decoration:none;">⬇️ Descargar Excel</a>' +
+      '<button class="boton-secundario" onclick="imprimirPalabrasLatinasRu()">🖨️ Imprimir</button>' +
+      '</div>' +
+      '<div id="msg-palabras-latinas-ru" style="font-size:13px;margin-bottom:10px;"></div>' +
+      '<div style="overflow-x:auto;"><table class="tabla-admin"><thead><tr><th>Palabra</th><th>De dónde viene</th><th>Fecha</th><th></th></tr></thead>' +
+      '<tbody>' + filas + '</tbody></table></div>' +
+      '<button class="boton-secundario" style="margin-top:12px;" onclick="document.getElementById(\'panel-palabras-latinas-ru\').classList.add(\'oculto\')">Cerrar</button>';
+  });
+}
+function msgPalabrasLatinasRu(texto, esError) {
+  var m = document.getElementById('msg-palabras-latinas-ru');
+  if (m) { m.style.color = esError ? '#c0392b' : '#2e7d32'; m.textContent = texto; }
+}
+function anadirPalabraLatinaRu() {
+  var campo = document.getElementById('nueva-palabra-latina-ru');
+  var w = String(campo && campo.value || '').trim().toLowerCase();
+  if (!w) return;
+  if (!/^[a-z0-9À-ÿ][a-z0-9À-ÿ'-]*$/i.test(w) || w.length > 40) {
+    msgPalabrasLatinasRu('«' + w + '» no vale: una sola palabra en letras latinas (se admiten números y guiones).', true);
+    return;
+  }
+  if (_palabrasLatinasRu.some(function (x) { return x.palabra === w; })) {
+    msgPalabrasLatinasRu('«' + w + '» ya está en la lista.', true);
+    return;
+  }
+  aprobarPalabrasLatinas([w], 'a mano').then(function () {
+    abrirPanelPalabrasLatinasRu(true);
+  });
+}
+function quitarPalabraLatinaRu(w) {
+  fetch('/admin/ruso-palabras-permitidas/quitar', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ palabra: w })
+  }).then(function (r) { return r.json(); }).then(function () {
+    abrirPanelPalabrasLatinasRu(true);
+  });
+}
+function imprimirPalabrasLatinasRu() {
+  var filas = _palabrasLatinasRu.map(function (x) {
+    return '<tr><td>' + escapar(x.palabra) + '</td><td>' + escapar(origenPalabraLatinaRu(x.origen)) + '</td><td>' + escapar(x.fecha || '') + '</td></tr>';
+  }).join('');
+  var v = window.open('', '_blank');
+  if (!v) return;
+  v.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Palabras latinas permitidas en ruso</title>' +
+    '<style>body{font-family:Arial,sans-serif;padding:24px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px 10px;text-align:left;font-size:13px}th{background:#f2f2f2}</style></head><body>' +
+    '<h2>Palabras latinas permitidas en ruso</h2><p>' + _palabrasLatinasRu.length + ' palabras</p>' +
+    '<table><thead><tr><th>Palabra</th><th>De dónde viene</th><th>Fecha</th></tr></thead><tbody>' + filas + '</tbody></table></body></html>');
+  v.document.close();
+  v.focus();
+  v.print();
 }
 
 function editarPalabraIdioma(codigo, campo, valorActual) {
