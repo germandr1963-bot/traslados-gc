@@ -652,6 +652,19 @@ async function initSchema() {
   // (30/10/2026) Regla de las traducciones: 🔴 cuando cambia el nombre en español de la isla
   await pool.query(`ALTER TABLE islas_traducciones ADD COLUMN IF NOT EXISTS desactualizado BOOLEAN NOT NULL DEFAULT FALSE`);
 
+  // (09/11/2026) Palabras en letras latinas aceptadas en ruso: lista guardada (las de partida + las que aprueba Germán)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ruso_palabras_permitidas (
+      palabra TEXT PRIMARY KEY,
+      origen TEXT,
+      creado_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  for (const w of RUSO_PALABRAS_PERMITIDAS) {
+    await pool.query(`INSERT INTO ruso_palabras_permitidas (palabra, origen) VALUES ($1, 'lista de partida') ON CONFLICT (palabra) DO NOTHING`, [w]);
+  }
+  await cargarPalabrasPermitidasRu();
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS categorias_vehiculos (
       id SERIAL PRIMARY KEY,
@@ -7255,7 +7268,7 @@ app.get('/admin/seo/destinos/:id/fotos/:fotoId/alt', requireAdmin, asyncHandler(
     mapa[a.lang_code] = a.alt_texto;
     if (a.alt_texto && a.alt_texto.trim()) estados[a.lang_code] = a.desactualizado ? 'desactualizado' : (a.revisado ? 'ok' : 'ia');
   }
-  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa, estados: estados });
+  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa, estados: estados, frenos: frenosPorIdioma(mapa) }); // (09/11/2026) frenos
 }));
 
 // Guarda el alt text de una foto en un idioma concreto
@@ -7622,7 +7635,7 @@ app.get('/admin/categorias/:id/fotos/:fotoId/alt', requireAdmin, asyncHandler(as
     mapa[a.lang_code] = a.alt_texto;
     if (a.alt_texto && a.alt_texto.trim()) estados[a.lang_code] = a.desactualizado ? 'desactualizado' : (a.revisado ? 'ok' : 'ia');
   }
-  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa, estados: estados });
+  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa, estados: estados, frenos: frenosPorIdioma(mapa) }); // (09/11/2026) frenos
 }));
 
 // Guarda el alt text de una foto de categoría en un idioma concreto
@@ -8223,7 +8236,7 @@ app.get('/admin/seo/rutas/:id/fotos/:fotoId/alt', requireAdmin, asyncHandler(asy
     mapa[a.lang_code] = a.alt_texto;
     if (a.alt_texto && a.alt_texto.trim()) estados[a.lang_code] = a.desactualizado ? 'desactualizado' : (a.revisado ? 'ok' : 'ia');
   }
-  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa, estados: estados });
+  res.json({ ok: true, idiomas: idiomas.rows, alts: mapa, estados: estados, frenos: frenosPorIdioma(mapa) }); // (09/11/2026) frenos
 }));
 
 // Guarda el alt text de una foto de ruta en un idioma concreto
@@ -20035,6 +20048,37 @@ app.put('/admin/plantillas-comunicacion/:clave/traducciones/:lang', requireAdmin
 const RUSO_PALABRAS_PERMITIDAS = ['traslados', 'gc', 'whatsapp', 'email', 'e-mail',
   'visa', 'mastercard', 'maestro', 'apple', 'google', 'pay', 'wi-fi', 'no-show', 'c', 'f', 'euro', 'd',
   'lpa', 'ib', 'abc', 'gca', 'pnr', 'eurotaxi', 'eurotaxis', 'vt', 'msc', 'bellísima'];
+// (09/11/2026) La lista que manda es la de Neon (ruso_palabras_permitidas); la de arriba es solo la de partida.
+let PALABRAS_PERMITIDAS_RU = new Set(RUSO_PALABRAS_PERMITIDAS);
+async function cargarPalabrasPermitidasRu() {
+  const r = await pool.query('SELECT palabra FROM ruso_palabras_permitidas');
+  PALABRAS_PERMITIDAS_RU = new Set(r.rows.map(function (x) { return String(x.palabra).toLowerCase(); }));
+}
+function palabraPermitidaRu(w) { return PALABRAS_PERMITIDAS_RU.has(String(w || '').toLowerCase()); }
+// (09/11/2026) Lo que el freno ve en cada idioma de una ficha (para enseñar el aviso en su pestaña)
+function frenosPorIdioma(mapa) {
+  const out = {};
+  Object.keys(mapa || {}).forEach(function (lang) {
+    if (lang === 'es' || !mapa[lang] || !String(mapa[lang]).trim()) return;
+    const r = revisarTraduccion(mapa[lang], lang);
+    if (!r.ok) out[lang] = { grave: r.grave, sinRuso: r.sinRuso, mezcladas: r.mezcladas, latinas: r.latinas };
+  });
+  return out;
+}
+// (09/11/2026) «✅ Sí, aprobar»: las palabras en letras latinas que aprueba Germán pasan a la lista (y ya no frenan)
+app.post('/admin/ruso-palabras-permitidas', requireAdmin, asyncHandler(async (req, res) => {
+  const palabras = Array.isArray(req.body.palabras) ? req.body.palabras : [];
+  const origen = String(req.body.origen || '').slice(0, 200);
+  const validas = [];
+  for (const p of palabras) {
+    const w = String(p || '').trim().toLowerCase();
+    if (!w || w.length > 40 || !/^[a-z0-9À-ÿ][a-z0-9À-ÿ'-]*$/i.test(w)) continue;
+    await pool.query(`INSERT INTO ruso_palabras_permitidas (palabra, origen) VALUES ($1, $2) ON CONFLICT (palabra) DO NOTHING`, [w, origen || null]);
+    validas.push(w);
+  }
+  await cargarPalabrasPermitidasRu();
+  res.json({ ok: true, añadidas: validas });
+}));
 // Devuelve { ok, grave, sinRuso, mezcladas: [...], latinas: [...] }.
 function revisarTraduccion(texto, lang) {
   const t = String(texto || '')
@@ -20059,10 +20103,10 @@ function revisarTraduccion(texto, lang) {
     const enteras = (t.match(/[A-Za-zÀ-ÖØ-öø-ÿ]+(?:-[A-Za-zÀ-ÖØ-öø-ÿ]+)*/g) || []);
     const permitidaEntera = {};
     enteras.forEach(function (w) {
-      if (RUSO_PALABRAS_PERMITIDAS.indexOf(w.toLowerCase()) >= 0) w.split('-').forEach(function (x) { permitidaEntera[x] = true; });
+      if (palabraPermitidaRu(w)) w.split('-').forEach(function (x) { permitidaEntera[x] = true; });
     });
     latinas = Array.from(new Set(palLatinas.filter(function (w) {
-      return !permitidaEntera[w] && RUSO_PALABRAS_PERMITIDAS.indexOf(w.toLowerCase()) < 0 &&
+      return !permitidaEntera[w] && !palabraPermitidaRu(w) &&
         mezcladas.indexOf(w) < 0;
     })));
     sinRuso = !cirilicas && latinas.length > 0; // solo palabras permitidas (p. ej. «Wi-Fi») no es «sin ruso»
@@ -20104,7 +20148,7 @@ function separarParaAprobar(filas) {
     const r = revisarTraduccion(f.texto, f.lang);
     if (r.ok) { out.aprobar.push(f); continue; }
     if (r.sinRuso) out.rojo.push(f); else out.quedan.push(f);
-    out.frenadas.push({ donde: f.donde || '', lang: f.lang, motivo: mensajeFreno(r) });
+    out.frenadas.push({ donde: f.donde || '', lang: f.lang, motivo: mensajeFreno(r), latinas: r.grave ? [] : r.latinas }); // (09/11/2026) latinas: para preguntar si se aprueban
   }
   return out;
 }
