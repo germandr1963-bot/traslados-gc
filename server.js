@@ -7463,6 +7463,7 @@ app.post('/admin/categorias/:id/fotos/sugerir-ia', requireAdmin, asyncHandler(as
   const prompt = `Eres un experto en SEO de imágenes para webs de transporte premium. Analiza esta imagen del vehículo de categoría "${nombreCategoria}" y sugiere:
 1. Un nombre de archivo SEO en español (ej: business-class-interior-gran-canaria.webp), en minúsculas, sin espacios, con guiones, extensión .webp
 2. Un alt text en ${nombreIdioma} — describe lo que se ve en la imagen de forma natural e incluye el nombre de la categoría. Máximo 125 caracteres.
+${iaPrompts.REGLA_LETRAS()}${iaPrompts.REGLA_RUSO(nombreIdioma)}${iaPrompts.REGLA_FOTOS()}
 Responde ÚNICAMENTE con JSON válido, sin markdown: {"nombre_archivo": "...", "alt_texto": "..."}`;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -7752,7 +7753,7 @@ Para cada idioma:
 - Describe con detalle lo que se ve — paisaje, luz, elementos visuales — e incluye el destino y Gran Canaria. Debe tener entre 110 y 125 caracteres como máximo absoluto
 - Máximo 125 caracteres
 
-${iaPrompts.REGLA_LETRAS()}${iaPrompts.REGLA_RUSO(pendientes.some(function (i) { return i.codigo === 'ru'; }) ? 'ruso' : '')}
+${iaPrompts.REGLA_LETRAS()}${iaPrompts.REGLA_RUSO(pendientes.some(function (i) { return i.codigo === 'ru'; }) ? 'ruso' : '')}${iaPrompts.REGLA_FOTOS()}
 
 Responde ÚNICAMENTE con JSON válido, sin markdown:
 {${codigos}}`;
@@ -7767,7 +7768,7 @@ Para cada idioma:
 - Escribe de forma completamente nativa, describe lo que se ve e incluye el nombre de la categoría
 - Máximo 125 caracteres
 
-${iaPrompts.REGLA_LETRAS()}${iaPrompts.REGLA_RUSO(pendientes.some(function (i) { return i.codigo === 'ru'; }) ? 'ruso' : '')}
+${iaPrompts.REGLA_LETRAS()}${iaPrompts.REGLA_RUSO(pendientes.some(function (i) { return i.codigo === 'ru'; }) ? 'ruso' : '')}${iaPrompts.REGLA_FOTOS()}
 
 Responde ÚNICAMENTE con JSON válido, sin markdown:
 {${codigos}}`;

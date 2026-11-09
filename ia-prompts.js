@@ -17,6 +17,19 @@ function REGLA_LETRAS() {
   return 'REGLA DE LETRAS (obligatoria en todos los idiomas): cada palabra se escribe entera en un solo alfabeto. ' +
     'Nunca mezcles letras latinas y cirílicas dentro de una misma palabra (mal: «Тауrito», «parasоller»; bien: «Таурито», «parasoller»).';
 }
+// (09/11/2026) Reglas de contenido de las descripciones (alt) de las fotos, comunes a todas las instrucciones de fotos
+function REGLA_FOTOS() {
+  return '\n\nREGLAS DE CONTENIDO DE LA FOTO (obligatorias en todos los idiomas):\n' +
+    '- Describe solo lo que se ve de verdad en la foto. Nunca inventes ni supongas datos.\n' +
+    '- Nombres de barcos, navieras, empresas o marcas: escríbelos SOLO si sus letras se leen claramente en la foto. Si no se leen con claridad, aunque reconozcas el barco, el coche o la empresa por su forma, no pongas ningún nombre: usa una palabra general (ferry, crucero, barco, coche). Nunca completes un nombre a medias.\n' +
+    '- Gran Canaria y las Islas Canarias están en el océano Atlántico: nunca escribas «mar Mediterráneo».\n' +
+    '- El lugar es el que se te indica. No lo cambies ni añadas otros lugares que la foto no permita asegurar.\n' +
+    '- Ante la duda, una descripción sencilla y cierta es mejor que una atractiva con un dato inventado.';
+}
+// (09/11/2026) ¿La lista de idiomas («en (Inglés), ru (Ruso)…») incluye el ruso?
+function listaConRuso(listaIdiomas) {
+  return /(^|,\s*)ru\s*\(/.test(String(listaIdiomas || '')) ? 'ruso' : '';
+}
 function esIdiomaRuso(nombreIdioma) {
   return /rus|рус/i.test(String(nombreIdioma || ''));
 }
@@ -61,7 +74,7 @@ REGLAS DE SALIDA:
 2. alt_texto: Texto alternativo descriptivo en ${lang === 'es' ? 'español' : nombreIdioma}. Describe la escena visual concreta (luz, paisaje, elementos) integrando de forma natural el destino y la ubicación (${isla}).
 - RESTRICCIÓN RÍGIDA DE LONGITUD: Debe tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125.
 - PROHIBIDO: Usar muletillas como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción.
-${REGLA_LETRAS()}${REGLA_RUSO(lang === 'es' ? 'español' : nombreIdioma)}
+${REGLA_LETRAS()}${REGLA_RUSO(lang === 'es' ? 'español' : nombreIdioma)}${REGLA_FOTOS()}
 FORMATO DE RESPUESTA:
 Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo adicional:
 {"nombre_archivo": "...", "alt_texto": "..."}`;
@@ -81,8 +94,7 @@ REGLAS OBLIGATORIAS POR IDIOMA:
 2. Descripción Visual y SEO: Describe elementos visuales concretos (luz, paisaje, detalles) e integra de forma natural el destino ("${nombre}") y la ubicación (${isla}).
 3. RESTRICCIÓN RÍGIDA DE LONGITUD: Cada texto DEBE tener OBLIGATORIAMENTE entre 100 y 125 caracteres (contando espacios). Jamás menos de 100 ni más de 125 caracteres por idioma.
 4. Sin Muletillas: PROHIBIDO usar fórmulas como "fotografía de", "imagen de", "vista de" en cualquier idioma. Empieza directamente con la descripción visual.
-5. Normas para Ruso (ru): Traduce las palabras comunes (playa, faro, puerto, etc.) al ruso. Translitera los nombres propios al alfabeto cirílico (ej. Maspalomas -> Маспаломас, Gran Canaria -> Гран-Канария). Cero caracteres latinos en la clave de ruso.
-${REGLA_LETRAS()}
+${REGLA_LETRAS()}${REGLA_RUSO(listaConRuso(listaIdiomas))}${REGLA_FOTOS()}
 FORMATO DE RESPUESTA:
 Responde EXCLUSIVAMENTE con un objeto JSON válido conteniendo las claves solicitadas, sin bloques de código markdown, sin saltos de línea innecesarios ni texto explicativo:
 {${codigos}}`;
@@ -303,7 +315,7 @@ REGLAS DE SALIDA:
 - PROHIBIDO: Usar muletillas como "fotografía de", "imagen de", "vista de", "foto de". Empieza directo con la descripción visual.
 
 FORMATO DE RESPUESTA:
-${REGLA_LETRAS()}${REGLA_RUSO(lang === 'es' ? 'español' : nombreIdioma)}
+${REGLA_LETRAS()}${REGLA_RUSO(lang === 'es' ? 'español' : nombreIdioma)}${REGLA_FOTOS()}
 Responde EXCLUSIVAMENTE con un objeto JSON válido, sin bloques de código markdown (\`\`\`json), sin saltos de línea innecesarios ni texto explicativo adicional:
 {"nombre_archivo": "...", "alt_texto": "..."}`;
 }
@@ -323,9 +335,8 @@ REGLAS OBLIGATORIAS POR IDIOMA:
 2. Descripción Visual y SEO: Describe elementos visuales concretos (luz, paisaje, detalles) y termina SIEMPRE con la frase fija indicando el traslado privado a "${destino}" adaptada de forma natural a cada idioma.
 3. RANGO DE CARACTERES PERMITIDO: Cada texto DEBE tener OBLIGATORIAMENTE entre 110 y 145 caracteres (contando espacios y puntuación). Jamás menos de 110 ni más de 145 por idioma.
 4. Sin Muletillas: PROHIBIDO usar fórmulas como "fotografía de", "imagen de", "vista de" en cualquier idioma. Empieza directo con la descripción.
-5. Normas para Ruso (ru): Traduce las palabras comunes al ruso. Translitera los nombres propios al alfabeto cirílico (ej. Las Palmas de Gran Canaria -> Лас-Пальмас-де-Гран-Канария, Gran Canaria -> Гран-Канария). Cero caracteres latinos en la clave de ruso.
 
-${REGLA_LETRAS()}
+${REGLA_LETRAS()}${REGLA_RUSO(listaConRuso(listaIdiomas))}${REGLA_FOTOS()}
 FORMATO DE RESPUESTA:
 Responde EXCLUSIVAMENTE con un objeto JSON válido conteniendo las claves solicitadas, sin bloques de código markdown (\`\`\`json), sin saltos de línea innecesarios ni texto explicativo:
 {${codigos}}`;
@@ -954,5 +965,6 @@ module.exports = {
   GENERADOR_FRASES_COMUNICACIONES,
   // (07/11/2026) Reglas comunes, también para los textos de IA que están dentro de server.js
   REGLA_LETRAS,
-  REGLA_RUSO
+  REGLA_RUSO,
+  REGLA_FOTOS // (09/11/2026)
 };
