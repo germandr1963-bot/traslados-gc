@@ -12238,6 +12238,19 @@ app.delete('/admin/cotizaciones/:id', requireAdmin, asyncHandler(async (req, res
 // ─── Admin: destinos — traducciones ──────────────────────────────────────────
 
 // Devuelve todas las traducciones de todos los destinos para un idioma
+// (10/11/2026) Destino Inicial: estado de las traducciones de cada destino en TODOS los idiomas activos (círculos de la lista)
+// estado: 'ok' 🟢 · 'ia' 🔵 traducido, sin aprobar · 'desactualizado' 🔴 español cambiado · null 🔴 sin traducir
+app.get('/admin/destinos/traducciones-estados', requireAdmin, asyncHandler(async (req, res) => {
+  const idiomas = await pool.query(`SELECT codigo FROM idiomas_web WHERE activo = TRUE AND codigo <> 'es' ORDER BY orden`);
+  const trads = await pool.query('SELECT destino_id, lang_code, nombre, revisado, desactualizado FROM destinos_traducciones');
+  const estados = {};
+  for (const t of trads.rows) {
+    if (!estados[t.destino_id]) estados[t.destino_id] = {};
+    estados[t.destino_id][t.lang_code] = !(t.nombre && t.nombre.trim()) ? null : (t.desactualizado ? 'desactualizado' : (t.revisado ? 'ok' : 'ia'));
+  }
+  res.json({ idiomas: idiomas.rows.map(function (i) { return i.codigo; }), estados: estados });
+}));
+
 app.get('/admin/destinos/traducciones/:lang', requireAdmin, asyncHandler(async (req, res) => {
   const { lang } = req.params;
   const destinos = await pool.query('SELECT id, nombre FROM destinos ORDER BY nombre');
