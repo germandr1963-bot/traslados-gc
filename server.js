@@ -8860,7 +8860,8 @@ async function traducirConClaudeIA(items, nombreIdioma) {
     throw new Error('Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.');
   }
 
-  const prompt = iaPrompts.GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items, await glosarioBotonesIA(nombreIdioma)); // (08/11/2026) N53
+  const prompt = iaPrompts.GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items, await glosarioBotonesIA(nombreIdioma) + // (08/11/2026) N53
+    await glosarioLugaresIA(nombreIdioma, items.map(function (i) { return i.texto_es || ''; }))); // (10/11/2026) nombres de lugares
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -19798,7 +19799,7 @@ app.get('/admin/plantillas-comunicacion-traducciones', requireAdmin, asyncHandle
 // Si el idioma aún no tiene el botón traducido, no se añade nada.
 async function glosarioBotonesIA(nombreIdioma) {
   try {
-    const r = await pool.query('SELECT codigo FROM idiomas_web WHERE nombre = $1 LIMIT 1', [nombreIdioma]);
+    const r = await pool.query('SELECT codigo FROM idiomas_web WHERE LOWER(nombre) = LOWER($1) LIMIT 1', [nombreIdioma]); // (10/11/2026) sin distinguir mayúsculas
     const lang = r.rows.length ? r.rows[0].codigo : null;
     if (!lang || lang === 'es') return '';
     const limpio = function(t) { return String(t || '').replace(/^[^\p{L}]+/u, '').trim(); };
@@ -19810,6 +19811,37 @@ async function glosarioBotonesIA(nombreIdioma) {
     return iaPrompts.GLOSARIO_BOTONES(nombreIdioma, [par('home_nav_acceso_clientes'), par('por_mensajes_titulo')]);
   } catch (e) {
     console.warn('Glosario de botones para la IA:', e.message);
+    return '';
+  }
+}
+
+// (10/11/2026) Nombres oficiales de los lugares que nombra un texto en español: destinos de «Destino Inicial» y la isla sola
+// de «Islas / Localidades», en el idioma que se traduce. Solo los que aparecen en los textos; si no aparece ninguno, nada.
+async function glosarioLugaresIA(nombreIdioma, textosEs) {
+  try {
+    const r = await pool.query('SELECT codigo FROM idiomas_web WHERE LOWER(nombre) = LOWER($1) LIMIT 1', [nombreIdioma]);
+    const lang = r.rows.length ? r.rows[0].codigo : null;
+    if (!lang || lang === 'es') return '';
+    const todo = (textosEs || []).join('\n').toLowerCase();
+    if (!todo.trim()) return '';
+    const dest = await pool.query(
+      `SELECT d.nombre AS es, dt.nombre AS tr FROM destinos d
+       JOIN destinos_traducciones dt ON dt.destino_id = d.id AND dt.lang_code = $1 AND TRIM(COALESCE(dt.nombre,'')) <> ''`, [lang]);
+    const pares = [];
+    let resto = todo;
+    dest.rows.sort(function (a, b) { return b.es.length - a.es.length; }).forEach(function (d) {
+      const n = d.es.toLowerCase();
+      if (resto.indexOf(n) >= 0) { pares.push({ es: d.es, tr: d.tr.trim() }); resto = resto.split(n).join(' '); }
+    });
+    const islas = await pool.query(
+      `SELECT i.nombre AS es, it.nombre AS tr FROM islas i
+       JOIN islas_traducciones it ON it.isla_id = i.id AND it.lang_code = $1 AND TRIM(COALESCE(it.nombre,'')) <> ''`, [lang]);
+    islas.rows.forEach(function (i) {
+      if (resto.indexOf(i.es.toLowerCase()) >= 0) pares.push({ es: i.es, tr: i.tr.trim(), isla: true });
+    });
+    return iaPrompts.GLOSARIO_LUGARES(nombreIdioma, pares);
+  } catch (e) {
+    console.warn('Glosario de lugares para la IA:', e.message);
     return '';
   }
 }

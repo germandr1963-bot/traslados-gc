@@ -31,7 +31,9 @@ function REGLA_FOTOS() {
 function REGLA_NOMBRES_OFICIALES(pares) {
   if (!pares || !pares.length) return '';
   return '\n\nNOMBRES OFICIALES (obligatorio):\n' +
-    'Estos son los nombres oficiales del lugar, la ruta o la categoría en cada idioma. Úsalos exactamente así. ' +
+    'Estos son los nombres oficiales del lugar, la ruta o la categoría en cada idioma. ' +
+    'Salen del Admin de la empresa: los lugares y las rutas, de «Destino Inicial», la lista oficial de los destinos y sus traducciones; la isla, de «Islas / Localidades», la lista oficial de las islas y sus traducciones; las categorías, de «Textos de interfaz». Son la única fuente válida: aunque conozcas otra forma de llamarlos, usa estos. ' + // (10/11/2026)
+    'Úsalos exactamente así. ' +
     'No los traduzcas de otra manera ni los dejes en español. ' +
     'En los idiomas que declinan (ruso, finés y otros) puedes declinarlo según la gramática de la frase, partiendo siempre de este nombre.\n' +
     pares.map(function (p) { return '- ' + p.lang + ': ' + p.nombre; }).join('\n');
@@ -79,6 +81,18 @@ function GLOSARIO_BOTONES(nombreIdioma, pares) {
     ' exactamente con este nombre, tal como lo ve el cliente en su pantalla, sin traducirlo de otra forma:\n' + lineas.join('\n');
 }
 
+// (10/11/2026) Nombres de lugares para un traductor: si el texto en español nombra un destino (o la isla sola),
+// la traducción usa el nombre oficial de ese idioma. Los da server.js (glosarioLugaresIA) desde Destino Inicial e Islas.
+function GLOSARIO_LUGARES(nombreIdioma, pares) {
+  const lineas = (pares || []).filter(function(p) { return p && p.es && p.tr; })
+    .map(function(p) { return '- «' + p.es + '»' + (p.isla ? ' (la isla, cuando se nombra sola, no dentro de otro nombre como «Las Palmas de Gran Canaria» o «Aeropuerto de Gran Canaria»)' : '') + ' → «' + p.tr + '»'; });
+  if (!lineas.length) return '';
+  return '\n\nNOMBRES DE LUGARES (obligatorio):\n' +
+    'Si el texto en español nombra alguno de estos lugares, escribe en ' + nombreIdioma + ' su nombre oficial, que sale del Admin de la empresa ' +
+    '(los destinos, de «Destino Inicial», la lista oficial de los destinos y sus traducciones; la isla, de «Islas / Localidades», la lista oficial de las islas y sus traducciones). ' +
+    'No lo traduzcas de otra manera. En los idiomas que declinan (ruso, finés y otros), declínalo según la gramática de la frase, partiendo siempre de este nombre:\n' +
+    lineas.join('\n');
+}
 
 // ─── GENERADOR 1 ─────────────────────────────────────────────────────────────────
 // Alt text foto nueva — 1 idioma (Destinos)
@@ -983,6 +997,7 @@ module.exports = {
   REGLA_LETRAS,
   REGLA_RUSO,
   fijarPalabrasLatinasRu,
+  GLOSARIO_LUGARES,
   REGLA_FOTOS, // (09/11/2026)
   REGLA_NOMBRES_OFICIALES // (09/11/2026)
 };
