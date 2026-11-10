@@ -20099,6 +20099,7 @@ let PALABRAS_PERMITIDAS_RU = new Set(RUSO_PALABRAS_PERMITIDAS);
 async function cargarPalabrasPermitidasRu() {
   const r = await pool.query('SELECT palabra FROM ruso_palabras_permitidas');
   PALABRAS_PERMITIDAS_RU = new Set(r.rows.map(function (x) { return String(x.palabra).toLowerCase(); }));
+  iaPrompts.fijarPalabrasLatinasRu(Array.from(PALABRAS_PERMITIDAS_RU)); // (10/11/2026) la IA recibe la lista al momento
 }
 function palabraPermitidaRu(w) { return PALABRAS_PERMITIDAS_RU.has(String(w || '').toLowerCase()); }
 // (09/11/2026) Lo que el freno ve en cada idioma de una ficha (para enseñar el aviso en su pestaña)

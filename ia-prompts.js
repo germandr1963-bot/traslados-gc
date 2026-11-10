@@ -43,6 +43,14 @@ function listaConRuso(listaIdiomas) {
 function esIdiomaRuso(nombreIdioma) {
   return /rus|рус/i.test(String(nombreIdioma || ''));
 }
+// (10/11/2026) Lista de palabras en letras latinas aprobadas por Germán (Admin → Idiomas → «🔤 Palabras latinas
+// permitidas en ruso», tabla ruso_palabras_permitidas). La pone al día server.js (cargarPalabrasPermitidasRu) al
+// arrancar y cada vez que se añade o se quita una palabra: la IA la recibe al momento, sin deploy.
+let PALABRAS_LATINAS_RU = [];
+function fijarPalabrasLatinasRu(lista) {
+  PALABRAS_LATINAS_RU = Array.from(new Set((lista || []).map(function (w) { return String(w || '').trim(); }).filter(Boolean)))
+    .sort(function (a, b) { return a.localeCompare(b, 'es'); });
+}
 function REGLA_RUSO(nombreIdioma, conSaludo) {
   if (!esIdiomaRuso(nombreIdioma)) return '';
   return '\n\nREGLA DEL RUSO (obligatoria):\n' +
@@ -50,6 +58,7 @@ function REGLA_RUSO(nombreIdioma, conSaludo) {
     '- Traduce al ruso las palabras comunes (playa → пляж, puerto → порт, aeropuerto → аэропорт).\n' +
     '- Translitera al cirílico los nombres propios de lugares (Maspalomas → Маспаломас, Taurito → Таурито, Gran Canaria → Гран-Канария).\n' +
     '- Solo se quedan en letras latinas: las variables entre llaves {…}, los enlaces, los correos, los números de reserva y los nombres de marca (Traslados GC, WhatsApp, Visa, Mastercard).\n' +
+    (PALABRAS_LATINAS_RU.length ? '- Palabras aprobadas por la empresa en letras latinas: si tienes que escribir alguna de ellas, escríbela así, en letras latinas, con sus mayúsculas normales (p. ej. VW, WhatsApp, Fred. Olsen), sin traducirla ni transliterarla. No las uses si no hacen falta: ' + PALABRAS_LATINAS_RU.join(', ') + '.\n' : '') +
     '- Si un nombre propio de verdad no se puede transliterar, déjalo entero en letras latinas, nunca a medias.\n' +
     '- Los slugs, las palabras de las direcciones web y los nombres de archivo siguen su propia regla: siempre en letras latinas.\n' +
     '- «Личный кабинет» (el área del cliente) va siempre con mayúscula: «войдите в раздел «Личный кабинет»», o declinado dentro de la frase: «в Личном кабинете».' +
@@ -976,6 +985,7 @@ module.exports = {
   // (07/11/2026) Reglas comunes, también para los textos de IA que están dentro de server.js
   REGLA_LETRAS,
   REGLA_RUSO,
+  fijarPalabrasLatinasRu,
   REGLA_FOTOS, // (09/11/2026)
   REGLA_NOMBRES_OFICIALES // (09/11/2026)
 };
