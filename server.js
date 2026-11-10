@@ -6305,7 +6305,10 @@ app.post('/admin/seo/rutas/:id/generar-ia', requireAdmin, asyncHandler(async (re
   const reglasSlug = `El slug debe seguir EXACTAMENTE este patrón para ${nombreIdioma}: ${slugRutaFn('[origen]', '[destino]')}. Solo letras minúsculas a-z y guiones. Sin tildes, sin caracteres especiales (ä→a, ö→o, ü→u, ß→ss, ø→o, å→a, etc.). Sin cirílico. Usa los nombres completos de origen y destino, nunca abreviados. Ejemplo de resultado esperado: "${slugRutaEjemplo}".`;
 
   const items = [{ route_id: parseInt(req.params.id), origen: origenParaGenerador, destino: destinoParaGenerador, reglasSlug }];
-  const prompt = iaPrompts.GENERADOR_RUTAS_SEO(nombreIdioma, items);
+  const islaRuta = await pool.query('SELECT isla FROM destinos WHERE nombre = $1 LIMIT 1', [destino]); // (10/11/2026)
+  const prompt = await conNombresOficialesPagina(iaPrompts.GENERADOR_RUTAS_SEO(nombreIdioma, items), lang,
+    [{ etiqueta: 'origen', es: origen }, { etiqueta: 'destino', es: destino }],
+    islaRuta.rows.length ? islaRuta.rows[0].isla : 'Gran Canaria'); // (10/11/2026) nombres oficiales de Destinos e Islas
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -7838,6 +7841,28 @@ async function conNombresOficiales(prompt, tipo, ref, langs) {
   const i = prompt.lastIndexOf('\nResponde');
   return i >= 0 ? prompt.slice(0, i) + bloque + '\n' + prompt.slice(i) : prompt + bloque;
 }
+// (10/11/2026) Nombres oficiales para los textos de las PÁGINAS (Página de Destino y SEO de rutas), en el idioma pedido:
+// los del destino (o el origen y el destino) salen de Destinos y el de la isla, de Islas. Si falta, el español.
+async function islaOficial(islaEs, lang) {
+  const nombre = islaEs || 'Gran Canaria';
+  if (lang === 'es') return nombre;
+  const r = await pool.query(
+    `SELECT it.nombre FROM islas i JOIN islas_traducciones it ON it.isla_id = i.id
+     WHERE i.nombre = $1 AND it.lang_code = $2 AND TRIM(COALESCE(it.nombre,'')) <> '' LIMIT 1`, [nombre, lang]);
+  return r.rows.length ? r.rows[0].nombre.trim() : nombre;
+}
+async function conNombresOficialesPagina(prompt, lang, lugares, islaEs) {
+  const pares = [];
+  for (const l of lugares) {
+    const tr = await trDestinoPorNombre(l.es);
+    pares.push({ lang: lang + (l.etiqueta ? ' (' + l.etiqueta + ')' : ''), nombre: (lang !== 'es' && tr[lang]) || l.es });
+  }
+  pares.push({ lang: lang + ' (isla)', nombre: await islaOficial(islaEs, lang) });
+  const bloque = iaPrompts.REGLA_NOMBRES_OFICIALES(pares);
+  let i = prompt.lastIndexOf('\n## FORMATO DE SALIDA');
+  if (i < 0) i = prompt.lastIndexOf('\nResponde');
+  return i >= 0 ? prompt.slice(0, i) + bloque + '\n' + prompt.slice(i) : prompt + bloque;
+}
 function codigosDe(lista) { return (lista || []).map(function (i) { return i.codigo || i; }); }
 // (07/11/2026) Llamada a la IA con la foto para una lista de idiomas (la usan «Generar lo que falta» y «🔄 Volver a traducir»)
 async function pedirAltsIA(apiKey, matches, lista, hacerPrompt) {
@@ -8472,9 +8497,10 @@ app.post('/admin/seo/destinos/:id/generar-todo', requireAdmin, asyncHandler(asyn
     }
   }
 
-  const prompt = d.es_puerto
+  const prompt = await conNombresOficialesPagina(d.es_puerto
     ? iaPrompts.GENERADOR_TERMINAL_PORTUARIA(nombreParaGenerador, d.isla, nombreIdioma, reglasSlug)
-    : iaPrompts.GENERADOR_DESTINO_TODO(nombreParaGenerador, d.isla, nombreIdioma, reglasSlug);
+    : iaPrompts.GENERADOR_DESTINO_TODO(nombreParaGenerador, d.isla, nombreIdioma, reglasSlug),
+    lang, [{ es: d.nombre }], d.isla); // (10/11/2026) nombres oficiales de Destinos e Islas
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
