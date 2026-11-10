@@ -193,7 +193,6 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="valoraciones">Valoraciones</button>
        <button class="item-menu" data-seccion="comunicaciones">Comunicaciones</button>
       <button class="item-menu" data-seccion="contabilidad">&#128210; Contabilidad</button>
-      <button class="item-menu" data-seccion="pagina-rutas">&#127758; Páginas Destino <span class="badge-pend-trad" id="badge-pend-pagina-rutas" title="Traducciones pendientes: sin traducir, español cambiado o sin aprobar" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
     </div>
     <button id="boton-salir" style="margin-top:16px;opacity:0.5;width:100%;">Cerrar sesión</button>
   </div>
@@ -448,6 +447,43 @@ table.tabla-precios input {
             <tbody id="tabla-seo-cuerpo"></tbody>
           </table>
           <div id="editor-seo" class="tarjeta oculto" style="margin-top:20px;max-width:760px;"></div>
+        </div>
+      </div>
+
+      <!-- ─── BLOQUE SEO — PÁGINA DE DESTINO (10/11/2026: antes menú «🌎 Páginas Destino») ─── -->
+      <div style="margin-bottom:32px;border:1px solid var(--gris-borde);border-radius:10px;overflow:hidden;">
+        <div style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--gris-fondo);user-select:none;" onclick="toggleBloqueSEODestinos()">
+          <span id="seo-destinos-icono" style="font-size:14px;">▶</span>
+          <h2 style="font-size:17px;margin:0;">🌍 SEO — Página de Destino</h2>
+          <span id="badge-pend-seo-destinos" class="badge-pend-bloque" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;font-weight:600;"></span>
+          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
+        </div>
+        <div id="seo-destinos-contenido" style="display:none;padding:18px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <button class="boton-costa" onclick="recargarAdminDestinos()" style="font-size:0.85rem;">🔄 Actualizar</button>
+            <button id="btn-migrar-cloudinary-destinos" class="boton-costa" onclick="migrarFotosDestinos()" style="font-size:0.85rem;background:#e67e22;color:#fff;">☁️ Migrar fotos a Cloudinary</button>
+            <span id="msg-migrar-cloudinary-destinos" style="font-size:0.85rem;color:#666;align-self:center;"></span>
+          </div>
+
+          <p class="subtitulo">Gestiona los destinos que aparecen en la página pública /rutas. Cada destino tiene su propia página con fotos, texto descriptivo y datos SEO por idioma. Los slugs, rutas y demás datos vienen de las secciones Destinos y Rutas y precios — aquí solo se enriquece y activa.</p>
+
+          <div id="mensaje-pagina-rutas" style="margin-bottom:12px;"></div>
+
+          <table class="tabla-admin">
+            <thead>
+              <tr>
+                <th>Destino</th>
+                <th>Isla</th>
+                <th>Zona</th>
+                <th style="text-align:center">Visible</th>
+                <th style="text-align:center">Fotos</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-pagina-rutas-cuerpo"></tbody>
+          </table>
+
+          <div id="editor-pagina-rutas" class="tarjeta oculto" style="margin-top:20px;max-width:760px;"></div>
         </div>
       </div>
     </div>
@@ -2211,36 +2247,6 @@ table.tabla-precios input {
     </div>
     <!-- FIN CONTABILIDAD -->
 
-    <div id="seccion-pagina-rutas" class="oculto">
-      <h1>🌍 Páginas Destino — SEO Destinos</h1>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-        <button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button>
-        <button id="btn-migrar-cloudinary-destinos" class="boton-costa" onclick="migrarFotosDestinos()" style="font-size:0.85rem;background:#e67e22;color:#fff;">☁️ Migrar fotos a Cloudinary</button>
-        <span id="msg-migrar-cloudinary-destinos" style="font-size:0.85rem;color:#666;align-self:center;"></span>
-      </div>
-
-      <p class="subtitulo">Gestiona los destinos que aparecen en la página pública /rutas. Cada destino tiene su propia página con fotos, texto descriptivo y datos SEO por idioma. Los slugs, rutas y demás datos vienen de las secciones Destinos y Rutas y precios — aquí solo se enriquece y activa.</p>
-
-
-      <div id="mensaje-pagina-rutas" style="margin-bottom:12px;"></div>
-
-      <table class="tabla-admin">
-        <thead>
-          <tr>
-            <th>Destino</th>
-            <th>Isla</th>
-            <th>Zona</th>
-            <th style="text-align:center">Visible</th>
-            <th style="text-align:center">Fotos</th>
-            <th>Acción</th>
-          </tr>
-        </thead>
-        <tbody id="tabla-pagina-rutas-cuerpo"></tbody>
-      </table>
-
-      <div id="editor-pagina-rutas" class="tarjeta oculto" style="margin-top:20px;max-width:760px;"></div>
-    </div>
-
   </div>
 </div>
 
@@ -2269,6 +2275,8 @@ function mostrarAdmin() {
     if (seccionGuardada && seccionGuardada !== 'fondos') {
       var botonSeccion = document.querySelector('.item-menu[data-seccion="' + seccionGuardada + '"]');
       if (botonSeccion) botonSeccion.click();
+      // (10/11/2026) «🔄 Actualizar» de SEO — Página de Destino: se vuelve con el bloque abierto
+      if (sessionStorage.getItem('adminBloqueDestinos')) { sessionStorage.removeItem('adminBloqueDestinos'); toggleBloqueSEODestinos(); }
     }
   } catch (e) {}
 }
@@ -2279,10 +2287,12 @@ function cargarPendientesTraduccion() {
   fetch('/admin/pendientes-traduccion')
     .then(function (r) { return r.json(); })
     .then(function (d) {
-      ['idiomas', 'islas', 'destinos', 'pagina-rutas', 'seo'].forEach(function (sec) {
+      ['idiomas', 'islas', 'destinos', 'seo'].forEach(function (sec) {
         var b = document.getElementById('badge-pend-' + sec);
         if (!b) return;
         var n = d && d[sec] ? parseInt(d[sec], 10) : 0;
+        // (10/11/2026) Página de Destino está ahora dentro de SEO: la señal de SEO suma también sus fotos
+        if (sec === 'seo') n += (d && d['pagina-rutas'] ? parseInt(d['pagina-rutas'], 10) : 0);
         if (n > 0) { b.textContent = n; b.style.display = 'inline'; } else { b.style.display = 'none'; }
       });
       window._pendFotos = (d && d.fotos) || { cat: {}, ruta: {}, destino: {} };
@@ -2299,7 +2309,7 @@ function badgeFotosPend(tipo, id) {
 function pintarBadgesFotosPend() {
   var p = window._pendFotos || { cat: {}, ruta: {}, destino: {} };
   // (02/11/2026) Título de cada desplegable de SEO: la suma de sus fotos pendientes
-  [['badge-pend-seo-cat', 'cat'], ['badge-pend-seo-rutas', 'ruta']].forEach(function (x) {
+  [['badge-pend-seo-cat', 'cat'], ['badge-pend-seo-rutas', 'ruta'], ['badge-pend-seo-destinos', 'destino']].forEach(function (x) {
     var b = document.getElementById(x[0]);
     if (!b) return;
     var total = 0;
@@ -2329,6 +2339,11 @@ function recargarAdmin() {
   location.reload();
 }
 window.recargarAdmin = recargarAdmin;
+// (10/11/2026) «🔄 Actualizar» del bloque SEO — Página de Destino: recarga y lo deja abierto
+function recargarAdminDestinos() {
+  try { sessionStorage.setItem('adminBloqueDestinos', '1'); } catch (e) {}
+  recargarAdmin();
+}
 
 function comprobarSesion() {
   fetch('/admin/sesion').then(function (r) { return r.json(); }).then(function (d) {
@@ -2366,7 +2381,7 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     document.querySelectorAll('.item-menu').forEach(function (b) { b.classList.remove('activo'); });
     boton.classList.add('activo');
     cargarPendientesTraduccion();
-    ['fondos', 'categorias', 'islas', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo', 'valoraciones', 'comunicaciones', 'contabilidad', 'pagina-rutas', 'modelo'].forEach(function (s) {
+    ['fondos', 'categorias', 'islas', 'conductores', 'destinos', 'precios', 'seo', 'idiomas', 'calculador', 'configuracion', 'contacto', 'facturacion', 'whatsapp', 'extras', 'cotizaciones', 'reservas', 'notificaciones', 'clientes', 'equipo', 'valoraciones', 'comunicaciones', 'contabilidad', 'modelo'].forEach(function (s) {
       document.getElementById('seccion-' + s).classList.add('oculto');
     });
     document.getElementById('seccion-' + boton.dataset.seccion).classList.remove('oculto');
@@ -2388,7 +2403,6 @@ document.querySelectorAll('.item-menu').forEach(function (boton) {
     if (boton.dataset.seccion === 'extras') { cargarExtras(); cargarAvisos(); cargarPreferencias(); cargarSugerenciasPreferencias(); cargarServiciosIncluidos(); }
     if (boton.dataset.seccion === 'clientes') cargarClientes();
     if (boton.dataset.seccion === 'equipo') cargarEquipo();
-    if (boton.dataset.seccion === 'pagina-rutas') cargarPaginaRutas();
     if (boton.dataset.seccion === 'valoraciones') cargarValoraciones();
     if (boton.dataset.seccion === 'comunicaciones') { cargarPlantillasCom(); iniciarEditorMarca(); }
   });
@@ -13952,6 +13966,20 @@ var seoCatIdActual = null;
 var seoCatIslaSlug = 'gran-canaria'; // isla de la categoría activa en el editor
 var seoCatIslaSlugs = {}; // (18/10/2026) isla de esa categoría en cada idioma (Islas/localidades)
 function islaSlugCat(lang) { return (seoCatIslaSlugs && seoCatIslaSlugs[lang]) || seoCatIslaSlug; }
+
+// (10/11/2026) SEO — Página de Destino (antes menú «🌎 Páginas Destino»): al abrirlo carga la lista, como antes al entrar
+function toggleBloqueSEODestinos() {
+  var contenido = document.getElementById('seo-destinos-contenido');
+  var icono = document.getElementById('seo-destinos-icono');
+  if (contenido.style.display === 'none') {
+    contenido.style.display = 'block';
+    icono.textContent = '▼';
+    cargarPaginaRutas();
+  } else {
+    contenido.style.display = 'none';
+    icono.textContent = '▶';
+  }
+}
 
 function toggleBloqueSEORutas() {
   var contenido = document.getElementById('seo-rutas-contenido');
