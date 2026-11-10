@@ -313,8 +313,9 @@ table.tabla-precios input {
         <table class="tabla-admin">
           <thead>
             <tr>
-              <th style="width:35%">Nombre en español</th>
-              <th style="width:15%;text-align:center">Estado</th>
+              <th style="width:24%">Nombre en español</th>
+              <th style="width:6%;text-align:center">Estado</th>
+              <th style="white-space:nowrap;">Idiomas</th>
               <th>Traducción</th>
               <th style="width:100px"></th>
             </tr>
@@ -6857,6 +6858,7 @@ function retraducirDestino(id) {
       if (inp) inp.value = d.nombre || '';
       var badge = document.getElementById('badge-dest-' + id);
       if (badge) badge.innerHTML = marcaTraduccionDestino('ia');
+      pintarCirculoDestino(id, lang, 'ia'); // (10/11/2026)
       av.innerHTML = titulo + htmlRetraducidoOk(d);
     })
     .catch(function () { av.innerHTML = htmlRetraducidoError({ error: 'No se pudo conectar con la IA. Inténtalo de nuevo.' }); });
@@ -9195,22 +9197,39 @@ function cargarSelectorLangDestinos() {
   });
 }
 
+var destinosEstadosIdiomas = { idiomas: [], estados: {} }; // (10/11/2026) círculos de todos los idiomas
 function cargarTraduccionesDestinos() {
   var lang = document.getElementById('select-lang-destinos').value;
   if (!lang) return;
   destinosTradCache = [];
-  fetch('/admin/destinos/traducciones/' + lang)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      renderizarTablaTraduccionesDestinos(data.destinos, []);
-    });
+  Promise.all([
+    fetch('/admin/destinos/traducciones/' + lang).then(function(r) { return r.json(); }),
+    fetch('/admin/destinos/traducciones-estados').then(function(r) { return r.json(); }).catch(function() { return { idiomas: [], estados: {} }; })
+  ]).then(function(res) {
+    destinosEstadosIdiomas = res[1] || { idiomas: [], estados: {} };
+    renderizarTablaTraduccionesDestinos(res[0].destinos, []);
+  });
 }
 
+// (10/11/2026) Círculo de color en lugar del ✓ (igual que en los textos de las fotos), con su etiqueta al pasar el ratón
 function marcaTraduccionDestino(estado) {
-  if (estado === 'ok') return '<span style="color:#2e7d32;font-weight:600;" title="Aprobada">✓</span>';
-  if (estado === 'ia') return '<span style="color:#1565c0;font-weight:600;" title="Traducido, sin aprobar">✓</span>';
-  if (estado === 'desactualizado') return '<span style="color:#c0392b;font-weight:600;" title="Español cambiado">✓</span>';
-  return '<span style="color:#c0392b;" title="Sin traducir">·</span>';
+  var c = estado === 'ok' ? ['#2e7d32', 'Aprobada'] : (estado === 'ia' ? ['#1565c0', 'Traducido, sin aprobar'] :
+    (estado === 'desactualizado' ? ['#c0392b', 'Español cambiado'] : ['#c0392b', 'Sin traducir']));
+  return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;background:' + c[0] + ';" title="' + c[1] + '"></span>';
+}
+// (10/11/2026) Vista de águila de la fila: un círculo por idioma con su código (EN ● DE ● …)
+function circulosIdiomasDestino(id) {
+  var est = destinosEstadosIdiomas.estados[id] || {};
+  return destinosEstadosIdiomas.idiomas.map(function(l) {
+    return '<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px;font-size:11px;color:var(--texto-muted);">' + l.toUpperCase() +
+      '<span id="circ-dest-' + id + '-' + l + '">' + marcaTraduccionDestino(est[l] || null) + '</span></span>';
+  }).join('');
+}
+function pintarCirculoDestino(id, lang, estado) {
+  if (!destinosEstadosIdiomas.estados[id]) destinosEstadosIdiomas.estados[id] = {};
+  destinosEstadosIdiomas.estados[id][lang] = estado;
+  var c = document.getElementById('circ-dest-' + id + '-' + lang);
+  if (c) c.innerHTML = marcaTraduccionDestino(estado);
 }
 function renderizarTablaTraduccionesDestinos(destinos, propuestasIA) {
   var mapaIA = {};
@@ -9224,9 +9243,10 @@ function renderizarTablaTraduccionesDestinos(destinos, propuestasIA) {
       '<td style="text-align:center;">' +
         '<span id="badge-dest-' + d.id + '">' + marcaTraduccionDestino(d.estado) + '</span>' +
       '</td>' +
+      '<td style="white-space:nowrap;">' + circulosIdiomasDestino(d.id) + '</td>' +
       '<td>' +
         '<input type="text" id="trad-dest-' + d.id + '" data-id="' + d.id + '" ' +
-        'value="' + valorCampo.replace(/"/g, '&quot;') + '" class="campo" style="height:34px;">' +
+        'value="' + valorCampo.replace(/"/g, '&quot;') + '" class="campo" style="height:34px;min-width:220px;">' +
       '</td>' +
       '<td>' +
         '<button class="boton-primario" style="font-size:0.78rem;padding:0.25rem 0.7rem;margin-top:0;" ' +
@@ -9259,6 +9279,7 @@ function guardarTraduccionDestino(id, confirmarLatinas) {
     }
     var badge = document.getElementById('badge-dest-' + id);
     if (badge) badge.innerHTML = marcaTraduccionDestino(nombre ? 'ok' : null); // (29/10/2026) guardar = 🟢
+    pintarCirculoDestino(id, lang, nombre ? 'ok' : null); // (10/11/2026)
     var av = document.getElementById('aviso-traducciones-destinos');
     av.style.display = 'block';
     av.innerHTML = '<div class="aviso-ok">✔ Guardado.</div>';
