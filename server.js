@@ -487,12 +487,12 @@ async function sincronizarTextosExtra(extraId) {
 }
 
 // (16/11/2026) Asistencia especial: el nombre de cada aviso (Admin → Extras → «Avisos informativos»)
-// pasa a Idiomas → Textos de interfaz → «Asistencia especial» al guardarlo (aviso_web_<id>).
+// pasa a Idiomas → Textos de interfaz → «Extras» (grupo «Asistencia especial») al guardarlo (aviso_web_<id>).
 async function sincronizarTextosAviso(avisoId) {
   const r = await pool.query('SELECT id, nombre FROM avisos_reserva WHERE id = $1', [avisoId]);
   if (!r.rows.length) return [];
   const av = r.rows[0];
-  const t = await sincronizarTextoAlGuardar('aviso_web_' + av.id, 'Asistencia especial',
+  const t = await sincronizarTextoAlGuardar('aviso_web_' + av.id, 'Extras',
     'Casilla de asistencia especial "' + av.nombre + '" que marca el cliente en la página de reserva', av.nombre);
   return t.cambiado ? [t.id] : [];
 }
@@ -2348,7 +2348,10 @@ async function initSchema() {
     ) AS v(nombre, nota_interna, orden)
     WHERE NOT EXISTS (SELECT 1 FROM avisos_reserva a WHERE a.nombre = v.nombre);
   `);
-  // Nombre de cada aviso en Idiomas → «Asistencia especial» (también los que están en borrador).
+  // (16/11/2026) Los textos de asistencia especial van en Idiomas → «Extras» (grupo «Asistencia especial»),
+  // igual que los avisos están en el menú «Extras». Se mueven los que se crearon en el módulo aparte; sus traducciones no cambian.
+  await pool.query(`UPDATE textos_interfaz SET modulo = 'Extras' WHERE modulo = 'Asistencia especial'`);
+  // Nombre de cada aviso en Idiomas (también los que están en borrador).
   const avisosTodos = await pool.query('SELECT id FROM avisos_reserva ORDER BY orden, id');
   for (const av of avisosTodos.rows) await sincronizarTextosAviso(av.id);
   // Textos fijos del bloque «Asistencia especial» (aprobados por Germán el 16/11/2026).
@@ -2363,7 +2366,7 @@ async function initSchema() {
   for (const tx of TEXTOS_ASISTENCIA) {
     await pool.query(
       `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
-       VALUES ($1, 'Asistencia especial', $2, $3)
+       VALUES ($1, 'Extras', $2, $3)
        ON CONFLICT (clave) DO NOTHING`,
       [tx.clave, tx.contexto, tx.es]
     );
@@ -4833,6 +4836,15 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
   );
 
   const reservaId = reserva.rows[0].id;
+
+  // (16/11/2026) Asistencia especial: lo marcado (solo avisos publicados) + registro del consentimiento.
+  try {
+    await guardarAsistenciaReserva(reservaId, numeroReserva, req.body.asistencia_avisos, {
+      email: email_cliente, enNombreDeOtra: !!es_para_otra_persona, lang: req.body.asistencia_lang
+    });
+  } catch (e) {
+    console.error('No se pudo guardar la asistencia especial:', e);
+  }
 
   // Guardar cliente en clientes_datos (sin sobrescribir datos si ya existen)
   try {
@@ -10709,11 +10721,20 @@ async function renderReserva(req, res, lang) {
       };
     });
   } catch (e) { console.warn('Preferencias del viajero:', e.message); }
+  // (16/11/2026) Asistencia especial: solo los avisos publicados, con su nombre en el idioma de la página.
+  let asistenciaAvisos = [];
+  try {
+    const av = await pool.query('SELECT id, nombre FROM avisos_reserva WHERE activo = TRUE ORDER BY orden, id');
+    asistenciaAvisos = av.rows.map(function (a) {
+      const n = lang === 'es' ? a.nombre : obtenerTexto('aviso_web_' + a.id, lang);
+      return { id: a.id, nombre: (n && n.indexOf('[[') !== 0) ? n : a.nombre };
+    });
+  } catch (e) { console.warn('Asistencia especial:', e.message); }
   res.render('reserva', {
     lang, t, idiomas: idiomas.rows, BASE_URL,
     palabrasReserva: SECCIONES_RESERVA,
     palabrasPaginas: PALABRAS_PAGINAS[lang] || {},
-    rutaReserva, urlHome, preferenciasViajero, soloIdioma
+    rutaReserva, urlHome, preferenciasViajero, asistenciaAvisos, soloIdioma
   });
 }
 
@@ -16783,6 +16804,31 @@ async function emailClienteSesion(req) {
 // ─── Preferencias de cada viaje (26/09/2026) ───────────────────────────────────
 // Cada reserva guarda sus propias preferencias (tabla preferencias_reserva, en español:
 // es lo que ve el chofer). Solo se aceptan preferencias activas del catálogo y opciones que existan.
+// (16/11/2026) Asistencia especial de una reserva. Guarda los avisos marcados (en español, con su nota interna,
+// que es lo que verá el chofer), el registro del consentimiento (quién, cuándo, en nombre de quién y el texto
+// exacto que vio en su idioma) y la marca «Reserva con asistencia especial». Si no hay nada marcado, no hace nada.
+async function guardarAsistenciaReserva(reservaId, numeroReserva, ids, datos) {
+  if (!Array.isArray(ids) || !ids.length) return;
+  const limpios = ids.map(function (x) { return parseInt(x, 10); }).filter(function (x) { return x > 0; });
+  if (!limpios.length) return;
+  const av = await pool.query(
+    'SELECT id, nombre, nota_interna FROM avisos_reserva WHERE activo = TRUE AND id = ANY($1) ORDER BY orden, id', [limpios]);
+  if (!av.rows.length) return;
+  for (const a of av.rows) {
+    await pool.query(
+      'INSERT INTO reservas_asistencia (reserva_id, aviso_id, nombre, nota_interna) VALUES ($1, $2, $3, $4)',
+      [reservaId, a.id, a.nombre, (a.nota_interna && a.nota_interna.trim()) ? a.nota_interna.trim() : null]);
+  }
+  const lang = (datos.lang && IDIOMAS_PERMITIDOS.includes(datos.lang)) ? datos.lang : 'es';
+  let texto = obtenerTexto('asistencia_consentimiento', lang);
+  if (datos.enNombreDeOtra) texto += '\n\n' + obtenerTexto('asistencia_terceros', lang);
+  await pool.query(
+    `INSERT INTO consentimientos_asistencia (reserva_id, numero_reserva, email_cliente, en_nombre_de_otra_persona, idioma, texto_mostrado)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [reservaId, numeroReserva, datos.email ? String(datos.email).trim().toLowerCase() : null, !!datos.enNombreDeOtra, lang, texto]);
+  await pool.query('UPDATE reservas SET asistencia_especial = TRUE WHERE id = $1', [reservaId]);
+}
+
 async function guardarPreferenciasViaje(reservaId, selecciones) {
   await pool.query('DELETE FROM preferencias_reserva WHERE reserva_id = $1', [reservaId]);
   if (!Array.isArray(selecciones) || !selecciones.length) return;
