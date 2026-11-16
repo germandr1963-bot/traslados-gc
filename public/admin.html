@@ -5395,12 +5395,14 @@ function renderizarTablaTextos(datos) {
       // (16/11/2026) Asistencia especial (menú «Extras» → «Avisos informativos» y los textos del bloque de la reserva):
       // grupo propio, en el orden en que se leen en la página de reserva.
       var ORDEN_ASIS = { asistencia_titulo: 1, asistencia_instruccion: 2, asistencia_consentimiento: 4, asistencia_terceros: 5, asistencia_marca: 6 };
-      var textosAsistencia = otrosTextosExtras.filter(function (t) { return /^aviso_web_\d+$/.test(t.clave) || ORDEN_ASIS[t.clave]; });
+      // (16/11/2026) Cualquier texto «asistencia_…» va a este grupo (los nuevos, después de los conocidos)
+      var textosAsistencia = otrosTextosExtras.filter(function (t) { return /^aviso_web_\d+$/.test(t.clave) || /^asistencia_/.test(t.clave); });
       otrosTextosExtras = otrosTextosExtras.filter(function (t) { return textosAsistencia.indexOf(t) === -1; });
       if (textosAsistencia.length) {
         textosAsistencia.sort(function (x, y) {
-          var ox = ORDEN_ASIS[x.clave] || 3, oy = ORDEN_ASIS[y.clave] || 3;
+          var ox = ORDEN_ASIS[x.clave] || (/^asistencia_/.test(x.clave) ? 7 : 3), oy = ORDEN_ASIS[y.clave] || (/^asistencia_/.test(y.clave) ? 7 : 3);
           if (ox !== oy) return ox - oy;
+          if (ox === 7) return x.id - y.id;
           return parseInt(x.clave.replace(/\D/g, ''), 10) - parseInt(y.clave.replace(/\D/g, ''), 10);
         });
         textosAsistencia.forEach(function (t) { extrasMap['otro-' + t.id] = t; });
@@ -9837,6 +9839,36 @@ function mostrarAvisoReservas(msg) {
   setTimeout(function() { av.style.display = 'none'; }, 3000);
 }
 
+// (16/11/2026) Ficha de la reserva → bloque «ASISTENCIA ESPECIAL» (antes de «PREFERENCIAS DEL VIAJE»)
+function htmlAsistenciaAdmin(a, marca) {
+  if (!a) return '';
+  function e(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function fh(t) { return t ? new Date(t).toLocaleString('es-ES', { timeZone: 'Atlantic/Canary', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
+  var IDI = { es: 'Español', en: 'Inglés', de: 'Alemán', fr: 'Francés', it: 'Italiano', nl: 'Neerlandés', sv: 'Sueco', no: 'Noruego', fi: 'Finés', ru: 'Ruso' };
+  var cab = '<tr><td colspan="2" style="background:#fdf6ec;font-size:0.75rem;font-weight:700;color:#8a6a1f;letter-spacing:0.05em;padding:6px 10px;">ASISTENCIA ESPECIAL</td></tr>';
+  var h = '';
+  if (a.detalle && a.detalle.length) {
+    h += '<tr><th>Pedido</th><td>' + a.detalle.map(function (d) {
+      return '♿ ' + e(d.nombre) + (d.nota_interna ? ' <span style="color:#888;font-style:italic;">— ' + e(d.nota_interna) + '</span>' : '');
+    }).join('<br>') + '</td></tr>';
+  } else if (marca) {
+    h += '<tr><th>Pedido</th><td style="color:#888;">Reserva con asistencia especial (el detalle ya se ha borrado)</td></tr>';
+  }
+  (a.consentimientos || []).forEach(function (c) {
+    h += '<tr><th>Consentimiento</th><td>Aceptado el ' + fh(c.aceptado_en) + ' · ' + (IDI[c.idioma] || e(c.idioma || '—')) + ' · ' +
+      (c.en_nombre_de_otra_persona ? 'en nombre de otra persona (el que reserva declara tener su permiso)' : 'el propio pasajero') +
+      (c.retirado_en ? '<br><span style="color:#c62828;">Retirado por el cliente: ' + fh(c.retirado_en) + '</span>' : '') + '</td></tr>';
+  });
+  (a.avisos_chofer || []).forEach(function (v) {
+    var mot = v.motivo === 'aceptada_tras_retirada' ? ' (aceptó la reserva después de la retirada)' : '';
+    h += '<tr><th>Aviso al chofer</th><td>«Asistencia especial retirada» a ' + e(v.nombre_chofer || '—') + mot + '<br>' +
+      'Puesto en cola: ' + fh(v.creado_en) + ' · ' +
+      (v.enviado ? 'enviado por WhatsApp: ' + (v.enviado_en ? fh(v.enviado_en) : 'sí (sin hora)') : '<span style="color:#b26a00;">⏳ pendiente de envío</span>') +
+      ' · también en su panel</td></tr>';
+  });
+  return h ? cab + h : '';
+}
+
 function abrirDetalleReserva(id, sinScroll) {
   reservaDetalleId = id;
   fetch('/admin/reservas/' + id)
@@ -9897,6 +9929,8 @@ function abrirDetalleReserva(id, sinScroll) {
           '<tr><th>Fecha y hora</th><td>' + fecha + ' a las ' + (r.hora ? r.hora.slice(0,5) : '—') + '</td></tr>' +
           '<tr><th>Categoría</th><td>' + (r.categoria_nombre || '—') + '</td></tr>' +
           operativaHtml +
+          // — ASISTENCIA ESPECIAL — (16/11/2026) Lo pedido, el consentimiento y los avisos al chofer, con fecha y hora
+          htmlAsistenciaAdmin(r.asistencia, r.asistencia_especial) +
           // — PREFERENCIAS DEL VIAJE — (04/11/2026) Las mismas que ve el chofer; no salen en canceladas ni no-show
           (r.preferencias_viaje ? '<tr><td colspan="2" style="background:#f5f0ea;font-size:0.75rem;font-weight:700;color:#888;letter-spacing:0.05em;padding:6px 10px;">PREFERENCIAS DEL VIAJE</td></tr>' +
             (r.preferencias_viaje.length ? r.preferencias_viaje.map(function(p) {
