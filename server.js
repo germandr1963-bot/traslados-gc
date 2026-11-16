@@ -486,6 +486,17 @@ async function sincronizarTextosExtra(extraId) {
   return t.cambiado ? [t.id] : [];
 }
 
+// (16/11/2026) Asistencia especial: el nombre de cada aviso (Admin → Extras → «Avisos informativos»)
+// pasa a Idiomas → Textos de interfaz → «Asistencia especial» al guardarlo (aviso_web_<id>).
+async function sincronizarTextosAviso(avisoId) {
+  const r = await pool.query('SELECT id, nombre FROM avisos_reserva WHERE id = $1', [avisoId]);
+  if (!r.rows.length) return [];
+  const av = r.rows[0];
+  const t = await sincronizarTextoAlGuardar('aviso_web_' + av.id, 'Asistencia especial',
+    'Casilla de asistencia especial "' + av.nombre + '" que marca el cliente en la página de reserva', av.nombre);
+  return t.cambiado ? [t.id] : [];
+}
+
 // (02/11/2026) Textos de una preferencia del pasajero: nombre y opciones.
 async function sincronizarTextosPreferencia(prefId) {
   const r = await pool.query('SELECT id, nombre, opciones FROM preferencias_catalogo WHERE id = $1', [prefId]);
@@ -2315,16 +2326,48 @@ async function initSchema() {
 
   // Avisos de ejemplo ya acordados. Solo se insertan los que no existan ya
   // por nombre, así que es seguro volver a desplegar sin duplicar nada.
+  // (16/11/2026) Asistencia especial: nombres aprobados por Germán. Se renombran los de antes (si siguen así)
+  // y la semilla usa los nombres nuevos, para que los viejos no vuelvan a aparecer en cada deploy.
+  const RENOMBRAR_AVISOS = [
+    ['Soy ciego', 'Necesito asistencia por discapacidad visual (ceguera)'],
+    ['Soy mudo, pero puedo oír', 'Necesito asistencia por discapacidad del habla (mudez)'],
+    ['Solo puedo comunicarme por texto', 'Solo puedo comunicarme por escrito (mensajes de texto)']
+  ];
+  for (const [viejo, nuevo] of RENOMBRAR_AVISOS) {
+    await pool.query(
+      `UPDATE avisos_reserva SET nombre = $2 WHERE nombre = $1
+         AND NOT EXISTS (SELECT 1 FROM avisos_reserva b WHERE b.nombre = $2)`, [viejo, nuevo]);
+  }
   await pool.query(`
     INSERT INTO avisos_reserva (nombre, nota_interna, orden, activo)
     SELECT v.nombre, v.nota_interna, v.orden, FALSE
     FROM (VALUES
-      ('Soy ciego', 'Ayuda mínima al subir/bajar del vehículo', 1),
-      ('Soy mudo, pero puedo oír', '', 2),
-      ('Solo puedo comunicarme por texto', '', 3)
+      ('Necesito asistencia por discapacidad visual (ceguera)', 'Ayuda mínima al subir/bajar del vehículo', 1),
+      ('Necesito asistencia por discapacidad del habla (mudez)', '', 2),
+      ('Solo puedo comunicarme por escrito (mensajes de texto)', '', 3)
     ) AS v(nombre, nota_interna, orden)
     WHERE NOT EXISTS (SELECT 1 FROM avisos_reserva a WHERE a.nombre = v.nombre);
   `);
+  // Nombre de cada aviso en Idiomas → «Asistencia especial» (también los que están en borrador).
+  const avisosTodos = await pool.query('SELECT id FROM avisos_reserva ORDER BY orden, id');
+  for (const av of avisosTodos.rows) await sincronizarTextosAviso(av.id);
+  // Textos fijos del bloque «Asistencia especial» (aprobados por Germán el 16/11/2026).
+  // ON CONFLICT DO NOTHING: lo que se cambie en el Admin manda y un deploy no lo pisa.
+  const TEXTOS_ASISTENCIA = [
+    { clave: 'asistencia_titulo', contexto: 'Título del bloque de asistencia especial en la página de reserva (datos de quien viaja)', es: 'Asistencia especial (opcional)' },
+    { clave: 'asistencia_instruccion', contexto: 'Frase bajo el título del bloque de asistencia especial, antes de las casillas', es: 'Si necesitas que el chofer adapte su forma de comunicarse o te ayude a subir o bajar del vehículo, indícalo aquí:' },
+    { clave: 'asistencia_consentimiento', contexto: 'Texto legal de consentimiento bajo las casillas de asistencia especial (dato de salud). No cambiar el sentido sin el asesor legal', es: 'Al marcar cualquiera de estas casillas, consientes expresamente que tratemos este dato de salud y lo comuniquemos únicamente al chofer asignado, con el único fin de prestarte la asistencia adecuada durante el traslado. Puedes retirar este consentimiento en cualquier momento antes del viaje desde «Acceso clientes».' },
+    { clave: 'asistencia_terceros', contexto: 'Texto legal que sale solo si la reserva es para otra persona («Yo no viajo»), bajo las casillas de asistencia especial. No cambiar el sentido sin el asesor legal', es: 'Si haces esta reserva en nombre de otra persona, declaras bajo tu responsabilidad que cuentas con su consentimiento explícito para facilitarnos este dato de salud y que le has informado de que solo se comunicará al chofer asignado, para prestarle la asistencia adecuada durante el traslado.' },
+    { clave: 'asistencia_marca', contexto: 'Marca que queda en la reserva cuando, al terminar el viaje, se borra el detalle de la asistencia especial (portal del cliente)', es: 'Reserva con asistencia especial' }
+  ];
+  for (const tx of TEXTOS_ASISTENCIA) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Asistencia especial', $2, $3)
+       ON CONFLICT (clave) DO NOTHING`,
+      [tx.clave, tx.contexto, tx.es]
+    );
+  }
 
   // ─── Preguntas frecuentes de la portada (21/10/2026) ───────────────────────
   // Admin → SEO → "Preguntas frecuentes — Portada". Cada idioma tiene su propia
@@ -2790,6 +2833,36 @@ async function initSchema() {
       precio_en_reserva NUMERIC(10,2) NOT NULL
     );
   `);
+
+  // ─── Asistencia especial (16/11/2026) ────────────────────────────────────
+  // reservas_asistencia: qué asistencia pidió cada reserva (dato de salud: se borra al terminar el viaje).
+  // consentimientos_asistencia: registro del consentimiento (quién, cuándo, en nombre de quién y el texto exacto
+  // que vio). No guarda qué asistencia era, para poder conservarse después del borrado.
+  // reservas.asistencia_especial: la marca «Reserva con asistencia especial», que se queda.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS reservas_asistencia (
+      id SERIAL PRIMARY KEY,
+      reserva_id INT NOT NULL REFERENCES reservas(id) ON DELETE CASCADE,
+      aviso_id INT REFERENCES avisos_reserva(id) ON DELETE SET NULL,
+      nombre TEXT NOT NULL,
+      nota_interna TEXT,
+      creado_en TIMESTAMP DEFAULT NOW()
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS consentimientos_asistencia (
+      id SERIAL PRIMARY KEY,
+      reserva_id INT REFERENCES reservas(id) ON DELETE SET NULL,
+      numero_reserva TEXT,
+      email_cliente TEXT,
+      en_nombre_de_otra_persona BOOLEAN NOT NULL DEFAULT FALSE,
+      idioma VARCHAR(5),
+      texto_mostrado TEXT NOT NULL,
+      aceptado_en TIMESTAMP NOT NULL DEFAULT NOW(),
+      retirado_en TIMESTAMP
+    );
+  `);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS asistencia_especial BOOLEAN DEFAULT FALSE`);
 
   // ─── URLs cortas para WhatsApp ────────────────────────────────────────────
   await pool.query(`
@@ -14991,10 +15064,13 @@ app.get('/admin/avisos', requireAdmin, asyncHandler(async (req, res) => {
 app.post('/admin/avisos', requireAdmin, asyncHandler(async (req, res) => {
   const { nombre, nota_interna, orden } = req.body;
   if (!nombre || !nombre.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
-  await pool.query(
-    'INSERT INTO avisos_reserva (nombre, nota_interna, orden, activo) VALUES ($1, $2, $3, FALSE)',
+  const nuevo = await pool.query(
+    'INSERT INTO avisos_reserva (nombre, nota_interna, orden, activo) VALUES ($1, $2, $3, FALSE) RETURNING id',
     [nombre.trim(), nota_interna ? nota_interna.trim() : null, parseInt(orden, 10) || 0]
   );
+  // (16/11/2026) Su nombre va ya a Idiomas → «Asistencia especial», aunque nazca en borrador.
+  await sincronizarTextosAviso(nuevo.rows[0].id);
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
@@ -15006,16 +15082,24 @@ app.post('/admin/avisos/:id/editar', requireAdmin, asyncHandler(async (req, res)
     [nombre.trim(), nota_interna ? nota_interna.trim() : null,
      (orden !== undefined && orden !== null && orden !== '') ? parseInt(orden, 10) : null, req.params.id]
   );
-  res.json({ ok: true });
+  // (16/11/2026) «El rojo al guardar»: si cambia el nombre, sus traducciones pasan a rojo.
+  const textosCambiados = await sincronizarTextosAviso(req.params.id);
+  await cargarTextosCache();
+  res.json({ ok: true, conTraducciones: textosCambiados.length, textosCambiados });
 }));
 
 app.post('/admin/avisos/:id/activo', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('UPDATE avisos_reserva SET activo = $1 WHERE id = $2', [!!req.body.activo, req.params.id]);
+  await sincronizarTextosAviso(req.params.id);
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
 app.post('/admin/avisos/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM avisos_reserva WHERE id = $1', [req.params.id]);
+  // (16/11/2026) Su nombre se quita también de Idiomas.
+  await pool.query('DELETE FROM textos_interfaz WHERE clave = $1', ['aviso_web_' + parseInt(req.params.id, 10)]);
+  await cargarTextosCache();
   res.json({ ok: true });
 }));
 
