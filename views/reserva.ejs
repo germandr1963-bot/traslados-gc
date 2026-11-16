@@ -751,6 +751,27 @@ footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13
         <% } %>
       </div>
 
+      <!-- (16/11/2026) Asistencia especial (opcional): para la persona que viaja. Cerrado al llegar; se abre al tocar el título. -->
+      <% if (typeof asistenciaAvisos !== 'undefined' && asistenciaAvisos.length) { %>
+      <div id="bloque-asistencia" style="border:1px solid var(--piedra-borde);border-radius:8px;background:#fff;margin:4px 0 14px;overflow:hidden;">
+        <div role="button" tabindex="0" aria-expanded="false" aria-controls="asistencia-cuerpo" id="asistencia-cabecera" onclick="toggleAsistencia()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleAsistencia();}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;">
+          <span style="font-size:14px;font-weight:600;color:var(--texto-oscuro);"><%= t('asistencia_titulo') %></span>
+          <span id="asistencia-flecha" style="font-size:12px;opacity:0.6;" aria-hidden="true">▼</span>
+        </div>
+        <div id="asistencia-cuerpo" style="display:none;padding:0 14px 12px;">
+          <p style="margin:0 0 6px;font-size:12.5px;line-height:1.5;color:var(--texto-muted);"><%= t('asistencia_instruccion') %></p>
+          <% asistenciaAvisos.forEach(function(av) { %>
+          <label style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;font-size:14px;color:var(--texto-oscuro);cursor:pointer;">
+            <input type="checkbox" class="asistencia-casilla" value="<%= av.id %>" style="width:18px;height:18px;flex-shrink:0;margin-top:1px;">
+            <span><%= av.nombre %></span>
+          </label>
+          <% }); %>
+          <p style="margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--texto-muted);font-style:italic;"><%= t('asistencia_consentimiento') %></p>
+          <p id="asistencia-terceros" style="display:none;margin:10px 0 0;font-size:12px;line-height:1.5;color:var(--texto-muted);font-style:italic;"><%= t('asistencia_terceros') %></p>
+        </div>
+      </div>
+      <% } %>
+
       <div class="campo-grupo">
         <label><%= t('reserva_label_indicaciones') %></label>
         <textarea id="pasajero-notas" placeholder="<%= t('reserva_ph_indicaciones') %>"></textarea>
@@ -1804,6 +1825,19 @@ function validarPaso2() {
   return ok;
 }
 
+// ── (16/11/2026) Asistencia especial ──
+function toggleAsistencia() {
+  var cuerpo = document.getElementById('asistencia-cuerpo');
+  if (!cuerpo) return;
+  var abierto = cuerpo.style.display !== 'none';
+  cuerpo.style.display = abierto ? 'none' : 'block';
+  document.getElementById('asistencia-flecha').textContent = abierto ? '▼' : '▲';
+  document.getElementById('asistencia-cabecera').setAttribute('aria-expanded', abierto ? 'false' : 'true');
+}
+function asistenciaParaEnviar() {
+  return Array.prototype.slice.call(document.querySelectorAll('.asistencia-casilla:checked')).map(function (c) { return parseInt(c.value, 10); });
+}
+
 // ── Preferencias del viajero (reserva para otra persona) ──
 var PREFS_VIAJERO = <%- JSON.stringify(typeof preferenciasViajero !== 'undefined' ? preferenciasViajero : []).replace(/</g, '\\u003c') %>;
 var PREF_VIAJERO_TEXTOS = {
@@ -1882,6 +1916,11 @@ function toggleOtraPersona(marcado) {
     document.getElementById('idioma-viajero').value = LANG;
     cambioIdiomaViajero(LANG);
   }
+  // (16/11/2026) Asistencia especial: la declaración para otra persona solo con «Yo no viajo».
+  // Al cambiar quién viaja, se desmarcan las casillas (eran de la otra persona).
+  var terceros = document.getElementById('asistencia-terceros');
+  if (terceros) terceros.style.display = marcado ? 'block' : 'none';
+  Array.prototype.forEach.call(document.querySelectorAll('.asistencia-casilla'), function (c) { c.checked = false; });
   // Al desmarcar "Yo no viajo", se borran las preferencias del viajero
   if (!marcado) {
     prefViajeroSel = {}; prefViajeroDetalle = {};
@@ -2008,6 +2047,8 @@ function confirmarEnvio() {
     extras: extrasSeleccionados.map(function(e){ return { id: e.extra_id, precio: e.precio }; }),
     lang_cliente: LANG,
     preferencias_viajero: document.getElementById('es-para-otra-persona').checked ? preferenciasViajeroParaEnviar() : [],
+    asistencia_avisos: asistenciaParaEnviar(),
+    asistencia_lang: LANG,
     idioma_viajero: (document.getElementById('es-para-otra-persona').checked && document.getElementById('idioma-viajero')) ? document.getElementById('idioma-viajero').value : '',
     idioma_viajero_otro: (document.getElementById('es-para-otra-persona').checked && document.getElementById('idioma-viajero-otro')) ? document.getElementById('idioma-viajero-otro').value.trim() : ''
   };
