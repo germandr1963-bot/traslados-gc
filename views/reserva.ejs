@@ -1002,6 +1002,7 @@ var TXT = {
   resPasajeros:   '<%- t("reserva_res_pasajeros").replace(/'/g, "\\'") %>',
   resPrecio:      '<%- (t("precio_estimado") + ":").replace(/'/g, "\\'") %>',
   resExtras:      '<%- t("reserva_res_extras").replace(/'/g, "\\'") %>',
+  resAsistencia:  '<%- t("asistencia_resumen").replace(/'/g, "\\'") %>',
   resPasajero:    '<%- t("reserva_res_pasajero").replace(/'/g, "\\'") %>',
   resPasaporte:   '<%- t("reserva_res_pasaporte").replace(/'/g, "\\'") %>',
   resOtraPersona: '<%- t("reserva_res_otra_persona").replace(/'/g, "\\'") %>',
@@ -1834,6 +1835,15 @@ function toggleAsistencia() {
   document.getElementById('asistencia-flecha').textContent = abierto ? '▼' : '▲';
   document.getElementById('asistencia-cabecera').setAttribute('aria-expanded', abierto ? 'false' : 'true');
 }
+// (16/11/2026) Línea «Asistencia especial:» del resumen, con los nombres de las casillas marcadas
+function asistenciaParaResumen() {
+  var nombres = Array.prototype.slice.call(document.querySelectorAll('.asistencia-casilla:checked')).map(function (c) {
+    var span = c.parentNode.querySelector('span');
+    var d = document.createElement('div'); d.textContent = span ? span.textContent : '';
+    return d.innerHTML;
+  });
+  return nombres.length ? '<strong>' + TXT.resAsistencia + '</strong> ' + nombres.join(', ') + '<br>' : '';
+}
 function asistenciaParaEnviar() {
   return Array.prototype.slice.call(document.querySelectorAll('.asistencia-casilla:checked')).map(function (c) { return parseInt(c.value, 10); });
 }
@@ -1986,6 +1996,7 @@ function mostrarResumen() {
     '<strong>' + TXT.resPasajeros + '</strong> ' + document.getElementById('num-pasajeros').value + '<br>' +
     (precioEstimado ? '<strong>' + TXT.resPrecio + '</strong> ' + Number(precioEstimado).toFixed(0) + ' €<br>' : '') +
     (extrasSeleccionados.length ? '<strong>' + TXT.resExtras + '</strong> ' + extrasSeleccionados.map(function(e){ return (e.nombre_traducido || e.nombre) + ' (' + Number(e.precio).toFixed(2) + ' €)'; }).join(', ') + '<br>' : '') +
+    asistenciaParaResumen() +
     '<strong>' + TXT.resPasajero + '</strong> ' + pasajero + '<br>' +
     ((origenEsAero || origenEsPuerto) ? '<strong>' + TXT.resPasaporte + '</strong> ' + (esOtraPersona ? document.getElementById('otra-persona-pasaporte').value.trim() : document.getElementById('pasajero-pasaporte').value.trim()) + '<br>' : '') +
     (esOtraPersona ? '<strong>' + TXT.resOtraPersona + '</strong> — ' + TXT.resContactoViaja + ' ' + otraTel + ' · ' + otraEmail + '<br>' : '') +

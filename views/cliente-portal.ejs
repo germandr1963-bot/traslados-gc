@@ -383,6 +383,27 @@
         }
       }
 
+      // (16/11/2026) Asistencia especial de este viaje: la ve el cliente y, mientras la reserva esté viva y el viaje
+      // no haya pasado, la puede retirar. Tras el viaje (cuando se borre el detalle) queda solo la marca.
+      if (r.asistencia) {
+        var asis = r.asistencia;
+        html += '<div style="border:1px solid #D9A441;border-radius:10px;background:#fdf6ec;padding:12px 16px;margin-bottom:12px;">' +
+          '<div style="font-size:13px;font-weight:600;color:var(--texto-oscuro);margin-bottom:6px;">' + escAsis(tx('asistencia_portal_titulo')) + '</div>';
+        if (asis.lista && asis.lista.length) {
+          html += '<ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--texto-oscuro);">' +
+            asis.lista.map(function(n) { return '<li>' + escAsis(n) + '</li>'; }).join('') + '</ul>';
+        } else if (asis.retirada) {
+          html += '<p style="margin:0;font-size:12.5px;color:#5a6c79;">' + escAsis(tx('asistencia_retirada')) + '</p>';
+        } else {
+          html += '<p style="margin:0;font-size:12.5px;color:#5a6c79;">' + escAsis(tx('asistencia_marca')) + '</p>';
+        }
+        if (asis.retirable) {
+          html += '<button onclick="retirarAsistencia(' + i + ',' + r.id + ')" style="margin-top:10px;background:#fff;color:#C1502E;border:1px solid #C1502E;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;">' + escAsis(tx('asistencia_retirar')) + '</button>';
+        }
+        html += '<div id="aviso-asistencia-' + i + '" style="display:none;font-size:12px;margin-top:6px;"></div>' +
+        '</div>';
+      }
+
       // Preferencias de este viaje — colapsado por defecto (26/09/2026).
       // (04/11/2026) Se cambian mientras la reserva está viva y el viaje no ha pasado; en un viaje realizado (completada)
       // se ven solo para leer; en una reserva cancelada o no-show no salen.
@@ -503,6 +524,27 @@
       var vp = viajePref[i]; if (!vp) return;
       if (vp.sel[pid] === op) { delete vp.sel[pid]; } else { vp.sel[pid] = op; }
       pintarViajePref(i);
+    }
+
+    // (16/11/2026) Asistencia especial: escapar textos y retirar el consentimiento de un viaje
+    function escAsis(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+    function retirarAsistencia(i, reservaId) {
+      if (!confirm(tx('asistencia_retirar_confirmar'))) return;
+      var av = document.getElementById('aviso-asistencia-' + i);
+      fetch('/api/cliente/asistencia/retirar', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reserva_id: reservaId })
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.ok) {
+            var rr = reservasData[i];
+            if (rr) rr.asistencia = { lista: [], retirada: true, retirable: false };
+            var det = document.getElementById('detalle-' + i);
+            if (det && rr) det.innerHTML = renderDetalle(rr, i);
+          } else if (av) { av.style.display = 'block'; av.style.color = '#c62828'; av.textContent = d.error || tx('por_no_guardar'); }
+        })
+        .catch(function() { if (av) { av.style.display = 'block'; av.style.color = '#c62828'; av.textContent = tx('por_error_conexion'); } });
     }
 
     function guardarViajePref(i, reservaId) {
