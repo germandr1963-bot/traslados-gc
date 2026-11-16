@@ -385,6 +385,16 @@
             (llegada ? '<div class="detalle-fila">' + llegada + '</div>' : '') +
             '<div class="detalle-fila"><strong>Pasajeros:</strong> ' + (r.num_pasajeros||'—') + '</div>' +
             '<div class="detalle-fila"><strong>Categoría:</strong> ' + (r.categoria_nombre||'—') + '</div>' +
+            // (16/11/2026) Asistencia especial: lo que marcó el cliente, con la nota interna. Se borra al terminar el viaje.
+            (r.asistencia && r.asistencia.length
+              ? '<div style="margin:12px 0;padding:12px 14px;background:#fdf6ec;border:2px solid #D9A441;border-radius:8px;">' +
+                  '<div style="font-size:15px;font-weight:700;color:#1C1815;margin-bottom:4px;">♿ Asistencia especial</div>' +
+                  r.asistencia.map(function(a){
+                    var esc = function(x){ return String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
+                    return '<div style="font-size:14px;margin:4px 0;">· ' + esc(a.nombre) + (a.nota ? ' — <em>' + esc(a.nota) + '</em>' : '') + '</div>';
+                  }).join('') +
+                '</div>'
+              : '') +
             (r.notas_cliente ? '<div class="detalle-fila"><strong>Notas del cliente:</strong> ' + r.notas_cliente + '</div>' : '') +
             (r.preferencias && r.preferencias.length
               ? '<div class="detalle-fila"><strong>Preferencias del cliente:</strong>' +
