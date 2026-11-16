@@ -5361,9 +5361,11 @@ function renderizarTablaTextos(datos) {
       // (16/11/2026) N83: los grupos salen de los extras reales de Admin → Extras (mismo bloque,
       // mismo orden y mismos nombres de bloque que allí). Antes era una lista de extras escrita a mano.
       var extrasMap = {};
+      var otrosTextosExtras = []; // (16/11/2026) textos del módulo que no son el nombre de un extra (p. ej. «Gratis»)
       textos.forEach(function(t) {
         var m = t.clave.match(/^extra_web_(\d+)$/);
         if (m) extrasMap[m[1]] = t;
+        else otrosTextosExtras.push(t);
       });
       var porBloqueEx = {};
       var conExtra = {};
@@ -5390,6 +5392,13 @@ function renderizarTablaTextos(datos) {
       if (huerfanos.length) {
         DEPARTAMENTOS.push({ bloque: 'Z', titulo: 'Textos de extras que ya no existen en Extras', extras: huerfanos });
       }
+      if (otrosTextosExtras.length) {
+        otrosTextosExtras.forEach(function (t) { extrasMap['otro-' + t.id] = t; });
+        DEPARTAMENTOS.push({ bloque: 'Y', titulo: 'Otros textos de Extras', otros: true,
+          extras: otrosTextosExtras.map(function (t) { return { id: 'otro-' + t.id, nombre: t.texto_es }; }) });
+        // «Otros textos» va antes que los textos sin extra
+        if (huerfanos.length) DEPARTAMENTOS.push(DEPARTAMENTOS.splice(DEPARTAMENTOS.length - 2, 1)[0]);
+      }
 
       DEPARTAMENTOS.forEach(function(dep) {
         var depSecId = seccionId + '-dep-' + dep.bloque;
@@ -5403,7 +5412,7 @@ function renderizarTablaTextos(datos) {
         });
         var depPct = depTotal > 0 ? Math.floor(depTraducidos / depTotal * 100) : 0;
         var depColor = depPct === 100 ? '#2e7d32' : depPct > 50 ? '#1565c0' : '#c0392b';
-        var subtitulo = dep.bloque === 'Z' ? (dep.extras.length + ' textos') : ('Bloque ' + dep.bloque + ' · ' + dep.extras.length + ' extras');
+        var subtitulo = (dep.bloque === 'Z' || dep.otros) ? (dep.extras.length + (dep.extras.length === 1 ? ' texto' : ' textos')) : ('Bloque ' + dep.bloque + ' · ' + dep.extras.length + ' extras');
         html += '<tr class="' + seccionId + '" style="display:none;background:#e8f0fe;cursor:pointer;" onclick="toggleSeccionTextos(\'' + depSecId + '\', this)">' +
           '<td colspan="' + totalCols + '" style="padding:10px 20px 10px 32px;font-size:13px;font-weight:700;user-select:none;color:#1a3a6b;letter-spacing:0.01em;">' +
             '<span id="' + depSecId + '-icono">▶</span> ' +
