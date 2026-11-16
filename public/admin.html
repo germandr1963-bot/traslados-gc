@@ -5392,6 +5392,23 @@ function renderizarTablaTextos(datos) {
       if (huerfanos.length) {
         DEPARTAMENTOS.push({ bloque: 'Z', titulo: 'Textos de extras que ya no existen en Extras', extras: huerfanos });
       }
+      // (16/11/2026) Asistencia especial (menú «Extras» → «Avisos informativos» y los textos del bloque de la reserva):
+      // grupo propio, en el orden en que se leen en la página de reserva.
+      var ORDEN_ASIS = { asistencia_titulo: 1, asistencia_instruccion: 2, asistencia_consentimiento: 4, asistencia_terceros: 5, asistencia_marca: 6 };
+      var textosAsistencia = otrosTextosExtras.filter(function (t) { return /^aviso_web_\d+$/.test(t.clave) || ORDEN_ASIS[t.clave]; });
+      otrosTextosExtras = otrosTextosExtras.filter(function (t) { return textosAsistencia.indexOf(t) === -1; });
+      if (textosAsistencia.length) {
+        textosAsistencia.sort(function (x, y) {
+          var ox = ORDEN_ASIS[x.clave] || 3, oy = ORDEN_ASIS[y.clave] || 3;
+          if (ox !== oy) return ox - oy;
+          return parseInt(x.clave.replace(/\D/g, ''), 10) - parseInt(y.clave.replace(/\D/g, ''), 10);
+        });
+        textosAsistencia.forEach(function (t) { extrasMap['otro-' + t.id] = t; });
+        DEPARTAMENTOS.push({ bloque: 'X', titulo: 'Asistencia especial', otros: true,
+          extras: textosAsistencia.map(function (t) { return { id: 'otro-' + t.id, nombre: t.texto_es }; }) });
+        // «Asistencia especial» va antes que los textos sin extra
+        if (huerfanos.length) DEPARTAMENTOS.push(DEPARTAMENTOS.splice(DEPARTAMENTOS.length - 2, 1)[0]);
+      }
       if (otrosTextosExtras.length) {
         otrosTextosExtras.forEach(function (t) { extrasMap['otro-' + t.id] = t; });
         DEPARTAMENTOS.push({ bloque: 'Y', titulo: 'Otros textos de Extras', otros: true,
