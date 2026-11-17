@@ -9861,7 +9861,8 @@ function htmlAsistenciaAdmin(a, marca) {
   });
   (a.avisos_chofer || []).forEach(function (v) {
     var mot = v.motivo === 'aceptada_tras_retirada' ? ' (aceptó la reserva después de la retirada)' : '';
-    h += '<tr><th>Aviso al chofer</th><td>«Asistencia especial retirada» a ' + e(v.nombre_chofer || '—') + mot + '<br>' +
+    var tit = v.motivo === 'anadida' ? '«Asistencia especial añadida»' : '«Asistencia especial retirada»';
+    h += '<tr><th>Aviso al chofer</th><td>' + tit + ' a ' + e(v.nombre_chofer || '—') + mot + '<br>' +
       'Puesto en cola: ' + fh(v.creado_en) + ' · ' +
       (v.enviado ? 'enviado por WhatsApp: ' + (v.enviado_en ? fh(v.enviado_en) : 'sí (sin hora)') : '<span style="color:#b26a00;">⏳ pendiente de envío</span>') +
       ' · también en su panel</td></tr>';
