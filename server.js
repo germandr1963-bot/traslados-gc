@@ -10277,12 +10277,24 @@ function lineaCopyright(lang) {
 app.locals.enlaceLegal = enlaceLegal;
 app.locals.lineaCopyright = lineaCopyright;
 
-// Texto de una página legal → párrafos: cada línea en blanco separa un apartado; un salto de línea simple se respeta.
+// Texto de una página legal. Con formato (editor del Admin): solo se dejan títulos, negritas, párrafos y listas, sin estilos.
+// Sin formato (texto pegado antes): cada línea en blanco separa un apartado; un salto de línea simple se respeta.
 function parrafosLegales(texto) {
   const esc = function (s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   };
-  return String(texto || '').replace(/\r\n/g, '\n').split(/\n\s*\n/)
+  const v = String(texto || '');
+  if (/<\/?(p|h2|h3|ul|ol|li|strong|b|br)(\s[^>]*)?\/?>/i.test(v)) {
+    const PERMITIDAS = { p: 'p', h2: 'h2', h3: 'h3', strong: 'strong', b: 'strong', ul: 'ul', ol: 'ol', li: 'li', br: 'br' };
+    return v.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '')
+      .replace(/<(\/?)([a-zA-Z0-9]+)\b[^>]*>/g, function (m, cierre, tag) {
+        const t = PERMITIDAS[tag.toLowerCase()];
+        if (!t) return '';
+        if (t === 'br') return cierre ? '' : '<br>';
+        return '<' + cierre + t + '>';
+      });
+  }
+  return v.replace(/\r\n/g, '\n').split(/\n\s*\n/)
     .map(function (b) { return b.trim(); })
     .filter(function (b) { return b; })
     .map(function (b) { return '<p>' + esc(b).replace(/\n/g, '<br>') + '</p>'; })
@@ -20724,7 +20736,7 @@ function origenPalabraRu(o) {
 // Devuelve { ok, grave, sinRuso, mezcladas: [...], latinas: [...] }.
 function revisarTraduccion(texto, lang) {
   const t = String(texto || '')
-    .replace(/\{[a-z_]+\}/g, ' ')
+    .replace(/\{[a-zñ_]+\}/g, ' ') // (17/11/2026) N86: también {año}
     .replace(/https?:\/\/\S+/g, ' ')
     .replace(/\S+@\S+/g, ' ')
     .replace(/<[^>]+>/g, ' ')
