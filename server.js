@@ -2363,8 +2363,8 @@ async function initSchema() {
     { clave: 'asistencia_terceros', contexto: 'Texto legal que sale solo si la reserva es para otra persona («Yo no viajo»), bajo las casillas de asistencia especial. No cambiar el sentido sin el asesor legal', es: 'Si haces esta reserva en nombre de otra persona, declaras bajo tu responsabilidad que cuentas con su consentimiento explícito para facilitarnos este dato de salud y que le has informado de que solo se comunicará al chofer asignado, para prestarle la asistencia adecuada durante el traslado.' },
     { clave: 'asistencia_resumen', contexto: 'Etiqueta de la asistencia especial en el resumen de la reserva, antes de confirmar', es: 'Asistencia especial:' },
     { clave: 'asistencia_portal_titulo', contexto: 'Título del recuadro de asistencia especial dentro de cada reserva en el portal del cliente', es: '♿ Asistencia especial' },
-    { clave: 'asistencia_retirar', contexto: 'Botón del portal del cliente para retirar el consentimiento de la asistencia especial de un viaje', es: 'Retirar mi consentimiento' },
-    { clave: 'asistencia_retirar_confirmar', contexto: 'Pregunta de confirmación al pulsar «Retirar mi consentimiento» en el portal del cliente', es: '¿Seguro que quieres retirar la asistencia especial de este viaje? El chofer dejará de verla.' },
+    { clave: 'asistencia_retirar', contexto: 'Botón del portal del cliente para retirar el consentimiento de la asistencia especial de un viaje', es: 'Quitar asistencia especial' },
+    { clave: 'asistencia_retirar_confirmar', contexto: 'Pregunta de confirmación al pulsar «Retirar mi consentimiento» en el portal del cliente', es: '¿Seguro que quieres quitar la asistencia especial de este viaje? Al quitarla, retiras el consentimiento que nos diste para usar este dato. Lo borraremos de tu reserva al momento y el chofer dejará de verlo.' },
     { clave: 'asistencia_retirada', contexto: 'Mensaje en el portal del cliente cuando ha retirado la asistencia especial de un viaje', es: 'Has retirado la asistencia especial de este viaje. El chofer ya no la verá.' },
     { clave: 'asistencia_marca', contexto: 'Marca que queda en la reserva cuando, al terminar el viaje, se borra el detalle de la asistencia especial (portal del cliente)', es: 'Reserva con asistencia especial' }
   ];
@@ -2873,6 +2873,30 @@ async function initSchema() {
     );
   `);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS asistencia_especial BOOLEAN DEFAULT FALSE`);
+  // (17/11/2026) Borrado del detalle de la asistencia especial al terminar el viaje (dato de salud, RGPD).
+  // Lo hace la base de datos en cuanto la reserva pasa a completada, no_show o cancelada, venga el cambio de donde venga
+  // (chofer, cliente, Admin, cancelación automática o Neon). Se quedan la marca reservas.asistencia_especial y el registro
+  // del consentimiento (consentimientos_asistencia), que no dicen cuál era la discapacidad.
+  try {
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION borrar_asistencia_al_terminar() RETURNS trigger AS $fn$
+      BEGIN
+        IF NEW.estado IN ('completada', 'no_show', 'cancelada') AND NEW.estado IS DISTINCT FROM OLD.estado THEN
+          DELETE FROM reservas_asistencia WHERE reserva_id = NEW.id;
+        END IF;
+        RETURN NEW;
+      END;
+      $fn$ LANGUAGE plpgsql;
+    `);
+    await pool.query(`DROP TRIGGER IF EXISTS trg_asistencia_fin_viaje ON reservas`);
+    await pool.query(`
+      CREATE TRIGGER trg_asistencia_fin_viaje
+      AFTER UPDATE OF estado ON reservas
+      FOR EACH ROW EXECUTE FUNCTION borrar_asistencia_al_terminar()
+    `);
+  } catch (eAsisTrg) {
+    console.warn('Borrado de la asistencia especial al terminar el viaje:', eAsisTrg.message);
+  }
   // (16/11/2026) Avisos «Asistencia especial retirada» a los choferes: a quién, cuándo y con qué mensaje de la cola
   // (el Admin enseña cuándo se puso en cola y cuándo se envió).
   await pool.query(`
@@ -21785,9 +21809,24 @@ app.get('/admin/contabilidad/exportar/gastos', requireAdmin, asyncHandler(async 
 
 setInterval(cancelarReservasSinPago, 60 * 60 * 1000);
 
+// (17/11/2026) Borrado de seguridad de la asistencia especial: cada hora (y al arrancar) se borra el detalle de las
+// reservas ya terminadas y de las que su hora de viaje (hora de Canarias) pasó hace más de 24 horas.
+async function purgarAsistenciaTerminada() {
+  try {
+    const r = await pool.query(
+      `DELETE FROM reservas_asistencia ra USING reservas r
+        WHERE ra.reserva_id = r.id
+          AND (r.estado IN ('completada', 'no_show', 'cancelada')
+               OR (r.fecha + r.hora) < (NOW() AT TIME ZONE 'Atlantic/Canary') - INTERVAL '24 hours')`);
+    if (r.rowCount) console.log('♿ Asistencia especial: detalle borrado en ' + r.rowCount + ' fila(s) de viajes terminados');
+  } catch (e) { console.warn('Borrado de seguridad de la asistencia especial:', e.message); }
+}
+setInterval(purgarAsistenciaTerminada, 60 * 60 * 1000);
+
 // ─── Arranque ─────────────────────────────────────────────────────────────────
 initSchema()
   .then(function () {
+    purgarAsistenciaTerminada(); // (17/11/2026)
     app.listen(PORT, function () {
       console.log('Traslados GC escuchando en el puerto ' + PORT);
     });
