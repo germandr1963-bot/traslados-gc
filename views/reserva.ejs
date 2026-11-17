@@ -502,6 +502,8 @@ footer a { display: inline-block; white-space: nowrap; } /* (17/11/2026) N86: ca
         <div id="cotiz-ok" style="color:#2d7a4f;font-size:0.85rem;display:none;text-align:center;padding:0.75rem;background:#d1e7dd;border-radius:6px;"></div>
         <button id="btn-enviar-cotizacion" onclick="enviarCotizacion()" class="boton-primario" style="width:100%;margin-top:0.5rem;"><%= t('home_modal_boton_enviar') %></button>
         <button id="btn-cancelar-cotizacion" onclick="cerrarFormCotizacion()" style="width:100%;background:#f5f0ea;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:0.9rem;padding:0.6rem;"><%= t('home_modal_boton_cancelar') %></button>
+        <!-- (17/11/2026) N86: información de privacidad (texto: Idiomas → Textos de interfaz → «Páginas legales») -->
+        <p style="font-size:0.75rem;color:#888;margin:0.25rem 0 0;text-align:center;line-height:1.5;"><%- textoConEnlacesLegales(t('legal_info_cotizacion'), lang, ['privacidad']).replace(/<a /g, '<a style="color:var(--terracota);font-weight:600;text-decoration:none;" ') %></p>
       </div>
     </div>
   </div>
