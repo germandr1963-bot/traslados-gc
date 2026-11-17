@@ -10310,7 +10310,7 @@ function textoConEnlacesLegales(texto, lang, paginas) {
   let i = 0;
   return escLegal(texto).replace(/\[\[([^\]]+)\]\]/g, function (m, dentro) {
     const pag = paginas[Math.min(i++, paginas.length - 1)];
-    return '<a href="' + enlaceLegal(lang, pag) + '" target="_blank" rel="noopener">' + dentro + '</a>';
+    return '<a href="' + enlaceLegal(lang, pag) + '" data-legal="' + pag + '" target="_blank" rel="noopener">' + dentro + '</a>';
   });
 }
 // Información básica de protección de datos: una línea por dato, lo de antes de «:» en negrita, [[ ]] = enlace a privacidad
@@ -10366,6 +10366,16 @@ async function renderLegal(req, res, lang, pagina) {
     contenidoHtml: parrafosLegales(t(p.texto))
   });
 }
+
+// (17/11/2026) N86 — Texto de una página legal para la ventana que se abre encima de la página (public/legal-ventana.js):
+// el cliente lee sin salir de donde está. Mismos textos que la página legal.
+app.get('/api/legal/:pagina', asyncHandler(async (req, res) => {
+  const p = PAGINAS_LEGALES[req.params.pagina];
+  if (!p) return res.status(404).json({ error: 'Página no encontrada' });
+  const lang = IDIOMAS_PERMITIDOS.includes(req.query.lang) ? req.query.lang : 'es';
+  const t = function (clave) { return obtenerTexto(clave, lang); };
+  res.json({ titulo: t(p.nombre), aviso: t('legal_provisional'), html: parrafosLegales(t(p.texto)), cerrar: t('home_modal_cerrar') });
+}));
 
 // Español: /aviso-legal, /politica-de-privacidad… (la palabra sale de Idiomas → 🔗 Palabras de URL por página)
 app.get('/:palabraLegal', asyncHandler(async (req, res, next) => {
