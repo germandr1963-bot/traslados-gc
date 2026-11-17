@@ -5469,7 +5469,7 @@ function renderizarTablaTextos(datos) {
           return celdaTextoInterfaz(t, lang);
         }).join('');
         html += '<tr class="' + seccionId + '" style="display:none;">' +
-          '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(t.texto_es) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
+          '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(textoCortoLegal(t)) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
           '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(t.modulo) + '</td>' +
           celdas +
           '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
@@ -5479,6 +5479,22 @@ function renderizarTablaTextos(datos) {
   });
 
   cuerpo.innerHTML = html;
+}
+
+// (17/11/2026) N86: los textos de las páginas legales son largos: en la lista salen cortados con «…» (entero, en su ficha).
+function esTextoLegalLargo(t) {
+  return !!t && t.modulo === 'Páginas legales' && /_texto$/.test(t.clave || '');
+}
+function textoCortoLegal(t) {
+  var s = String(t.texto_es || '');
+  if (!esTextoLegalLargo(t)) return s;
+  s = s.replace(/\s+/g, ' ').trim();
+  return s.length > 90 ? s.slice(0, 90).trim() + '…' : s;
+}
+// Caja de la ficha: grande para los textos de las páginas legales; la de siempre para lo demás.
+function atributosCajaTexto(textoId) {
+  var t = textosCache && textosCache.textos.find(function (x) { return x.id === textoId; });
+  return esTextoLegalLargo(t) ? 'rows="22" style="height:460px;padding:10px 14px;line-height:1.5;font-family:inherit;"' : 'rows="3"';
 }
 
 function toggleSeccionTextos(seccionId, cabeceraEl) {
@@ -6796,7 +6812,7 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
     var valorEs = texto ? (texto.texto_es || '') : '';
     campo.innerHTML =
       '<label class="etiqueta">Texto en Español</label>' +
-      '<textarea class="campo" id="texto-traduccion" rows="3">' + escapar(valorEs) + '</textarea>' +
+      '<textarea class="campo" id="texto-traduccion" ' + atributosCajaTexto(textoId) + '>' + escapar(valorEs) + '</textarea>' +
       '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'es\')">💾 Guardar</button>' +
       '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="guardarTodoTexto(' + textoId + ', \'es\')">💾 Guardar todo</button>';
   } else {
@@ -6814,7 +6830,7 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
         campo.innerHTML =
           avisoDesact +
           '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
-          '<textarea class="campo" id="texto-traduccion" rows="3" placeholder="Todavía sin traducir...">' + escapar(datos.texto || '') + '</textarea>' +
+          '<textarea class="campo" id="texto-traduccion" ' + atributosCajaTexto(textoId) + ' placeholder="Todavía sin traducir...">' + escapar(datos.texto || '') + '</textarea>' +
           '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar</button>' +
           '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="guardarTodoTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar todo</button>' +
           // (07/11/2026) N51: rehace con la IA solo el idioma de esta pestaña, aunque esté aprobado (como en Frases)
@@ -7171,7 +7187,12 @@ function abrirPanelPalabrasURL() {
       flota:        'Flota',
       contacto:     'Contacto',
       'mi-reserva': 'Acceso clientes (mi reserva)',
-      traslado:     'Traslado (sección de rutas)'
+      traslado:     'Traslado (sección de rutas)',
+      // (17/11/2026) N86: páginas legales del pie de página
+      'aviso-legal': 'Aviso legal',
+      privacidad:    'Política de privacidad',
+      cookies:       'Política de cookies',
+      condiciones:   'Condiciones generales'
     };
 
     var cabecerasIdiomas = idiomas.map(function(idi) {
