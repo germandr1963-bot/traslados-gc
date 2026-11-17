@@ -181,6 +181,14 @@
     </div>
   </main>
 
+  <!-- (17/11/2026) N86: fila legal (cada página se abre en otra pestaña, para no perder lo escrito) -->
+  <div style="text-align:center;padding:30px;font-size:13px;">
+    <a href="<%= enlaceLegal(lang, 'aviso-legal') %>" target="_blank" rel="noopener" style="color:#5b5347;text-decoration:none;margin:0 12px;display:inline-block;white-space:nowrap;"><%= t('legal_footer_aviso') %></a>
+    <a href="<%= enlaceLegal(lang, 'privacidad') %>" target="_blank" rel="noopener" style="color:#5b5347;text-decoration:none;margin:0 12px;display:inline-block;white-space:nowrap;"><%= t('legal_footer_privacidad') %></a>
+    <a href="<%= enlaceLegal(lang, 'cookies') %>" target="_blank" rel="noopener" style="color:#5b5347;text-decoration:none;margin:0 12px;display:inline-block;white-space:nowrap;"><%= t('legal_footer_cookies') %></a>
+    <a href="<%= enlaceLegal(lang, 'condiciones') %>" target="_blank" rel="noopener" style="color:#5b5347;text-decoration:none;margin:0 12px;display:inline-block;white-space:nowrap;"><%= t('legal_footer_condiciones') %></a>
+  </div>
+
   <script>
     var TXT = {
       enviar:    <%- JSON.stringify(t('val_btn_enviar')) %>,
