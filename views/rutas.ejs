@@ -130,7 +130,7 @@
     }
 
     footer { text-align: center; padding: 30px; color: var(--texto-muted); font-size: 13px; }
-    footer a { color: var(--texto-muted); text-decoration: none; margin: 0 12px; font-size: 13px; }
+    footer a { color: var(--texto-muted); text-decoration: none; margin: 0 12px; font-size: 13px; display: inline-block; white-space: nowrap; } /* (17/11/2026) N86: cada enlace del pie, entero en el móvil */
     footer a:hover { color: var(--texto-oscuro); }
     .footer-links { margin-bottom: 12px; }
   </style>
@@ -192,7 +192,14 @@
       <% } %>
       <a href="<%= lang === 'es' ? '/mi-reserva' : '/' + lang + '/' + (palabrasPaginas['mi-reserva'] || 'mi-reserva') %>"><%= t('home_footer_acceso_clientes') || 'Acceso clientes' %></a>
     </div>
-    Traslados · GC — Gran Canaria
-  </footer>
+    <!-- (17/11/2026) N86: fila legal -->
+    <div class="footer-links">
+      <a href="<%= enlaceLegal(lang, 'aviso-legal') %>"><%= t('legal_footer_aviso') %></a>
+      <a href="<%= enlaceLegal(lang, 'privacidad') %>"><%= t('legal_footer_privacidad') %></a>
+      <a href="<%= enlaceLegal(lang, 'cookies') %>"><%= t('legal_footer_cookies') %></a>
+      <a href="<%= enlaceLegal(lang, 'condiciones') %>"><%= t('legal_footer_condiciones') %></a>
+    </div>
+    <%= lineaCopyright(lang) %>
+</footer>
 </body>
 </html>
