@@ -308,6 +308,29 @@
       renderizarReservas();
     }
 
+    // (17/11/2026) Si el cliente quita la asistencia especial, el recuadro desaparece solo, sin recargar.
+    // Cada 2 minutos (y al volver a la pantalla) se miran las reservas y solo se quita ese recuadro:
+    // no se cierra ninguna reserva abierta ni se borra nada de lo que el chofer esté escribiendo.
+    async function refrescarAsistencia() {
+      try {
+        const r = await fetch('/chofer/mis-reservas', { cache: 'no-store' });
+        if (!r.ok) return;
+        const data = await r.json();
+        (data.reservas || []).forEach(function (nueva) {
+          var vieja = todasLasReservas.find(function (x) { return x.id === nueva.id; });
+          if (!vieja || !(vieja.asistencia && vieja.asistencia.length)) return;
+          if (nueva.asistencia && nueva.asistencia.length) return;
+          vieja.asistencia = [];
+          var caja = document.getElementById('asis-' + nueva.id);
+          if (caja) caja.remove();
+          var cuerpo = document.getElementById('cuerpo-' + nueva.id);
+          if (cuerpo && cuerpo.classList.contains('abierto')) cargarMensajesChofer(nueva.id);
+        });
+      } catch (e) {}
+    }
+    setInterval(function () { if (!document.hidden) refrescarAsistencia(); }, 120000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) refrescarAsistencia(); });
+
     function aplicarFiltro(filtro) {
       filtroActual = filtro;
       document.querySelectorAll('.filtro-btn').forEach(function(b) { b.classList.remove('activo'); });
@@ -387,7 +410,7 @@
             '<div class="detalle-fila"><strong>Categoría:</strong> ' + (r.categoria_nombre||'—') + '</div>' +
             // (16/11/2026) Asistencia especial: lo que marcó el cliente, con la nota interna. Se borra al terminar el viaje.
             (r.asistencia && r.asistencia.length
-              ? '<div style="margin:12px 0;padding:12px 14px;background:#fdf6ec;border:2px solid #D9A441;border-radius:8px;">' +
+              ? '<div id="asis-' + r.id + '" style="margin:12px 0;padding:12px 14px;background:#fdf6ec;border:2px solid #D9A441;border-radius:8px;">' +
                   '<div style="font-size:15px;font-weight:700;color:#1C1815;margin-bottom:4px;">♿ Asistencia especial</div>' +
                   r.asistencia.map(function(a){
                     var esc = function(x){ return String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
