@@ -342,10 +342,10 @@
 
 <!-- (17/11/2026) N86: fila legal (cada página se abre en otra pestaña, para no perder lo escrito) -->
 <div style="text-align:center;padding:30px;font-size:13px;">
-  <a href="<%= enlaceLegal(lang, 'aviso-legal') %>" target="_blank" rel="noopener" style="color:#5b5347;text-decoration:none;margin:0 12px;display:inline-block;white-space:nowrap;"><%= t('legal_footer_aviso') %></a>
-  <a href="<%= enlaceLegal(lang, 'privacidad') %>" target="_blank" rel="noopener" style="color:#5b5347;text-decoration:none;margin:0 12px;display:inline-block;white-space:nowrap;"><%= t('legal_footer_privacidad') %></a>
-  <a href="<%= enlaceLegal(lang, 'cookies') %>" target="_blank" rel="noopener" style="color:#5b5347;text-decoration:none;margin:0 12px;display:inline-block;white-space:nowrap;"><%= t('legal_footer_cookies') %></a>
-  <a href="<%= enlaceLegal(lang, 'condiciones') %>" target="_blank" rel="noopener" style="color:#5b5347;text-decoration:none;margin:0 12px;display:inline-block;white-space:nowrap;"><%= t('legal_footer_condiciones') %></a>
+  <a href="<%= enlaceLegal(lang, 'aviso-legal') %>" data-legal="aviso-legal" target="_blank" rel="noopener" style="color:#5b5347;text-decoration:none;margin:0 12px;display:inline-block;white-space:nowrap;"><%= t('legal_footer_aviso') %></a>
+  <a href="<%= enlaceLegal(lang, 'privacidad') %>" data-legal="privacidad" target="_blank" rel="noopener" style="color:#5b5347;text-decoration:none;margin:0 12px;display:inline-block;white-space:nowrap;"><%= t('legal_footer_privacidad') %></a>
+  <a href="<%= enlaceLegal(lang, 'cookies') %>" data-legal="cookies" target="_blank" rel="noopener" style="color:#5b5347;text-decoration:none;margin:0 12px;display:inline-block;white-space:nowrap;"><%= t('legal_footer_cookies') %></a>
+  <a href="<%= enlaceLegal(lang, 'condiciones') %>" data-legal="condiciones" target="_blank" rel="noopener" style="color:#5b5347;text-decoration:none;margin:0 12px;display:inline-block;white-space:nowrap;"><%= t('legal_footer_condiciones') %></a>
 </div>
 
 <script>
@@ -853,5 +853,6 @@ document.addEventListener('click', function(e) {
   }
 });
 </script>
+<script src="/legal-ventana.js" defer></script><!-- (17/11/2026) N86: los enlaces legales se abren en una ventana, sin salir de la página -->
 </body>
 </html>

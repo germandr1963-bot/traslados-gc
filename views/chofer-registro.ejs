@@ -237,7 +237,7 @@
         <h2>Aceptaciones</h2>
         <div class="check-wrap">
           <input type="checkbox" id="acepta-privacidad">
-          <label for="acepta-privacidad">He leído y acepto la <a href="<%= enlaceLegal(lang, 'privacidad') %>" target="_blank">Política de Privacidad</a>.</label>
+          <label for="acepta-privacidad">He leído y acepto la <a href="<%= enlaceLegal(lang, 'privacidad') %>" data-legal="privacidad" target="_blank">Política de Privacidad</a>.</label>
         </div>
 
         <div id="mensaje-registro" class="mensaje"></div>
@@ -261,10 +261,10 @@
     </div>
     <!-- (17/11/2026) N86: fila legal -->
     <div class="footer-links">
-      <a href="<%= enlaceLegal(lang, 'aviso-legal') %>"><%= t('legal_footer_aviso') %></a>
-      <a href="<%= enlaceLegal(lang, 'privacidad') %>"><%= t('legal_footer_privacidad') %></a>
-      <a href="<%= enlaceLegal(lang, 'cookies') %>"><%= t('legal_footer_cookies') %></a>
-      <a href="<%= enlaceLegal(lang, 'condiciones') %>"><%= t('legal_footer_condiciones') %></a>
+      <a href="<%= enlaceLegal(lang, 'aviso-legal') %>" data-legal="aviso-legal"><%= t('legal_footer_aviso') %></a>
+      <a href="<%= enlaceLegal(lang, 'privacidad') %>" data-legal="privacidad"><%= t('legal_footer_privacidad') %></a>
+      <a href="<%= enlaceLegal(lang, 'cookies') %>" data-legal="cookies"><%= t('legal_footer_cookies') %></a>
+      <a href="<%= enlaceLegal(lang, 'condiciones') %>" data-legal="condiciones"><%= t('legal_footer_condiciones') %></a>
     </div>
     <div style="padding-top:10px;"><strong><%= lineaCopyright(lang) %></strong></div>
 </footer>
@@ -584,5 +584,6 @@
       });
     }
   </script>
+<script src="/legal-ventana.js" defer></script><!-- (17/11/2026) N86: los enlaces legales se abren en una ventana, sin salir de la página -->
 </body>
 </html>
