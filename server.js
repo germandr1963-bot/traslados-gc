@@ -140,8 +140,17 @@ function plantillaEmail(contenidoHtml) {
       <p style="color:#aaa;margin:4px 0 0;font-size:12px;font-family:'Helvetica Neue',Arial,sans-serif;">${_marcaSubtitulo}</p>
     </div>
     <div class="body">${contenidoHtml}</div>
-    <div class="footer" style="font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;">${_marcaPie}</div>
+    <div class="footer" style="font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;">${_marcaPie}${enlacePrivacidadEmail(_langMarca)}</div>
   </div></body></html>`;
+}
+
+// (17/11/2026) N86: enlace a la Política de privacidad en el pie de todos los emails, en el idioma del email
+function enlacePrivacidadEmail(lang) {
+  try {
+    const l = IDIOMAS_PERMITIDOS.includes(lang) ? lang : 'es';
+    return '<br><a href="' + BASE_URL + enlaceLegal(l, 'privacidad') + '" style="color:#888;font-weight:400;font-size:11px;text-decoration:underline;">' +
+      obtenerTexto('legal_footer_privacidad', l) + '</a>';
+  } catch (e) { return ''; }
 }
 
 // (01/10/2026) Igual que plantillaEmail, pero con la cabecera y el pie de "Email — marca"
@@ -13657,7 +13666,7 @@ async function generarHtmlVoucher(reservaId) {
       </div>
       <p style="margin-top:20px;">${tv('vou_despedida')} 🙏<br><strong>${tv('vou_firma')}</strong></p>
     </div>
-    <div class="footer" style="font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;">${textoMarcaEmail('email_marca_3_pie', _lv, 'Traslados GC · Gran Canaria')}</div>
+    <div class="footer" style="font-family:'Helvetica Neue',Arial,sans-serif;font-weight:700;">${textoMarcaEmail('email_marca_3_pie', _lv, 'Traslados GC · Gran Canaria')}${enlacePrivacidadEmail(_lv)}</div>
   </div></body></html>`;
 }
 
