@@ -766,6 +766,8 @@ footer a { display: inline-block; white-space: nowrap; } /* (17/11/2026) N86: ca
           </div>
         </div>
         <% } %>
+        <!-- (17/11/2026) N86: información a quien reserva para otra persona (texto: Idiomas → Textos de interfaz → «Páginas legales») -->
+        <p style="margin:4px 0 12px;font-size:12px;line-height:1.5;color:var(--texto-muted);"><%- textoConEnlacesLegales(t('legal_info_terceros'), lang, ['privacidad']).replace(/<a /g, '<a style="color:var(--terracota);font-weight:600;text-decoration:none;" ') %></p>
       </div>
 
       <!-- (16/11/2026) Asistencia especial (opcional): para la persona que viaja. Cerrado al llegar; se abre al tocar el título. -->
