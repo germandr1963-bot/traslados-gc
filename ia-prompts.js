@@ -303,6 +303,10 @@ function GENERADOR_INTERFAZ_TEXTOS(nombreIdioma, items, glosario) {
     '- Traduce TODOS los textos sin excepción, incluidos nombres de categorías como "Business", "Económico", "Confort", "Premium" — tradúcelos a su equivalente natural en ' + nombreIdioma + '.\n' +
     '- Para claves extra_web_X: es el nombre de un extra que ve el cliente al reservar — tradúcelo de forma 100% nativa en ' + nombreIdioma + ', como lo escribiría un local, nunca de forma literal.\n' +
     '- Si un texto contiene marcas entre llaves, como {fecha} o {importe}, cópialas exactamente igual, sin traducirlas ni cambiarlas: el programa pone ahí un dato real.\n\n' +
+    // (17/11/2026) N86 — se añaden 3 reglas (lo de arriba no cambia): enlaces entre [[ ]], marcas de formato y líneas
+    '- Si un texto contiene palabras entre dobles corchetes, como [[Política de privacidad]], mantén los dobles corchetes exactamente igual, el mismo número de veces y en el mismo orden, y traduce solo las palabras de dentro, en la forma gramatical que pida la frase (en ruso, en el caso que corresponda): el programa convierte ese trozo en un enlace.\n' +
+    '- Si un texto contiene marcas de formato como <h2>, <h3>, <p>, <strong>, <ul>, <li> o <br>, cópialas exactamente igual y en el mismo orden, y traduce solo el texto que hay entre ellas.\n' +
+    '- Si un texto tiene varias líneas, devuelve la traducción con las mismas líneas, en el mismo orden (cada línea es un dato distinto en la página).\n\n' +
     'Textos a traducir (JSON):\n' + JSON.stringify(items, null, 2) + '\n\n' +
     REGLA_LETRAS() + REGLA_RUSO(nombreIdioma) + (glosario || '') + '\n\n' +
     'Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni después, ' +
