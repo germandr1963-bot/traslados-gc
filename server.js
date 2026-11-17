@@ -2366,6 +2366,9 @@ async function initSchema() {
     { clave: 'asistencia_retirar', contexto: 'Botón del portal del cliente para retirar el consentimiento de la asistencia especial de un viaje', es: 'Quitar asistencia especial' },
     { clave: 'asistencia_retirar_confirmar', contexto: 'Pregunta de confirmación al pulsar «Retirar mi consentimiento» en el portal del cliente', es: '¿Seguro que quieres quitar la asistencia especial de este viaje? Al quitarla, retiras el consentimiento que nos diste para usar este dato. Lo borraremos de tu reserva al momento y el chofer dejará de verlo.' },
     { clave: 'asistencia_retirada', contexto: 'Mensaje en el portal del cliente cuando ha retirado la asistencia especial de un viaje', es: 'Has retirado la asistencia especial de este viaje. El chofer ya no la verá.' },
+    { clave: 'asistencia_guardar', contexto: 'Botón del portal del cliente para añadir la asistencia especial a un viaje ya reservado', es: 'Guardar asistencia especial' },
+    { clave: 'asistencia_anadida', contexto: 'Frase fija dentro del recuadro de asistencia especial de cada reserva en el portal del cliente, debajo de lo que pidió (al reservar o añadida después)', es: 'Hemos añadido la asistencia especial a este viaje. El chofer la tendrá en cuenta y te prestará la ayuda que has indicado.' },
+    { clave: 'asistencia_elegir_una', contexto: 'Aviso en el portal del cliente si pulsa «Guardar asistencia especial» sin marcar ninguna opción', es: 'Marca al menos una opción.' },
     { clave: 'asistencia_marca', contexto: 'Marca que queda en la reserva cuando, al terminar el viaje, se borra el detalle de la asistencia especial (portal del cliente)', es: 'Reserva con asistencia especial' }
   ];
   for (const tx of TEXTOS_ASISTENCIA) {
@@ -3613,6 +3616,8 @@ Pulsa el botón para crear una nueva contraseña:
     { clave: 'chofer_servicio_asignado', nombre: 'Servicio asignado en sustitución (al chofer nuevo)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n✅ *Servicio asignado*\n_Se te asigna este servicio en sustitución de un compañero._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n👥 *Pasajeros:* {pasajeros}{asistencia_especial}\n🌐 *Idioma del cliente:* {idioma}\n\nRevisa todos los detalles en tu panel. El cartel de recogida te llegará cuando el cliente haya pagado el depósito.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_servicio_reasignado', nombre: 'Servicio reasignado a otro compañero (al chofer anterior)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\nℹ️ *Servicio reasignado*\n_Este servicio se ha asignado a otro compañero. Ya no tienes que hacerlo._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nQueda liberado de tu agenda. Gracias.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     // (16/11/2026) Asistencia especial retirada por el cliente (al chofer asignado, o al que acepta después)
+    // (17/11/2026) Asistencia especial añadida por el cliente desde su portal (al chofer ya asignado)
+    { clave: 'chofer_asistencia_anadida', nombre: 'Asistencia especial añadida (al chofer)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n⚠️ *Asistencia especial añadida*\n_El cliente ha añadido asistencia especial a este servicio. El servicio sigue igual; verás el detalle en tu portal, en los datos de la reserva._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_asistencia_retirada', nombre: 'Asistencia especial retirada (al chofer)', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\nℹ️ *Asistencia especial retirada*\n_El servicio NO se ha cancelado: sigue en pie y sigue siendo tuyo. Solo se ha retirado la asistencia especial que había pedido el cliente; ya no tienes que tenerla en cuenta._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'chofer_respuesta_confirmado', nombre: 'Respuesta al SI: servicio confirmado', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: '✅ *Servicio confirmado*\nLa reserva *{numero_reserva}* es tuya. Revisa todos los detalles en tu panel.' },
     { clave: 'chofer_respuesta_ya_asignada', nombre: 'Respuesta al SI: ya asignada a otro compañero', categoria: 'chofer', asunto_email: '', cuerpo_email: '', cuerpo_whatsapp: 'ℹ️ La reserva *{numero_reserva}* ya ha sido asignada a otro compañero. Gracias por tu disponibilidad.' },
@@ -13102,6 +13107,7 @@ const RESPALDO_PLANTILLAS_CHOFER = {
   chofer_aviso_reasignacion: '🔄 *SERVICIO A REASIGNAR*\n_Un compañero no puede hacer este servicio._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n🚗 *Categoría:* {categoria}\n👥 *Pasajeros:* {pasajeros}{asistencia_especial}\n\nResponde *SI* para aceptar o *NO* para rechazar.',
   chofer_servicio_asignado: 'Hola, *{nombre_chofer}* 👋\n\n✅ *Servicio asignado*\n_Se te asigna este servicio en sustitución de un compañero._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n👥 *Pasajeros:* {pasajeros}{asistencia_especial}\n🌐 *Idioma del cliente:* {idioma}\n\nRevisa todos los detalles en tu panel. El cartel de recogida te llegará cuando el cliente haya pagado el depósito.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*',
   chofer_servicio_reasignado: 'Hola, *{nombre_chofer}* 👋\n\nℹ️ *Servicio reasignado*\n_Este servicio se ha asignado a otro compañero. Ya no tienes que hacerlo._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nQueda liberado de tu agenda. Gracias.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*',
+  chofer_asistencia_anadida: 'Hola, *{nombre_chofer}* 👋\n\n⚠️ *Asistencia especial añadida*\n_El cliente ha añadido asistencia especial a este servicio. El servicio sigue igual; verás el detalle en tu portal, en los datos de la reserva._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*',
   chofer_asistencia_retirada: 'Hola, *{nombre_chofer}* 👋\n\nℹ️ *Asistencia especial retirada*\n_El servicio NO se ha cancelado: sigue en pie y sigue siendo tuyo. Solo se ha retirado la asistencia especial que había pedido el cliente; ya no tienes que tenerla en cuenta._\n\n🔖 *Reserva:* {numero_reserva}\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*',
   chofer_respuesta_confirmado: '✅ *Servicio confirmado*\nLa reserva *{numero_reserva}* es tuya. Revisa todos los detalles en tu panel.',
   chofer_respuesta_ya_asignada: 'ℹ️ La reserva *{numero_reserva}* ya ha sido asignada a otro compañero. Gracias por tu disponibilidad.',
@@ -16941,7 +16947,9 @@ async function guardarAsistenciaReserva(reservaId, numeroReserva, ids, datos) {
 
 // (16/11/2026) «Asistencia especial retirada» al chofer de la reserva: por WhatsApp (cola del Puente) y en su panel
 // («Mensajes del equipo»). Queda registrado en asistencia_avisos_chofer con el mensaje de la cola.
-async function avisarChoferAsistenciaRetirada(reservaId, motivo) {
+async function avisarChoferAsistenciaRetirada(reservaId, motivo, clavePlantilla) {
+  // (17/11/2026) Sirve también para «Asistencia especial añadida» (clavePlantilla = 'chofer_asistencia_anadida')
+  const clave = clavePlantilla || 'chofer_asistencia_retirada';
   const q = await pool.query(
     `SELECT r.id, r.numero_reserva, r.origen, r.destino, r.fecha, r.hora, r.conductor_id, c.nombre, c.telefono
        FROM reservas r JOIN conductores c ON c.id = r.conductor_id WHERE r.id = $1`, [reservaId]);
@@ -16949,10 +16957,12 @@ async function avisarChoferAsistenciaRetirada(reservaId, motivo) {
   const r = q.rows[0];
   const fechaTxt = r.fecha ? fechaCliente(r.fecha, 'es') : '—';
   const horaTxt = r.hora ? String(r.hora).slice(0, 5) : '—';
-  const txt = await plantillaChoferWa('chofer_asistencia_retirada', {
+  const txt = await plantillaChoferWa(clave, {
     nombre_chofer: String(r.nombre || '').trim().split(/\s+/)[0], numero_reserva: r.numero_reserva,
     origen: r.origen || '—', destino: r.destino || '—', fecha: fechaTxt, hora: horaTxt
-  }, 'Reserva ' + r.numero_reserva + ': el cliente ha retirado la asistencia especial. El servicio NO se ha cancelado y sigue siendo tuyo.');
+  }, clave === 'chofer_asistencia_anadida'
+    ? 'Reserva ' + r.numero_reserva + ': el cliente ha añadido asistencia especial. Verás el detalle en tu portal, en los datos de la reserva.'
+    : 'Reserva ' + r.numero_reserva + ': el cliente ha retirado la asistencia especial. El servicio NO se ha cancelado y sigue siendo tuyo.');
   let mensajeId = null;
   if (r.telefono) {
     const m = await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2) RETURNING id', [r.telefono, txt]);
@@ -17046,6 +17056,27 @@ app.post('/api/cliente/asistencia/retirar', asyncHandler(async (req, res) => {
   await pool.query('UPDATE reservas SET asistencia_especial = FALSE WHERE id = $1', [r.id]);
   try { await avisarChoferAsistenciaRetirada(r.id, 'retirada_con_chofer'); }
   catch (e) { console.warn('Asistencia especial retirada (aviso al chofer):', e.message); }
+  res.json({ ok: true });
+}));
+
+// (17/11/2026) Portal: añadir la asistencia especial a un viaje ya reservado, hasta 1 hora antes del viaje.
+// Se guarda igual que al reservar (detalle, marca y registro del consentimiento) y, si hay chofer, se le avisa.
+app.post('/api/cliente/asistencia/anadir', asyncHandler(async (req, res) => {
+  const r = await reservaViajeEditable(req, req.body && req.body.reserva_id);
+  if (!r) return res.status(404).json({ error: 'Reserva no disponible.' });
+  if (new Date() >= calcularFechaCancelacion(new Date(r.fecha), r.hora, 1)) return res.status(400).json({ error: 'Ya no se puede añadir.' });
+  const ya = await pool.query('SELECT 1 FROM reservas_asistencia WHERE reserva_id = $1 LIMIT 1', [r.id]);
+  if (ya.rows.length) return res.status(400).json({ error: 'Esta reserva ya tiene asistencia especial.' });
+  const ids = Array.isArray(req.body.avisos) ? req.body.avisos : [];
+  const d = await pool.query('SELECT numero_reserva, email_cliente, es_para_otra_persona FROM reservas WHERE id = $1', [r.id]);
+  let lang = 'es';
+  try { lang = await idiomaPortalCliente(req); } catch (e) { lang = 'es'; }
+  await guardarAsistenciaReserva(r.id, d.rows[0].numero_reserva, ids,
+    { email: d.rows[0].email_cliente, enNombreDeOtra: !!d.rows[0].es_para_otra_persona, lang: lang });
+  const ok = await pool.query('SELECT 1 FROM reservas_asistencia WHERE reserva_id = $1 LIMIT 1', [r.id]);
+  if (!ok.rows.length) return res.status(400).json({ error: 'Marca al menos una opción.' });
+  try { await avisarChoferAsistenciaRetirada(r.id, 'anadida', 'chofer_asistencia_anadida'); }
+  catch (e) { console.warn('Asistencia especial añadida (aviso al chofer):', e.message); }
   res.json({ ok: true });
 }));
 
@@ -17297,6 +17328,14 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
       } else if (_ar.rows.length) {
         asistencia = { lista: [], retirada: true, retirable: false };
       }
+      // (17/11/2026) Se puede añadir desde el portal hasta 1 hora antes del viaje, si ahora no tiene
+      if (!_as.rows.length && !esHistorial && ['pendiente', 'confirmada', 'modificacion_pendiente'].includes(r.estado)
+          && ahora < calcularFechaCancelacion(new Date(r.fecha), r.hora, 1)) {
+        const _op = await pool.query('SELECT es_para_otra_persona FROM reservas WHERE id = $1', [r.id]);
+        asistencia = Object.assign(asistencia || { lista: [], retirable: false }, {
+          anadible: true, otra_persona: !!(_op.rows.length && _op.rows[0].es_para_otra_persona)
+        });
+      }
     } catch (e) { console.warn('Asistencia especial (portal del cliente):', e.message); }
     return Object.assign({}, r, {
       asistencia: asistencia,
@@ -17325,7 +17364,16 @@ app.get('/api/cliente/mi-reserva', asyncHandler(async (req, res) => {
   );
   const nombre = (nombreCliente.rows.length && nombreCliente.rows[0].nombre)
     || (result.rows.length ? result.rows[0].nombre_cliente : '');
-  res.json({ reservas, nombre });
+  // (17/11/2026) Opciones de asistencia especial (Admin → Extras), en el idioma del portal, para añadirlas desde el portal
+  let asistenciaOpciones = [];
+  try {
+    const _ao = await pool.query('SELECT id, nombre FROM avisos_reserva WHERE activo = TRUE ORDER BY orden, id');
+    asistenciaOpciones = _ao.rows.map(function (a) {
+      const n = langPortal !== 'es' ? obtenerTexto('aviso_web_' + a.id, langPortal) : null;
+      return { id: a.id, nombre: (n && n.indexOf('[[') !== 0) ? n : a.nombre };
+    });
+  } catch (e) { console.warn('Asistencia especial (opciones del portal):', e.message); }
+  res.json({ reservas, nombre, asistencia_opciones: asistenciaOpciones });
 }));
 
 // Enviar mensaje al operador (siempre disponible)
@@ -19926,6 +19974,7 @@ const VARIABLES_PLANTILLAS = {
   chofer_servicio_asignado:      { email: null, wa: _VCH.concat(['pasajeros', 'idioma', 'asistencia_especial']) },
   chofer_servicio_reasignado:    { email: null, wa: _VCH },
   chofer_asistencia_retirada:    { email: null, wa: _VCH },
+  chofer_asistencia_anadida:     { email: null, wa: _VCH },
   chofer_solicitud_recibida:     { email: ['nombre_chofer'], wa: null },
   // Cliente
   cliente_acceso_reserva:        { email: _V6.concat(['password_temporal', 'url_portal']), wa: _V6.concat(['password_temporal', 'url_portal']) },
