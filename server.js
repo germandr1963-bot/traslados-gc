@@ -1321,6 +1321,12 @@ async function initSchema() {
     { clave: "legal_footer_condiciones", contexto: "Nombre de la página «Condiciones generales»: sale en la segunda fila del pie de página y como título de la página (y de la pestaña del navegador)", es: "Condiciones generales" },
     { clave: "legal_copyright", contexto: "Última línea del pie de página en toda la web. {año} lo pone la web sola (no se traduce). La marca «Traslados · GC» no se traduce; la isla, con su nombre oficial en cada idioma (Islas / Localidades)", es: "© {año} Traslados · GC — Gran Canaria. Todos los derechos reservados." },
     { clave: "legal_provisional", contexto: "Aviso arriba de cada página legal mientras su texto no sea el oficial (cuando se pegue el oficial, se deja vacío y no sale)", es: "Texto provisional — en preparación" },
+    { clave: "legal_acepto", contexto: "Casilla obligatoria antes de «Confirmar y enviar solicitud» (página de reserva). Lo que va entre [[ ]] se convierte en enlace: el primero lleva a Condiciones generales y el segundo a Política de privacidad. Mantener los dobles corchetes en todos los idiomas", es: "He leído y acepto las [[Condiciones generales]] y la [[Política de privacidad]]." },
+    { clave: "legal_acepto_error", contexto: "Aviso si se pulsa «Confirmar y enviar solicitud» sin marcar la casilla de aceptación", es: "Para enviar la solicitud, marque la casilla de aceptación." },
+    { clave: "legal_info_titulo", contexto: "Título del recuadro de información básica de protección de datos (página de reserva, encima de la casilla)", es: "Información básica sobre protección de datos" },
+    { clave: "legal_info_basica", contexto: "Recuadro de información básica de protección de datos (página de reserva). Una línea por dato; lo que va antes de «:» sale en negrita; lo que va entre [[ ]] es el enlace a la Política de privacidad (lo que va entre [ ] sencillos es texto normal). En el móvil se ven las 3 primeras líneas y «Ver más»", es: "Responsable: [Nombre de tu empresa o tu nombre completo si eres autónomo], con NIF/CIF [tu NIF/CIF].\nFinalidad: Gestionar, facturar y ejecutar el servicio de traslado reservado, así como prestar la asistencia especial solicitada voluntariamente en su caso.\nLegitimación: Ejecución de un contrato de transporte (Art. 6.1.b RGPD) y, para los datos de asistencia por discapacidad, tu consentimiento explícito (Art. 9.2.a RGPD).\nDestinatarios: Los datos necesarios para el servicio se comunicarán al chofer o empresa colaboradora encargada de realizar el traslado. No se cederán datos a terceros salvo obligación legal.\nDerechos: Puedes acceder, rectificar y suprimir tus datos, así como retirar tu consentimiento o ejercer otros derechos, escribiendo a [tu correo de privacidad].\nInformación adicional: Consulta información detallada sobre el tratamiento de tus datos en nuestra [[Política de privacidad]]." },
+    { clave: "legal_ver_mas", contexto: "Botón del móvil para desplegar el resto de la información básica de protección de datos", es: "Ver más" },
+    { clave: "legal_ver_menos", contexto: "Botón del móvil para plegar la información básica de protección de datos", es: "Ver menos" },
     { clave: "legal_aviso_texto", contexto: "Texto completo de la página Aviso legal. Cada línea en blanco separa un apartado", es: "1. Datos identificativos del titular\nEn cumplimiento del artículo 10 de la Ley 34/2002, de 11 de julio, de Servicios de la Sociedad de la Información y de Comercio Electrónico (LSSI-CE), se informa que este sitio web es titularidad de:\n\nTitular: [Nombre de la Empresa S.L. / Nombre y Apellidos del Autónomo]\nNIF / CIF: [Número de NIF o CIF]\nDomicilio: [Dirección completa, Código Postal, Ciudad, Provincia]\nCorreo electrónico: [info@tudominio.com]\nTeléfono: [+34 XXX XXX XXX]\nDatos registrales: [Inscrita en el Registro Mercantil de ..., Tomo ..., Folio ..., Hoja ... — Eliminar si es autónomo]\nLicencias / Autorizaciones administrativas: [Autorización de transporte VTC / Licencia Taxi nº ..., si aplica]\n\n2. Objeto y condiciones de uso\nEl presente sitio web tiene por objeto ofrecer información y permitir la reserva online de servicios de traslado privado de pasajeros. El acceso y navegación por el sitio web atribuye la condición de usuario e implica la aceptación de las presentes condiciones de uso.\n\n3. Propiedad intelectual e industrial\nTodos los contenidos de esta web (textos, logotipos, imágenes, diseño gráfico y código fuente) son propiedad de su titular o de terceros que han autorizado su uso, quedando prohibida su reproducción o distribución sin autorización expresa.\n\n4. Legislación aplicable\nPara la resolución de cualquier controversia relacionada con este sitio web será de aplicación la legislación española." },
     { clave: "legal_privacidad_texto", contexto: "Texto completo de la página Política de privacidad. Cada línea en blanco separa un apartado", es: "Información básica sobre protección de datos\nResponsable: [Nombre de tu empresa o tu nombre completo si eres autónomo], con NIF/CIF [tu NIF/CIF].\nFinalidad: Gestionar, facturar y ejecutar el servicio de traslado reservado, así como prestar la asistencia especial solicitada voluntariamente en su caso.\nLegitimación: Ejecución de un contrato de transporte (Art. 6.1.b RGPD) y, para los datos de asistencia por discapacidad, tu consentimiento explícito (Art. 9.2.a RGPD).\nDestinatarios: Los datos necesarios para el servicio se comunicarán al conductor o empresa colaboradora encargada de realizar el traslado. No se cederán datos a terceros salvo obligación legal.\nDerechos: Puedes acceder, rectificar y suprimir tus datos, así como retirar tu consentimiento o ejercer otros derechos, escribiendo a [tu correo de privacidad].\n\nTratamiento de datos relativos a necesidades de asistencia especial (categorías especiales de datos)\nCon carácter estrictamente voluntario, durante el proceso de reserva de traslado el usuario podrá facilitar información relativa a determinadas discapacidades sensoriales o del habla (en concreto, discapacidad visual/ceguera o discapacidad del habla/mudez) mediante la marcación expresa de las casillas habilitadas al efecto. La única finalidad de recabar estos datos de salud es adaptar los canales de comunicación y garantizar la asistencia física o logística adecuada por parte del conductor durante la prestación del servicio contratado. La base jurídica que legitima este tratamiento es el consentimiento explícito del interesado, conforme a lo dispuesto en el artículo 9.2.a) del Reglamento (UE) 2016/679 (RGPD), otorgado mediante una acción afirmativa clara al seleccionar la opción correspondiente. Esta información tendrá carácter estrictamente confidencial y será comunicada única y exclusivamente al conductor asignado para realizar el traslado concreto; en caso de que el servicio sea ejecutado por un profesional autónomo o empresa colaboradora externa, el acceso a dicho dato se regulará mediante el preceptivo contrato de encargado del tratamiento conforme al artículo 28 del RGPD. Los datos relativos a estas necesidades especiales se conservarán únicamente durante el tiempo necesario para la ejecución del viaje y serán suprimidos o anonimizados de forma definitiva transcurrido un plazo máximo de [indicar plazo, ej. 30 días] desde la finalización del servicio para la gestión de posibles incidencias, salvo obligación legal de bloqueo. El usuario podrá revocar su consentimiento en cualquier momento previo a la realización del traslado dirigiendo una solicitud a [tu correo electrónico de privacidad], sin que dicha retirada afecte a la licitud del tratamiento basado en el consentimiento previo." },
     { clave: "legal_cookies_texto", contexto: "Texto completo de la página Política de cookies. Cada línea en blanco separa un apartado", es: "1. ¿Qué son las cookies?\nLas cookies son pequeños archivos de texto que se descargan en tu dispositivo al navegar por este sitio web. Permiten garantizar el funcionamiento técnico de la página, recordar tus preferencias de reserva y analizar de forma estadística el uso de la web.\n\n2. Tipos de cookies utilizadas en este sitio web\nCookies técnicas o necesarias (Obligatorias): Permiten la navegación, la gestión de la sesión de reserva, el cálculo de rutas y el procesamiento seguro de los pagos. No requieren consentimiento previo.\nCookies de preferencias o personalización: Permiten recordar opciones como el idioma o la divisa seleccionada por el usuario.\nCookies analíticas o de medición: Nos ayudan a entender cómo interactúan los visitantes con la web (páginas visitadas, tiempos de carga) para mejorar el servicio. (Ej. Google Analytics).\nCookies de terceros (Mapas y pasarelas de pago): Al utilizar servicios integrados como mapas interactivos para seleccionar puntos de recogida/destino o plataformas de pago seguro, dichos proveedores pueden instalar sus propias cookies técnicas o funcionales.\n\n3. Gestión y configuración de cookies\nPuedes aceptar, rechazar o configurar el uso de cookies no esenciales en cualquier momento a través de nuestro [Panel de Configuración de Cookies]. Asimismo, puedes bloquear o eliminar las cookies desde la configuración de tu navegador (Chrome, Safari, Firefox, Edge)." },
@@ -2924,6 +2930,8 @@ async function initSchema() {
     );
   `);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS asistencia_especial BOOLEAN DEFAULT FALSE`);
+  // (17/11/2026) N86: cuándo aceptó el cliente las Condiciones generales y la Política de privacidad (casilla de la reserva)
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS condiciones_aceptadas_en TIMESTAMP`);
   // (17/11/2026) Borrado del detalle de la asistencia especial al terminar el viaje (dato de salud, RGPD).
   // Lo hace la base de datos en cuanto la reserva pasa a completada, no_show o cancelada, venga el cambio de donde venga
   // (chofer, cliente, Admin, cancelación automática o Neon). Se quedan la marca reservas.asistencia_especial y el registro
@@ -4844,6 +4852,11 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
   if (!origen || !destino || !categoria_id || !fecha || !nombre_cliente || !telefono_cliente || !email_cliente) {
     return res.status(400).json({ error: 'Faltan datos obligatorios.' });
   }
+  // (17/11/2026) N86: sin la casilla «He leído y acepto las Condiciones generales y la Política de privacidad» no se reserva
+  if (req.body.acepta_condiciones !== true) {
+    const _langAc = (lang_cliente && IDIOMAS_PERMITIDOS.includes(lang_cliente)) ? lang_cliente : 'es';
+    return res.status(400).json({ error: obtenerTexto('legal_acepto_error', _langAc) });
+  }
   // (15/10/2026) Fecha del viaje: nunca en el pasado; hoy, solo si Modelo de negocio acepta reservas del mismo día
   {
     const _langErr = (lang_cliente && IDIOMAS_PERMITIDOS.includes(lang_cliente)) ? lang_cliente : 'es';
@@ -4955,6 +4968,8 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
   );
 
   const reservaId = reserva.rows[0].id;
+  // (17/11/2026) N86: fecha y hora de la aceptación de las Condiciones generales y la Política de privacidad
+  await pool.query('UPDATE reservas SET condiciones_aceptadas_en = NOW() WHERE id = $1', [reservaId]);
 
   // (16/11/2026) Asistencia especial: lo marcado (solo avisos publicados) + registro del consentimiento.
   try {
@@ -10274,6 +10289,27 @@ function lineaCopyright(lang) {
   const anio = new Intl.DateTimeFormat('en', { timeZone: 'Atlantic/Canary', year: 'numeric' }).format(new Date());
   return obtenerTexto('legal_copyright', IDIOMAS_PERMITIDOS.includes(lang) ? lang : 'es').split('{año}').join(anio);
 }
+// (17/11/2026) N86: texto con enlaces entre [[ ]]: el primero lleva a la página «paginas[0]», el segundo a «paginas[1]»…
+// (los [ ] sencillos se quedan como texto: p. ej. los huecos del borrador del asesor, «[tu NIF/CIF]»)
+function escLegal(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function textoConEnlacesLegales(texto, lang, paginas) {
+  let i = 0;
+  return escLegal(texto).replace(/\[\[([^\]]+)\]\]/g, function (m, dentro) {
+    const pag = paginas[Math.min(i++, paginas.length - 1)];
+    return '<a href="' + enlaceLegal(lang, pag) + '" target="_blank" rel="noopener">' + dentro + '</a>';
+  });
+}
+// Información básica de protección de datos: una línea por dato, lo de antes de «:» en negrita, [[ ]] = enlace a privacidad
+function lineasInfoBasica(lang) {
+  return String(obtenerTexto('legal_info_basica', lang) || '').split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean)
+    .map(function (l) {
+      const html = textoConEnlacesLegales(l, lang, ['privacidad']);
+      const k = html.indexOf(':');
+      return (k > 0 && k < 40 && html.slice(0, k).indexOf('<') < 0) ? '<strong>' + html.slice(0, k + 1) + '</strong>' + html.slice(k + 1) : html;
+    });
+}
+app.locals.textoConEnlacesLegales = textoConEnlacesLegales;
+app.locals.lineasInfoBasica = lineasInfoBasica;
 app.locals.enlaceLegal = enlaceLegal;
 app.locals.lineaCopyright = lineaCopyright;
 
