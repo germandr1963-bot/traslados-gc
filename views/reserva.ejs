@@ -164,6 +164,20 @@
   color:var(--texto-oscuro);
 }
 .resumen-box strong { color:var(--texto-oscuro); }
+/* (17/11/2026) N86 — información básica de protección de datos y casilla de aceptación (mismo recuadro que el resumen) */
+.info-datos { background:var(--gris-fondo); border:1px solid var(--gris-borde); border-radius:10px; padding:12px 16px; margin:0 0 14px; font-size:12px; line-height:1.6; color:var(--texto-muted); text-align:left; }
+.info-datos-titulo { font-weight:700; color:var(--texto-oscuro); margin-bottom:6px; font-size:13px; }
+.info-datos-linea { margin-bottom:4px; }
+.info-datos strong { color:var(--texto-oscuro); }
+.info-datos a, .acepto-legal a { color:var(--terracota); font-weight:600; text-decoration:none; }
+.info-datos-boton { display:none; background:none; border:none; padding:2px 0; color:var(--terracota); font-size:12px; font-weight:700; cursor:pointer; }
+.acepto-legal { display:flex; align-items:flex-start; gap:10px; font-size:13px; color:var(--texto-oscuro); line-height:1.5; margin:0 0 16px; cursor:pointer; text-align:left; }
+.acepto-legal input { width:18px; height:18px; flex-shrink:0; margin-top:1px; }
+@media (max-width: 600px) {
+  .info-datos-mas { display:none; }
+  .info-datos.abierta .info-datos-mas { display:block; }
+  .info-datos-boton { display:inline-block; }
+}
 .mensaje-ok { text-align:center; padding:50px 20px; }
 .mensaje-ok .icono { font-size:52px; margin-bottom:18px; }
 .mensaje-ok h2 { font-family:'Big Shoulders Display',sans-serif; font-size:28px; margin-bottom:10px; color:var(--texto-oscuro); }
@@ -816,6 +830,21 @@ footer a { display: inline-block; white-space: nowrap; } /* (17/11/2026) N86: ca
         <h3 id="resumen-titulo" style="text-align:center;font-family:'Big Shoulders Display',sans-serif;font-size:20px;font-weight:600;color:var(--texto-oscuro);margin:0 0 14px;"><%= t('reserva_resumen_titulo') %></h3>
         <div id="resumen-final-contenido" class="resumen-box"></div>
         <p style="font-size:13px;color:var(--texto-muted);text-align:center;margin:0 0 16px;line-height:1.6;"><%- t('reserva_resumen_aviso') %></p>
+        <!-- (17/11/2026) N86: información básica de protección de datos + casilla obligatoria (textos: Idiomas → Textos de interfaz → «Páginas legales») -->
+        <% var _infoBasica = lineasInfoBasica(lang); %>
+        <div class="info-datos">
+          <div class="info-datos-titulo"><%= t('legal_info_titulo') %></div>
+          <% _infoBasica.forEach(function (linea, i) { %>
+          <div class="info-datos-linea<%= i >= 3 ? ' info-datos-mas' : '' %>"><%- linea %></div>
+          <% }); %>
+          <% if (_infoBasica.length > 3) { %>
+          <button type="button" class="info-datos-boton" onclick="toggleInfoDatos(this)"><%= t('legal_ver_mas') %></button>
+          <% } %>
+        </div>
+        <label class="acepto-legal">
+          <input type="checkbox" id="acepta-condiciones" onchange="if (this.checked) document.getElementById('err-envio').style.display = 'none';">
+          <span><%- textoConEnlacesLegales(t('legal_acepto'), lang, ['condiciones', 'privacidad']) %></span>
+        </label>
       </div>
       <button class="boton-siguiente" id="boton-enviar" onclick="mostrarResumen()"><%= t('reserva_boton_revisar') %></button>
       <div id="err-envio" style="margin-top:10px;font-size:13px;color:var(--rojo-error);display:none;"></div>
@@ -999,6 +1028,9 @@ var TXT = {
   volverPanel:    '<%- t("reserva_boton_volver_panel").replace(/'/g, "\\'") %>',
   volverPanelFin: '<%- t("reserva_ok_volver_panel").replace(/'/g, "\\'") %>',
   botonConfirmar: '<%- t("reserva_boton_confirmar").replace(/'/g, "\\'") %>',
+  aceptoError:    '<%- t("legal_acepto_error").replace(/'/g, "\\'") %>',   // (17/11/2026) N86
+  verMas:         '<%- t("legal_ver_mas").replace(/'/g, "\\'") %>',
+  verMenos:       '<%- t("legal_ver_menos").replace(/'/g, "\\'") %>',
   errEnvio:       '<%- t("reserva_err_envio").replace(/'/g, "\\'") %>',
   resumenTitulo:  '<%- t("reserva_resumen_titulo").replace(/'/g, "\\'") %>',
   resNumero:      '<%- t("reserva_res_numero").replace(/'/g, "\\'") %>',
@@ -2018,8 +2050,24 @@ function mostrarResumen() {
   btn.onclick = confirmarEnvio;
 }
 
+// (17/11/2026) N86: «Ver más / Ver menos» de la información básica de protección de datos (solo en el móvil)
+function toggleInfoDatos(boton) {
+  var caja = boton.parentNode;
+  var abierta = caja.classList.toggle('abierta');
+  boton.textContent = abierta ? TXT.verMenos : TXT.verMas;
+}
+
 function confirmarEnvio() {
   var btn = document.getElementById('boton-enviar');
+  // (17/11/2026) N86: sin la casilla de aceptación no se envía
+  var casillaAcepto = document.getElementById('acepta-condiciones');
+  if (!casillaAcepto || !casillaAcepto.checked) {
+    var errA = document.getElementById('err-envio');
+    errA.textContent = TXT.aceptoError;
+    errA.style.display = 'block';
+    if (casillaAcepto) casillaAcepto.focus();
+    return;
+  }
   btn.disabled = true; btn.textContent = TXT.enviando;
 
   var tel = prefijoReserva('telefono-prefijo') + ' ' + document.getElementById('telefono-numero').value.trim().replace(/\s/g,'');
@@ -2069,7 +2117,8 @@ function confirmarEnvio() {
     asistencia_avisos: asistenciaParaEnviar(),
     asistencia_lang: LANG,
     idioma_viajero: (document.getElementById('es-para-otra-persona').checked && document.getElementById('idioma-viajero')) ? document.getElementById('idioma-viajero').value : '',
-    idioma_viajero_otro: (document.getElementById('es-para-otra-persona').checked && document.getElementById('idioma-viajero-otro')) ? document.getElementById('idioma-viajero-otro').value.trim() : ''
+    idioma_viajero_otro: (document.getElementById('es-para-otra-persona').checked && document.getElementById('idioma-viajero-otro')) ? document.getElementById('idioma-viajero-otro').value.trim() : '',
+    acepta_condiciones: true // (17/11/2026) N86: casilla marcada (si no, no se llega aquí)
   };
 
   fetch('/api/reservas', {
