@@ -1311,6 +1311,30 @@ async function initSchema() {
     );
   }
 
+  // ─── (17/11/2026) N86 — Páginas legales (grupo «Páginas legales» de Idiomas → Textos de interfaz) ───
+  // Nombres de la fila legal del pie, línea del © y título + texto de cada página legal.
+  // El español solo se pone si el texto no existe (manda lo que se escriba en el Admin).
+  const TEXTOS_LEGALES = [
+    { clave: "legal_footer_aviso", contexto: "Nombre de la página «Aviso legal»: sale en la segunda fila del pie de página y como título de la página (y de la pestaña del navegador)", es: "Aviso legal" },
+    { clave: "legal_footer_privacidad", contexto: "Nombre de la página «Política de privacidad»: sale en la segunda fila del pie de página y como título de la página (y de la pestaña del navegador)", es: "Política de privacidad" },
+    { clave: "legal_footer_cookies", contexto: "Nombre de la página «Política de cookies»: sale en la segunda fila del pie de página y como título de la página (y de la pestaña del navegador)", es: "Política de cookies" },
+    { clave: "legal_footer_condiciones", contexto: "Nombre de la página «Condiciones generales»: sale en la segunda fila del pie de página y como título de la página (y de la pestaña del navegador)", es: "Condiciones generales" },
+    { clave: "legal_copyright", contexto: "Última línea del pie de página en toda la web. {año} lo pone la web sola (no se traduce). La marca «Traslados · GC» no se traduce; la isla, con su nombre oficial en cada idioma (Islas / Localidades)", es: "© {año} Traslados · GC — Gran Canaria. Todos los derechos reservados." },
+    { clave: "legal_provisional", contexto: "Aviso arriba de cada página legal mientras su texto no sea el oficial (cuando se pegue el oficial, se deja vacío y no sale)", es: "Texto provisional — en preparación" },
+    { clave: "legal_aviso_texto", contexto: "Texto completo de la página Aviso legal. Cada línea en blanco separa un apartado", es: "1. Datos identificativos del titular\nEn cumplimiento del artículo 10 de la Ley 34/2002, de 11 de julio, de Servicios de la Sociedad de la Información y de Comercio Electrónico (LSSI-CE), se informa que este sitio web es titularidad de:\n\nTitular: [Nombre de la Empresa S.L. / Nombre y Apellidos del Autónomo]\nNIF / CIF: [Número de NIF o CIF]\nDomicilio: [Dirección completa, Código Postal, Ciudad, Provincia]\nCorreo electrónico: [info@tudominio.com]\nTeléfono: [+34 XXX XXX XXX]\nDatos registrales: [Inscrita en el Registro Mercantil de ..., Tomo ..., Folio ..., Hoja ... — Eliminar si es autónomo]\nLicencias / Autorizaciones administrativas: [Autorización de transporte VTC / Licencia Taxi nº ..., si aplica]\n\n2. Objeto y condiciones de uso\nEl presente sitio web tiene por objeto ofrecer información y permitir la reserva online de servicios de traslado privado de pasajeros. El acceso y navegación por el sitio web atribuye la condición de usuario e implica la aceptación de las presentes condiciones de uso.\n\n3. Propiedad intelectual e industrial\nTodos los contenidos de esta web (textos, logotipos, imágenes, diseño gráfico y código fuente) son propiedad de su titular o de terceros que han autorizado su uso, quedando prohibida su reproducción o distribución sin autorización expresa.\n\n4. Legislación aplicable\nPara la resolución de cualquier controversia relacionada con este sitio web será de aplicación la legislación española." },
+    { clave: "legal_privacidad_texto", contexto: "Texto completo de la página Política de privacidad. Cada línea en blanco separa un apartado", es: "Información básica sobre protección de datos\nResponsable: [Nombre de tu empresa o tu nombre completo si eres autónomo], con NIF/CIF [tu NIF/CIF].\nFinalidad: Gestionar, facturar y ejecutar el servicio de traslado reservado, así como prestar la asistencia especial solicitada voluntariamente en su caso.\nLegitimación: Ejecución de un contrato de transporte (Art. 6.1.b RGPD) y, para los datos de asistencia por discapacidad, tu consentimiento explícito (Art. 9.2.a RGPD).\nDestinatarios: Los datos necesarios para el servicio se comunicarán al conductor o empresa colaboradora encargada de realizar el traslado. No se cederán datos a terceros salvo obligación legal.\nDerechos: Puedes acceder, rectificar y suprimir tus datos, así como retirar tu consentimiento o ejercer otros derechos, escribiendo a [tu correo de privacidad].\n\nTratamiento de datos relativos a necesidades de asistencia especial (categorías especiales de datos)\nCon carácter estrictamente voluntario, durante el proceso de reserva de traslado el usuario podrá facilitar información relativa a determinadas discapacidades sensoriales o del habla (en concreto, discapacidad visual/ceguera o discapacidad del habla/mudez) mediante la marcación expresa de las casillas habilitadas al efecto. La única finalidad de recabar estos datos de salud es adaptar los canales de comunicación y garantizar la asistencia física o logística adecuada por parte del conductor durante la prestación del servicio contratado. La base jurídica que legitima este tratamiento es el consentimiento explícito del interesado, conforme a lo dispuesto en el artículo 9.2.a) del Reglamento (UE) 2016/679 (RGPD), otorgado mediante una acción afirmativa clara al seleccionar la opción correspondiente. Esta información tendrá carácter estrictamente confidencial y será comunicada única y exclusivamente al conductor asignado para realizar el traslado concreto; en caso de que el servicio sea ejecutado por un profesional autónomo o empresa colaboradora externa, el acceso a dicho dato se regulará mediante el preceptivo contrato de encargado del tratamiento conforme al artículo 28 del RGPD. Los datos relativos a estas necesidades especiales se conservarán únicamente durante el tiempo necesario para la ejecución del viaje y serán suprimidos o anonimizados de forma definitiva transcurrido un plazo máximo de [indicar plazo, ej. 30 días] desde la finalización del servicio para la gestión de posibles incidencias, salvo obligación legal de bloqueo. El usuario podrá revocar su consentimiento en cualquier momento previo a la realización del traslado dirigiendo una solicitud a [tu correo electrónico de privacidad], sin que dicha retirada afecte a la licitud del tratamiento basado en el consentimiento previo." },
+    { clave: "legal_cookies_texto", contexto: "Texto completo de la página Política de cookies. Cada línea en blanco separa un apartado", es: "1. ¿Qué son las cookies?\nLas cookies son pequeños archivos de texto que se descargan en tu dispositivo al navegar por este sitio web. Permiten garantizar el funcionamiento técnico de la página, recordar tus preferencias de reserva y analizar de forma estadística el uso de la web.\n\n2. Tipos de cookies utilizadas en este sitio web\nCookies técnicas o necesarias (Obligatorias): Permiten la navegación, la gestión de la sesión de reserva, el cálculo de rutas y el procesamiento seguro de los pagos. No requieren consentimiento previo.\nCookies de preferencias o personalización: Permiten recordar opciones como el idioma o la divisa seleccionada por el usuario.\nCookies analíticas o de medición: Nos ayudan a entender cómo interactúan los visitantes con la web (páginas visitadas, tiempos de carga) para mejorar el servicio. (Ej. Google Analytics).\nCookies de terceros (Mapas y pasarelas de pago): Al utilizar servicios integrados como mapas interactivos para seleccionar puntos de recogida/destino o plataformas de pago seguro, dichos proveedores pueden instalar sus propias cookies técnicas o funcionales.\n\n3. Gestión y configuración de cookies\nPuedes aceptar, rechazar o configurar el uso de cookies no esenciales en cualquier momento a través de nuestro [Panel de Configuración de Cookies]. Asimismo, puedes bloquear o eliminar las cookies desde la configuración de tu navegador (Chrome, Safari, Firefox, Edge)." },
+    { clave: "legal_condiciones_texto", contexto: "Texto completo de la página Condiciones generales. Cada línea en blanco separa un apartado", es: "1. Objeto del servicio\nLas presentes condiciones regulan la contratación online de servicios de transporte y traslado privado de pasajeros ofrecidos a través de este sitio web por [Nombre de la Empresa / Titular].\n\n2. Proceso de reserva y precios\nPara realizar una reserva, el usuario deberá seleccionar origen, destino, fecha, hora, número de pasajeros y extras opcionales.\nLos precios mostrados en la web incluyen el IVA aplicable y los gastos de gestión, salvo que se indique expresamente lo contrario.\nLa reserva quedará confirmada una vez completado el pago a través de la pasarela habilitada y recibido el correo electrónico de confirmación con los detalles del servicio.\n\n3. Tiempos de espera y retrasos\nRecogidas en aeropuertos / estaciones: El conductor monitorizará el estado del vuelo/tren indicado en la reserva. Se incluye un tiempo de espera gratuito de [45 / 60] minutos desde la hora real de aterrizaje o llegada.\nOtras recogidas (hoteles, domicilios, direcciones): Se incluye un tiempo de espera gratuito de [15] minutos desde la hora programada. Transcurrido dicho plazo sin contacto con el pasajero, el servicio podrá considerarse cancelado por no presentación (no-show).\n\n4. Política de cancelación y modificaciones\nCancelación gratuita: El usuario podrá cancelar o modificar su reserva sin coste alguno hasta [24 / 48] horas antes de la hora programada de recogida, escribiendo a [info@tudominio.com].\nCancelaciones tardías: Las cancelaciones realizadas con menos de [24 / 48] horas de antelación o la no presentación del pasajero en el punto de encuentro conllevarán una penalización del [100%] del importe abonado.\n\n5. Derecho de desistimiento\nDe conformidad con el artículo 103.l) del Real Decreto Legislativo 1/2007 (Ley General para la Defensa de los Consumidores y Usuarios), el derecho legal de desistimiento de 14 días no es aplicable a los contratos de suministro de servicios de transporte de pasajeros cuando el contrato prevea una fecha o un periodo de ejecución específicos, aplicándose en su lugar las condiciones de cancelación detalladas en la cláusula anterior.\n\n6. Equipaje y asistencia especial\nEl pasajero deberá respetar la capacidad de equipaje indicada para el vehículo seleccionado. En caso de haber solicitado asistencia especial por discapacidad visual o del habla en los extras de la reserva, el conductor asignado será informado previamente para adaptar la atención en el punto de recogida.\n\n7. Hojas de reclamaciones y resolución de conflictos\nExisten hojas de reclamaciones a disposición de los consumidores que las soliciten a través de [info@tudominio.com]. Las partes se someten a la legislación española y a los juzgados y tribunales que correspondan conforme a la normativa vigente de defensa de los consumidores." }
+  ];
+  for (const t of TEXTOS_LEGALES) {
+    await pool.query(
+      `INSERT INTO textos_interfaz (clave, modulo, contexto, texto_es)
+       VALUES ($1, 'Páginas legales', $2, $3)
+       ON CONFLICT (clave) DO UPDATE SET modulo = 'Páginas legales', contexto = $2`,
+      [t.clave, t.contexto, t.es]
+    );
+  }
+
   // ─── Textos de la página de reserva (traducibles desde Idiomas) ──────────
   // Los textos que la página de reserva clona de la portada (buscador de rutas,
   // modal de cotización, tarjeta de precio) NO se duplican aquí: en la versión
@@ -2110,6 +2134,30 @@ async function initSchema() {
   };
   for (const lang of Object.keys(SEMILLA_PALABRAS_PAGINAS)) {
     for (const [pagina, palabra] of Object.entries(SEMILLA_PALABRAS_PAGINAS[lang])) {
+      await pool.query(
+        `INSERT INTO palabras_paginas (lang_code, pagina, palabra)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (lang_code, pagina) DO NOTHING`,
+        [lang, pagina, palabra]
+      );
+    }
+  }
+  // (17/11/2026) N86 — Direcciones de las 4 páginas legales (Idiomas → 🔗 Palabras de URL por página).
+  // Solo se ponen si no existen: lo que se cambie en el Admin manda.
+  const SEMILLA_PALABRAS_LEGALES = {
+    es: { 'aviso-legal': 'aviso-legal',            privacidad: 'politica-de-privacidad',       cookies: 'politica-de-cookies',   condiciones: 'condiciones-generales' },
+    en: { 'aviso-legal': 'legal-notice',           privacidad: 'privacy-policy',               cookies: 'cookie-policy',         condiciones: 'terms-and-conditions' },
+    de: { 'aviso-legal': 'impressum',              privacidad: 'datenschutz',                  cookies: 'cookie-richtlinie',     condiciones: 'agb' },
+    sv: { 'aviso-legal': 'rattslig-information',   privacidad: 'integritetspolicy',            cookies: 'cookiepolicy',          condiciones: 'allmanna-villkor' },
+    no: { 'aviso-legal': 'juridisk-informasjon',   privacidad: 'personvern',                   cookies: 'informasjonskapsler',   condiciones: 'generelle-vilkar' },
+    nl: { 'aviso-legal': 'juridische-kennisgeving',privacidad: 'privacybeleid',                cookies: 'cookiebeleid',          condiciones: 'algemene-voorwaarden' },
+    it: { 'aviso-legal': 'note-legali',            privacidad: 'informativa-privacy',          cookies: 'informativa-cookie',    condiciones: 'condizioni-generali' },
+    fr: { 'aviso-legal': 'mentions-legales',       privacidad: 'politique-de-confidentialite', cookies: 'politique-de-cookies',  condiciones: 'conditions-generales' },
+    fi: { 'aviso-legal': 'oikeudellinen-ilmoitus', privacidad: 'tietosuojaseloste',            cookies: 'evastekaytanto',        condiciones: 'yleiset-ehdot' },
+    ru: { 'aviso-legal': 'pravovaya-informatsiya', privacidad: 'politika-konfidentsialnosti',  cookies: 'politika-kuki',         condiciones: 'obshchie-usloviya' }
+  };
+  for (const lang of Object.keys(SEMILLA_PALABRAS_LEGALES)) {
+    for (const [pagina, palabra] of Object.entries(SEMILLA_PALABRAS_LEGALES[lang])) {
       await pool.query(
         `INSERT INTO palabras_paginas (lang_code, pagina, palabra)
          VALUES ($1, $2, $3)
@@ -9521,7 +9569,7 @@ app.post('/admin/idiomas', requireAdmin, asyncHandler(async (req, res) => {
 // Guarda en palabras_paginas y recarga caché — cambio inmediato sin redesplegar.
 app.post('/admin/palabras-paginas/:lang/:pagina', requireAdmin, asyncHandler(async (req, res) => {
   const { lang, pagina } = req.params;
-  const PAGINAS_PERMITIDAS = ['destino', 'destinos', 'rutas', 'flota', 'contacto', 'traslado'];
+  const PAGINAS_PERMITIDAS = ['destino', 'destinos', 'rutas', 'flota', 'contacto', 'traslado', 'aviso-legal', 'privacidad', 'cookies', 'condiciones']; // (17/11/2026) N86: + páginas legales
   if (!PAGINAS_PERMITIDAS.includes(pagina)) {
     return res.status(400).json({ error: 'Página no válida' });
   }
@@ -10204,6 +10252,69 @@ app.get('/contacto', asyncHandler(async (req, res) => {
   await renderContacto(req, res, 'es');
 }));
 
+// ─── (17/11/2026) N86 — Páginas legales (Aviso legal, Política de privacidad, Política de cookies, Condiciones generales) ───
+// Misma estructura que Contacto. Textos: Idiomas → Textos de interfaz → «Páginas legales».
+// Direcciones: Idiomas → 🔗 Palabras de URL por página (español sin prefijo: /aviso-legal; resto: /en/legal-notice…).
+const PAGINAS_LEGALES = {
+  'aviso-legal': { nombre: 'legal_footer_aviso',       texto: 'legal_aviso_texto',       palabraEs: 'aviso-legal' },
+  privacidad:    { nombre: 'legal_footer_privacidad',  texto: 'legal_privacidad_texto',  palabraEs: 'politica-de-privacidad' },
+  cookies:       { nombre: 'legal_footer_cookies',     texto: 'legal_cookies_texto',     palabraEs: 'politica-de-cookies' },
+  condiciones:   { nombre: 'legal_footer_condiciones', texto: 'legal_condiciones_texto', palabraEs: 'condiciones-generales' }
+};
+
+// Dirección de una página legal en un idioma (la usan los pies de página de todas las vistas).
+function enlaceLegal(lang, pagina) {
+  const l = IDIOMAS_PERMITIDOS.includes(lang) ? lang : 'es';
+  const palabra = ((PALABRAS_PAGINAS[l] || {})[pagina]) || ((PALABRAS_PAGINAS.es || {})[pagina]) || PAGINAS_LEGALES[pagina].palabraEs;
+  return l === 'es' ? '/' + palabra : '/' + l + '/' + palabra;
+}
+
+// Última línea del pie de página: «© {año} …». El año lo pone la web (hora de Canarias): cambia solo el 1 de enero.
+function lineaCopyright(lang) {
+  const anio = new Intl.DateTimeFormat('en', { timeZone: 'Atlantic/Canary', year: 'numeric' }).format(new Date());
+  return obtenerTexto('legal_copyright', IDIOMAS_PERMITIDOS.includes(lang) ? lang : 'es').split('{año}').join(anio);
+}
+app.locals.enlaceLegal = enlaceLegal;
+app.locals.lineaCopyright = lineaCopyright;
+
+// Texto de una página legal → párrafos: cada línea en blanco separa un apartado; un salto de línea simple se respeta.
+function parrafosLegales(texto) {
+  const esc = function (s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+  return String(texto || '').replace(/\r\n/g, '\n').split(/\n\s*\n/)
+    .map(function (b) { return b.trim(); })
+    .filter(function (b) { return b; })
+    .map(function (b) { return '<p>' + esc(b).replace(/\n/g, '<br>') + '</p>'; })
+    .join('\n');
+}
+
+async function renderLegal(req, res, lang, pagina) {
+  if (!IDIOMAS_PERMITIDOS.includes(lang) || !PAGINAS_LEGALES[pagina]) {
+    return res.status(404).send('Página no encontrada');
+  }
+  const t = function(clave) { return obtenerTexto(clave, lang); };
+  const palabrasPaginas = PALABRAS_PAGINAS[lang] || {};
+  const p = PAGINAS_LEGALES[pagina];
+  res.render('legal', {
+    lang, t, palabrasPaginas, BASE_URL,
+    titulo: t(p.nombre),
+    nombreMigas: t(p.nombre),
+    aviso: t('legal_provisional'),
+    contenidoHtml: parrafosLegales(t(p.texto))
+  });
+}
+
+// Español: /aviso-legal, /politica-de-privacidad… (la palabra sale de Idiomas → 🔗 Palabras de URL por página)
+app.get('/:palabraLegal', asyncHandler(async (req, res, next) => {
+  const pp = PALABRAS_PAGINAS.es || {};
+  const pagina = Object.keys(PAGINAS_LEGALES).find(function (k) {
+    return (pp[k] || PAGINAS_LEGALES[k].palabraEs) === req.params.palabraLegal;
+  });
+  if (!pagina) return next();
+  await renderLegal(req, res, 'es', pagina);
+}));
+
 // (09/10/2026) Dirección pública: SOLO los datos que salen en la página de Contacto.
 // Los datos internos (Notificaciones de Reservas, etc.) los lee el Admin por /admin/contacto-info (con sesión).
 app.get('/api/contacto', asyncHandler(async (req, res) => {
@@ -10866,6 +10977,14 @@ app.get('/:lang([a-z]{2})/:seccion', asyncHandler(async (req, res) => {
   const palabraContacto = pp.contacto || 'contacto';
   if (seccion === palabraContacto) {
     return renderContacto(req, res, lang);
+  }
+
+  // ── (17/11/2026) N86 — Páginas legales ──────────────────────────────────
+  const paginaLegal = Object.keys(PAGINAS_LEGALES).find(function (k) {
+    return (pp[k] || '') === seccion;
+  });
+  if (paginaLegal) {
+    return renderLegal(req, res, lang, paginaLegal);
   }
 
   // ── Acceso clientes (mi reserva) ─────────────────────────────────────────
