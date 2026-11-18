@@ -113,3 +113,103 @@
       .catch(function () { window.open(href, '_blank', 'noopener'); });
   });
 })();
+
+// (18/11/2026) N86 — Aviso de cookies. Solo sale si en el Admin → 🏢 Modelo de negocio está marcado
+// «Enseñar el aviso de cookies en la web». Tres botones con el mismo peso («Aceptar», «Rechazar», «Configurar»),
+// como pide la AEPD. La elección se guarda 12 meses en la cookie «tgc_cookies» (a1 = acepta análisis, a0 = no).
+// En la página Política de cookies sale el botón para cambiar la elección. Textos: Idiomas → Textos de interfaz
+// → «Páginas legales». Para el futuro (Analytics): window.tgcCookies.analisis dice si se puede cargar
+// y el evento «tgc-cookies» avisa cuando el cliente elige.
+(function () {
+  var NOMBRE = 'tgc_cookies';
+  function leer() {
+    var m = document.cookie.match(/(?:^|;\s*)tgc_cookies=(a[01])/);
+    return m ? m[1] === 'a1' : null;
+  }
+  function guardar(analisis) {
+    var d = new Date(); d.setTime(d.getTime() + 365 * 24 * 3600 * 1000);
+    document.cookie = NOMBRE + '=' + (analisis ? 'a1' : 'a0') + ';expires=' + d.toUTCString() + ';path=/;SameSite=Lax';
+    window.tgcCookies.analisis = analisis;
+    try { document.dispatchEvent(new CustomEvent('tgc-cookies', { detail: { analisis: analisis } })); } catch (e) {}
+  }
+  window.tgcCookies = { analisis: leer(), abrir: function () {} };
+
+  var CSS =
+    '#tgc-cookies{position:fixed;left:0;right:0;bottom:0;z-index:99990;padding:12px;box-sizing:border-box;display:flex;justify-content:center;pointer-events:none;}' +
+    '#tgc-cookies .ck-caja{pointer-events:auto;background:#fff;border:1px solid var(--gris-borde,#E1DCD0);border-radius:12px;box-shadow:0 6px 28px rgba(0,0,0,0.18);max-width:760px;width:100%;padding:18px 22px;font-family:"Public Sans",sans-serif;color:var(--texto-oscuro,#2A211B);text-align:left;}' +
+    '#tgc-cookies .ck-titulo{font-family:"Big Shoulders Display",sans-serif;font-size:22px;font-weight:bold;margin:0 0 6px;}' +
+    '#tgc-cookies .ck-texto{font-size:14px;line-height:1.6;color:var(--texto-muted,#5b5347);margin:0 0 14px;}' +
+    '#tgc-cookies .ck-texto a{color:var(--terracota,#C1502E);font-weight:600;text-decoration:none;}' +
+    '#tgc-cookies .ck-botones{display:flex;gap:10px;flex-wrap:wrap;}' +
+    '#tgc-cookies .ck-botones button{flex:1 1 140px;background:var(--terracota,#C1502E);color:var(--texto-claro,#F2EDE4);border:none;border-radius:6px;padding:11px 18px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;}' +
+    '#tgc-cookies .ck-botones button:hover{background:var(--terracota-oscuro,#8a3a20);}' +
+    '#tgc-cookies .ck-tipo{border:1px solid var(--gris-borde,#E1DCD0);border-radius:8px;padding:10px 14px;margin:0 0 10px;}' +
+    '#tgc-cookies .ck-tipo label{display:flex;justify-content:space-between;align-items:center;gap:12px;font-weight:600;font-size:14px;cursor:pointer;}' +
+    '#tgc-cookies .ck-tipo input{width:18px;height:18px;flex-shrink:0;}' +
+    '#tgc-cookies .ck-tipo p{font-size:13px;line-height:1.5;color:var(--texto-muted,#5b5347);margin:6px 0 0;}' +
+    '#tgc-cookies .ck-siempre{font-size:12px;font-weight:600;color:var(--verde-ok,#085041);white-space:nowrap;}' +
+    '.tgc-cookies-cambiar{display:inline-block;margin-top:18px;background:var(--terracota,#C1502E);color:var(--texto-claro,#F2EDE4);border:none;border-radius:6px;padding:11px 18px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;}' +
+    '@media (max-width:600px){#tgc-cookies{padding:0;}#tgc-cookies .ck-caja{border-radius:12px 12px 0 0;padding:16px;}#tgc-cookies .ck-botones button{flex:1 1 100%;}}';
+
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  function iniciar(d) {
+    if (!d || !d.activo) return;
+    var t = d.textos || {};
+    var st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
+    var caja = null;
+    function cerrar() { if (caja) { caja.parentNode.removeChild(caja); caja = null; } }
+    function textoConEnlace(s) {
+      return esc(s).replace(/\[\[([^\]]+)\]\]/, '<a href="' + esc(d.politica_url) + '">$1</a>');
+    }
+    function abrir(configurar) {
+      cerrar();
+      caja = document.createElement('div');
+      caja.id = 'tgc-cookies';
+      caja.setAttribute('role', 'dialog');
+      var html = '<div class="ck-caja"><p class="ck-titulo">' + esc(t.titulo) + '</p>';
+      if (!configurar) {
+        html += '<p class="ck-texto">' + textoConEnlace(t.texto) + '</p>' +
+          '<div class="ck-botones"><button type="button" data-ck="si">' + esc(t.aceptar) + '</button>' +
+          '<button type="button" data-ck="no">' + esc(t.rechazar) + '</button>' +
+          '<button type="button" data-ck="conf">' + esc(t.configurar) + '</button></div>';
+      } else {
+        var marcado = window.tgcCookies.analisis === true ? ' checked' : '';
+        html += '<div class="ck-tipo"><label>' + esc(t.necesarias_titulo) + ' <span class="ck-siempre">' + esc(t.siempre_activas) + '</span></label>' +
+          '<p>' + esc(t.necesarias_texto) + '</p></div>' +
+          '<div class="ck-tipo"><label for="ck-analisis">' + esc(t.analisis_titulo) + ' <input type="checkbox" id="ck-analisis"' + marcado + '></label>' +
+          '<p>' + esc(t.analisis_texto) + '</p></div>' +
+          '<div class="ck-botones"><button type="button" data-ck="guardar">' + esc(t.guardar) + '</button></div>';
+      }
+      caja.innerHTML = html + '</div>';
+      caja.addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('button[data-ck]') : null;
+        if (!b) return;
+        var q = b.getAttribute('data-ck');
+        if (q === 'si') { guardar(true); cerrar(); }
+        else if (q === 'no') { guardar(false); cerrar(); }
+        else if (q === 'conf') { abrir(true); }
+        else if (q === 'guardar') { guardar(!!document.getElementById('ck-analisis').checked); cerrar(); }
+      });
+      document.body.appendChild(caja);
+    }
+    window.tgcCookies.abrir = abrir;
+    if (window.tgcCookies.analisis === null) abrir(false);
+    // Página Política de cookies: botón para cambiar la elección
+    if (d.politica_url && decodeURI(location.pathname) === d.politica_url) {
+      var dest = document.querySelector('.texto-legal');
+      if (dest) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'tgc-cookies-cambiar'; b.textContent = t.cambiar || '';
+        b.onclick = function () { abrir(true); };
+        dest.parentNode.insertBefore(b, dest.nextSibling);
+      }
+    }
+  }
+
+  var lang = (document.documentElement.getAttribute('lang') || 'es').slice(0, 2);
+  fetch('/api/cookies-aviso?lang=' + encodeURIComponent(lang))
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(iniciar)
+    .catch(function () {});
+})();

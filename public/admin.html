@@ -1390,6 +1390,17 @@ table.tabla-precios input {
         <div style="margin-top:14px;"><button class="boton-primario" style="font-size:0.85rem;padding:7px 14px;" onclick="guardarModeloNegocio()">💾 Guardar</button>
         <span id="aviso-modelo" style="margin-left:10px;font-size:0.85rem;"></span></div>
       </div>
+      <!-- (18/11/2026) N86: aviso de cookies, apagado de inicio (hoy la web solo usa la cookie técnica de la sesión) -->
+      <div class="tarjeta" style="margin-bottom:20px;">
+        <h2 style="font-size:1rem;margin:0 0 10px 0;">🍪 Aviso de cookies</h2>
+        <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:14px;">
+          <input type="checkbox" id="modelo-aviso-cookies" style="width:18px;height:18px;margin-top:2px;">
+          <span><strong>Enseñar el aviso de cookies en la web</strong><br>
+          <span style="font-size:13px;color:var(--texto-muted);">Marcado: al entrar en la web sale abajo el aviso con «Aceptar», «Rechazar» y «Configurar», y en la página Política de cookies, el botón para cambiar la elección. Sin marcar: no sale. Hoy la web solo usa la cookie técnica de la sesión, que no necesita aviso: márcalo el día que conectes Google Analytics u otra herramienta que use cookies.</span></span>
+        </label>
+        <div style="margin-top:14px;"><button class="boton-primario" style="font-size:0.85rem;padding:7px 14px;" onclick="guardarAvisoCookies()">💾 Guardar</button>
+        <span id="aviso-cookies-msg" style="margin-left:10px;font-size:0.85rem;"></span></div>
+      </div>
     </div>
 
     <div id="seccion-whatsapp" class="oculto">
@@ -5515,7 +5526,20 @@ var NOMBRES_TEXTOS_LEGALES = {
   legal_ver_menos:          'Reserva (paso 3) — botón «Ver menos» del recuadro (móvil)',
   legal_acepto:             'Reserva (paso 3) — casilla de aceptación',
   legal_acepto_error:       'Reserva (paso 3) — aviso si no se marca la casilla',
-  legal_info_cotizacion:    '«¿No encuentras tu ruta?» — línea de privacidad bajo «Cancelar» (portada y reserva)'
+  legal_info_cotizacion:    '«¿No encuentras tu ruta?» — línea de privacidad bajo «Cancelar» (portada y reserva)',
+  // (18/11/2026) Aviso de cookies (sale si está marcado en 🏢 Modelo de negocio)
+  cookies_titulo:            'Aviso de cookies — título',
+  cookies_texto:             'Aviso de cookies — texto (con enlace a la Política de cookies)',
+  cookies_aceptar:           'Aviso de cookies — botón «Aceptar»',
+  cookies_rechazar:          'Aviso de cookies — botón «Rechazar»',
+  cookies_configurar:        'Aviso de cookies — botón «Configurar»',
+  cookies_necesarias_titulo: 'Aviso de cookies (al pulsar «Configurar») — título de las cookies técnicas',
+  cookies_siempre_activas:   'Aviso de cookies (al pulsar «Configurar») — etiqueta «Siempre activas»',
+  cookies_necesarias_texto:  'Aviso de cookies (al pulsar «Configurar») — explicación de las cookies técnicas',
+  cookies_analisis_titulo:   'Aviso de cookies (al pulsar «Configurar») — título de las cookies de análisis',
+  cookies_analisis_texto:    'Aviso de cookies (al pulsar «Configurar») — explicación de las cookies de análisis',
+  cookies_guardar:           'Aviso de cookies (al pulsar «Configurar») — botón «Guardar mi elección»',
+  cookies_cambiar:           'Política de cookies — botón para cambiar la elección'
 };
 // Orden de la lista = orden de arriba. Un texto legal nuevo que no esté aquí sale al final.
 function ordenarTextosLegales(textos) {
@@ -8876,7 +8900,18 @@ function guardarContacto() {
 function cargarModeloNegocio() {
   fetch('/admin/modelo-negocio').then(function(r) { return r.json(); }).then(function(d) {
     document.getElementById('modelo-no-mismo-dia').checked = !!d.no_mismo_dia;
+    document.getElementById('modelo-aviso-cookies').checked = !!d.aviso_cookies; // (18/11/2026) N86
   }).catch(function() {});
+}
+// (18/11/2026) N86: interruptor del aviso de cookies (mismo formato que «Guardar» de Reservas)
+function guardarAvisoCookies() {
+  var av = document.getElementById('aviso-cookies-msg');
+  av.style.color = 'var(--texto-muted)'; av.textContent = 'Guardando...';
+  fetch('/admin/aviso-cookies', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ aviso_cookies: document.getElementById('modelo-aviso-cookies').checked }) })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { if (d.ok) { av.style.color = 'green'; av.textContent = '✅ Guardado.'; } else { av.style.color = 'var(--rojo)'; av.textContent = '❌ No se pudo guardar.'; } })
+    .catch(function() { av.style.color = 'var(--rojo)'; av.textContent = '❌ Error de conexión.'; });
 }
 function guardarModeloNegocio() {
   var av = document.getElementById('aviso-modelo');
