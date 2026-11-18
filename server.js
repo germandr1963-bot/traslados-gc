@@ -10371,6 +10371,25 @@ async function renderLegal(req, res, lang, pagina) {
 // (17/11/2026) N86 — Texto de una página legal para la ventana que se abre encima de la página (public/legal-ventana.js):
 // el cliente lee sin salir de donde está. Mismos textos que la página legal.
 app.get('/api/legal/:pagina', asyncHandler(async (req, res) => {
+  // (18/11/2026) «Contacto» del pie de la página de Reserva (con los 3 pasos): en la misma ventana, con los mismos
+  // datos, textos y orden que la página de Contacto (Admin → Contacto e Idiomas → Textos de interfaz)
+  if (req.params.pagina === 'contacto') {
+    const lang = IDIOMAS_PERMITIDOS.includes(req.query.lang) ? req.query.lang : 'es';
+    const t = function (clave) { return obtenerTexto(clave, lang); };
+    const c = (await pool.query('SELECT * FROM configuracion_contacto WHERE id = 1')).rows[0] || {};
+    const dato = function (icono, etiqueta, valorHtml) {
+      return '<p>' + icono + ' <strong>' + escLegal(etiqueta) + '</strong><br>' + valorHtml + '</p>';
+    };
+    let html = '';
+    if (c.nombre_empresa) html += dato('🏢', t('contacto_etiqueta_empresa') || 'Empresa', escLegal(c.nombre_empresa));
+    if (c.telefono) html += dato('📞', t('contacto_etiqueta_telefono') || 'Teléfono', '<a href="tel:' + escLegal(c.telefono) + '">' + escLegal(c.telefono) + '</a>');
+    if (c.whatsapp) html += dato('💬', t('contacto_etiqueta_whatsapp') || 'WhatsApp', '<a href="https://wa.me/' + escLegal(String(c.whatsapp).replace(/\s|\+/g, '')) + '" target="_blank" rel="noopener">' + escLegal(c.whatsapp) + '</a>');
+    if (c.email) html += dato('✉️', t('contacto_etiqueta_email') || 'Email', '<a href="mailto:' + escLegal(c.email) + '">' + escLegal(c.email) + '</a>');
+    if (t('contacto_horario')) html += dato('🕐', t('contacto_etiqueta_horario') || 'Horario', escLegal(t('contacto_horario')));
+    if (c.direccion) html += dato('📍', t('contacto_etiqueta_direccion') || 'Dirección', escLegal(c.direccion));
+    if (!c.nombre_empresa && !c.telefono && !c.whatsapp && !c.email && !c.direccion) html = '<p>' + escLegal(t('contacto_vacio') || 'Información de contacto no disponible.') + '</p>';
+    return res.json({ titulo: t('contacto_titulo') || 'Contacto', aviso: t('contacto_subtitulo') || '', html: html, cerrar: t('home_modal_cerrar') });
+  }
   const p = PAGINAS_LEGALES[req.params.pagina];
   if (!p) return res.status(404).json({ error: 'Página no encontrada' });
   const lang = IDIOMAS_PERMITIDOS.includes(req.query.lang) ? req.query.lang : 'es';
