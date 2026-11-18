@@ -376,6 +376,8 @@
 .lang-pill.activo { background:#C1502E; border-color:#C1502E; color:#fff; }
 footer { text-align:center; padding:30px; color:var(--texto-muted); font-size:13px; }
 footer a { display: inline-block; white-space: nowrap; } /* (17/11/2026) N86: cada enlace del pie, entero en el móvil */
+/* (18/11/2026) Reserva cerrada: con los 3 pasos en pantalla, el pie solo deja «Contacto», lo legal y el © */
+body.reserva-cerrada footer .pie-nav a:not(.pie-contacto) { display: none; }
 .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; padding: 0 0 0 4px; }
 .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
 .breadcrumbs a:hover { text-decoration: underline; }
@@ -411,7 +413,7 @@ footer a { display: inline-block; white-space: nowrap; } /* (17/11/2026) N86: ca
 }
 </style>
 </head>
-<body>
+<body data-legal-ventana-pie>
 
 <div class="cabecera">
   <a href="<%= urlHome %>" class="boton-volver"><%= t('reserva_boton_volver') %></a>
@@ -873,11 +875,11 @@ footer a { display: inline-block; white-space: nowrap; } /* (17/11/2026) N86: ca
 </div>
 
 <footer>
-  <div style="margin-bottom:12px;">
+  <div class="pie-nav" style="margin-bottom:12px;">
     <a href="<%= lang === 'es' ? '/rutas'    : '/' + lang + '/' + (palabrasPaginas.rutas    || 'rutas')    %>" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_rutas') %></a>
     <a href="<%= lang === 'es' ? '/destinos' : '/' + lang + '/' + (palabrasPaginas.destinos || 'destinos') %>" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_destinos') %></a>
     <a href="<%= lang === 'es' ? '/flota'    : '/' + lang + '/' + (palabrasPaginas.flota    || 'flota')    %>" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_flota') %></a>
-    <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/' + (palabrasPaginas.contacto || 'contacto') %>" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_contacto') %></a>
+    <a href="<%= lang === 'es' ? '/contacto' : '/' + lang + '/' + (palabrasPaginas.contacto || 'contacto') %>" class="pie-contacto" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_contacto') %></a>
     <% if (lang === 'es') { %>
     <a href="/chofer/acceso/alta" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_alta_choferes') %></a>
     <a href="/chofer/acceso" style="color:var(--texto-muted);text-decoration:none;margin:0 12px;font-size:13px;"><%= t('home_footer_acceso_choferes') %></a>
@@ -1131,6 +1133,12 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
     cargarCategorias();
     return;
   }
+
+  // (18/11/2026) Reserva cerrada: ya eligió ruta y empieza a reservar. El pie se reduce a «Contacto» (en una pestaña
+  // nueva, para no salir de la reserva), lo legal (en ventana) y el ©. Mientras está el buscador, el pie sale completo.
+  document.body.classList.add('reserva-cerrada');
+  var _pieContacto = document.querySelector('footer .pie-contacto');
+  if (_pieContacto) { _pieContacto.target = '_blank'; _pieContacto.rel = 'noopener'; }
 
   // Tarjeta resumen
   if (paramOrigen && paramDestino) {
