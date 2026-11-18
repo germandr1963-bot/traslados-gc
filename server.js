@@ -2160,7 +2160,7 @@ async function initSchema() {
     it: { destino: 'destinazione',  destinos: 'destinazioni',  rutas: 'itinerari',   flota: 'parco-auto',  contacto: 'contatti',    'mi-reserva': 'la-mia-prenotazione',traslado: 'trasferimento' },
     fr: { destino: 'destination',   destinos: 'destinations',  rutas: 'itineraires', flota: 'flotte',      contacto: 'contact',     'mi-reserva': 'ma-reservation',     traslado: 'transfert' },
     fi: { destino: 'kohde',         destinos: 'kohteet',       rutas: 'reitit',      flota: 'kalusto',     contacto: 'yhteystiedot','mi-reserva': 'varaukseni',         traslado: 'kuljetus' },
-    ru: { destino: 'napravlenie',   destinos: 'napravleniya',  rutas: 'marshruty',   flota: 'avtopark',    contacto: 'kontakty',    'mi-reserva': 'moya-bronyа',        traslado: 'transfer' }
+    ru: { destino: 'napravlenie',   destinos: 'napravleniya',  rutas: 'marshruty',   flota: 'avtopark',    contacto: 'kontakty',    'mi-reserva': 'moya-bronya',         traslado: 'transfer' }
   };
   for (const lang of Object.keys(SEMILLA_PALABRAS_PAGINAS)) {
     for (const [pagina, palabra] of Object.entries(SEMILLA_PALABRAS_PAGINAS[lang])) {
@@ -9628,8 +9628,8 @@ app.post('/admin/idiomas', requireAdmin, asyncHandler(async (req, res) => {
 // Guarda en palabras_paginas y recarga caché — cambio inmediato sin redesplegar.
 app.post('/admin/palabras-paginas/:lang/:pagina', requireAdmin, asyncHandler(async (req, res) => {
   const { lang, pagina } = req.params;
-  const PAGINAS_PERMITIDAS = ['destino', 'destinos', 'rutas', 'flota', 'contacto', 'traslado', 'aviso-legal', 'privacidad', 'cookies', 'condiciones']; // (17/11/2026) N86: + páginas legales
-  if (!PAGINAS_PERMITIDAS.includes(pagina)) {
+  // (18/11/2026) Las páginas que se pueden guardar son las de PAGINAS_URL (la misma lista que enseña la pantalla)
+  if (!PAGINAS_URL.some(function (p) { return p.pagina === pagina; })) {
     return res.status(400).json({ error: 'Página no válida' });
   }
   const palabra = String(req.body.palabra || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
@@ -9789,9 +9789,28 @@ app.get('/api/palabras-paginas-publico', asyncHandler(async (req, res) => {
 }));
 
 // Devuelve todas las palabras de páginas para el admin
+// (18/11/2026) Idiomas → 🔗 Palabras de URL por página: UNA SOLA LISTA de las páginas con dirección propia.
+// La pantalla la pide al servidor y el servidor solo guarda las que están aquí: toda fila que se ve, se puede guardar.
+// Una página nueva que se programe se añade AQUÍ (y sale sola en la pantalla, con su nombre).
+const PAGINAS_URL = [
+  { pagina: 'destino',     nombre: 'Destino (página individual)' },
+  { pagina: 'destinos',    nombre: 'Destinos (listado)' },
+  { pagina: 'rutas',       nombre: 'Rutas' },
+  { pagina: 'flota',       nombre: 'Flota' },
+  { pagina: 'contacto',    nombre: 'Contacto' },
+  { pagina: 'mi-reserva',  nombre: 'Acceso clientes (mi reserva)' },
+  { pagina: 'traslado',    nombre: 'Traslado (sección de rutas)' },
+  { pagina: 'aviso-legal', nombre: 'Aviso legal' },
+  { pagina: 'privacidad',  nombre: 'Política de privacidad' },
+  { pagina: 'cookies',     nombre: 'Política de cookies' },
+  { pagina: 'condiciones', nombre: 'Condiciones generales' }
+];
 app.get('/admin/palabras-paginas', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT lang_code, pagina, palabra FROM palabras_paginas ORDER BY lang_code, pagina');
   res.json(result.rows);
+}));
+app.get('/admin/palabras-paginas-lista', requireAdmin, asyncHandler(async (req, res) => {
+  res.json(PAGINAS_URL);
 }));
 
 // Edita las palabras de URL de un idioma existente (traslado y/o reserva)
