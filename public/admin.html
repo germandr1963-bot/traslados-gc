@@ -5472,12 +5472,18 @@ function renderizarTablaTextos(datos) {
       });
 
     } else {
+      // (18/11/2026) Páginas legales: en el orden de la web (pie, páginas, reserva, «¿No encuentras tu ruta?»)
+      if (modulo === 'Páginas legales') textos = ordenarTextosLegales(textos);
       textos.forEach(function(t) {
         var celdas = IDIOMAS_TEXTOS.map(function(lang) {
           return celdaTextoInterfaz(t, lang);
         }).join('');
+        // (18/11/2026) Páginas legales: arriba, qué es y dónde sale; debajo, el texto en español; abajo, la clave
+        var nombreLegal = NOMBRES_TEXTOS_LEGALES[t.clave];
         html += '<tr class="' + seccionId + '" style="display:none;">' +
-          '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;"><strong>' + escapar(textoCortoLegal(t)) + '</strong><br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
+          '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;">' +
+            (nombreLegal ? '<strong>' + escapar(nombreLegal) + '</strong><br><span>' + escapar(textoCortoLegal(t)) + '</span>' : '<strong>' + escapar(textoCortoLegal(t)) + '</strong>') +
+            '<br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
           '<td style="font-size:12px;color:var(--texto-muted);">' + escapar(t.modulo) + '</td>' +
           celdas +
           '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
@@ -5487,6 +5493,37 @@ function renderizarTablaTextos(datos) {
   });
 
   cuerpo.innerHTML = html;
+}
+
+// (18/11/2026) Páginas legales: nombre que dice qué es cada texto y dónde sale (solo para el Admin; no se traduce).
+// Lo del pie (4 enlaces y la línea del ©) lleva delante su número, en el orden en que sale en el pie.
+var NOMBRES_TEXTOS_LEGALES = {
+  legal_footer_aviso:       '1. Aviso legal — enlace del pie y título de su página',
+  legal_footer_privacidad:  '2. Política de privacidad — enlace del pie y título de su página',
+  legal_footer_cookies:     '3. Política de cookies — enlace del pie y título de su página',
+  legal_footer_condiciones: '4. Condiciones generales — enlace del pie y título de su página',
+  legal_copyright:          '5. Línea del © — final del pie de página',
+  legal_provisional:        'Páginas legales — aviso «Texto provisional» arriba de las 4 páginas',
+  legal_aviso_texto:        'Aviso legal — texto completo de la página',
+  legal_privacidad_texto:   'Política de privacidad — texto completo de la página',
+  legal_cookies_texto:      'Política de cookies — texto completo de la página',
+  legal_condiciones_texto:  'Condiciones generales — texto completo de la página',
+  legal_info_terceros:      'Reserva (paso 2) — línea de privacidad al final de «Yo no viajo»',
+  legal_info_titulo:        'Reserva (paso 3) — título del recuadro de protección de datos',
+  legal_info_basica:        'Reserva (paso 3) — contenido del recuadro de protección de datos',
+  legal_ver_mas:            'Reserva (paso 3) — botón «Ver más» del recuadro (móvil)',
+  legal_ver_menos:          'Reserva (paso 3) — botón «Ver menos» del recuadro (móvil)',
+  legal_acepto:             'Reserva (paso 3) — casilla de aceptación',
+  legal_acepto_error:       'Reserva (paso 3) — aviso si no se marca la casilla',
+  legal_info_cotizacion:    '«¿No encuentras tu ruta?» — línea de privacidad bajo «Cancelar» (portada y reserva)'
+};
+// Orden de la lista = orden de arriba. Un texto legal nuevo que no esté aquí sale al final.
+function ordenarTextosLegales(textos) {
+  var orden = Object.keys(NOMBRES_TEXTOS_LEGALES);
+  return textos.slice().sort(function (a, b) {
+    var ia = orden.indexOf(a.clave), ib = orden.indexOf(b.clave);
+    return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+  });
 }
 
 // (17/11/2026) N86: los textos de las páginas legales son largos: en la lista salen cortados con «…» (entero, en su ficha).
@@ -6865,7 +6902,7 @@ function abrirEditorTexto(textoId) {
   var esEditable = texto.clave === 'contacto_horario';
 
   editor.innerHTML =
-    '<h2 style="margin-top:0">✏️ ' + escapar(texto.clave) + '</h2>' +
+    '<h2 style="margin-top:0">✏️ ' + escapar(NOMBRES_TEXTOS_LEGALES[texto.clave] || texto.clave) + '</h2>' +
     '<div style="background:var(--gris-fondo);padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px;">' +
     (texto.contexto ? '<span style="color:var(--texto-muted);font-size:12px;"><strong>Contexto:</strong> ' + escapar(texto.contexto) + '</span>' : '') +
     '</div>' +
