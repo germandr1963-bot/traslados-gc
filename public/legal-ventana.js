@@ -2,7 +2,8 @@
 // Los enlaces legales de la web (pie, casilla de la reserva, información de datos, «Solicitar precio»,
 // Alta choferes, portal…) llevan data-legal="aviso-legal | privacidad | cookies | condiciones".
 // Al pulsarlos, el texto se abre en una ventana encima de la página: el cliente no sale de donde está
-// ni pierde lo escrito. (18/11/2026) Los del pie de página abren su página normal, salvo en la página de Reserva. Si algo falla, el enlace funciona como siempre (abre la página legal).
+// ni pierde lo escrito. (18/11/2026) Los del pie de página abren su página normal, salvo en la página de Reserva,
+// donde, con los 3 pasos en pantalla, también «Contacto» se abre en esta ventana (data-legal="contacto"). Si algo falla, el enlace funciona como siempre (abre la página legal).
 // Los textos salen de Idiomas → Textos de interfaz → «Páginas legales»; el botón, de «Cerrar» (home_modal_cerrar).
 (function () {
   var CSS =
@@ -19,6 +20,7 @@
     '#legal-ventana .lv-texto h3{font-family:"Big Shoulders Display",sans-serif;font-size:19px;font-weight:bold;margin:18px 0 6px;}' +
     '#legal-ventana .lv-texto ul,#legal-ventana .lv-texto ol{padding-left:20px;margin:0 0 14px;}' +
     '#legal-ventana .lv-texto li{margin-bottom:6px;}' +
+    '#legal-ventana .lv-texto a{color:var(--terracota,#C1502E);font-weight:600;text-decoration:none;}' +
     '#legal-ventana .lv-pie{padding:12px 22px 18px;border-top:1px solid var(--gris-borde,#E1DCD0);}' +
     '#legal-ventana .lv-cerrar{width:100%;background:#f5f0ea;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:0.95rem;padding:0.7rem;color:var(--texto-oscuro,#2A211B);font-family:inherit;}' +
     '@media (max-width:600px){#legal-ventana{padding:0;align-items:flex-end;}#legal-ventana .lv-caja{max-height:92vh;border-radius:12px 12px 0 0;}#legal-ventana .lv-titulo{font-size:22px;}}';
