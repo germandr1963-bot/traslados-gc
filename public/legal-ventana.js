@@ -160,7 +160,8 @@
     var caja = null;
     function cerrar() { if (caja) { caja.parentNode.removeChild(caja); caja = null; } }
     function textoConEnlace(s) {
-      return esc(s).replace(/\[\[([^\]]+)\]\]/, '<a href="' + esc(d.politica_url) + '">$1</a>');
+      // (18/11/2026) El enlace a la Política de cookies se abre en la ventana (data-legal): el cliente no sale de la página
+      return esc(s).replace(/\[\[([^\]]+)\]\]/, '<a href="' + esc(d.politica_url) + '" data-legal="cookies">$1</a>');
     }
     function abrir(configurar) {
       cerrar();
