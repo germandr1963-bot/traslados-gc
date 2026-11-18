@@ -1134,11 +1134,11 @@ var tocaPuerto      = origenEsPuerto || destinoEsPuerto;
     return;
   }
 
-  // (18/11/2026) Reserva cerrada: ya eligió ruta y empieza a reservar. El pie se reduce a «Contacto» (en una pestaña
-  // nueva, para no salir de la reserva), lo legal (en ventana) y el ©. Mientras está el buscador, el pie sale completo.
+  // (18/11/2026) Reserva cerrada: ya eligió ruta y empieza a reservar. El pie se reduce a «Contacto» y lo legal (los dos
+  // en ventana, para no salir de la reserva) y el ©. Mientras está el buscador, el pie sale completo.
   document.body.classList.add('reserva-cerrada');
   var _pieContacto = document.querySelector('footer .pie-contacto');
-  if (_pieContacto) { _pieContacto.target = '_blank'; _pieContacto.rel = 'noopener'; }
+  if (_pieContacto) _pieContacto.setAttribute('data-legal', 'contacto');
 
   // Tarjeta resumen
   if (paramOrigen && paramDestino) {
