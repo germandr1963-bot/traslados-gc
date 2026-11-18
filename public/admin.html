@@ -7323,10 +7323,12 @@ function abrirPanelPalabrasURL() {
 
   Promise.all([
     fetch('/admin/idiomas').then(function(r) { return r.json(); }),
-    fetch('/admin/palabras-paginas').then(function(r) { return r.json(); })
+    fetch('/admin/palabras-paginas').then(function(r) { return r.json(); }),
+    fetch('/admin/palabras-paginas-lista').then(function(r) { return r.json(); }) // (18/11/2026) la lista de páginas, del servidor
   ]).then(function(resultados) {
     var idiomas = resultados[0];
     var palabras = resultados[1];
+    var listaPaginas = resultados[2] || [];
 
     var porPagina = {};
     palabras.forEach(function(p) {
@@ -7334,20 +7336,9 @@ function abrirPanelPalabrasURL() {
       porPagina[p.pagina][p.lang_code] = p.palabra;
     });
 
-    var PAGINAS_ETIQUETAS = {
-      destino:      'Destino (página individual)',
-      destinos:     'Destinos (listado)',
-      rutas:        'Rutas',
-      flota:        'Flota',
-      contacto:     'Contacto',
-      'mi-reserva': 'Acceso clientes (mi reserva)',
-      traslado:     'Traslado (sección de rutas)',
-      // (17/11/2026) N86: páginas legales del pie de página
-      'aviso-legal': 'Aviso legal',
-      privacidad:    'Política de privacidad',
-      cookies:       'Política de cookies',
-      condiciones:   'Condiciones generales'
-    };
+    // (18/11/2026) Las filas (y sus nombres) salen de la lista del servidor: toda fila que se ve, se puede guardar
+    var PAGINAS_ETIQUETAS = {};
+    listaPaginas.forEach(function(p) { PAGINAS_ETIQUETAS[p.pagina] = p.nombre; });
 
     var cabecerasIdiomas = idiomas.map(function(idi) {
       return '<th style="text-align:center;">' + escapar(idi.codigo.toUpperCase()) + '</th>';
