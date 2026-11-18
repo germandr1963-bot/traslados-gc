@@ -2,7 +2,7 @@
 // Los enlaces legales de la web (pie, casilla de la reserva, información de datos, «Solicitar precio»,
 // Alta choferes, portal…) llevan data-legal="aviso-legal | privacidad | cookies | condiciones".
 // Al pulsarlos, el texto se abre en una ventana encima de la página: el cliente no sale de donde está
-// ni pierde lo escrito. Si algo falla, el enlace funciona como siempre (abre la página legal).
+// ni pierde lo escrito. (18/11/2026) Los del pie de página abren su página normal, salvo en la página de Reserva. Si algo falla, el enlace funciona como siempre (abre la página legal).
 // Los textos salen de Idiomas → Textos de interfaz → «Páginas legales»; el botón, de «Cerrar» (home_modal_cerrar).
 (function () {
   var CSS =
@@ -97,6 +97,9 @@
   document.addEventListener('click', function (e) {
     var a = e.target && e.target.closest ? e.target.closest('a[data-legal]') : null;
     if (!a) return;
+    // (18/11/2026) Los enlaces legales del PIE abren su página normal, salvo en la página que pida la ventana
+    // (la de Reserva: <body data-legal-ventana-pie>). Los de dentro de los formularios, siempre en ventana.
+    if (a.closest('footer') && !document.body.hasAttribute('data-legal-ventana-pie')) return;
     // Ctrl / Cmd / clic con la rueda: que abra la página como siempre
     if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
     e.preventDefault();
