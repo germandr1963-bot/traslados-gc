@@ -5516,7 +5516,6 @@ var NOMBRES_TEXTOS_LEGALES = {
   legal_privacidad_texto:   '2. Política de privacidad — TEXTO COMPLETO de la página (aquí se pega el texto)',
   legal_cookies_texto:      '3. Política de cookies — TEXTO COMPLETO de la página (aquí se pega el texto)',
   legal_condiciones_texto:  '4. Condiciones generales — TEXTO COMPLETO de la página (aquí se pega el texto)',
-  legal_provisional:        'Aviso «Texto provisional» — sale arriba de las páginas que NO tienen marcado «Texto oficial»',
   legal_footer_aviso:       'Aviso legal — SOLO EL NOMBRE (enlace del pie y título de la página; el texto va en el 1)',
   legal_footer_privacidad:  'Política de privacidad — SOLO EL NOMBRE (enlace del pie y título de la página; el texto va en el 2)',
   legal_footer_cookies:     'Política de cookies — SOLO EL NOMBRE (enlace del pie y título de la página; el texto va en el 3)',
@@ -7006,7 +7005,6 @@ function abrirEditorTexto(textoId) {
     '<div style="background:var(--gris-fondo);padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px;">' +
     (texto.contexto ? '<span style="color:var(--texto-muted);font-size:12px;"><strong>Contexto:</strong> ' + escapar(texto.contexto) + '</span>' : '') +
     '</div>' +
-    htmlCasillaLegalOficial(texto) +
     '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="texto-campo-editor"></div>' +
     '<div id="texto-mensaje-editor" style="margin-top:8px;"></div>' +
@@ -7016,37 +7014,6 @@ function abrirEditorTexto(textoId) {
 
   cambiarIdiomaEditorTexto(textoId, IDIOMAS_TEXTOS[0], editor.querySelector('.tab-idioma'));
   editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-// (19/11/2026) N93 — En la ficha del TEXTO COMPLETO de una página legal: «Texto oficial» quita el aviso «Texto provisional»
-// de ESA página (en todos los idiomas). Se guarda al marcar o desmarcar.
-var PAGINA_DE_TEXTO_LEGAL = { legal_aviso_texto: 'aviso-legal', legal_privacidad_texto: 'privacidad', legal_cookies_texto: 'cookies', legal_condiciones_texto: 'condiciones' };
-function htmlCasillaLegalOficial(texto) {
-  var pagina = PAGINA_DE_TEXTO_LEGAL[texto.clave];
-  if (!pagina) return '';
-  setTimeout(function () {
-    fetch('/admin/legal-oficial').then(function (r) { return r.json(); }).then(function (m) {
-      var c = document.getElementById('casilla-legal-oficial');
-      if (c) { c.checked = !!m[pagina]; c.disabled = false; }
-    });
-  }, 0);
-  return '<div style="border:1px solid var(--gris-borde);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;background:#fff;">' +
-    '<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;">' +
-      '<input type="checkbox" id="casilla-legal-oficial" disabled style="margin-top:3px;" onchange="guardarLegalOficial(\'' + pagina + '\', this)">' +
-      '<span><strong>Texto oficial</strong> — no enseñar el aviso «Texto provisional» en esta página (en todos los idiomas). ' +
-      '<span style="color:var(--texto-muted);">Se guarda al marcar o desmarcar.</span></span>' +
-    '</label><div id="mensaje-legal-oficial" style="margin-top:6px;"></div></div>';
-}
-function guardarLegalOficial(pagina, casilla) {
-  var msg = document.getElementById('mensaje-legal-oficial');
-  fetch('/admin/legal-oficial', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pagina: pagina, oficial: casilla.checked }) })
-    .then(function (r) { return r.json(); })
-    .then(function (d) {
-      if (d.error) throw new Error(d.error);
-      msg.textContent = d.oficial ? '✅ Guardado: esta página ya no enseña el aviso «Texto provisional».' : '✅ Guardado: esta página enseña el aviso «Texto provisional».';
-      msg.style.color = 'var(--verde-ok)';
-    })
-    .catch(function () { casilla.checked = !casilla.checked; msg.textContent = '❌ No se pudo guardar. Inténtalo de nuevo.'; msg.style.color = 'var(--rojo-error)'; });
 }
 
 function limpiarTraduccionesCategoria(textoId) {
