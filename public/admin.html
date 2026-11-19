@@ -7191,8 +7191,7 @@ function abrirEditorTexto(textoId) {
   var editor = document.getElementById('editor-texto-interfaz');
   editor.classList.remove('oculto');
 
-  // (19/11/2026) «Solo español»: solo la pestaña ES
-  var tabs = IDIOMAS_TEXTOS.filter(function (lang) { return !texto.solo_es || lang === 'es'; }).map(function (lang, i) {
+  var tabs = IDIOMAS_TEXTOS.map(function (lang, i) {
     var ok = texto.estado[lang];
     var azul = !ok && texto.sinAprobar && texto.sinAprobar[lang]; // (28/10/2026) 🔵 hecha por la IA, sin aprobar
     return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? ' tab-idioma-verde' : (azul ? ' tab-idioma-azul' : ' tab-idioma-rojo')) + '" ' +
@@ -7206,7 +7205,6 @@ function abrirEditorTexto(textoId) {
     '<h2 style="margin-top:0">✏️ ' + escapar(NOMBRES_TEXTOS_LEGALES[texto.clave] || texto.clave) + '</h2>' +
     '<div style="background:var(--gris-fondo);padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px;">' +
     (texto.contexto ? '<span style="color:var(--texto-muted);font-size:12px;"><strong>Contexto:</strong> ' + escapar(texto.contexto) + '</span>' : '') +
-    (texto.solo_es ? '<br><span style="font-size:12px;color:#5b5347;">🇪🇸 <strong>Solo español:</strong> este texto no se traduce.</span>' : '') +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="texto-campo-editor"></div>' +
@@ -7486,7 +7484,7 @@ function guardarTraduccionTexto(textoId, lang, confirmarLatinas) {
   var msg = document.getElementById('texto-mensaje-editor');
   var _textoAntes = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
   var _esCambiado = lang === 'es' && _textoAntes && (_textoAntes.texto_es || '') !== valor;
-  var _tieneTraducciones = _textoAntes && !_textoAntes.solo_es && IDIOMAS_TEXTOS.some(function (l) { return l !== 'es' && (_textoAntes.estado[l] || (_textoAntes.desact && _textoAntes.desact[l])); });
+  var _tieneTraducciones = _textoAntes && IDIOMAS_TEXTOS.some(function (l) { return l !== 'es' && (_textoAntes.estado[l] || (_textoAntes.desact && _textoAntes.desact[l])); });
   var url = lang === 'es'
     ? '/admin/textos/' + textoId + '/es'
     : '/admin/textos/' + textoId + '/idioma/' + lang;
@@ -7888,10 +7886,6 @@ function guardarRevisionIA(lang) {
 // (28/10/2026) Celda de la tabla de Textos de interfaz, con la regla de las traducciones (igual que Comunicaciones):
 // 🔴 · sin traducir · 🔴 ✓ el español ha cambiado · 🔵 ✓ hecha por la IA, sin aprobar · 🟢 ✓ aprobada
 function celdaTextoInterfaz(t, lang) {
-  // (19/11/2026) «Solo español» (alta de choferes y sus Condiciones): en los otros idiomas no hay nada que traducir
-  if (t.solo_es && lang !== 'es') {
-    return '<td style="text-align:center"><span style="color:#9a9184;" title="Solo español: no se traduce">—</span></td>';
-  }
   if (t.estado[lang]) {
     return '<td style="text-align:center"><span style="color:#2e7d32;font-weight:600;" title="Aprobada">✓</span></td>';
   }
