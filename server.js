@@ -3021,6 +3021,9 @@ async function initSchema() {
   await pool.query(`INSERT INTO configuracion_modelo (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
   // (18/11/2026) N86: aviso de cookies en la web (apagado de inicio)
   await pool.query(`ALTER TABLE configuracion_modelo ADD COLUMN IF NOT EXISTS aviso_cookies BOOLEAN NOT NULL DEFAULT FALSE`);
+  // (19/11/2026) N93: aviso «Texto provisional» por página legal. Si una página tiene marcado «Texto oficial», su aviso no sale.
+  await pool.query(`CREATE TABLE IF NOT EXISTS paginas_legales_oficial (pagina TEXT PRIMARY KEY, oficial BOOLEAN NOT NULL DEFAULT FALSE, actualizado_en TIMESTAMP DEFAULT NOW())`);
+  await cargarLegalOficial();
 
   // ─── Imágenes de WhatsApp ──────────────────────────────────────────────────
   await pool.query(`
@@ -10380,6 +10383,30 @@ app.locals.lineasInfoBasica = lineasInfoBasica;
 app.locals.enlaceLegal = enlaceLegal;
 app.locals.lineaCopyright = lineaCopyright;
 
+// (19/11/2026) N93: lo que queda suelto entre títulos y párrafos (p. ej. el primer párrafo tras un título pegado de Word)
+// se mete en su propio párrafo, para que tenga su espacio debajo como los demás.
+function envolverSueltosLegal(html) {
+  var BLOQUES = { p: 1, h2: 1, h3: 1, ul: 1, ol: 1 };
+  var out = '', suelto = '', nivel = 0, m;
+  var re = /<(\/?)([a-zA-Z0-9]+)[^>]*>|[^<]+/g;
+  function soltar() {
+    if (suelto.replace(/<br>/gi, '').replace(/<[^>]+>/g, '').trim()) out += '<p>' + suelto.replace(/^(\s|<br>)+|(\s|<br>)+$/gi, '') + '</p>';
+    suelto = '';
+  }
+  while ((m = re.exec(String(html || ''))) !== null) {
+    var tag = m[2] ? m[2].toLowerCase() : '';
+    if (tag && BLOQUES[tag]) {
+      if (!m[1]) { if (nivel === 0) soltar(); nivel++; } else { nivel = Math.max(0, nivel - 1); }
+      out += m[0];
+    } else if (nivel === 0) {
+      suelto += m[0];
+    } else {
+      out += m[0];
+    }
+  }
+  soltar();
+  return out;
+}
 // Texto de una página legal. Con formato (editor del Admin): solo se dejan títulos, negritas, párrafos y listas, sin estilos.
 // Sin formato (texto pegado antes): cada línea en blanco separa un apartado; un salto de línea simple se respeta.
 function parrafosLegales(texto) {
@@ -10387,15 +10414,24 @@ function parrafosLegales(texto) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   };
   const v = String(texto || '');
-  if (/<\/?(p|h2|h3|ul|ol|li|strong|b|br)(\s[^>]*)?\/?>/i.test(v)) {
-    const PERMITIDAS = { p: 'p', h2: 'h2', h3: 'h3', strong: 'strong', b: 'strong', ul: 'ul', ol: 'ol', li: 'li', br: 'br' };
+  if (/<\/?(p|h2|h3|ul|ol|li|strong|b|br|a)(\s[^>]*)?\/?>/i.test(v)) {
+    const PERMITIDAS = { p: 'p', h2: 'h2', h3: 'h3', strong: 'strong', b: 'strong', ul: 'ul', ol: 'ol', li: 'li', br: 'br', a: 'a' };
     return v.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '')
-      .replace(/<(\/?)([a-zA-Z0-9]+)\b[^>]*>/g, function (m, cierre, tag) {
+      .replace(/<(\/?)([a-zA-Z0-9]+)\b([^>]*)>/g, function (m, cierre, tag, attrs) {
         const t = PERMITIDAS[tag.toLowerCase()];
         if (!t) return '';
         if (t === 'br') return cierre ? '' : '<br>';
+        // (19/11/2026) N93: enlaces del editor (email, teléfono o web); solo mailto:, tel:, http(s):
+        if (t === 'a') {
+          if (cierre) return '</a>';
+          const mh = /href\s*=\s*"([^"]*)"/i.exec(attrs || '') || /href\s*=\s*'([^']*)'/i.exec(attrs || '');
+          const href = mh ? mh[1].replace(/&amp;/g, '&') : '';
+          if (!/^(mailto:|tel:|https?:\/\/)/i.test(href)) return '<a>';
+          const web = /^https?:/i.test(href);
+          return '<a href="' + esc(href) + '"' + (web ? ' target="_blank" rel="noopener"' : '') + '>';
+        }
         return '<' + cierre + t + '>';
-      });
+      }).replace(/^[\s\S]*$/, function (limpio) { return envolverSueltosLegal(limpio); });
   }
   return v.replace(/\r\n/g, '\n').split(/\n\s*\n/)
     .map(function (b) { return b.trim(); })
@@ -10403,6 +10439,32 @@ function parrafosLegales(texto) {
     .map(function (b) { return '<p>' + esc(b).replace(/\n/g, '<br>') + '</p>'; })
     .join('\n');
 }
+
+// (19/11/2026) N93: páginas legales con su texto oficial (sin el aviso «Texto provisional»). Se marca en la ficha del texto completo.
+let LEGAL_OFICIAL = {};
+async function cargarLegalOficial() {
+  const r = await pool.query('SELECT pagina, oficial FROM paginas_legales_oficial');
+  const m = {};
+  r.rows.forEach(function (f) { m[f.pagina] = !!f.oficial; });
+  LEGAL_OFICIAL = m;
+}
+function avisoProvisional(pagina, lang) {
+  return LEGAL_OFICIAL[pagina] ? '' : obtenerTexto('legal_provisional', lang);
+}
+app.get('/admin/legal-oficial', requireAdmin, asyncHandler(async (req, res) => {
+  res.json(LEGAL_OFICIAL);
+}));
+app.post('/admin/legal-oficial', requireAdmin, asyncHandler(async (req, res) => {
+  const pagina = String(req.body.pagina || '');
+  if (!PAGINAS_LEGALES[pagina]) return res.status(400).json({ error: 'Página no válida' });
+  await pool.query(
+    `INSERT INTO paginas_legales_oficial (pagina, oficial, actualizado_en) VALUES ($1, $2, NOW())
+     ON CONFLICT (pagina) DO UPDATE SET oficial = $2, actualizado_en = NOW()`,
+    [pagina, req.body.oficial === true]
+  );
+  await cargarLegalOficial();
+  res.json({ ok: true, oficial: !!LEGAL_OFICIAL[pagina] });
+}));
 
 async function renderLegal(req, res, lang, pagina) {
   if (!IDIOMAS_PERMITIDOS.includes(lang) || !PAGINAS_LEGALES[pagina]) {
@@ -10415,7 +10477,7 @@ async function renderLegal(req, res, lang, pagina) {
     lang, t, palabrasPaginas, BASE_URL,
     titulo: t(p.nombre),
     nombreMigas: t(p.nombre),
-    aviso: t('legal_provisional'),
+    aviso: avisoProvisional(pagina, lang),
     contenidoHtml: parrafosLegales(t(p.texto))
   });
 }
@@ -10446,7 +10508,7 @@ app.get('/api/legal/:pagina', asyncHandler(async (req, res) => {
   if (!p) return res.status(404).json({ error: 'Página no encontrada' });
   const lang = IDIOMAS_PERMITIDOS.includes(req.query.lang) ? req.query.lang : 'es';
   const t = function (clave) { return obtenerTexto(clave, lang); };
-  res.json({ titulo: t(p.nombre), aviso: t('legal_provisional'), html: parrafosLegales(t(p.texto)), cerrar: t('home_modal_cerrar') });
+  res.json({ titulo: t(p.nombre), aviso: avisoProvisional(req.params.pagina, lang), html: parrafosLegales(t(p.texto)), cerrar: t('home_modal_cerrar') });
 }));
 
 // Español: /aviso-legal, /politica-de-privacidad… (la palabra sale de Idiomas → 🔗 Palabras de URL por página)
