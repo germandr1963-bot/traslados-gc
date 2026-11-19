@@ -7100,7 +7100,7 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
           '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="guardarTodoTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar todo</button>' +
           // (07/11/2026) N51: rehace con la IA solo el idioma de esta pestaña, aunque esté aprobado (como en Frases)
           // (19/11/2026) N93: no en los textos completos legales (sus traducciones las pega Germán)
-          (legalLargo ? '' : '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="retraducirTexto(' + textoId + ', \'' + lang + '\')">🔄 Volver a traducir</button>');
+          '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="retraducirTexto(' + textoId + ', \'' + lang + '\')">🔄 Volver a traducir</button>';
         montarEditorLegal(textoId); // (17/11/2026) N86
       });
   }
