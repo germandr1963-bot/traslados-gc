@@ -356,7 +356,7 @@ app.get('/admin/pendientes-traduccion', requireAdmin, asyncHandler(async (req, r
 WITH l AS (SELECT codigo FROM idiomas_web WHERE activo = TRUE AND codigo <> 'es'),
 la AS (SELECT codigo FROM idiomas_web WHERE activo = TRUE)
 SELECT '01 Idiomas - Textos de interfaz' AS pantalla, COUNT(*) AS con_rojo FROM textos_interfaz t
- WHERE NOT COALESCE(t.solo_es, FALSE) AND EXISTS (SELECT 1 FROM l WHERE NOT EXISTS (SELECT 1 FROM textos_interfaz_traducciones x WHERE x.texto_id = t.id AND x.lang_code = l.codigo AND TRIM(COALESCE(x.texto,'')) <> '' AND NOT COALESCE(x.desactualizado,FALSE) AND COALESCE(x.revisado,TRUE)))
+ WHERE EXISTS (SELECT 1 FROM l WHERE NOT EXISTS (SELECT 1 FROM textos_interfaz_traducciones x WHERE x.texto_id = t.id AND x.lang_code = l.codigo AND TRIM(COALESCE(x.texto,'')) <> '' AND NOT COALESCE(x.desactualizado,FALSE) AND COALESCE(x.revisado,TRUE)))
 UNION ALL
 SELECT '02 Idiomas - Pagina de flota', COUNT(*) FROM categorias_vehiculos c
  WHERE c.activa = TRUE AND EXISTS (SELECT 1 FROM l WHERE NOT EXISTS (SELECT 1 FROM categorias_vehiculos_traducciones x WHERE x.categoria_id = c.id AND x.lang_code = l.codigo AND TRIM(COALESCE(x.descripcion,'')) <> '' AND NOT COALESCE(x.ficha_desactualizado,FALSE) AND COALESCE(x.ficha_revisado,TRUE)))
@@ -1403,10 +1403,10 @@ async function initSchema() {
     { clave: "legal_privacidad_texto", contexto: "Texto completo de la página Política de privacidad. Cada línea en blanco separa un apartado", es: "Información básica sobre protección de datos\nResponsable: [Nombre de tu empresa o tu nombre completo si eres autónomo], con NIF/CIF [tu NIF/CIF].\nFinalidad: Gestionar, facturar y ejecutar el servicio de traslado reservado, así como prestar la asistencia especial solicitada voluntariamente en su caso.\nLegitimación: Ejecución de un contrato de transporte (Art. 6.1.b RGPD) y, para los datos de asistencia por discapacidad, tu consentimiento explícito (Art. 9.2.a RGPD).\nDestinatarios: Los datos necesarios para el servicio se comunicarán al conductor o empresa colaboradora encargada de realizar el traslado. No se cederán datos a terceros salvo obligación legal.\nDerechos: Puedes acceder, rectificar y suprimir tus datos, así como retirar tu consentimiento o ejercer otros derechos, escribiendo a [tu correo de privacidad].\n\nTratamiento de datos relativos a necesidades de asistencia especial (categorías especiales de datos)\nCon carácter estrictamente voluntario, durante el proceso de reserva de traslado el usuario podrá facilitar información relativa a determinadas discapacidades sensoriales o del habla (en concreto, discapacidad visual/ceguera o discapacidad del habla/mudez) mediante la marcación expresa de las casillas habilitadas al efecto. La única finalidad de recabar estos datos de salud es adaptar los canales de comunicación y garantizar la asistencia física o logística adecuada por parte del conductor durante la prestación del servicio contratado. La base jurídica que legitima este tratamiento es el consentimiento explícito del interesado, conforme a lo dispuesto en el artículo 9.2.a) del Reglamento (UE) 2016/679 (RGPD), otorgado mediante una acción afirmativa clara al seleccionar la opción correspondiente. Esta información tendrá carácter estrictamente confidencial y será comunicada única y exclusivamente al conductor asignado para realizar el traslado concreto; en caso de que el servicio sea ejecutado por un profesional autónomo o empresa colaboradora externa, el acceso a dicho dato se regulará mediante el preceptivo contrato de encargado del tratamiento conforme al artículo 28 del RGPD. Los datos relativos a estas necesidades especiales se conservarán únicamente durante el tiempo necesario para la ejecución del viaje y serán suprimidos o anonimizados de forma definitiva transcurrido un plazo máximo de [indicar plazo, ej. 30 días] desde la finalización del servicio para la gestión de posibles incidencias, salvo obligación legal de bloqueo. El usuario podrá revocar su consentimiento en cualquier momento previo a la realización del traslado dirigiendo una solicitud a [tu correo electrónico de privacidad], sin que dicha retirada afecte a la licitud del tratamiento basado en el consentimiento previo." },
     { clave: "legal_cookies_texto", contexto: "Texto completo de la página Política de cookies. Cada línea en blanco separa un apartado", es: "1. ¿Qué son las cookies?\nLas cookies son pequeños archivos de texto que se descargan en tu dispositivo al navegar por este sitio web. Permiten garantizar el funcionamiento técnico de la página, recordar tus preferencias de reserva y analizar de forma estadística el uso de la web.\n\n2. Tipos de cookies utilizadas en este sitio web\nCookies técnicas o necesarias (Obligatorias): Permiten la navegación, la gestión de la sesión de reserva, el cálculo de rutas y el procesamiento seguro de los pagos. No requieren consentimiento previo.\nCookies de preferencias o personalización: Permiten recordar opciones como el idioma o la divisa seleccionada por el usuario.\nCookies analíticas o de medición: Nos ayudan a entender cómo interactúan los visitantes con la web (páginas visitadas, tiempos de carga) para mejorar el servicio. (Ej. Google Analytics).\nCookies de terceros (Mapas y pasarelas de pago): Al utilizar servicios integrados como mapas interactivos para seleccionar puntos de recogida/destino o plataformas de pago seguro, dichos proveedores pueden instalar sus propias cookies técnicas o funcionales.\n\n3. Gestión y configuración de cookies\nPuedes aceptar, rechazar o configurar el uso de cookies no esenciales en cualquier momento a través de nuestro [Panel de Configuración de Cookies]. Asimismo, puedes bloquear o eliminar las cookies desde la configuración de tu navegador (Chrome, Safari, Firefox, Edge)." },
     { clave: "legal_condiciones_texto", contexto: "Texto completo de la página Condiciones generales. Cada línea en blanco separa un apartado", es: "1. Objeto del servicio\nLas presentes condiciones regulan la contratación online de servicios de transporte y traslado privado de pasajeros ofrecidos a través de este sitio web por [Nombre de la Empresa / Titular].\n\n2. Proceso de reserva y precios\nPara realizar una reserva, el usuario deberá seleccionar origen, destino, fecha, hora, número de pasajeros y extras opcionales.\nLos precios mostrados en la web incluyen el IVA aplicable y los gastos de gestión, salvo que se indique expresamente lo contrario.\nLa reserva quedará confirmada una vez completado el pago a través de la pasarela habilitada y recibido el correo electrónico de confirmación con los detalles del servicio.\n\n3. Tiempos de espera y retrasos\nRecogidas en aeropuertos / estaciones: El conductor monitorizará el estado del vuelo/tren indicado en la reserva. Se incluye un tiempo de espera gratuito de [45 / 60] minutos desde la hora real de aterrizaje o llegada.\nOtras recogidas (hoteles, domicilios, direcciones): Se incluye un tiempo de espera gratuito de [15] minutos desde la hora programada. Transcurrido dicho plazo sin contacto con el pasajero, el servicio podrá considerarse cancelado por no presentación (no-show).\n\n4. Política de cancelación y modificaciones\nCancelación gratuita: El usuario podrá cancelar o modificar su reserva sin coste alguno hasta [24 / 48] horas antes de la hora programada de recogida, escribiendo a [info@tudominio.com].\nCancelaciones tardías: Las cancelaciones realizadas con menos de [24 / 48] horas de antelación o la no presentación del pasajero en el punto de encuentro conllevarán una penalización del [100%] del importe abonado.\n\n5. Derecho de desistimiento\nDe conformidad con el artículo 103.l) del Real Decreto Legislativo 1/2007 (Ley General para la Defensa de los Consumidores y Usuarios), el derecho legal de desistimiento de 14 días no es aplicable a los contratos de suministro de servicios de transporte de pasajeros cuando el contrato prevea una fecha o un periodo de ejecución específicos, aplicándose en su lugar las condiciones de cancelación detalladas en la cláusula anterior.\n\n6. Equipaje y asistencia especial\nEl pasajero deberá respetar la capacidad de equipaje indicada para el vehículo seleccionado. En caso de haber solicitado asistencia especial por discapacidad visual o del habla en los extras de la reserva, el conductor asignado será informado previamente para adaptar la atención en el punto de recogida.\n\n7. Hojas de reclamaciones y resolución de conflictos\nExisten hojas de reclamaciones a disposición de los consumidores que las soliciten a través de [info@tudominio.com]. Las partes se someten a la legislación española y a los juzgados y tribunales que correspondan conforme a la normativa vigente de defensa de los consumidores." },
-    // (19/11/2026) Parte 3 del alta — Condiciones de adhesión y colaboración para choferes (SOLO ESPAÑOL; no va en el pie:
+    // (19/11/2026) Parte 3 del alta — Condiciones de adhesión y colaboración para choferes (no va en el pie:
     // se abre desde la casilla del registro de choferes). Germán pega aquí su texto.
-    { clave: "legal_choferes_nombre", contexto: "Nombre de la página «Condiciones de adhesión y colaboración para choferes»: título de la página y de la ventana que se abre desde la casilla del registro de choferes. Solo en español", es: "Condiciones de adhesión y colaboración para choferes" },
-    { clave: "legal_choferes_texto", contexto: "Texto completo de la página Condiciones de adhesión y colaboración para choferes (se abre desde la casilla del registro de choferes). Solo en español", es: "Texto pendiente." },
+    { clave: "legal_choferes_nombre", contexto: "Nombre de la página «Condiciones de adhesión y colaboración para choferes»: título de la página y de la ventana que se abre desde la casilla del registro de choferes", es: "Condiciones de adhesión y colaboración para choferes" },
+    { clave: "legal_choferes_texto", contexto: "Texto completo de la página Condiciones de adhesión y colaboración para choferes (se abre desde la casilla del registro de choferes)", es: "Texto pendiente." },
     // (18/11/2026) N86 — Aviso de cookies (sale solo si está marcado en Admin → 🏢 Modelo de negocio)
     { clave: "cookies_titulo", contexto: "Aviso de cookies: título", es: "Usamos cookies" },
     { clave: "cookies_texto", contexto: "Aviso de cookies: texto. Lo que va entre [[ ]] es el enlace a la Política de cookies", es: "Usamos cookies técnicas, necesarias para que la web funcione, y, solo si nos das permiso, cookies de análisis para saber cómo se usa la web y mejorarla. Puedes aceptarlas, rechazarlas o elegir cuáles. Más información en nuestra [[Política de cookies]]." },
@@ -1989,12 +1989,9 @@ async function initSchema() {
       [tx.clave, tx.contexto, tx.es]
     );
   }
-  // (19/11/2026) Parte 3 — «Solo español»: los textos del alta de choferes y las Condiciones de los choferes
-  // no se traducen (los choferes trabajan en español). No salen en rojo en los otros idiomas, no cuentan en la
-  // señal del menú y no entran en «Generar lo que falta». Sus traducciones antiguas, si las hay, no se borran.
-  await pool.query(`ALTER TABLE textos_interfaz ADD COLUMN IF NOT EXISTS solo_es BOOLEAN DEFAULT FALSE`);
-  await pool.query(`UPDATE textos_interfaz SET solo_es = TRUE
-    WHERE (modulo = 'Alta de chofer' OR clave IN ('legal_choferes_nombre', 'legal_choferes_texto')) AND NOT COALESCE(solo_es, FALSE)`);
+  // (19/11/2026) Parte 3: la ficha de las Condiciones de los choferes y los textos del alta, como los demás textos (con sus
+  // 10 idiomas). La columna «solo español» de una prueba anterior del mismo día se quita.
+  await pool.query(`ALTER TABLE textos_interfaz DROP COLUMN IF EXISTS solo_es`);
 
 
   // Factura en PDF que recibe el cliente, en su idioma. ON CONFLICT DO NOTHING:
@@ -10018,7 +10015,7 @@ app.post('/admin/idiomas/:codigo/activo', requireAdmin, asyncHandler(async (req,
 
 app.get('/admin/textos', requireAdmin, asyncHandler(async (req, res) => {
   const textos = await pool.query(
-    `SELECT id, clave, modulo, contexto, texto_es, COALESCE(solo_es, FALSE) AS solo_es FROM textos_interfaz ORDER BY (modulo = 'Email — marca') DESC, modulo, (regexp_replace(clave, '[^0-9]', '', 'g') || '0')::int, clave`
+    `SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz ORDER BY (modulo = 'Email — marca') DESC, modulo, (regexp_replace(clave, '[^0-9]', '', 'g') || '0')::int, clave`
   );
   const traducciones = await pool.query(
     `SELECT texto_id, lang_code, texto, desactualizado, revisado FROM textos_interfaz_traducciones`
@@ -10052,8 +10049,6 @@ app.get('/admin/textos', requireAdmin, asyncHandler(async (req, res) => {
       // (28/10/2026) Una traducción en azul (hecha por la IA, sin aprobar) tampoco cuenta hasta aprobarla
       sinAprobar[lang] = !desact[lang] && !!(sinAprobarPorTexto[t.id] && sinAprobarPorTexto[t.id][lang]);
       estado[lang] = !!(valor && valor.trim()) && !desact[lang] && !sinAprobar[lang];
-      // (19/11/2026) «Solo español»: no se traduce, así que no cuenta como pendiente en ningún idioma
-      if (t.solo_es) { estado[lang] = true; desact[lang] = false; sinAprobar[lang] = false; }
     }
     return { ...t, estado, desact, sinAprobar };
   });
@@ -10300,8 +10295,7 @@ app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (re
     return res.status(400).json({ error: 'Idioma no válido' });
   }
 
-  // (19/11/2026) Los textos «Solo español» no se generan
-  const textos = await pool.query('SELECT id, clave, contexto, texto_es FROM textos_interfaz WHERE NOT COALESCE(solo_es, FALSE) ORDER BY modulo, (regexp_replace(clave, \'[^0-9]\', \'\', \'g\') || \'0\')::int, clave');
+  const textos = await pool.query('SELECT id, clave, contexto, texto_es FROM textos_interfaz ORDER BY modulo, (regexp_replace(clave, \'[^0-9]\', \'\', \'g\') || \'0\')::int, clave');
   const traducciones = await pool.query(
     'SELECT texto_id, texto, desactualizado FROM textos_interfaz_traducciones WHERE lang_code = $1',
     [lang]
@@ -10491,8 +10485,8 @@ const PAGINAS_LEGALES = {
   privacidad:    { nombre: 'legal_footer_privacidad',  texto: 'legal_privacidad_texto',  palabraEs: 'politica-de-privacidad' },
   cookies:       { nombre: 'legal_footer_cookies',     texto: 'legal_cookies_texto',     palabraEs: 'politica-de-cookies' },
   condiciones:   { nombre: 'legal_footer_condiciones', texto: 'legal_condiciones_texto', palabraEs: 'condiciones-generales' },
-  // (19/11/2026) Parte 3 del alta: solo en español, fuera del pie y del sitemap; se abre desde la casilla del registro de choferes
-  'condiciones-choferes': { nombre: 'legal_choferes_nombre', texto: 'legal_choferes_texto', palabraEs: 'condiciones-choferes', soloEs: true }
+  // (19/11/2026) Parte 3 del alta: fuera del pie y del sitemap; se abre desde la casilla del registro de choferes
+  'condiciones-choferes': { nombre: 'legal_choferes_nombre', texto: 'legal_choferes_texto', palabraEs: 'condiciones-choferes' }
 };
 
 // Dirección de una página legal en un idioma (la usan los pies de página de todas las vistas).
@@ -10670,7 +10664,7 @@ app.get('/api/legal/:pagina', asyncHandler(async (req, res) => {
   }
   const p = PAGINAS_LEGALES[req.params.pagina];
   if (!p) return res.status(404).json({ error: 'Página no encontrada' });
-  const lang = (!p.soloEs && IDIOMAS_PERMITIDOS.includes(req.query.lang)) ? req.query.lang : 'es'; // (19/11/2026) soloEs: siempre en español
+  const lang = IDIOMAS_PERMITIDOS.includes(req.query.lang) ? req.query.lang : 'es';
   const t = function (clave) { return obtenerTexto(clave, lang); };
   res.json({ titulo: t(p.nombre), html: await htmlTextoLegal(req.params.pagina, lang), cerrar: t('home_modal_cerrar') }); // (19/11/2026) N93: sin aviso «Texto provisional» (quitado por Germán)
 }));
