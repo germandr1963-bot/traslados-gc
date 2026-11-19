@@ -3753,14 +3753,16 @@ Revisa el estado del depósito desde el panel de administración.
     { clave: 'interno_prerregistro_chofer', nombre: '[Admin] Nuevo pre-registro de chofer', categoria: 'interno',
       asunto_email: '📝 Nuevo pre-registro de chofer \u2014 {nombre_chofer}',
       cuerpo_email: `
-📝 <strong>{nombre_chofer}</strong> ha hecho el pre-registro para unirse a la red de choferes.
+👋 Hola, equipo:
+<strong>{nombre_chofer}</strong> quiere unirse a nuestra red de choferes y ha hecho su pre-registro.
 
-📧 <strong>Email:</strong> {email_chofer}
-📱 <strong>Teléfono:</strong> {telefono_chofer}
-🏝️ <strong>Isla:</strong> {isla} · <strong>Municipio:</strong> {municipio}
-🪪 <strong>Licencia municipal:</strong> {numero_licencia}
+📧 {email_chofer}
+📱 {telefono_chofer}
+🏝️ {isla} · {municipio}
+🪪 Licencia municipal: {numero_licencia}
 
-🔍 Revísalo en el panel de administración, en Conductores → «Pre-registros de choferes».
+Puede ser un nuevo compañero: revisemos sus datos con atención.
+🔍 Dónde verlo: Admin → Conductores → «📝 Pre-registro».
 `,
       cuerpo_whatsapp: null },
     { clave: 'interno_recuperar_password_admin', nombre: '[Admin] Recuperar contrase\u00f1a de administrador', categoria: 'interno',
@@ -11481,10 +11483,9 @@ app.post('/api/chofer/prerregistro', asyncHandler(async (req, res) => {
         to: em,
         subject: (pl && pl.email && pl.asunto) || ('📝 Nuevo pre-registro de chofer — ' + nombre),
         html: (pl && pl.email) ? plantillaEmail(pl.email) : plantillaEmail(
-          `<p>📝 <strong>${escLegal(nombre)}</strong> ha hecho el pre-registro para unirse a la red de choferes.</p>
-           <p>📧 <strong>Email:</strong> ${escLegal(email)}<br>📱 <strong>Teléfono:</strong> ${escLegal(telefono)}<br>
-           🏝️ <strong>Isla:</strong> ${escLegal(isla)} · <strong>Municipio:</strong> ${escLegal(municipio)}<br>🪪 <strong>Licencia municipal:</strong> ${escLegal(licencia)}</p>
-           <p>🔍 Revísalo en el panel de administración, en Conductores → «Pre-registros de choferes».</p>`)
+          `<p>👋 Hola, equipo:<br><strong>${escLegal(nombre)}</strong> quiere unirse a nuestra red de choferes y ha hecho su pre-registro.</p>
+           <p>📧 ${escLegal(email)}<br>📱 ${escLegal(telefono)}<br>🏝️ ${escLegal(isla)} · ${escLegal(municipio)}<br>🪪 Licencia municipal: ${escLegal(licencia)}</p>
+           <p>Puede ser un nuevo compañero: revisemos sus datos con atención.<br>🔍 Dónde verlo: Admin → Conductores → «📝 Pre-registro».</p>`)
       });
     }
   } catch (err) {
