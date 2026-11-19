@@ -186,7 +186,7 @@ table.tabla-precios input {
       <button class="item-menu activo" data-seccion="fondos">Fondos de portada</button>
       <button class="item-menu" data-seccion="categorias">Categorías</button>
       <button class="item-menu" data-seccion="islas">🏝️ Islas / Localidades <span class="badge-pend-trad" id="badge-pend-islas" title="Traducciones pendientes: sin traducir, español cambiado o sin aprobar" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
-      <button class="item-menu" data-seccion="conductores">Conductores</button>
+      <button class="item-menu" data-seccion="conductores">Conductores <span id="badge-prerregistro" title="Pre-registros nuevos por revisar" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">0</span></button>
       <button class="item-menu" data-seccion="destinos">Destino Inicial <span class="badge-pend-trad" id="badge-pend-destinos" title="Traducciones pendientes: sin traducir, español cambiado o sin aprobar" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
       <button class="item-menu" data-seccion="precios">Rutas y precios</button>
       <button class="item-menu" data-seccion="seo">SEO <span class="badge-pend-trad" id="badge-pend-seo" title="Traducciones pendientes: sin traducir, español cambiado o sin aprobar" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
@@ -277,29 +277,26 @@ table.tabla-precios input {
         <button class="boton-costa" onclick="contactoGlobalConductores(true)">💬 Permitir contacto a TODOS</button>
         <button class="boton-peligro" onclick="contactoGlobalConductores(false)">🔇 Quitar contacto a TODOS</button>
       </div>
-      <!-- (19/11/2026) Alta de choferes en dos pasos — paso 1: imagen de la página pública «Alta choferes» -->
-      <div class="tarjeta" id="tarjeta-alta-imagen" style="max-width:640px;margin-bottom:16px;">
-        <h3 style="margin:0 0 6px;">🖼️ Imagen de la página «Alta choferes»</h3>
-        <p style="font-size:13px;color:#5b5347;margin:0 0 12px;">Sale arriba de la página pública de pre-registro. Tamaño recomendado 1600 × 800 px · jpg, png o webp · máx. 1 MB. Sin textos dentro de la imagen (en el móvil no se leen).</p>
-        <img id="alta-imagen-vista" alt="" style="display:none;width:100%;aspect-ratio:2/1;object-fit:cover;border-radius:8px;border:1px solid #E1DCD0;margin-bottom:10px;">
-        <p id="alta-imagen-sin" style="display:none;font-size:13px;color:#8a8175;margin:0 0 10px;">Todavía no hay imagen: la página sale sin ella.</p>
-        <label class="etiqueta">Imagen</label>
-        <input type="file" id="alta-imagen-archivo" accept="image/jpeg,image/png,image/webp" onchange="previsualizarImagenAlta()" style="display:block;margin-bottom:10px;">
-        <label class="etiqueta">Descripción de la foto (alt)</label>
-        <input type="text" id="alta-imagen-alt" class="campo" maxlength="300" placeholder="Ej.: Choferes de Traslados GC en Gran Canaria" style="width:100%;margin-bottom:12px;">
-        <button class="boton-primario" onclick="guardarImagenAlta()">💾 Guardar</button>
-        <button class="boton-peligro" id="alta-imagen-quitar" style="margin-left:8px;display:none;" onclick="quitarImagenAlta()">🗑️ Quitar imagen</button>
-        <div id="alta-imagen-mensaje" style="margin-top:10px;font-size:13px;"></div>
+      <!-- (19/11/2026) Imagen de la página pública «Alta choferes», en un bloque plegado (cerrado) -->
+      <div style="margin-bottom:16px;border:1px solid var(--gris-borde);border-radius:10px;overflow:hidden;max-width:680px;">
+        <div style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--gris-fondo);user-select:none;" onclick="toggleBloqueImagenAlta()">
+          <span id="alta-imagen-icono" style="font-size:14px;">▶</span>
+          <h2 style="font-size:16px;margin:0;">🖼️ Imagen de la página «Alta choferes»</h2>
+          <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
+        </div>
+        <div id="alta-imagen-contenido" style="display:none;padding:16px;">
+          <p style="font-size:13px;color:#5b5347;margin:0 0 12px;">Sale arriba de la página pública de pre-registro. Tamaño recomendado 1600 × 800 px · jpg, png o webp · máx. 1 MB. Sin textos dentro de la imagen (en el móvil no se leen).</p>
+          <img id="alta-imagen-vista" alt="" style="display:none;width:100%;aspect-ratio:2/1;object-fit:cover;border-radius:8px;border:1px solid #E1DCD0;margin-bottom:10px;">
+          <p id="alta-imagen-sin" style="display:none;font-size:13px;color:#8a8175;margin:0 0 10px;">Todavía no hay imagen: la página sale sin ella.</p>
+          <label class="etiqueta">Imagen</label>
+          <input type="file" id="alta-imagen-archivo" accept="image/jpeg,image/png,image/webp" onchange="previsualizarImagenAlta()" style="display:block;margin-bottom:10px;">
+          <label class="etiqueta">Descripción de la foto (alt)</label>
+          <input type="text" id="alta-imagen-alt" class="campo" maxlength="300" placeholder="Ej.: Choferes de Traslados GC en Gran Canaria" style="width:100%;margin-bottom:12px;">
+          <button class="boton-primario" onclick="guardarImagenAlta()">💾 Guardar</button>
+          <button class="boton-peligro" id="alta-imagen-quitar" style="margin-left:8px;display:none;" onclick="quitarImagenAlta()">🗑️ Quitar imagen</button>
+          <div id="alta-imagen-mensaje" style="margin-top:10px;font-size:13px;"></div>
+        </div>
       </div>
-      <!-- (19/11/2026) Pre-registros de la página «Alta choferes» (aún no son choferes) -->
-      <h3 style="margin:18px 0 6px;">📝 Pre-registros de choferes</h3>
-      <p class="subtitulo" style="margin-bottom:8px;">Solicitudes de la página pública «Alta choferes». Todavía no son choferes: no reciben avisos ni entran en la lista de abajo.</p>
-      <table class="tabla-admin" style="margin-bottom:22px;">
-        <thead>
-          <tr><th>Fecha</th><th>Nombre</th><th>Contacto</th><th>Isla / Municipio</th><th>Licencia municipal</th><th>Privacidad</th><th>Estado</th><th>Acciones</th></tr>
-        </thead>
-        <tbody id="tabla-prerregistros"></tbody>
-      </table>
       <table class="tabla-admin">
         <thead>
           <tr><th>Nombre</th><th>Contacto</th><th>Vehículo</th><th>Categoría</th><th>Isla</th><th>Foto</th><th style="min-width:150px">💬 Botón contacto</th><th style="min-width:130px">Tipo</th><th>Estado</th><th>Acciones</th></tr>
@@ -310,6 +307,16 @@ table.tabla-precios input {
 
       <div class="tarjeta oculto" id="editor-conductor" style="margin-top:16px;max-width:640px;"></div>
       <div class="tarjeta oculto" id="ficha-conductor" style="margin-top:16px;"></div>
+
+      <!-- (19/11/2026) Pre-registro: los choferes que han hecho el pre-registro en la página pública «Alta choferes» -->
+      <h2 style="margin:36px 0 4px;display:flex;align-items:center;gap:8px;">📝 Pre-registro <span id="badge-prerregistro-dentro" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;">0</span></h2>
+      <p class="subtitulo" style="margin-bottom:8px;">Choferes que han hecho el pre-registro en la página pública «Alta choferes». Todavía no están registrados: no reciben avisos ni entran en la lista de arriba.</p>
+      <table class="tabla-admin">
+        <thead>
+          <tr><th>Fecha</th><th>Nombre</th><th>Contacto</th><th>Isla / Municipio</th><th>Licencia municipal</th><th>Privacidad</th><th>Estado</th><th>Acciones</th></tr>
+        </thead>
+        <tbody id="tabla-prerregistros"></tbody>
+      </table>
     </div>
 
     <div id="seccion-destinos" class="oculto">
@@ -2307,6 +2314,7 @@ function mostrarAdmin() {
   cargarCategorias();
   cargarConductores();
   cargarAltaChoferesAdmin(); // (19/11/2026) imagen de «Alta choferes» y pre-registros
+  if (!window._intervaloPrerregistro) window._intervaloPrerregistro = setInterval(cargarPrerregistrosAdmin, 60000); // señal de pre-registros nuevos
   cargarPreciosGrid();
   // Badge de cotizaciones pendientes
   setTimeout(function() { cargarCotizaciones(); }, 500);
@@ -3200,8 +3208,21 @@ function cargarAltaChoferesAdmin() {
       document.getElementById('alta-imagen-quitar').style.display = 'none';
     }
   });
+  cargarPrerregistrosAdmin();
+}
+
+// Lista «📝 Pre-registro» y su señal (menú y título). Se pone al día cada minuto sin tocar el bloque de la imagen.
+function cargarPrerregistrosAdmin() {
   fetch('/admin/choferes-prerregistro').then(function (r) { return r.json(); }).then(function (filas) {
     var cuerpo = document.getElementById('tabla-prerregistros');
+    // Señal de pre-registros nuevos (por revisar): en el menú «Conductores» y en el título «📝 Pre-registro»
+    var nuevos = filas.filter(function (p) { return p.estado === 'pendiente'; }).length;
+    ['badge-prerregistro', 'badge-prerregistro-dentro'].forEach(function (idB) {
+      var bd = document.getElementById(idB);
+      if (!bd) return;
+      bd.textContent = nuevos;
+      bd.style.display = nuevos > 0 ? 'inline' : 'none';
+    });
     if (!filas.length) { cuerpo.innerHTML = '<tr><td colspan="8">Todavía no hay pre-registros.</td></tr>'; return; }
     cuerpo.innerHTML = filas.map(function (p) {
       return '<tr>' +
@@ -3216,6 +3237,14 @@ function cargarAltaChoferesAdmin() {
       '</tr>';
     }).join('');
   });
+}
+
+function toggleBloqueImagenAlta() {
+  var contenido = document.getElementById('alta-imagen-contenido');
+  var icono = document.getElementById('alta-imagen-icono');
+  var abrir = contenido.style.display === 'none';
+  contenido.style.display = abrir ? 'block' : 'none';
+  icono.textContent = abrir ? '▼' : '▶';
 }
 
 function previsualizarImagenAlta() {
@@ -3257,7 +3286,7 @@ function quitarImagenAlta() {
 
 function eliminarPrerregistro(id) {
   if (!confirm('¿Eliminar este pre-registro? No se puede deshacer.')) return;
-  fetch('/admin/choferes-prerregistro/' + id, { method: 'DELETE' }).then(function () { cargarAltaChoferesAdmin(); });
+  fetch('/admin/choferes-prerregistro/' + id, { method: 'DELETE' }).then(function () { cargarPrerregistrosAdmin(); });
 }
 
 function cambiarEstadoConductor(id, estado) {
