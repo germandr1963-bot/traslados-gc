@@ -3534,6 +3534,11 @@ function verFichaConductor(id) {
       ficha.innerHTML = '' +
         '<h2 style="margin-top:0">📋 Expediente: ' + escapar(c.nombre) + ' <span style="font-size:0.8rem;color:#5a6c79;font-weight:400">(modifica lo que necesites y pulsa Guardar)</span></h2>' +
         (c.cambios_pendientes ? bloqueCambiosPendientes(c) : '') +
+        // (19/11/2026) Parte 3 del alta: cuándo aceptó la casilla del registro (Condiciones + Política de privacidad)
+        '<div style="margin-top:10px;font-size:13px;color:#5b5347;">' +
+          '🔒 Política de privacidad: ' + (c.privacidad_aceptada_en ? 'aceptada el ' + fechaHoraAdmin(c.privacidad_aceptada_en) : '—') +
+          ' &nbsp;·&nbsp; 📄 Condiciones de adhesión y colaboración para choferes: ' + (c.condiciones_aceptadas_en ? 'aceptadas el ' + fechaHoraAdmin(c.condiciones_aceptadas_en) : '—') +
+        '</div>' +
         // (13/10/2026) Lo que escribió el chofer al darse de alta (destacado si eligió "Otro vehículo")
         (c.observaciones ? '<div style="margin-top:12px;padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.5;' +
           (c.categoria_id ? 'background:#f4f1ec;color:#3d372f;' : 'background:#fdf3e1;color:#7a4e0b;border:1px solid #efd29a;') + '">' +
@@ -5680,10 +5685,12 @@ var NOMBRES_TEXTOS_LEGALES = {
   legal_privacidad_texto:   '2. Política de privacidad — TEXTO COMPLETO de la página (aquí se pega el texto)',
   legal_cookies_texto:      '3. Política de cookies — TEXTO COMPLETO de la página (aquí se pega el texto)',
   legal_condiciones_texto:  '4. Condiciones generales — TEXTO COMPLETO de la página (aquí se pega el texto)',
+  legal_choferes_texto:     '5. Condiciones de adhesión y colaboración para choferes — TEXTO COMPLETO (aquí se pega el texto). Solo español; no va en el pie: se abre desde la casilla del registro de choferes',
   legal_footer_aviso:       'Aviso legal — SOLO EL NOMBRE (enlace del pie y título de la página; el texto va en el 1)',
   legal_footer_privacidad:  'Política de privacidad — SOLO EL NOMBRE (enlace del pie y título de la página; el texto va en el 2)',
   legal_footer_cookies:     'Política de cookies — SOLO EL NOMBRE (enlace del pie y título de la página; el texto va en el 3)',
   legal_footer_condiciones: 'Condiciones generales — SOLO EL NOMBRE (enlace del pie y título de la página; el texto va en el 4)',
+  legal_choferes_nombre:    'Condiciones de adhesión y colaboración para choferes — SOLO EL NOMBRE (título de la página y de la ventana; el texto va en el 5)',
   legal_copyright:          'Línea del © — final del pie de página',
   legal_info_terceros:      'Reserva (paso 2) — línea de privacidad al final de «Yo no viajo»',
   legal_info_titulo:        'Reserva (paso 3) — título del recuadro de protección de datos',
@@ -7184,7 +7191,8 @@ function abrirEditorTexto(textoId) {
   var editor = document.getElementById('editor-texto-interfaz');
   editor.classList.remove('oculto');
 
-  var tabs = IDIOMAS_TEXTOS.map(function (lang, i) {
+  // (19/11/2026) «Solo español»: solo la pestaña ES
+  var tabs = IDIOMAS_TEXTOS.filter(function (lang) { return !texto.solo_es || lang === 'es'; }).map(function (lang, i) {
     var ok = texto.estado[lang];
     var azul = !ok && texto.sinAprobar && texto.sinAprobar[lang]; // (28/10/2026) 🔵 hecha por la IA, sin aprobar
     return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? ' tab-idioma-verde' : (azul ? ' tab-idioma-azul' : ' tab-idioma-rojo')) + '" ' +
@@ -7198,6 +7206,7 @@ function abrirEditorTexto(textoId) {
     '<h2 style="margin-top:0">✏️ ' + escapar(NOMBRES_TEXTOS_LEGALES[texto.clave] || texto.clave) + '</h2>' +
     '<div style="background:var(--gris-fondo);padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px;">' +
     (texto.contexto ? '<span style="color:var(--texto-muted);font-size:12px;"><strong>Contexto:</strong> ' + escapar(texto.contexto) + '</span>' : '') +
+    (texto.solo_es ? '<br><span style="font-size:12px;color:#5b5347;">🇪🇸 <strong>Solo español:</strong> este texto no se traduce.</span>' : '') +
     '</div>' +
     '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="texto-campo-editor"></div>' +
@@ -7477,7 +7486,7 @@ function guardarTraduccionTexto(textoId, lang, confirmarLatinas) {
   var msg = document.getElementById('texto-mensaje-editor');
   var _textoAntes = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
   var _esCambiado = lang === 'es' && _textoAntes && (_textoAntes.texto_es || '') !== valor;
-  var _tieneTraducciones = _textoAntes && IDIOMAS_TEXTOS.some(function (l) { return l !== 'es' && (_textoAntes.estado[l] || (_textoAntes.desact && _textoAntes.desact[l])); });
+  var _tieneTraducciones = _textoAntes && !_textoAntes.solo_es && IDIOMAS_TEXTOS.some(function (l) { return l !== 'es' && (_textoAntes.estado[l] || (_textoAntes.desact && _textoAntes.desact[l])); });
   var url = lang === 'es'
     ? '/admin/textos/' + textoId + '/es'
     : '/admin/textos/' + textoId + '/idioma/' + lang;
@@ -7879,6 +7888,10 @@ function guardarRevisionIA(lang) {
 // (28/10/2026) Celda de la tabla de Textos de interfaz, con la regla de las traducciones (igual que Comunicaciones):
 // 🔴 · sin traducir · 🔴 ✓ el español ha cambiado · 🔵 ✓ hecha por la IA, sin aprobar · 🟢 ✓ aprobada
 function celdaTextoInterfaz(t, lang) {
+  // (19/11/2026) «Solo español» (alta de choferes y sus Condiciones): en los otros idiomas no hay nada que traducir
+  if (t.solo_es && lang !== 'es') {
+    return '<td style="text-align:center"><span style="color:#9a9184;" title="Solo español: no se traduce">—</span></td>';
+  }
   if (t.estado[lang]) {
     return '<td style="text-align:center"><span style="color:#2e7d32;font-weight:600;" title="Aprobada">✓</span></td>';
   }
