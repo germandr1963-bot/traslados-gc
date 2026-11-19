@@ -899,7 +899,12 @@ async function initSchema() {
       creado_en TIMESTAMP DEFAULT NOW()
     )
   `);
-  // Imagen de arriba de la página «Alta choferes» (una sola), subida desde Admin → Conductores
+  // (19/11/2026) Paso 2: el equipo envía el enlace privado del registro y el chofer lo completa
+  await pool.query(`ALTER TABLE choferes_prerregistro ADD COLUMN IF NOT EXISTS enlace_enviado_en TIMESTAMP`);
+  await pool.query(`ALTER TABLE choferes_prerregistro ADD COLUMN IF NOT EXISTS enlace_caduca_en TIMESTAMP`);
+  await pool.query(`ALTER TABLE choferes_prerregistro ADD COLUMN IF NOT EXISTS completado_en TIMESTAMP`);
+  await pool.query(`ALTER TABLE choferes_prerregistro ADD COLUMN IF NOT EXISTS conductor_id INT`);
+  // Imagen de arriba de la página «Alta choferes» (una sola), subida desde Admin → Choferes
   await pool.query(`
     CREATE TABLE IF NOT EXISTS alta_choferes_imagen (
       id INT PRIMARY KEY DEFAULT 1,
@@ -1959,6 +1964,11 @@ async function initSchema() {
     { clave: 'pre_ya_existe', contexto: 'Pre-registro de choferes: aviso si el email ya está dado de alta o pre-registrado', es: 'Ya tenemos una solicitud con este email. Si necesitas ayuda, escríbenos desde la página de Contacto.' },
     { clave: 'pre_error_conexion', contexto: 'Pre-registro de choferes: aviso si falla la conexión', es: 'Error de conexión. Inténtalo de nuevo.' },
     { clave: 'pre_ok_titulo', contexto: 'Pre-registro de choferes: título del mensaje después de enviar', es: '✅ ¡Pre-registro recibido!' },
+    // (19/11/2026) Paso 2: página privada del registro (solo con el enlace que envía el equipo)
+    { clave: 'reg_titulo', contexto: 'Registro de chofer (página privada del enlace): título', es: 'Registro de chofer' },
+    { clave: 'reg_intro', contexto: 'Registro de chofer (página privada del enlace): texto bajo el título', es: 'Completa tus datos profesionales, los de tu vehículo y tu foto. Nuestro equipo revisará tu registro antes de activar tu acceso al portal.' },
+    { clave: 'reg_enlace_no_valido_titulo', contexto: 'Registro de chofer: título si el enlace no vale (caducado o ya usado)', es: 'Este enlace ya no es válido' },
+    { clave: 'reg_enlace_no_valido', contexto: 'Registro de chofer: texto si el enlace no vale (caducado o ya usado)', es: 'El enlace ha caducado o ya se ha usado. Si necesitas uno nuevo, escríbenos desde la página de Contacto.' },
     { clave: 'pre_ok_texto', contexto: 'Pre-registro de choferes: texto del mensaje después de enviar', es: 'Revisaremos tu solicitud y te enviaremos un enlace privado a tu correo electrónico para completar el resto de tus datos profesionales. Revisa tu bandeja de entrada (o la carpeta de spam).' },
   ];
   for (const tx of TEXTOS_ALTA_CHOFER) {
@@ -3643,6 +3653,21 @@ Un saludo cordial, 🙏
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>`,
       cuerpo_whatsapp: '' },
+    // (19/11/2026) Alta de choferes en dos pasos — paso 2: el enlace privado para completar el registro
+    { clave: 'chofer_enlace_registro', nombre: 'Enlace para completar el registro (chofer)', categoria: 'chofer',
+      asunto_email: 'Completa tu registro de chofer \u2014 Traslados GC',
+      cuerpo_email: `Hola, <strong>{nombre_chofer}</strong> 👋
+
+Gracias por tu interés en formar parte de nuestra red de choferes. Hemos revisado tu pre-registro y ya puedes completar tu registro: tus datos profesionales, los de tu vehículo y tu foto.
+
+<div style="text-align:center;margin:12px 0;"><a href="{enlace_registro}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Completar mi registro</a></div>
+📋 Cuando lo envíes, nuestro equipo revisará tu registro. Si se aprueba, te enviaremos un email de confirmación con el acceso a tu portal de chofer.
+
+<span style="font-size:13px;color:#5b5347;">⏱️ Este enlace es personal y caduca en {horas_validez} horas. Si caduca, escríbenos desde la página de Contacto y te enviaremos otro.</span>
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>`,
+      cuerpo_whatsapp: '' },
     { clave: 'chofer_solicitud_recibida', nombre: 'Solicitud de registro recibida (chofer)', categoria: 'chofer',
       asunto_email: 'Solicitud recibida \u2014 Traslados GC',
       cuerpo_email: `Hola, <strong>{nombre_chofer}</strong> 👋
@@ -4507,6 +4532,20 @@ async function obtenerEmailsNotificacion() {
   const cfg = await pool.query('SELECT emails_notificacion FROM configuracion_contacto WHERE id = 1');
   if (!cfg.rows.length || !cfg.rows[0].emails_notificacion) return [];
   return cfg.rows[0].emails_notificacion.split(',').map(e => e.trim()).filter(Boolean);
+}
+
+// (19/11/2026) Avisos del alta de choferes: van a las personas activas del departamento «Alta Choferes»
+// de Admin → Equipo. Si ese departamento no tiene a nadie activo, van a Notificaciones (como antes).
+async function obtenerEmailsAltaChoferes() {
+  try {
+    const r = await pool.query(
+      `SELECT DISTINCT LOWER(TRIM(p.email)) AS email
+         FROM equipo_personas p JOIN equipo_departamentos d ON d.id = p.departamento_id
+        WHERE LOWER(TRIM(d.nombre)) = 'alta choferes' AND p.estado = 'activo'
+          AND p.email IS NOT NULL AND TRIM(p.email) <> ''`);
+    if (r.rows.length) return r.rows.map(x => x.email);
+  } catch (e) { console.error('[alta choferes] emails del departamento:', e.message); }
+  return await obtenerEmailsNotificacion();
 }
 
 // ─── Helper: generar contraseña provisional ───────────────────────────────────
@@ -11416,7 +11455,66 @@ app.get('/chofer/acceso', asyncHandler(async (req, res) => {
   if (req.session && req.session.choferId) return res.redirect('/chofer/portal');
   const t = function(clave) { return obtenerTexto(clave, 'es'); };
   const palabrasPaginas = PALABRAS_PAGINAS['es'] || {};
-  res.render('chofer-registro', { lang: 'es', t, palabrasPaginas, BASE_URL });
+  res.render('chofer-registro', { lang: 'es', t, palabrasPaginas, BASE_URL, modo: 'acceso', registro: null });
+}));
+
+// (19/11/2026) Alta de choferes en dos pasos — paso 2: el enlace privado (tokens_recuperacion, tipo 'chofer_registro',
+// referencia_id = id del pre-registro). Devuelve el pre-registro si el enlace vale (sin usar y sin caducar).
+const HORAS_ENLACE_REGISTRO = 72;
+async function prerregistroPorEnlace(token) {
+  if (!token || typeof token !== 'string') return null;
+  const r = await pool.query(
+    `SELECT p.* FROM tokens_recuperacion t JOIN choferes_prerregistro p ON p.id = t.referencia_id
+     WHERE t.token = $1 AND t.tipo = 'chofer_registro' AND t.usado = FALSE AND t.expira_en > NOW() AND p.estado = 'enlace_enviado'`,
+    [token]);
+  return r.rows[0] || null;
+}
+
+// Página privada del registro: solo con el enlace. Nunca sale en Google.
+app.get('/chofer/registro', asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  const t = function(clave) { return obtenerTexto(clave, 'es'); };
+  const palabrasPaginas = PALABRAS_PAGINAS['es'] || {};
+  const token = typeof req.query.token === 'string' ? req.query.token : '';
+  const p = await prerregistroPorEnlace(token);
+  const registro = p
+    ? { valido: true, token: token, nombre: p.nombre, email: p.email, telefono: p.telefono, isla: p.isla, municipio: p.municipio, numero_licencia: p.numero_licencia }
+    : { valido: false };
+  res.render('chofer-registro', { lang: 'es', t, palabrasPaginas, BASE_URL, modo: 'registro', registro });
+}));
+
+// Admin → Choferes → «📝 Pre-registro de choferes»: enviar (o volver a enviar) el enlace privado del registro
+app.post('/admin/choferes-prerregistro/:id/enviar-enlace', requireAdmin, asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id, 10) || 0;
+  const r = await pool.query(`SELECT * FROM choferes_prerregistro WHERE id = $1 AND estado IN ('pendiente','enlace_enviado')`, [id]);
+  if (!r.rows.length) return res.status(404).json({ error: 'Este pre-registro ya no está pendiente.' });
+  const p = r.rows[0];
+  // El enlace anterior deja de valer: solo vale el último que se envía
+  await pool.query(`UPDATE tokens_recuperacion SET usado = TRUE WHERE tipo = 'chofer_registro' AND referencia_id = $1 AND usado = FALSE`, [id]);
+  const token = crypto.randomBytes(32).toString('hex');
+  const caduca = new Date(Date.now() + HORAS_ENLACE_REGISTRO * 60 * 60 * 1000);
+  await pool.query('INSERT INTO tokens_recuperacion (tipo, referencia_id, token, expira_en) VALUES ($1,$2,$3,$4)', ['chofer_registro', id, token, caduca]);
+  const BASE = process.env.BASE_URL || 'https://traslados-gc.onrender.com';
+  const enlace = BASE + '/chofer/registro?token=' + token;
+  const pl = await obtenerPlantilla('chofer_enlace_registro', { nombre_chofer: p.nombre, enlace_registro: enlace, horas_validez: String(HORAS_ENLACE_REGISTRO) });
+  try {
+    await enviarEmail({
+      to: p.email,
+      subject: (pl && pl.email && pl.asunto) || 'Completa tu registro de chofer — Traslados GC',
+      html: (pl && pl.email) ? plantillaEmail(pl.email) : plantillaEmail(
+        `<p>Hola, <strong>${escLegal(p.nombre)}</strong> 👋</p>
+         <p>Gracias por tu interés en formar parte de nuestra red de choferes. Hemos revisado tu pre-registro y ya puedes completar tu registro: tus datos profesionales, los de tu vehículo y tu foto.</p>
+         <div style="text-align:center;margin:12px 0;"><a href="${enlace}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Completar mi registro</a></div>
+         <p>📋 Cuando lo envíes, nuestro equipo revisará tu registro. Si se aprueba, te enviaremos un email de confirmación con el acceso a tu portal de chofer.</p>
+         <p style="font-size:13px;color:#5b5347;">⏱️ Este enlace es personal y caduca en ${HORAS_ENLACE_REGISTRO} horas. Si caduca, escríbenos desde la página de Contacto y te enviaremos otro.</p>`)
+    });
+  } catch (err) {
+    await pool.query(`UPDATE tokens_recuperacion SET usado = TRUE WHERE token = $1`, [token]);
+    return res.status(500).json({ error: 'No se pudo enviar el email. Inténtalo de nuevo.' });
+  }
+  await pool.query(`UPDATE choferes_prerregistro SET estado = 'enlace_enviado', enlace_enviado_en = NOW(), enlace_caduca_en = $2 WHERE id = $1`, [id, caduca]);
+  res.json({ ok: true });
 }));
 
 // (19/11/2026) Alta de choferes en dos pasos — paso 1: «Alta choferes» es ahora el PRE-REGISTRO público
@@ -11473,11 +11571,11 @@ app.post('/api/chofer/prerregistro', asyncHandler(async (req, res) => {
      VALUES ($1,$2,$3,$4,$5,$6,NOW())`,
     [nombre, email, telefono, isla, municipio, licencia]
   );
-  // Aviso al equipo (Admin → Notificaciones) con la plantilla «[Admin] Nuevo pre-registro de chofer»
+  // Aviso al departamento «Alta Choferes» (Admin → Equipo) con la plantilla «[Admin] Nuevo pre-registro de chofer»
   try {
     const vars = { nombre_chofer: nombre, email_chofer: email, telefono_chofer: telefono, isla: isla, municipio: municipio, numero_licencia: licencia };
     const pl = await obtenerPlantilla('interno_prerregistro_chofer', vars, 'es');
-    const emails = await obtenerEmailsNotificacion();
+    const emails = await obtenerEmailsAltaChoferes();
     for (const em of emails) {
       await enviarEmail({
         to: em,
@@ -11550,8 +11648,9 @@ app.delete('/admin/alta-choferes/imagen', requireAdmin, asyncHandler(async (req,
 
 app.get('/admin/choferes-prerregistro', requireAdmin, asyncHandler(async (req, res) => {
   const r = await pool.query(
-    `SELECT id, nombre, email, telefono, isla, municipio, numero_licencia, privacidad_aceptada_en, estado, creado_en
-     FROM choferes_prerregistro ORDER BY creado_en DESC`);
+    `SELECT id, nombre, email, telefono, isla, municipio, numero_licencia, privacidad_aceptada_en, estado, creado_en,
+            enlace_enviado_en, enlace_caduca_en, (enlace_caduca_en IS NOT NULL AND enlace_caduca_en < NOW()) AS enlace_caducado
+     FROM choferes_prerregistro WHERE estado IN ('pendiente','enlace_enviado') ORDER BY creado_en DESC`);
   res.json(r.rows);
 }));
 
@@ -11570,8 +11669,15 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
     numero_taxi, plazas, isla, observaciones, foto
   } = req.body;
 
+  // (19/11/2026) Paso 2: el registro solo se puede enviar con el enlace privado que manda el equipo
+  const prerregistro = await prerregistroPorEnlace(req.body && req.body.token);
+  if (!prerregistro) return res.status(403).json({ error: obtenerTexto('reg_enlace_no_valido', 'es') });
   if (!nombre || !email || !telefono || !password) {
     return res.status(400).json({ error: 'Los campos nombre, email, teléfono y contraseña son obligatorios.' });
+  }
+  // El email es el del pre-registro (al que se envió el enlace): no se puede cambiar
+  if (String(email).trim().toLowerCase() !== String(prerregistro.email).trim().toLowerCase()) {
+    return res.status(400).json({ error: 'El email no se puede cambiar: es el del pre-registro.' });
   }
   // (13/10/2026) "Otro vehículo": la descripción del vehículo es obligatoria
   if (!categoria_id && !String(observaciones || '').replace('[Otro vehículo]', '').trim()) {
@@ -11603,7 +11709,7 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
   const plazasAltaOk = await comprobarPlazasChofer(plazasAlta, catId);
   if (plazasAltaOk.error) return res.status(400).json({ error: plazasAltaOk.error });
 
-  await pool.query(
+  const nuevoChofer = await pool.query(
     `INSERT INTO conductores (
       nombre, email, telefono, password_hash,
       documento, direccion, cp, municipio,
@@ -11611,7 +11717,7 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
       central_flota, categoria_id,
       vehiculo_marca, vehiculo_modelo, matricula,
       numero_taxi, plazas, isla, observaciones, foto, foto_estado, estado
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'pendiente')`,
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'pendiente') RETURNING id`,
     [
       nombre.trim(), email.trim().toLowerCase(), telefono.trim(), hash,
       documento||'', direccion||'', cp||'', municipio||'',
@@ -11623,6 +11729,9 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
       foto||null, foto ? 'pendiente' : 'sin_foto'
     ]
   );
+  // (19/11/2026) El enlace ya no vale y el pre-registro sale de la lista (queda guardado con el chofer creado)
+  await pool.query(`UPDATE tokens_recuperacion SET usado = TRUE WHERE tipo = 'chofer_registro' AND referencia_id = $1`, [prerregistro.id]);
+  await pool.query(`UPDATE choferes_prerregistro SET estado = 'completado', completado_en = NOW(), conductor_id = $2 WHERE id = $1`, [prerregistro.id, nuevoChofer.rows[0].id]);
 
   // Email de confirmación al chofer
   try {
@@ -11641,7 +11750,7 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
     console.warn('Error enviando email confirmación registro chofer:', err.message);
   }
 
-  // (14/10/2026) Aviso al equipo (Admin → Notificaciones) con la plantilla "[Admin] Nuevo chofer registrado"
+  // (14/10/2026) Aviso al departamento «Alta Choferes» (Admin → Equipo; si no hay nadie, a Notificaciones) con la plantilla "[Admin] Nuevo chofer registrado"
   try {
     let _vehiculo = '';
     if (catId) {
@@ -11655,7 +11764,7 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
       vehiculo: _vehiculo || '—', isla: isla || 'Gran Canaria'
     };
     const _pReg = await obtenerPlantilla('interno_registro_chofer', _varsReg, 'es');
-    const _emailsReg = await obtenerEmailsNotificacion();
+    const _emailsReg = await obtenerEmailsAltaChoferes();
     for (const em of _emailsReg) {
       await enviarEmail({
         to: em,
@@ -20540,6 +20649,7 @@ const VARIABLES_PLANTILLAS = {
   chofer_asistencia_retirada:    { email: null, wa: _VCH },
   chofer_asistencia_anadida:     { email: null, wa: _VCH },
   chofer_solicitud_recibida:     { email: ['nombre_chofer'], wa: null },
+  chofer_enlace_registro:        { email: ['nombre_chofer', 'enlace_registro', 'horas_validez'], wa: null },
   // Cliente
   cliente_acceso_reserva:        { email: _V6.concat(['password_temporal', 'url_portal']), wa: _V6.concat(['password_temporal', 'url_portal']) },
   cliente_acuse_recibo:          { email: _V6.concat(['pasajeros', 'extras']), wa: _V6.concat(['pasajeros', 'extras']) },
