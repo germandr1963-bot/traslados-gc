@@ -160,7 +160,10 @@ table.tabla-precios input {
 .editor-legal p { margin:0 0 10px; }
 .editor-legal ul, .editor-legal ol { padding-left:20px; margin:0 0 10px; }
 .editor-legal li { margin-bottom:4px; }
-.editor-legal a { color:var(--terracota); font-weight:600; text-decoration:none; } /* (19/11/2026) N93: como en la página */
+.editor-legal a { color:#1a0dab; text-decoration:underline; } /* (19/11/2026) N93: enlaces en el azul de siempre, como en la página */
+.editor-legal table { border-collapse:collapse; margin:0 0 12px; font-size:13px; }
+.editor-legal th, .editor-legal td { border:1px solid var(--gris-borde); padding:6px 8px; vertical-align:top; min-width:90px; }
+.editor-legal th { background:var(--gris-fondo); font-weight:600; }
 </style>
 </head>
 <body>
@@ -5566,7 +5569,8 @@ function textoCortoLegal(t) {
 // se pega desde Word y conserva títulos, negritas y listas; botones «Título», «Negrita» y «Lista».
 // Lo que se guarda es el texto con sus marcas (solo títulos, negritas, párrafos y listas: lo demás de Word se quita).
 var ETIQUETAS_LEGAL = { P: 'p', DIV: 'p', H1: 'h2', H2: 'h2', H3: 'h3', H4: 'h3', H5: 'h3', H6: 'h3',
-  STRONG: 'strong', B: 'strong', UL: 'ul', OL: 'ol', LI: 'li', BR: 'br' };
+  STRONG: 'strong', B: 'strong', UL: 'ul', OL: 'ol', LI: 'li', BR: 'br',
+  TABLE: 'table', THEAD: 'thead', TBODY: 'tbody', TR: 'tr', TH: 'th', TD: 'td' }; // (19/11/2026) N93: tablas
 function limpiarHtmlLegal(html) {
   var doc = new DOMParser().parseFromString('<div>' + String(html || '') + '</div>', 'text/html');
   function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -5590,20 +5594,35 @@ function limpiarHtmlLegal(html) {
       }
       if (t === 'br') { out += '<br>'; return; }
       if (!t) { out += dentro; return; }
+      var TABLA_ETQ = { table: 1, thead: 1, tbody: 1, tr: 1, th: 1, td: 1 };
+      if (TABLA_ETQ[t]) { out += '<' + t + '>' + dentro + '</' + t + '>'; return; } // (19/11/2026) N93: celdas vacías se quedan
       if (t !== 'ul' && t !== 'ol' && !dentro.replace(/<br>/g, '').trim()) return; // bloques vacíos fuera
       // (19/11/2026) N93: un título o párrafo que lleva dentro otros párrafos (p. ej. al pegar sobre un título vacío)
       // no envuelve nada: se quedan sus párrafos tal cual
-      if ((t === 'p' || t === 'h2' || t === 'h3') && /<(p|h2|h3|ul|ol)>/.test(dentro)) { out += dentro; return; }
+      if ((t === 'p' || t === 'h2' || t === 'h3') && /<(p|h2|h3|ul|ol|table)>/.test(dentro)) { out += dentro; return; }
       out += '<' + t + '>' + dentro + '</' + t + '>';
     });
     return out;
   }
-  return envolverSueltosLegal(recorrer(doc.body.firstChild)).replace(/<p>\s*<\/p>/g, '').trim();
+  return envolverSueltosLegal(tablasDesdeTabuladores(recorrer(doc.body.firstChild))).replace(/<p>\s*<\/p>/g, '').trim();
+}
+// (19/11/2026) N93: líneas seguidas separadas con tabulador (Bloc de notas, Excel como texto) → una tabla; la 1.ª fila, cabecera.
+function tablasDesdeTabuladores(html) {
+  return String(html || '').replace(/(?:<p>(?:(?!<\/p>)[\s\S])*\t(?:(?!<\/p>)[\s\S])*<\/p>\s*)+/g, function (bloque) {
+    var filas = bloque.match(/<p>[\s\S]*?<\/p>/g) || [];
+    if (filas.length < 2) return bloque;
+    var t = '<table>';
+    filas.forEach(function (f, i) {
+      var tag = i === 0 ? 'th' : 'td';
+      t += '<tr>' + f.replace(/^<p>|<\/p>$/g, '').split('\t').map(function (x) { return '<' + tag + '>' + x.trim() + '</' + tag + '>'; }).join('') + '</tr>';
+    });
+    return t + '</table>';
+  });
 }
 // (19/11/2026) N93: lo que queda suelto entre títulos y párrafos (p. ej. el primer párrafo tras un título pegado de Word)
 // se mete en su propio párrafo, para que tenga su espacio debajo como los demás.
 function envolverSueltosLegal(html) {
-  var BLOQUES = { p: 1, h2: 1, h3: 1, ul: 1, ol: 1 };
+  var BLOQUES = { p: 1, h2: 1, h3: 1, ul: 1, ol: 1, table: 1 };
   var out = '', suelto = '', nivel = 0, m;
   var re = /<(\/?)([a-zA-Z0-9]+)[^>]*>|[^<]+/g;
   function soltar() {
@@ -5630,7 +5649,7 @@ function htmlLegalParaEditar(valor) {
   // Texto sin formato (Bloc de notas): (19/11/2026) N93 — cada línea es su propio párrafo (con su espacio debajo)
   return v.replace(/\r\n/g, '\n').split('\n').map(function (b) { return b.trim(); })
     .filter(function (b) { return b; })
-    .map(function (b) { return '<p>' + escapar(b) + '</p>'; }).join('');
+    .map(function (b) { return '<p>' + escapar(b) + '</p>'; }).join('').replace(/^[\s\S]*$/, function (h) { return tablasDesdeTabuladores(h); });
 }
 function montarEditorLegal(textoId) {
   var t = textosCache && textosCache.textos.find(function (x) { return x.id === textoId; });
@@ -5645,6 +5664,7 @@ function montarEditorLegal(textoId) {
     '<button type="button" style="' + estiloBoton + 'font-weight:700;" onmousedown="event.preventDefault();formatoLegal(\'negrita\')"><strong>B</strong> Negrita</button>' +
     '<button type="button" style="' + estiloBoton + '" onmousedown="event.preventDefault();formatoLegal(\'lista\')">• Lista</button>' +
     '<button type="button" style="' + estiloBoton + '" onmousedown="event.preventDefault();formatoLegal(\'enlace\')">🔗 Enlace</button>' +
+    '<button type="button" style="' + estiloBoton + '" onmousedown="event.preventDefault();formatoLegal(\'tabla\')">▦ Tabla</button>' +
     '<button type="button" id="boton-ver-html-legal" style="' + estiloBoton + 'margin-left:auto;" onmousedown="event.preventDefault();verHtmlLegal()">&lt;/&gt; Ver HTML</button>';
   var ed = document.createElement('div');
   ed.id = 'texto-legal-editor';
@@ -5698,6 +5718,19 @@ function formatoLegal(que) {
     document.execCommand('bold');
   } else if (que === 'lista') {
     document.execCommand('insertUnorderedList');
+  } else if (que === 'tabla') {
+    // (19/11/2026) N93: tabla vacía para rellenar; la primera fila es la cabecera (títulos de las columnas)
+    var cols = parseInt(prompt('¿Cuántas columnas? (contando la primera)', '3'), 10);
+    if (!cols || cols < 1) return;
+    var filas = parseInt(prompt('¿Cuántas filas, sin contar la fila de los títulos?', '3'), 10);
+    if (!filas || filas < 1) return;
+    cols = Math.min(cols, 10); filas = Math.min(filas, 50);
+    var celda = function (tag) { return '<' + tag + '><br></' + tag + '>'; };
+    var html = '<table><tr>' + new Array(cols + 1).join(celda('th')) + '</tr>';
+    for (var f = 0; f < filas; f++) html += '<tr>' + new Array(cols + 1).join(celda('td')) + '</tr>';
+    html += '</table><p><br></p>';
+    ed.focus();
+    document.execCommand('insertHTML', false, html);
   } else if (que === 'enlace') {
     // (19/11/2026) N93: se marca el texto y se pulsa «🔗 Enlace»; un email o un teléfono se reconocen solos
     var sel = window.getSelection();
@@ -7049,7 +7082,11 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
       .then(function (datos) {
         // (07/10/2026) Traducción en rojo: el español cambió después de traducirla
         var texto = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
-        var avisoDesact = datos.desactualizado
+        var legalLargo = esTextoLegalLargo(texto); // (19/11/2026) N93: textos completos de las páginas legales
+        var avisoDesact = (datos.desactualizado && legalLargo)
+          ? '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#c0392b;">' +
+              '⚠️ <strong>El español ha cambiado.</strong> Pega aquí abajo la traducción nueva y pulsa «💾 Guardar».</div>'
+          : datos.desactualizado
           ? '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#c0392b;">' +
               '⚠️ <strong>El español ha cambiado.</strong> Revisa esta traducción: corrígela y guárdala, o pulsa «💾 Guardar» tal cual si el cambio no le afecta.' +
               (texto ? '<br><span style="color:#5b5347;">Español actual: <em>' + escapar(texto.texto_es || '') + '</em></span>' : '') +
@@ -7062,7 +7099,8 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
           '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar</button>' +
           '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="guardarTodoTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar todo</button>' +
           // (07/11/2026) N51: rehace con la IA solo el idioma de esta pestaña, aunque esté aprobado (como en Frases)
-          '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="retraducirTexto(' + textoId + ', \'' + lang + '\')">🔄 Volver a traducir</button>';
+          // (19/11/2026) N93: no en los textos completos legales (sus traducciones las pega Germán)
+          (legalLargo ? '' : '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="retraducirTexto(' + textoId + ', \'' + lang + '\')">🔄 Volver a traducir</button>');
         montarEditorLegal(textoId); // (17/11/2026) N86
       });
   }
