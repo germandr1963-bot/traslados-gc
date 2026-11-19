@@ -882,6 +882,34 @@ async function initSchema() {
   // Columna observaciones en conductores: campo libre para notas del registro web.
   await pool.query(`ALTER TABLE conductores ADD COLUMN IF NOT EXISTS observaciones TEXT DEFAULT ''`);
 
+  // (19/11/2026) Alta de choferes en dos pasos — paso 1, pre-registro público (sugerencia del gestor legal:
+  // el formulario completo ya no está abierto a cualquiera). Los pre-registros van en su propia tabla
+  // (aún no son choferes: no entran en Conductores, ni en los avisos, ni en Equipo) y se ven en Admin → Conductores.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS choferes_prerregistro (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      email TEXT NOT NULL,
+      telefono TEXT NOT NULL,
+      isla TEXT DEFAULT '',
+      municipio TEXT DEFAULT '',
+      numero_licencia TEXT DEFAULT '',
+      privacidad_aceptada_en TIMESTAMP,
+      estado TEXT DEFAULT 'pendiente',
+      creado_en TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  // Imagen de arriba de la página «Alta choferes» (una sola), subida desde Admin → Conductores
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS alta_choferes_imagen (
+      id INT PRIMARY KEY DEFAULT 1,
+      imagen TEXT,
+      cloudinary_url TEXT,
+      alt_texto TEXT DEFAULT '',
+      actualizado_en TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
   // (09/10/2026) Equipo por departamentos (Admin → Equipo), para comunicados informativos.
   // equipo_departamentos: los departamentos (se crean, renombran y borran desde el Admin).
   //   es_choferes = TRUE marca el departamento al que pasan solos los choferes aprobados de Conductores.
@@ -1910,6 +1938,28 @@ async function initSchema() {
     { clave: 'alta_otro_ejemplo', contexto: 'Ejemplo dentro del campo para describir el vehículo', es: 'Ej.: autobús de 30 plazas con bodega para equipaje' },
     { clave: 'alta_otro_nota', contexto: 'Nota bajo el campo para describir el vehículo', es: 'Lo revisaremos y te contactaremos para darte de alta.' },
     { clave: 'alta_otro_falta', contexto: 'Aviso si se elige "Otro vehículo" y no se describe', es: 'Describe tu vehículo: tipo, plazas, maletero…' },
+    // (19/11/2026) Página de pre-registro de choferes (Alta choferes, paso 1). Textos del gestor legal, con «chofer».
+    { clave: 'pre_titulo', contexto: 'Pre-registro de choferes: título grande de la página', es: 'Únete a nuestra red de choferes en Canarias' },
+    { clave: 'pre_intro', contexto: 'Pre-registro de choferes: texto debajo de la imagen', es: 'Completa este breve pre-registro para validar tus datos de contacto. En cuanto verifiquemos tu solicitud, recibirás un correo electrónico con un enlace privado para completar tu ficha profesional, subir la documentación de tu vehículo y activar tu cuenta.' },
+    { clave: 'pre_nombre', contexto: 'Pre-registro de choferes: etiqueta del nombre', es: 'Nombre completo *' },
+    { clave: 'pre_nombre_ej', contexto: 'Pre-registro de choferes: ejemplo dentro del campo del nombre', es: 'Tu nombre y apellidos' },
+    { clave: 'pre_telefono', contexto: 'Pre-registro de choferes: etiqueta del teléfono', es: 'Teléfono móvil *' },
+    { clave: 'pre_email', contexto: 'Pre-registro de choferes: etiqueta del email', es: 'Email *' },
+    { clave: 'pre_isla', contexto: 'Pre-registro de choferes: etiqueta de la isla', es: 'Isla *' },
+    { clave: 'pre_municipio', contexto: 'Pre-registro de choferes: etiqueta del municipio', es: 'Municipio *' },
+    { clave: 'pre_municipio_ej', contexto: 'Pre-registro de choferes: ejemplo dentro del campo del municipio', es: 'Las Palmas de Gran Canaria' },
+    { clave: 'pre_licencia', contexto: 'Pre-registro de choferes: etiqueta del número de licencia', es: 'Número de la licencia municipal *' },
+    { clave: 'pre_licencia_ej', contexto: 'Pre-registro de choferes: ejemplo dentro del campo de la licencia', es: 'LPA-0001' },
+    { clave: 'pre_privacidad', contexto: 'Pre-registro de choferes: casilla obligatoria. [[ ]] = enlace a la Política de privacidad (se abre en ventana)', es: 'He leído y acepto la [[Política de privacidad]].' },
+    { clave: 'pre_boton', contexto: 'Pre-registro de choferes: botón de enviar', es: 'Solicitar pre-registro' },
+    { clave: 'pre_enviando', contexto: 'Pre-registro de choferes: botón mientras se envía', es: 'Enviando...' },
+    { clave: 'pre_faltan', contexto: 'Pre-registro de choferes: aviso si falta algún campo', es: 'Completa los campos marcados en rosa.' },
+    { clave: 'pre_email_mal', contexto: 'Pre-registro de choferes: aviso si el email no es válido', es: 'Revisa el email: no parece correcto.' },
+    { clave: 'pre_privacidad_falta', contexto: 'Pre-registro de choferes: aviso si no se marca la casilla', es: 'Debes aceptar la Política de privacidad.' },
+    { clave: 'pre_ya_existe', contexto: 'Pre-registro de choferes: aviso si el email ya está dado de alta o pre-registrado', es: 'Ya tenemos una solicitud con este email. Si necesitas ayuda, escríbenos desde la página de Contacto.' },
+    { clave: 'pre_error_conexion', contexto: 'Pre-registro de choferes: aviso si falla la conexión', es: 'Error de conexión. Inténtalo de nuevo.' },
+    { clave: 'pre_ok_titulo', contexto: 'Pre-registro de choferes: título del mensaje después de enviar', es: '✅ ¡Pre-registro recibido!' },
+    { clave: 'pre_ok_texto', contexto: 'Pre-registro de choferes: texto del mensaje después de enviar', es: 'Revisaremos tu solicitud y te enviaremos un enlace privado a tu correo electrónico para completar el resto de tus datos profesionales. Revisa tu bandeja de entrada (o la carpeta de spam).' },
   ];
   for (const tx of TEXTOS_ALTA_CHOFER) {
     await pool.query(
@@ -3697,6 +3747,20 @@ Revisa el estado del depósito desde el panel de administración.
 🚗 El conductor <strong>{nombre_chofer}</strong> ha completado su solicitud para unirse a la flota.
 
 🔍 Accede al panel de administración para revisar su perfil y aprobar o rechazar la solicitud.
+`,
+      cuerpo_whatsapp: null },
+    // (19/11/2026) Alta de choferes en dos pasos: aviso al equipo de un pre-registro nuevo (paso 1)
+    { clave: 'interno_prerregistro_chofer', nombre: '[Admin] Nuevo pre-registro de chofer', categoria: 'interno',
+      asunto_email: '📝 Nuevo pre-registro de chofer \u2014 {nombre_chofer}',
+      cuerpo_email: `
+📝 <strong>{nombre_chofer}</strong> ha hecho el pre-registro para unirse a la red de choferes.
+
+📧 <strong>Email:</strong> {email_chofer}
+📱 <strong>Teléfono:</strong> {telefono_chofer}
+🏝️ <strong>Isla:</strong> {isla} · <strong>Municipio:</strong> {municipio}
+🪪 <strong>Licencia municipal:</strong> {numero_licencia}
+
+🔍 Revísalo en el panel de administración, en Conductores → «Pre-registros de choferes».
 `,
       cuerpo_whatsapp: null },
     { clave: 'interno_recuperar_password_admin', nombre: '[Admin] Recuperar contrase\u00f1a de administrador', categoria: 'interno',
@@ -11353,11 +11417,146 @@ app.get('/chofer/acceso', asyncHandler(async (req, res) => {
   res.render('chofer-registro', { lang: 'es', t, palabrasPaginas, BASE_URL });
 }));
 
+// (19/11/2026) Alta de choferes en dos pasos — paso 1: «Alta choferes» es ahora el PRE-REGISTRO público
+// (nombre, móvil, email, isla, municipio, licencia y casilla de privacidad). El formulario completo de
+// views/chofer-registro.ejs pasa a ser privado (paso 2, con enlace personal); hasta entonces no se ofrece en la web.
 app.get('/chofer/acceso/alta', asyncHandler(async (req, res) => {
   if (req.session && req.session.choferId) return res.redirect('/chofer/portal');
+  res.set('Cache-Control', 'no-cache');
   const t = function(clave) { return obtenerTexto(clave, 'es'); };
   const palabrasPaginas = PALABRAS_PAGINAS['es'] || {};
-  res.render('chofer-registro', { lang: 'es', t, palabrasPaginas, BASE_URL });
+  const img = await pool.query('SELECT (imagen IS NOT NULL OR cloudinary_url IS NOT NULL) AS hay, alt_texto, actualizado_en FROM alta_choferes_imagen WHERE id = 1');
+  const imagen = (img.rows.length && img.rows[0].hay)
+    ? { url: '/alta-choferes/imagen?v=' + new Date(img.rows[0].actualizado_en).getTime(), alt: img.rows[0].alt_texto || '' }
+    : null;
+  const islas = await pool.query('SELECT nombre FROM islas WHERE activa = TRUE ORDER BY orden, nombre');
+  res.render('chofer-prerregistro', { lang: 'es', t, palabrasPaginas, BASE_URL, imagen, islas: islas.rows.map(function (r) { return r.nombre; }) });
+}));
+
+// Imagen de arriba de «Alta choferes» (pública): de Cloudinary; si no está allí, la copia guardada
+app.get('/alta-choferes/imagen', asyncHandler(async (req, res) => {
+  const r = await pool.query('SELECT imagen, cloudinary_url FROM alta_choferes_imagen WHERE id = 1');
+  if (!r.rows.length || (!r.rows[0].imagen && !r.rows[0].cloudinary_url)) return res.status(404).send('Sin imagen');
+  if (r.rows[0].cloudinary_url) return res.redirect(302, r.rows[0].cloudinary_url);
+  const m = String(r.rows[0].imagen).match(/^data:([^;]+);base64,(.+)$/);
+  if (!m) return res.status(404).send('Sin imagen');
+  res.set('Content-Type', m[1]);
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.send(Buffer.from(m[2], 'base64'));
+}));
+
+// Envío del pre-registro. No crea ningún chofer: guarda la solicitud y avisa al equipo.
+app.post('/api/chofer/prerregistro', asyncHandler(async (req, res) => {
+  const b = req.body || {};
+  const txt = function (clave) { return obtenerTexto(clave, 'es'); };
+  // Campo trampa para programas automáticos: una persona nunca lo rellena (está escondido)
+  if (String(b.web || '').trim()) return res.json({ ok: true });
+  const nombre = String(b.nombre || '').trim().slice(0, 200);
+  const email = String(b.email || '').trim().toLowerCase().slice(0, 200);
+  const telefono = String(b.telefono || '').trim().slice(0, 40);
+  const isla = String(b.isla || '').trim().slice(0, 100);
+  const municipio = String(b.municipio || '').trim().slice(0, 150);
+  const licencia = String(b.numero_licencia || '').trim().slice(0, 100);
+  if (!nombre || !email || !telefono || !isla || !municipio || !licencia) return res.status(400).json({ error: txt('pre_faltan') });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: txt('pre_email_mal') });
+  const cifras = telefono.replace(/[^0-9]/g, '');
+  if (!/^\+[0-9][0-9 ]*$/.test(telefono) || cifras.length < 8 || cifras.length > 15) return res.status(400).json({ error: txt('alta_tel_sin_prefijo') });
+  if (b.acepta_privacidad !== true) return res.status(400).json({ error: txt('pre_privacidad_falta') });
+  const ya = await pool.query(
+    `SELECT 1 FROM conductores WHERE LOWER(email) = $1
+     UNION ALL SELECT 1 FROM choferes_prerregistro WHERE LOWER(email) = $1 AND estado <> 'descartado' LIMIT 1`, [email]);
+  if (ya.rows.length) return res.status(400).json({ error: txt('pre_ya_existe') });
+  await pool.query(
+    `INSERT INTO choferes_prerregistro (nombre, email, telefono, isla, municipio, numero_licencia, privacidad_aceptada_en)
+     VALUES ($1,$2,$3,$4,$5,$6,NOW())`,
+    [nombre, email, telefono, isla, municipio, licencia]
+  );
+  // Aviso al equipo (Admin → Notificaciones) con la plantilla «[Admin] Nuevo pre-registro de chofer»
+  try {
+    const vars = { nombre_chofer: nombre, email_chofer: email, telefono_chofer: telefono, isla: isla, municipio: municipio, numero_licencia: licencia };
+    const pl = await obtenerPlantilla('interno_prerregistro_chofer', vars, 'es');
+    const emails = await obtenerEmailsNotificacion();
+    for (const em of emails) {
+      await enviarEmail({
+        to: em,
+        subject: (pl && pl.email && pl.asunto) || ('📝 Nuevo pre-registro de chofer — ' + nombre),
+        html: (pl && pl.email) ? plantillaEmail(pl.email) : plantillaEmail(
+          `<p>📝 <strong>${escLegal(nombre)}</strong> ha hecho el pre-registro para unirse a la red de choferes.</p>
+           <p>📧 <strong>Email:</strong> ${escLegal(email)}<br>📱 <strong>Teléfono:</strong> ${escLegal(telefono)}<br>
+           🏝️ <strong>Isla:</strong> ${escLegal(isla)} · <strong>Municipio:</strong> ${escLegal(municipio)}<br>🪪 <strong>Licencia municipal:</strong> ${escLegal(licencia)}</p>
+           <p>🔍 Revísalo en el panel de administración, en Conductores → «Pre-registros de choferes».</p>`)
+      });
+    }
+  } catch (err) {
+    console.warn('Error enviando el aviso de pre-registro de chofer:', err.message);
+  }
+  res.json({ ok: true });
+}));
+
+// Admin → Conductores: la imagen de «Alta choferes» y los pre-registros
+app.get('/admin/alta-choferes/imagen', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query('SELECT (imagen IS NOT NULL OR cloudinary_url IS NOT NULL) AS hay, alt_texto, actualizado_en FROM alta_choferes_imagen WHERE id = 1');
+  if (!r.rows.length) return res.json({ hay: false, alt_texto: '' });
+  res.json({ hay: r.rows[0].hay, alt_texto: r.rows[0].alt_texto || '', version: new Date(r.rows[0].actualizado_en).getTime() });
+}));
+
+app.post('/admin/alta-choferes/imagen', requireAdmin, asyncHandler(async (req, res) => {
+  const foto = req.body && req.body.foto;
+  const alt = String((req.body && req.body.alt_texto) || '').trim().slice(0, 300);
+  if (!foto) {
+    // Solo la descripción (alt)
+    const r = await pool.query('UPDATE alta_choferes_imagen SET alt_texto = $1, actualizado_en = NOW() WHERE id = 1', [alt]);
+    if (!r.rowCount) return res.status(400).json({ error: 'Primero sube una imagen.' });
+    return res.json({ ok: true });
+  }
+  if (!String(foto).startsWith('data:image/') || foto.length > 10000000) {
+    return res.status(400).json({ error: 'La imagen no es válida o pesa demasiado.' });
+  }
+  const m = String(foto).match(/^data:([^;]+);base64,(.+)$/);
+  if (!m) return res.status(400).json({ error: 'Formato de imagen no válido.' });
+  const webp = await sharp(Buffer.from(m[2], 'base64')).resize({ width: 1600, withoutEnlargement: true }).webp({ quality: 88 }).toBuffer();
+  const dataUrl = 'data:image/webp;base64,' + webp.toString('base64');
+  let urlCloud = null;
+  try {
+    const subida = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: 'traslados-gc/alta-choferes', public_id: 'alta-choferes-cabecera', overwrite: true, invalidate: true },
+        (error, result) => { if (error) reject(error); else resolve(result); }
+      );
+      stream.end(webp);
+    });
+    urlCloud = subida.secure_url;
+  } catch (e) {
+    console.error('Error subiendo la imagen de Alta choferes a Cloudinary:', e.message);
+  }
+  await pool.query(
+    `INSERT INTO alta_choferes_imagen (id, imagen, cloudinary_url, alt_texto, actualizado_en) VALUES (1, $1, $2, $3, NOW())
+     ON CONFLICT (id) DO UPDATE SET imagen = $1, cloudinary_url = $2, alt_texto = $3, actualizado_en = NOW()`,
+    [dataUrl, urlCloud, alt]
+  );
+  res.json({ ok: true });
+}));
+
+app.delete('/admin/alta-choferes/imagen', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query('SELECT cloudinary_url FROM alta_choferes_imagen WHERE id = 1');
+  if (r.rows.length && r.rows[0].cloudinary_url) {
+    try { await cloudinary.uploader.destroy('traslados-gc/alta-choferes/alta-choferes-cabecera', { invalidate: true }); }
+    catch (e) { console.warn('No se pudo borrar la imagen de Alta choferes en Cloudinary:', e.message); }
+  }
+  await pool.query('DELETE FROM alta_choferes_imagen WHERE id = 1');
+  res.json({ ok: true });
+}));
+
+app.get('/admin/choferes-prerregistro', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query(
+    `SELECT id, nombre, email, telefono, isla, municipio, numero_licencia, privacidad_aceptada_en, estado, creado_en
+     FROM choferes_prerregistro ORDER BY creado_en DESC`);
+  res.json(r.rows);
+}));
+
+app.delete('/admin/choferes-prerregistro/:id', requireAdmin, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM choferes_prerregistro WHERE id = $1', [parseInt(req.params.id, 10) || 0]);
+  res.json({ ok: true });
 }));
 
 app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
@@ -20329,6 +20528,7 @@ const VARIABLES_PLANTILLAS = {
   interno_cliente_cancelo:       { email: ['numero_reserva', 'nombre_cliente', 'origen', 'destino', 'fecha'], wa: null },
   interno_sin_choferes:          { email: ['numero_reserva'], wa: null },
   interno_registro_chofer:       { email: ['nombre_chofer', 'email_chofer', 'telefono_chofer', 'vehiculo', 'isla'], wa: null },
+  interno_prerregistro_chofer:   { email: ['nombre_chofer', 'email_chofer', 'telefono_chofer', 'isla', 'municipio', 'numero_licencia'], wa: null },
   chofer_respuesta_confirmado:   { email: null, wa: ['numero_reserva'] },
   chofer_respuesta_rechazo:      { email: null, wa: [] },
   chofer_aviso_cancelada:        { email: null, wa: _VCH },
