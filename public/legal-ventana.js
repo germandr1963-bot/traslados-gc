@@ -20,7 +20,12 @@
     '#legal-ventana .lv-texto h3{font-family:"Big Shoulders Display",sans-serif;font-size:19px;font-weight:bold;margin:18px 0 6px;}' +
     '#legal-ventana .lv-texto ul,#legal-ventana .lv-texto ol{padding-left:20px;margin:0 0 14px;}' +
     '#legal-ventana .lv-texto li{margin-bottom:6px;}' +
-    '#legal-ventana .lv-texto a{color:var(--terracota,#C1502E);font-weight:600;text-decoration:none;}' +
+    '#legal-ventana .lv-texto a{color:#1a0dab;text-decoration:underline;}' + // (19/11/2026) N93: enlaces en el azul de siempre
+    // (19/11/2026) N93: tablas de los textos legales (se deslizan a los lados si no caben)
+    '#legal-ventana .lv-texto table{width:100%;border-collapse:collapse;margin:0 0 16px;font-size:14px;line-height:1.5;}' +
+    '#legal-ventana .lv-texto th,#legal-ventana .lv-texto td{border:1px solid var(--gris-borde,#E1DCD0);padding:7px 9px;text-align:left;vertical-align:top;}' +
+    '@media (max-width:600px){#legal-ventana .lv-texto table{display:block;overflow-x:auto;}#legal-ventana .lv-texto th,#legal-ventana .lv-texto td{min-width:110px;}}' +
+    '#legal-ventana .lv-texto th{background:var(--gris-fondo,#F6F4EF);font-weight:600;}' +
     '#legal-ventana .lv-pie{padding:12px 22px 18px;border-top:1px solid var(--gris-borde,#E1DCD0);}' +
     '#legal-ventana .lv-cerrar{width:100%;background:#f5f0ea;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:0.95rem;padding:0.7rem;color:var(--texto-oscuro,#2A211B);font-family:inherit;}' +
     '@media (max-width:600px){#legal-ventana{padding:0;align-items:flex-end;}#legal-ventana .lv-caja{max-height:92vh;border-radius:12px 12px 0 0;}#legal-ventana .lv-titulo{font-size:22px;}}';
