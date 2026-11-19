@@ -10468,7 +10468,8 @@ async function fechaTextoLegal(claveTexto, lang) {
 async function htmlTextoLegal(pagina, lang) {
   const p = PAGINAS_LEGALES[pagina];
   const fecha = await fechaTextoLegal(p.texto, lang);
-  return parrafosLegales(obtenerTexto(p.texto, lang)).replace(/\[FECHA\]/gi, fecha || '[FECHA]');
+  // «[FECHA]» aunque lleve negritas por medio (p. ej. «[</strong>FECHA<strong>]»)
+  return parrafosLegales(obtenerTexto(p.texto, lang)).replace(/\[(?:\s|<[^>]+>)*FECHA(?:\s|<[^>]+>)*\]/gi, fecha || '[FECHA]');
 }
 // Texto de una página legal. Con formato (editor del Admin): solo se dejan títulos, negritas, párrafos y listas, sin estilos.
 // Sin formato (texto pegado antes): cada línea en blanco separa un apartado; un salto de línea simple se respeta.
