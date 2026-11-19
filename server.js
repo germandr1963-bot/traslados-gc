@@ -10125,9 +10125,8 @@ app.post('/admin/textos/aprobar-azules', requireAdmin, asyncHandler(async (req, 
     `SELECT tit.texto_id, tit.lang_code, tit.texto, ti.clave
      FROM textos_interfaz_traducciones tit JOIN textos_interfaz ti ON ti.id = tit.texto_id
      WHERE tit.revisado = FALSE AND COALESCE(tit.desactualizado, FALSE) = FALSE
-       AND tit.texto IS NOT NULL AND TRIM(tit.texto) <> ''
-       AND ti.clave NOT IN ('legal_aviso_texto','legal_privacidad_texto','legal_cookies_texto','legal_condiciones_texto')`
-  ); // (19/11/2026) N93: los 4 textos completos legales se aprueban uno a uno en su ficha
+       AND tit.texto IS NOT NULL AND TRIM(tit.texto) <> ''`
+  );
   const sep = separarParaAprobar(azules.rows.map(function (f) {
     return { texto_id: f.texto_id, lang: f.lang_code, texto: f.texto, donde: f.clave + ' (' + f.lang_code.toUpperCase() + ')' };
   }));
@@ -10145,7 +10144,6 @@ app.post('/admin/textos/:id/idioma/:lang/retraducir', requireAdmin, asyncHandler
   if (!tx.rows.length) return res.status(404).json({ ok: false, error: 'Texto no encontrado' });
   const t = tx.rows[0];
   if (!t.texto_es || !t.texto_es.trim()) return res.json({ ok: false, error: 'Este texto no tiene español.' });
-  if (esTextoLegalCompleto(t.clave)) return res.json({ ok: false, error: 'Este texto legal no se traduce con la IA: pega la traducción y pulsa «💾 Guardar».' }); // (19/11/2026) N93
   const item = { clave: t.clave, contexto: t.contexto || '', texto_es: t.texto_es };
   let ultimoProblema = null;
   for (let intento = 1; intento <= 2; intento++) {
@@ -10192,7 +10190,6 @@ app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (re
   }
 
   const pendientes = textos.rows.filter(function (t) {
-    if (esTextoLegalCompleto(t.clave)) return false; // (19/11/2026) N93: sus traducciones las pega Germán, nunca la IA
     return !(yaTraducidos[t.id] && yaTraducidos[t.id].trim());
   });
 
@@ -10446,9 +10443,6 @@ function tablasDesdeTabuladores(html) {
     });
     return t + '</table>';
   });
-}
-function esTextoLegalCompleto(clave) {
-  return Object.keys(PAGINAS_LEGALES).some(function (k) { return PAGINAS_LEGALES[k].texto === clave; });
 }
 // (19/11/2026) N93: «[FECHA]» en el texto de una página legal = fecha del último cambio de ese texto en ese idioma
 // (en español, cuando cambió el español; en otro idioma, cuando se guardó su traducción), en el formato del idioma.
