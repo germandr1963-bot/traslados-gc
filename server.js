@@ -1016,6 +1016,32 @@ async function initSchema() {
   } catch (eTrig) {
     console.warn('Aviso de traducciones desactualizadas (Textos de interfaz):', eTrig.message);
   }
+  // (19/11/2026) N93: fecha del último cambio del español de cada texto (la usa «[FECHA]» de las páginas legales).
+  // La pone la base de datos sola cada vez que cambia el español, venga de donde venga el cambio.
+  try {
+    await pool.query(`ALTER TABLE textos_interfaz ADD COLUMN IF NOT EXISTS texto_es_actualizado_en TIMESTAMP`);
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION fecha_texto_es_cambiado() RETURNS trigger AS $fn$
+      BEGIN
+        IF NEW.texto_es IS DISTINCT FROM OLD.texto_es THEN
+          NEW.texto_es_actualizado_en := NOW();
+        END IF;
+        RETURN NEW;
+      END;
+      $fn$ LANGUAGE plpgsql;
+    `);
+    await pool.query(`DROP TRIGGER IF EXISTS trg_fecha_texto_es ON textos_interfaz`);
+    await pool.query(`
+      CREATE TRIGGER trg_fecha_texto_es
+      BEFORE UPDATE OF texto_es ON textos_interfaz
+      FOR EACH ROW EXECUTE FUNCTION fecha_texto_es_cambiado()
+    `);
+    // Los 4 textos completos que ya existían sin fecha: la de hoy (Germán los pegó el 19/11)
+    await pool.query(`UPDATE textos_interfaz SET texto_es_actualizado_en = NOW()
+      WHERE texto_es_actualizado_en IS NULL AND clave IN ('legal_aviso_texto','legal_privacidad_texto','legal_cookies_texto','legal_condiciones_texto')`);
+  } catch (eFecha) {
+    console.warn('Fecha de los textos en español:', eFecha.message);
+  }
 
   // Los 21 textos fijos de la página de ruta (traslado.ejs), con su contexto
   // para que cualquier traductor sepa exactamente dónde aparece cada uno.
@@ -10099,8 +10125,9 @@ app.post('/admin/textos/aprobar-azules', requireAdmin, asyncHandler(async (req, 
     `SELECT tit.texto_id, tit.lang_code, tit.texto, ti.clave
      FROM textos_interfaz_traducciones tit JOIN textos_interfaz ti ON ti.id = tit.texto_id
      WHERE tit.revisado = FALSE AND COALESCE(tit.desactualizado, FALSE) = FALSE
-       AND tit.texto IS NOT NULL AND TRIM(tit.texto) <> ''`
-  );
+       AND tit.texto IS NOT NULL AND TRIM(tit.texto) <> ''
+       AND ti.clave NOT IN ('legal_aviso_texto','legal_privacidad_texto','legal_cookies_texto','legal_condiciones_texto')`
+  ); // (19/11/2026) N93: los 4 textos completos legales se aprueban uno a uno en su ficha
   const sep = separarParaAprobar(azules.rows.map(function (f) {
     return { texto_id: f.texto_id, lang: f.lang_code, texto: f.texto, donde: f.clave + ' (' + f.lang_code.toUpperCase() + ')' };
   }));
@@ -10118,6 +10145,7 @@ app.post('/admin/textos/:id/idioma/:lang/retraducir', requireAdmin, asyncHandler
   if (!tx.rows.length) return res.status(404).json({ ok: false, error: 'Texto no encontrado' });
   const t = tx.rows[0];
   if (!t.texto_es || !t.texto_es.trim()) return res.json({ ok: false, error: 'Este texto no tiene español.' });
+  if (esTextoLegalCompleto(t.clave)) return res.json({ ok: false, error: 'Este texto legal no se traduce con la IA: pega la traducción y pulsa «💾 Guardar».' }); // (19/11/2026) N93
   const item = { clave: t.clave, contexto: t.contexto || '', texto_es: t.texto_es };
   let ultimoProblema = null;
   for (let intento = 1; intento <= 2; intento++) {
@@ -10164,6 +10192,7 @@ app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (re
   }
 
   const pendientes = textos.rows.filter(function (t) {
+    if (esTextoLegalCompleto(t.clave)) return false; // (19/11/2026) N93: sus traducciones las pega Germán, nunca la IA
     return !(yaTraducidos[t.id] && yaTraducidos[t.id].trim());
   });
 
@@ -10382,7 +10411,7 @@ app.locals.lineaCopyright = lineaCopyright;
 // (19/11/2026) N93: lo que queda suelto entre títulos y párrafos (p. ej. el primer párrafo tras un título pegado de Word)
 // se mete en su propio párrafo, para que tenga su espacio debajo como los demás.
 function envolverSueltosLegal(html) {
-  var BLOQUES = { p: 1, h2: 1, h3: 1, ul: 1, ol: 1 };
+  var BLOQUES = { p: 1, h2: 1, h3: 1, ul: 1, ol: 1, table: 1 };
   var out = '', suelto = '', nivel = 0, m;
   var re = /<(\/?)([a-zA-Z0-9]+)[^>]*>|[^<]+/g;
   function soltar() {
@@ -10403,6 +10432,44 @@ function envolverSueltosLegal(html) {
   soltar();
   return out;
 }
+// (19/11/2026) N93: líneas seguidas separadas con tabulador (pegadas del Bloc de notas o de Excel como texto)
+// → una tabla; la primera línea es la cabecera.
+function tablasDesdeTabuladores(html) {
+  return String(html || '').replace(/(?:<p>(?:(?!<\/p>)[\s\S])*\t(?:(?!<\/p>)[\s\S])*<\/p>\s*)+/g, function (bloque) {
+    const filas = bloque.match(/<p>[\s\S]*?<\/p>/g) || [];
+    if (filas.length < 2) return bloque;
+    const celdas = filas.map(function (f) { return f.replace(/^<p>|<\/p>$/g, '').split('\t'); });
+    let t = '<table>';
+    celdas.forEach(function (c, i) {
+      const tag = i === 0 ? 'th' : 'td';
+      t += '<tr>' + c.map(function (x) { return '<' + tag + '>' + x.trim() + '</' + tag + '>'; }).join('') + '</tr>';
+    });
+    return t + '</table>';
+  });
+}
+function esTextoLegalCompleto(clave) {
+  return Object.keys(PAGINAS_LEGALES).some(function (k) { return PAGINAS_LEGALES[k].texto === clave; });
+}
+// (19/11/2026) N93: «[FECHA]» en el texto de una página legal = fecha del último cambio de ese texto en ese idioma
+// (en español, cuando cambió el español; en otro idioma, cuando se guardó su traducción), en el formato del idioma.
+const LOCALE_FECHA_LEGAL = { es: 'es-ES', en: 'en-GB', de: 'de-DE', fr: 'fr-FR', it: 'it-IT', nl: 'nl-NL', sv: 'sv-SE', no: 'nb-NO', fi: 'fi-FI', ru: 'ru-RU' };
+async function fechaTextoLegal(claveTexto, lang) {
+  const r = await pool.query(
+    `SELECT ti.texto_es_actualizado_en AS es, tr.updated_at AS tr, tr.texto AS texto
+     FROM textos_interfaz ti
+     LEFT JOIN textos_interfaz_traducciones tr ON tr.texto_id = ti.id AND tr.lang_code = $2
+     WHERE ti.clave = $1`, [claveTexto, lang]);
+  if (!r.rows.length) return '';
+  const f = r.rows[0];
+  const fecha = (lang !== 'es' && f.texto && String(f.texto).trim() && f.tr) ? f.tr : f.es;
+  if (!fecha) return '';
+  return new Intl.DateTimeFormat(LOCALE_FECHA_LEGAL[lang] || 'es-ES', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Atlantic/Canary' }).format(new Date(fecha));
+}
+async function htmlTextoLegal(pagina, lang) {
+  const p = PAGINAS_LEGALES[pagina];
+  const fecha = await fechaTextoLegal(p.texto, lang);
+  return parrafosLegales(obtenerTexto(p.texto, lang)).replace(/\[FECHA\]/gi, fecha || '[FECHA]');
+}
 // Texto de una página legal. Con formato (editor del Admin): solo se dejan títulos, negritas, párrafos y listas, sin estilos.
 // Sin formato (texto pegado antes): cada línea en blanco separa un apartado; un salto de línea simple se respeta.
 function parrafosLegales(texto) {
@@ -10410,8 +10477,9 @@ function parrafosLegales(texto) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   };
   const v = String(texto || '');
-  if (/<\/?(p|h2|h3|ul|ol|li|strong|b|br|a)(\s[^>]*)?\/?>/i.test(v)) {
-    const PERMITIDAS = { p: 'p', h2: 'h2', h3: 'h3', strong: 'strong', b: 'strong', ul: 'ul', ol: 'ol', li: 'li', br: 'br', a: 'a' };
+  if (/<\/?(p|h2|h3|ul|ol|li|strong|b|br|a|table)(\s[^>]*)?\/?>/i.test(v)) {
+    const PERMITIDAS = { p: 'p', h2: 'h2', h3: 'h3', strong: 'strong', b: 'strong', ul: 'ul', ol: 'ol', li: 'li', br: 'br', a: 'a',
+      table: 'table', thead: 'thead', tbody: 'tbody', tr: 'tr', th: 'th', td: 'td' }; // (19/11/2026) N93: tablas
     return v.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '')
       .replace(/<(\/?)([a-zA-Z0-9]+)\b([^>]*)>/g, function (m, cierre, tag, attrs) {
         const t = PERMITIDAS[tag.toLowerCase()];
@@ -10427,12 +10495,18 @@ function parrafosLegales(texto) {
           return '<a href="' + esc(href) + '"' + (web ? ' target="_blank" rel="noopener"' : '') + '>';
         }
         return '<' + cierre + t + '>';
-      }).replace(/^[\s\S]*$/, function (limpio) { return envolverSueltosLegal(limpio); });
+      }).replace(/^[\s\S]*$/, function (limpio) { return envolverSueltosLegal(tablasDesdeTabuladores(limpio)); });
   }
   return v.replace(/\r\n/g, '\n').split(/\n\s*\n/)
     .map(function (b) { return b.trim(); })
     .filter(function (b) { return b; })
-    .map(function (b) { return '<p>' + esc(b).replace(/\n/g, '<br>') + '</p>'; })
+    .map(function (b) {
+      const lineas = b.split('\n');
+      if (lineas.length > 1 && lineas.every(function (l) { return l.indexOf('\t') >= 0; })) {
+        return tablasDesdeTabuladores(lineas.map(function (l) { return '<p>' + esc(l) + '</p>'; }).join(''));
+      }
+      return '<p>' + esc(b).replace(/\n/g, '<br>') + '</p>';
+    })
     .join('\n');
 }
 
@@ -10447,7 +10521,7 @@ async function renderLegal(req, res, lang, pagina) {
     lang, t, palabrasPaginas, BASE_URL,
     titulo: t(p.nombre),
     nombreMigas: t(p.nombre),
-    contenidoHtml: parrafosLegales(t(p.texto))
+    contenidoHtml: await htmlTextoLegal(pagina, lang)
   });
 }
 
@@ -10477,7 +10551,7 @@ app.get('/api/legal/:pagina', asyncHandler(async (req, res) => {
   if (!p) return res.status(404).json({ error: 'Página no encontrada' });
   const lang = IDIOMAS_PERMITIDOS.includes(req.query.lang) ? req.query.lang : 'es';
   const t = function (clave) { return obtenerTexto(clave, lang); };
-  res.json({ titulo: t(p.nombre), html: parrafosLegales(t(p.texto)), cerrar: t('home_modal_cerrar') }); // (19/11/2026) N93: sin aviso «Texto provisional» (quitado por Germán)
+  res.json({ titulo: t(p.nombre), html: await htmlTextoLegal(req.params.pagina, lang), cerrar: t('home_modal_cerrar') }); // (19/11/2026) N93: sin aviso «Texto provisional» (quitado por Germán)
 }));
 
 // Español: /aviso-legal, /politica-de-privacidad… (la palabra sale de Idiomas → 🔗 Palabras de URL por página)
