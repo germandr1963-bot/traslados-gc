@@ -1329,7 +1329,6 @@ async function initSchema() {
     { clave: "legal_footer_cookies", contexto: "Nombre de la página «Política de cookies»: sale en la segunda fila del pie de página y como título de la página (y de la pestaña del navegador)", es: "Política de cookies" },
     { clave: "legal_footer_condiciones", contexto: "Nombre de la página «Condiciones generales»: sale en la segunda fila del pie de página y como título de la página (y de la pestaña del navegador)", es: "Condiciones generales" },
     { clave: "legal_copyright", contexto: "Última línea del pie de página en toda la web. {año} lo pone la web sola (no se traduce). La marca «Traslados · GC» no se traduce; la isla, con su nombre oficial en cada idioma (Islas / Localidades)", es: "© {año} Traslados · GC — Gran Canaria. Todos los derechos reservados." },
-    { clave: "legal_provisional", contexto: "Aviso arriba de cada página legal mientras su texto no sea el oficial (cuando se pegue el oficial, se deja vacío y no sale)", es: "Texto provisional — en preparación" },
     { clave: "legal_acepto", contexto: "Casilla obligatoria antes de «Confirmar y enviar solicitud» (página de reserva). Lo que va entre [[ ]] se convierte en enlace: el primero lleva a Condiciones generales y el segundo a Política de privacidad. Mantener los dobles corchetes en todos los idiomas", es: "He leído y acepto las [[Condiciones generales]] y la [[Política de privacidad]]." },
     { clave: "legal_acepto_error", contexto: "Aviso si se pulsa «Confirmar y enviar solicitud» sin marcar la casilla de aceptación", es: "Para enviar la solicitud, marque la casilla de aceptación." },
     { clave: "legal_info_titulo", contexto: "Título del recuadro de información básica de protección de datos (página de reserva, encima de la casilla)", es: "Información básica sobre protección de datos" },
@@ -3021,9 +3020,6 @@ async function initSchema() {
   await pool.query(`INSERT INTO configuracion_modelo (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
   // (18/11/2026) N86: aviso de cookies en la web (apagado de inicio)
   await pool.query(`ALTER TABLE configuracion_modelo ADD COLUMN IF NOT EXISTS aviso_cookies BOOLEAN NOT NULL DEFAULT FALSE`);
-  // (19/11/2026) N93: aviso «Texto provisional» por página legal. Si una página tiene marcado «Texto oficial», su aviso no sale.
-  await pool.query(`CREATE TABLE IF NOT EXISTS paginas_legales_oficial (pagina TEXT PRIMARY KEY, oficial BOOLEAN NOT NULL DEFAULT FALSE, actualizado_en TIMESTAMP DEFAULT NOW())`);
-  await cargarLegalOficial();
 
   // ─── Imágenes de WhatsApp ──────────────────────────────────────────────────
   await pool.query(`
@@ -10440,32 +10436,6 @@ function parrafosLegales(texto) {
     .join('\n');
 }
 
-// (19/11/2026) N93: páginas legales con su texto oficial (sin el aviso «Texto provisional»). Se marca en la ficha del texto completo.
-let LEGAL_OFICIAL = {};
-async function cargarLegalOficial() {
-  const r = await pool.query('SELECT pagina, oficial FROM paginas_legales_oficial');
-  const m = {};
-  r.rows.forEach(function (f) { m[f.pagina] = !!f.oficial; });
-  LEGAL_OFICIAL = m;
-}
-function avisoProvisional(pagina, lang) {
-  return LEGAL_OFICIAL[pagina] ? '' : obtenerTexto('legal_provisional', lang);
-}
-app.get('/admin/legal-oficial', requireAdmin, asyncHandler(async (req, res) => {
-  res.json(LEGAL_OFICIAL);
-}));
-app.post('/admin/legal-oficial', requireAdmin, asyncHandler(async (req, res) => {
-  const pagina = String(req.body.pagina || '');
-  if (!PAGINAS_LEGALES[pagina]) return res.status(400).json({ error: 'Página no válida' });
-  await pool.query(
-    `INSERT INTO paginas_legales_oficial (pagina, oficial, actualizado_en) VALUES ($1, $2, NOW())
-     ON CONFLICT (pagina) DO UPDATE SET oficial = $2, actualizado_en = NOW()`,
-    [pagina, req.body.oficial === true]
-  );
-  await cargarLegalOficial();
-  res.json({ ok: true, oficial: !!LEGAL_OFICIAL[pagina] });
-}));
-
 async function renderLegal(req, res, lang, pagina) {
   if (!IDIOMAS_PERMITIDOS.includes(lang) || !PAGINAS_LEGALES[pagina]) {
     return res.status(404).send('Página no encontrada');
@@ -10477,7 +10447,6 @@ async function renderLegal(req, res, lang, pagina) {
     lang, t, palabrasPaginas, BASE_URL,
     titulo: t(p.nombre),
     nombreMigas: t(p.nombre),
-    aviso: avisoProvisional(pagina, lang),
     contenidoHtml: parrafosLegales(t(p.texto))
   });
 }
@@ -10508,7 +10477,7 @@ app.get('/api/legal/:pagina', asyncHandler(async (req, res) => {
   if (!p) return res.status(404).json({ error: 'Página no encontrada' });
   const lang = IDIOMAS_PERMITIDOS.includes(req.query.lang) ? req.query.lang : 'es';
   const t = function (clave) { return obtenerTexto(clave, lang); };
-  res.json({ titulo: t(p.nombre), aviso: avisoProvisional(req.params.pagina, lang), html: parrafosLegales(t(p.texto)), cerrar: t('home_modal_cerrar') });
+  res.json({ titulo: t(p.nombre), html: parrafosLegales(t(p.texto)), cerrar: t('home_modal_cerrar') }); // (19/11/2026) N93: sin aviso «Texto provisional» (quitado por Germán)
 }));
 
 // Español: /aviso-legal, /politica-de-privacidad… (la palabra sale de Idiomas → 🔗 Palabras de URL por página)
