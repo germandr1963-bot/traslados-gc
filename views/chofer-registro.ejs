@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Alta de Chofer — Traslados GC</title>
+  <title><%= modo === 'registro' ? t('reg_titulo') : 'Acceso a choferes' %> — Traslados GC</title>
+  <% if (modo === 'registro') { %><meta name="robots" content="noindex, nofollow"><% } %>
   <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/estilos.css">
   <style>
@@ -46,7 +47,8 @@
     @media (max-width: 600px) { .contenido { padding: 24px 16px 60px; } }
 
     h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: clamp(32px, 6vw, 52px); color: var(--texto-oscuro); margin-bottom: 12px; }
-    h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 15px; color: var(--terracota); margin: 20px 0 6px; letter-spacing: 0.5px; }
+    /* (19/11/2026) Solo los subtítulos del formulario: así no se mete en los títulos de la ventana legal */
+    .tarjeta h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 15px; color: var(--terracota); margin: 20px 0 6px; letter-spacing: 0.5px; }
     p.sub { color: var(--texto-muted); margin-bottom: 20px; font-size: 19px; font-style: italic; letter-spacing: 0.3px; line-height: 1.6; }
 
     .pestanas { display: flex; gap: 8px; margin-bottom: 18px; }
@@ -119,11 +121,18 @@
     <nav class="breadcrumbs" id="breadcrumb-nav">
       <a href="/">Inicio</a>
       <span> › </span>
-      <span id="breadcrumb-texto">Acceso choferes</span>
+      <span id="breadcrumb-texto"><%= modo === 'registro' ? t('reg_titulo') : 'Acceso choferes' %></span>
     </nav>
 
-    <h1 id="titulo-pagina">Acceso a choferes</h1>
-    <p class="sub" id="texto-intro">Regístrate y forma parte de nuestro equipo</p>
+    <h1 id="titulo-pagina"><%= modo === 'registro' ? t('reg_titulo') : 'Acceso a choferes' %></h1>
+    <% if (modo === 'registro' && !registro.valido) { %>
+    <!-- (19/11/2026) Paso 2: enlace caducado o ya usado -->
+    <div style="max-width:520px;margin:10px auto 0;padding:20px;border-radius:8px;background:var(--rojo-error-fondo);color:var(--rojo-error);border:1px solid #e8b4a8;text-align:center;line-height:1.6;">
+      <strong style="font-size:17px;display:block;margin-bottom:6px;"><%= t('reg_enlace_no_valido_titulo') %></strong>
+      <%= t('reg_enlace_no_valido') %>
+    </div>
+    <% } else { %>
+    <p class="sub" id="texto-intro"><%= modo === 'registro' ? t('reg_intro') : 'Accede a tu portal para gestionar tus servicios' %></p>
 
     <div class="tarjeta" style="max-width:520px">
       <div class="pestanas" id="selector-pestanas">
@@ -167,7 +176,7 @@
         <label for="r-municipio">Municipio *</label>
         <input id="r-municipio" type="text" placeholder="Las Palmas de Gran Canaria">
         <label for="r-email">Email *</label>
-        <input id="r-email" type="email" autocomplete="email" placeholder="tu@email.com">
+        <input id="r-email" type="email" autocomplete="email" placeholder="tu@email.com"<% if (modo === 'registro' && registro.valido) { %> readonly style="background:var(--gris-fondo);color:var(--texto-muted);" title="Es el email del pre-registro: no se puede cambiar"<% } %>>
         <label for="r-telefono">Teléfono móvil *</label>
         <!-- (13/10/2026) Prefijo del país + número (misma lista que la Reserva) y "Otro" para escribirlo a mano -->
         <div style="display:flex;gap:6px;">
@@ -247,6 +256,7 @@
 
       </div>
     </div>
+    <% } %>
   </div>
 
   <footer>
@@ -269,19 +279,34 @@
     <div style="padding-top:10px;"><strong><%= lineaCopyright(lang) %></strong></div>
 </footer>
 
+  <% if (!(modo === 'registro' && !registro.valido)) { %>
   <script>
-    // Breadcrumb y título según URL
-    (function() {
-      var esAlta = window.location.pathname.indexOf('/alta') !== -1;
-      if (esAlta) {
-        document.getElementById('breadcrumb-texto').textContent = 'Alta choferes';
-        document.getElementById('titulo-pagina').textContent    = 'Alta choferes';
-      } else {
-        document.getElementById('texto-intro').textContent = 'Accede a tu portal para gestionar tus servicios';
+    // (19/11/2026) Acceso (iniciar sesión) o registro privado (con el enlace del equipo): lo decide el servidor
+    var MODO = <%- JSON.stringify(modo) %>;
+    var REGISTRO = <%- JSON.stringify(registro || null) %>;
+    if (REGISTRO && !REGISTRO.valido) { REGISTRO = null; }
+    window.addEventListener('DOMContentLoaded', function () {
+      var selector = document.getElementById('selector-pestanas');
+      if (!selector) return; // enlace no válido: no hay formulario
+      selector.style.display = 'none';
+      if (MODO === 'registro') {
+        mostrarPestana('registro');
+        // Datos del pre-registro, ya rellenos (el email no se puede cambiar)
+        document.getElementById('r-nombre').value = REGISTRO.nombre || '';
+        document.getElementById('r-email').value = REGISTRO.email || '';
+        var tel = String(REGISTRO.telefono || '').trim();
+        var m = tel.match(/^(\+[0-9]{1,4})\s*(.*)$/);
+        if (m) {
+          var sel = document.getElementById('r-telefono-prefijo');
+          var hay = Array.prototype.some.call(sel.options, function (o) { return o.value === m[1]; });
+          if (hay) { sel.value = m[1]; } else { sel.value = 'otro'; document.getElementById('r-telefono-prefijo-otro').value = m[1]; cambioPrefijoAlta(); }
+          document.getElementById('r-telefono').value = m[2];
+        }
+        if (REGISTRO.isla) document.getElementById('r-isla').value = REGISTRO.isla;
+        document.getElementById('r-municipio-licencia').value = REGISTRO.municipio || '';
+        document.getElementById('r-numero-licencia').value = REGISTRO.numero_licencia || '';
       }
-      document.getElementById('selector-pestanas').style.display = 'none';
-      if (esAlta) mostrarPestana('registro');
-    })();
+    });
 
     var catalogoMarcas = [];
     var categoriaSeleccionada = null;
@@ -562,7 +587,8 @@
           plazas: document.getElementById('r-plazas').value,
           isla: document.getElementById('r-isla').value,
           foto: fotoRegistro,
-          observaciones: obs
+          observaciones: obs,
+          token: REGISTRO ? REGISTRO.token : ''
         })
       })
       .then(function(r) { return r.json(); })
@@ -584,6 +610,7 @@
       });
     }
   </script>
+  <% } %>
 <script src="/legal-ventana.js" defer></script><!-- (17/11/2026) N86: los enlaces legales se abren en una ventana, sin salir de la página -->
 </body>
 </html>
