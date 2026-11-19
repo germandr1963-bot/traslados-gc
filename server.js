@@ -3762,7 +3762,7 @@ Revisa el estado del depósito desde el panel de administración.
 🪪 Licencia municipal: {numero_licencia}
 
 Puede ser un nuevo compañero: revisemos sus datos con atención.
-🔍 Dónde verlo: Admin → Conductores → «📝 Pre-registro».
+🔍 Dónde verlo: Admin → Choferes → «📝 Pre-registro de choferes».
 `,
       cuerpo_whatsapp: null },
     { clave: 'interno_recuperar_password_admin', nombre: '[Admin] Recuperar contrase\u00f1a de administrador', categoria: 'interno',
@@ -11485,7 +11485,7 @@ app.post('/api/chofer/prerregistro', asyncHandler(async (req, res) => {
         html: (pl && pl.email) ? plantillaEmail(pl.email) : plantillaEmail(
           `<p>👋 Hola, equipo:<br><strong>${escLegal(nombre)}</strong> quiere unirse a nuestra red de choferes y ha hecho su pre-registro.</p>
            <p>📧 ${escLegal(email)}<br>📱 ${escLegal(telefono)}<br>🏝️ ${escLegal(isla)} · ${escLegal(municipio)}<br>🪪 Licencia municipal: ${escLegal(licencia)}</p>
-           <p>Puede ser un nuevo compañero: revisemos sus datos con atención.<br>🔍 Dónde verlo: Admin → Conductores → «📝 Pre-registro».</p>`)
+           <p>Puede ser un nuevo compañero: revisemos sus datos con atención.<br>🔍 Dónde verlo: Admin → Choferes → «📝 Pre-registro de choferes».</p>`)
       });
     }
   } catch (err) {
