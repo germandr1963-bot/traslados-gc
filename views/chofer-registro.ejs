@@ -246,7 +246,7 @@
         <h2>Aceptaciones</h2>
         <div class="check-wrap">
           <input type="checkbox" id="acepta-privacidad">
-          <label for="acepta-privacidad">He leído y acepto la <a href="<%= enlaceLegal(lang, 'privacidad') %>" data-legal="privacidad" target="_blank">Política de Privacidad</a>.</label>
+          <label for="acepta-privacidad"><%- textoConEnlacesLegales(t('reg_acepto'), 'es', ['condiciones-choferes', 'privacidad']) %></label>
         </div>
 
         <div id="mensaje-registro" class="mensaje"></div>
@@ -559,7 +559,7 @@
       if (password.length < 6) { marcar(document.getElementById('r-password')); mostrarError(msg, 'La contraseña debe tener al menos 6 caracteres.'); return; }
       if (password !== password2) { marcar(document.getElementById('r-password2')); mostrarError(msg, 'Las contraseñas no coinciden.'); return; }
       var privacidad = document.getElementById('acepta-privacidad').checked;
-      if (!privacidad) { mostrarError(msg, 'Debes aceptar la Política de Privacidad.'); return; }
+      if (!privacidad) { mostrarError(msg, <%- JSON.stringify(t('reg_acepto_falta')) %>); return; }
 
       var obs = document.getElementById('r-observaciones').value.trim();
       // (13/10/2026) "Otro vehículo": su descripción es obligatoria y va delante de las observaciones
@@ -588,7 +588,8 @@
           isla: document.getElementById('r-isla').value,
           foto: fotoRegistro,
           observaciones: obs,
-          token: REGISTRO ? REGISTRO.token : ''
+          token: REGISTRO ? REGISTRO.token : '',
+          acepta_condiciones: privacidad
         })
       })
       .then(function(r) { return r.json(); })
