@@ -160,6 +160,7 @@ table.tabla-precios input {
 .editor-legal p { margin:0 0 10px; }
 .editor-legal ul, .editor-legal ol { padding-left:20px; margin:0 0 10px; }
 .editor-legal li { margin-bottom:4px; }
+.editor-legal a { color:var(--terracota); font-weight:600; text-decoration:none; } /* (19/11/2026) N93: como en la página */
 </style>
 </head>
 <body>
@@ -5508,17 +5509,19 @@ function renderizarTablaTextos(datos) {
 
 // (18/11/2026) Páginas legales: nombre que dice qué es cada texto y dónde sale (solo para el Admin; no se traduce).
 // Lo del pie (4 enlaces y la línea del ©) lleva delante su número, en el orden en que sale en el pie.
+// (19/11/2026) N93: los NÚMEROS van en los textos completos (lo que más se cambia: aquí se pega el texto de cada página).
+// Los nombres cortos dicen claramente que solo llevan el nombre.
 var NOMBRES_TEXTOS_LEGALES = {
-  legal_footer_aviso:       '1. Aviso legal — enlace del pie y título de su página',
-  legal_footer_privacidad:  '2. Política de privacidad — enlace del pie y título de su página',
-  legal_footer_cookies:     '3. Política de cookies — enlace del pie y título de su página',
-  legal_footer_condiciones: '4. Condiciones generales — enlace del pie y título de su página',
-  legal_copyright:          '5. Línea del © — final del pie de página',
-  legal_provisional:        'Páginas legales — aviso «Texto provisional» arriba de las 4 páginas',
-  legal_aviso_texto:        'Aviso legal — texto completo de la página',
-  legal_privacidad_texto:   'Política de privacidad — texto completo de la página',
-  legal_cookies_texto:      'Política de cookies — texto completo de la página',
-  legal_condiciones_texto:  'Condiciones generales — texto completo de la página',
+  legal_aviso_texto:        '1. Aviso legal — TEXTO COMPLETO de la página (aquí se pega el texto)',
+  legal_privacidad_texto:   '2. Política de privacidad — TEXTO COMPLETO de la página (aquí se pega el texto)',
+  legal_cookies_texto:      '3. Política de cookies — TEXTO COMPLETO de la página (aquí se pega el texto)',
+  legal_condiciones_texto:  '4. Condiciones generales — TEXTO COMPLETO de la página (aquí se pega el texto)',
+  legal_provisional:        'Aviso «Texto provisional» — sale arriba de las páginas que NO tienen marcado «Texto oficial»',
+  legal_footer_aviso:       'Aviso legal — SOLO EL NOMBRE (enlace del pie y título de la página; el texto va en el 1)',
+  legal_footer_privacidad:  'Política de privacidad — SOLO EL NOMBRE (enlace del pie y título de la página; el texto va en el 2)',
+  legal_footer_cookies:     'Política de cookies — SOLO EL NOMBRE (enlace del pie y título de la página; el texto va en el 3)',
+  legal_footer_condiciones: 'Condiciones generales — SOLO EL NOMBRE (enlace del pie y título de la página; el texto va en el 4)',
+  legal_copyright:          'Línea del © — final del pie de página',
   legal_info_terceros:      'Reserva (paso 2) — línea de privacidad al final de «Yo no viajo»',
   legal_info_titulo:        'Reserva (paso 3) — título del recuadro de protección de datos',
   legal_info_basica:        'Reserva (paso 3) — contenido del recuadro de protección de datos',
@@ -5579,22 +5582,56 @@ function limpiarHtmlLegal(html) {
       var negritaSpan = tag === 'SPAN' && /font-weight\s*:\s*(bold|[6-9]00)/i.test(n.getAttribute('style') || '');
       var t = ETIQUETAS_LEGAL[tag] || (negritaSpan ? 'strong' : '');
       var dentro = recorrer(n);
+      // (19/11/2026) N93: enlaces (email, teléfono o web); los demás enlaces de Word se quedan como texto
+      if (tag === 'A') {
+        var href = String(n.getAttribute('href') || '').trim();
+        if (/^(mailto:|tel:|https?:\/\/)/i.test(href) && dentro.trim()) { out += '<a href="' + esc(href).replace(/"/g, '&quot;') + '">' + dentro + '</a>'; }
+        else out += dentro;
+        return;
+      }
       if (t === 'br') { out += '<br>'; return; }
       if (!t) { out += dentro; return; }
       if (t !== 'ul' && t !== 'ol' && !dentro.replace(/<br>/g, '').trim()) return; // bloques vacíos fuera
+      // (19/11/2026) N93: un título o párrafo que lleva dentro otros párrafos (p. ej. al pegar sobre un título vacío)
+      // no envuelve nada: se quedan sus párrafos tal cual
+      if ((t === 'p' || t === 'h2' || t === 'h3') && /<(p|h2|h3|ul|ol)>/.test(dentro)) { out += dentro; return; }
       out += '<' + t + '>' + dentro + '</' + t + '>';
     });
     return out;
   }
-  return recorrer(doc.body.firstChild).replace(/<p>\s*<\/p>/g, '').trim();
+  return envolverSueltosLegal(recorrer(doc.body.firstChild)).replace(/<p>\s*<\/p>/g, '').trim();
+}
+// (19/11/2026) N93: lo que queda suelto entre títulos y párrafos (p. ej. el primer párrafo tras un título pegado de Word)
+// se mete en su propio párrafo, para que tenga su espacio debajo como los demás.
+function envolverSueltosLegal(html) {
+  var BLOQUES = { p: 1, h2: 1, h3: 1, ul: 1, ol: 1 };
+  var out = '', suelto = '', nivel = 0, m;
+  var re = /<(\/?)([a-zA-Z0-9]+)[^>]*>|[^<]+/g;
+  function soltar() {
+    if (suelto.replace(/<br>/gi, '').replace(/<[^>]+>/g, '').trim()) out += '<p>' + suelto.replace(/^(\s|<br>)+|(\s|<br>)+$/gi, '') + '</p>';
+    suelto = '';
+  }
+  while ((m = re.exec(String(html || ''))) !== null) {
+    var tag = m[2] ? m[2].toLowerCase() : '';
+    if (tag && BLOQUES[tag]) {
+      if (!m[1]) { if (nivel === 0) soltar(); nivel++; } else { nivel = Math.max(0, nivel - 1); }
+      out += m[0];
+    } else if (nivel === 0) {
+      suelto += m[0];
+    } else {
+      out += m[0];
+    }
+  }
+  soltar();
+  return out;
 }
 function htmlLegalParaEditar(valor) {
   var v = String(valor || '');
   if (/<\/?(p|h2|h3|ul|ol|li|strong|b|br)(\s[^>]*)?\/?>/i.test(v)) return limpiarHtmlLegal(v);
-  // Texto sin formato (lo pegado antes): cada línea en blanco separa un párrafo
-  return v.replace(/\r\n/g, '\n').split(/\n\s*\n/).map(function (b) { return b.trim(); })
+  // Texto sin formato (Bloc de notas): (19/11/2026) N93 — cada línea es su propio párrafo (con su espacio debajo)
+  return v.replace(/\r\n/g, '\n').split('\n').map(function (b) { return b.trim(); })
     .filter(function (b) { return b; })
-    .map(function (b) { return '<p>' + escapar(b).replace(/\n/g, '<br>') + '</p>'; }).join('');
+    .map(function (b) { return '<p>' + escapar(b) + '</p>'; }).join('');
 }
 function montarEditorLegal(textoId) {
   var t = textosCache && textosCache.textos.find(function (x) { return x.id === textoId; });
@@ -5607,7 +5644,9 @@ function montarEditorLegal(textoId) {
   barra.innerHTML =
     '<button type="button" style="' + estiloBoton + 'font-weight:700;" onmousedown="event.preventDefault();formatoLegal(\'titulo\')">Título</button>' +
     '<button type="button" style="' + estiloBoton + 'font-weight:700;" onmousedown="event.preventDefault();formatoLegal(\'negrita\')"><strong>B</strong> Negrita</button>' +
-    '<button type="button" style="' + estiloBoton + '" onmousedown="event.preventDefault();formatoLegal(\'lista\')">• Lista</button>';
+    '<button type="button" style="' + estiloBoton + '" onmousedown="event.preventDefault();formatoLegal(\'lista\')">• Lista</button>' +
+    '<button type="button" style="' + estiloBoton + '" onmousedown="event.preventDefault();formatoLegal(\'enlace\')">🔗 Enlace</button>' +
+    '<button type="button" id="boton-ver-html-legal" style="' + estiloBoton + 'margin-left:auto;" onmousedown="event.preventDefault();verHtmlLegal()">&lt;/&gt; Ver HTML</button>';
   var ed = document.createElement('div');
   ed.id = 'texto-legal-editor';
   ed.className = 'editor-legal';
@@ -5620,12 +5659,34 @@ function montarEditorLegal(textoId) {
     e.preventDefault();
     var html = cd.getData('text/html');
     var limpio = html ? limpiarHtmlLegal(html) : htmlLegalParaEditar(cd.getData('text/plain'));
-    document.execCommand('insertHTML', false, limpio);
+    // (19/11/2026) N93: si el editor está vacío (se borró todo para pegar el texto nuevo), el pegado ocupa todo el editor
+    if (!ed.textContent.trim()) ed.innerHTML = limpio;
+    else document.execCommand('insertHTML', false, limpio);
     ta.value = limpiarHtmlLegal(ed.innerHTML);
   });
   ta.parentNode.insertBefore(barra, ta);
   ta.parentNode.insertBefore(ed, ta);
   ta.value = limpiarHtmlLegal(ed.innerHTML);
+  // (19/11/2026) N93: en «Ver HTML», lo escrito en la caja vuelve al editor al salir de ella
+  ta.style.fontFamily = "'JetBrains Mono', monospace";
+  ta.style.fontSize = '12px';
+}
+// (19/11/2026) N93 — «</> Ver HTML»: cambia entre el editor y el código del texto (se puede corregir ahí y volver)
+function verHtmlLegal() {
+  var ed = document.getElementById('texto-legal-editor');
+  var ta = document.getElementById('texto-traduccion');
+  var b = document.getElementById('boton-ver-html-legal');
+  if (!ed || !ta) return;
+  if (ta.style.display === 'none') {
+    ta.value = limpiarHtmlLegal(ed.innerHTML).replace(/(<\/(p|h2|h3|ul|ol|li)>)/g, '$1\n');
+    ed.style.display = 'none'; ta.style.display = '';
+    if (b) b.innerHTML = '✏️ Volver al editor';
+  } else {
+    ed.innerHTML = htmlLegalParaEditar(ta.value.replace(/\n/g, ''));
+    ta.value = limpiarHtmlLegal(ed.innerHTML);
+    ta.style.display = 'none'; ed.style.display = '';
+    if (b) b.innerHTML = '&lt;/&gt; Ver HTML';
+  }
 }
 function formatoLegal(que) {
   var ed = document.getElementById('texto-legal-editor');
@@ -5638,6 +5699,21 @@ function formatoLegal(que) {
     document.execCommand('bold');
   } else if (que === 'lista') {
     document.execCommand('insertUnorderedList');
+  } else if (que === 'enlace') {
+    // (19/11/2026) N93: se marca el texto y se pulsa «🔗 Enlace»; un email o un teléfono se reconocen solos
+    var sel = window.getSelection();
+    var marcado = sel ? String(sel.toString()).trim() : '';
+    if (!marcado) { alert('Marca primero con el ratón el texto que será el enlace (un email, un teléfono o una web).'); return; }
+    var rango = sel.getRangeAt(0).cloneRange();
+    var propuesta = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(marcado) ? 'mailto:' + marcado
+      : (/^\+?[0-9 ]{6,}$/.test(marcado) ? 'tel:' + marcado.replace(/\s/g, '')
+      : (/^https?:\/\//i.test(marcado) ? marcado : (/^www\./i.test(marcado) ? 'https://' + marcado : '')));
+    var href = prompt('Dirección del enlace (email: mailto:…, teléfono: tel:…, web: https://…)', propuesta);
+    if (href === null) return;
+    href = href.trim();
+    if (!/^(mailto:|tel:|https?:\/\/)/i.test(href)) { alert('El enlace debe empezar por mailto:, tel: o https://'); return; }
+    ed.focus(); sel.removeAllRanges(); sel.addRange(rango);
+    document.execCommand('createLink', false, href);
   }
   var ta = document.getElementById('texto-traduccion');
   if (ta) ta.value = limpiarHtmlLegal(ed.innerHTML);
@@ -6930,6 +7006,7 @@ function abrirEditorTexto(textoId) {
     '<div style="background:var(--gris-fondo);padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px;">' +
     (texto.contexto ? '<span style="color:var(--texto-muted);font-size:12px;"><strong>Contexto:</strong> ' + escapar(texto.contexto) + '</span>' : '') +
     '</div>' +
+    htmlCasillaLegalOficial(texto) +
     '<div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">' + tabs + '</div>' +
     '<div id="texto-campo-editor"></div>' +
     '<div id="texto-mensaje-editor" style="margin-top:8px;"></div>' +
@@ -6939,6 +7016,37 @@ function abrirEditorTexto(textoId) {
 
   cambiarIdiomaEditorTexto(textoId, IDIOMAS_TEXTOS[0], editor.querySelector('.tab-idioma'));
   editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// (19/11/2026) N93 — En la ficha del TEXTO COMPLETO de una página legal: «Texto oficial» quita el aviso «Texto provisional»
+// de ESA página (en todos los idiomas). Se guarda al marcar o desmarcar.
+var PAGINA_DE_TEXTO_LEGAL = { legal_aviso_texto: 'aviso-legal', legal_privacidad_texto: 'privacidad', legal_cookies_texto: 'cookies', legal_condiciones_texto: 'condiciones' };
+function htmlCasillaLegalOficial(texto) {
+  var pagina = PAGINA_DE_TEXTO_LEGAL[texto.clave];
+  if (!pagina) return '';
+  setTimeout(function () {
+    fetch('/admin/legal-oficial').then(function (r) { return r.json(); }).then(function (m) {
+      var c = document.getElementById('casilla-legal-oficial');
+      if (c) { c.checked = !!m[pagina]; c.disabled = false; }
+    });
+  }, 0);
+  return '<div style="border:1px solid var(--gris-borde);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;background:#fff;">' +
+    '<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;">' +
+      '<input type="checkbox" id="casilla-legal-oficial" disabled style="margin-top:3px;" onchange="guardarLegalOficial(\'' + pagina + '\', this)">' +
+      '<span><strong>Texto oficial</strong> — no enseñar el aviso «Texto provisional» en esta página (en todos los idiomas). ' +
+      '<span style="color:var(--texto-muted);">Se guarda al marcar o desmarcar.</span></span>' +
+    '</label><div id="mensaje-legal-oficial" style="margin-top:6px;"></div></div>';
+}
+function guardarLegalOficial(pagina, casilla) {
+  var msg = document.getElementById('mensaje-legal-oficial');
+  fetch('/admin/legal-oficial', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pagina: pagina, oficial: casilla.checked }) })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.error) throw new Error(d.error);
+      msg.textContent = d.oficial ? '✅ Guardado: esta página ya no enseña el aviso «Texto provisional».' : '✅ Guardado: esta página enseña el aviso «Texto provisional».';
+      msg.style.color = 'var(--verde-ok)';
+    })
+    .catch(function () { casilla.checked = !casilla.checked; msg.textContent = '❌ No se pudo guardar. Inténtalo de nuevo.'; msg.style.color = 'var(--rojo-error)'; });
 }
 
 function limpiarTraduccionesCategoria(textoId) {
