@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= t('home_footer_alta_choferes') || 'Alta choferes' %> — Traslados GC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/estilos.css">
+  <style>
+    header.app {
+      background: var(--charcoal);
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      border-bottom: 3px solid var(--terracota);
+    }
+    header.app .marca {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--texto-claro);
+      letter-spacing: 2px;
+      text-decoration: none;
+      text-align: center;
+      justify-self: center;
+    }
+    header.app a.nav { color: rgba(255,255,255,0.65); text-decoration: none; font-size: 14px; }
+    header.app a.nav:hover { color: #fff; }
+    header.app a.nav.izquierda { justify-self: start; }
+    header.app a.nav.derecha { justify-self: end; }
+
+    @media (max-width: 560px) {
+      header.app { padding: 12px 14px; }
+      header.app .marca { font-size: 19px; letter-spacing: 1px; }
+      header.app a.nav { font-size: 12px; }
+    }
+
+    .breadcrumbs { font-size: 13px; color: var(--texto-muted); margin-bottom: 18px; text-align: left; }
+    .breadcrumbs a { color: var(--texto-muted); text-decoration: none; }
+    .breadcrumbs a:hover { text-decoration: underline; }
+
+    .contenido { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; text-align: center; }
+    .contenido .tarjeta { text-align: left; margin: 0 auto; }
+
+    @media (max-width: 600px) { .contenido { padding: 24px 16px 60px; } }
+
+    h1 { font-family: 'Big Shoulders Display', sans-serif; font-size: clamp(32px, 6vw, 52px); color: var(--texto-oscuro); margin-bottom: 12px; }
+    h2 { font-family: 'Big Shoulders Display', sans-serif; font-size: 15px; color: var(--terracota); margin: 20px 0 6px; letter-spacing: 0.5px; }
+    p.sub { color: var(--texto-muted); margin-bottom: 20px; font-size: 19px; font-style: italic; letter-spacing: 0.3px; line-height: 1.6; }
+
+    .pestanas { display: flex; gap: 8px; margin-bottom: 18px; }
+    .pestanas button {
+      flex: 1; margin-top: 0; background: #fff;
+      border: 1px solid var(--gris-borde); border-radius: 8px;
+      color: var(--texto-muted); font-family: 'Public Sans', sans-serif;
+      font-size: 14px; font-weight: 600; padding: 10px; cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .pestanas button.activa { background: var(--charcoal); color: #fff; border-color: var(--charcoal); }
+
+    label { display: block; font-size: 13px; font-weight: 600; color: var(--texto-oscuro); margin: 14px 0 4px; }
+    input[type=text], input[type=email], input[type=tel], input[type=password], select {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--gris-borde);
+      border-radius: 8px; font-size: 14px; font-family: 'Public Sans', sans-serif;
+      color: var(--texto-oscuro); background: #fff;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--terracota); box-shadow: 0 0 0 3px rgba(193,80,46,0.1); }
+    input::placeholder { color: #c0b5aa; }
+
+    .categorias-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-top: 6px; }
+    .cat-opcion { border: 1px solid var(--gris-borde); border-radius: 8px; padding: 12px 10px; cursor: pointer; text-align: center; background: #fff; transition: border-color 0.15s, background 0.15s; }
+    .cat-opcion:hover { border-color: #b5a99a; }
+    .cat-opcion.sel { border-color: var(--terracota); background: rgba(193,80,46,0.05); }
+    .cat-opcion .cn { font-size: 13px; font-weight: 700; color: var(--texto-oscuro); }
+    .cat-opcion .cd { font-size: 11px; color: var(--texto-muted); margin-top: 2px; }
+    .cat-otra { border: 1px dashed var(--gris-borde); border-radius: 8px; padding: 12px 10px; cursor: pointer; text-align: center; background: #fff; transition: border-color 0.15s; }
+    .cat-otra:hover { border-color: #b5a99a; }
+    .cat-otra.sel { border-color: var(--oro); background: rgba(217,164,65,0.06); }
+    .cat-otra .cn { font-size: 13px; font-weight: 700; color: var(--texto-muted); }
+    .aviso-otra { display: none; margin-top: 8px; background: #fdf8ec; border: 1px solid rgba(217,164,65,0.5); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #5a4010; line-height: 1.5; }
+
+    .check-wrap { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; }
+    .check-wrap input[type=checkbox] { width: 16px; min-width: 16px; height: 16px; margin-top: 2px; accent-color: var(--terracota); cursor: pointer; }
+    .check-wrap label { font-size: 13px; font-weight: 400; color: var(--texto-muted); margin: 0; cursor: pointer; line-height: 1.55; }
+    .check-wrap label a { color: var(--terracota); text-decoration: underline; }
+
+    button.principal { display: block; width: 100%; margin-top: 20px; padding: 13px; border: none; border-radius: 8px; background: var(--terracota); color: #fff; font-weight: 700; font-size: 15px; font-family: 'Public Sans', sans-serif; cursor: pointer; transition: background 0.2s; }
+    button.principal:hover { background: var(--terracota-oscuro); }
+    button.principal:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .mensaje { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 13px; display: none; line-height: 1.5; }
+    .mensaje.error { display: block; background: var(--rojo-error-fondo); color: var(--rojo-error); border: 1px solid #e8b4a8; }
+    .mensaje.ok { display: block; background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; padding: 10px 14px; margin-top: 0; margin-bottom: 16px; text-align: left; }
+
+    .nota-final { font-size: 12px; color: var(--texto-muted); text-align: center; margin-top: 10px; line-height: 1.6; }
+
+    .enlace { display: block; text-align: center; font-size: 13px; color: var(--terracota); text-decoration: underline; cursor: pointer; margin-top: 12px; }
+
+    .cat-opcion.campo-obligatorio-vacio, .cat-otra.campo-obligatorio-vacio {
+      border-width: 2px;
+    }
+    footer { text-align: center; padding: 30px; color: var(--texto-muted); font-size: 13px; }
+    footer a { color: var(--texto-muted); text-decoration: none; margin: 0 12px; font-size: 13px; display: inline-block; white-space: nowrap; } /* (17/11/2026) N86: cada enlace del pie, entero en el móvil */
+    footer a:hover { color: var(--texto-oscuro); }
+    .footer-links { margin-bottom: 12px; }
+  </style>
+
+  <style>
+    /* (19/11/2026) Pre-registro de choferes */
+    .contenido.ancho { max-width: 1100px; }
+    .hero-alta { width: 100%; height: auto; aspect-ratio: 2 / 1; object-fit: cover; border-radius: 14px; display: block; margin: 6px 0 22px; box-shadow: 0 6px 24px rgba(28,24,21,0.18); background: var(--piedra); }
+    .intro-alta { max-width: 760px; margin: 0 auto 22px; color: var(--texto-muted); font-size: 16px; line-height: 1.7; text-align: center; }
+    .tarjeta-pre { background: #fff; border: 1px solid var(--gris-borde); border-radius: 12px; padding: 22px 24px; text-align: left; }
+    .fila-pre { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .fila-pre + .fila-pre { margin-top: 6px; }
+    .fila-pre label { margin-top: 4px; }
+    .trampa { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+    .ok-pre { padding: 22px; border-radius: 12px; background: var(--verde-ok-fondo); color: var(--verde-ok); border: 1px solid #a8dece; text-align: center; max-width: 760px; margin: 0 auto; line-height: 1.6; }
+    .ok-pre strong { font-size: 18px; display: block; margin-bottom: 8px; }
+    @media (max-width: 700px) {
+      .fila-pre { grid-template-columns: 1fr; gap: 0; }
+      .tarjeta-pre { padding: 16px; }
+      .intro-alta { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- (19/11/2026) Alta de choferes en dos pasos — paso 1: pre-registro público. El formulario completo es privado (enlace personal). -->
+  <header class="app">
+    <a href="/" class="nav izquierda"><%= t('nav_inicio') || 'Inicio' %></a>
+    <a href="/" class="marca">TRASLADOS · GC</a>
+    <a href="/contacto" class="nav derecha"><%= t('nav_contacto') || 'Contacto' %></a>
+  </header>
+
+  <div class="contenido ancho">
+    <nav class="breadcrumbs">
+      <a href="/"><%= t('nav_inicio') || 'Inicio' %></a>
+      <span> › </span>
+      <span><%= t('home_footer_alta_choferes') || 'Alta choferes' %></span>
+    </nav>
+
+    <h1><%= t('pre_titulo') %></h1>
+    <% if (imagen) { %>
+    <img class="hero-alta" src="<%= imagen.url %>" alt="<%= imagen.alt %>" width="1600" height="800">
+    <% } %>
+    <p class="intro-alta"><%= t('pre_intro') %></p>
+
+    <div id="zona-pre">
+      <div class="tarjeta-pre">
+        <div class="fila-pre">
+          <div>
+            <label for="p-nombre"><%= t('pre_nombre') %></label>
+            <input id="p-nombre" type="text" autocomplete="name" maxlength="200" placeholder="<%= t('pre_nombre_ej') %>">
+          </div>
+          <div>
+            <label for="p-telefono"><%= t('pre_telefono') %></label>
+            <div style="display:flex;gap:6px;">
+              <select id="p-telefono-prefijo" onchange="cambioPrefijo()" style="width:105px;flex-shrink:0;"><option value="+34">🇪🇸 +34</option><option value="+44">🇬🇧 +44</option><option value="+49">🇩🇪 +49</option><option value="+46">🇸🇪 +46</option><option value="+47">🇳🇴 +47</option><option value="+31">🇳🇱 +31</option><option value="+39">🇮🇹 +39</option><option value="+33">🇫🇷 +33</option><option value="+358">🇫🇮 +358</option><option value="+7">🇷🇺 +7</option><option value="+1">🇺🇸 +1</option><option value="+351">🇵🇹 +351</option><option value="+32">🇧🇪 +32</option><option value="+41">🇨🇭 +41</option><option value="+43">🇦🇹 +43</option><option value="+48">🇵🇱 +48</option><option value="otro"><%= t('alta_tel_otro') %></option></select>
+              <input id="p-telefono-prefijo-otro" type="text" maxlength="5" placeholder="+54" style="display:none;width:70px;flex-shrink:0;">
+              <input id="p-telefono" type="tel" autocomplete="tel-national" maxlength="20" placeholder="600 000 000" style="flex:1;min-width:0;">
+            </div>
+          </div>
+          <div>
+            <label for="p-email"><%= t('pre_email') %></label>
+            <input id="p-email" type="email" autocomplete="email" maxlength="200" placeholder="tu@email.com">
+          </div>
+        </div>
+        <div class="fila-pre">
+          <div>
+            <label for="p-isla"><%= t('pre_isla') %></label>
+            <select id="p-isla">
+              <% islas.forEach(function (nombreIsla, i) { %><option value="<%= nombreIsla %>"<%= nombreIsla === 'Gran Canaria' ? ' selected' : '' %>><%= nombreIsla %></option><% }); %>
+            </select>
+          </div>
+          <div>
+            <label for="p-municipio"><%= t('pre_municipio') %></label>
+            <input id="p-municipio" type="text" maxlength="150" placeholder="<%= t('pre_municipio_ej') %>">
+          </div>
+          <div>
+            <label for="p-licencia"><%= t('pre_licencia') %></label>
+            <input id="p-licencia" type="text" maxlength="100" placeholder="<%= t('pre_licencia_ej') %>">
+          </div>
+        </div>
+        <div class="trampa" aria-hidden="true"><label for="p-web">Web</label><input id="p-web" type="text" tabindex="-1" autocomplete="off"></div>
+        <div class="check-wrap">
+          <input type="checkbox" id="p-privacidad">
+          <label for="p-privacidad"><%- textoConEnlacesLegales(t('pre_privacidad'), 'es', ['privacidad']) %></label>
+        </div>
+        <div id="p-mensaje" class="mensaje"></div>
+        <button class="principal" id="p-boton" onclick="enviarPrerregistro()"><%= t('pre_boton') %></button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-links">
+      <a href="/rutas"><%= t('home_footer_rutas') || 'Rutas' %></a>
+      <a href="/destinos"><%= t('home_footer_destinos') || 'Destinos' %></a>
+      <a href="/flota"><%= t('home_footer_flota') || 'Flota' %></a>
+      <a href="/contacto"><%= t('home_footer_contacto') || 'Contacto' %></a>
+      <a href="/chofer/acceso/alta"><%= t('home_footer_alta_choferes') || 'Alta choferes' %></a>
+      <a href="/chofer/acceso"><%= t('home_footer_acceso_choferes') || 'Acceso a choferes' %></a>
+      <a href="/mi-reserva"><%= t('home_footer_acceso_clientes') || 'Acceso clientes' %></a>
+    </div>
+    <!-- (17/11/2026) N86: fila legal -->
+    <div class="footer-links">
+      <a href="<%= enlaceLegal(lang, 'aviso-legal') %>" data-legal="aviso-legal"><%= t('legal_footer_aviso') %></a>
+      <a href="<%= enlaceLegal(lang, 'privacidad') %>" data-legal="privacidad"><%= t('legal_footer_privacidad') %></a>
+      <a href="<%= enlaceLegal(lang, 'cookies') %>" data-legal="cookies"><%= t('legal_footer_cookies') %></a>
+      <a href="<%= enlaceLegal(lang, 'condiciones') %>" data-legal="condiciones"><%= t('legal_footer_condiciones') %></a>
+    </div>
+    <div style="padding-top:10px;"><strong><%= lineaCopyright(lang) %></strong></div>
+</footer>
+
+  <script>
+    var TXT = <%- JSON.stringify({
+      faltan: t('pre_faltan'), emailMal: t('pre_email_mal'), privacidad: t('pre_privacidad_falta'),
+      soloCifras: t('alta_tel_solo_cifras'), prefijoOtro: t('alta_tel_prefijo_otro'),
+      conexion: t('pre_error_conexion'), enviando: t('pre_enviando'), boton: t('pre_boton'),
+      okTitulo: t('pre_ok_titulo'), okTexto: t('pre_ok_texto')
+    }) %>;
+
+    function cambioPrefijo() {
+      var otro = document.getElementById('p-telefono-prefijo').value === 'otro';
+      document.getElementById('p-telefono-prefijo-otro').style.display = otro ? 'block' : 'none';
+    }
+
+    function avisar(texto) {
+      var m = document.getElementById('p-mensaje');
+      m.textContent = texto;
+      m.className = 'mensaje error';
+    }
+
+    function enviarPrerregistro() {
+      document.querySelectorAll('.campo-obligatorio-vacio').forEach(function (el) { el.classList.remove('campo-obligatorio-vacio'); });
+      document.getElementById('p-mensaje').className = 'mensaje';
+      var primero = null;
+      function valor(id) {
+        var el = document.getElementById(id);
+        var v = el.value.trim();
+        if (!v) { el.classList.add('campo-obligatorio-vacio'); if (!primero) primero = el; }
+        return v;
+      }
+      var nombre = valor('p-nombre');
+      var telefono = valor('p-telefono');
+      var email = valor('p-email');
+      var isla = valor('p-isla');
+      var municipio = valor('p-municipio');
+      var licencia = valor('p-licencia');
+      if (primero) { avisar(TXT.faltan); primero.focus(); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { document.getElementById('p-email').classList.add('campo-obligatorio-vacio'); avisar(TXT.emailMal); return; }
+      if (!/^[0-9 ]+$/.test(telefono)) { document.getElementById('p-telefono').classList.add('campo-obligatorio-vacio'); avisar(TXT.soloCifras); return; }
+      var prefijo = document.getElementById('p-telefono-prefijo').value;
+      if (prefijo === 'otro') {
+        prefijo = document.getElementById('p-telefono-prefijo-otro').value.trim();
+        if (!/^\+[0-9]{1,4}$/.test(prefijo)) { document.getElementById('p-telefono-prefijo-otro').classList.add('campo-obligatorio-vacio'); avisar(TXT.prefijoOtro); return; }
+      }
+      if (!document.getElementById('p-privacidad').checked) { avisar(TXT.privacidad); return; }
+
+      var btn = document.getElementById('p-boton');
+      btn.disabled = true; btn.textContent = TXT.enviando;
+      fetch('/api/chofer/prerregistro', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: nombre, telefono: prefijo + ' ' + telefono.replace(/\s/g, ''), email: email,
+          isla: isla, municipio: municipio, numero_licencia: licencia,
+          acepta_privacidad: true, web: document.getElementById('p-web').value
+        })
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.error) { avisar(d.error); btn.disabled = false; btn.textContent = TXT.boton; return; }
+        var zona = document.getElementById('zona-pre');
+        zona.innerHTML = '<div class="ok-pre"><strong></strong><span></span></div>';
+        zona.querySelector('strong').textContent = TXT.okTitulo;
+        zona.querySelector('span').textContent = TXT.okTexto;
+        zona.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      })
+      .catch(function () { avisar(TXT.conexion); btn.disabled = false; btn.textContent = TXT.boton; });
+    }
+  </script>
+<script src="/legal-ventana.js" defer></script>
+</body>
+</html>
