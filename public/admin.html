@@ -277,6 +277,29 @@ table.tabla-precios input {
         <button class="boton-costa" onclick="contactoGlobalConductores(true)">💬 Permitir contacto a TODOS</button>
         <button class="boton-peligro" onclick="contactoGlobalConductores(false)">🔇 Quitar contacto a TODOS</button>
       </div>
+      <!-- (19/11/2026) Alta de choferes en dos pasos — paso 1: imagen de la página pública «Alta choferes» -->
+      <div class="tarjeta" id="tarjeta-alta-imagen" style="max-width:640px;margin-bottom:16px;">
+        <h3 style="margin:0 0 6px;">🖼️ Imagen de la página «Alta choferes»</h3>
+        <p style="font-size:13px;color:#5b5347;margin:0 0 12px;">Sale arriba de la página pública de pre-registro. Tamaño recomendado 1600 × 800 px · jpg, png o webp · máx. 1 MB. Sin textos dentro de la imagen (en el móvil no se leen).</p>
+        <img id="alta-imagen-vista" alt="" style="display:none;width:100%;aspect-ratio:2/1;object-fit:cover;border-radius:8px;border:1px solid #E1DCD0;margin-bottom:10px;">
+        <p id="alta-imagen-sin" style="display:none;font-size:13px;color:#8a8175;margin:0 0 10px;">Todavía no hay imagen: la página sale sin ella.</p>
+        <label class="etiqueta">Imagen</label>
+        <input type="file" id="alta-imagen-archivo" accept="image/jpeg,image/png,image/webp" onchange="previsualizarImagenAlta()" style="display:block;margin-bottom:10px;">
+        <label class="etiqueta">Descripción de la foto (alt)</label>
+        <input type="text" id="alta-imagen-alt" class="campo" maxlength="300" placeholder="Ej.: Choferes de Traslados GC en Gran Canaria" style="width:100%;margin-bottom:12px;">
+        <button class="boton-primario" onclick="guardarImagenAlta()">💾 Guardar</button>
+        <button class="boton-peligro" id="alta-imagen-quitar" style="margin-left:8px;display:none;" onclick="quitarImagenAlta()">🗑️ Quitar imagen</button>
+        <div id="alta-imagen-mensaje" style="margin-top:10px;font-size:13px;"></div>
+      </div>
+      <!-- (19/11/2026) Pre-registros de la página «Alta choferes» (aún no son choferes) -->
+      <h3 style="margin:18px 0 6px;">📝 Pre-registros de choferes</h3>
+      <p class="subtitulo" style="margin-bottom:8px;">Solicitudes de la página pública «Alta choferes». Todavía no son choferes: no reciben avisos ni entran en la lista de abajo.</p>
+      <table class="tabla-admin" style="margin-bottom:22px;">
+        <thead>
+          <tr><th>Fecha</th><th>Nombre</th><th>Contacto</th><th>Isla / Municipio</th><th>Licencia municipal</th><th>Privacidad</th><th>Estado</th><th>Acciones</th></tr>
+        </thead>
+        <tbody id="tabla-prerregistros"></tbody>
+      </table>
       <table class="tabla-admin">
         <thead>
           <tr><th>Nombre</th><th>Contacto</th><th>Vehículo</th><th>Categoría</th><th>Isla</th><th>Foto</th><th style="min-width:150px">💬 Botón contacto</th><th style="min-width:130px">Tipo</th><th>Estado</th><th>Acciones</th></tr>
@@ -2283,6 +2306,7 @@ function mostrarAdmin() {
   cargarIslas();
   cargarCategorias();
   cargarConductores();
+  cargarAltaChoferesAdmin(); // (19/11/2026) imagen de «Alta choferes» y pre-registros
   cargarPreciosGrid();
   // Badge de cotizaciones pendientes
   setTimeout(function() { cargarCotizaciones(); }, 500);
@@ -3151,6 +3175,89 @@ function cargarConductores() {
       '</tr>';
     }).join('');
   });
+}
+
+// (19/11/2026) Alta de choferes en dos pasos — paso 1: imagen de «Alta choferes» y pre-registros
+var imagenAltaNueva = null;
+function fechaHoraAdmin(t) { return t ? new Date(t).toLocaleString('es-ES', { timeZone: 'Atlantic/Canary', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
+
+function cargarAltaChoferesAdmin() {
+  imagenAltaNueva = null;
+  document.getElementById('alta-imagen-archivo').value = '';
+  document.getElementById('alta-imagen-mensaje').textContent = '';
+  fetch('/admin/alta-choferes/imagen').then(function (r) { return r.json(); }).then(function (d) {
+    var vista = document.getElementById('alta-imagen-vista');
+    document.getElementById('alta-imagen-alt').value = d.alt_texto || '';
+    if (d.hay) {
+      vista.src = '/alta-choferes/imagen?v=' + d.version;
+      vista.style.display = 'block';
+      document.getElementById('alta-imagen-sin').style.display = 'none';
+      document.getElementById('alta-imagen-quitar').style.display = 'inline-block';
+    } else {
+      vista.removeAttribute('src');
+      vista.style.display = 'none';
+      document.getElementById('alta-imagen-sin').style.display = 'block';
+      document.getElementById('alta-imagen-quitar').style.display = 'none';
+    }
+  });
+  fetch('/admin/choferes-prerregistro').then(function (r) { return r.json(); }).then(function (filas) {
+    var cuerpo = document.getElementById('tabla-prerregistros');
+    if (!filas.length) { cuerpo.innerHTML = '<tr><td colspan="8">Todavía no hay pre-registros.</td></tr>'; return; }
+    cuerpo.innerHTML = filas.map(function (p) {
+      return '<tr>' +
+        '<td style="white-space:nowrap">' + fechaHoraAdmin(p.creado_en) + '</td>' +
+        '<td><strong>' + escapar(p.nombre) + '</strong></td>' +
+        '<td>' + escapar(p.email) + '<br>' + escapar(p.telefono) + '</td>' +
+        '<td>' + escapar(p.isla) + '<br>' + escapar(p.municipio) + '</td>' +
+        '<td>' + escapar(p.numero_licencia) + '</td>' +
+        '<td style="white-space:nowrap">' + (p.privacidad_aceptada_en ? '✅ ' + fechaHoraAdmin(p.privacidad_aceptada_en) : '—') + '</td>' +
+        '<td><span class="insignia insignia-pendiente">PRE-REGISTRO</span></td>' +
+        '<td><button class="boton-peligro" style="padding:6px 10px;font-size:0.8rem" onclick="eliminarPrerregistro(' + p.id + ')">🗑️</button></td>' +
+      '</tr>';
+    }).join('');
+  });
+}
+
+function previsualizarImagenAlta() {
+  var archivo = document.getElementById('alta-imagen-archivo').files[0];
+  var msg = document.getElementById('alta-imagen-mensaje');
+  msg.textContent = '';
+  if (!archivo) { imagenAltaNueva = null; return; }
+  if (archivo.size > 1024 * 1024) { msg.style.color = '#c0392b'; msg.textContent = 'La imagen pesa más de 1 MB. Elige una más ligera.'; document.getElementById('alta-imagen-archivo').value = ''; imagenAltaNueva = null; return; }
+  var lector = new FileReader();
+  lector.onload = function (e) {
+    imagenAltaNueva = e.target.result;
+    var vista = document.getElementById('alta-imagen-vista');
+    vista.src = imagenAltaNueva;
+    vista.style.display = 'block';
+    document.getElementById('alta-imagen-sin').style.display = 'none';
+  };
+  lector.readAsDataURL(archivo);
+}
+
+function guardarImagenAlta() {
+  var msg = document.getElementById('alta-imagen-mensaje');
+  var datos = { alt_texto: document.getElementById('alta-imagen-alt').value.trim() };
+  if (imagenAltaNueva) datos.foto = imagenAltaNueva;
+  msg.style.color = '#5b5347'; msg.textContent = 'Guardando...';
+  fetch('/admin/alta-choferes/imagen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.error) { msg.style.color = '#c0392b'; msg.textContent = d.error; return; }
+      cargarAltaChoferesAdmin();
+      msg.style.color = '#0f5132'; msg.textContent = '✓ Guardado. Ya se ve en la página «Alta choferes».';
+    })
+    .catch(function () { msg.style.color = '#c0392b'; msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; });
+}
+
+function quitarImagenAlta() {
+  if (!confirm('¿Quitar la imagen de la página «Alta choferes»? La página saldrá sin imagen.')) return;
+  fetch('/admin/alta-choferes/imagen', { method: 'DELETE' }).then(function () { cargarAltaChoferesAdmin(); });
+}
+
+function eliminarPrerregistro(id) {
+  if (!confirm('¿Eliminar este pre-registro? No se puede deshacer.')) return;
+  fetch('/admin/choferes-prerregistro/' + id, { method: 'DELETE' }).then(function () { cargarAltaChoferesAdmin(); });
 }
 
 function cambiarEstadoConductor(id, estado) {
