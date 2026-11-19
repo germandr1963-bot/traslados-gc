@@ -3233,11 +3233,35 @@ function cargarPrerregistrosAdmin() {
         '<td>' + escapar(p.isla) + '<br>' + escapar(p.municipio) + '</td>' +
         '<td>' + escapar(p.numero_licencia) + '</td>' +
         '<td style="white-space:nowrap">' + (p.privacidad_aceptada_en ? '✅ ' + fechaHoraAdmin(p.privacidad_aceptada_en) : '—') + '</td>' +
-        '<td><span class="insignia insignia-pendiente">PRE-REGISTRO</span></td>' +
-        '<td><button class="boton-peligro" style="padding:6px 10px;font-size:0.8rem" onclick="eliminarPrerregistro(' + p.id + ')">🗑️</button></td>' +
+        '<td>' + estadoPrerregistro(p) + '</td>' +
+        '<td style="white-space:nowrap">' +
+          '<button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;margin-right:4px" onclick="enviarEnlacePrerregistro(' + p.id + ', \'' + escapar(p.nombre).replace(/'/g, "\\'") + '\', ' + (p.estado === 'enlace_enviado') + ')">' + (p.estado === 'enlace_enviado' ? '🔁 Volver a enviar el enlace' : '📧 Enviar enlace de registro') + '</button>' +
+          '<button class="boton-peligro" style="padding:6px 10px;font-size:0.8rem" onclick="eliminarPrerregistro(' + p.id + ')">🗑️</button>' +
+        '</td>' +
       '</tr>';
     }).join('');
   });
+}
+
+// (19/11/2026) Paso 2: estado de cada pre-registro y envío del enlace privado del registro
+function estadoPrerregistro(p) {
+  if (p.estado !== 'enlace_enviado') return '<span class="insignia insignia-pendiente">PRE-REGISTRO</span>';
+  if (p.enlace_caducado) return '<span class="insignia insignia-suspendido">ENLACE CADUCADO</span><br><span style="font-size:11px;color:#8a8175">Caducó el ' + fechaHoraAdmin(p.enlace_caduca_en) + '</span>';
+  return '<span class="insignia insignia-ok">ENLACE ENVIADO</span><br><span style="font-size:11px;color:#8a8175">El ' + fechaHoraAdmin(p.enlace_enviado_en) + ' · caduca el ' + fechaHoraAdmin(p.enlace_caduca_en) + '</span>';
+}
+
+function enviarEnlacePrerregistro(id, nombre, yaEnviado) {
+  var pregunta = yaEnviado
+    ? '¿Volver a enviar a ' + nombre + ' el enlace para completar su registro? El enlace anterior deja de valer.'
+    : '¿Enviar a ' + nombre + ' el enlace para completar su registro? Le llegará por email y caduca en 72 horas.';
+  if (!confirm(pregunta)) return;
+  fetch('/admin/choferes-prerregistro/' + id + '/enviar-enlace', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.error) { alert(d.error); return; }
+      cargarPrerregistrosAdmin();
+    })
+    .catch(function () { alert('Error de conexión. Inténtalo de nuevo.'); });
 }
 
 function toggleBloqueImagenAlta() {
