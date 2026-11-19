@@ -186,7 +186,7 @@ table.tabla-precios input {
       <button class="item-menu activo" data-seccion="fondos">Fondos de portada</button>
       <button class="item-menu" data-seccion="categorias">Categorías</button>
       <button class="item-menu" data-seccion="islas">🏝️ Islas / Localidades <span class="badge-pend-trad" id="badge-pend-islas" title="Traducciones pendientes: sin traducir, español cambiado o sin aprobar" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
-      <button class="item-menu" data-seccion="conductores">Conductores <span id="badge-prerregistro" title="Pre-registros nuevos por revisar" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">0</span></button>
+      <button class="item-menu" data-seccion="conductores">Choferes <span id="badge-prerregistro" title="Pre-registros nuevos por revisar" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">0</span></button>
       <button class="item-menu" data-seccion="destinos">Destino Inicial <span class="badge-pend-trad" id="badge-pend-destinos" title="Traducciones pendientes: sin traducir, español cambiado o sin aprobar" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
       <button class="item-menu" data-seccion="precios">Rutas y precios</button>
       <button class="item-menu" data-seccion="seo">SEO <span class="badge-pend-trad" id="badge-pend-seo" title="Traducciones pendientes: sin traducir, español cambiado o sin aprobar" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
@@ -270,8 +270,8 @@ table.tabla-precios input {
     </div>
 
     <div id="seccion-conductores" class="oculto">
-      <h1>Conductores</h1>
-      <p class="subtitulo">Alta y gestión de la flota de conductores. La categoría se elige entre las activas; la marca y el modelo se guardan en un catálogo propio que crece según se van añadiendo conductores.</p>
+      <h1>Choferes</h1>
+      <p class="subtitulo">Alta y gestión de la flota de choferes. La categoría se elige entre las activas; la marca y el modelo se guardan en un catálogo propio que crece según se van añadiendo choferes.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
         <button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button>
         <button class="boton-costa" onclick="contactoGlobalConductores(true)">💬 Permitir contacto a TODOS</button>
@@ -297,26 +297,27 @@ table.tabla-precios input {
           <div id="alta-imagen-mensaje" style="margin-top:10px;font-size:13px;"></div>
         </div>
       </div>
-      <table class="tabla-admin">
-        <thead>
-          <tr><th>Nombre</th><th>Contacto</th><th>Vehículo</th><th>Categoría</th><th>Isla</th><th>Foto</th><th style="min-width:150px">💬 Botón contacto</th><th style="min-width:130px">Tipo</th><th>Estado</th><th>Acciones</th></tr>
-        </thead>
-        <tbody id="tabla-conductores"></tbody>
-      </table>
-      <button id="boton-nuevo-conductor" class="boton-primario" style="margin-top:14px;">➕ Dar de alta un conductor</button>
-
-      <div class="tarjeta oculto" id="editor-conductor" style="margin-top:16px;max-width:640px;"></div>
-      <div class="tarjeta oculto" id="ficha-conductor" style="margin-top:16px;"></div>
-
       <!-- (19/11/2026) Pre-registro: los choferes que han hecho el pre-registro en la página pública «Alta choferes» -->
-      <h2 style="margin:36px 0 4px;display:flex;align-items:center;gap:8px;">📝 Pre-registro <span id="badge-prerregistro-dentro" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;">0</span></h2>
-      <p class="subtitulo" style="margin-bottom:8px;">Choferes que han hecho el pre-registro en la página pública «Alta choferes». Todavía no están registrados: no reciben avisos ni entran en la lista de arriba.</p>
+      <h2 style="margin:8px 0 4px;display:flex;align-items:center;gap:8px;">📝 Pre-registro de choferes <span id="badge-prerregistro-dentro" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;">0</span></h2>
+      <p class="subtitulo" style="margin-bottom:8px;">Choferes que han hecho el pre-registro en la página pública «Alta choferes». Todavía no están registrados: no reciben avisos ni entran en «Choferes de alta». Cuando se atiende uno, deja de contar en la señal.</p>
       <table class="tabla-admin">
         <thead>
           <tr><th>Fecha</th><th>Nombre</th><th>Contacto</th><th>Isla / Municipio</th><th>Licencia municipal</th><th>Privacidad</th><th>Estado</th><th>Acciones</th></tr>
         </thead>
         <tbody id="tabla-prerregistros"></tbody>
       </table>
+      <h2 style="margin:32px 0 8px;">Choferes de alta</h2>
+      <table class="tabla-admin">
+        <thead>
+          <tr><th>Nombre</th><th>Contacto</th><th>Vehículo</th><th>Categoría</th><th>Isla</th><th>Foto</th><th style="min-width:150px">💬 Botón contacto</th><th style="min-width:130px">Tipo</th><th>Estado</th><th>Acciones</th></tr>
+        </thead>
+        <tbody id="tabla-conductores"></tbody>
+      </table>
+      <button id="boton-nuevo-conductor" class="boton-primario" style="margin-top:14px;">➕ Dar de alta un chofer manualmente</button>
+
+      <div class="tarjeta oculto" id="editor-conductor" style="margin-top:16px;max-width:640px;"></div>
+      <div class="tarjeta oculto" id="ficha-conductor" style="margin-top:16px;"></div>
+
     </div>
 
     <div id="seccion-destinos" class="oculto">
@@ -3150,7 +3151,7 @@ function cargarConductores() {
     conductoresCache = conductores;
     var cuerpo = document.getElementById('tabla-conductores');
     if (conductores.length === 0) {
-      cuerpo.innerHTML = '<tr><td colspan="9">Todavía no hay conductores dados de alta.</td></tr>';
+      cuerpo.innerHTML = '<tr><td colspan="9">Todavía no hay choferes dados de alta.</td></tr>';
       return;
     }
     cuerpo.innerHTML = conductores.map(function (c) {
@@ -3211,11 +3212,11 @@ function cargarAltaChoferesAdmin() {
   cargarPrerregistrosAdmin();
 }
 
-// Lista «📝 Pre-registro» y su señal (menú y título). Se pone al día cada minuto sin tocar el bloque de la imagen.
+// Lista «📝 Pre-registro de choferes» y su señal (menú y título). Se pone al día cada minuto sin tocar el bloque de la imagen.
 function cargarPrerregistrosAdmin() {
   fetch('/admin/choferes-prerregistro').then(function (r) { return r.json(); }).then(function (filas) {
     var cuerpo = document.getElementById('tabla-prerregistros');
-    // Señal de pre-registros nuevos (por revisar): en el menú «Conductores» y en el título «📝 Pre-registro»
+    // Señal de pre-registros por atender: en el menú «Choferes» y en el título «📝 Pre-registro de choferes»
     var nuevos = filas.filter(function (p) { return p.estado === 'pendiente'; }).length;
     ['badge-prerregistro', 'badge-prerregistro-dentro'].forEach(function (idB) {
       var bd = document.getElementById(idB);
@@ -3307,7 +3308,7 @@ function cambiarTipoConductor(id, tipo) {
 
 function eliminarConductor(id) {
   var c = conductoresCache.find(function (x) { return x.id === id; });
-  if (!confirm('¿Eliminar al conductor "' + (c ? c.nombre : '') + '"? Esta acción no se puede deshacer.')) { return; }
+  if (!confirm('¿Eliminar al chofer "' + (c ? c.nombre : '') + '"? Esta acción no se puede deshacer.')) { return; }
   fetch('/admin/conductores/' + id + '/eliminar', { method: 'POST' })
     .then(function (r) { return r.json(); })
     .then(function (respuesta) {
@@ -3325,8 +3326,8 @@ function cambiarContactoConductor(id, permite) {
 
 function contactoGlobalConductores(permite) {
   if (!confirm(permite
-    ? '¿Activar el botón de contacto para TODOS los conductores?'
-    : '¿Quitar el botón de contacto a TODOS los conductores?')) { return; }
+    ? '¿Activar el botón de contacto para TODOS los choferes?'
+    : '¿Quitar el botón de contacto a TODOS los choferes?')) { return; }
   fetch('/admin/conductores-contacto-global', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -3335,7 +3336,7 @@ function contactoGlobalConductores(permite) {
 }
 
 function editarNombreConductor(id, actual) {
-  var nombre = prompt('Nombre correcto del conductor:', actual);
+  var nombre = prompt('Nombre correcto del chofer:', actual);
   if (nombre === null || !nombre.trim()) { return; }
   fetch('/admin/conductores/' + id + '/nombre', {
     method: 'POST',
@@ -3698,7 +3699,7 @@ function guardarFichaConductor(id) {
 function decidirFotoConductor(id, accion) {
   var motivo = null;
   if (accion === 'rechazar') {
-    motivo = prompt('Motivo del rechazo (el conductor lo verá):', 'La foto no es clara o no es de tipo carné.');
+    motivo = prompt('Motivo del rechazo (el chofer lo verá):', 'La foto no es clara o no es de tipo carné.');
     if (motivo === null) { return; }
   }
   fetch('/admin/conductores/' + id + '/foto', {
@@ -3746,7 +3747,7 @@ function formularioConductor() {
       '<option>Gran Canaria</option><option>Tenerife</option><option>Lanzarote</option>' +
       '<option>Fuerteventura</option><option>La Palma</option><option>La Gomera</option><option>El Hierro</option>' +
     '</select>' +
-    '<label class="etiqueta">Foto del conductor (opcional, queda aprobada al subirla aquí)</label>' +
+    '<label class="etiqueta">Foto del chofer (opcional, queda aprobada al subirla aquí)</label>' +
     '<input class="campo" type="file" id="ac-foto-input" accept="image/*" onchange="previsualizarFotoConductor()" style="margin-bottom:10px">' +
     '<img id="ac-foto-preview" style="max-width:160px;border-radius:8px;margin-bottom:10px;display:none">';
 }
@@ -3756,7 +3757,7 @@ function mostrarFormularioConductor() {
   function pintar() {
     fotoConductorNueva = null;
     editor.classList.remove('oculto');
-    editor.innerHTML = '<h2 style="margin-top:0">➕ Dar de alta un conductor</h2>' +
+    editor.innerHTML = '<h2 style="margin-top:0">➕ Dar de alta un chofer manualmente</h2>' +
       '<p class="subtitulo" style="margin:0 0 12px">Pasa por la oficina con su documentación. La foto se sube desde aquí y queda aprobada directamente.</p>' +
       formularioConductor() +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">' +
@@ -3865,7 +3866,7 @@ function guardarConductor() {
     body: JSON.stringify(datos)
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
     if (respuesta.ok) {
-      msg.innerHTML = '<div class="aviso-ok">✅ Conductor creado y aprobado.</div>';
+      msg.innerHTML = '<div class="aviso-ok">✅ Chofer creado y aprobado.</div>';
       cargarConductores();
       setTimeout(function () { document.getElementById('editor-conductor').classList.add('oculto'); }, 1200);
     } else {
