@@ -578,6 +578,33 @@ table.tabla-precios input {
       <!-- ─── SEPARADOR — Bloques con generador IA propio ────────────────── -->
       <table class="tabla-admin" style="margin-top:20px;">
         <tbody>
+          <!-- ─── (23/11/2026) BLOQUE — Páginas legales, con su traductor jurídico (Generador 19) ─── -->
+          <tr style="background:var(--gris-fondo);cursor:pointer;" onclick="toggleBloqueLegal()">
+            <td style="padding:10px 14px;font-weight:600;font-size:13px;user-select:none;">
+              <span id="bloque-legal-icono">▶</span>
+              Páginas legales
+              <span id="bloque-legal-num" style="font-size:11px;font-weight:400;color:var(--texto-muted);"></span>
+              <span id="bloque-legal-pct" style="float:right;font-size:12px;font-weight:600;"></span>
+            </td>
+          </tr>
+          <tr id="bloque-legal-fila" style="display:none;">
+            <td style="padding:16px 14px;">
+              <p style="font-size:13px;color:var(--texto-muted);margin-bottom:16px;">Textos legales de la web (Aviso legal, Privacidad, Cookies, Condiciones, Condiciones de los choferes, pie, reserva y aviso de cookies). Se traducen con su propio traductor jurídico, especializado en derecho español. Lo traducido queda en azul hasta que lo apruebes.</p>
+              <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;background:var(--gris-fondo);padding:10px 14px;border-radius:8px;">
+                <span style="font-size:13px;">🤖 Traducir textos legales con IA:</span>
+                <select id="select-idioma-legal" class="campo" style="height:34px;width:auto;"></select>
+                <button class="boton-costa" id="btn-generar-legal" onclick="generarLegalConIA()">Generar lo que falta</button>
+                <button class="boton-primario" style="padding:6px 14px;font-size:0.85rem;" onclick="aprobarTodoLegal()">✅ Aprobar todo</button>
+                <span id="legal-aprobar-msg" style="font-size:13px;color:var(--verde-ok);display:none;"></span>
+              </div>
+              <div id="mensaje-legal-ia" style="margin-bottom:12px;"></div>
+              <table class="tabla-admin">
+                <thead id="thead-legal"></thead>
+                <tbody id="tabla-legal-cuerpo"></tbody>
+              </table>
+              <div id="hueco-editor-legal"></div>
+            </td>
+          </tr>
 
         <!-- ─── BLOQUE 2 — Contenido de categorías de flota ──────────────── -->
         <tr style="background:var(--gris-fondo);cursor:pointer;" onclick="toggleBloque2Flota()">
@@ -5223,6 +5250,7 @@ function renderizarCabeceraTextos() {
 var BOTONES_GENERAR_IDIOMA = {
   'select-idioma-ia': 'btn-generar-textos',
   'select-idioma-categorias': 'btn-generar-categorias',
+  'select-idioma-legal': 'btn-generar-legal', // (23/11/2026)
   'select-com-email-ia': 'btn-generar-com-email',
   'select-com-wa-ia': 'btn-generar-com-wa',
   'select-com-frases-ia': 'btn-generar-com-frases',
@@ -5254,6 +5282,14 @@ function renderizarSelectIA() {
     return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
   }).join('');
   rotularBotonGenerar('select-idioma-categorias');
+  // (23/11/2026) Selector del bloque «Páginas legales» (sin el español)
+  var selectLegal = document.getElementById('select-idioma-legal');
+  if (selectLegal) {
+    selectLegal.innerHTML = IDIOMAS_TEXTOS.filter(function (l) { return l !== 'es'; }).map(function (l) {
+      return '<option value="' + l + '">' + (NOMBRES_IDIOMA[l] || l.toUpperCase()) + '</option>';
+    }).join('');
+    rotularBotonGenerar('select-idioma-legal');
+  }
 }
 
 var extrasIdiomasLista = []; // (16/11/2026) N83: extras reales de Admin → Extras
@@ -5512,10 +5548,14 @@ function renderizarTablaTextos(datos) {
     return;
   }
 
+  // (23/11/2026) El grupo «Páginas legales» tiene su propio bloque (con su traductor): aquí no sale
+  renderizarBloqueLegal(datos);
+
   // Agrupar por módulo manteniendo orden de aparición
   var modulos = [];
   var porModulo = {};
   datos.textos.forEach(function(t) {
+    if (t.modulo === MODULO_LEGAL) return;
     if (!porModulo[t.modulo]) {
       porModulo[t.modulo] = [];
       modulos.push(t.modulo);
@@ -5676,6 +5716,169 @@ function renderizarTablaTextos(datos) {
   cuerpo.innerHTML = html;
 }
 
+// ─── (23/11/2026) Bloque «Páginas legales» de Idiomas (con su traductor jurídico, Generador 19) ───
+var MODULO_LEGAL = 'Páginas legales';
+function esTextoLegal(t) { return !!t && t.modulo === MODULO_LEGAL; }
+function toggleBloqueLegal() {
+  var fila = document.getElementById('bloque-legal-fila');
+  var icono = document.getElementById('bloque-legal-icono');
+  if (!fila) return;
+  var visible = fila.style.display !== 'none';
+  fila.style.display = visible ? 'none' : '';
+  if (icono) icono.textContent = visible ? '▶' : '▼';
+}
+function renderizarBloqueLegal(datos) {
+  var cuerpo = document.getElementById('tabla-legal-cuerpo');
+  var thead = document.getElementById('thead-legal');
+  if (!cuerpo) return;
+  var textos = ordenarTextosLegales((datos.textos || []).filter(esTextoLegal));
+  if (thead) thead.innerHTML = '<tr><th>Texto</th>' +
+    IDIOMAS_TEXTOS.map(function (l) { return '<th style="text-align:center">' + l.toUpperCase() + '</th>'; }).join('') + '<th>Acción</th></tr>';
+  var traducidos = 0, total = 0;
+  cuerpo.innerHTML = textos.length ? textos.map(function (t) {
+    IDIOMAS_TEXTOS.forEach(function (l) { total++; if (t.estado[l]) traducidos++; });
+    var nombreLegal = NOMBRES_TEXTOS_LEGALES[t.clave];
+    return '<tr>' +
+      '<td style="white-space:normal;word-break:break-word;min-width:260px;max-width:520px;line-height:1.5;">' +
+        (nombreLegal ? '<strong>' + escapar(nombreLegal) + '</strong><br><span>' + escapar(textoCortoLegal(t)) + '</span>' : '<strong>' + escapar(textoCortoLegal(t)) + '</strong>') +
+        '<br><span style="font-size:11px;color:var(--texto-muted);font-family:\'JetBrains Mono\',monospace;">' + escapar(t.clave) + '</span></td>' +
+      IDIOMAS_TEXTOS.map(function (lang) { return celdaTextoInterfaz(t, lang); }).join('') +
+      '<td><button class="boton-costa" style="padding:6px 10px;font-size:0.8rem" onclick="abrirEditorTexto(' + t.id + ')">✏️ Editar</button></td>' +
+    '</tr>';
+  }).join('') : '<tr><td colspan="12">No hay textos legales.</td></tr>';
+  var elNum = document.getElementById('bloque-legal-num');
+  if (elNum) elNum.textContent = '(' + textos.length + ' textos)';
+  var pct = total > 0 ? Math.floor(traducidos / total * 100) : 0;
+  var color = pct === 100 ? '#2e7d32' : pct > 50 ? '#1565c0' : '#c0392b';
+  var elPct = document.getElementById('bloque-legal-pct');
+  if (elPct) elPct.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
+}
+// La ficha de un texto legal se abre dentro de su bloque (es la misma ficha de Textos de interfaz, que se cambia de sitio)
+var _sitioEditorTextos = null;
+function colocarEditorTexto(legal) {
+  var editor = document.getElementById('editor-texto-interfaz');
+  if (!editor) return;
+  if (!_sitioEditorTextos) _sitioEditorTextos = { padre: editor.parentNode, siguiente: editor.nextSibling };
+  var destino = legal ? document.getElementById('hueco-editor-legal') : _sitioEditorTextos.padre;
+  if (!destino || editor.parentNode === destino) return;
+  if (legal) destino.appendChild(editor);
+  else _sitioEditorTextos.padre.insertBefore(editor, _sitioEditorTextos.siguiente);
+}
+function recargarTextosLegal() {
+  return fetch('/admin/textos').then(function (r) { return r.json(); }).then(function (datos) {
+    textosCache = datos;
+    renderizarTablaTextos(datos);
+  });
+}
+// Mensajes del bloque
+function msgLegal(html) { var el = document.getElementById('mensaje-legal-ia'); if (el) el.innerHTML = html; }
+function cajaRojaLegal(texto) {
+  return '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">' + texto + '</div>';
+}
+// Sigue un trabajo de traducción en segundo plano: avisa cada 3 segundos de cómo va
+function seguirTrabajoLegal(idTrabajo, alAvanzar, alTerminar) {
+  var tick = function () {
+    fetch('/admin/textos/legal/trabajo/' + encodeURIComponent(idTrabajo))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { alTerminar(d); return; }
+        if (d.terminado) { alTerminar(d); return; }
+        alAvanzar(d);
+        setTimeout(tick, 3000);
+      })
+      .catch(function () { setTimeout(tick, 5000); });
+  };
+  setTimeout(tick, 1500);
+}
+function nombreCortoLegal(clave) {
+  var n = NOMBRES_TEXTOS_LEGALES[clave] || clave;
+  return n.split(' — ')[0];
+}
+function textoProgresoLegal(d) {
+  var n = d.actual ? '«' + escapar(nombreCortoLegal(d.actual)) + '» ' : '';
+  return '🤖 Traduciendo ' + n + '(' + Math.min(d.hecho + 1, d.total) + ' de ' + d.total + ')… Los textos largos tardan unos minutos. Puedes seguir trabajando.';
+}
+// Resumen al terminar: lo traducido, lo que no se ha podido traducir y las palabras latinas que hay que decidir
+function resumenTrabajoLegal(d, lang) {
+  if (!d.ok) return cajaRojaLegal('⚠️ ' + escapar(d.error || 'No se ha podido terminar.'));
+  var bien = (d.resultados || []).filter(function (r) { return r.ok; });
+  var mal = (d.resultados || []).filter(function (r) { return !r.ok; });
+  var html = bien.length ? '<div class="aviso-ok">🤖 ' + bien.length + ' texto(s) traducido(s) en ' + escapar(String(lang || d.lang || '').toUpperCase()) + '. Están en azul: revísalos y apruébalos.</div>' : '';
+  if (mal.length) html += cajaRojaLegal('⚠️ No se ha podido traducir bien (no se ha guardado nada de estos; vuelve a pulsar el botón): ' +
+    mal.map(function (r) { return '«' + escapar(nombreCortoLegal(r.clave)) + '»: ' + escapar(r.error || ''); }).join(' · '));
+  return html;
+}
+// «Generar lo que falta en <idioma>»
+function generarLegalConIA() {
+  var lang = document.getElementById('select-idioma-legal').value;
+  var btn = document.getElementById('btn-generar-legal');
+  if (btn) btn.disabled = true;
+  msgLegal('<p style="font-size:13px;color:var(--texto-muted);margin:0;">🤖 Buscando lo que falta…</p>');
+  fetch('/admin/textos/legal/traducir-ia/' + lang, { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) { if (btn) btn.disabled = false; msgLegal(cajaRojaLegal('⚠️ ' + escapar(d.error || 'Error'))); return; }
+      if (!d.total) { if (btn) btn.disabled = false; msgLegal('<div class="aviso-ok">✅ No falta nada en ' + escapar(lang.toUpperCase()) + '.</div>'); return; }
+      msgLegal('<p style="font-size:13px;color:var(--texto-muted);margin:0;">' + textoProgresoLegal({ hecho: 0, total: d.total, actual: '' }) + '</p>');
+      seguirTrabajoLegal(d.trabajo, function (p) {
+        msgLegal('<p style="font-size:13px;color:var(--texto-muted);margin:0;">' + textoProgresoLegal(p) + '</p>');
+      }, function (fin) {
+        if (btn) btn.disabled = false;
+        msgLegal(resumenTrabajoLegal(fin, lang));
+        recargarTextosLegal();
+      });
+    })
+    .catch(function () { if (btn) btn.disabled = false; msgLegal(cajaRojaLegal('⚠️ No se pudo conectar. Inténtalo de nuevo.')); });
+}
+// «✅ Aprobar todo» del bloque: solo los textos legales en azul. Si alguno lleva palabras latinas nuevas en ruso, se preguntan.
+function aprobarTodoLegal() {
+  aprobarTodoAzulesLegal();
+}
+function aprobarTodoAzulesLegal() {
+  var msg = document.getElementById('legal-aprobar-msg');
+  if (msg) { msg.style.color = 'var(--texto-muted)'; msg.textContent = 'Aprobando…'; msg.style.display = 'inline'; }
+  fetch('/admin/textos/legal/aprobar-azules', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'Error al aprobar.'; } return; }
+      // las palabras de todos los textos, juntas por idioma (un idioma se nombra una vez)
+      var porLang = {};
+      latinasDeFrenadas(d).forEach(function (f) {
+        porLang[f.lang] = porLang[f.lang] || [];
+        (f.latinas || []).forEach(function (w) { if (porLang[f.lang].indexOf(w) < 0) porLang[f.lang].push(w); });
+      });
+      var latinas = Object.keys(porLang).map(function (l) { return { lang: l, latinas: porLang[l] }; });
+      if (msg) {
+        msg.style.color = 'var(--verde-ok)';
+        msg.textContent = d.aprobadas > 0 ? '✅ ' + d.aprobadas + ' traducción(es) aprobada(s).' : (latinas.length ? '' : '✅ Todo ya estaba aprobado.');
+        if (!latinas.length) setTimeout(function () { msg.style.display = 'none'; }, 4000);
+      }
+      if (latinas.length) msgLegal(htmlPreguntaLatinas(latinas, function () { msgLegal(''); aprobarTodoAzulesLegal(); }));
+      recargarTextosLegal();
+    })
+    .catch(function () { if (msg) { msg.style.color = 'var(--rojo-error)'; msg.textContent = 'No se pudo conectar.'; } });
+}
+// «🔄 Volver a traducir XX» de la ficha de un texto legal
+function retraducirTextoLegal(textoId, lang) {
+  var msg = document.getElementById('texto-mensaje-editor');
+  msg.innerHTML = '<p style="font-size:13px;color:var(--texto-muted);margin:0;">🤖 Traduciendo de nuevo con el traductor jurídico… Un texto largo tarda unos minutos.</p>';
+  fetch('/admin/textos/legal/' + textoId + '/idioma/' + lang + '/retraducir', { method: 'POST' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) { msg.innerHTML = htmlRetraducidoError(d); return; }
+      seguirTrabajoLegal(d.trabajo, function () {}, function (fin) {
+        var r = fin.ok && fin.resultados && fin.resultados[0];
+        var m = document.getElementById('texto-mensaje-editor');
+        if (!r || !r.ok) { if (m) m.innerHTML = htmlRetraducidoError({ error: (r && r.error) || fin.error || 'No se ha podido traducir.' }); return; }
+        refrescarTextosYPestanas(textoId, lang).then(function () {
+          var m2 = document.getElementById('texto-mensaje-editor');
+          if (m2) m2.innerHTML = '<div class="aviso-ok">🤖 Traducido de nuevo. Está en azul: revísalo y pulsa «💾 Guardar en ' + escapar(lang.toUpperCase()) + '».</div>' + (m2.innerHTML || '');
+        });
+      });
+    })
+    .catch(function () { msg.innerHTML = htmlRetraducidoError({ error: 'No se pudo conectar con la IA. Inténtalo de nuevo.' }); });
+}
+
 // (18/11/2026) Páginas legales: nombre que dice qué es cada texto y dónde sale (solo para el Admin; no se traduce).
 // Lo del pie (4 enlaces y la línea del ©) lleva delante su número, en el orden en que sale en el pie.
 // (19/11/2026) N93: los NÚMEROS van en los textos completos (lo que más se cambia: aquí se pega el texto de cada página).
@@ -5745,7 +5948,8 @@ function limpiarHtmlLegal(html) {
   function recorrer(nodo) {
     var out = '';
     nodo.childNodes.forEach(function (n) {
-      if (n.nodeType === 3) { out += esc(n.nodeValue.replace(/ /g, ' ')); return; }
+      // (23/11/2026) El espacio fijo del francés (antes de : ; ? ! » y después de «) se conserva; los demás pasan a espacio normal
+      if (n.nodeType === 3) { out += esc(n.nodeValue.replace(/ /g, function (m, i, str) { return /[:;?!»]/.test(str.charAt(i + 1)) || str.charAt(i - 1) === '«' ? m : ' '; })); return; }
       if (n.nodeType !== 1) return;
       var tag = n.tagName;
       if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'META' || tag === 'TITLE') return;
@@ -7188,6 +7392,7 @@ function abrirEditorTexto(textoId) {
   var texto = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
   if (!texto) return;
 
+  colocarEditorTexto(esTextoLegal(texto)); // (23/11/2026) la ficha de un texto legal se abre en su bloque
   var editor = document.getElementById('editor-texto-interfaz');
   editor.classList.remove('oculto');
 
@@ -7241,7 +7446,7 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
     campo.innerHTML =
       '<label class="etiqueta">Texto en Español</label>' +
       '<textarea class="campo" id="texto-traduccion" ' + atributosCajaTexto(textoId) + '>' + escapar(valorEs) + '</textarea>' +
-      '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'es\')">💾 Guardar</button>' +
+      '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'es\')">💾 Guardar' + (esTextoLegal(texto) ? ' en ES' : '') + '</button>' +
       '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="guardarTodoTexto(' + textoId + ', \'es\')">💾 Guardar todo</button>';
     montarEditorLegal(textoId); // (17/11/2026) N86
   } else {
@@ -7253,7 +7458,9 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
         var legalLargo = esTextoLegalLargo(texto); // (19/11/2026) N93: textos completos de las páginas legales
         var avisoDesact = (datos.desactualizado && legalLargo)
           ? '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#c0392b;">' +
-              '⚠️ <strong>El español ha cambiado.</strong> Pega aquí abajo la traducción nueva y pulsa «💾 Guardar».</div>'
+              (esTextoLegal(texto) // (23/11/2026) bloque «Páginas legales»: con su traductor
+                ? '⚠️ <strong>El español ha cambiado.</strong> Pulsa «🔄 Volver a traducir ' + lang.toUpperCase() + '» para que el traductor jurídico la rehaga, o pega aquí abajo la traducción nueva y pulsa «💾 Guardar en ' + lang.toUpperCase() + '».</div>'
+                : '⚠️ <strong>El español ha cambiado.</strong> Pega aquí abajo la traducción nueva y pulsa «💾 Guardar».</div>')
           : datos.desactualizado
           ? '<div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#c0392b;">' +
               '⚠️ <strong>El español ha cambiado.</strong> Revisa esta traducción: corrígela y guárdala, o pulsa «💾 Guardar» tal cual si el cambio no le afecta.' +
@@ -7264,12 +7471,33 @@ function cambiarIdiomaEditorTexto(textoId, lang, botonTab) {
           avisoDesact +
           '<label class="etiqueta">Traducción en ' + lang.toUpperCase() + '</label>' +
           '<textarea class="campo" id="texto-traduccion" ' + atributosCajaTexto(textoId) + ' placeholder="Todavía sin traducir...">' + escapar(datos.texto || '') + '</textarea>' +
-          '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar</button>' +
+          '<button class="boton-primario" style="margin-top:10px;" onclick="guardarTraduccionTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar' + (esTextoLegal(texto) ? ' en ' + lang.toUpperCase() : '') + '</button>' +
           '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="guardarTodoTexto(' + textoId + ', \'' + lang + '\')">💾 Guardar todo</button>' +
           // (07/11/2026) N51: rehace con la IA solo el idioma de esta pestaña, aunque esté aprobado (como en Frases)
           // (19/11/2026) N93: no en los textos completos legales (sus traducciones las pega Germán)
-          '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="retraducirTexto(' + textoId + ', \'' + lang + '\')">🔄 Volver a traducir</button>';
+          // (23/11/2026) Los textos legales, con su traductor jurídico (Generador 19) y el botón con el idioma
+          (esTextoLegal(texto)
+            ? '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="retraducirTextoLegal(' + textoId + ', \'' + lang + '\')">🔄 Volver a traducir ' + lang.toUpperCase() + '</button>'
+            : '<button class="boton-primario" style="margin-top:10px;margin-left:8px;" onclick="retraducirTexto(' + textoId + ', \'' + lang + '\')">🔄 Volver a traducir</button>');
         montarEditorLegal(textoId); // (17/11/2026) N86
+        // (23/11/2026) Texto legal sin aprobar con palabras en letras latinas: se preguntan aquí, en su pestaña
+        if (esTextoLegal(texto) && datos.freno && !datos.freno.grave && datos.freno.latinas && datos.freno.latinas.length && texto.sinAprobar && texto.sinAprobar[lang] && !datos.desactualizado) {
+          // «✅ Sí, aprobar»: las palabras pasan a la lista y se aprueba el texto guardado, tal cual (no se vuelve a escribir)
+          var _mLat = document.getElementById('texto-mensaje-editor');
+          var _okPrevio = _mLat.querySelector('.aviso-ok'); // («Traducido de nuevo…» se queda encima de la pregunta)
+          _mLat.innerHTML = (_okPrevio ? _okPrevio.outerHTML : '') + htmlPreguntaLatinas([{ lang: lang, latinas: datos.freno.latinas }], function () {
+            fetch('/admin/textos/' + textoId + '/idioma/' + lang + '/aprobar', { method: 'POST' })
+              .then(function (r) { return r.json(); })
+              .then(function (d) {
+                var m = document.getElementById('texto-mensaje-editor');
+                if (!d.ok) { if (m) m.innerHTML = htmlFreno(d, null); return; }
+                refrescarTextosYPestanas(textoId, lang).then(function () {
+                  var m2 = document.getElementById('texto-mensaje-editor');
+                  if (m2) m2.innerHTML = '<div class="aviso-ok">✅ Aprobado. Las palabras ya están en la lista.</div>';
+                });
+              });
+          });
+        }
       });
   }
 }
@@ -7468,6 +7696,14 @@ function guardarTodoTexto(textoId, lang) {
   }).then(function (respuesta) {
     if (!respuesta.ok) throw new Error(respuesta.error || 'Error al guardar');
     var frenadas = textoFrenoLote(respuesta, 'No aprobado'); // (07/11/2026) N51
+    var _textoGT = textosCache && textosCache.textos.find(function (t) { return t.id === textoId; });
+    if (esTextoLegal(_textoGT) && latinasDeFrenadas(respuesta).length) { // (23/11/2026) palabras latinas: se preguntan
+      var _latGT = latinasDeFrenadas(respuesta);
+      refrescarTextosYPestanas(textoId, lang).then(function () {
+        msg.innerHTML = '<div class="aviso-ok">✅ Guardado.</div>' + htmlPreguntaLatinas(_latGT, function () { aprobarTodasTexto(textoId); });
+      });
+      return;
+    }
     msg.innerHTML = frenadas
       ? '<div class="aviso-ok">✅ Guardado.</div><div style="background:#fdecea;border:1px solid #e74c3c;border-radius:8px;padding:10px 14px;font-size:13px;color:#c0392b;margin-top:8px;">' + escapar(frenadas) + '</div>'
       : '<div class="aviso-ok">✅ Guardado correctamente</div>';
@@ -7494,6 +7730,11 @@ function guardarTraduccionTexto(textoId, lang, confirmarLatinas) {
     body: JSON.stringify({ texto: valor, confirmar_latinas: confirmarLatinas === true })
   }).then(function (r) { return r.json(); }).then(function (respuesta) {
     // (07/11/2026) N51 — Freno de las traducciones
+    // (23/11/2026) En un texto legal, las palabras latinas se preguntan: «✅ Sí, aprobar» las pasa a la lista y guarda
+    if (respuesta.freno && esTextoLegal(_textoAntes) && !respuesta.freno.grave && respuesta.freno.latinas && respuesta.freno.latinas.length) {
+      msg.innerHTML = htmlPreguntaLatinas([{ lang: lang, latinas: respuesta.freno.latinas }], function () { guardarTraduccionTexto(textoId, lang, true); });
+      return;
+    }
     if (respuesta.freno) { pintarFreno(msg, respuesta, function () { guardarTraduccionTexto(textoId, lang, true); }); return; }
     if (respuesta.ok && _esCambiado && _tieneTraducciones) {
       // (07/10/2026) El español ha cambiado: ¿afecta a las traducciones?
