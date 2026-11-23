@@ -976,6 +976,68 @@ Responde EXCLUSIVAMENTE con un objeto JSON válido, sin texto adicional antes ni
 {"clave1": "traducción1", "clave2": "traducción2"}`;
 }
 
+// Palabras de la empresa en cada idioma para los textos legales (las de los textos aprobados por Germán el 23/11/2026).
+// Las usa el GENERADOR 19.
+const TERMINOS_LEGALES = {
+  en: { chofer: 'driver', deposito: 'security deposit', trato: 'el trato neutro habitual de un texto legal en inglés' },
+  de: { chofer: 'Fahrer', deposito: 'Kaution', trato: 'de «Sie»' },
+  fr: { chofer: 'chauffeur', deposito: 'dépôt de garantie', trato: 'de «vous»' },
+  it: { chofer: 'autista', deposito: 'deposito cauzionale', trato: 'de «Lei» o impersonal, como en los textos legales italianos' },
+  nl: { chofer: 'chauffeur', deposito: 'borg', trato: 'de «u»' },
+  sv: { chofer: 'chaufför', deposito: 'säkerhetsdeposition', trato: 'el trato habitual de un texto legal en sueco (du o impersonal)' },
+  no: { chofer: 'sjåfør', deposito: 'depositum', trato: 'el trato habitual de un texto legal en noruego (du o impersonal)' },
+  fi: { chofer: 'kuljettaja', deposito: 'takuumaksu', trato: 'el trato habitual de un texto legal en finés (impersonal o sinä)' },
+  ru: { chofer: 'водитель', deposito: 'гарантийный депозит', trato: 'de «вы»' }
+};
+
+// ─── GENERADOR 19 ────────────────────────────────────────────────────────────
+// Traducción de los textos legales — traductor jurídico especializado en derecho español (un texto largo, por fragmentos)
+// Endpoint: POST /admin/textos/legal/traducir-ia/:lang y POST /admin/textos/legal/:id/idioma/:lang/retraducir
+// Botón admin: Generar lo que falta y 🔄 Volver a traducir XX (Admin → Idiomas → Páginas legales)
+// Línea server.js: ~10374
+function GENERADOR_TEXTOS_LEGALES(d) {
+  const t = TERMINOS_LEGALES[d.lang] || null;
+  const idioma = String(d.nombreIdioma || '').toLowerCase();
+  return `Eres un traductor jurídico especializado en derecho español. Traduces un texto legal de la web de Traslados GC, una plataforma española de intermediación de traslados en Gran Canaria (Islas Canarias, España), del español al ${idioma}.
+
+Qué es este texto: ${d.nombreTexto || ''}.
+
+Reglas estrictas que nunca puedes romper:
+
+1. No traduzcas palabra por palabra. Redáctalo como lo haría un jurista nativo de ${idioma}: con el vocabulario, el tono y las fórmulas propias de los textos legales de ese idioma, claro y preciso.
+2. El contenido jurídico no cambia: el texto se rige por el derecho español. Las leyes, los organismos, los juzgados y los derechos son los de España. No los cambies por los del país del idioma ni añadas leyes, organismos o derechos que el español no nombra. No quites ni añadas obligaciones, plazos, importes, condiciones ni excepciones.
+3. Las siglas y los nombres oficiales españoles (LSSI-CE, LOPDGDD, AEPD, NIF, DNI/NIE, IGIC, RETA, ITV…) se dejan como están en el español. Si el español explica qué son, explícalo también en ${idioma}.
+4. Los huecos entre corchetes ([NOMBRE DE TU PLATAFORMA], [FECHA], [TU NIF]…) se copian exactamente igual, sin traducirlos ni transliterarlos. Si dentro del corchete hay una cifra con su unidad (por ejemplo [1 año] o [2 años / 24h]), se mantienen los corchetes y la cifra, y la unidad se escribe en ${idioma}.
+5. Copia exactamente igual, en el mismo orden y número, las marcas de formato (<h2>, <h3>, <p>, <strong>, <ul>, <ol>, <li>, <table>, <tbody>, <tr>, <th>, <td>, <a>, <br>) y las direcciones de los enlaces. Traduce solo el texto que hay entre ellas. Única excepción: en un enlace a nuestra web (traslados-gc.onrender.com/es/), cambia «/es/» por el código del idioma («/${d.lang}/»).
+${t ? `6. La persona que conduce el vehículo es siempre «chofer»: en ${idioma}, «${t.chofer}». Nunca uses otra palabra («conducente», «conductor»…).
+7. El depósito de garantía se llama en ${idioma} «${t.deposito}».
+8. Trato al lector: ${t.trato}.
+9.` : '6.'} Usa la puntuación propia del idioma (en francés, el espacio antes de : ; ? ! y dentro de « »).
+${d.glosario || ''}
+
+${d.anterior ? `Versión anterior: esta es la traducción anterior de este texto en ${idioma}, revisada y aprobada por la empresa. Es tu modelo: conserva su redacción, sus términos y su estilo en todo lo que siga diciendo lo mismo que el español actual. Cambia solo lo que el español dice ahora distinto, añade lo nuevo y quita lo que el español ya no dice.
+<<<VERSION_ANTERIOR
+${d.anterior}
+VERSION_ANTERIOR>>>
+
+` : ''}${d.fragmento ? `Texto completo en español (solo para que entiendas el contexto):
+<<<ESPAÑOL
+${d.textoEs}
+ESPAÑOL>>>
+
+Traduce SOLO este fragmento:
+<<<FRAGMENTO
+${d.fragmento}
+FRAGMENTO>>>` : `Texto en español que hay que traducir:
+<<<ESPAÑOL
+${d.textoEs}
+ESPAÑOL>>>`}
+
+${REGLA_LETRAS()}${REGLA_RUSO(idioma)}${esIdiomaRuso(idioma) ? '\n- En este texto legal, los huecos entre corchetes, las siglas oficiales españolas y las marcas se escriben como en el español: no se transliteran.' : ''}
+
+Responde EXCLUSIVAMENTE con la traducción${d.fragmento ? ' del fragmento' : ''}, sin explicaciones, sin comillas y sin bloques de código.`;
+}
+
 // =============================================================================
 module.exports = {
   GLOSARIO_BOTONES,
@@ -997,6 +1059,7 @@ module.exports = {
   GENERADOR_EMAIL_COMUNICACIONES,
   GENERADOR_WA_COMUNICACIONES,
   GENERADOR_FRASES_COMUNICACIONES,
+  GENERADOR_TEXTOS_LEGALES,
   // (07/11/2026) Reglas comunes, también para los textos de IA que están dentro de server.js
   REGLA_LETRAS,
   REGLA_RUSO,

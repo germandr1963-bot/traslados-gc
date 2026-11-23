@@ -10163,7 +10163,11 @@ app.get('/admin/textos/:id/idioma/:lang', requireAdmin, asyncHandler(async (req,
     'SELECT texto, desactualizado FROM textos_interfaz_traducciones WHERE texto_id = $1 AND lang_code = $2',
     [req.params.id, req.params.lang]
   );
-  res.json({ texto: result.rows.length ? result.rows[0].texto : '', desactualizado: !!(result.rows.length && result.rows[0].desactualizado) });
+  // (23/11/2026) Bloque «Páginas legales»: también lo que ve el freno (las palabras latinas se preguntan en su pestaña)
+  const _txtIdioma = result.rows.length ? result.rows[0].texto : '';
+  const _rrIdioma = _txtIdioma ? revisarTraduccion(_txtIdioma, req.params.lang) : null;
+  res.json({ texto: _txtIdioma, desactualizado: !!(result.rows.length && result.rows[0].desactualizado),
+    freno: _rrIdioma && !_rrIdioma.ok ? { grave: _rrIdioma.grave, sinRuso: _rrIdioma.sinRuso, mezcladas: _rrIdioma.mezcladas, latinas: _rrIdioma.latinas } : null });
 }));
 
 // Editar el texto base en español de cualquier clave desde el admin
@@ -10238,19 +10242,28 @@ async function aprobarTextosSeparados(textoId, sep) {
 // (30/10/2026) «✅ Aprobar todo» de Idiomas → Textos de interfaz: aprueba (🟢) todo lo que está en 🔵
 // (traducido, sin aprobar) en todos los idiomas. Los 🔴 (español cambiado o sin traducir) no se tocan.
 app.post('/admin/textos/aprobar-azules', requireAdmin, asyncHandler(async (req, res) => {
+  res.json(await aprobarAzulesTextos(false));
+}));
+// (23/11/2026) «✅ Aprobar todo» del bloque «Páginas legales»: solo los textos legales
+app.post('/admin/textos/legal/aprobar-azules', requireAdmin, asyncHandler(async (req, res) => {
+  res.json(await aprobarAzulesTextos(true));
+}));
+async function aprobarAzulesTextos(soloLegal) {
   // (07/11/2026) N51: antes de aprobar, cada 🔵 pasa por el freno
+  // (23/11/2026) Textos de interfaz y el bloque «Páginas legales» aprueban cada uno lo suyo
   const azules = await pool.query(
     `SELECT tit.texto_id, tit.lang_code, tit.texto, ti.clave
      FROM textos_interfaz_traducciones tit JOIN textos_interfaz ti ON ti.id = tit.texto_id
      WHERE tit.revisado = FALSE AND COALESCE(tit.desactualizado, FALSE) = FALSE
-       AND tit.texto IS NOT NULL AND TRIM(tit.texto) <> ''`
+       AND tit.texto IS NOT NULL AND TRIM(tit.texto) <> ''
+       AND (ti.modulo = $1) = $2`, [MODULO_LEGAL, !!soloLegal]
   );
   const sep = separarParaAprobar(azules.rows.map(function (f) {
     return { texto_id: f.texto_id, lang: f.lang_code, texto: f.texto, donde: f.clave + ' (' + f.lang_code.toUpperCase() + ')' };
   }));
   await aprobarTextosSeparados(null, sep);
-  res.json({ ok: true, aprobadas: sep.aprobar.length, frenadas: sep.frenadas });
-}));
+  return { ok: true, aprobadas: sep.aprobar.length, frenadas: sep.frenadas };
+}
 
 // (07/11/2026) N51 — «🔄 Volver a traducir» de la ficha de un texto: la IA traduce otra vez ese texto SOLO en el idioma
 // de la pestaña abierta, aunque esté aprobado. Dos intentos. Lo grave (ruso sin ruso, letras mezcladas) no se guarda;
@@ -10258,9 +10271,10 @@ app.post('/admin/textos/aprobar-azules', requireAdmin, asyncHandler(async (req, 
 app.post('/admin/textos/:id/idioma/:lang/retraducir', requireAdmin, asyncHandler(async (req, res) => {
   const lang = req.params.lang;
   if (!IDIOMAS_TRADUCIBLES.includes(lang)) return res.status(400).json({ ok: false, error: 'Idioma no válido' });
-  const tx = await pool.query('SELECT id, clave, contexto, texto_es FROM textos_interfaz WHERE id = $1', [req.params.id]);
+  const tx = await pool.query('SELECT id, clave, modulo, contexto, texto_es FROM textos_interfaz WHERE id = $1', [req.params.id]);
   if (!tx.rows.length) return res.status(404).json({ ok: false, error: 'Texto no encontrado' });
   const t = tx.rows[0];
+  if (t.modulo === MODULO_LEGAL) return res.json({ ok: false, error: 'Este texto legal se traduce desde el bloque «Páginas legales».' }); // (23/11/2026)
   if (!t.texto_es || !t.texto_es.trim()) return res.json({ ok: false, error: 'Este texto no tiene español.' });
   const item = { clave: t.clave, contexto: t.contexto || '', texto_es: t.texto_es };
   let ultimoProblema = null;
@@ -10287,6 +10301,168 @@ app.post('/admin/textos/:id/idioma/:lang/retraducir', requireAdmin, asyncHandler
   res.json({ ok: false, error: 'No se ha podido traducir bien (lo ha intentado dos veces): ' + (ultimoProblema || 'error desconocido') + ' No se ha guardado nada: vuelve a pulsar «🔄 Volver a traducir».' });
 }));
 
+// ─── (23/11/2026) Bloque «Páginas legales» de Idiomas — GENERADOR 19 (traductor jurídico) ──────────────
+// Los textos del grupo «Páginas legales» se traducen con su propio traductor (ia-prompts.js, GENERADOR_TEXTOS_LEGALES).
+// Un texto largo se traduce por fragmentos y en segundo plano (una traducción larga tarda más de lo que espera la web):
+// el Admin pregunta cada pocos segundos cómo va (/admin/textos/legal/trabajo/:id). Lo traducido queda en 🔵.
+const MODULO_LEGAL = 'Páginas legales';
+// Nombres de la web que un texto legal puede citar: se dan a la IA con su nombre en el idioma (el Admin manda)
+const CLAVES_GLOSARIO_LEGAL = ['legal_footer_aviso', 'legal_footer_privacidad', 'legal_footer_cookies', 'legal_footer_condiciones',
+  'legal_choferes_nombre', 'home_nav_acceso_clientes', 'por_mensajes_titulo', 'asistencia_retirar', 'cookies_cambiar'];
+function glosarioLegalIA(lang, nombreIdioma) {
+  const limpio = function (t) { return String(t || '').replace(/^[^\p{L}]+/u, '').replace(/<[^>]+>/g, '').trim(); };
+  return iaPrompts.GLOSARIO_BOTONES(nombreIdioma, CLAVES_GLOSARIO_LEGAL.map(function (c) {
+    const e = TEXTOS_CACHE[c];
+    return e ? { es: limpio(e.texto_es), tr: limpio(e.traducciones && e.traducciones[lang]) } : null;
+  }));
+}
+// Un texto largo en fragmentos de bloques enteros (títulos, párrafos, listas, tablas). Si no se puede partir sin
+// dejar nada fuera, va entero.
+function partesTextoLegal(html, max) {
+  const txt = String(html || '');
+  if (txt.length <= max) return [txt];
+  const bloques = txt.match(/<(h2|h3|p|ul|ol|table)\b[\s\S]*?<\/\1>/gi) || [];
+  if (!bloques.length || bloques.join('') !== txt) return [txt];
+  const partes = [];
+  let actual = '';
+  bloques.forEach(function (b) {
+    if (actual && actual.length + b.length > max) { partes.push(actual); actual = ''; }
+    actual += b;
+  });
+  if (actual) partes.push(actual);
+  return partes;
+}
+// Lo que la traducción de un texto legal tiene que conservar del español (devuelve el problema; '' = bien)
+function marcasLegalesPerdidas(es, tr, lang) {
+  const etiquetas = function (t) { return (String(t).match(/<\/?[a-z0-9]+\b/gi) || []).map(function (x) { return x.toLowerCase(); }).join(','); };
+  if (etiquetas(es) !== etiquetas(tr)) return 'Se han perdido o cambiado las marcas de formato (títulos, negritas, listas, tablas o enlaces)';
+  const enlaces = function (t, esEs) {
+    return (String(t).match(/href="[^"]*"/gi) || []).map(function (h) { return esEs ? h.replace('traslados-gc.onrender.com/es/', 'traslados-gc.onrender.com/' + lang + '/') : h; }).join(',');
+  };
+  if (enlaces(es, true) !== enlaces(tr, false)) return 'Se han cambiado las direcciones de los enlaces';
+  const n = function (t, re) { return (String(t).match(re) || []).length; };
+  if (n(es, /\[/g) !== n(tr, /\[/g) || n(es, /\]/g) !== n(tr, /\]/g)) return 'Se han perdido o cambiado los huecos entre corchetes [ ]';
+  const huecos = (String(es).match(/\[[^\[\]<>]*\]/g) || []).filter(function (h) { return !/[a-zñáéíóú]/.test(h); });
+  for (const h of huecos) { if (String(tr).indexOf(h) < 0) return 'Se ha cambiado el hueco ' + h; }
+  return '';
+}
+function problemaTraduccionLegal(es, tr, lang) {
+  if (!tr || !String(tr).trim()) return 'La IA no ha devuelto el texto.';
+  const rr = revisarTraduccion(tr, lang);
+  if (rr.grave) return mensajeFreno(rr);
+  if (fraseSinTraducir(tr, es)) return 'Ha vuelto sin traducir.';
+  return marcasPerdidas(es, tr) || marcasLegalesPerdidas(es, tr, lang);
+}
+// Llamada a la IA que devuelve texto (no JSON)
+async function llamarClaudeTexto(prompt, maxTokens) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('Falta configurar ANTHROPIC_API_KEY en las variables de entorno de Render.');
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: maxTokens || 8000, messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!response.ok) {
+    const cuerpoError = await response.text();
+    throw new Error('Error de la API de Claude (' + response.status + '): ' + cuerpoError.slice(0, 200));
+  }
+  const data = await response.json();
+  if (data.stop_reason === 'max_tokens') throw new Error('La traducción ha salido cortada.');
+  return data.content.map(function (b) { return b.text || ''; }).join('').replace(/^\s*```[a-z]*\s*|\s*```\s*$/gi, '').trim();
+}
+// Traduce un texto legal a un idioma (dos intentos por fragmento). Devuelve { texto, rr } o lanza el problema.
+async function traducirTextoLegalIA(t, lang) {
+  const nombreIdioma = await getNombreIdioma(lang);
+  const ant = await pool.query('SELECT texto FROM textos_interfaz_traducciones WHERE texto_id = $1 AND lang_code = $2', [t.id, lang]);
+  let anterior = ant.rows.length ? String(ant.rows[0].texto || '').trim() : '';
+  if (anterior && revisarTraduccion(anterior, lang).sinRuso) anterior = ''; // un ruso escrito sin ruso no es modelo
+  const glosario = glosarioLegalIA(lang, nombreIdioma) + await glosarioLugaresIA(nombreIdioma, [t.texto_es]);
+  const partes = partesTextoLegal(t.texto_es, 5000);
+  const salida = [];
+  for (const parte of partes) {
+    let bien = '', problema = '';
+    for (let intento = 1; intento <= 2 && !bien; intento++) {
+      const prompt = iaPrompts.GENERADOR_TEXTOS_LEGALES({
+        nombreIdioma: nombreIdioma, lang: lang, nombreTexto: t.contexto || t.clave, textoEs: t.texto_es,
+        anterior: anterior, fragmento: partes.length > 1 ? parte : '', glosario: glosario
+      });
+      let tr = '';
+      try { tr = await llamarClaudeTexto(prompt, partes.length > 1 ? 8000 : 16000); }
+      catch (err) { problema = err.message; continue; }
+      // El enlace a nuestra web lleva el código del idioma (/en/, /de/…), aunque la IA lo deje en /es/
+      tr = tr.split('traslados-gc.onrender.com/es/').join('traslados-gc.onrender.com/' + lang + '/');
+      problema = problemaTraduccionLegal(parte, tr, lang);
+      if (!problema) bien = tr;
+      else console.warn('[GEN19] ' + t.clave + ' (' + lang + '), intento ' + intento + ': ' + problema);
+    }
+    if (!bien) throw new Error(problema || 'La IA no ha devuelto el texto.');
+    salida.push(bien);
+  }
+  const final = salida.join('');
+  const p2 = problemaTraduccionLegal(t.texto_es, final, lang);
+  if (p2) throw new Error(p2);
+  return { texto: final, rr: revisarTraduccion(final, lang) };
+}
+// Trabajos en segundo plano (en memoria; se borran solos a la hora)
+const TRABAJOS_LEGAL = {};
+let _numTrabajoLegal = 0;
+function lanzarTrabajoLegal(lang, textos) {
+  const id = String(++_numTrabajoLegal) + '-' + Date.now();
+  const trabajo = { lang: lang, total: textos.length, hecho: 0, actual: '', terminado: false, resultados: [] };
+  TRABAJOS_LEGAL[id] = trabajo;
+  (async function () {
+    for (const t of textos) {
+      trabajo.actual = t.clave;
+      try {
+        const r = await traducirTextoLegalIA(t, lang);
+        await pool.query(
+          `INSERT INTO textos_interfaz_traducciones (texto_id, lang_code, texto, revisado)
+           VALUES ($1, $2, $3, FALSE)
+           ON CONFLICT (texto_id, lang_code) DO UPDATE SET texto = $3, updated_at = NOW(), desactualizado = FALSE, revisado = FALSE`,
+          [t.id, lang, r.texto]);
+        trabajo.resultados.push({ clave: t.clave, ok: true, aviso: r.rr.latinas.length ? mensajeFreno(r.rr) : '', latinas: r.rr.latinas });
+      } catch (err) {
+        trabajo.resultados.push({ clave: t.clave, ok: false, error: err.message });
+      }
+      trabajo.hecho++;
+    }
+    try { await cargarTextosCache(); } catch (e) { console.error('[GEN19] caché:', e.message); }
+    trabajo.actual = '';
+    trabajo.terminado = true;
+    setTimeout(function () { delete TRABAJOS_LEGAL[id]; }, 60 * 60 * 1000);
+  })();
+  return id;
+}
+// «Generar lo que falta en <idioma>» del bloque: los textos legales sin traducir, con el español cambiado o con un ruso sin ruso
+app.post('/admin/textos/legal/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) return res.status(400).json({ ok: false, error: 'Idioma no válido' });
+  const textos = await pool.query(
+    `SELECT ti.id, ti.clave, ti.contexto, ti.texto_es, tr.texto, tr.desactualizado
+     FROM textos_interfaz ti LEFT JOIN textos_interfaz_traducciones tr ON tr.texto_id = ti.id AND tr.lang_code = $2
+     WHERE ti.modulo = $1 AND TRIM(COALESCE(ti.texto_es, '')) <> '' ORDER BY ti.id`, [MODULO_LEGAL, lang]);
+  const pendientes = textos.rows.filter(function (t) {
+    return !t.texto || !String(t.texto).trim() || t.desactualizado || revisarTraduccion(t.texto, lang).sinRuso;
+  });
+  if (!pendientes.length) return res.json({ ok: true, total: 0 });
+  res.json({ ok: true, total: pendientes.length, trabajo: lanzarTrabajoLegal(lang, pendientes) });
+}));
+// «🔄 Volver a traducir XX» de la ficha de un texto legal: ese texto, en ese idioma, aunque esté aprobado
+app.post('/admin/textos/legal/:id/idioma/:lang/retraducir', requireAdmin, asyncHandler(async (req, res) => {
+  const lang = req.params.lang;
+  if (!IDIOMAS_TRADUCIBLES.includes(lang)) return res.status(400).json({ ok: false, error: 'Idioma no válido' });
+  const tx = await pool.query('SELECT id, clave, contexto, texto_es FROM textos_interfaz WHERE id = $1 AND modulo = $2', [req.params.id, MODULO_LEGAL]);
+  if (!tx.rows.length) return res.status(404).json({ ok: false, error: 'Texto no encontrado' });
+  if (!tx.rows[0].texto_es || !tx.rows[0].texto_es.trim()) return res.json({ ok: false, error: 'Este texto no tiene español.' });
+  res.json({ ok: true, total: 1, trabajo: lanzarTrabajoLegal(lang, tx.rows) });
+}));
+// Cómo va un trabajo
+app.get('/admin/textos/legal/trabajo/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const t = TRABAJOS_LEGAL[req.params.id];
+  if (!t) return res.json({ ok: false, error: 'No se encuentra este trabajo (puede que la web se haya reiniciado). Vuelve a pulsar el botón.' });
+  res.json({ ok: true, lang: t.lang, total: t.total, hecho: t.hecho, actual: t.actual, terminado: t.terminado, resultados: t.resultados });
+}));
+
 // Traduce con IA (Claude) todos los textos que falten en un idioma — no
 // guarda nada todavía, solo devuelve propuestas para revisar antes de guardar
 app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (req, res) => {
@@ -10295,7 +10471,8 @@ app.post('/admin/textos/traducir-ia/:lang', requireAdmin, asyncHandler(async (re
     return res.status(400).json({ error: 'Idioma no válido' });
   }
 
-  const textos = await pool.query('SELECT id, clave, contexto, texto_es FROM textos_interfaz ORDER BY modulo, (regexp_replace(clave, \'[^0-9]\', \'\', \'g\') || \'0\')::int, clave');
+  // (23/11/2026) Los textos legales tienen su propio traductor (bloque «Páginas legales»): aquí no entran
+  const textos = await pool.query('SELECT id, clave, contexto, texto_es FROM textos_interfaz WHERE modulo IS DISTINCT FROM $1 ORDER BY modulo, (regexp_replace(clave, \'[^0-9]\', \'\', \'g\') || \'0\')::int, clave', [MODULO_LEGAL]);
   const traducciones = await pool.query(
     'SELECT texto_id, texto, desactualizado FROM textos_interfaz_traducciones WHERE lang_code = $1',
     [lang]
@@ -21300,10 +21477,14 @@ function revisarTraduccion(texto, lang) {
   const t = String(texto || '')
     .replace(/\{[a-zñ_]+\}/g, ' ') // (17/11/2026) N86: también {año}
     .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/\bwww\.\S+/gi, ' ') // (23/11/2026) las direcciones con «www.» son enlaces, como las de «https://»
     .replace(/\S+@\S+/g, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&[a-z]+;/g, ' ')
-    .replace(/\b[A-Z]{3}[0-9]{3}\b/g, ' ');
+    .replace(/\b[A-Z]{3}[0-9]{3}\b/g, ' ')
+    // (23/11/2026) Los huecos entre corchetes ([NOMBRE DE TU PLATAFORMA], [FECHA]…) no cuentan: son provisionales.
+    // Los enlaces entre dobles corchetes [[…]] sí se siguen revisando.
+    .replace(/\[\[[^\]]*\]\]|\[[^\[\]]*\]/g, function (m) { return m.indexOf('[[') === 0 ? m : ' '; });
   // Palabras con los dos alfabetos (se mira cada trozo entre guiones: «VIP-трансфер» es correcto)
   const trozos = t.match(/[A-Za-zÀ-ÖØ-öø-ÿЀ-ӿ]+/g) || [];
   const mezcladas = Array.from(new Set(trozos.filter(function (w) {
