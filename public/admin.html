@@ -2704,7 +2704,7 @@ function renderizarEditorIsla(isla) {
     var tabsHtml = IDIOMAS_ISLA.map(function(lang, i) {
       return '<button class="tab-idioma tab-idioma-rojo' + (i === 0 ? ' activo' : '') + '" id="isla-tab-' + lang + '" ' +
         'onclick="cambiarIdiomaIsla(' + isla.id + ', \'' + lang + '\', this)">' +
-        lang.toUpperCase() + ' ⚠️</button>';
+        lang.toUpperCase() + '</button>'; // (24/11/2026) N77: sin ⚠️ (solo para «se pasa de píxeles»)
     }).join('');
 
     var bloqueTrads =
@@ -2753,7 +2753,7 @@ function pintarPestanasIsla() {
     var e = estadoTradIsla(window._islaTrads.find(function(t) { return t.lang_code === lang; }));
     b.classList.remove('tab-idioma-verde', 'tab-idioma-azul', 'tab-idioma-rojo');
     b.classList.add(e === 'ok' ? 'tab-idioma-verde' : (e === 'ia' ? 'tab-idioma-azul' : 'tab-idioma-rojo'));
-    b.textContent = lang.toUpperCase() + ((e === 'ok' || e === 'ia') ? '' : ' ⚠️');
+    b.textContent = lang.toUpperCase(); // (24/11/2026) N77: el color de la pestaña lo dice todo
   });
 }
 
@@ -4212,7 +4212,7 @@ function abrirEditorSEO(rutaId) {
             : parcial
               ? 'background:#e3f2fd;color:#1565c0;border-color:#90caf9;'
               : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
-        var icono = excede ? ' ⚠️' : completo ? ' ✓' : parcial ? ' ·' : '';
+        var icono = excede ? ' ⚠️' : ''; // (24/11/2026) N77: sin ✓ ni ·; ⚠️ solo si se pasa de píxeles
         return '<button class="' + clases + '" id="tab-idioma-' + lang + '" ' +
           'style="' + estilo + '" ' +
           'onclick="cambiarIdiomaEditorSEO(' + rutaId + ', \'' + lang + '\', this)" ' +
@@ -4665,10 +4665,10 @@ function guardarSEO(rutaId, lang, confirmarLatinas) {
           tab.innerHTML = lang.toUpperCase() + ' ⚠️';
         } else if (completo) {
           tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
-          tab.innerHTML = lang.toUpperCase() + ' ✓';
+          tab.innerHTML = lang.toUpperCase();
         } else if (parcial) {
           tab.style.background = '#e3f2fd'; tab.style.color = '#1565c0'; tab.style.borderColor = '#90caf9';
-          tab.innerHTML = lang.toUpperCase() + ' ·';
+          tab.innerHTML = lang.toUpperCase();
         } else {
           tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
           tab.innerHTML = lang.toUpperCase();
@@ -5384,7 +5384,7 @@ function abrirEditorCategoriaIA(catId) {
     var azul = !ok && cat.sinAprobar && cat.sinAprobar[lang]; // (28/10/2026) 🔵 hecha por la IA, sin aprobar
     return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? ' tab-idioma-verde' : (azul ? ' tab-idioma-azul' : ' tab-idioma-rojo')) + '" ' +
       'onclick="cambiarIdiomaEditorCategoriaIA(' + catId + ', \'' + lang + '\', this)">' +
-      lang.toUpperCase() + (ok || azul ? '' : ' ⚠️') + '</button>';
+      lang.toUpperCase() + '</button>'; // (24/11/2026) N77: sin ⚠️
   }).join('');
 
   editor.innerHTML =
@@ -5447,7 +5447,7 @@ function pintarPestanasCategoriaIA(catId) {
     var azul = !ok && cat.sinAprobar && cat.sinAprobar[lang];
     b.classList.remove('tab-idioma-verde', 'tab-idioma-azul', 'tab-idioma-rojo');
     b.classList.add(ok ? 'tab-idioma-verde' : (azul ? 'tab-idioma-azul' : 'tab-idioma-rojo'));
-    b.textContent = lang.toUpperCase() + (ok || azul ? '' : ' ⚠️');
+    b.textContent = lang.toUpperCase(); // (24/11/2026) N77: sin ⚠️
   });
 }
 
@@ -6750,7 +6750,7 @@ function pintarPestanasComTrad() {
   cont.innerHTML = (_comClienteDatos.idiomas || []).map(function(lang) {
     var e = estados[lang];
     var clase = (e === true || e === 'ok') ? 'tab-idioma-verde' : (e === 'ia' ? 'tab-idioma-azul' : 'tab-idioma-rojo');
-    var aviso = clase === 'tab-idioma-rojo' ? ' ⚠️' : '';
+    var aviso = ''; // (24/11/2026) N77: sin ⚠️ (solo para «se pasa de píxeles»)
     return '<button class="tab-idioma ' + clase + (lang === _comClienteLangTrad ? ' activo' : '') + '" ' +
       'onclick="abrirModalComTrad(\'' + _comClienteClaveTrad + '\', \'' + _comClienteTipoTrad + '\', \'' + lang + '\')">' +
       lang.toUpperCase() + aviso + '</button>';
@@ -7170,7 +7170,7 @@ function pintarPestanasComFrase() {
   cont.innerHTML = (_comFrasesDatos.idiomas || []).map(function(lang) {
     var e = f.estado[lang];
     var clase = (e === true || e === 'ok') ? 'tab-idioma-verde' : (e === 'ia' ? 'tab-idioma-azul' : 'tab-idioma-rojo');
-    var aviso = clase === 'tab-idioma-rojo' ? ' ⚠️' : '';
+    var aviso = ''; // (24/11/2026) N77: sin ⚠️ (solo para «se pasa de píxeles»)
     return '<button class="tab-idioma ' + clase + (lang === _comFraseLangTrad ? ' activo' : '') + '" ' +
       'onclick="abrirModalComFrase(\'' + _comFraseClaveTrad + '\', \'' + lang + '\')">' + lang.toUpperCase() + aviso + '</button>';
   }).join('');
@@ -7404,7 +7404,7 @@ function abrirEditorTexto(textoId) {
     var azul = !ok && texto.sinAprobar && texto.sinAprobar[lang]; // (28/10/2026) 🔵 hecha por la IA, sin aprobar
     return '<button class="tab-idioma' + (i === 0 ? ' activo' : '') + (ok ? ' tab-idioma-verde' : (azul ? ' tab-idioma-azul' : ' tab-idioma-rojo')) + '" ' +
       'onclick="cambiarIdiomaEditorTexto(' + textoId + ', \'' + lang + '\', this)">' +
-      lang.toUpperCase() + (ok || azul ? '' : ' ⚠️') + '</button>';
+      lang.toUpperCase() + '</button>'; // (24/11/2026) N77: sin ⚠️
   }).join('');
 
   var esEditable = texto.clave === 'contacto_horario';
@@ -7667,7 +7667,7 @@ function pintarPestanasTexto(textoId) {
     var azul = !ok && texto.sinAprobar && texto.sinAprobar[lang];
     b.classList.remove('tab-idioma-verde', 'tab-idioma-azul', 'tab-idioma-rojo');
     b.classList.add(ok ? 'tab-idioma-verde' : (azul ? 'tab-idioma-azul' : 'tab-idioma-rojo'));
-    b.textContent = lang.toUpperCase() + (ok || azul ? '' : ' ⚠️');
+    b.textContent = lang.toUpperCase(); // (24/11/2026) N77: sin ⚠️
   });
 }
 function refrescarTextosYPestanas(textoId, lang) {
@@ -13167,7 +13167,7 @@ function cargarPaginaRutas() {
           var color  = excede ? '#c0392b' : (s.activo ? '#2e7d32' : (tieneTitulo ? '#1565c0' : '#c0392b'));
           var bg     = excede ? '#fdecea' : (s.activo ? '#e8f5e9' : (tieneTitulo ? '#e3f2fd' : '#fdecea'));
           var border = excede ? '#e74c3c' : (s.activo ? '#81c784' : (tieneTitulo ? '#90caf9' : '#e74c3c'));
-          var icono  = excede ? ' ⚠️' : (s.activo ? ' ✓' : '');
+          var icono  = excede ? ' ⚠️' : '';
           return '<span title="' + (excede ? 'Título o descripción pasados de píxeles' : '') + '" style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';margin:2px;display:inline-block;font-weight:' + (excede ? '700' : 'normal') + ';">' + lang.toUpperCase() + icono + '</span>';
         }).join('');
         var visibleBadge = dest.visible_rutas
@@ -13218,7 +13218,7 @@ function abrirEditorDestino(destinoId) {
             : parcial
               ? 'background:#e3f2fd;color:#1565c0;border-color:#90caf9;'
               : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
-        var icono = excede ? ' ⚠️' : completo ? ' ✓' : parcial ? ' ·' : '';
+        var icono = excede ? ' ⚠️' : ''; // (24/11/2026) N77: sin ✓ ni ·; ⚠️ solo si se pasa de píxeles
         return '<button class="tab-idioma' + (lang === 'es' ? ' activo' : '') + '" ' +
           'id="tab-dest-idioma-' + lang + '" style="' + estilo + '" ' +
           'data-estilo-base="' + estilo + '" ' +
@@ -13550,7 +13550,7 @@ function clasePestanaAltFoto(e) {
   return e === 'ok' ? 'tab-idioma-verde' : (e === 'ia' ? 'tab-idioma-azul' : 'tab-idioma-rojo');
 }
 function textoPestanaAltFoto(lang, e) {
-  return lang.toUpperCase() + ((e === 'ok' || e === 'ia') ? '' : ' ⚠️');
+  return lang.toUpperCase(); // (24/11/2026) N77: sin ⚠️ (solo para «se pasa de píxeles»)
 }
 function pintarPestanasAltFoto(fotoId) {
   var panel = document.getElementById('panel-alt-foto-' + fotoId);
@@ -14228,10 +14228,10 @@ function guardarDestinoSEO(destinoId, lang, confirmarLatinas) {
         tab.innerHTML = lang.toUpperCase() + ' ⚠️';
       } else if (completo) {
         tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
-        tab.innerHTML = lang.toUpperCase() + ' ✓';
+        tab.innerHTML = lang.toUpperCase();
       } else if (parcial) {
         tab.style.background = '#e3f2fd'; tab.style.color = '#1565c0'; tab.style.borderColor = '#90caf9';
-        tab.innerHTML = lang.toUpperCase() + ' ·';
+        tab.innerHTML = lang.toUpperCase();
       } else {
         tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
         tab.innerHTML = lang.toUpperCase();
@@ -15162,7 +15162,7 @@ function abrirEditorSEOCat(catId) {
         : d.titulo
           ? 'background:#e3f2fd;color:#1565c0;border-color:#90caf9;'
           : 'background:#fdecea;color:#c0392b;border-color:#e74c3c;';
-    var icono = d.activo ? ' ✓' : d.titulo ? ' ·' : '';
+    var icono = ''; // (24/11/2026) N77: sin ✓ ni ·
     return '<button class="' + clases + '" id="seo-cat-tab-' + lang + '" style="' + estilo + '" ' +
       'onclick="cambiarIdiomaEditorSEOCat(' + catId + ', \'' + lang + '\', this)">' +
       lang.toUpperCase() + icono + '</button>';
@@ -15699,10 +15699,10 @@ function guardarSEOCat(catId, lang, confirmarLatinas) {
           tab.innerHTML = lang.toUpperCase() + ' ⚠️';
         } else if (completo) {
           tab.style.background = '#e8f5e9'; tab.style.color = '#2e7d32'; tab.style.borderColor = '#81c784';
-          tab.innerHTML = lang.toUpperCase() + ' ✓';
+          tab.innerHTML = lang.toUpperCase();
         } else if (parcial) {
           tab.style.background = '#e3f2fd'; tab.style.color = '#1565c0'; tab.style.borderColor = '#90caf9';
-          tab.innerHTML = lang.toUpperCase() + ' ·';
+          tab.innerHTML = lang.toUpperCase();
         } else {
           tab.style.background = '#fdecea'; tab.style.color = '#c0392b'; tab.style.borderColor = '#e74c3c';
           tab.innerHTML = lang.toUpperCase();
