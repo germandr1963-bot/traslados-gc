@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= modo === 'registro' ? t('reg_titulo') : 'Acceso a choferes' %> — Traslados GC</title>
+  <% var esPrimerAcceso = modo === 'registro' && registro && registro.primer; /* (24/11/2026) alta manual: primer acceso */ %>
+  <title><%= esPrimerAcceso ? t('reg_primer_titulo') : (modo === 'registro' ? t('reg_titulo') : 'Acceso a choferes') %> — Traslados GC</title>
   <% if (modo === 'registro') { %><meta name="robots" content="noindex, nofollow"><% } %>
   <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500&family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/estilos.css">
@@ -121,10 +122,10 @@
     <nav class="breadcrumbs" id="breadcrumb-nav">
       <a href="/">Inicio</a>
       <span> › </span>
-      <span id="breadcrumb-texto"><%= modo === 'registro' ? t('reg_titulo') : 'Acceso choferes' %></span>
+      <span id="breadcrumb-texto"><%= esPrimerAcceso ? t('reg_primer_titulo') : (modo === 'registro' ? t('reg_titulo') : 'Acceso choferes') %></span>
     </nav>
 
-    <h1 id="titulo-pagina"><%= modo === 'registro' ? t('reg_titulo') : 'Acceso a choferes' %></h1>
+    <h1 id="titulo-pagina"><%= esPrimerAcceso ? t('reg_primer_titulo') : (modo === 'registro' ? t('reg_titulo') : 'Acceso a choferes') %></h1>
     <% if (modo === 'registro' && !registro.valido) { %>
     <!-- (19/11/2026) Paso 2: enlace caducado o ya usado -->
     <div style="max-width:520px;margin:10px auto 0;padding:20px;border-radius:8px;background:var(--rojo-error-fondo);color:var(--rojo-error);border:1px solid #e8b4a8;text-align:center;line-height:1.6;">
@@ -132,7 +133,7 @@
       <%= t('reg_enlace_no_valido') %>
     </div>
     <% } else { %>
-    <p class="sub" id="texto-intro"><%= modo === 'registro' ? t('reg_intro') : 'Accede a tu portal para gestionar tus servicios' %></p>
+    <p class="sub" id="texto-intro"><%= esPrimerAcceso ? t('reg_primer_intro') : (modo === 'registro' ? t('reg_intro') : 'Accede a tu portal para gestionar tus servicios') %></p>
 
     <div class="tarjeta" style="max-width:520px">
       <div class="pestanas" id="selector-pestanas">
@@ -176,7 +177,7 @@
         <label for="r-municipio">Municipio *</label>
         <input id="r-municipio" type="text" placeholder="Las Palmas de Gran Canaria">
         <label for="r-email">Email *</label>
-        <input id="r-email" type="email" autocomplete="email" placeholder="tu@email.com"<% if (modo === 'registro' && registro.valido) { %> readonly style="background:var(--gris-fondo);color:var(--texto-muted);" title="Es el email del pre-registro: no se puede cambiar"<% } %>>
+        <input id="r-email" type="email" autocomplete="email" placeholder="tu@email.com"<% if (modo === 'registro' && registro.valido) { %> readonly style="background:var(--gris-fondo);color:var(--texto-muted);" title="<%= esPrimerAcceso ? 'Es tu usuario: no se puede cambiar' : 'Es el email del pre-registro: no se puede cambiar' %>"<% } %>>
         <label for="r-telefono">Teléfono móvil *</label>
         <!-- (13/10/2026) Prefijo del país + número (misma lista que la Reserva) y "Otro" para escribirlo a mano -->
         <div style="display:flex;gap:6px;">
@@ -305,8 +306,58 @@
         if (REGISTRO.isla) document.getElementById('r-isla').value = REGISTRO.isla;
         document.getElementById('r-municipio-licencia').value = REGISTRO.municipio || '';
         document.getElementById('r-numero-licencia').value = REGISTRO.numero_licencia || '';
+        if (REGISTRO.primer) rellenarPrimerAcceso();
       }
     });
+
+    // (24/11/2026) Alta manual: en el primer acceso salen todos los datos que puso la oficina (el chofer los puede corregir)
+    function rellenarPrimerAcceso() {
+      var v = function (id, x) { var e = document.getElementById(id); if (e) e.value = x == null ? '' : x; };
+      v('r-documento', REGISTRO.documento); v('r-direccion', REGISTRO.direccion); v('r-cp', REGISTRO.cp);
+      v('r-municipio', REGISTRO.municipio); v('r-municipio-licencia', REGISTRO.municipio_licencia);
+      v('r-matricula', REGISTRO.matricula); v('r-numero-taxi', REGISTRO.numero_taxi);
+      v('r-central-flota', REGISTRO.central_flota);
+      var obs = String(REGISTRO.observaciones || '');
+      if (!REGISTRO.categoria_id && obs.indexOf('[Otro vehículo]') === 0) {
+        var resto = obs.replace('[Otro vehículo]', '').trim();
+        var k = resto.indexOf(' — ');
+        v('r-otro-vehiculo', k >= 0 ? resto.slice(0, k) : resto);
+        obs = k >= 0 ? resto.slice(k + 3) : '';
+      }
+      v('r-observaciones', obs);
+      if (REGISTRO.foto) {
+        fotoRegistro = 'actual';
+        var pv = document.getElementById('r-foto-preview');
+        pv.src = REGISTRO.foto; pv.style.display = 'block';
+      }
+      categoriaPrimerAcceso();
+      vehiculoPrimerAcceso();
+    }
+    function categoriaPrimerAcceso() {
+      if (!REGISTRO || !REGISTRO.primer) return;
+      var el = REGISTRO.categoria_id
+        ? document.querySelector('.cat-opcion[data-id="' + REGISTRO.categoria_id + '"]')
+        : document.querySelector('.cat-otra');
+      if (!el) return;
+      selCat(el);
+      if (REGISTRO.plazas) document.getElementById('r-plazas').value = String(REGISTRO.plazas);
+    }
+    function vehiculoPrimerAcceso() {
+      if (!REGISTRO || !REGISTRO.primer || !catalogoMarcas.length) return;
+      var marca = catalogoMarcas.find(function (m) { return m.nombre === REGISTRO.vehiculo_marca; });
+      var selM = document.getElementById('r-marca');
+      if (marca) {
+        selM.value = String(marca.id); cambioMarca();
+        var modelo = (marca.modelos || []).find(function (mo) { return mo.nombre === REGISTRO.vehiculo_modelo; });
+        var selMo = document.getElementById('r-modelo');
+        if (modelo) { selMo.value = String(modelo.id); } else { selMo.value = 'nuevo'; document.getElementById('r-modelo-nuevo').value = REGISTRO.vehiculo_modelo || ''; }
+        cambioModelo();
+      } else if (REGISTRO.vehiculo_marca) {
+        selM.value = 'nueva'; cambioMarca();
+        document.getElementById('r-marca-nueva').value = REGISTRO.vehiculo_marca;
+        document.getElementById('r-modelo-nuevo').value = REGISTRO.vehiculo_modelo || '';
+      }
+    }
 
     var catalogoMarcas = [];
     var categoriaSeleccionada = null;
@@ -354,7 +405,7 @@
         .then(function(r) { return r.json(); })
         .then(function(d) {
           if (d.error) { msg.textContent = d.error; msg.className = 'mensaje error'; return; }
-          window.location.href = '/chofer/portal';
+          window.location.href = d.primer_acceso ? '/chofer/primer-acceso' : '/chofer/portal';
         })
         .catch(function() { msg.textContent = 'Error de conexión. Inténtalo de nuevo.'; msg.className = 'mensaje error'; });
     }
@@ -412,6 +463,7 @@
             + '<div class="cd">' + c.capacidad_pasajeros + ' pas. · ' + TXT_MALETAS + ' ' + c.capacidad_maletas + '</div></div>';
         }).join('') + '<div class="cat-otra" data-id="otra" onclick="selCat(this)"><div class="cn">Otro vehículo</div></div>';
         document.getElementById('categorias-grid').innerHTML = html;
+        categoriaPrimerAcceso();
       })
       .catch(function() { document.getElementById('categorias-grid').innerHTML = '<p style="font-size:13px;color:var(--texto-muted)">No se pudieron cargar las categorías.</p>'; });
 
@@ -437,6 +489,7 @@
         sel.innerHTML = '<option value="">— Selecciona la marca —</option>'
           + marcas.map(function(m) { return '<option value="' + m.id + '">' + m.nombre + '</option>'; }).join('')
           + '<option value="nueva">➕ Otra marca</option>';
+        vehiculoPrimerAcceso();
       })
       .catch(function() { document.getElementById('r-marca').innerHTML = '<option value="nueva">Escribir la marca</option>'; cambioMarca(); });
 
@@ -573,7 +626,8 @@
       var btn = document.querySelector('#formulario-registro button.principal');
       btn.disabled = true; btn.textContent = 'Enviando...';
 
-      fetch('/api/chofer/registro', {
+      var esPrimer = !!(REGISTRO && REGISTRO.primer);
+      fetch(esPrimer ? '/api/chofer/primer-acceso' : '/api/chofer/registro', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre: nombre, email: email, telefono: telefono, password: password,
@@ -586,7 +640,7 @@
           numero_taxi: numeroTaxi,
           plazas: document.getElementById('r-plazas').value,
           isla: document.getElementById('r-isla').value,
-          foto: fotoRegistro,
+          foto: fotoRegistro === 'actual' ? null : fotoRegistro,
           observaciones: obs,
           token: REGISTRO ? REGISTRO.token : '',
           acepta_condiciones: privacidad
@@ -601,7 +655,9 @@
         document.getElementById('formulario-registro').innerHTML =
           '<div style="margin-top:0;padding:20px;border-radius:8px;background:var(--verde-ok-fondo);color:var(--verde-ok);border:1px solid #a8dece;text-align:center;">'
           + '<strong style="font-size:17px;display:block;margin-bottom:8px">✅ Solicitud enviada</strong>'
-          + 'Hemos recibido tu solicitud y te hemos enviado un email de confirmación. Revisaremos tu información y nos pondremos en contacto contigo en breve.'
+          + (esPrimer
+              ? 'Nuestro equipo revisará tu alta y te enviaremos un email cuando esté aprobada.'
+              : 'Hemos recibido tu solicitud y te hemos enviado un email de confirmación. Revisaremos tu información y nos pondremos en contacto contigo en breve.')
           + '</div>';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       })
