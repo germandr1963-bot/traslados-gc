@@ -6370,18 +6370,19 @@ function renderizarComunicacionesCliente(data) {
   // 'desactualizado' → ✓ rojo   (español modificado después de traducir)
   // 'ok'        → ✓ verde       (revisado y al día)
   // true/false  → compatibilidad con la celda ES que sigue siendo booleano
+  // (24/11/2026) N77: círculo de color en lugar del ✓ (el mismo de Destino Inicial)
   function celdaEstado(estado) {
     if (estado === null || estado === undefined || estado === false) {
-      return '<td style="text-align:center;"><span style="color:#c0392b;" title="Sin traducir">·</span></td>';
+      return '<td style="text-align:center;">' + circuloTrad(null) + '</td>';
     }
     if (estado === true || estado === 'ok') {
-      return '<td style="text-align:center;"><span style="color:#2e7d32;font-weight:600;" title="Aprobada">✓</span></td>';
+      return '<td style="text-align:center;">' + circuloTrad('ok') + '</td>';
     }
     if (estado === 'ia') {
-      return '<td style="text-align:center;"><span style="color:#1565c0;font-weight:600;" title="Traducido, sin aprobar">✓</span></td>';
+      return '<td style="text-align:center;">' + circuloTrad('ia') + '</td>';
     }
     if (estado === 'desactualizado') {
-      return '<td style="text-align:center;"><span style="color:#c0392b;font-weight:600;" title="Español cambiado">✓</span></td>';
+      return '<td style="text-align:center;">' + circuloTrad('desactualizado') + '</td>';
     }
     return '<td style="text-align:center;"><span style="color:#c0392b;" title="Sin traducir">·</span></td>';
   }
@@ -7004,17 +7005,9 @@ function renderizarComFrases(data) {
   var elPct = document.getElementById('com-frases-pct');
   if (elPct) elPct.innerHTML = '<span style="color:' + color + ';">' + pct + '% traducido</span>';
 
+  // (24/11/2026) N77: círculo de color en lugar del ✓ (el mismo de Destino Inicial)
   function celda(estado) {
-    if (estado === true || estado === 'ok') {
-      return '<td style="text-align:center;"><span style="color:#2e7d32;font-weight:600;" title="Aprobada">✓</span></td>';
-    }
-    if (estado === 'ia') {
-      return '<td style="text-align:center;"><span style="color:#1565c0;font-weight:600;" title="Traducido, sin aprobar">✓</span></td>';
-    }
-    if (estado === 'desactualizado') {
-      return '<td style="text-align:center;"><span style="color:#c0392b;font-weight:600;" title="Español cambiado">✓</span></td>';
-    }
-    return '<td style="text-align:center;"><span style="color:#c0392b;" title="Sin traducir">·</span></td>';
+    return '<td style="text-align:center;">' + circuloTrad(estado === true ? 'ok' : estado) + '</td>';
   }
   function etiquetaCanal(canal) {
     var txt = canal === 'wa' ? '📱 WhatsApp' : canal === 'ambos' ? '📧📱 Email y WhatsApp' : '📧 Email';
@@ -8131,17 +8124,18 @@ function guardarRevisionIA(lang) {
 
 // (28/10/2026) Celda de la tabla de Textos de interfaz, con la regla de las traducciones (igual que Comunicaciones):
 // 🔴 · sin traducir · 🔴 ✓ el español ha cambiado · 🔵 ✓ hecha por la IA, sin aprobar · 🟢 ✓ aprobada
+// (24/11/2026) N77: círculo de color en lugar del ✓ (el mismo de Destino Inicial)
 function celdaTextoInterfaz(t, lang) {
-  if (t.estado[lang]) {
-    return '<td style="text-align:center"><span style="color:#2e7d32;font-weight:600;" title="Aprobada">✓</span></td>';
-  }
-  if (t.sinAprobar && t.sinAprobar[lang]) {
-    return '<td style="text-align:center"><span style="color:#1565c0;font-weight:600;" title="Traducido, sin aprobar">✓</span></td>';
-  }
-  if (t.desact && t.desact[lang]) {
-    return '<td style="text-align:center"><span style="color:#c0392b;font-weight:600;" title="Español cambiado">✓</span></td>';
-  }
-  return '<td style="text-align:center"><span style="color:#c0392b;" title="Sin traducir">·</span></td>';
+  var e = t.estado[lang] ? 'ok' : ((t.sinAprobar && t.sinAprobar[lang]) ? 'ia' : ((t.desact && t.desact[lang]) ? 'desactualizado' : null));
+  return '<td style="text-align:center">' + circuloTrad(e) + '</td>';
+}
+// (24/11/2026) N77 — el círculo común de la vista de águila de las traducciones, igual que marcaTraduccionDestino
+// (Destino Inicial): 'ok' 🟢 Aprobada · 'ia' 🔵 Traducido, sin aprobar · 'desactualizado' 🔴 Español cambiado ·
+// otro 🔴 Sin traducir. Con «titulo», otra etiqueta (las marcas que resumen varios idiomas).
+function circuloTrad(estado, titulo) {
+  var c = estado === 'ok' ? ['#2e7d32', 'Aprobada'] : (estado === 'ia' ? ['#1565c0', 'Traducido, sin aprobar'] :
+    (estado === 'desactualizado' ? ['#c0392b', 'Español cambiado'] : ['#c0392b', 'Sin traducir']));
+  return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;background:' + c[0] + ';" title="' + (titulo || c[1]) + '"></span>';
 }
 
 // ─── (07/11/2026) N51 — FRENO DE LAS TRADUCCIONES: avisos comunes de todas las pantallas de traducción ───
@@ -12077,16 +12071,16 @@ function cargarEstadosTradCom() {
 function marcaCanalCom(p, canal) {
   var tiene = canal === 'email' ? (p.cuerpo_email && p.cuerpo_email.trim()) : (p.cuerpo_whatsapp && p.cuerpo_whatsapp.trim());
   if (!tiene) return '<span style="color:#ccc;">\u2014</span>';
-  var verde = '<span style="color:#2e7d32;font-weight:600;" title="Aprobada">&#10003;</span>';
+  var verde = circuloTrad('ok'); // (24/11/2026) N77: círculo en lugar del ✓
   if (p.categoria !== 'cliente' || !_estadosTradCom) return verde;
   var fila = (_estadosTradCom.plantillas || []).find(function(x) { return x.clave === p.clave; });
   if (!fila) return verde;
   var estados = canal === 'email' ? fila.estado_email : fila.estado_wa;
   var idiomas = _estadosTradCom.idiomas || [];
   var hayRojo = idiomas.some(function(l) { var e = estados[l]; return !e || e === 'desactualizado'; });
-  if (hayRojo) return '<span style="color:#c0392b;font-weight:600;" title="Sin traducir o español cambiado">&#10003;</span>';
+  if (hayRojo) return circuloTrad(null, 'Sin traducir o español cambiado');
   var hayAzul = idiomas.some(function(l) { return estados[l] === 'ia'; });
-  if (hayAzul) return '<span style="color:#1565c0;font-weight:600;" title="Traducido, sin aprobar">&#10003;</span>';
+  if (hayAzul) return circuloTrad('ia');
   return verde;
 }
 
@@ -12190,15 +12184,15 @@ function cargarFrasesCom() {
 
 // Un ✓ que resume los idiomas de la frase: 🔴 si falta alguno o cambió el español · 🔵 si hay alguno sin aprobar · 🟢 si todos aprobados
 function marcaTraduccionFraseCom(clave) {
-  var verde = '<span style="color:#2e7d32;font-weight:600;" title="Aprobada">&#10003;</span>';
+  var verde = circuloTrad('ok'); // (24/11/2026) N77: círculo en lugar del ✓
   if (!_estadosTradFrasesCom) return '';
   var fila = (_estadosTradFrasesCom.frases || []).find(function(x) { return x.clave === clave; });
   if (!fila) return '';
   var idiomas = _estadosTradFrasesCom.idiomas || [];
   if (idiomas.some(function(l) { var e = fila.estado[l]; return !e || e === 'desactualizado'; }))
-    return '<span style="color:#c0392b;font-weight:600;" title="Sin traducir o español cambiado">&#10003;</span>';
+    return circuloTrad(null, 'Sin traducir o español cambiado');
   if (idiomas.some(function(l) { return fila.estado[l] === 'ia'; }))
-    return '<span style="color:#1565c0;font-weight:600;" title="Traducido, sin aprobar">&#10003;</span>';
+    return circuloTrad('ia');
   return verde;
 }
 
