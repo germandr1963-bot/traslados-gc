@@ -884,6 +884,10 @@ async function initSchema() {
   // (19/11/2026) Parte 3 del alta: cuándo aceptó el chofer la Política de privacidad y las Condiciones (casilla del registro)
   await pool.query(`ALTER TABLE conductores ADD COLUMN IF NOT EXISTS privacidad_aceptada_en TIMESTAMP`);
   await pool.query(`ALTER TABLE conductores ADD COLUMN IF NOT EXISTS condiciones_aceptadas_en TIMESTAMP`);
+  // (24/11/2026) Alta manual (oficina): el chofer queda pendiente hasta su primer acceso (contraseña nueva, revisa sus datos
+  // y acepta los dos documentos); el acceso provisional caduca a las 72 horas. Después lo aprueba el Admin.
+  await pool.query(`ALTER TABLE conductores ADD COLUMN IF NOT EXISTS primer_acceso_pendiente BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE conductores ADD COLUMN IF NOT EXISTS acceso_provisional_caduca TIMESTAMP`);
 
   // (19/11/2026) Alta de choferes en dos pasos — paso 1, pre-registro público (sugerencia del gestor legal:
   // el formulario completo ya no está abierto a cualquiera). Los pre-registros van en su propia tabla
@@ -1974,6 +1978,9 @@ async function initSchema() {
     // (19/11/2026) Paso 2: página privada del registro (solo con el enlace que envía el equipo)
     { clave: 'reg_titulo', contexto: 'Registro de chofer (página privada del enlace): título', es: 'Registro de chofer' },
     { clave: 'reg_intro', contexto: 'Registro de chofer (página privada del enlace): texto bajo el título', es: 'Completa tus datos profesionales, los de tu vehículo y tu foto. Nuestro equipo revisará tu registro antes de activar tu acceso al portal.' },
+    // (24/11/2026) Alta manual: la misma página, en el primer acceso del chofer dado de alta en la oficina
+    { clave: 'reg_primer_titulo', contexto: 'Primer acceso del chofer dado de alta en la oficina: título', es: 'Antes de empezar' },
+    { clave: 'reg_primer_intro', contexto: 'Primer acceso del chofer dado de alta en la oficina: texto bajo el título', es: 'Te hemos dado de alta en la oficina. Revisa tus datos y corrígelos si hace falta, pon tu contraseña y acepta las Condiciones de adhesión y colaboración para choferes y la Política de privacidad. Nuestro equipo revisará tu alta antes de activar tu acceso al portal.' },
     { clave: 'reg_enlace_no_valido_titulo', contexto: 'Registro de chofer: título si el enlace no vale (caducado o ya usado)', es: 'Este enlace ya no es válido' },
     { clave: 'reg_enlace_no_valido', contexto: 'Registro de chofer: texto si el enlace no vale (caducado o ya usado)', es: 'El enlace ha caducado o ya se ha usado. Si necesitas uno nuevo, escríbenos desde la página de Contacto.' },
     // (19/11/2026) Parte 3 — casilla del registro: Condiciones de adhesión y colaboración para choferes + Política de privacidad
@@ -3641,27 +3648,29 @@ Hola, <strong>{nombre_chofer}</strong> 👋
 <div style="text-align:center;margin:12px 0;">
   <a href="{url_portal}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Acceder a mi portal</a>
 </div>
-<span style="font-size:13px;color:#5b5347;">❓ Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</span>
+<span style="font-size:13px;color:#5b5347;">❓ Si tienes cualquier duda, escríbenos desde la página de Contacto. ¡Bienvenido al equipo!</span>
 
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
-      cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n🎉 Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de Traslados GC.\n\n📱 Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.\n\n❓ Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+      cuerpo_whatsapp: 'Hola, *{nombre_chofer}* 👋\n\n🎉 Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de Traslados GC.\n\n📱 Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.\n\n❓ Si tienes cualquier duda, escríbenos desde la página de Contacto. ¡Bienvenido al equipo!\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     // (02/10/2026) Emails de cuenta del chofer que estaban escritos fijos en el programa
     { clave: 'chofer_alta_datos_acceso', nombre: 'Alta de chofer desde el Admin (datos de acceso)', categoria: 'chofer',
-      asunto_email: '\u00a1Bienvenido a Traslados GC! Tus datos de acceso',
+      asunto_email: 'Tu acceso provisional — Traslados GC',
       cuerpo_email: `Hola, <strong>{nombre_chofer}</strong> 👋
 
-🎉 Te hemos dado de alta en nuestra flota de choferes. Ya puedes acceder a tu portal con estos datos:
+🎉 Te hemos dado de alta en la oficina. Para terminar tu alta, entra con este acceso provisional:
 <div class="info-box">
   📩 <strong>Usuario (email):</strong> {email_chofer}
   🔑 <strong>Contraseña provisional:</strong> {password_temporal}
 </div>
-📱 En tu portal encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil.
 <div style="text-align:center;margin:12px 0;">
-  <a href="{url_portal}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Acceder a mi portal</a>
+  <a href="{url_portal}" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Entrar en mi portal</a>
 </div>
-<span style="font-size:13px;color:#5b5347;">❓ Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</span>
+🔐 La primera vez que entres te pediremos que revises tus datos, que pongas tu propia contraseña y que aceptes las Condiciones de adhesión y colaboración para choferes y la Política de privacidad.
+📋 Después, nuestro equipo revisará tu alta y te enviaremos un email cuando esté aprobada.
+⏱️ Este acceso provisional caduca en {horas_validez} horas. Si caduca, escríbenos desde la página de Contacto y te enviaremos otro.
+<span style="font-size:13px;color:#5b5347;">❓ Si tienes cualquier duda, escríbenos desde la página de Contacto. ¡Bienvenido al equipo!</span>
 
 Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>`,
@@ -5884,10 +5893,66 @@ async function comprobarPlazasChofer(plazas, categoriaId) {
   return { plazas: n };
 }
 
+// (24/11/2026) Alta manual: acceso provisional del chofer (contraseña de un solo uso creada por el sistema, 72 horas).
+// Sirve para el alta y para «📧 Volver a enviar el acceso» de la Ficha: cada envío crea una contraseña nueva.
+const HORAS_ACCESO_PROVISIONAL = 72;
+function crearPasswordProvisional() {
+  const letras = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  const bytes = crypto.randomBytes(10);
+  let p = '';
+  for (let i = 0; i < 10; i++) p += letras[bytes[i] % letras.length];
+  return p;
+}
+async function enviarAccesoProvisionalChofer(id) {
+  const password = crearPasswordProvisional();
+  const hash = await bcrypt.hash(password, 10);
+  const caduca = new Date(Date.now() + HORAS_ACCESO_PROVISIONAL * 60 * 60 * 1000);
+  const r = await pool.query(
+    `UPDATE conductores SET password_hash = $1, acceso_provisional_caduca = $2
+     WHERE id = $3 AND estado = 'pendiente' AND primer_acceso_pendiente = TRUE RETURNING nombre, email`,
+    [hash, caduca, id]);
+  if (!r.rows.length) throw new Error('Este chofer ya no está pendiente de su primer acceso.');
+  const { nombre, email } = r.rows[0];
+  const _pAlta = await obtenerPlantilla('chofer_alta_datos_acceso', {
+    nombre_chofer: nombre,
+    email_chofer: email,
+    password_temporal: password,
+    url_portal: BASE_URL + '/chofer/acceso',
+    horas_validez: String(HORAS_ACCESO_PROVISIONAL)
+  });
+  await enviarEmail({
+    to: email,
+    subject: (_pAlta && _pAlta.email && _pAlta.asunto) || 'Tu acceso provisional — Traslados GC',
+    html: (_pAlta && _pAlta.email) ? plantillaEmail(_pAlta.email) : plantillaEmail(
+      `<p>Hola <strong>${escLegal(nombre)}</strong>,</p>
+       <p>Te hemos dado de alta en la oficina. Para terminar tu alta, entra con este acceso provisional:</p>
+       <div class="info-box">
+         <strong>Usuario (email):</strong> ${escLegal(email)}<br>
+         <strong>Contraseña provisional:</strong> ${password}
+       </div>
+       <div style="text-align:center;margin:12px 0;"><a href="${BASE_URL}/chofer/acceso" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Entrar en mi portal</a></div>
+       <p>🔐 La primera vez que entres te pediremos que revises tus datos, que pongas tu propia contraseña y que aceptes las Condiciones de adhesión y colaboración para choferes y la Política de privacidad.</p>
+       <p>📋 Después, nuestro equipo revisará tu alta y te enviaremos un email cuando esté aprobada.</p>
+       <p>⏱️ Este acceso provisional caduca en ${HORAS_ACCESO_PROVISIONAL} horas. Si caduca, escríbenos desde la página de Contacto y te enviaremos otro.</p>
+       <p style="font-size:13px;color:#5b5347;">❓ Si tienes cualquier duda, escríbenos desde la página de Contacto. ¡Bienvenido al equipo!</p>`)
+  });
+}
+
+// Ficha del chofer → «📧 Volver a enviar el acceso» (solo mientras no haya hecho su primer acceso)
+app.post('/admin/conductores/:id/reenviar-acceso', requireAdmin, asyncHandler(async (req, res) => {
+  try {
+    await enviarAccesoProvisionalChofer(parseInt(req.params.id, 10) || 0);
+  } catch (err) {
+    return res.status(400).json({ error: err.message || 'No se pudo enviar el email. Inténtalo de nuevo.' });
+  }
+  res.json({ ok: true });
+}));
+
 app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   const d = req.body;
-  if (!d.nombre || !d.email || !d.telefono || !d.password || d.password.length < 6) {
-    return res.status(400).json({ error: 'Nombre, email, teléfono y contraseña (mínimo 6 caracteres) son obligatorios.' });
+  // (24/11/2026) La oficina ya no pone contraseña: la crea el sistema (acceso provisional, 72 horas)
+  if (!d.nombre || !d.email || !d.telefono) {
+    return res.status(400).json({ error: 'Nombre, email y teléfono son obligatorios.' });
   }
   if (!telefonoConPrefijo(d.telefono)) return res.status(400).json({ error: AVISO_TELEFONO_PREFIJO });
   if (!d.documento || !d.direccion || !d.cp || !d.municipio) {
@@ -5910,7 +5975,7 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   }
   const plazasOk = await comprobarPlazasChofer(d.plazas, categoriaId);
   if (plazasOk.error) return res.status(400).json({ error: plazasOk.error });
-  const hash = await bcrypt.hash(d.password, 10);
+  const hash = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 10); // se cambia al enviar el acceso provisional
   const foto = d.foto || null;
   const fotoEstado = foto ? 'pendiente' : 'sin_foto';
   try {
@@ -5919,8 +5984,8 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
         (nombre, email, telefono, password_hash, documento, direccion, cp, municipio,
          municipio_licencia, numero_licencia, central_flota,
          categoria_id, vehiculo_marca, vehiculo_modelo, matricula, numero_taxi, plazas, isla,
-         foto, foto_estado, estado)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'aprobado')
+         foto, foto_estado, estado, primer_acceso_pendiente)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'pendiente',TRUE)
        RETURNING id`,
       [
         d.nombre.trim(), d.email.toLowerCase().trim(), d.telefono.trim(), hash,
@@ -5932,35 +5997,15 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
       ]
     );
     const nuevoId = result.rows[0].id;
-
+    // (24/11/2026) Email «Alta de chofer desde el Admin (datos de acceso)» con el acceso provisional
+    let emailEnviado = true;
     try {
-      // (02/10/2026) Plantilla de Comunicaciones → Chofer; si falta, el texto de siempre
-      const _pAlta = await obtenerPlantilla('chofer_alta_datos_acceso', {
-        nombre_chofer: d.nombre.trim(),
-        email_chofer: d.email.toLowerCase().trim(),
-        password_temporal: d.password,
-        url_portal: BASE_URL + '/chofer/acceso'
-      });
-      await enviarEmail({
-        to: d.email.toLowerCase().trim(),
-        subject: (_pAlta && _pAlta.email && _pAlta.asunto) || '¡Bienvenido a Traslados GC! Tus datos de acceso',
-        html: (_pAlta && _pAlta.email) ? plantillaEmail(_pAlta.email) : plantillaEmail(
-          `<p>Hola <strong>${d.nombre.trim()}</strong>,</p>
-           <p>Te hemos dado de alta en nuestra flota de choferes. Ya puedes acceder a tu portal con estos datos:</p>
-           <div class="info-box">
-             <strong>Usuario (email):</strong> ${d.email.toLowerCase().trim()}<br>
-             <strong>Contraseña provisional:</strong> ${d.password}
-           </div>
-           <p>En tu portal encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil.</p>
-           <div style="text-align:center;margin:12px 0;"><a href="${BASE_URL}/chofer/acceso" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Acceder a mi portal</a></div>
-           <p style="font-size:13px;color:#5b5347;">Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</p>`
-        )
-      });
+      await enviarAccesoProvisionalChofer(nuevoId);
     } catch (err) {
-      console.warn('Error enviando email de bienvenida (alta manual de conductor):', err.message);
+      emailEnviado = false;
+      console.warn('Error enviando el acceso provisional (alta manual de chofer):', err.message);
     }
-
-    res.json({ ok: true, id: nuevoId });
+    res.json({ ok: true, id: nuevoId, email_enviado: emailEnviado });
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ error: 'Ese email ya está registrado.' });
     throw err;
@@ -5971,6 +6016,13 @@ app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req,
   const estado = req.body.estado;
   if (!['pendiente', 'aprobado', 'suspendido'].includes(estado)) {
     return res.status(400).json({ error: 'Estado no válido.' });
+  }
+  // (24/11/2026) Alta manual: no se aprueba hasta que el chofer acepte los documentos en su primer acceso
+  if (estado === 'aprobado') {
+    const pa = await pool.query('SELECT primer_acceso_pendiente FROM conductores WHERE id = $1', [req.params.id]);
+    if (pa.rows.length && pa.rows[0].primer_acceso_pendiente) {
+      return res.status(400).json({ error: 'Este chofer todavía no ha aceptado las Condiciones de adhesión y colaboración para choferes.' });
+    }
   }
   await pool.query('UPDATE conductores SET estado = $1 WHERE id = $2', [estado, req.params.id]);
 
@@ -5994,7 +6046,7 @@ app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req,
              <p>Es un placer darte la bienvenida a nuestra flota. Tu solicitud ha sido revisada y aprobada — a partir de ahora formas parte del equipo de Traslados GC.</p>
              <p>Ya puedes acceder a tu portal de chofer, donde encontrarás tus próximas reservas asignadas y podrás gestionar tu perfil y foto.</p>
              <div style="text-align:center;margin:12px 0;"><a href="${BASE_URL}/chofer/acceso" style="display:inline-block;background:#C1502E;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Acceder a mi portal</a></div>
-             <p style="font-size:13px;color:#5b5347;">Si tienes cualquier duda, estamos disponibles a través de nuestro WhatsApp. ¡Bienvenido al equipo!</p>`
+             <p style="font-size:13px;color:#5b5347;">Si tienes cualquier duda, escríbenos desde la página de Contacto. ¡Bienvenido al equipo!</p>`
           )
         });
       }
@@ -6027,6 +6079,7 @@ app.get('/admin/conductores/:id/ficha', requireAdmin, asyncHandler(async (req, r
             c.vehiculo_marca, c.vehiculo_modelo, c.matricula, c.numero_taxi, c.plazas, c.isla,
             c.tipo, c.estado, c.foto, c.foto_estado, c.foto_motivo, c.creado_en, c.permitir_edicion_ficha,
             c.cambios_pendientes, c.observaciones, c.privacidad_aceptada_en, c.condiciones_aceptadas_en,
+            c.primer_acceso_pendiente, c.acceso_provisional_caduca,
             cat.nombre AS categoria, c.categoria_id
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
@@ -11676,6 +11729,84 @@ app.get('/chofer/registro', asyncHandler(async (req, res) => {
   res.render('chofer-registro', { lang: 'es', t, palabrasPaginas, BASE_URL, modo: 'registro', registro });
 }));
 
+// (24/11/2026) Alta manual: primer acceso del chofer dado de alta en la oficina. Es la misma página del registro,
+// con todos sus datos ya rellenos; cambia la contraseña, revisa sus datos y acepta los dos documentos.
+async function choferPrimerAcceso(req) {
+  const id = req.session && req.session.primerAccesoId;
+  if (!id) return null;
+  const r = await pool.query(
+    `SELECT * FROM conductores WHERE id = $1 AND estado = 'pendiente' AND primer_acceso_pendiente = TRUE
+       AND acceso_provisional_caduca > NOW()`, [id]);
+  return r.rows[0] || null;
+}
+
+app.get('/chofer/primer-acceso', asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  const c = await choferPrimerAcceso(req);
+  if (!c) { if (req.session) delete req.session.primerAccesoId; return res.redirect('/chofer/acceso'); }
+  const t = function(clave) { return obtenerTexto(clave, 'es'); };
+  const palabrasPaginas = PALABRAS_PAGINAS['es'] || {};
+  const registro = {
+    valido: true, primer: true, token: '',
+    nombre: c.nombre, email: c.email, telefono: c.telefono, documento: c.documento, direccion: c.direccion,
+    cp: c.cp, municipio: c.municipio, municipio_licencia: c.municipio_licencia, numero_licencia: c.numero_licencia,
+    central_flota: c.central_flota, categoria_id: c.categoria_id, vehiculo_marca: c.vehiculo_marca,
+    vehiculo_modelo: c.vehiculo_modelo, matricula: c.matricula, numero_taxi: c.numero_taxi, plazas: c.plazas,
+    isla: c.isla, observaciones: c.observaciones, foto: c.foto || null
+  };
+  res.render('chofer-registro', { lang: 'es', t, palabrasPaginas, BASE_URL, modo: 'registro', registro });
+}));
+
+app.post('/api/chofer/primer-acceso', asyncHandler(async (req, res) => {
+  const c = await choferPrimerAcceso(req);
+  if (!c) return res.status(403).json({ error: 'Tu acceso provisional ya no es válido. Escríbenos desde la página de Contacto y te enviaremos otro.' });
+  const b = req.body || {};
+  const txt = function (s) { return String(s == null ? '' : s).trim(); };
+  if (b.acepta_condiciones !== true) return res.status(400).json({ error: obtenerTexto('reg_acepto_falta', 'es') });
+  const password = String(b.password || '');
+  if (password.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+  const nombre = txt(b.nombre), telefono = txt(b.telefono);
+  if (!nombre || !telefono || !txt(b.documento) || !txt(b.direccion) || !txt(b.cp) || !txt(b.municipio)
+      || !txt(b.municipio_licencia) || !txt(b.numero_licencia) || !txt(b.vehiculo_marca) || !txt(b.vehiculo_modelo)
+      || !txt(b.matricula) || !txt(b.numero_taxi)) {
+    return res.status(400).json({ error: 'Completa los campos marcados en rosa.' });
+  }
+  const catId = b.categoria_id ? parseInt(b.categoria_id, 10) : null;
+  if (!catId && !txt(b.observaciones).replace('[Otro vehículo]', '').trim()) {
+    return res.status(400).json({ error: obtenerTexto('alta_otro_falta', 'es') });
+  }
+  const _cifras = telefono.replace(/[^0-9]/g, '');
+  if (!/^\+[0-9][0-9 ]*$/.test(telefono) || _cifras.length < 8 || _cifras.length > 15) {
+    return res.status(400).json({ error: obtenerTexto('alta_tel_sin_prefijo', 'es') });
+  }
+  let plazas = parseInt(b.plazas, 10);
+  if (isNaN(plazas)) plazas = c.plazas;
+  const plazasOk = await comprobarPlazasChofer(plazas, catId);
+  if (plazasOk.error) return res.status(400).json({ error: plazasOk.error });
+  // La foto: si sube una nueva, queda pendiente de que la apruebe el Admin; si no, se queda la que puso la oficina
+  const fotoNueva = b.foto && String(b.foto).startsWith('data:image/') ? String(b.foto) : null;
+  if (!fotoNueva && !c.foto) return res.status(400).json({ error: 'Falta tu foto.' });
+  const hash = await bcrypt.hash(password, 10);
+  await pool.query(
+    `UPDATE conductores SET nombre = $1, telefono = $2, password_hash = $3, documento = $4, direccion = $5, cp = $6,
+       municipio = $7, municipio_licencia = $8, numero_licencia = $9, central_flota = $10, categoria_id = $11,
+       vehiculo_marca = $12, vehiculo_modelo = $13, matricula = $14, numero_taxi = $15, plazas = $16, isla = $17,
+       observaciones = $18,
+       foto = COALESCE($19, foto), foto_estado = CASE WHEN $19::text IS NULL THEN foto_estado ELSE 'pendiente' END,
+       foto_motivo = CASE WHEN $19::text IS NULL THEN foto_motivo ELSE NULL END,
+       privacidad_aceptada_en = NOW(), condiciones_aceptadas_en = NOW(), primer_acceso_pendiente = FALSE
+     WHERE id = $20`,
+    [nombre, telefono, hash, txt(b.documento).toUpperCase(), txt(b.direccion), txt(b.cp), txt(b.municipio),
+     txt(b.municipio_licencia), txt(b.numero_licencia), txt(b.central_flota), catId,
+     txt(b.vehiculo_marca), txt(b.vehiculo_modelo), txt(b.matricula).toUpperCase(), txt(b.numero_taxi),
+     plazasOk.plazas, txt(b.isla) || 'Gran Canaria', txt(b.observaciones), fotoNueva, c.id]);
+  delete req.session.primerAccesoId;
+  // Aviso a la oficina («[Admin] Nuevo chofer registrado»): ya lo puede revisar y aprobar
+  await avisarEquipoRegistroChofer({ nombre, email: c.email, telefono, catId, observaciones: txt(b.observaciones), isla: txt(b.isla) });
+  res.json({ ok: true });
+}));
+
 // Admin → Choferes → «📝 Pre-registro de choferes»: enviar (o volver a enviar) el enlace privado del registro
 app.post('/admin/choferes-prerregistro/:id/enviar-enlace', requireAdmin, asyncHandler(async (req, res) => {
   const id = parseInt(req.params.id, 10) || 0;
@@ -11851,6 +11982,39 @@ app.delete('/admin/choferes-prerregistro/:id', requireAdmin, asyncHandler(async 
   res.json({ ok: true });
 }));
 
+// (14/10/2026) Aviso al departamento «Alta Choferes» (Admin → Equipo; si no hay nadie, a Notificaciones) con la plantilla "[Admin] Nuevo chofer registrado".
+// (24/11/2026) En una función: lo usan el registro de la web y el primer acceso del chofer dado de alta en la oficina.
+async function avisarEquipoRegistroChofer({ nombre, email, telefono, catId, observaciones, isla }) {
+  try {
+    let _vehiculo = '';
+    if (catId) {
+      const _cat = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [catId]);
+      _vehiculo = _cat.rows.length ? _cat.rows[0].nombre : '';
+    } else {
+      _vehiculo = 'Otro vehículo: ' + String(observaciones || '').replace('[Otro vehículo]', '').trim();
+    }
+    const _varsReg = {
+      nombre_chofer: nombre.trim(), email_chofer: email.trim().toLowerCase(), telefono_chofer: telefono.trim(),
+      vehiculo: _vehiculo || '—', isla: isla || 'Gran Canaria'
+    };
+    const _pReg = await obtenerPlantilla('interno_registro_chofer', _varsReg, 'es');
+    const _emailsReg = await obtenerEmailsAltaChoferes();
+    for (const em of _emailsReg) {
+      await enviarEmail({
+        to: em,
+        subject: (_pReg && _pReg.email && _pReg.asunto) || ('🚗 Nuevo chofer registrado — ' + _varsReg.nombre_chofer),
+        html: (_pReg && _pReg.email) ? plantillaEmail(_pReg.email) : plantillaEmail(
+          `<p>🚗 El chofer <strong>${_varsReg.nombre_chofer}</strong> ha enviado su solicitud para unirse a la flota.</p>
+           <p>📧 <strong>Email:</strong> ${_varsReg.email_chofer}<br>📱 <strong>Teléfono:</strong> ${_varsReg.telefono_chofer}<br>
+           🚘 <strong>Vehículo:</strong> ${_varsReg.vehiculo}<br>🏝️ <strong>Isla:</strong> ${_varsReg.isla}</p>
+           <p>🔍 Accede al panel de administración, en Conductores, para revisar su perfil y aprobar o rechazar la solicitud.</p>`)
+      });
+    }
+  } catch (err) {
+    console.warn('Error avisando al equipo del registro de chofer:', err.message);
+  }
+}
+
 app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
   const {
     nombre, email, telefono, password,
@@ -11947,34 +12111,7 @@ app.post('/api/chofer/registro', asyncHandler(async (req, res) => {
   }
 
   // (14/10/2026) Aviso al departamento «Alta Choferes» (Admin → Equipo; si no hay nadie, a Notificaciones) con la plantilla "[Admin] Nuevo chofer registrado"
-  try {
-    let _vehiculo = '';
-    if (catId) {
-      const _cat = await pool.query('SELECT nombre FROM categorias_vehiculos WHERE id = $1', [catId]);
-      _vehiculo = _cat.rows.length ? _cat.rows[0].nombre : '';
-    } else {
-      _vehiculo = 'Otro vehículo: ' + String(observaciones || '').replace('[Otro vehículo]', '').trim();
-    }
-    const _varsReg = {
-      nombre_chofer: nombre.trim(), email_chofer: email.trim().toLowerCase(), telefono_chofer: telefono.trim(),
-      vehiculo: _vehiculo || '—', isla: isla || 'Gran Canaria'
-    };
-    const _pReg = await obtenerPlantilla('interno_registro_chofer', _varsReg, 'es');
-    const _emailsReg = await obtenerEmailsAltaChoferes();
-    for (const em of _emailsReg) {
-      await enviarEmail({
-        to: em,
-        subject: (_pReg && _pReg.email && _pReg.asunto) || ('🚗 Nuevo chofer registrado — ' + _varsReg.nombre_chofer),
-        html: (_pReg && _pReg.email) ? plantillaEmail(_pReg.email) : plantillaEmail(
-          `<p>🚗 El chofer <strong>${_varsReg.nombre_chofer}</strong> ha enviado su solicitud para unirse a la flota.</p>
-           <p>📧 <strong>Email:</strong> ${_varsReg.email_chofer}<br>📱 <strong>Teléfono:</strong> ${_varsReg.telefono_chofer}<br>
-           🚘 <strong>Vehículo:</strong> ${_varsReg.vehiculo}<br>🏝️ <strong>Isla:</strong> ${_varsReg.isla}</p>
-           <p>🔍 Accede al panel de administración, en Conductores, para revisar su perfil y aprobar o rechazar la solicitud.</p>`)
-      });
-    }
-  } catch (err) {
-    console.warn('Error avisando al equipo del registro de chofer:', err.message);
-  }
+  await avisarEquipoRegistroChofer({ nombre, email, telefono, catId, observaciones, isla });
 
   res.json({ ok: true });
 }));
@@ -11992,8 +12129,8 @@ app.post('/chofer/login', asyncHandler(async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'Introduce email y contraseña.' });
 
   const result = await pool.query(
-    'SELECT * FROM conductores WHERE email = $1 AND estado = $2',
-    [email.trim().toLowerCase(), 'aprobado']
+    'SELECT * FROM conductores WHERE email = $1',
+    [email.trim().toLowerCase()]
   );
   if (!result.rows.length) {
     return res.status(401).json({ error: 'Email o contraseña incorrectos.' });
@@ -12001,6 +12138,20 @@ app.post('/chofer/login', asyncHandler(async (req, res) => {
   const chofer = result.rows[0];
   const ok = await bcrypt.compare(password, chofer.password_hash);
   if (!ok) return res.status(401).json({ error: 'Email o contraseña incorrectos.' });
+
+  // (24/11/2026) Alta manual (oficina): con el acceso provisional, solo la pantalla «Antes de empezar»
+  if (chofer.estado === 'pendiente' && chofer.primer_acceso_pendiente) {
+    if (!chofer.acceso_provisional_caduca || new Date(chofer.acceso_provisional_caduca) < new Date()) {
+      return res.status(401).json({ error: 'Tu acceso provisional ha caducado. Escríbenos desde la página de Contacto y te enviaremos otro.' });
+    }
+    req.session.primerAccesoId = chofer.id;
+    return res.json({ ok: true, primer_acceso: true });
+  }
+  if (chofer.estado === 'pendiente' && chofer.acceso_provisional_caduca) {
+    return res.status(401).json({ error: 'Tu alta está pendiente de revisión. Te enviaremos un email cuando esté aprobada.' });
+  }
+  // Como siempre: solo entran los choferes aprobados
+  if (chofer.estado !== 'aprobado') return res.status(401).json({ error: 'Email o contraseña incorrectos.' });
 
   req.session.choferId = chofer.id;
   req.session.choferNombre = chofer.nombre;
@@ -20805,7 +20956,7 @@ const _VCH = ['nombre_chofer', 'numero_reserva', 'origen', 'destino', 'fecha', '
 const _VCONF = _V6.concat(['categoria', 'chofer', 'importe_deposito', 'horas_cancelacion', 'fecha_limite_cancelacion', 'extras']);
 const VARIABLES_PLANTILLAS = {
   // Chofer
-  chofer_alta_datos_acceso:      { email: ['nombre_chofer', 'email_chofer', 'password_temporal', 'url_portal'], wa: null },
+  chofer_alta_datos_acceso:      { email: ['nombre_chofer', 'email_chofer', 'password_temporal', 'url_portal', 'horas_validez'], wa: null },
   chofer_aviso_reserva:          { email: null, wa: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora', 'categoria', 'pasajeros', 'asistencia_especial'] },
   chofer_aviso_reasignacion:     { email: null, wa: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora', 'categoria', 'pasajeros', 'asistencia_especial'] },
   chofer_bienvenida:             { email: ['nombre_chofer', 'url_portal'], wa: null },
