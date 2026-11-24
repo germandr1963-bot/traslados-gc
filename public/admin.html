@@ -7901,6 +7901,44 @@ function origenPalabraLatinaRu(o) {
   if (o === 'a mano') return 'Añadida a mano';
   return 'Aprobada en una ficha';
 }
+// (24/11/2026) N96 — Ordenar la lista pulsando el título de la columna (Palabra, De dónde viene, Fecha), con las mismas
+// flechas que la tabla de Reservas: ↑ / ↓ en naranja la columna que manda (otro clic le da la vuelta), ↕ en gris las demás.
+// Palabra y De dónde viene: alfabético; Fecha: de la más antigua a la más nueva (↑) o al revés (↓). Empates, por palabra.
+var _ordenPalabrasLatinasRu = { col: 'palabra', dir: 'asc' };
+function fechaOrdenPalabraLatinaRu(f) { // «DD/MM/YYYY HH:MI» → «YYYYMMDDHHMI»
+  var m = String(f || '').match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/);
+  return m ? m[3] + m[2] + m[1] + m[4] + m[5] : '';
+}
+function ordenarPalabrasLatinasRu(lista) {
+  var o = _ordenPalabrasLatinasRu, signo = o.dir === 'asc' ? 1 : -1;
+  return lista.slice().sort(function (a, b) {
+    var porPalabra = String(a.palabra).localeCompare(String(b.palabra), 'es');
+    var c = 0;
+    if (o.col === 'fecha') {
+      var fa = fechaOrdenPalabraLatinaRu(a.fecha), fb = fechaOrdenPalabraLatinaRu(b.fecha);
+      c = fa === fb ? 0 : (fa < fb ? -1 : 1);
+    } else if (o.col === 'origen') {
+      c = origenPalabraLatinaRu(a.origen).localeCompare(origenPalabraLatinaRu(b.origen), 'es');
+    } else {
+      return signo * porPalabra;
+    }
+    return c !== 0 ? signo * c : porPalabra;
+  });
+}
+function thOrdenPalabrasLatinasRu(col, titulo) {
+  var activa = _ordenPalabrasLatinasRu.col === col;
+  var flecha = activa ? (_ordenPalabrasLatinasRu.dir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
+  return '<th onclick="ordenarColumnaPalabrasLatinasRu(\'' + col + '\')" style="cursor:pointer;white-space:nowrap;">' + titulo +
+    '<span style="color:' + (activa ? 'var(--terracota)' : '#ccc') + ';">' + flecha + '</span></th>';
+}
+function ordenarColumnaPalabrasLatinasRu(col) {
+  if (_ordenPalabrasLatinasRu.col === col) {
+    _ordenPalabrasLatinasRu.dir = _ordenPalabrasLatinasRu.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _ordenPalabrasLatinasRu = { col: col, dir: 'asc' };
+  }
+  abrirPanelPalabrasLatinasRu(true);
+}
 function abrirPanelPalabrasLatinasRu(recargar) {
   var panel = document.getElementById('panel-palabras-latinas-ru');
   if (!recargar && !panel.classList.contains('oculto')) {
@@ -7913,7 +7951,7 @@ function abrirPanelPalabrasLatinasRu(recargar) {
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   fetch('/admin/ruso-palabras-permitidas').then(function (r) { return r.json(); }).then(function (lista) {
-    _palabrasLatinasRu = lista || [];
+    _palabrasLatinasRu = ordenarPalabrasLatinasRu(lista || []);
     var filas = _palabrasLatinasRu.map(function (x) {
       return '<tr><td style="font-family:monospace;font-size:13px;"><strong>' + escapar(x.palabra) + '</strong></td>' +
         '<td>' + escapar(origenPalabraLatinaRu(x.origen)) + '</td>' +
@@ -7932,7 +7970,7 @@ function abrirPanelPalabrasLatinasRu(recargar) {
       '<button class="boton-secundario" onclick="imprimirPalabrasLatinasRu()">🖨️ Imprimir</button>' +
       '</div>' +
       '<div id="msg-palabras-latinas-ru" style="font-size:13px;margin-bottom:10px;"></div>' +
-      '<div style="overflow-x:auto;"><table class="tabla-admin"><thead><tr><th>Palabra</th><th>De dónde viene</th><th>Fecha</th><th></th></tr></thead>' +
+      '<div style="overflow-x:auto;"><table class="tabla-admin"><thead><tr>' + thOrdenPalabrasLatinasRu('palabra', 'Palabra') + thOrdenPalabrasLatinasRu('origen', 'De dónde viene') + thOrdenPalabrasLatinasRu('fecha', 'Fecha') + '<th></th></tr></thead>' +
       '<tbody>' + filas + '</tbody></table></div>' +
       '<button class="boton-secundario" style="margin-top:12px;" onclick="document.getElementById(\'panel-palabras-latinas-ru\').classList.add(\'oculto\')">Cerrar</button>';
   });
