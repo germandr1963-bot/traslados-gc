@@ -15106,11 +15106,12 @@ function cargarSEOCategorias() {
     });
 }
 
+// (24/11/2026) N77: en «🚗 SEO — Páginas de categoría de vehículo», el mismo círculo que en «🗺️ SEO — Páginas de rutas»
 function badgeSEOCat(langData) {
-  if (!langData) return '<span class="estado-seo-vacio">—</span>';
-  if (langData.activo) return '<span class="estado-seo-ok">✓</span>';
-  if (langData.titulo) return '<span class="estado-seo-draft">✎</span>';
-  return '<span class="estado-seo-vacio">·</span>';
+  if (!langData) return circuloSEO('#c0392b', 'Sin rellenar');
+  if (langData.activo) return circuloSEO('#2e7d32', 'Página activa');
+  if (langData.titulo) return circuloSEO('#1565c0', 'Rellenada, sin activar');
+  return circuloSEO('#c0392b', 'Sin rellenar');
 }
 
 function renderizarTablaSEOCat(datos) {
