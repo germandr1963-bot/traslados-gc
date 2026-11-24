@@ -4141,11 +4141,16 @@ function renderizarSelectIASEO() {
   }).join('');
 }
 
+// (24/11/2026) N77: en «🗺️ SEO — Páginas de rutas», círculo de color en lugar de ✓ / ✎ / · (mismos colores),
+// con su etiqueta al pasar el ratón. Sin datos en ese idioma = vacía = mismo círculo rojo (Germán, 24/11).
+function circuloSEO(color, titulo) {
+  return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;background:' + color + ';" title="' + titulo + '"></span>';
+}
 function badgeSEO(langData) {
-  if (!langData) return '<span class="estado-seo-vacio">—</span>';
-  if (langData.activo) return '<span class="estado-seo-ok">✓</span>';
-  if (langData.titulo) return '<span class="estado-seo-draft">✎</span>';
-  return '<span class="estado-seo-vacio">·</span>';
+  if (!langData) return circuloSEO('#c0392b', 'Sin rellenar');
+  if (langData.activo) return circuloSEO('#2e7d32', 'Página activa');
+  if (langData.titulo) return circuloSEO('#1565c0', 'Rellenada, sin activar');
+  return circuloSEO('#c0392b', 'Sin rellenar');
 }
 
 function renderizarTablaSEO(datos) {
@@ -4742,8 +4747,8 @@ function actualizarBadgeSEO(rutaId, lang, activar) {
   celdas.forEach(function(td) {
     if (td.dataset.rutaId == rutaId && td.dataset.lang === lang) {
       td.innerHTML = activar
-        ? '<span class="estado-seo-ok">✓</span>'
-        : '<span class="estado-seo-vacio">—</span>';
+        ? circuloSEO('#2e7d32', 'Página activa') // (24/11/2026) N77: círculo en lugar del ✓
+        : circuloSEO('#1565c0', 'Rellenada, sin activar'); // al desactivar, la página sigue rellenada
     }
   });
 }
