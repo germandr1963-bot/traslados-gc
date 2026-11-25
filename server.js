@@ -6025,13 +6025,12 @@ app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req,
   if (!['pendiente', 'aprobado', 'suspendido', 'baja'].includes(estado)) {
     return res.status(400).json({ error: 'Estado no válido.' });
   }
-  // (25/11/2026) BAJA: definitiva (no se reactiva; solo se da a un chofer aprobado o suspendido).
-  // SUSPENSIÓN: temporal. Las dos, nunca con viajes pendientes.
+  // (25/11/2026) BAJA y SUSPENSIÓN: dos estados que se pueden recuperar con «Aprobar». Las dos, nunca con viajes pendientes.
   {
     const act = await pool.query('SELECT nombre, estado FROM conductores WHERE id = $1', [req.params.id]);
     if (!act.rows.length) return res.status(404).json({ error: 'Chofer no encontrado.' });
-    if (act.rows[0].estado === 'baja') {
-      return res.status(400).json({ error: 'Este chofer está de baja. La baja es definitiva: no se puede cambiar su estado.' });
+    if (act.rows[0].estado === 'baja' && estado !== 'aprobado') {
+      return res.status(400).json({ error: 'Un chofer de baja solo se puede volver a aprobar.' });
     }
     if (estado === 'suspendido' && act.rows[0].estado === 'suspendido') {
       return res.status(400).json({ error: 'Este chofer ya está suspendido.' });
@@ -6121,6 +6120,12 @@ app.post('/admin/conductores/:id/tipo', requireAdmin, asyncHandler(async (req, r
 }));
 
 app.post('/admin/conductores/:id/eliminar', requireAdmin, asyncHandler(async (req, res) => {
+  // (25/11/2026) Un chofer aprobado no se elimina: antes se suspende o se da de baja, y eso revisa sus viajes pendientes
+  const el = await pool.query('SELECT estado FROM conductores WHERE id = $1', [req.params.id]);
+  if (!el.rows.length) return res.status(404).json({ error: 'Chofer no encontrado.' });
+  if (el.rows[0].estado === 'aprobado') {
+    return res.status(400).json({ error: 'Un chofer aprobado no se puede eliminar. Primero suspéndelo o dalo de baja: así se revisan sus viajes pendientes.' });
+  }
   await pool.query('DELETE FROM conductores WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
