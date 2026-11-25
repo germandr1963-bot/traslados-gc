@@ -543,9 +543,9 @@ function requireAdmin(req, res, next) {
 
 function requireChofer(req, res, next) {
   if (req.session && req.session.choferId) {
-    // (25/11/2026) Un chofer de baja no entra aunque tenga la sesión abierta: se comprueba su estado en cada petición
+    // (25/11/2026) Un chofer suspendido o de baja no entra aunque tenga la sesión abierta: se comprueba su estado en cada petición
     return pool.query('SELECT estado FROM conductores WHERE id = $1', [req.session.choferId]).then(function (q) {
-      if (q.rows.length && q.rows[0].estado === 'baja') {
+      if (q.rows.length && (q.rows[0].estado === 'baja' || q.rows[0].estado === 'suspendido')) {
         delete req.session.choferId;
         delete req.session.choferNombre;
         return res.status(401).json({ error: 'No autorizado' });
@@ -6025,16 +6025,23 @@ app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req,
   if (!['pendiente', 'aprobado', 'suspendido', 'baja'].includes(estado)) {
     return res.status(400).json({ error: 'Estado no válido.' });
   }
-  // (25/11/2026) BAJA: definitiva. No se reactiva; solo se da a un chofer aprobado o suspendido; y nunca con viajes pendientes.
+  // (25/11/2026) BAJA: definitiva (no se reactiva; solo se da a un chofer aprobado o suspendido).
+  // SUSPENSIÓN: temporal. Las dos, nunca con viajes pendientes.
   {
     const act = await pool.query('SELECT nombre, estado FROM conductores WHERE id = $1', [req.params.id]);
     if (!act.rows.length) return res.status(404).json({ error: 'Chofer no encontrado.' });
     if (act.rows[0].estado === 'baja') {
       return res.status(400).json({ error: 'Este chofer está de baja. La baja es definitiva: no se puede cambiar su estado.' });
     }
-    if (estado === 'baja') {
-      if (!['aprobado', 'suspendido'].includes(act.rows[0].estado)) {
+    if (estado === 'suspendido' && act.rows[0].estado === 'suspendido') {
+      return res.status(400).json({ error: 'Este chofer ya está suspendido.' });
+    }
+    if (estado === 'baja' || estado === 'suspendido') {
+      if (estado === 'baja' && !['aprobado', 'suspendido'].includes(act.rows[0].estado)) {
         return res.status(400).json({ error: 'Solo se puede dar de baja a un chofer aprobado o suspendido.' });
+      }
+      if (estado === 'suspendido' && act.rows[0].estado !== 'aprobado') {
+        return res.status(400).json({ error: 'Solo se puede suspender a un chofer aprobado.' });
       }
       // Mismo criterio de «pendiente» que ya usa el sistema: no archivada y ni cancelada, ni completada, ni no-show
       const pend = await pool.query(
@@ -6045,6 +6052,7 @@ app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req,
       if (pend.rows.length) {
         return res.status(409).json({
           error: 'viajes_pendientes',
+          accion: estado,
           nombre: act.rows[0].nombre,
           pendientes: pend.rows.map(function (r) {
             return {
@@ -20945,11 +20953,11 @@ app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asy
 app.post('/api/whatsapp/asignar/:id', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const { conductor_id } = req.body;
   if (!conductor_id) return res.status(400).json({ error: 'Falta conductor_id.' });
-  // (25/11/2026) Un chofer de baja no puede aceptar una reserva respondiendo SI
+  // (25/11/2026) Un chofer suspendido o de baja no puede aceptar una reserva respondiendo SI
   {
     const cb = await pool.query('SELECT estado FROM conductores WHERE id = $1', [conductor_id]);
-    if (cb.rows.length && cb.rows[0].estado === 'baja') {
-      return res.status(409).json({ error: 'Este chofer está de baja: no puede aceptar reservas.' });
+    if (cb.rows.length && (cb.rows[0].estado === 'baja' || cb.rows[0].estado === 'suspendido')) {
+      return res.status(409).json({ error: 'Este chofer está ' + (cb.rows[0].estado === 'baja' ? 'de baja' : 'suspendido') + ': no puede aceptar reservas.' });
     }
   }
   // (03/11/2026) Una reserva cancelada o anulada nunca se puede aceptar: al chofer que responde SI
