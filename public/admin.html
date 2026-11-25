@@ -3349,18 +3349,36 @@ function eliminarPrerregistro(id) {
 
 function cambiarEstadoConductor(id, estado) {
   if (estado === 'suspendido') {
-    var cs = conductoresCache.find(function (x) { return x.id === id; });
-    if (!confirm('¿Suspender a ' + (cs ? cs.nombre : '') + '? Dejará de entrar y de recibir avisos hasta que lo vuelvas a aprobar.')) return;
+    // (25/11/2026) Primero se comprueban los viajes pendientes; la confirmación solo sale si no hay ninguno
+    pedirEstadoConductor(id, estado, true).then(function (d) {
+      if (d && d.error === 'viajes_pendientes') { mostrarViajesPendientesBaja(d); return; }
+      if (d && d.error) { alert(d.error); return; }
+      var cs = conductoresCache.find(function (x) { return x.id === id; });
+      if (!confirm('¿Suspender a ' + (cs ? cs.nombre : '') + '? Dejará de entrar y de recibir avisos hasta que lo vuelvas a aprobar.')) return;
+      pedirEstadoConductor(id, estado, false).then(function (d2) {
+        if (d2 && d2.error === 'viajes_pendientes') { mostrarViajesPendientesBaja(d2); return; }
+        if (d2 && d2.error) { alert(d2.error); }
+        cargarConductores();
+      });
+    });
+    return;
   }
-  fetch('/admin/conductores/' + id + '/estado', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ estado: estado })
-  }).then(function (r) { return r.json(); }).then(function (d) {
+  pedirEstadoConductor(id, estado, false).then(function (d) {
     // (24/11/2026) Alta manual: no se aprueba a un chofer que no ha aceptado los documentos
-    if (d && d.error === 'viajes_pendientes') { mostrarViajesPendientesBaja(d); return; }
     if (d && d.error) { alert(d.error); }
     cargarConductores();
+  });
+}
+
+function pedirEstadoConductor(id, estado, soloComprobar) {
+  return fetch('/admin/conductores/' + id + '/estado', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ estado: estado, solo_comprobar: !!soloComprobar })
+  }).then(function (r) {
+    return r.text().then(function (t) {
+      try { return JSON.parse(t); } catch (e) { return { error: 'El servidor respondió algo inesperado (código ' + r.status + ').' }; }
+    });
   });
 }
 
@@ -3368,15 +3386,15 @@ function cambiarEstadoConductor(id, estado) {
 function darDeBajaConductor(id) {
   var c = conductoresCache.find(function (x) { return x.id === id; });
   var nombre = c ? c.nombre : '';
-  if (!confirm('¿Dar de baja a ' + nombre + '? Dejará de entrar y de recibir avisos. La baja es definitiva.')) return;
-  fetch('/admin/conductores/' + id + '/estado', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ estado: 'baja' })
-  }).then(function (r) { return r.json(); }).then(function (d) {
+  pedirEstadoConductor(id, 'baja', true).then(function (d) {
     if (d && d.error === 'viajes_pendientes') { mostrarViajesPendientesBaja(d); return; }
     if (d && d.error) { alert(d.error); return; }
-    cargarConductores();
+    if (!confirm('¿Dar de baja a ' + nombre + '? Dejará de entrar y de recibir avisos. La baja es definitiva.')) return;
+    pedirEstadoConductor(id, 'baja', false).then(function (d2) {
+      if (d2 && d2.error === 'viajes_pendientes') { mostrarViajesPendientesBaja(d2); return; }
+      if (d2 && d2.error) { alert(d2.error); return; }
+      cargarConductores();
+    });
   });
 }
 
