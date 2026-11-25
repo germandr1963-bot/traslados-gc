@@ -6066,6 +6066,8 @@ app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req,
           })
         });
       }
+      // (25/11/2026) Solo comprobar: el Admin pregunta antes de enseñar la confirmación; no cambia nada
+      if (req.body.solo_comprobar) return res.json({ ok: true, libre: true });
     }
   }
   // (24/11/2026) Alta manual: no se aprueba hasta que el chofer acepte los documentos en su primer acceso
