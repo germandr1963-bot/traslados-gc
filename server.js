@@ -543,7 +543,15 @@ function requireAdmin(req, res, next) {
 
 function requireChofer(req, res, next) {
   if (req.session && req.session.choferId) {
-    return next();
+    // (25/11/2026) Un chofer de baja no entra aunque tenga la sesión abierta: se comprueba su estado en cada petición
+    return pool.query('SELECT estado FROM conductores WHERE id = $1', [req.session.choferId]).then(function (q) {
+      if (q.rows.length && q.rows[0].estado === 'baja') {
+        delete req.session.choferId;
+        delete req.session.choferNombre;
+        return res.status(401).json({ error: 'No autorizado' });
+      }
+      return next();
+    }).catch(function (err) { return next(err); });
   }
   return res.status(401).json({ error: 'No autorizado' });
 }
@@ -6014,8 +6022,43 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
 
 app.post('/admin/conductores/:id/estado', requireAdmin, asyncHandler(async (req, res) => {
   const estado = req.body.estado;
-  if (!['pendiente', 'aprobado', 'suspendido'].includes(estado)) {
+  if (!['pendiente', 'aprobado', 'suspendido', 'baja'].includes(estado)) {
     return res.status(400).json({ error: 'Estado no válido.' });
+  }
+  // (25/11/2026) BAJA: definitiva. No se reactiva; solo se da a un chofer aprobado o suspendido; y nunca con viajes pendientes.
+  {
+    const act = await pool.query('SELECT nombre, estado FROM conductores WHERE id = $1', [req.params.id]);
+    if (!act.rows.length) return res.status(404).json({ error: 'Chofer no encontrado.' });
+    if (act.rows[0].estado === 'baja') {
+      return res.status(400).json({ error: 'Este chofer está de baja. La baja es definitiva: no se puede cambiar su estado.' });
+    }
+    if (estado === 'baja') {
+      if (!['aprobado', 'suspendido'].includes(act.rows[0].estado)) {
+        return res.status(400).json({ error: 'Solo se puede dar de baja a un chofer aprobado o suspendido.' });
+      }
+      // Mismo criterio de «pendiente» que ya usa el sistema: no archivada y ni cancelada, ni completada, ni no-show
+      const pend = await pool.query(
+        `SELECT id, numero_reserva, fecha, hora, origen, destino
+         FROM reservas
+         WHERE conductor_id = $1 AND archivada = FALSE AND estado NOT IN ('cancelada', 'completada', 'no_show')
+         ORDER BY fecha ASC, hora ASC`, [req.params.id]);
+      if (pend.rows.length) {
+        return res.status(409).json({
+          error: 'viajes_pendientes',
+          nombre: act.rows[0].nombre,
+          pendientes: pend.rows.map(function (r) {
+            return {
+              id: r.id,
+              numero_reserva: r.numero_reserva,
+              fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: ZONA_HORARIA }) : '—',
+              hora: r.hora ? String(r.hora).slice(0, 5) : '—',
+              origen: r.origen || '—',
+              destino: r.destino || '—'
+            };
+          })
+        });
+      }
+    }
   }
   // (24/11/2026) Alta manual: no se aprueba hasta que el chofer acepte los documentos en su primer acceso
   if (estado === 'aprobado') {
@@ -20902,6 +20945,13 @@ app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asy
 app.post('/api/whatsapp/asignar/:id', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const { conductor_id } = req.body;
   if (!conductor_id) return res.status(400).json({ error: 'Falta conductor_id.' });
+  // (25/11/2026) Un chofer de baja no puede aceptar una reserva respondiendo SI
+  {
+    const cb = await pool.query('SELECT estado FROM conductores WHERE id = $1', [conductor_id]);
+    if (cb.rows.length && cb.rows[0].estado === 'baja') {
+      return res.status(409).json({ error: 'Este chofer está de baja: no puede aceptar reservas.' });
+    }
+  }
   // (03/11/2026) Una reserva cancelada o anulada nunca se puede aceptar: al chofer que responde SI
   // le llega «Reserva cancelada / anulada… Ya no está disponible» y no se le asigna.
   {
