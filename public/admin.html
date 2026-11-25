@@ -3202,7 +3202,7 @@ function cargarConductores() {
           '</select>' +
         '</td>' +
         '<td>' +
-          '<span class="insignia ' + (c.estado === 'aprobado' ? 'insignia-ok' : (c.estado === 'suspendido' ? 'insignia-suspendido' : 'insignia-pendiente')) + '">' + c.estado.toUpperCase() + '</span>' +
+          (c.estado === 'baja' ? '<span class="insignia" style="background:#4a4a4a;color:#fff">DE BAJA</span>' : '<span class="insignia ' + (c.estado === 'aprobado' ? 'insignia-ok' : (c.estado === 'suspendido' ? 'insignia-suspendido' : 'insignia-pendiente')) + '">' + c.estado.toUpperCase() + '</span>') +
           (c.cambios_pendientes ? '<br><span class="insignia" style="background:#e65100;color:#fff;margin-top:4px;display:inline-block">🕐 Cambios pendientes</span>' : '') +
           (c.estado === 'aprobado' ? ('<br><span class="insignia ' + (c.disponible_hoy !== false ? 'insignia-ok' : 'insignia-pendiente') + '" style="margin-top:4px;display:inline-block">' + (c.disponible_hoy !== false ? '🟢 Disponible hoy' : '⚪ No disponible hoy') + '</span>') : '') +
         '</td>' +
@@ -3210,8 +3210,9 @@ function cargarConductores() {
           '<button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;margin-right:4px" onclick="verFichaConductor(' + c.id + ')">📋 Ficha</button>' +
           '<button class="boton-secundario" style="padding:6px 10px;font-size:0.8rem;margin-right:4px" onclick="editarNombreConductor(' + c.id + ', \'' + escapar(c.nombre).replace(/'/g, "\\'") + '\')">✏️</button>' +
           '<button class="boton-peligro" style="padding:6px 10px;font-size:0.8rem" onclick="eliminarConductor(' + c.id + ')">🗑️</button><br>' +
-          (c.estado !== 'aprobado' ? '<button class="boton-costa" style="margin-top:6px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'aprobado\')">Aprobar</button>' : '') +
-          (c.estado !== 'suspendido' ? '<button class="boton-peligro" style="margin-top:6px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'suspendido\')">Suspender</button>' : '') +
+          (c.estado !== 'aprobado' && c.estado !== 'baja' ? '<button class="boton-costa" style="margin-top:6px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'aprobado\')">Aprobar</button>' : '') +
+          (c.estado !== 'suspendido' && c.estado !== 'baja' ? '<button class="boton-peligro" style="margin-top:6px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'suspendido\')">Suspender</button>' : '') +
+          ((c.estado === 'aprobado' || c.estado === 'suspendido') ? '<button class="boton-peligro" style="margin-top:6px;margin-left:4px;padding:6px 12px;font-size:0.8rem" onclick="darDeBajaConductor(' + c.id + ')">Dar de baja</button>' : '') +
         '</td>' +
       '</tr>';
     }).join('');
@@ -3356,6 +3357,50 @@ function cambiarEstadoConductor(id, estado) {
     if (d && d.error) { alert(d.error); }
     cargarConductores();
   });
+}
+
+// (25/11/2026) BAJA de un chofer: definitiva; antes se revisan sus viajes pendientes
+function darDeBajaConductor(id) {
+  var c = conductoresCache.find(function (x) { return x.id === id; });
+  var nombre = c ? c.nombre : '';
+  if (!confirm('¿Dar de baja a ' + nombre + '? Dejará de entrar y de recibir avisos. La baja es definitiva.')) return;
+  fetch('/admin/conductores/' + id + '/estado', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ estado: 'baja' })
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (d && d.error === 'viajes_pendientes') { mostrarViajesPendientesBaja(d); return; }
+    if (d && d.error) { alert(d.error); return; }
+    cargarConductores();
+  });
+}
+
+function mostrarViajesPendientesBaja(d) {
+  var viejo = document.getElementById('ventana-baja-pendientes');
+  if (viejo) viejo.remove();
+  var filas = d.pendientes.map(function (p) {
+    return '<li style="margin:8px 0"><a href="#" onclick="abrirReservaDesdeBaja(' + p.id + '); return false;" style="color:#C1502E;font-weight:700">PNR ' + escapar(p.numero_reserva || String(p.id)) + '</a> — ' +
+      escapar(p.fecha) + ', ' + escapar(p.hora) + ' — ' + escapar(p.origen) + ' → ' + escapar(p.destino) + '</li>';
+  }).join('');
+  var caja = document.createElement('div');
+  caja.id = 'ventana-baja-pendientes';
+  caja.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  caja.innerHTML = '<div style="background:#fff;border-radius:10px;max-width:640px;width:100%;max-height:85vh;overflow:auto;padding:22px">' +
+    '<p style="margin:0 0 10px"><strong>⚠️ No se puede dar de baja a ' + escapar(d.nombre) + ': tiene viajes pendientes.</strong></p>' +
+    '<p style="margin:0 0 6px">Reasigna primero estas reservas a otro chofer:</p>' +
+    '<ul style="padding-left:18px;margin:0 0 12px">' + filas + '</ul>' +
+    '<p style="margin:0 0 14px">Cuando ya no le quede ninguna, podrás darlo de baja.</p>' +
+    '<button class="boton-secundario" onclick="document.getElementById(\'ventana-baja-pendientes\').remove()">Cerrar</button>' +
+    '</div>';
+  document.body.appendChild(caja);
+}
+
+function abrirReservaDesdeBaja(idReserva) {
+  var v = document.getElementById('ventana-baja-pendientes');
+  if (v) v.remove();
+  var bt = document.querySelector('.item-menu[data-seccion="reservas"]');
+  if (bt) bt.click();
+  setTimeout(function () { abrirDetalleReserva(idReserva); }, 400);
 }
 
 function cambiarTipoConductor(id, tipo) {
