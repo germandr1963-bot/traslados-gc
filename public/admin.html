@@ -289,7 +289,7 @@ table.tabla-precios input {
           <span style="font-size:12px;color:var(--texto-muted);font-weight:400;">(clic para expandir)</span>
         </div>
         <div id="alta-imagen-contenido" style="display:none;padding:16px;">
-          <p style="font-size:13px;color:#5b5347;margin:0 0 12px;">Sale arriba de la página pública de pre-registro. Tamaño recomendado 1600 × 800 px · jpg, png o webp · máx. 1 MB. Sin textos dentro de la imagen (en el móvil no se leen).</p>
+          <p style="font-size:13px;color:#5b5347;margin:0 0 12px;">Sale arriba de la página pública de pre-registro. Tamaño recomendado 1600 × 800 px · jpg, png o webp · máx. 3 MB. Sin textos dentro de la imagen (en el móvil no se leen).</p>
           <img id="alta-imagen-vista" alt="" style="display:none;width:100%;aspect-ratio:2/1;object-fit:cover;border-radius:8px;border:1px solid #E1DCD0;margin-bottom:10px;">
           <p id="alta-imagen-sin" style="display:none;font-size:13px;color:#8a8175;margin:0 0 10px;">Todavía no hay imagen: la página sale sin ella.</p>
           <label class="etiqueta">Imagen</label>
@@ -3310,7 +3310,7 @@ function previsualizarImagenAlta() {
   var msg = document.getElementById('alta-imagen-mensaje');
   msg.textContent = '';
   if (!archivo) { imagenAltaNueva = null; return; }
-  if (archivo.size > 1024 * 1024) { msg.style.color = '#c0392b'; msg.textContent = 'La imagen pesa más de 1 MB. Elige una más ligera.'; document.getElementById('alta-imagen-archivo').value = ''; imagenAltaNueva = null; return; }
+  if (archivo.size > 3 * 1024 * 1024) { msg.style.color = '#c0392b'; msg.textContent = 'La imagen pesa más de 3 MB. Elige una más ligera.'; document.getElementById('alta-imagen-archivo').value = ''; imagenAltaNueva = null; return; }
   var lector = new FileReader();
   lector.onload = function (e) {
     imagenAltaNueva = e.target.result;
