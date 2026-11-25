@@ -545,7 +545,7 @@ function requireChofer(req, res, next) {
   if (req.session && req.session.choferId) {
     // (25/11/2026) Un chofer suspendido o de baja no entra aunque tenga la sesión abierta: se comprueba su estado en cada petición
     return pool.query('SELECT estado FROM conductores WHERE id = $1', [req.session.choferId]).then(function (q) {
-      if (q.rows.length && (q.rows[0].estado === 'baja' || q.rows[0].estado === 'suspendido')) {
+      if (q.rows.length && (q.rows[0].estado === 'baja' || q.rows[0].estado === 'suspendido' || q.rows[0].estado === 'eliminado')) {
         delete req.session.choferId;
         delete req.session.choferNombre;
         return res.status(401).json({ error: 'No autorizado' });
@@ -919,6 +919,9 @@ async function initSchema() {
   await pool.query(`ALTER TABLE choferes_prerregistro ADD COLUMN IF NOT EXISTS enlace_caduca_en TIMESTAMP`);
   await pool.query(`ALTER TABLE choferes_prerregistro ADD COLUMN IF NOT EXISTS completado_en TIMESTAMP`);
   await pool.query(`ALTER TABLE choferes_prerregistro ADD COLUMN IF NOT EXISTS conductor_id INT`);
+  // (25/11/2026) Chofer eliminado: su ficha se queda guardada (para el historial) y su email queda libre
+  await pool.query(`ALTER TABLE conductores ADD COLUMN IF NOT EXISTS eliminado_en TIMESTAMP`);
+  await pool.query(`ALTER TABLE conductores ADD COLUMN IF NOT EXISTS email_eliminado TEXT`);
   // Imagen de arriba de la página «Alta choferes» (una sola), subida desde Admin → Choferes
   await pool.query(`
     CREATE TABLE IF NOT EXISTS alta_choferes_imagen (
@@ -5867,6 +5870,7 @@ app.get('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
             cat.nombre AS categoria
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
+     WHERE c.estado <> 'eliminado'
      ORDER BY c.creado_en DESC`
   );
   res.json(result.rows);
@@ -6126,7 +6130,18 @@ app.post('/admin/conductores/:id/eliminar', requireAdmin, asyncHandler(async (re
   if (el.rows[0].estado === 'aprobado') {
     return res.status(400).json({ error: 'Un chofer aprobado no se puede eliminar. Primero suspéndelo o dalo de baja: así se revisan sus viajes pendientes.' });
   }
-  await pool.query('DELETE FROM conductores WHERE id = $1', [req.params.id]);
+  if (el.rows[0].estado === 'eliminado') return res.status(404).json({ error: 'Chofer no encontrado.' });
+  // (25/11/2026) Eliminar saca al chofer de la lista, pero NO borra su ficha: así todo su historial (reservas, voucher,
+  // contabilidad, comisiones, incidencias, historial de cambios de chofer) sigue con su nombre en todos los sitios.
+  // Su email queda libre (se guarda aparte, en email_eliminado) para que pueda volver a registrarse si un día regresa.
+  await pool.query(
+    `UPDATE conductores SET estado = 'eliminado', eliminado_en = NOW(), email_eliminado = email,
+            email = 'eliminado-' || id || '@eliminado.invalid', disponible_hoy = FALSE
+     WHERE id = $1`, [req.params.id]);
+  // Sus extras se quitan, como antes (no forman parte del historial)
+  await pool.query('DELETE FROM conductor_extras WHERE conductor_id = $1', [req.params.id]);
+  // Su pre-registro (con el registro de su consentimiento) se conserva, pero deja de bloquear el email
+  await pool.query(`UPDATE choferes_prerregistro SET estado = 'chofer_eliminado' WHERE conductor_id = $1`, [req.params.id]);
   res.json({ ok: true });
 }));
 
@@ -11945,7 +11960,7 @@ app.post('/api/chofer/prerregistro', asyncHandler(async (req, res) => {
   if (b.acepta_privacidad !== true) return res.status(400).json({ error: txt('pre_privacidad_falta') });
   const ya = await pool.query(
     `SELECT 1 FROM conductores WHERE LOWER(email) = $1
-     UNION ALL SELECT 1 FROM choferes_prerregistro WHERE LOWER(email) = $1 AND estado <> 'descartado' LIMIT 1`, [email]);
+     UNION ALL SELECT 1 FROM choferes_prerregistro WHERE LOWER(email) = $1 AND estado NOT IN ('descartado','chofer_eliminado') LIMIT 1`, [email]);
   if (ya.rows.length) return res.status(400).json({ error: txt('pre_ya_existe') });
   await pool.query(
     `INSERT INTO choferes_prerregistro (nombre, email, telefono, isla, municipio, numero_licencia, privacidad_aceptada_en)
