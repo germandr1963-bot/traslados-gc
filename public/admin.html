@@ -3209,7 +3209,7 @@ function cargarConductores() {
         '<td>' +
           '<button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;margin-right:4px" onclick="verFichaConductor(' + c.id + ')">📋 Ficha</button>' +
           '<button class="boton-secundario" style="padding:6px 10px;font-size:0.8rem;margin-right:4px" onclick="editarNombreConductor(' + c.id + ', \'' + escapar(c.nombre).replace(/'/g, "\\'") + '\')">✏️</button>' +
-          (c.estado !== 'aprobado' ? '<button class="boton-peligro" style="padding:6px 10px;font-size:0.8rem" onclick="eliminarConductor(' + c.id + ')">🗑️</button>' : '') + '<br>' +
+          (c.estado !== 'aprobado' ? '<button class="boton-peligro" style="padding:6px 10px;font-size:0.8rem" onclick="eliminarConductor(' + c.id + ')">🗑️ Eliminar</button>' : '') + '<br>' +
           (c.estado !== 'aprobado' ? '<button class="boton-costa" style="margin-top:6px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'aprobado\')">Aprobar</button>' : '') +
           (c.estado !== 'suspendido' && c.estado !== 'baja' ? '<button class="boton-peligro" style="margin-top:6px;padding:6px 12px;font-size:0.8rem" onclick="cambiarEstadoConductor(' + c.id + ', \'suspendido\')">Suspender</button>' : '') +
           ((c.estado === 'aprobado' || c.estado === 'suspendido') ? '<button class="boton-peligro" style="margin-top:6px;margin-left:4px;padding:6px 12px;font-size:0.8rem;background:#C0392B;color:#fff" onclick="darDeBajaConductor(' + c.id + ')">Dar de baja</button>' : '') +
