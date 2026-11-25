@@ -3348,12 +3348,17 @@ function eliminarPrerregistro(id) {
 }
 
 function cambiarEstadoConductor(id, estado) {
+  if (estado === 'suspendido') {
+    var cs = conductoresCache.find(function (x) { return x.id === id; });
+    if (!confirm('¿Suspender a ' + (cs ? cs.nombre : '') + '? Dejará de entrar y de recibir avisos hasta que lo vuelvas a aprobar.')) return;
+  }
   fetch('/admin/conductores/' + id + '/estado', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ estado: estado })
   }).then(function (r) { return r.json(); }).then(function (d) {
     // (24/11/2026) Alta manual: no se aprueba a un chofer que no ha aceptado los documentos
+    if (d && d.error === 'viajes_pendientes') { mostrarViajesPendientesBaja(d); return; }
     if (d && d.error) { alert(d.error); }
     cargarConductores();
   });
@@ -3386,10 +3391,10 @@ function mostrarViajesPendientesBaja(d) {
   caja.id = 'ventana-baja-pendientes';
   caja.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
   caja.innerHTML = '<div style="background:#fff;border-radius:10px;max-width:640px;width:100%;max-height:85vh;overflow:auto;padding:22px">' +
-    '<p style="margin:0 0 10px"><strong>⚠️ No se puede dar de baja a ' + escapar(d.nombre) + ': tiene viajes pendientes.</strong></p>' +
+    '<p style="margin:0 0 10px"><strong>⚠️ No se puede ' + (d.accion === 'suspendido' ? 'suspender' : 'dar de baja') + ' a ' + escapar(d.nombre) + ': tiene viajes pendientes.</strong></p>' +
     '<p style="margin:0 0 6px">Reasigna primero estas reservas a otro chofer:</p>' +
     '<ul style="padding-left:18px;margin:0 0 12px">' + filas + '</ul>' +
-    '<p style="margin:0 0 14px">Cuando ya no le quede ninguna, podrás darlo de baja.</p>' +
+    '<p style="margin:0 0 14px">Cuando ya no le quede ninguna, podrás ' + (d.accion === 'suspendido' ? 'suspenderlo' : 'darlo de baja') + '.</p>' +
     '<button class="boton-secundario" onclick="document.getElementById(\'ventana-baja-pendientes\').remove()">Cerrar</button>' +
     '</div>';
   document.body.appendChild(caja);
