@@ -11177,7 +11177,7 @@ function abrirDetalleReserva(id, sinScroll) {
         contenedorEstado.appendChild(btn);
       });
 
-      cargarConductoresEnDetalle(r.conductor_id, r.conductor_nombre, r.reasignacion);
+      cargarConductoresEnDetalle(r.conductor_id, r.conductor_nombre, r.reasignacion, r.id);
       rellenarCamposEdicion(r);
 
       // Rellenar campos de edición
@@ -11626,7 +11626,11 @@ function cambiarEstadoReserva(id, nuevoEstado) {
   });
 }
 
-function cargarConductoresEnDetalle(conductorActualId, conductorNombre, reasignacion) {
+// (26/11/2026) Notas de debajo de «Guardar y confirmar»: primera asignación y reserva buscando chofer nuevo
+var NOTA_PRIMERA_ASIGNACION = '📧 Al guardar se enviará automáticamente el email de confirmación con el enlace de pago al cliente.';
+var NOTA_REASIGNACION = '🔄 Al guardar se avisará al chofer nuevo (con el cartel), al cliente (con el voucher actualizado si ya pagó) y a los choferes avisados (ya asignada a otro compañero). No se envía un enlace de pago nuevo.';
+
+function cargarConductoresEnDetalle(conductorActualId, conductorNombre, reasignacion, reservaId) {
   // Si ya hay chofer asignado, mostrar bloqueado
   var boxAsignado = document.getElementById('chofer-asignado-box');
   var boxSelector = document.getElementById('chofer-selector-box');
@@ -11641,9 +11645,11 @@ function cargarConductoresEnDetalle(conductorActualId, conductorNombre, reasigna
       ? '🔄 <strong>Buscando chofer nuevo.</strong> ' + quien + desde + ' Avisados: ' + reasignacion.avisados + ' ' + (reasignacion.avisados === 1 ? 'chofer' : 'choferes') + '. Sin respuesta todavía.'
       : '⚠️ <strong>Ningún chofer cumple esta reserva</strong> (categoría, plazas y extras). ' + quien + desde + ' Asígnalo a mano.';
     boxReas.style.display = 'block';
+    if (notaEmail) notaEmail.textContent = NOTA_REASIGNACION;
   } else {
     boxReas.style.display = 'none';
     boxReas.innerHTML = '';
+    if (notaEmail) notaEmail.textContent = NOTA_PRIMERA_ASIGNACION;
   }
 
   if (conductorActualId) {
@@ -11660,10 +11666,21 @@ function cargarConductoresEnDetalle(conductorActualId, conductorNombre, reasigna
     if (motivoBox) motivoBox.style.display = 'none';
   }
 
-  fetch('/admin/conductores-aprobados')
+  // (26/11/2026) Con la reserva, la lista sale ordenada en grupos: su categoría y otras superiores que cumplen
+  fetch('/admin/conductores-aprobados' + (reservaId ? '?reserva=' + reservaId : ''))
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var sel = document.getElementById('select-chofer-detalle');
+      if (data.grupos) {
+        sel.innerHTML = '<option value="">— Sin asignar —</option>' +
+          data.grupos.map(function(g) {
+            return '<optgroup label="' + escapar(g.etiqueta) + '">' + g.conductores.map(function(c) {
+              var selected = conductorActualId && c.id === conductorActualId ? ' selected' : '';
+              return '<option value="' + c.id + '"' + selected + '>' + escapar(c.categoria_nombre + ' · ' + c.nombre + ' · ' + (c.telefono || '')) + '</option>';
+            }).join('') + '</optgroup>';
+          }).join('');
+        return;
+      }
       sel.innerHTML = '<option value="">— Sin asignar —</option>' +
         data.conductores.map(function(c) {
           var selected = conductorActualId && c.id === conductorActualId ? ' selected' : '';
@@ -11695,15 +11712,23 @@ function guardarChoferReserva() {
     if (causa === 'Otra' && !motivo) { av.innerHTML = '<span style="color:#e07b5a;">❌ Escribe el detalle de la causa.</span>'; return; }
     motivo = causa + (motivo ? ' — ' + motivo : '');
   }
+  // (26/11/2026) Reserva buscando chofer nuevo: elegir un chofer es un cambio de chofer, no una primera confirmación
+  var esReasignacion = document.getElementById('reasignacion-box').style.display === 'block';
   av.style.display = 'block';
-  av.innerHTML = '<span style="color:#888;">' + (esCambio && conductorId ? 'Cambiando el chofer y enviando los avisos...' : 'Guardando y enviando confirmación al cliente...') + '</span>';
+  av.innerHTML = '<span style="color:#888;">' + (esReasignacion && conductorId ? 'Asignando el chofer y enviando los avisos...' : (esCambio && conductorId ? 'Cambiando el chofer y enviando los avisos...' : 'Guardando y enviando confirmación al cliente...')) + '</span>';
 
   fetch('/admin/reservas/' + reservaDetalleId + '/chofer', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conductor_id: conductorId ? Number(conductorId) : null, motivo: motivo })
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d && d.error) { av.innerHTML = '<span style="color:#e07b5a;">❌ ' + d.error + '</span>'; return; }
-    av.innerHTML = '<span style="color:#2d7a4f;">' + (d && d.reasignado
+    if (d && d.reasignacion_manual) {
+      document.getElementById('reasignacion-box').style.display = 'none';
+      var notaR = document.getElementById('nota-email-auto'); if (notaR) notaR.textContent = NOTA_PRIMERA_ASIGNACION;
+    }
+    av.innerHTML = '<span style="color:#2d7a4f;">' + (d && d.reasignacion_manual
+      ? '✔ Chofer asignado. Avisos enviados al chofer nuevo, al cliente y a los choferes avisados.'
+      : d && d.reasignado
       ? '✔ Chofer cambiado. Avisos enviados al chofer anterior, al nuevo y al cliente.'
       : (d && d.sin_cambios ? 'Es el mismo chofer: no se ha cambiado nada.' : '✔ Chofer asignado. Email de confirmación enviado al cliente.')) + '</span>';
     if (motivoInput) motivoInput.value = '';
