@@ -9581,11 +9581,17 @@ function abrirOficina(id) {
     fetch('/admin/equipo').then(function (r) { return r.json(); })
   ]).then(function (res) {
     oficinaFicha._islas = (res[0] && res[0].islas) || [];
-    // Personas de Equipo (sin los choferes): las activas y, si alguna marcada ya no lo está, también, para poder quitarla
+    // Solo las personas del departamento de guardia de Equipo (el que empieza por «Guardia», p. ej. «Guardia Operativa»),
+    // igual que los avisos del alta van al departamento «Alta Choferes». Las activas y, si alguna marcada ya no está
+    // activa o ya no es de ese departamento, también, para poder quitarla.
     var marcadas = oficinaFicha.guardia_personas || [];
-    oficinaFicha._personas = (Array.isArray(res[1]) ? res[1] : []).filter(function (p) {
-      return !p.es_chofer && (p.estado === 'activo' || marcadas.indexOf(p.id) !== -1);
-    });
+    var esGuardia = function (p) { return String(p.departamento || '').trim().toLowerCase().indexOf('guardia') === 0; };
+    var todas = (Array.isArray(res[1]) ? res[1] : []).filter(function (p) { return !p.es_chofer; });
+    var dep = todas.filter(esGuardia)[0];
+    oficinaFicha._depGuardia = dep ? dep.departamento : 'Guardia Operativa';
+    oficinaFicha._personas = todas.filter(function (p) {
+      return (esGuardia(p) && p.estado === 'activo') || marcadas.indexOf(p.id) !== -1;
+    }).map(function (p) { p._fuera = !esGuardia(p); return p; });
     pintarFichaOficina();
     cargarLugaresOficina(false);
     if (oficinaFicha.id) cargarFestivosOficina();
@@ -9630,25 +9636,17 @@ function pintarFichaOficina() {
     return '<label style="font-size:0.85rem;white-space:nowrap;margin-right:0.9rem;display:inline-block;"><input type="checkbox" class="ofi-isla" value="' + i.id + '" ' +
       ((o.islas || []).indexOf(i.id) !== -1 ? 'checked' : '') + '> ' + escapar(i.nombre) + '</label>';
   }).join('') : '<span style="color:#999;font-size:0.85rem;">No hay islas en «Islas / Localidades».</span>';
-  // Personas de guardia: casillas agrupadas por departamento de Equipo
-  var grupos = [], porDep = {};
-  o._personas.forEach(function (p) {
-    var dep = p.departamento || 'Sin departamento';
-    if (!porDep[dep]) { porDep[dep] = []; grupos.push(dep); }
-    porDep[dep].push(p);
-  });
-  var guardiaHtml = grupos.length ? grupos.map(function (dep, i) {
-    return '<div style="font-weight:600;font-size:0.85rem;margin:' + (i ? '10px' : '2px') + ' 0 4px;">' + escapar(dep) + '</div>' +
-      porDep[dep].map(function (p) {
+  // Personas de guardia: casillas con las personas del departamento de guardia de Equipo
+  var guardiaHtml = o._personas.length ? o._personas.map(function (p) {
         var avisos = [];
+        if (p._fuera) avisos.push('ya no está en «' + o._depGuardia + '»');
         if (p.estado !== 'activo') avisos.push('no activa');
         if (!String(p.telefono || '').trim()) avisos.push('sin teléfono (no recibirá WhatsApp)');
         if (!String(p.email || '').trim()) avisos.push('sin email (no recibirá email)');
         return '<label style="display:block;font-size:0.85rem;margin:3px 0;"><input type="checkbox" class="ofi-guardia" value="' + p.id + '" ' +
           ((o.guardia_personas || []).indexOf(p.id) !== -1 ? 'checked' : '') + '> ' + escapar(p.nombre) +
           (avisos.length ? ' <span style="color:#c0392b;font-size:0.78rem;">· ' + avisos.join(' · ') + '</span>' : '') + '</label>';
-      }).join('');
-  }).join('') : '<span style="color:#999;font-size:0.85rem;">No hay personas en Equipo.</span>';
+  }).join('') : '<span style="color:#c0392b;font-size:0.85rem;">No hay nadie en el departamento «' + escapar(o._depGuardia) + '». Añádelo en el menú de la izquierda «Equipo».</span>';
   var anioHoy = new Date().getFullYear();
   var anios = [anioHoy, anioHoy + 1, anioHoy + 2].map(function (a) {
     return '<option value="' + a + '" ' + (a === oficinaAnioFestivos ? 'selected' : '') + '>' + a + '</option>';
@@ -9666,7 +9664,7 @@ function pintarFichaOficina() {
       '<div style="grid-column:1/-1;"><label class="etiqueta">Islas que atiende</label><div>' + islasHtml + '</div></div>' +
       '<div style="grid-column:1/-1;"><label class="etiqueta">Personas de guardia (reciben los avisos fuera de horario por WhatsApp y email)</label>' +
         '<div style="border:1px solid #e3d6c6;border-radius:8px;padding:10px 14px;background:#fff;">' + guardiaHtml + '</div>' +
-        '<div style="font-size:0.8rem;color:#666;margin-top:6px;">Solo salen las personas activas de Equipo (los choferes no).</div></div>' +
+        '<div style="font-size:0.8rem;color:#666;margin-top:6px;">Salen las personas activas del departamento «' + escapar(o._depGuardia) + '» de Equipo. Marca las que hacen la guardia de esta oficina.</div></div>' +
     '</div>' +
     '<h3 style="font-size:0.95rem;margin:1rem 0 0.5rem;">🕐 Horario</h3>' +
     '<div class="tabla-envoltura"><table class="tabla-admin" style="width:100%;font-size:0.85rem;"><thead><tr><th style="text-align:left;">Día</th><th>Abierta</th><th style="text-align:left;">Tramo 1</th><th style="text-align:left;">Tramo 2</th></tr></thead>' +
