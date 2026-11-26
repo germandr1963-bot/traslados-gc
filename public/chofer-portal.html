@@ -104,6 +104,12 @@
         <label for="chk-disponible-hoy" style="margin:0;font-size:14px;font-weight:600;cursor:pointer">Disponible hoy</label>
       </div>
 
+      <!-- (26/11/2026) El chofer decide si acepta viajes de categorías inferiores a la suya (segunda ronda de avisos) -->
+      <div class="tarjeta" id="tarjeta-acepta-inferiores" style="display:flex;align-items:center;gap:10px;padding:14px 16px">
+        <input type="checkbox" id="chk-acepta-inferiores" onchange="cambiarAceptaInferiores(this.checked)" style="width:18px;height:18px">
+        <label for="chk-acepta-inferiores" style="margin:0;font-size:14px;font-weight:600;cursor:pointer">Acepto viajes de categorías inferiores</label>
+      </div>
+
       <div class="tarjeta" id="ficha-vehiculo"></div>
 
       <div class="reserva-card" id="tarjeta-mi-perfil">
@@ -178,6 +184,17 @@
       });
     }
 
+    // (26/11/2026) «Acepto viajes de categorías inferiores» (igual que «Disponible hoy»)
+    function cambiarAceptaInferiores(acepta) {
+      fetch('/chofer/acepta-inferiores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acepta_inferiores: acepta })
+      }).catch(function() {
+        alert('No se pudo guardar el cambio. Comprueba tu conexión e inténtalo de nuevo.');
+      });
+    }
+
     async function mostrarPanel() {
       const r = await fetch('/chofer/me');
       if (!r.ok) { window.location.href = '/chofer/acceso'; return; }
@@ -187,11 +204,13 @@
         '<span class="etiqueta ' + conductor.estado + '">' + conductor.estado.toUpperCase() + '</span> ' +
         TEXTOS_ESTADO[conductor.estado];
       document.getElementById('chk-disponible-hoy').checked = conductor.disponible_hoy !== false;
+      document.getElementById('chk-acepta-inferiores').checked = conductor.acepta_inferiores === true;
       // (26/11/2026) Chofer «Externo»: solo ve sus viajes asignados (sin «Disponible hoy» ni «🧩 Mis extras»).
       // No se borra nada: si pasa a «Flota propia», le vuelve a salir todo.
       if (conductor.tipo === 'externo') {
         window.choferExterno = true;
         document.getElementById('tarjeta-disponible-hoy').style.display = 'none';
+        document.getElementById('tarjeta-acepta-inferiores').style.display = 'none';
         document.getElementById('tarjeta-mis-extras').style.display = 'none';
         document.getElementById('aviso-extras-pendientes').style.display = 'none';
       }

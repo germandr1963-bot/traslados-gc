@@ -3218,6 +3218,8 @@ function cargarConductores() {
           (c.estado === 'baja' ? '<span class="insignia" style="background:#4a4a4a;color:#fff">DE BAJA</span>' : '<span class="insignia ' + (c.estado === 'aprobado' ? 'insignia-ok' : (c.estado === 'suspendido' ? 'insignia-suspendido' : 'insignia-pendiente')) + '">' + c.estado.toUpperCase() + '</span>') +
           (c.cambios_pendientes ? '<br><span class="insignia" style="background:#e65100;color:#fff;margin-top:4px;display:inline-block">🕐 Cambios pendientes</span>' : '') +
           (c.estado === 'aprobado' ? ('<br><span class="insignia ' + (c.disponible_hoy !== false ? 'insignia-ok' : 'insignia-pendiente') + '" style="margin-top:4px;display:inline-block">' + (c.disponible_hoy !== false ? '🟢 Disponible hoy' : '⚪ No disponible hoy') + '</span>') : '') +
+          // (26/11/2026) Lo marca el chofer en su portal
+          (c.estado === 'aprobado' && c.acepta_inferiores === true && c.tipo !== 'externo' ? '<br><span class="insignia insignia-ok" style="margin-top:4px;display:inline-block">⬇️ Acepta categorías inferiores</span>' : '') +
         '</td>' +
         '<td>' +
           '<button class="boton-costa" style="padding:6px 10px;font-size:0.8rem;margin-right:4px" onclick="verFichaConductor(' + c.id + ')">📋 Ficha</button>' +
