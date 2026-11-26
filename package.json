@@ -13,6 +13,7 @@
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.11.0",
     "connect-pg-simple": "^9.0.1",
+    "date-holidays": "^3.39.2",
     "docx": "^9.0.0",
     "ejs": "^3.1.10",
     "exceljs": "^4.4.0",

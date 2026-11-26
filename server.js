@@ -967,6 +967,56 @@ async function initSchema() {
     await pool.query(`INSERT INTO migraciones_datos (clave) VALUES ('equipo_departamentos_20261009') ON CONFLICT DO NOTHING`);
   }
 
+  // (26/11/2026) OFICINAS (uso interno, Admin → Contacto → «🏢 Oficinas (uso interno)»): lugar, zona horaria,
+  // islas que atiende, horario (hasta 2 tramos por día), festivos por año y departamento de Equipo de guardia.
+  // El sistema las usará para saber si la oficina está abierta (avisos fuera de horario).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS oficinas (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      pais TEXT, region TEXT, subregion TEXT, municipio TEXT,
+      zona_horaria TEXT,
+      islas INT[] DEFAULT '{}',
+      guardia_departamento_id INT REFERENCES equipo_departamentos(id) ON DELETE SET NULL,
+      horario JSONB DEFAULT '{}'::jsonb,
+      orden INT DEFAULT 0,
+      creado_en TIMESTAMP DEFAULT NOW()
+    )`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS oficinas_festivos (
+      id SERIAL PRIMARY KEY,
+      oficina_id INT NOT NULL REFERENCES oficinas(id) ON DELETE CASCADE,
+      fecha DATE NOT NULL,
+      nombre TEXT NOT NULL,
+      tipo TEXT,
+      origen TEXT DEFAULT 'manual',
+      creado_en TIMESTAMP DEFAULT NOW(),
+      UNIQUE (oficina_id, fecha)
+    )`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS oficinas_festivos_revision (
+      oficina_id INT NOT NULL REFERENCES oficinas(id) ON DELETE CASCADE,
+      anio INT NOT NULL,
+      revisado_en TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (oficina_id, anio)
+    )`);
+  // Oficina de partida (una sola vez): Las Palmas de Gran Canaria, que atiende Gran Canaria, sin horario
+  // (lo pone el Admin) y con la guardia en el departamento de Equipo que empiece por «Guardia», si existe.
+  const _ofiHecho = await pool.query(`SELECT 1 FROM migraciones_datos WHERE clave = 'oficina_inicial_20261126'`);
+  if (!_ofiHecho.rows.length) {
+    const _ofiHay = await pool.query('SELECT COUNT(*)::int AS n FROM oficinas');
+    if (!_ofiHay.rows[0].n) {
+      const _gc = await pool.query(`SELECT id FROM islas WHERE slug = 'gran-canaria' LIMIT 1`);
+      const _gd = await pool.query(`SELECT id FROM equipo_departamentos WHERE LOWER(TRIM(nombre)) LIKE 'guardia%' AND NOT es_choferes ORDER BY id LIMIT 1`);
+      await pool.query(
+        `INSERT INTO oficinas (nombre, pais, region, subregion, municipio, zona_horaria, islas, guardia_departamento_id, horario)
+         VALUES ('Oficina Las Palmas de Gran Canaria', 'ES', 'CN', 'GC', 'Las Palmas de Gran Canaria', 'Atlantic/Canary', $1, $2, '{}'::jsonb)`,
+        [_gc.rows.length ? [_gc.rows[0].id] : [], _gd.rows.length ? _gd.rows[0].id : null]
+      );
+    }
+    await pool.query(`INSERT INTO migraciones_datos (clave) VALUES ('oficina_inicial_20261126') ON CONFLICT DO NOTHING`);
+  }
+
   // Columna activo en route_seo_settings: controla si la página
   // de esa ruta en ese idioma está visible en internet o no.
   await pool.query(`
@@ -19739,6 +19789,280 @@ app.get('/og-imagen/:tipo', asyncHandler(async (req, res) => {
 app.get('/admin/contacto-info', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query('SELECT * FROM configuracion_contacto WHERE id = 1');
   res.json(result.rows[0] || {});
+}));
+
+// ─── (26/11/2026) OFICINAS (uso interno): horario, festivos y guardia ─────────────────────────────
+// Admin → Contacto → «🏢 Oficinas (uso interno)». Los festivos nacionales, de la comunidad y de la isla o
+// provincia los da la librería date-holidays (dentro del servidor, sin servicios de fuera); los locales se
+// añaden a mano. La fuente oficial es el boletín de cada comunidad: cada año se revisa la lista.
+const DIAS_OFICINA = ['1', '2', '3', '4', '5', '6', '7']; // 1 = lunes … 7 = domingo
+const NOMBRES_DIA_OFICINA = { 1: 'lunes', 2: 'martes', 3: 'miércoles', 4: 'jueves', 5: 'viernes', 6: 'sábado', 7: 'domingo' };
+
+// La librería se carga al usarla: si faltara, el resto de la web sigue funcionando.
+let _LibFestivos = null;
+function libreriaFestivos() {
+  if (_LibFestivos) return _LibFestivos;
+  try { _LibFestivos = require('date-holidays'); } catch (e) { _LibFestivos = null; }
+  return _LibFestivos;
+}
+function zonasHorariasValidas() {
+  try { return Intl.supportedValuesOf('timeZone'); } catch (e) { return [ZONA_HORARIA]; }
+}
+function esZonaValida(z) {
+  if (!z) return false;
+  try { new Intl.DateTimeFormat('en-US', { timeZone: z }); return true; } catch (e) { return false; }
+}
+// Fecha (AAAA-MM-DD), día de la semana (1–7) y minutos del día en una zona horaria
+function ahoraEnZona(zona, instante) {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: zona, hourCycle: 'h23', weekday: 'short',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+  }).formatToParts(instante || new Date());
+  const v = {}; partes.forEach(function (p) { v[p.type] = p.value; });
+  const dias = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  return { ymd: v.year + '-' + v.month + '-' + v.day, dia: dias[v.weekday], minutos: (+v.hour) * 60 + (+v.minute) };
+}
+function minutosHora(hhmm) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '').trim());
+  if (!m) return null;
+  const h = +m[1], mi = +m[2];
+  if (h > 23 || mi > 59) return null;
+  return h * 60 + mi;
+}
+function sumarDiasYmd(ymd, n) {
+  const f = ymd.split('-').map(Number);
+  const d = new Date(Date.UTC(f[0], f[1] - 1, f[2] + n));
+  return d.toISOString().slice(0, 10);
+}
+function diaSemanaYmd(ymd) { const f = ymd.split('-').map(Number); const w = new Date(Date.UTC(f[0], f[1] - 1, f[2])).getUTCDay(); return w === 0 ? 7 : w; }
+function ddmm(ymd) { const f = ymd.split('-'); return f[2] + '/' + f[1]; }
+
+// Horario limpio: { "1": [["09:00","14:00"],["16:00","19:00"]], …, "7": [] }. Devuelve { horario } o { error }.
+function limpiarHorarioOficina(h) {
+  const salida = {};
+  for (const d of DIAS_OFICINA) {
+    const tramos = Array.isArray(h && h[d]) ? h[d] : [];
+    if (tramos.length > 2) return { error: 'Como máximo dos tramos por día (' + NOMBRES_DIA_OFICINA[d] + ').' };
+    const limpios = [];
+    for (const t of tramos) {
+      const a = minutosHora(t && t[0]), b = minutosHora(t && t[1]);
+      if (a === null || b === null) return { error: 'Revisa las horas del ' + NOMBRES_DIA_OFICINA[d] + ' (formato 09:00).' };
+      if (b <= a) return { error: 'El ' + NOMBRES_DIA_OFICINA[d] + ': la hora de cierre tiene que ser después de la de apertura.' };
+      limpios.push([String(t[0]).trim().padStart(5, '0'), String(t[1]).trim().padStart(5, '0')]);
+    }
+    if (limpios.length === 2 && minutosHora(limpios[1][0]) < minutosHora(limpios[0][1])) {
+      return { error: 'El ' + NOMBRES_DIA_OFICINA[d] + ': el segundo tramo tiene que empezar después de que termine el primero.' };
+    }
+    salida[d] = limpios;
+  }
+  return { horario: salida };
+}
+
+// ¿Está abierta la oficina en este instante? Devuelve { abierta, texto } («Abierta · cierra a las 14:00»,
+// «Cerrada · abre mañana a las 09:00»…). festivos = Set de 'AAAA-MM-DD' (días con la oficina cerrada).
+function estadoOficina(oficina, festivos, instante) {
+  const zona = esZonaValida(oficina.zona_horaria) ? oficina.zona_horaria : ZONA_HORARIA;
+  const h = oficina.horario || {};
+  const ahora = ahoraEnZona(zona, instante);
+  const tramosDe = function (ymd) {
+    if (festivos && festivos.has(ymd)) return [];
+    return (h[String(diaSemanaYmd(ymd))] || []).map(function (t) { return [minutosHora(t[0]), minutosHora(t[1]), t[0], t[1]]; })
+      .filter(function (t) { return t[0] !== null && t[1] !== null; });
+  };
+  const hoy = tramosDe(ahora.ymd);
+  for (const t of hoy) {
+    if (ahora.minutos >= t[0] && ahora.minutos < t[1]) return { abierta: true, texto: 'Abierta · cierra a las ' + t[3] };
+  }
+  const motivo = (festivos && festivos.has(ahora.ymd)) ? ' (hoy es festivo)' : '';
+  for (const t of hoy) {
+    if (t[0] > ahora.minutos) return { abierta: false, texto: 'Cerrada' + motivo + ' · abre hoy a las ' + t[2] };
+  }
+  for (let n = 1; n <= 21; n++) {
+    const ymd = sumarDiasYmd(ahora.ymd, n);
+    const tr = tramosDe(ymd);
+    if (tr.length) {
+      const cuando = n === 1 ? 'mañana' : ('el ' + NOMBRES_DIA_OFICINA[diaSemanaYmd(ymd)] + ' ' + ddmm(ymd));
+      return { abierta: false, texto: 'Cerrada' + motivo + ' · abre ' + cuando + ' a las ' + tr[0][2] };
+    }
+  }
+  return { abierta: false, texto: 'Cerrada · sin horario' };
+}
+
+async function festivosOficinaSet(oficinaId) {
+  const q = await pool.query(
+    `SELECT to_char(fecha, 'YYYY-MM-DD') AS f FROM oficinas_festivos
+     WHERE oficina_id = $1 AND fecha BETWEEN CURRENT_DATE - 2 AND CURRENT_DATE + 30`, [oficinaId]);
+  return new Set(q.rows.map(function (r) { return r.f; }));
+}
+
+// Lista de oficinas, con su estado de ahora y el de sus festivos del año actual y del siguiente
+app.get('/admin/oficinas', requireAdmin, asyncHandler(async (req, res) => {
+  const q = await pool.query(
+    `SELECT o.*, d.nombre AS guardia_nombre FROM oficinas o
+     LEFT JOIN equipo_departamentos d ON d.id = o.guardia_departamento_id
+     ORDER BY o.orden, o.id`);
+  const islas = await pool.query('SELECT id, nombre FROM islas ORDER BY orden, nombre');
+  const nombreIsla = {}; islas.rows.forEach(function (i) { nombreIsla[i.id] = i.nombre; });
+  const anioActual = +hoyCanarias().slice(0, 4);
+  for (const o of q.rows) {
+    o.islas_nombres = (o.islas || []).map(function (id) { return nombreIsla[id]; }).filter(Boolean);
+    o.estado = estadoOficina(o, await festivosOficinaSet(o.id));
+    o.festivos_anios = [];
+    for (const anio of [anioActual, anioActual + 1]) {
+      const c = await pool.query(
+        `SELECT (SELECT COUNT(*)::int FROM oficinas_festivos WHERE oficina_id = $1 AND EXTRACT(YEAR FROM fecha) = $2) AS n,
+                EXISTS (SELECT 1 FROM oficinas_festivos_revision WHERE oficina_id = $1 AND anio = $2) AS revisado`, [o.id, anio]);
+      const r = c.rows[0];
+      o.festivos_anios.push({ anio: anio, estado: r.revisado ? 'revisado' : (r.n ? 'cargado' : 'vacio'), n: r.n });
+    }
+  }
+  res.json({ oficinas: q.rows });
+}));
+
+// Países, comunidades e islas o provincias (de la librería de festivos) y zonas horarias
+app.get('/admin/oficinas/lugares', requireAdmin, asyncHandler(async (req, res) => {
+  const Lib = libreriaFestivos();
+  const pais = String(req.query.pais || '').trim();
+  const region = String(req.query.region || '').trim();
+  const subregion = String(req.query.subregion || '').trim();
+  const salida = { libreria: !!Lib, paises: {}, regiones: {}, subregiones: {}, zona_sugerida: null, zonas: zonasHorariasValidas() };
+  if (!Lib) return res.json(salida);
+  const hd = new Lib();
+  salida.paises = hd.getCountries('es') || {};
+  if (pais) salida.regiones = hd.getStates(pais, 'es') || {};
+  if (pais && region) salida.subregiones = hd.getRegions(pais, region, 'es') || {};
+  try {
+    const h = new Lib();
+    if (pais) h.init(pais, region || undefined, subregion || undefined);
+    const z = pais ? h.getTimezones() : [];
+    salida.zona_sugerida = (z && z.length) ? z[0] : null;
+  } catch (e) { salida.zona_sugerida = null; }
+  res.json(salida);
+}));
+
+async function datosOficinaDesdeBody(b) {
+  const nombre = String((b && b.nombre) || '').trim().slice(0, 120);
+  if (!nombre) return { error: 'Escribe el nombre de la oficina.' };
+  const zona = String((b && b.zona_horaria) || '').trim();
+  if (!esZonaValida(zona)) return { error: 'Elige la zona horaria de la oficina.' };
+  const hz = limpiarHorarioOficina((b && b.horario) || {});
+  if (hz.error) return { error: hz.error };
+  const islas = (Array.isArray(b && b.islas) ? b.islas : []).map(Number).filter(function (n) { return Number.isInteger(n) && n > 0; });
+  const guardia = parseInt(b && b.guardia_departamento_id, 10) || null;
+  return {
+    nombre: nombre,
+    pais: String((b && b.pais) || '').trim().slice(0, 10) || null,
+    region: String((b && b.region) || '').trim().slice(0, 20) || null,
+    subregion: String((b && b.subregion) || '').trim().slice(0, 20) || null,
+    municipio: String((b && b.municipio) || '').trim().slice(0, 120) || null,
+    zona_horaria: zona, islas: islas, guardia_departamento_id: guardia, horario: hz.horario
+  };
+}
+
+app.post('/admin/oficinas', requireAdmin, asyncHandler(async (req, res) => {
+  const d = await datosOficinaDesdeBody(req.body);
+  if (d.error) return res.status(400).json({ error: d.error });
+  const r = await pool.query(
+    `INSERT INTO oficinas (nombre, pais, region, subregion, municipio, zona_horaria, islas, guardia_departamento_id, horario, orden)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, (SELECT COALESCE(MAX(orden), 0) + 1 FROM oficinas)) RETURNING id`,
+    [d.nombre, d.pais, d.region, d.subregion, d.municipio, d.zona_horaria, d.islas, d.guardia_departamento_id, JSON.stringify(d.horario)]);
+  res.json({ ok: true, id: r.rows[0].id });
+}));
+
+app.put('/admin/oficinas/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const d = await datosOficinaDesdeBody(req.body);
+  if (d.error) return res.status(400).json({ error: d.error });
+  const r = await pool.query(
+    `UPDATE oficinas SET nombre = $1, pais = $2, region = $3, subregion = $4, municipio = $5, zona_horaria = $6,
+       islas = $7, guardia_departamento_id = $8, horario = $9 WHERE id = $10 RETURNING id`,
+    [d.nombre, d.pais, d.region, d.subregion, d.municipio, d.zona_horaria, d.islas, d.guardia_departamento_id, JSON.stringify(d.horario), req.params.id]);
+  if (!r.rows.length) return res.status(404).json({ error: 'Oficina no encontrada.' });
+  res.json({ ok: true });
+}));
+
+app.delete('/admin/oficinas/:id', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query('DELETE FROM oficinas WHERE id = $1 RETURNING id', [req.params.id]);
+  if (!r.rows.length) return res.status(404).json({ error: 'Oficina no encontrada.' });
+  res.json({ ok: true });
+}));
+
+app.get('/admin/oficinas/:id/festivos', requireAdmin, asyncHandler(async (req, res) => {
+  const anio = parseInt(req.query.anio, 10);
+  if (!anio) return res.status(400).json({ error: 'Falta el año.' });
+  const f = await pool.query(
+    `SELECT id, to_char(fecha, 'YYYY-MM-DD') AS fecha, nombre, tipo, origen FROM oficinas_festivos
+     WHERE oficina_id = $1 AND EXTRACT(YEAR FROM fecha) = $2 ORDER BY fecha`, [req.params.id, anio]);
+  const rv = await pool.query('SELECT revisado_en FROM oficinas_festivos_revision WHERE oficina_id = $1 AND anio = $2', [req.params.id, anio]);
+  res.json({ festivos: f.rows, revisado: rv.rows.length ? rv.rows[0].revisado_en : null });
+}));
+
+// Carga los festivos del año según el lugar de la oficina. No toca los que ya están (ni los añadidos a mano).
+app.post('/admin/oficinas/:id/festivos/cargar', requireAdmin, asyncHandler(async (req, res) => {
+  const anio = parseInt(req.body && req.body.anio, 10);
+  if (!anio || anio < 2000 || anio > 2100) return res.status(400).json({ error: 'Año no válido.' });
+  const Lib = libreriaFestivos();
+  if (!Lib) return res.status(500).json({ error: 'Falta la librería de festivos en el servidor (date-holidays). Revisa que package.json esté subido.' });
+  const oq = await pool.query('SELECT * FROM oficinas WHERE id = $1', [req.params.id]);
+  if (!oq.rows.length) return res.status(404).json({ error: 'Oficina no encontrada.' });
+  const o = oq.rows[0];
+  if (!o.pais) return res.status(400).json({ error: 'Elige primero el país de la oficina y guarda.' });
+  const publicos = function (args) {
+    try {
+      const h = new Lib(args[0], args[1], args[2], { languages: ['es'] });
+      return (h.getHolidays(anio) || []).filter(function (x) { return x.type === 'public'; });
+    } catch (e) { return []; }
+  };
+  const clave = function (x) { return String(x.date).slice(0, 10); };
+  const delPais = new Set(publicos([o.pais]).map(clave));
+  const deRegion = o.region ? new Set(publicos([o.pais, o.region]).map(clave)) : new Set();
+  const todos = publicos([o.pais, o.region || undefined, o.subregion || undefined]);
+  const hd = new Lib();
+  const nombreRegion = o.region ? ((hd.getStates(o.pais, 'es') || {})[o.region] || o.region) : '';
+  const nombreSub = (o.region && o.subregion) ? ((hd.getRegions(o.pais, o.region, 'es') || {})[o.subregion] || o.subregion) : '';
+  let añadidos = 0;
+  for (const x of todos) {
+    const f = clave(x);
+    const tipo = delPais.has(f) ? 'Nacional' : (deRegion.has(f) ? nombreRegion : (nombreSub || nombreRegion || 'Regional'));
+    const ins = await pool.query(
+      `INSERT INTO oficinas_festivos (oficina_id, fecha, nombre, tipo, origen) VALUES ($1, $2, $3, $4, 'auto')
+       ON CONFLICT (oficina_id, fecha) DO NOTHING RETURNING id`, [o.id, f, String(x.name || '').slice(0, 150), tipo]);
+    if (ins.rows.length) añadidos++;
+  }
+  res.json({ ok: true, añadidos: añadidos, encontrados: todos.length });
+}));
+
+app.post('/admin/oficinas/:id/festivos', requireAdmin, asyncHandler(async (req, res) => {
+  const fecha = String((req.body && req.body.fecha) || '').trim();
+  const nombre = String((req.body && req.body.nombre) || '').trim().slice(0, 150);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return res.status(400).json({ error: 'Elige la fecha del festivo.' });
+  if (!nombre) return res.status(400).json({ error: 'Escribe el nombre del festivo.' });
+  const ex = await pool.query('SELECT 1 FROM oficinas WHERE id = $1', [req.params.id]);
+  if (!ex.rows.length) return res.status(404).json({ error: 'Oficina no encontrada.' });
+  const ins = await pool.query(
+    `INSERT INTO oficinas_festivos (oficina_id, fecha, nombre, tipo, origen) VALUES ($1, $2, $3, 'Local', 'manual')
+     ON CONFLICT (oficina_id, fecha) DO NOTHING RETURNING id`, [req.params.id, fecha, nombre]);
+  if (!ins.rows.length) return res.status(409).json({ error: 'Ese día ya está en la lista de festivos.' });
+  res.json({ ok: true });
+}));
+
+app.delete('/admin/oficinas/festivos/:fid', requireAdmin, asyncHandler(async (req, res) => {
+  const r = await pool.query('DELETE FROM oficinas_festivos WHERE id = $1 RETURNING id', [req.params.fid]);
+  if (!r.rows.length) return res.status(404).json({ error: 'Festivo no encontrado.' });
+  res.json({ ok: true });
+}));
+
+// Marca (o desmarca) los festivos de un año como revisados con el boletín oficial
+app.post('/admin/oficinas/:id/festivos/revisado', requireAdmin, asyncHandler(async (req, res) => {
+  const anio = parseInt(req.body && req.body.anio, 10);
+  if (!anio) return res.status(400).json({ error: 'Falta el año.' });
+  if (req.body && req.body.revisado === false) {
+    await pool.query('DELETE FROM oficinas_festivos_revision WHERE oficina_id = $1 AND anio = $2', [req.params.id, anio]);
+  } else {
+    await pool.query(
+      `INSERT INTO oficinas_festivos_revision (oficina_id, anio) VALUES ($1, $2)
+       ON CONFLICT (oficina_id, anio) DO UPDATE SET revisado_en = NOW()`, [req.params.id, anio]);
+  }
+  res.json({ ok: true });
 }));
 
 // (09/10/2026) Contactos Admin (interno, solo con sesión del Admin)
