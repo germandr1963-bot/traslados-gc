@@ -968,7 +968,7 @@ async function initSchema() {
   }
 
   // (26/11/2026) OFICINAS (uso interno, Admin → Contacto → «🏢 Oficinas (uso interno)»): lugar, zona horaria,
-  // islas que atiende, horario (hasta 2 tramos por día), festivos por año y departamento de Equipo de guardia.
+  // islas que atiende, horario (hasta 2 tramos por día), festivos por año y personas de Equipo de guardia.
   // El sistema las usará para saber si la oficina está abierta (avisos fuera de horario).
   await pool.query(`
     CREATE TABLE IF NOT EXISTS oficinas (
@@ -1000,21 +1000,35 @@ async function initSchema() {
       revisado_en TIMESTAMP DEFAULT NOW(),
       PRIMARY KEY (oficina_id, anio)
     )`);
+  // (26/11/2026) La guardia son PERSONAS de Equipo (una o varias, de cualquier departamento), no un departamento entero.
+  await pool.query(`ALTER TABLE oficinas ADD COLUMN IF NOT EXISTS guardia_personas INT[] DEFAULT '{}'`);
   // Oficina de partida (una sola vez): Las Palmas de Gran Canaria, que atiende Gran Canaria, sin horario
-  // (lo pone el Admin) y con la guardia en el departamento de Equipo que empiece por «Guardia», si existe.
+  // (lo pone el Admin) y con la guardia en las personas activas del departamento de Equipo que empiece por «Guardia», si existe.
   const _ofiHecho = await pool.query(`SELECT 1 FROM migraciones_datos WHERE clave = 'oficina_inicial_20261126'`);
   if (!_ofiHecho.rows.length) {
     const _ofiHay = await pool.query('SELECT COUNT(*)::int AS n FROM oficinas');
     if (!_ofiHay.rows[0].n) {
       const _gc = await pool.query(`SELECT id FROM islas WHERE slug = 'gran-canaria' LIMIT 1`);
-      const _gd = await pool.query(`SELECT id FROM equipo_departamentos WHERE LOWER(TRIM(nombre)) LIKE 'guardia%' AND NOT es_choferes ORDER BY id LIMIT 1`);
+      const _gp = await pool.query(
+        `SELECT p.id FROM equipo_personas p JOIN equipo_departamentos d ON d.id = p.departamento_id
+         WHERE LOWER(TRIM(d.nombre)) LIKE 'guardia%' AND NOT d.es_choferes AND p.estado = 'activo' ORDER BY p.id`);
       await pool.query(
-        `INSERT INTO oficinas (nombre, pais, region, subregion, municipio, zona_horaria, islas, guardia_departamento_id, horario)
+        `INSERT INTO oficinas (nombre, pais, region, subregion, municipio, zona_horaria, islas, guardia_personas, horario)
          VALUES ('Oficina Las Palmas de Gran Canaria', 'ES', 'CN', 'GC', 'Las Palmas de Gran Canaria', 'Atlantic/Canary', $1, $2, '{}'::jsonb)`,
-        [_gc.rows.length ? [_gc.rows[0].id] : [], _gd.rows.length ? _gd.rows[0].id : null]
+        [_gc.rows.length ? [_gc.rows[0].id] : [], _gp.rows.map(function (x) { return x.id; })]
       );
     }
     await pool.query(`INSERT INTO migraciones_datos (clave) VALUES ('oficina_inicial_20261126') ON CONFLICT DO NOTHING`);
+  }
+  // (26/11/2026) Una sola vez: las oficinas que tenían un departamento de guardia pasan a tener marcadas sus personas activas
+  const _gpHecho = await pool.query(`SELECT 1 FROM migraciones_datos WHERE clave = 'oficinas_guardia_personas_20261126'`);
+  if (!_gpHecho.rows.length) {
+    await pool.query(
+      `UPDATE oficinas o SET guardia_personas = COALESCE((
+         SELECT array_agg(p.id ORDER BY p.id) FROM equipo_personas p
+         WHERE p.departamento_id = o.guardia_departamento_id AND p.estado = 'activo'), '{}')
+       WHERE o.guardia_departamento_id IS NOT NULL AND COALESCE(cardinality(o.guardia_personas), 0) = 0`);
+    await pool.query(`INSERT INTO migraciones_datos (clave) VALUES ('oficinas_guardia_personas_20261126') ON CONFLICT DO NOTHING`);
   }
 
   // Columna activo en route_seo_settings: controla si la página
@@ -19898,14 +19912,20 @@ async function festivosOficinaSet(oficinaId) {
 // Lista de oficinas, con su estado de ahora y el de sus festivos del año actual y del siguiente
 app.get('/admin/oficinas', requireAdmin, asyncHandler(async (req, res) => {
   const q = await pool.query(
-    `SELECT o.*, d.nombre AS guardia_nombre FROM oficinas o
-     LEFT JOIN equipo_departamentos d ON d.id = o.guardia_departamento_id
-     ORDER BY o.orden, o.id`);
+    `SELECT o.* FROM oficinas o ORDER BY o.orden, o.id`);
+  const personas = await pool.query(
+    `SELECT p.id, p.nombre, p.estado, p.email, p.telefono FROM equipo_personas p`);
+  const persona = {}; personas.rows.forEach(function (p) { persona[p.id] = p; });
   const islas = await pool.query('SELECT id, nombre FROM islas ORDER BY orden, nombre');
   const nombreIsla = {}; islas.rows.forEach(function (i) { nombreIsla[i.id] = i.nombre; });
   const anioActual = +hoyCanarias().slice(0, 4);
   for (const o of q.rows) {
     o.islas_nombres = (o.islas || []).map(function (id) { return nombreIsla[id]; }).filter(Boolean);
+    // Personas de guardia, con aviso si ya no están activas o les falta el teléfono o el email
+    o.guardia = (o.guardia_personas || []).map(function (id) { return persona[id]; }).filter(Boolean).map(function (p) {
+      return { id: p.id, nombre: p.nombre, activa: p.estado === 'activo',
+               tiene_telefono: !!String(p.telefono || '').trim(), tiene_email: !!String(p.email || '').trim() };
+    });
     o.estado = estadoOficina(o, await festivosOficinaSet(o.id));
     o.festivos_anios = [];
     for (const anio of [anioActual, anioActual + 1]) {
@@ -19948,14 +19968,17 @@ async function datosOficinaDesdeBody(b) {
   const hz = limpiarHorarioOficina((b && b.horario) || {});
   if (hz.error) return { error: hz.error };
   const islas = (Array.isArray(b && b.islas) ? b.islas : []).map(Number).filter(function (n) { return Number.isInteger(n) && n > 0; });
-  const guardia = parseInt(b && b.guardia_departamento_id, 10) || null;
+  const guardia = (Array.isArray(b && b.guardia_personas) ? b.guardia_personas : []).map(Number)
+    .filter(function (n) { return Number.isInteger(n) && n > 0; });
+  const existen = guardia.length ? await pool.query('SELECT id FROM equipo_personas WHERE id = ANY($1::int[])', [guardia]) : { rows: [] };
+  const idsGuardia = existen.rows.map(function (r) { return r.id; });
   return {
     nombre: nombre,
     pais: String((b && b.pais) || '').trim().slice(0, 10) || null,
     region: String((b && b.region) || '').trim().slice(0, 20) || null,
     subregion: String((b && b.subregion) || '').trim().slice(0, 20) || null,
     municipio: String((b && b.municipio) || '').trim().slice(0, 120) || null,
-    zona_horaria: zona, islas: islas, guardia_departamento_id: guardia, horario: hz.horario
+    zona_horaria: zona, islas: islas, guardia_personas: guardia.filter(function (id) { return idsGuardia.indexOf(id) !== -1; }), horario: hz.horario
   };
 }
 
@@ -19963,9 +19986,9 @@ app.post('/admin/oficinas', requireAdmin, asyncHandler(async (req, res) => {
   const d = await datosOficinaDesdeBody(req.body);
   if (d.error) return res.status(400).json({ error: d.error });
   const r = await pool.query(
-    `INSERT INTO oficinas (nombre, pais, region, subregion, municipio, zona_horaria, islas, guardia_departamento_id, horario, orden)
+    `INSERT INTO oficinas (nombre, pais, region, subregion, municipio, zona_horaria, islas, guardia_personas, horario, orden)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, (SELECT COALESCE(MAX(orden), 0) + 1 FROM oficinas)) RETURNING id`,
-    [d.nombre, d.pais, d.region, d.subregion, d.municipio, d.zona_horaria, d.islas, d.guardia_departamento_id, JSON.stringify(d.horario)]);
+    [d.nombre, d.pais, d.region, d.subregion, d.municipio, d.zona_horaria, d.islas, d.guardia_personas, JSON.stringify(d.horario)]);
   res.json({ ok: true, id: r.rows[0].id });
 }));
 
@@ -19974,8 +19997,8 @@ app.put('/admin/oficinas/:id', requireAdmin, asyncHandler(async (req, res) => {
   if (d.error) return res.status(400).json({ error: d.error });
   const r = await pool.query(
     `UPDATE oficinas SET nombre = $1, pais = $2, region = $3, subregion = $4, municipio = $5, zona_horaria = $6,
-       islas = $7, guardia_departamento_id = $8, horario = $9 WHERE id = $10 RETURNING id`,
-    [d.nombre, d.pais, d.region, d.subregion, d.municipio, d.zona_horaria, d.islas, d.guardia_departamento_id, JSON.stringify(d.horario), req.params.id]);
+       islas = $7, guardia_personas = $8, horario = $9 WHERE id = $10 RETURNING id`,
+    [d.nombre, d.pais, d.region, d.subregion, d.municipio, d.zona_horaria, d.islas, d.guardia_personas, JSON.stringify(d.horario), req.params.id]);
   if (!r.rows.length) return res.status(404).json({ error: 'Oficina no encontrada.' });
   res.json({ ok: true });
 }));
