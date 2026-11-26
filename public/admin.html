@@ -9544,7 +9544,9 @@ function pintarOficinas() {
       '<td><strong>' + escapar(o.nombre) + '</strong></td>' +
       '<td>' + (o.islas_nombres.length ? escapar(o.islas_nombres.join(', ')) : '<span style="color:#c0392b;">Ninguna</span>') + '</td>' +
       '<td>' + circuloOficina(o.estado.abierta ? '#2e7d32' : '#c0392b', o.estado.abierta ? 'Abierta' : 'Cerrada') + ' ' + escapar(o.estado.texto) + '</td>' +
-      '<td>' + (o.guardia_nombre ? escapar(o.guardia_nombre) : '<span style="color:#c0392b;">Sin guardia</span>') + '</td>' +
+      '<td>' + (o.guardia && o.guardia.length ? o.guardia.map(function (g) {
+        return '<div style="white-space:nowrap;">' + escapar(g.nombre) + (g.activa ? '' : ' <span style="color:#c0392b;">(no activa)</span>') + '</div>';
+      }).join('') : '<span style="color:#c0392b;">Sin guardia</span>') + '</td>' +
       '<td style="text-align:center;white-space:nowrap;">' + o.festivos_anios.map(function (a) { return circuloFestivos(a.estado); }).join(' &nbsp; ') + '</td>' +
       '<td style="text-align:right;white-space:nowrap;">' +
         '<button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.6rem;" onclick="abrirOficina(' + o.id + ')">✏️ Editar</button> ' +
@@ -9570,16 +9572,20 @@ function eliminarOficina(id) {
 function abrirOficina(id) {
   var base = id ? oficinasDatos.filter(function (x) { return x.id === id; })[0] : null;
   oficinaFicha = base ? JSON.parse(JSON.stringify(base)) : {
-    id: null, nombre: '', pais: 'ES', region: '', subregion: '', municipio: '', zona_horaria: '', islas: [], guardia_departamento_id: null, horario: {}
+    id: null, nombre: '', pais: 'ES', region: '', subregion: '', municipio: '', zona_horaria: '', islas: [], guardia_personas: [], horario: {}
   };
   if (!oficinaFicha.horario) oficinaFicha.horario = {};
   oficinaAnioFestivos = new Date().getFullYear();
   Promise.all([
     fetch('/admin/islas').then(function (r) { return r.json(); }),
-    fetch('/admin/equipo/departamentos').then(function (r) { return r.json(); })
+    fetch('/admin/equipo').then(function (r) { return r.json(); })
   ]).then(function (res) {
     oficinaFicha._islas = (res[0] && res[0].islas) || [];
-    oficinaFicha._departamentos = ((res[1] && res[1].departamentos) || []).filter(function (d) { return !d.es_choferes; });
+    // Personas de Equipo (sin los choferes): las activas y, si alguna marcada ya no lo está, también, para poder quitarla
+    var marcadas = oficinaFicha.guardia_personas || [];
+    oficinaFicha._personas = (Array.isArray(res[1]) ? res[1] : []).filter(function (p) {
+      return !p.es_chofer && (p.estado === 'activo' || marcadas.indexOf(p.id) !== -1);
+    });
     pintarFichaOficina();
     cargarLugaresOficina(false);
     if (oficinaFicha.id) cargarFestivosOficina();
@@ -9624,9 +9630,25 @@ function pintarFichaOficina() {
     return '<label style="font-size:0.85rem;white-space:nowrap;margin-right:0.9rem;display:inline-block;"><input type="checkbox" class="ofi-isla" value="' + i.id + '" ' +
       ((o.islas || []).indexOf(i.id) !== -1 ? 'checked' : '') + '> ' + escapar(i.nombre) + '</label>';
   }).join('') : '<span style="color:#999;font-size:0.85rem;">No hay islas en «Islas / Localidades».</span>';
-  var depHtml = '<option value="">— Sin guardia —</option>' + o._departamentos.map(function (d) {
-    return '<option value="' + d.id + '" ' + (String(o.guardia_departamento_id) === String(d.id) ? 'selected' : '') + '>' + escapar(d.nombre) + '</option>';
-  }).join('');
+  // Personas de guardia: casillas agrupadas por departamento de Equipo
+  var grupos = [], porDep = {};
+  o._personas.forEach(function (p) {
+    var dep = p.departamento || 'Sin departamento';
+    if (!porDep[dep]) { porDep[dep] = []; grupos.push(dep); }
+    porDep[dep].push(p);
+  });
+  var guardiaHtml = grupos.length ? grupos.map(function (dep, i) {
+    return '<div style="font-weight:600;font-size:0.85rem;margin:' + (i ? '10px' : '2px') + ' 0 4px;">' + escapar(dep) + '</div>' +
+      porDep[dep].map(function (p) {
+        var avisos = [];
+        if (p.estado !== 'activo') avisos.push('no activa');
+        if (!String(p.telefono || '').trim()) avisos.push('sin teléfono (no recibirá WhatsApp)');
+        if (!String(p.email || '').trim()) avisos.push('sin email (no recibirá email)');
+        return '<label style="display:block;font-size:0.85rem;margin:3px 0;"><input type="checkbox" class="ofi-guardia" value="' + p.id + '" ' +
+          ((o.guardia_personas || []).indexOf(p.id) !== -1 ? 'checked' : '') + '> ' + escapar(p.nombre) +
+          (avisos.length ? ' <span style="color:#c0392b;font-size:0.78rem;">· ' + avisos.join(' · ') + '</span>' : '') + '</label>';
+      }).join('');
+  }).join('') : '<span style="color:#999;font-size:0.85rem;">No hay personas en Equipo.</span>';
   var anioHoy = new Date().getFullYear();
   var anios = [anioHoy, anioHoy + 1, anioHoy + 2].map(function (a) {
     return '<option value="' + a + '" ' + (a === oficinaAnioFestivos ? 'selected' : '') + '>' + a + '</option>';
@@ -9642,7 +9664,9 @@ function pintarFichaOficina() {
       '<div><label class="etiqueta">Municipio</label><input type="text" class="campo" id="ofi-municipio" value="' + escapar(o.municipio || '') + '" placeholder="Las Palmas de Gran Canaria"></div>' +
       '<div style="grid-column:1/-1;"><label class="etiqueta">Zona horaria <span style="font-weight:400;color:#888;">(se propone sola según el lugar; se puede cambiar)</span></label><select class="campo" id="ofi-zona"><option value="">Cargando…</option></select></div>' +
       '<div style="grid-column:1/-1;"><label class="etiqueta">Islas que atiende</label><div>' + islasHtml + '</div></div>' +
-      '<div style="grid-column:1/-1;"><label class="etiqueta">Guardia (departamento de Equipo que recibe los avisos fuera de horario)</label><select class="campo" id="ofi-guardia">' + depHtml + '</select></div>' +
+      '<div style="grid-column:1/-1;"><label class="etiqueta">Personas de guardia (reciben los avisos fuera de horario por WhatsApp y email)</label>' +
+        '<div style="border:1px solid #e3d6c6;border-radius:8px;padding:10px 14px;background:#fff;">' + guardiaHtml + '</div>' +
+        '<div style="font-size:0.8rem;color:#666;margin-top:6px;">Solo salen las personas activas de Equipo (los choferes no).</div></div>' +
     '</div>' +
     '<h3 style="font-size:0.95rem;margin:1rem 0 0.5rem;">🕐 Horario</h3>' +
     '<div class="tabla-envoltura"><table class="tabla-admin" style="width:100%;font-size:0.85rem;"><thead><tr><th style="text-align:left;">Día</th><th>Abierta</th><th style="text-align:left;">Tramo 1</th><th style="text-align:left;">Tramo 2</th></tr></thead>' +
@@ -9707,7 +9731,7 @@ function leerFichaOficina() {
   o.nombre = document.getElementById('ofi-nombre').value.trim();
   o.municipio = document.getElementById('ofi-municipio').value.trim();
   o.zona_horaria = document.getElementById('ofi-zona').value;
-  o.guardia_departamento_id = document.getElementById('ofi-guardia').value || null;
+  o.guardia_personas = Array.prototype.slice.call(document.querySelectorAll('#ficha-oficina .ofi-guardia:checked')).map(function (c) { return parseInt(c.value, 10); });
   o.islas = Array.prototype.slice.call(document.querySelectorAll('#ficha-oficina .ofi-isla:checked')).map(function (c) { return parseInt(c.value, 10); });
 }
 
@@ -9750,7 +9774,7 @@ function guardarOficina() {
   leerFichaOficina();
   var o = oficinaFicha;
   var cuerpo = { nombre: o.nombre, pais: o.pais, region: o.region, subregion: o.subregion, municipio: o.municipio,
-    zona_horaria: o.zona_horaria, islas: o.islas, guardia_departamento_id: o.guardia_departamento_id, horario: o.horario };
+    zona_horaria: o.zona_horaria, islas: o.islas, guardia_personas: o.guardia_personas, horario: o.horario };
   fetch(o.id ? '/admin/oficinas/' + o.id : '/admin/oficinas', {
     method: o.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo)
   }).then(function (r) { return r.json(); }).then(function (d) {
