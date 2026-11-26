@@ -2960,6 +2960,9 @@ async function initSchema() {
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS reasignacion_chofer_anterior TEXT`);
   // (26/11/2026) Causa que eligió el chofer al pulsar «No puedo hacer este servicio» (se ve en la reserva del Admin)
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS reasignacion_causa TEXT`);
+  // (26/11/2026) «Acepto viajes de categorías inferiores» (lo marca el chofer en su portal) y segunda ronda del aviso
+  await pool.query(`ALTER TABLE conductores ADD COLUMN IF NOT EXISTS acepta_inferiores BOOLEAN DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS segunda_ronda_en TIMESTAMP`);
   // Mensajes de WhatsApp recibidos en el número de OpenWA (28/09/2026). Paso 1: solo se guardan.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS whatsapp_entrantes (
@@ -4785,7 +4788,9 @@ app.get('/api/categorias', asyncHandler(async (req, res) => {
             LEAST(cv.capacidad_pasajeros, MAX(COALESCE(c.plazas, cv.capacidad_pasajeros)))::int AS capacidad_pasajeros,
             cv.capacidad_maletas, cv.descripcion, cv.limite_sillas, cv.foto, cv.orden
      FROM categorias_vehiculos cv
-     JOIN conductores c ON c.categoria_id = cv.id
+     -- (26/11/2026) También cuenta un chofer de categoría superior con «Acepto viajes de categorías inferiores»
+     JOIN conductores c ON (c.categoria_id = cv.id OR (c.acepta_inferiores = TRUE AND EXISTS (
+                          SELECT 1 FROM categorias_vehiculos csup WHERE csup.id = c.categoria_id AND csup.orden > cv.orden)))
                        AND c.estado = 'aprobado' AND COALESCE(c.tipo, 'flota') <> 'externo'
                        ${filtroDisponible}
      WHERE cv.disponible = TRUE
@@ -5180,7 +5185,9 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     const _q = await pool.query(
       `SELECT LEAST(cv.capacidad_pasajeros, MAX(COALESCE(c.plazas, cv.capacidad_pasajeros)))::int AS maximo
        FROM categorias_vehiculos cv
-       JOIN conductores c ON c.categoria_id = cv.id AND c.estado = 'aprobado' AND COALESCE(c.tipo, 'flota') <> 'externo'
+       JOIN conductores c ON (c.categoria_id = cv.id OR (c.acepta_inferiores = TRUE AND EXISTS (
+                          SELECT 1 FROM categorias_vehiculos csup WHERE csup.id = c.categoria_id AND csup.orden > cv.orden)))
+                         AND c.estado = 'aprobado' AND COALESCE(c.tipo, 'flota') <> 'externo'
                          ${_f === _hoy ? 'AND c.disponible_hoy = TRUE' : ''}
        WHERE cv.id = $1
        GROUP BY cv.id`, [parseInt(categoria_id, 10) || 0]);
@@ -5964,7 +5971,7 @@ app.get('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT c.id, c.nombre, c.email, c.telefono, c.vehiculo_marca, c.vehiculo_modelo, c.matricula,
             c.numero_taxi, c.plazas, c.isla, c.tipo, c.estado, c.foto_estado, c.permite_contacto, c.creado_en,
-            c.cambios_pendientes, c.disponible_hoy,
+            c.cambios_pendientes, c.disponible_hoy, c.acepta_inferiores,
             cat.nombre AS categoria
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
@@ -12382,7 +12389,7 @@ app.get('/chofer/me', requireChofer, asyncHandler(async (req, res) => {
             c.municipio_licencia, c.numero_licencia, c.central_flota,
             c.vehiculo_marca, c.vehiculo_modelo, c.matricula, c.numero_taxi, c.plazas, c.isla,
             c.estado, c.foto, c.foto_estado, c.foto_motivo, c.permitir_edicion_ficha, c.cambios_pendientes,
-            c.disponible_hoy, c.tipo,
+            c.disponible_hoy, c.tipo, c.acepta_inferiores,
             cat.nombre AS categoria, cat.capacidad_pasajeros AS categoria_max_plazas
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
@@ -12391,6 +12398,14 @@ app.get('/chofer/me', requireChofer, asyncHandler(async (req, res) => {
   );
   if (!result.rows.length) return res.status(404).json({ error: 'No encontrado.' });
   res.json({ conductor: result.rows[0] });
+}));
+
+// (26/11/2026) «Acepto viajes de categorías inferiores»: lo marca el chofer en su portal (no los externos)
+app.post('/chofer/acepta-inferiores', requireChofer, asyncHandler(async (req, res) => {
+  const acepta = req.body.acepta_inferiores === true;
+  await pool.query(`UPDATE conductores SET acepta_inferiores = $1 WHERE id = $2 AND COALESCE(tipo, 'flota') <> 'externo'`,
+    [acepta, req.session.choferId]);
+  res.json({ ok: true, acepta_inferiores: acepta });
 }));
 
 app.post('/chofer/disponibilidad', requireChofer, asyncHandler(async (req, res) => {
@@ -12933,7 +12948,7 @@ app.post('/chofer/reservas/:id/liberar', requireChofer, asyncHandler(async (req,
   await pool.query(
     `UPDATE reservas SET conductor_id = NULL, reasignacion_en_curso = TRUE, reasignacion_excluir_id = $1,
        reasignacion_inicio = NOW(), reasignacion_chofer_anterior = $2, estado_aviso_whatsapp = 'pendiente',
-       reasignacion_causa = $4, choferes_avisados = NULL
+       reasignacion_causa = $4, choferes_avisados = NULL, segunda_ronda_en = NULL
      WHERE id = $3`,
     [req.session.choferId, r.chofer_nombre, r.id, causa]
   );
@@ -14578,7 +14593,8 @@ app.get('/admin/conductores-aprobados', requireAdmin, asyncHandler(async (req, r
   );
   // (26/11/2026) Desplegable de «👤 Paso 1 — Asignar chofer» ordenado para la reserva (Germán, 26/11):
   //  1) la categoría de la reserva: choferes con plazas suficientes y todos los extras que dependen del chofer;
-  //  2) otras categorías de orden superior (Admin → Categorías → Orden) que cumplen lo mismo.
+  //  2) otras categorías de orden superior (Admin → Categorías → Orden) que cumplen lo mismo, solo los choferes
+  //     que marcaron «Acepto viajes de categorías inferiores» (26/11/2026, lo decide el chofer).
   //  Los que no cumplen no salen. Si la reserva busca chofer nuevo, tampoco el chofer que la dejó.
   //  Sin reserva (o reserva sin categoría): la lista de siempre, todos los aprobados.
   const reservaId = parseInt(req.query.reserva, 10);
@@ -14596,7 +14612,7 @@ app.get('/admin/conductores-aprobados', requireAdmin, asyncHandler(async (req, r
      WHERE c.estado = 'aprobado' AND COALESCE(c.tipo, 'flota') <> 'externo'
        AND COALESCE(c.plazas, 0) >= COALESCE($1, 0)
        AND c.id <> COALESCE($2, 0)
-       AND (c.categoria_id = $3 OR COALESCE(cv.orden, 0) > COALESCE($4, 0))
+       AND (c.categoria_id = $3 OR (c.acepta_inferiores = TRUE AND COALESCE(cv.orden, 0) > COALESCE($4, 0)))
        AND NOT EXISTS (
          SELECT 1 FROM reservas_extras re JOIN extras e ON e.id = re.extra_id
          WHERE re.reserva_id = $5 AND e.depende_chofer = TRUE
@@ -21355,6 +21371,71 @@ app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandle
     await pool.query('UPDATE reservas SET choferes_avisados = $1 WHERE id = $2', [ch.rows.map(function (c) { return c.id; }), r.id]);
   }
   res.json(result.rows);
+}));
+
+// (26/11/2026) SEGUNDA RONDA del aviso (Germán, 26/11: «si todos están ocupados, en la segunda ronda se le pide a
+// esos que aceptan menor categoría»). A los 15 minutos del aviso sin que nadie diga SI, UNA sola vez, a los choferes
+// de categoría superior (Orden de Admin → Categorías) con «Acepto viajes de categorías inferiores», plazas suficientes
+// y los extras de la reserva, que no estaban en la primera ronda. Vale para las reservas nuevas y para las
+// reasignaciones. «Disponible hoy» solo cuenta en una reserva nueva para HOY (regla de Germán, 26/11: marcado recibe
+// para hoy y para otros días; sin marcar, para mañana y otros días). Nunca a externos.
+// Dirección propia para puente.js (un puente.js anterior no la llama y no envía nada de más).
+async function choferesSegundaRonda(r) {
+  const q = await pool.query(
+    `SELECT c.id, c.nombre, c.telefono FROM conductores c
+     JOIN categorias_vehiculos cc ON cc.id = c.categoria_id
+     WHERE c.estado = 'aprobado' AND COALESCE(c.tipo, 'flota') <> 'externo' AND c.acepta_inferiores = TRUE
+       AND c.telefono IS NOT NULL AND c.telefono <> ''
+       AND cc.orden > (SELECT orden FROM categorias_vehiculos WHERE id = $1)
+       AND COALESCE(c.plazas, 0) >= COALESCE($2, 0)
+       AND c.id <> COALESCE($3, 0)
+       AND NOT (c.id = ANY(COALESCE($4::int[], '{}')))
+       AND ($5::boolean OR c.disponible_hoy = TRUE
+            OR (SELECT x.fecha FROM reservas x WHERE x.id = $6) IS DISTINCT FROM $7::date)
+       AND NOT EXISTS (
+         SELECT 1 FROM reservas_extras re JOIN extras e ON e.id = re.extra_id
+         WHERE re.reserva_id = $6 AND e.depende_chofer = TRUE
+           AND NOT EXISTS (SELECT 1 FROM conductor_extras ce
+                           WHERE ce.conductor_id = c.id AND ce.extra_id = re.extra_id AND ce.estado IN ('gratis', 'pago')))
+     ORDER BY cc.orden, c.nombre`,
+    [r.categoria_id, r.num_pasajeros, r.reasignacion ? r.reasignacion_excluir_id : null,
+     r.choferes_avisados || [], !!r.reasignacion, r.id, hoyCanarias()]);
+  return q.rows;
+}
+
+app.get('/api/whatsapp/segunda-ronda', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino, r.categoria_id, r.num_pasajeros,
+            cv.nombre AS categoria_nombre, COALESCE(r.reasignacion_en_curso, FALSE) AS reasignacion,
+            r.reasignacion_excluir_id, r.choferes_avisados
+     FROM reservas r LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     WHERE r.conductor_id IS NULL AND r.archivada = FALSE AND r.categoria_id IS NOT NULL
+       AND r.estado NOT IN ('cancelada', 'completada', 'no_show')
+       AND r.estado_aviso_whatsapp IN ('enviado', 'sin_respuesta')
+       AND r.whatsapp_aviso_enviado_en <= NOW() - INTERVAL '15 minutes'
+       AND r.segunda_ronda_en IS NULL
+     ORDER BY r.id ASC`);
+  const salida = [];
+  for (const r of result.rows) {
+    const lista = await choferesSegundaRonda(r);
+    if (!lista.length) {
+      // Nadie para la segunda ronda: se apunta para no volver a mirarla
+      await pool.query('UPDATE reservas SET segunda_ronda_en = NOW() WHERE id = $1', [r.id]);
+      continue;
+    }
+    r.choferes_segunda_ronda = lista;
+    salida.push(r);
+  }
+  res.json(salida);
+}));
+
+app.post('/api/whatsapp/marcar-segunda-ronda/:id', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids.map(Number).filter(Boolean) : [];
+  await pool.query(
+    `UPDATE reservas SET segunda_ronda_en = NOW(),
+       choferes_avisados = (SELECT ARRAY(SELECT DISTINCT unnest(COALESCE(choferes_avisados, '{}') || $1::int[])))
+     WHERE id = $2`, [ids, req.params.id]);
+  res.json({ ok: true });
 }));
 
 // Reservas que llevan 15 minutos o más avisadas a los choferes sin que nadie
