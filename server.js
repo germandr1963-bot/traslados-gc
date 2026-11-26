@@ -14492,6 +14492,25 @@ async function reasignarChofer(reservaId, nuevoConductorId, causa, desdeAdmin) {
 app.post('/admin/reservas/:id/chofer', requireAdmin, asyncHandler(async (req, res) => {
   const { conductor_id, motivo } = req.body;
 
+  // (26/11/2026) Reserva buscando chofer nuevo (su chofer pulsó «No puedo hacer este servicio»): la oficina pone
+  // un chofer a mano. Es un CAMBIO DE CHOFER, no una primera asignación: al cliente «Cambio de chofer» con el
+  // voucher (sin enlace de pago nuevo), al chofer nuevo «Servicio asignado en sustitución», la búsqueda se para
+  // y a los choferes avisados «Respuesta al SI: ya asignada a otro compañero».
+  {
+    const rq = await pool.query(
+      'SELECT numero_reserva, conductor_id, reasignacion_en_curso, choferes_avisados FROM reservas WHERE id = $1', [req.params.id]);
+    const rr = rq.rows[0];
+    if (rr && rr.reasignacion_en_curso && !rr.conductor_id) {
+      if (!conductor_id) return res.status(400).json({ error: 'Esta reserva está buscando chofer nuevo: elige un chofer en la lista.' });
+      await reasignarChofer(req.params.id, Number(conductor_id),
+        'Asignado a mano por la oficina mientras se buscaba chofer nuevo' + (motivo && String(motivo).trim() ? ' — ' + String(motivo).trim() : ''));
+      await pool.query(`UPDATE reservas SET reasignacion_en_curso = FALSE, estado_aviso_whatsapp = 'asignado' WHERE id = $1`, [req.params.id]);
+      try { await avisarYaAsignada(rr.choferes_avisados, conductor_id, rr.numero_reserva); }
+      catch (eYa) { console.warn('Aviso «ya asignada» a los choferes avisados:', eYa.message); }
+      return res.json({ ok: true, reasignacion_manual: true });
+    }
+  }
+
   // Reasignación (28/09/2026): si la reserva YA tenía otro chofer, no se repite la primera
   // asignación (no se reenvía la confirmación con enlace de pago). Causa obligatoria.
   if (conductor_id) {
@@ -14520,7 +14539,46 @@ app.get('/admin/conductores-aprobados', requireAdmin, asyncHandler(async (req, r
     'SELECT id, nombre, telefono FROM conductores WHERE estado = $1 ORDER BY nombre',
     ['aprobado']
   );
-  res.json({ conductores: result.rows });
+  // (26/11/2026) Desplegable de «👤 Paso 1 — Asignar chofer» ordenado para la reserva (Germán, 26/11):
+  //  1) la categoría de la reserva: choferes con plazas suficientes y todos los extras que dependen del chofer;
+  //  2) otras categorías de orden superior (Admin → Categorías → Orden) que cumplen lo mismo.
+  //  Los que no cumplen no salen. Si la reserva busca chofer nuevo, tampoco el chofer que la dejó.
+  //  Sin reserva (o reserva sin categoría): la lista de siempre, todos los aprobados.
+  const reservaId = parseInt(req.query.reserva, 10);
+  if (!reservaId) return res.json({ conductores: result.rows });
+  const rq = await pool.query(
+    `SELECT r.id, r.categoria_id, r.num_pasajeros, r.reasignacion_en_curso, r.reasignacion_excluir_id, r.conductor_id,
+            cv.nombre AS categoria_nombre, cv.orden AS categoria_orden
+     FROM reservas r LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id WHERE r.id = $1`, [reservaId]);
+  const r = rq.rows[0];
+  if (!r || !r.categoria_id) return res.json({ conductores: result.rows });
+  const excluir = (r.reasignacion_en_curso && !r.conductor_id) ? r.reasignacion_excluir_id : null;
+  const cq = await pool.query(
+    `SELECT c.id, c.nombre, c.telefono, c.categoria_id, cv.nombre AS categoria_nombre
+     FROM conductores c JOIN categorias_vehiculos cv ON cv.id = c.categoria_id
+     WHERE c.estado = 'aprobado'
+       AND COALESCE(c.plazas, 0) >= COALESCE($1, 0)
+       AND c.id <> COALESCE($2, 0)
+       AND (c.categoria_id = $3 OR COALESCE(cv.orden, 0) > COALESCE($4, 0))
+       AND NOT EXISTS (
+         SELECT 1 FROM reservas_extras re JOIN extras e ON e.id = re.extra_id
+         WHERE re.reserva_id = $5 AND e.depende_chofer = TRUE
+           AND NOT EXISTS (SELECT 1 FROM conductor_extras ce
+                           WHERE ce.conductor_id = c.id AND ce.extra_id = re.extra_id AND ce.estado IN ('gratis', 'pago')))
+     ORDER BY CASE WHEN c.categoria_id = $3 THEN 0 ELSE 1 END, cv.orden, c.nombre`,
+    [r.num_pasajeros, excluir, r.categoria_id, r.categoria_orden, r.id]);
+  const ex = await pool.query(
+    `SELECT DISTINCT e.nombre FROM reservas_extras re JOIN extras e ON e.id = re.extra_id
+     WHERE re.reserva_id = $1 AND e.depende_chofer = TRUE ORDER BY e.nombre`, [r.id]);
+  const cumplen = [r.num_pasajeros ? textoPax(r.num_pasajeros, 'es') : null]
+    .concat(ex.rows.map(function (x) { return x.nombre; })).filter(Boolean);
+  const textoCumplen = cumplen.length > 1 ? cumplen.slice(0, -1).join(', ') + ' y ' + cumplen[cumplen.length - 1] : cumplen.join('');
+  const misma = cq.rows.filter(function (c) { return Number(c.categoria_id) === Number(r.categoria_id); });
+  const otras = cq.rows.filter(function (c) { return Number(c.categoria_id) !== Number(r.categoria_id); });
+  const grupos = [];
+  if (misma.length) grupos.push({ etiqueta: '✅ ' + r.categoria_nombre + (textoCumplen ? ' · cumplen ' + textoCumplen : ''), conductores: misma });
+  if (otras.length) grupos.push({ etiqueta: '⬆️ Otras categorías que cumplen', conductores: otras });
+  res.json({ conductores: cq.rows, grupos: grupos });
 }));
 
 // ─── Helper: generar HTML del voucher ────────────────────────────────────────
@@ -21181,6 +21239,20 @@ async function choferesParaReasignacion(r) {
   return q.rows;
 }
 
+// (26/11/2026) «Respuesta al SI: ya asignada a otro compañero» a los choferes indicados (por la cola que envía puente.js),
+// p. ej. a los avisados de una reasignación que la oficina resolvió a mano, o al que responde SI cuando ya está asignada.
+async function avisarYaAsignada(ids, excluirId, numeroReserva) {
+  const lista = (ids || []).map(Number).filter(function (x) { return x && x !== Number(excluirId || 0); });
+  if (!lista.length) return;
+  const ch = await pool.query(
+    `SELECT id, telefono FROM conductores WHERE id = ANY($1::int[]) AND telefono IS NOT NULL AND telefono <> ''`, [lista]);
+  const txt = await plantillaChoferWa('chofer_respuesta_ya_asignada', { numero_reserva: numeroReserva },
+    'ℹ️ La reserva *' + numeroReserva + '* ya ha sido asignada a otro compañero. Gracias por tu disponibilidad.');
+  for (const c of ch.rows) {
+    await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)', [c.telefono, txt]);
+  }
+}
+
 app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino,
@@ -21401,6 +21473,21 @@ app.post('/api/whatsapp/asignar/:id', requierePuenteWhatsapp, asyncHandler(async
       try { await avisarChoferesReservaCerrada(req.params.id, claveCerrada, conductor_id); }
       catch (eAv) { console.warn('Aviso de reserva cerrada al chofer que respondió SI:', eAv.message); }
       return res.status(409).json({ error: 'La reserva está cancelada: no se puede aceptar.' });
+    }
+  }
+
+  // (26/11/2026) Reasignación que ya tiene chofer (la oficina lo puso a mano mientras se buscaba): un SI que llega
+  // tarde no le quita la reserva. Al que responde le llega «ya asignada a otro compañero» por la cola; si es el
+  // mismo chofer que puso la oficina, se le deja confirmar sin cambiar nada.
+  {
+    const ya = await pool.query(
+      'SELECT numero_reserva, conductor_id, reasignacion_en_curso, reasignacion_inicio FROM reservas WHERE id = $1', [req.params.id]);
+    const y = ya.rows[0];
+    if (y && y.reasignacion_inicio && !y.reasignacion_en_curso && y.conductor_id) {
+      if (Number(y.conductor_id) === Number(conductor_id)) return res.json({ ok: true, sin_cambios: true });
+      try { await avisarYaAsignada([conductor_id], null, y.numero_reserva); }
+      catch (eYa) { console.warn('Aviso «ya asignada» al SI tardío:', eYa.message); }
+      return res.status(409).json({ error: 'La reserva ya tiene chofer asignado.' });
     }
   }
 
