@@ -541,14 +541,34 @@ function requireAdmin(req, res, next) {
   return res.status(401).json({ error: 'No autorizado' });
 }
 
+// (26/11/2026) Chofer «Externo» (de emergencia): solo tiene acceso mientras tenga algún viaje asignado sin terminar,
+// y hasta 2 horas después de marcar su último viaje terminado, por si el cliente se deja algo en el coche (Germán,
+// 26/11): en esas 2 horas sigue con su portal, el cartel y la comunicación con el cliente. Con «No se presentó» el
+// acceso termina en el acto. Después ya no entra; si la oficina le asigna otro servicio, vuelve a entrar.
+const TEXTO_ACCESO_EXTERNO_TERMINADO = 'Tu acceso ha terminado. Si te asignamos otro servicio, podrás volver a entrar.';
+async function externoSinViajes(conductorId) {
+  const q = await pool.query(
+    `SELECT 1 FROM reservas WHERE conductor_id = $1 AND archivada = FALSE
+       AND (estado NOT IN ('cancelada', 'completada', 'no_show')
+            OR (estado = 'completada' AND completada_en > NOW() - INTERVAL '2 hours'))
+     LIMIT 1`, [conductorId]);
+  return !q.rows.length;
+}
+
 function requireChofer(req, res, next) {
   if (req.session && req.session.choferId) {
     // (25/11/2026) Un chofer suspendido o de baja no entra aunque tenga la sesión abierta: se comprueba su estado en cada petición
-    return pool.query('SELECT estado FROM conductores WHERE id = $1', [req.session.choferId]).then(function (q) {
+    return pool.query('SELECT estado, tipo FROM conductores WHERE id = $1', [req.session.choferId]).then(async function (q) {
       if (q.rows.length && (q.rows[0].estado === 'baja' || q.rows[0].estado === 'suspendido' || q.rows[0].estado === 'eliminado')) {
         delete req.session.choferId;
         delete req.session.choferNombre;
         return res.status(401).json({ error: 'No autorizado' });
+      }
+      // (26/11/2026) Externo sin viajes por hacer: se le cierra la sesión
+      if (q.rows.length && q.rows[0].tipo === 'externo' && await externoSinViajes(req.session.choferId)) {
+        delete req.session.choferId;
+        delete req.session.choferNombre;
+        return res.status(401).json({ error: TEXTO_ACCESO_EXTERNO_TERMINADO });
       }
       return next();
     }).catch(function (err) { return next(err); });
@@ -1000,6 +1020,18 @@ async function initSchema() {
       revisado_en TIMESTAMP DEFAULT NOW(),
       PRIMARY KEY (oficina_id, anio)
     )`);
+  // (26/11/2026) Tipo de chofer: «Flota propia» = chofer normal (recibe los avisos automáticos); «Externo» = chofer de
+  // emergencia que solo recibe las reservas que le asigna la oficina (Germán, 26/11: «los externos solo reciben las
+  // reservas vía Admin»). Hasta hoy todos nacían «Externo» sin que eso cambiara nada: los nuevos nacen «Flota propia»
+  // y, una sola vez, los que ya había pasan a «Flota propia».
+  await pool.query(`ALTER TABLE conductores ALTER COLUMN tipo SET DEFAULT 'flota'`);
+  {
+    const _tipoHecho = await pool.query(`SELECT 1 FROM migraciones_datos WHERE clave = 'choferes_tipo_flota_20261126'`);
+    if (!_tipoHecho.rows.length) {
+      await pool.query(`UPDATE conductores SET tipo = 'flota' WHERE tipo IS NULL OR tipo = 'externo'`);
+      await pool.query(`INSERT INTO migraciones_datos (clave) VALUES ('choferes_tipo_flota_20261126') ON CONFLICT DO NOTHING`);
+    }
+  }
   // (26/11/2026) La guardia son PERSONAS de Equipo (una o varias, de cualquier departamento), no un departamento entero.
   await pool.query(`ALTER TABLE oficinas ADD COLUMN IF NOT EXISTS guardia_personas INT[] DEFAULT '{}'`);
   // Oficina de partida (una sola vez): Las Palmas de Gran Canaria, que atiende Gran Canaria, sin horario
@@ -4754,7 +4786,7 @@ app.get('/api/categorias', asyncHandler(async (req, res) => {
             cv.capacidad_maletas, cv.descripcion, cv.limite_sillas, cv.foto, cv.orden
      FROM categorias_vehiculos cv
      JOIN conductores c ON c.categoria_id = cv.id
-                       AND c.estado = 'aprobado'
+                       AND c.estado = 'aprobado' AND COALESCE(c.tipo, 'flota') <> 'externo'
                        ${filtroDisponible}
      WHERE cv.disponible = TRUE
      GROUP BY cv.id
@@ -4996,7 +5028,7 @@ app.get('/api/extras-flota', asyncHandler(async (req, res) => {
     WHERE e.activo = TRUE
       AND e.depende_chofer = TRUE
       AND ce.estado IN ('gratis', 'pago')
-      AND c.estado = 'aprobado'
+      AND c.estado = 'aprobado' AND COALESCE(c.tipo, 'flota') <> 'externo'
       ${filtroCategoria}
     GROUP BY e.id, e.nombre, e.precio, e.bloque, e.orden, ce.estado
     ORDER BY e.bloque, e.orden, e.id, ce.estado
@@ -5148,7 +5180,7 @@ app.post('/api/reservas', asyncHandler(async (req, res) => {
     const _q = await pool.query(
       `SELECT LEAST(cv.capacidad_pasajeros, MAX(COALESCE(c.plazas, cv.capacidad_pasajeros)))::int AS maximo
        FROM categorias_vehiculos cv
-       JOIN conductores c ON c.categoria_id = cv.id AND c.estado = 'aprobado'
+       JOIN conductores c ON c.categoria_id = cv.id AND c.estado = 'aprobado' AND COALESCE(c.tipo, 'flota') <> 'externo'
                          ${_f === _hoy ? 'AND c.disponible_hoy = TRUE' : ''}
        WHERE cv.id = $1
        GROUP BY cv.id`, [parseInt(categoria_id, 10) || 0]);
@@ -6062,8 +6094,8 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
         (nombre, email, telefono, password_hash, documento, direccion, cp, municipio,
          municipio_licencia, numero_licencia, central_flota,
          categoria_id, vehiculo_marca, vehiculo_modelo, matricula, numero_taxi, plazas, isla,
-         foto, foto_estado, estado, primer_acceso_pendiente)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'pendiente',TRUE)
+         foto, foto_estado, estado, primer_acceso_pendiente, tipo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,'pendiente',TRUE,$21)
        RETURNING id`,
       [
         d.nombre.trim(), d.email.toLowerCase().trim(), d.telefono.trim(), hash,
@@ -6071,7 +6103,8 @@ app.post('/admin/conductores', requireAdmin, asyncHandler(async (req, res) => {
         d.municipio_licencia.trim(), d.numero_licencia.trim(), (d.central_flota || '').trim(),
         categoriaId, vehiculo.marcaNombre, vehiculo.modeloNombre,
         d.matricula.trim().toUpperCase(), (d.numero_taxi || '').trim(), plazasOk.plazas,
-        d.isla || 'Gran Canaria', foto, fotoEstado
+        d.isla || 'Gran Canaria', foto, fotoEstado,
+        d.tipo === 'externo' ? 'externo' : 'flota' // (26/11/2026) Tipo elegido en el alta: Flota propia o Externo
       ]
     );
     const nuevoId = result.rows[0].id;
@@ -12291,6 +12324,10 @@ app.post('/chofer/login', asyncHandler(async (req, res) => {
   }
   // Como siempre: solo entran los choferes aprobados
   if (chofer.estado !== 'aprobado') return res.status(401).json({ error: 'Email o contraseña incorrectos.' });
+  // (26/11/2026) Externo: solo entra si tiene algún viaje asignado sin terminar
+  if (chofer.tipo === 'externo' && await externoSinViajes(chofer.id)) {
+    return res.status(401).json({ error: TEXTO_ACCESO_EXTERNO_TERMINADO });
+  }
 
   req.session.choferId = chofer.id;
   req.session.choferNombre = chofer.nombre;
@@ -12345,7 +12382,7 @@ app.get('/chofer/me', requireChofer, asyncHandler(async (req, res) => {
             c.municipio_licencia, c.numero_licencia, c.central_flota,
             c.vehiculo_marca, c.vehiculo_modelo, c.matricula, c.numero_taxi, c.plazas, c.isla,
             c.estado, c.foto, c.foto_estado, c.foto_motivo, c.permitir_edicion_ficha, c.cambios_pendientes,
-            c.disponible_hoy,
+            c.disponible_hoy, c.tipo,
             cat.nombre AS categoria, cat.capacidad_pasajeros AS categoria_max_plazas
      FROM conductores c
      LEFT JOIN categorias_vehiculos cat ON cat.id = c.categoria_id
@@ -14556,7 +14593,7 @@ app.get('/admin/conductores-aprobados', requireAdmin, asyncHandler(async (req, r
   const cq = await pool.query(
     `SELECT c.id, c.nombre, c.telefono, c.categoria_id, cv.nombre AS categoria_nombre
      FROM conductores c JOIN categorias_vehiculos cv ON cv.id = c.categoria_id
-     WHERE c.estado = 'aprobado'
+     WHERE c.estado = 'aprobado' AND COALESCE(c.tipo, 'flota') <> 'externo'
        AND COALESCE(c.plazas, 0) >= COALESCE($1, 0)
        AND c.id <> COALESCE($2, 0)
        AND (c.categoria_id = $3 OR COALESCE(cv.orden, 0) > COALESCE($4, 0))
@@ -14578,7 +14615,20 @@ app.get('/admin/conductores-aprobados', requireAdmin, asyncHandler(async (req, r
   const grupos = [];
   if (misma.length) grupos.push({ etiqueta: '✅ ' + r.categoria_nombre + (textoCumplen ? ' · cumplen ' + textoCumplen : ''), conductores: misma });
   if (otras.length) grupos.push({ etiqueta: '⬆️ Otras categorías que cumplen', conductores: otras });
-  res.json({ conductores: cq.rows, grupos: grupos });
+  // (26/11/2026) Choferes «Externo» (de emergencia): solo reciben las reservas que les asigna la oficina. Salen al
+  // final, en su grupo, ordenados por categoría: categoría de la reserva o superior y plazas suficientes. Los extras
+  // NO filtran (Germán, 26/11: «los extras no… se llaman, si tienen los extras se le envía la reserva»).
+  const xq = await pool.query(
+    `SELECT c.id, c.nombre, c.telefono, c.categoria_id, cv.nombre AS categoria_nombre
+     FROM conductores c JOIN categorias_vehiculos cv ON cv.id = c.categoria_id
+     WHERE c.estado = 'aprobado' AND c.tipo = 'externo'
+       AND COALESCE(c.plazas, 0) >= COALESCE($1, 0)
+       AND c.id <> COALESCE($2, 0)
+       AND (c.categoria_id = $3 OR COALESCE(cv.orden, 0) > COALESCE($4, 0))
+     ORDER BY cv.orden, c.nombre`,
+    [r.num_pasajeros, excluir, r.categoria_id, r.categoria_orden]);
+  if (xq.rows.length) grupos.push({ etiqueta: '🚕 Chofer Externo', conductores: xq.rows });
+  res.json({ conductores: cq.rows.concat(xq.rows), grupos: grupos });
 }));
 
 // ─── Helper: generar HTML del voucher ────────────────────────────────────────
@@ -17460,7 +17510,7 @@ async function departamentoChoferes() {
 app.get('/admin/equipo', requireAdmin, asyncHandler(async (req, res) => {
   const dc = await departamentoChoferes();
   const choferes = await pool.query(
-    "SELECT id, nombre, email, telefono FROM conductores WHERE estado = 'aprobado' ORDER BY nombre ASC"
+    "SELECT id, nombre, email, telefono FROM conductores WHERE estado = 'aprobado' AND COALESCE(tipo, 'flota') <> 'externo' ORDER BY nombre ASC"
   );
   const filas = choferes.rows.map(function (c) {
     // (13/10/2026) chofer_id: número del chofer en Conductores, para elegirlo suelto en "Nuevo comunicado"
@@ -17484,7 +17534,7 @@ app.get('/admin/equipo/departamentos', requireAdmin, asyncHandler(async (req, re
   await departamentoChoferes();
   const r = await pool.query(
     `SELECT d.id, d.nombre, d.es_choferes,
-       CASE WHEN d.es_choferes THEN (SELECT COUNT(*)::int FROM conductores WHERE estado = 'aprobado')
+       CASE WHEN d.es_choferes THEN (SELECT COUNT(*)::int FROM conductores WHERE estado = 'aprobado' AND COALESCE(tipo, 'flota') <> 'externo')
             ELSE (SELECT COUNT(*)::int FROM equipo_personas p WHERE p.departamento_id = d.id) END AS personas
      FROM equipo_departamentos d ORDER BY d.orden, d.id`
   );
@@ -17516,7 +17566,7 @@ app.delete('/admin/equipo/departamentos/:id', requireAdmin, asyncHandler(async (
   const d = await pool.query('SELECT id, es_choferes FROM equipo_departamentos WHERE id = $1', [req.params.id]);
   if (!d.rows.length) return res.status(404).json({ error: 'Departamento no encontrado.' });
   const n = d.rows[0].es_choferes
-    ? await pool.query("SELECT COUNT(*)::int AS n FROM conductores WHERE estado = 'aprobado'")
+    ? await pool.query("SELECT COUNT(*)::int AS n FROM conductores WHERE estado = 'aprobado' AND COALESCE(tipo, 'flota') <> 'externo'")
     : await pool.query('SELECT COUNT(*)::int AS n FROM equipo_personas WHERE departamento_id = $1', [req.params.id]);
   if (n.rows[0].n > 0) return res.status(400).json({ error: 'No se puede borrar: el departamento tiene personas.' });
   await pool.query('DELETE FROM equipo_departamentos WHERE id = $1', [req.params.id]);
@@ -17659,7 +17709,7 @@ app.post('/admin/comunicado/equipo', requireAdmin, asyncHandler(async (req, res)
   const choferesEnteros = !!(dc && (todos || deptos.includes(dc.id)));
   if (choferesEnteros || choferesSueltos.length) {
     const ch = await pool.query(
-      "SELECT nombre, email, telefono FROM conductores WHERE estado = 'aprobado' AND ($1 OR id = ANY($2::int[])) ORDER BY nombre ASC",
+      "SELECT nombre, email, telefono FROM conductores WHERE estado = 'aprobado' AND COALESCE(tipo, 'flota') <> 'externo' AND ($1 OR id = ANY($2::int[])) ORDER BY nombre ASC",
       [choferesEnteros, choferesSueltos]
     );
     ch.rows.forEach(function (c) { lista.push(c); });
@@ -20830,7 +20880,7 @@ app.post('/api/whatsapp/mensajes-pendientes/:id/enviado', requierePuenteWhatsapp
 app.get('/api/whatsapp/choferes-disponibles', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
   const result = await pool.query(
     `SELECT id, nombre, telefono FROM conductores
-     WHERE estado = 'aprobado'
+     WHERE estado = 'aprobado' AND COALESCE(tipo, 'flota') <> 'externo'
        AND disponible_hoy = TRUE
      ORDER BY nombre`
   );
@@ -21223,7 +21273,7 @@ app.post('/api/whatsapp/lid-resuelto', requierePuenteWhatsapp, asyncHandler(asyn
 async function choferesParaReasignacion(r) {
   const q = await pool.query(
     `SELECT c.id, c.nombre, c.telefono FROM conductores c
-     WHERE c.estado = 'aprobado'
+     WHERE c.estado = 'aprobado' AND COALESCE(c.tipo, 'flota') <> 'externo'
        AND c.telefono IS NOT NULL AND c.telefono <> ''
        AND c.categoria_id = $1
        AND COALESCE(c.plazas, 0) >= COALESCE($2, 0)
@@ -21276,7 +21326,7 @@ app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandle
       if (r.reasignacion) {
         const ch = await pool.query(
           `SELECT id, nombre, telefono FROM conductores
-           WHERE estado = 'aprobado' AND telefono IS NOT NULL AND telefono <> '' AND id <> COALESCE($1, 0)
+           WHERE estado = 'aprobado' AND COALESCE(tipo, 'flota') <> 'externo' AND telefono IS NOT NULL AND telefono <> '' AND id <> COALESCE($1, 0)
            ORDER BY nombre`, [r.reasignacion_excluir_id]
         );
         r.choferes_reasignacion = ch.rows;
@@ -21292,7 +21342,7 @@ app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandle
     }
     const ch = await pool.query(
       `SELECT id, nombre, telefono FROM conductores
-       WHERE estado = 'aprobado' AND disponible_hoy = TRUE
+       WHERE estado = 'aprobado' AND COALESCE(tipo, 'flota') <> 'externo' AND disponible_hoy = TRUE
          AND telefono IS NOT NULL AND telefono <> ''
          AND categoria_id = $1
          AND COALESCE(plazas, 0) >= COALESCE($2, 0)
