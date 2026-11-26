@@ -1354,6 +1354,16 @@ table.tabla-precios input {
         <button class="boton-primario" onclick="guardarContacto()">💾 Guardar</button>
         <div id="aviso-contacto" style="display:none;margin-top:0.75rem;"></div>
       </div>
+
+      <!-- (26/11/2026) Oficinas (uso interno): horario, festivos y guardia. No sale en la web. -->
+      <div class="tarjeta" id="bloque-oficinas" style="margin-top:20px;">
+        <h2 style="font-size:1rem;margin:0 0 0.3rem 0;">🏢 Oficinas (uso interno)</h2>
+        <p style="font-size:0.85rem;color:#666;margin:0 0 1rem 0;">Solo para el sistema: horario, festivos y guardia de cada oficina. No sale en la web.</p>
+        <div id="lista-oficinas"><p style="color:#999;font-size:0.85rem;">Cargando…</p></div>
+        <button class="boton-primario" style="margin-top:1rem;" onclick="abrirOficina(null)">➕ Añadir oficina</button>
+        <div id="aviso-oficinas" style="display:none;margin-top:0.75rem;"></div>
+        <div id="ficha-oficina" style="display:none;margin-top:1.2rem;"></div>
+      </div>
     </div>
 
     <div id="seccion-facturacion" class="oculto">
@@ -9489,6 +9499,346 @@ function cargarContacto() {
       document.getElementById('contacto-direccion').value = d.direccion || '';
 
     });
+  cargarOficinas();
+}
+
+// ─── (26/11/2026) OFICINAS (uso interno): horario, festivos y guardia ───────────────────────────
+var oficinasDatos = [];
+var oficinaFicha = null;      // oficina abierta en la ficha (copia para editar)
+var oficinaAnioFestivos = null;
+var DIAS_OFI = [['1','Lunes'],['2','Martes'],['3','Miércoles'],['4','Jueves'],['5','Viernes'],['6','Sábado'],['7','Domingo']];
+
+function circuloOficina(color, titulo) {
+  return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;background:' + color + ';" title="' + escapar(titulo) + '"></span>';
+}
+function circuloFestivos(estado) {
+  if (estado === 'revisado') return circuloOficina('#2e7d32', 'Revisados');
+  if (estado === 'cargado') return circuloOficina('#1565c0', 'Cargados, sin revisar');
+  return circuloOficina('#c0392b', 'Sin cargar');
+}
+function avisoOficinas(html, ok) {
+  var av = document.getElementById('aviso-oficinas');
+  av.style.display = 'block';
+  av.innerHTML = '<div class="' + (ok ? 'aviso-ok' : 'aviso-error') + '">' + html + '</div>';
+  if (ok) setTimeout(function () { av.style.display = 'none'; }, 3000);
+}
+
+function cargarOficinas() {
+  fetch('/admin/oficinas').then(function (r) { return r.json(); }).then(function (d) {
+    oficinasDatos = (d && d.oficinas) || [];
+    pintarOficinas();
+  }).catch(function () {
+    document.getElementById('lista-oficinas').innerHTML = '<div class="aviso-error">No se pudieron cargar las oficinas.</div>';
+  });
+}
+
+function pintarOficinas() {
+  var cont = document.getElementById('lista-oficinas');
+  if (!oficinasDatos.length) { cont.innerHTML = '<p style="color:#999;font-size:0.85rem;">Todavía no hay ninguna oficina.</p>'; return; }
+  var anios = oficinasDatos[0].festivos_anios.map(function (a) { return a.anio; });
+  var html = '<div class="tabla-envoltura"><table class="tabla-admin" style="width:100%;font-size:0.85rem;">' +
+    '<thead><tr><th style="text-align:left;">Oficina</th><th style="text-align:left;">Islas que atiende</th><th style="text-align:left;">Ahora</th>' +
+    '<th style="text-align:left;">Guardia</th><th style="text-align:center;white-space:nowrap;">Festivos ' + anios.join(' · ') + '</th><th></th></tr></thead><tbody>';
+  oficinasDatos.forEach(function (o) {
+    html += '<tr>' +
+      '<td><strong>' + escapar(o.nombre) + '</strong></td>' +
+      '<td>' + (o.islas_nombres.length ? escapar(o.islas_nombres.join(', ')) : '<span style="color:#c0392b;">Ninguna</span>') + '</td>' +
+      '<td>' + circuloOficina(o.estado.abierta ? '#2e7d32' : '#c0392b', o.estado.abierta ? 'Abierta' : 'Cerrada') + ' ' + escapar(o.estado.texto) + '</td>' +
+      '<td>' + (o.guardia_nombre ? escapar(o.guardia_nombre) : '<span style="color:#c0392b;">Sin guardia</span>') + '</td>' +
+      '<td style="text-align:center;white-space:nowrap;">' + o.festivos_anios.map(function (a) { return circuloFestivos(a.estado); }).join(' &nbsp; ') + '</td>' +
+      '<td style="text-align:right;white-space:nowrap;">' +
+        '<button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.6rem;" onclick="abrirOficina(' + o.id + ')">✏️ Editar</button> ' +
+        '<button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.6rem;" onclick="eliminarOficina(' + o.id + ')">🗑️ Eliminar</button>' +
+      '</td></tr>';
+  });
+  cont.innerHTML = html + '</tbody></table></div>';
+}
+
+function eliminarOficina(id) {
+  var o = oficinasDatos.filter(function (x) { return x.id === id; })[0];
+  if (!o) return;
+  if (!confirm('¿Eliminar la oficina «' + o.nombre + '»? Se borran también su horario y sus festivos.')) return;
+  fetch('/admin/oficinas/' + id, { method: 'DELETE' }).then(function (r) { return r.json(); }).then(function (d) {
+    if (d && d.ok) {
+      if (oficinaFicha && oficinaFicha.id === id) cerrarFichaOficina();
+      avisoOficinas('✔ Oficina eliminada.', true);
+      cargarOficinas();
+    } else avisoOficinas(escapar((d && d.error) || 'No se pudo eliminar.'), false);
+  });
+}
+
+function abrirOficina(id) {
+  var base = id ? oficinasDatos.filter(function (x) { return x.id === id; })[0] : null;
+  oficinaFicha = base ? JSON.parse(JSON.stringify(base)) : {
+    id: null, nombre: '', pais: 'ES', region: '', subregion: '', municipio: '', zona_horaria: '', islas: [], guardia_departamento_id: null, horario: {}
+  };
+  if (!oficinaFicha.horario) oficinaFicha.horario = {};
+  oficinaAnioFestivos = new Date().getFullYear();
+  Promise.all([
+    fetch('/admin/islas').then(function (r) { return r.json(); }),
+    fetch('/admin/equipo/departamentos').then(function (r) { return r.json(); })
+  ]).then(function (res) {
+    oficinaFicha._islas = (res[0] && res[0].islas) || [];
+    oficinaFicha._departamentos = ((res[1] && res[1].departamentos) || []).filter(function (d) { return !d.es_choferes; });
+    pintarFichaOficina();
+    cargarLugaresOficina(false);
+    if (oficinaFicha.id) cargarFestivosOficina();
+    document.getElementById('ficha-oficina').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+function cerrarFichaOficina() {
+  oficinaFicha = null;
+  var f = document.getElementById('ficha-oficina');
+  f.style.display = 'none'; f.innerHTML = '';
+}
+
+function inputHoraOfi(dia, tramo, pos, valor) {
+  return '<input type="text" class="campo" maxlength="5" placeholder="00:00" style="width:72px;padding:4px 6px;font-size:0.82rem;display:inline-block;" ' +
+    'value="' + escapar(valor || '') + '" onchange="cambiarHoraOficina(\'' + dia + '\',' + tramo + ',' + pos + ',this.value)">';
+}
+
+function filasHorarioOficina() {
+  var h = oficinaFicha.horario;
+  return DIAS_OFI.map(function (d) {
+    var tramos = h[d[0]] || [];
+    var abierta = tramos.length > 0;
+    var t1 = abierta ? inputHoraOfi(d[0], 0, 0, tramos[0][0]) + ' – ' + inputHoraOfi(d[0], 0, 1, tramos[0][1]) : '<span style="color:#999;">Cerrada</span>';
+    var t2 = '';
+    if (abierta && tramos[1]) {
+      t2 = inputHoraOfi(d[0], 1, 0, tramos[1][0]) + ' – ' + inputHoraOfi(d[0], 1, 1, tramos[1][1]) +
+        ' <button class="boton-costa" style="font-size:0.72rem;padding:0.1rem 0.45rem;" onclick="quitarTramoOficina(\'' + d[0] + '\')" title="Quitar el segundo tramo">✕</button>';
+    } else if (abierta) {
+      t2 = '<button class="boton-costa" style="font-size:0.75rem;padding:0.15rem 0.5rem;" onclick="anadirTramoOficina(\'' + d[0] + '\')">➕ Segundo tramo</button>';
+    }
+    return '<tr><td>' + d[1] + '</td>' +
+      '<td style="text-align:center;"><input type="checkbox" ' + (abierta ? 'checked' : '') + ' onchange="cambiarDiaAbiertoOficina(\'' + d[0] + '\',this.checked)"></td>' +
+      '<td style="white-space:nowrap;">' + t1 + '</td><td style="white-space:nowrap;">' + t2 + '</td></tr>';
+  }).join('');
+}
+
+function pintarFichaOficina() {
+  var o = oficinaFicha;
+  var f = document.getElementById('ficha-oficina');
+  var islasHtml = o._islas.length ? o._islas.map(function (i) {
+    return '<label style="font-size:0.85rem;white-space:nowrap;margin-right:0.9rem;display:inline-block;"><input type="checkbox" class="ofi-isla" value="' + i.id + '" ' +
+      ((o.islas || []).indexOf(i.id) !== -1 ? 'checked' : '') + '> ' + escapar(i.nombre) + '</label>';
+  }).join('') : '<span style="color:#999;font-size:0.85rem;">No hay islas en «Islas / Localidades».</span>';
+  var depHtml = '<option value="">— Sin guardia —</option>' + o._departamentos.map(function (d) {
+    return '<option value="' + d.id + '" ' + (String(o.guardia_departamento_id) === String(d.id) ? 'selected' : '') + '>' + escapar(d.nombre) + '</option>';
+  }).join('');
+  var anioHoy = new Date().getFullYear();
+  var anios = [anioHoy, anioHoy + 1, anioHoy + 2].map(function (a) {
+    return '<option value="' + a + '" ' + (a === oficinaAnioFestivos ? 'selected' : '') + '>' + a + '</option>';
+  }).join('');
+  f.style.display = 'block';
+  f.innerHTML = '<div class="tarjeta" style="border:2px solid #c9a27a;">' +
+    '<h2 style="font-size:1rem;margin:0 0 1rem 0;">' + (o.id ? '✏️ ' + escapar(o.nombre) : '➕ Oficina nueva') + '</h2>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">' +
+      '<div style="grid-column:1/-1;"><label class="etiqueta">Nombre de la oficina</label><input type="text" class="campo" id="ofi-nombre" value="' + escapar(o.nombre || '') + '" placeholder="Oficina Las Palmas de Gran Canaria"></div>' +
+      '<div><label class="etiqueta">País</label><select class="campo" id="ofi-pais" onchange="cambiarLugarOficina(\'pais\')"><option value="">Cargando…</option></select></div>' +
+      '<div><label class="etiqueta">Comunidad</label><select class="campo" id="ofi-region" onchange="cambiarLugarOficina(\'region\')"><option value="">—</option></select></div>' +
+      '<div><label class="etiqueta">Isla o provincia</label><select class="campo" id="ofi-subregion" onchange="cambiarLugarOficina(\'subregion\')"><option value="">—</option></select></div>' +
+      '<div><label class="etiqueta">Municipio</label><input type="text" class="campo" id="ofi-municipio" value="' + escapar(o.municipio || '') + '" placeholder="Las Palmas de Gran Canaria"></div>' +
+      '<div style="grid-column:1/-1;"><label class="etiqueta">Zona horaria <span style="font-weight:400;color:#888;">(se propone sola según el lugar; se puede cambiar)</span></label><select class="campo" id="ofi-zona"><option value="">Cargando…</option></select></div>' +
+      '<div style="grid-column:1/-1;"><label class="etiqueta">Islas que atiende</label><div>' + islasHtml + '</div></div>' +
+      '<div style="grid-column:1/-1;"><label class="etiqueta">Guardia (departamento de Equipo que recibe los avisos fuera de horario)</label><select class="campo" id="ofi-guardia">' + depHtml + '</select></div>' +
+    '</div>' +
+    '<h3 style="font-size:0.95rem;margin:1rem 0 0.5rem;">🕐 Horario</h3>' +
+    '<div class="tabla-envoltura"><table class="tabla-admin" style="width:100%;font-size:0.85rem;"><thead><tr><th style="text-align:left;">Día</th><th>Abierta</th><th style="text-align:left;">Tramo 1</th><th style="text-align:left;">Tramo 2</th></tr></thead>' +
+    '<tbody id="ofi-horario">' + filasHorarioOficina() + '</tbody></table></div>' +
+    '<h3 style="font-size:0.95rem;margin:1.2rem 0 0.5rem;">📅 Festivos (oficina cerrada todo el día)</h3>' +
+    (o.id
+      ? '<div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.6rem;">' +
+          '<select class="campo" id="ofi-anio" style="width:110px;" onchange="oficinaAnioFestivos=parseInt(this.value,10);cargarFestivosOficina()">' + anios + '</select>' +
+          '<button class="boton-costa" style="font-size:0.8rem;" onclick="cargarFestivosLibreriaOficina()">🔄 Cargar festivos del año</button>' +
+          '<button class="boton-costa" style="font-size:0.8rem;" onclick="mostrarNuevoFestivoOficina()">➕ Añadir festivo local</button>' +
+        '</div>' +
+        '<div id="ofi-nuevo-festivo" style="display:none;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.6rem;">' +
+          '<input type="date" class="campo" id="ofi-nf-fecha" style="width:160px;">' +
+          '<input type="text" class="campo" id="ofi-nf-nombre" style="width:320px;" placeholder="Nombre del festivo (p. ej. Fundación de la Ciudad)">' +
+          '<button class="boton-primario" style="font-size:0.8rem;" onclick="guardarNuevoFestivoOficina()">💾 Añadir</button>' +
+        '</div>' +
+        '<div id="ofi-festivos"><p style="color:#999;font-size:0.85rem;">Cargando…</p></div>'
+      : '<p style="color:#999;font-size:0.85rem;">Guarda la oficina para poder cargar sus festivos.</p>') +
+    '<div id="aviso-ficha-oficina" style="display:none;margin-top:0.75rem;"></div>' +
+    '<div style="margin-top:1rem;display:flex;gap:0.5rem;">' +
+      '<button class="boton-primario" onclick="guardarOficina()">💾 Guardar</button>' +
+      '<button class="boton-secundario" onclick="cerrarFichaOficina()">Cerrar</button>' +
+    '</div></div>';
+}
+
+function avisoFichaOficina(html, ok) {
+  var av = document.getElementById('aviso-ficha-oficina');
+  if (!av) return;
+  av.style.display = 'block';
+  av.innerHTML = '<div class="' + (ok ? 'aviso-ok' : 'aviso-error') + '">' + html + '</div>';
+  if (ok) setTimeout(function () { av.style.display = 'none'; }, 3000);
+}
+
+// Rellena los desplegables de País, Comunidad, Isla o provincia y Zona horaria.
+// proponerZona = true cuando el Admin cambia el lugar: la zona se cambia a la propuesta.
+function cargarLugaresOficina(proponerZona) {
+  var o = oficinaFicha;
+  var url = '/admin/oficinas/lugares?pais=' + encodeURIComponent(o.pais || '') + '&region=' + encodeURIComponent(o.region || '') + '&subregion=' + encodeURIComponent(o.subregion || '');
+  fetch(url).then(function (r) { return r.json(); }).then(function (d) {
+    if (!oficinaFicha) return;
+    var opciones = function (obj, valor, vacio) {
+      var claves = Object.keys(obj || {}).sort(function (a, b) { return String(obj[a]).localeCompare(String(obj[b]), 'es'); });
+      return '<option value="">' + vacio + '</option>' + claves.map(function (k) {
+        return '<option value="' + escapar(k) + '" ' + (k === valor ? 'selected' : '') + '>' + escapar(obj[k]) + '</option>';
+      }).join('');
+    };
+    if (!d.libreria) avisoFichaOficina('Falta la librería de festivos en el servidor: los lugares no se pueden elegir. Revisa que package.json esté subido.', false);
+    document.getElementById('ofi-pais').innerHTML = opciones(d.paises, o.pais, '— Elige el país —');
+    document.getElementById('ofi-region').innerHTML = opciones(d.regiones, o.region, Object.keys(d.regiones || {}).length ? '— Elige la comunidad —' : '—');
+    document.getElementById('ofi-subregion').innerHTML = opciones(d.subregiones, o.subregion, Object.keys(d.subregiones || {}).length ? '— Elige la isla o provincia —' : '—');
+    if (proponerZona && d.zona_sugerida) o.zona_horaria = d.zona_sugerida;
+    var zonas = d.zonas || [];
+    if (o.zona_horaria && zonas.indexOf(o.zona_horaria) === -1) zonas = [o.zona_horaria].concat(zonas);
+    document.getElementById('ofi-zona').innerHTML = '<option value="">— Elige la zona horaria —</option>' + zonas.map(function (z) {
+      return '<option value="' + escapar(z) + '" ' + (z === o.zona_horaria ? 'selected' : '') + '>' + escapar(z) + (z === d.zona_sugerida ? ' (propuesta por el lugar)' : '') + '</option>';
+    }).join('');
+  });
+}
+
+function leerFichaOficina() {
+  var o = oficinaFicha;
+  o.nombre = document.getElementById('ofi-nombre').value.trim();
+  o.municipio = document.getElementById('ofi-municipio').value.trim();
+  o.zona_horaria = document.getElementById('ofi-zona').value;
+  o.guardia_departamento_id = document.getElementById('ofi-guardia').value || null;
+  o.islas = Array.prototype.slice.call(document.querySelectorAll('#ficha-oficina .ofi-isla:checked')).map(function (c) { return parseInt(c.value, 10); });
+}
+
+function cambiarLugarOficina(nivel) {
+  var o = oficinaFicha;
+  leerFichaOficina();
+  if (nivel === 'pais') { o.pais = document.getElementById('ofi-pais').value; o.region = ''; o.subregion = ''; }
+  if (nivel === 'region') { o.region = document.getElementById('ofi-region').value; o.subregion = ''; }
+  if (nivel === 'subregion') { o.subregion = document.getElementById('ofi-subregion').value; }
+  cargarLugaresOficina(true);
+}
+
+function cambiarDiaAbiertoOficina(dia, abierta) {
+  leerFichaOficina();
+  oficinaFicha.horario[dia] = abierta ? [['09:00', '14:00']] : [];
+  document.getElementById('ofi-horario').innerHTML = filasHorarioOficina();
+}
+function anadirTramoOficina(dia) {
+  leerFichaOficina();
+  var t = oficinaFicha.horario[dia] || [];
+  if (t.length === 1) t.push(['16:00', '19:00']);
+  oficinaFicha.horario[dia] = t;
+  document.getElementById('ofi-horario').innerHTML = filasHorarioOficina();
+}
+function quitarTramoOficina(dia) {
+  leerFichaOficina();
+  oficinaFicha.horario[dia] = (oficinaFicha.horario[dia] || []).slice(0, 1);
+  document.getElementById('ofi-horario').innerHTML = filasHorarioOficina();
+}
+function cambiarHoraOficina(dia, tramo, pos, valor) {
+  var v = String(valor || '').trim();
+  if (/^\d{3,4}$/.test(v)) v = (v.length === 3 ? '0' + v.slice(0, 1) : v.slice(0, 2)) + ':' + v.slice(-2); // «930» → 09:30
+  if (/^\d{1}:\d{2}$/.test(v)) v = '0' + v;
+  var t = oficinaFicha.horario[dia] || [];
+  if (t[tramo]) t[tramo][pos] = v;
+  oficinaFicha.horario[dia] = t;
+}
+
+function guardarOficina() {
+  leerFichaOficina();
+  var o = oficinaFicha;
+  var cuerpo = { nombre: o.nombre, pais: o.pais, region: o.region, subregion: o.subregion, municipio: o.municipio,
+    zona_horaria: o.zona_horaria, islas: o.islas, guardia_departamento_id: o.guardia_departamento_id, horario: o.horario };
+  fetch(o.id ? '/admin/oficinas/' + o.id : '/admin/oficinas', {
+    method: o.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo)
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (!(d && d.ok)) { avisoFichaOficina(escapar((d && d.error) || 'No se pudo guardar.'), false); return; }
+    var nueva = !o.id;
+    if (nueva) o.id = d.id;
+    fetch('/admin/oficinas').then(function (r) { return r.json(); }).then(function (l) {
+      oficinasDatos = (l && l.oficinas) || [];
+      pintarOficinas();
+      if (nueva) { abrirOficina(o.id); return; }
+      avisoFichaOficina('✔ Oficina guardada.', true);
+    });
+  });
+}
+
+function cargarFestivosOficina() {
+  if (!oficinaFicha || !oficinaFicha.id) return;
+  fetch('/admin/oficinas/' + oficinaFicha.id + '/festivos?anio=' + oficinaAnioFestivos).then(function (r) { return r.json(); }).then(function (d) {
+    var cont = document.getElementById('ofi-festivos');
+    if (!cont) return;
+    var lista = (d && d.festivos) || [];
+    var html = '';
+    if (!lista.length) {
+      html = '<p style="font-size:0.85rem;">' + circuloFestivos('vacio') + ' No hay festivos de ' + oficinaAnioFestivos + '. Pulsa «🔄 Cargar festivos del año» y añade los locales.</p>';
+    } else {
+      html = '<div class="tabla-envoltura"><table class="tabla-admin" style="width:100%;font-size:0.83rem;"><thead><tr><th style="text-align:left;">Fecha</th><th style="text-align:left;">Festivo</th><th style="text-align:left;">Tipo</th><th style="text-align:left;">Origen</th><th></th></tr></thead><tbody>' +
+        lista.map(function (x) {
+          var f = x.fecha.split('-');
+          return '<tr><td style="white-space:nowrap;">' + f[2] + '/' + f[1] + '/' + f[0] + '</td><td>' + escapar(x.nombre) + '</td><td>' + escapar(x.tipo || '') + '</td>' +
+            '<td>' + (x.origen === 'auto' ? 'Cargado solo' : 'Añadido a mano') + '</td>' +
+            '<td style="text-align:right;"><button class="boton-costa" style="font-size:0.72rem;padding:0.1rem 0.45rem;" title="Quitar este festivo" onclick="quitarFestivoOficina(' + x.id + ')">🗑️</button></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+    var locales = lista.filter(function (x) { return x.origen === 'manual'; }).length;
+    html += '<div style="margin-top:0.6rem;font-size:0.8rem;color:#666;">Revisa cada año la lista con el boletín oficial de tu comunidad (en Canarias, el BOC): los locales del municipio se añaden a mano' +
+      (locales ? '' : ' — <span style="color:#c0392b;">todavía no hay ninguno de ' + oficinaAnioFestivos + '</span>') + '.</div>';
+    if (lista.length) {
+      html += '<div style="margin-top:0.6rem;font-size:0.85rem;">' + (d.revisado
+        ? circuloFestivos('revisado') + ' Festivos de ' + oficinaAnioFestivos + ' revisados. <button class="boton-costa" style="font-size:0.75rem;padding:0.15rem 0.5rem;" onclick="marcarRevisadoOficina(false)">↩️ Quitar «revisados»</button>'
+        : circuloFestivos('cargado') + ' Sin revisar. <button class="boton-costa" style="font-size:0.75rem;padding:0.15rem 0.5rem;" onclick="marcarRevisadoOficina(true)">✅ Marcar ' + oficinaAnioFestivos + ' como revisados</button>') + '</div>';
+    }
+    cont.innerHTML = html;
+  });
+}
+
+function cargarFestivosLibreriaOficina() {
+  fetch('/admin/oficinas/' + oficinaFicha.id + '/festivos/cargar', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ anio: oficinaAnioFestivos })
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (!(d && d.ok)) { avisoFichaOficina(escapar((d && d.error) || 'No se pudieron cargar los festivos.'), false); return; }
+    avisoFichaOficina('✔ Festivos de ' + oficinaAnioFestivos + ': ' + d.añadidos + ' añadidos' + (d.encontrados > d.añadidos ? ' (' + (d.encontrados - d.añadidos) + ' ya estaban)' : '') + '.', true);
+    cargarFestivosOficina(); cargarOficinas();
+  });
+}
+
+function mostrarNuevoFestivoOficina() {
+  var c = document.getElementById('ofi-nuevo-festivo');
+  c.style.display = c.style.display === 'flex' ? 'none' : 'flex';
+  if (c.style.display === 'flex') {
+    document.getElementById('ofi-nf-fecha').min = oficinaAnioFestivos + '-01-01';
+    document.getElementById('ofi-nf-fecha').max = oficinaAnioFestivos + '-12-31';
+  }
+}
+function guardarNuevoFestivoOficina() {
+  var fecha = document.getElementById('ofi-nf-fecha').value;
+  var nombre = document.getElementById('ofi-nf-nombre').value.trim();
+  fetch('/admin/oficinas/' + oficinaFicha.id + '/festivos', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fecha: fecha, nombre: nombre })
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (!(d && d.ok)) { avisoFichaOficina(escapar((d && d.error) || 'No se pudo añadir.'), false); return; }
+    document.getElementById('ofi-nf-fecha').value = '';
+    document.getElementById('ofi-nf-nombre').value = '';
+    document.getElementById('ofi-nuevo-festivo').style.display = 'none';
+    avisoFichaOficina('✔ Festivo añadido.', true);
+    cargarFestivosOficina(); cargarOficinas();
+  });
+}
+function quitarFestivoOficina(fid) {
+  if (!confirm('¿Quitar este festivo de la lista?')) return;
+  fetch('/admin/oficinas/festivos/' + fid, { method: 'DELETE' }).then(function (r) { return r.json(); }).then(function (d) {
+    if (!(d && d.ok)) { avisoFichaOficina(escapar((d && d.error) || 'No se pudo quitar.'), false); return; }
+    cargarFestivosOficina(); cargarOficinas();
+  });
+}
+function marcarRevisadoOficina(revisado) {
+  fetch('/admin/oficinas/' + oficinaFicha.id + '/festivos/revisado', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ anio: oficinaAnioFestivos, revisado: revisado })
+  }).then(function (r) { return r.json(); }).then(function () { cargarFestivosOficina(); cargarOficinas(); });
 }
 
 // (09/10/2026) Contactos Admin (interno)
