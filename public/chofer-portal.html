@@ -99,7 +99,7 @@
         ⚠️ Tienes extras pendientes por aprobar. Revisa y ajusta.
       </div>
 
-      <div class="tarjeta" style="display:flex;align-items:center;gap:10px;padding:14px 16px">
+      <div class="tarjeta" id="tarjeta-disponible-hoy" style="display:flex;align-items:center;gap:10px;padding:14px 16px">
         <input type="checkbox" id="chk-disponible-hoy" onchange="cambiarDisponibilidad(this.checked)" style="width:18px;height:18px">
         <label for="chk-disponible-hoy" style="margin:0;font-size:14px;font-weight:600;cursor:pointer">Disponible hoy</label>
       </div>
@@ -187,6 +187,14 @@
         '<span class="etiqueta ' + conductor.estado + '">' + conductor.estado.toUpperCase() + '</span> ' +
         TEXTOS_ESTADO[conductor.estado];
       document.getElementById('chk-disponible-hoy').checked = conductor.disponible_hoy !== false;
+      // (26/11/2026) Chofer «Externo»: solo ve sus viajes asignados (sin «Disponible hoy» ni «🧩 Mis extras»).
+      // No se borra nada: si pasa a «Flota propia», le vuelve a salir todo.
+      if (conductor.tipo === 'externo') {
+        window.choferExterno = true;
+        document.getElementById('tarjeta-disponible-hoy').style.display = 'none';
+        document.getElementById('tarjeta-mis-extras').style.display = 'none';
+        document.getElementById('aviso-extras-pendientes').style.display = 'none';
+      }
       const TEXTOS_FOTO = {
         sin_foto: '📷 Aún no has subido tu foto de carné.',
         pendiente: '🕐 Tu foto está pendiente de revisión por la administración.',
@@ -231,7 +239,7 @@
       const r = await fetch('/chofer/extras');
       if (!r.ok) return;
       const data = await r.json();
-      document.getElementById('aviso-extras-pendientes').style.display = data.pendientes > 0 ? 'block' : 'none';
+      document.getElementById('aviso-extras-pendientes').style.display = (data.pendientes > 0 && !window.choferExterno) ? 'block' : 'none';
       document.getElementById('badge-extras-pendientes').style.display = data.pendientes > 0 ? 'inline-block' : 'none';
       pintarExtrasChofer(data.extras || []);
     }

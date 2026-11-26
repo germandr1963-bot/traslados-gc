@@ -3909,6 +3909,11 @@ function formularioConductor() {
       '<option>Gran Canaria</option><option>Tenerife</option><option>Lanzarote</option>' +
       '<option>Fuerteventura</option><option>La Palma</option><option>La Gomera</option><option>El Hierro</option>' +
     '</select>' +
+    // (26/11/2026) Tipo: «Externo» = chofer de emergencia, solo recibe las reservas que le asigna la oficina
+    '<label class="etiqueta">Tipo</label><select class="campo" id="ac-tipo" style="margin-bottom:4px">' +
+      '<option value="flota">Flota propia</option><option value="externo">Externo</option>' +
+    '</select>' +
+    '<p style="font-size:0.78rem;color:#888;margin:0 0 10px">Externo: solo recibe las reservas que le asigne la oficina (no recibe avisos automáticos ni comunicados).</p>' +
     '<label class="etiqueta">Foto del chofer (opcional; queda pendiente hasta que la apruebes en su Ficha)</label>' +
     '<input class="campo" type="file" id="ac-foto-input" accept="image/*" onchange="previsualizarFotoConductor()" style="margin-bottom:10px">' +
     '<img id="ac-foto-preview" style="max-width:160px;border-radius:8px;margin-bottom:10px;display:none">';
@@ -4014,6 +4019,7 @@ function guardarConductor() {
     numero_taxi: document.getElementById('ac-numero-taxi').value,
     plazas: document.getElementById('ac-plazas').value,
     isla: document.getElementById('ac-isla').value,
+    tipo: document.getElementById('ac-tipo').value,
     foto: fotoConductorNueva
   };
   var msg = document.getElementById('ac-mensaje');
