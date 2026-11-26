@@ -1107,6 +1107,9 @@ table.tabla-precios input {
             </div>
           </div>
 
+          <!-- (26/11/2026) Reasignación en curso: su chofer pulsó «No puedo hacer este servicio» y el sistema busca otro -->
+          <div id="reasignacion-box" style="display:none;margin-bottom:0.75rem;padding:0.6rem 0.75rem;border:1px solid #e0b25a;border-radius:6px;background:#fff8e6;font-size:0.85rem;line-height:1.5;color:#2c2c2c;"></div>
+
           <!-- Selector (visible solo sin chofer o al cambiar) -->
           <div id="chofer-selector-box">
             <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
@@ -11174,7 +11177,7 @@ function abrirDetalleReserva(id, sinScroll) {
         contenedorEstado.appendChild(btn);
       });
 
-      cargarConductoresEnDetalle(r.conductor_id, r.conductor_nombre);
+      cargarConductoresEnDetalle(r.conductor_id, r.conductor_nombre, r.reasignacion);
       rellenarCamposEdicion(r);
 
       // Rellenar campos de edición
@@ -11623,12 +11626,25 @@ function cambiarEstadoReserva(id, nuevoEstado) {
   });
 }
 
-function cargarConductoresEnDetalle(conductorActualId, conductorNombre) {
+function cargarConductoresEnDetalle(conductorActualId, conductorNombre, reasignacion) {
   // Si ya hay chofer asignado, mostrar bloqueado
   var boxAsignado = document.getElementById('chofer-asignado-box');
   var boxSelector = document.getElementById('chofer-selector-box');
   var notaEmail = document.getElementById('nota-email-auto');
   var motivoBox = document.getElementById('motivo-cambio-chofer');
+  // (26/11/2026) Recuadro de la reasignación en curso (solo informa de la búsqueda automática)
+  var boxReas = document.getElementById('reasignacion-box');
+  if (reasignacion && !conductorActualId) {
+    var desde = ' Desde el ' + escapar(reasignacion.fecha) + ' a las ' + escapar(reasignacion.hora) + '.';
+    var quien = escapar(reasignacion.chofer_anterior) + ' no puede hacer este servicio (' + escapar(reasignacion.causa) + ').';
+    boxReas.innerHTML = reasignacion.avisados > 0
+      ? '🔄 <strong>Buscando chofer nuevo.</strong> ' + quien + desde + ' Avisados: ' + reasignacion.avisados + ' ' + (reasignacion.avisados === 1 ? 'chofer' : 'choferes') + '. Sin respuesta todavía.'
+      : '⚠️ <strong>Ningún chofer cumple esta reserva</strong> (categoría, plazas y extras). ' + quien + desde + ' Asígnalo a mano.';
+    boxReas.style.display = 'block';
+  } else {
+    boxReas.style.display = 'none';
+    boxReas.innerHTML = '';
+  }
 
   if (conductorActualId) {
     boxAsignado.style.display = 'block';
