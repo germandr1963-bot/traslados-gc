@@ -3552,6 +3552,33 @@ Un saludo cordial, 🙏
 <strong>El equipo de Traslados GC</strong>
 `,
       cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n🔄 Seguimos trabajando en tu solicitud de traslado *{numero_reserva}*. Aún no hemos podido confirmar chofer, pero continuamos buscando disponibilidad.\n\n⏱️ Te avisaremos en cuanto tengamos una respuesta. El plazo habitual de gestión es de 15 minutos.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
+    // (27/11/2026) Reserva YA CONFIRMADA que se cancela a las 12 h de la recogida porque su chofer no puede y no hay
+    // otro (texto aprobado por Germán, 27/11). {aviso_deposito}: la línea del depósito devuelto, solo si lo había pagado.
+    { clave: 'cliente_cancelada_sin_chofer', nombre: 'Reserva cancelada: su chofer no puede y no hay otro (al cliente)', categoria: 'cliente',
+      asunto_email: '❌ Tu reserva {numero_reserva} ha sido cancelada',
+      cuerpo_email: `Hola, <strong>{nombre_cliente}</strong> 👋
+
+❌ <strong>Tu reserva ha sido cancelada.</strong>
+<p style="text-align:center;margin:10px 0;">
+  Reserva <span class="pnr">{numero_reserva}</span>
+</p>
+<div class="info-box">
+  <strong>Detalles del traslado:</strong>
+  📍 <strong>Origen:</strong> {origen}
+  🏁 <strong>Destino:</strong> {destino}
+  📅 <strong>Fecha:</strong> {fecha} · {hora}
+</div>
+😔 Lamentamos informarte de que tu chofer no puede realizar este traslado y no hemos encontrado otro chofer disponible a tiempo.
+{aviso_deposito}
+🚖 Si lo deseas, puedes hacer una nueva solicitud en nuestra web, por ejemplo con otra categoría de vehículo o a otra hora.
+
+❓ Si tienes alguna duda, escríbenos por email. Lo encontrarás en nuestra página de Contacto: <a href="{url_contacto}" style="color:#C1502E;">{url_contacto}</a>
+
+Lamentamos los inconvenientes causados.
+
+Un saludo cordial, 🙏
+<strong>El equipo de Traslados GC</strong>`,
+      cuerpo_whatsapp: 'Hola, *{nombre_cliente}* 👋\n\n❌ *Tu reserva ha sido cancelada.*\n\n🔖 *Reserva:* {numero_reserva}\n\n📍 *Origen:* {origen}\n🏁 *Destino:* {destino}\n📅 *Fecha:* {fecha} · {hora}\n\n😔 Lamentamos informarte de que tu chofer no puede realizar este traslado y no hemos encontrado otro chofer disponible a tiempo.\n\n{aviso_deposito}\n\n🚖 Si lo deseas, puedes hacer una nueva solicitud en nuestra web, por ejemplo con otra categoría de vehículo o a otra hora.\n\n❓ Si tienes alguna duda, escríbenos por email. Lo encontrarás en nuestra página de Contacto: {url_contacto}\n\nLamentamos los inconvenientes causados.\n\nUn saludo cordial, 🙏\n*El equipo de Traslados GC*' },
     { clave: 'cliente_reserva_anulada', nombre: 'Reserva anulada (sin chofer disponible)', categoria: 'cliente',
       asunto_email: 'Tu reserva {numero_reserva} ha sido anulada',
       cuerpo_email: `
@@ -21885,6 +21912,34 @@ app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asy
   const _rAnul = reserva.rows[0];
 
   try {
+    // (27/11/2026) Reserva YA CONFIRMADA (su chofer no puede y no hay otro): su propio mensaje, «Reserva cancelada: su
+    // chofer no puede y no hay otro», con la línea del depósito devuelto si lo había pagado; email y WhatsApp los envía
+    // la web (el WhatsApp por la cola). Reserva nueva: «Reserva anulada» de siempre (el WhatsApp lo envía puente.js).
+    if (_antes.reasignacion) {
+      const _langC = lang_cliente || 'es';
+      const _fraseDep = _depositoDevuelto ? await obtenerFrase('frase_anulada_deposito_liberado', _langC,
+        'Hemos liberado tu depósito de garantía; el importe llegará a tu tarjeta en un plazo de 5 a 10 días hábiles, según tu entidad bancaria.') : '';
+      const _varsC = function (aviso) {
+        return { nombre_cliente: nombre_cliente, numero_reserva: numero_reserva, origen: _rAnul.origen || '—', destino: _rAnul.destino || '—',
+                 fecha: fechaCliente(_rAnul.fecha, _langC), hora: _rAnul.hora ? String(_rAnul.hora).slice(0,5) : '—', aviso_deposito: aviso };
+      };
+      const _pE = await obtenerPlantilla('cliente_cancelada_sin_chofer', _varsC(_fraseDep
+        ? '<p style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:10px 14px;font-size:13px;color:#2e7d32;">✅ ' + _fraseDep + '</p>'
+        : ''), _langC);
+      await enviarEmail({
+        to: email_cliente,
+        subject: (_pE && _pE.asunto) || ('❌ Tu reserva ' + numero_reserva + ' ha sido cancelada'),
+        html: plantillaEmail((_pE && _pE.email) || ('<p>Hola, <strong>' + nombre_cliente + '</strong> 👋</p><p>❌ <strong>Tu reserva ha sido cancelada.</strong></p>'))
+      });
+      if (_antes.telefono_cliente) {
+        const _pW = await obtenerPlantilla('cliente_cancelada_sin_chofer', _varsC(_fraseDep ? '✅ ' + _fraseDep : ''), _langC);
+        if (_pW && _pW.whatsapp) {
+          await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+            [_antes.telefono_cliente, _pW.whatsapp.replace(/\n{3,}/g, '\n\n')]);
+        }
+      }
+      return res.json({ ok: true });
+    }
     // Plantilla "Reserva anulada" de Admin → Comunicaciones, en el idioma del cliente
     const _panul = await obtenerPlantilla('cliente_reserva_anulada', {
       nombre_cliente: nombre_cliente,
@@ -21894,21 +21949,10 @@ app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asy
       fecha: fechaCliente(_rAnul.fecha, lang_cliente || 'es'),
       hora: _rAnul.hora ? String(_rAnul.hora).slice(0,5) : '—'
     }, lang_cliente || 'es');
-    // (27/11/2026) Con el depósito devuelto, el mismo aviso verde que en una cancelación a tiempo, con su frase
-    const _fraseDep = _depositoDevuelto ? await obtenerFrase('frase_anulada_deposito_liberado', lang_cliente || 'es',
-      'Hemos liberado tu depósito de garantía; el importe llegará a tu tarjeta en un plazo de 5 a 10 días hábiles, según tu entidad bancaria.') : '';
-    const _avisoDep = _fraseDep
-      ? '<p style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:10px 14px;font-size:13px;color:#2e7d32;">✅ ' + _fraseDep + '</p>'
-      : '';
-    // En la reasignación el WhatsApp al cliente lo envía el servidor (por la cola), con la línea del depósito si se devolvió
-    if (_antes.reasignacion && _antes.telefono_cliente && _panul && _panul.whatsapp) {
-      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
-        [_antes.telefono_cliente, _panul.whatsapp.replace(/\n{3,}/g, '\n\n') + (_fraseDep ? '\n\n✅ ' + _fraseDep : '')]);
-    }
     await enviarEmail({
       to: email_cliente,
       subject: (_panul && _panul.asunto) || ('Tu reserva ' + numero_reserva + ' ha sido anulada'),
-      html: (_panul && _panul.email) ? plantillaEmail(_panul.email + _avisoDep) : plantillaEmailSimple(
+      html: (_panul && _panul.email) ? plantillaEmail(_panul.email) : plantillaEmailSimple(
         nombre_cliente,
         'Lamentamos informarte que no hemos podido confirmar un chofer disponible para tu traslado en la fecha solicitada, por lo que hemos anulado la reserva. Puedes enviarnos una nueva solicitud más adelante; con gusto intentaremos ayudarte si tenemos disponibilidad.',
         numero_reserva
@@ -22064,6 +22108,7 @@ const VARIABLES_PLANTILLAS = {
   cliente_recuperar_password:    { email: ['nombre_cliente', 'enlace_recuperacion'], wa: ['nombre_cliente', 'enlace_recuperacion'] },
   cliente_reserva_actualizada:   { email: ['nombre_cliente', 'numero_reserva', 'resumen', 'url_portal'], wa: ['nombre_cliente', 'numero_reserva', 'resumen', 'url_portal'] },
   cliente_reserva_anulada:       { email: _V6.concat(['url_contacto']), wa: _V6.concat(['url_contacto']) },
+  cliente_cancelada_sin_chofer:  { email: _V6.concat(['aviso_deposito', 'url_contacto']), wa: _V6.concat(['aviso_deposito', 'url_contacto']) },
   cliente_valoracion:            { email: ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'boton_valoracion'], wa: ['nombre_cliente', 'numero_reserva', 'origen', 'destino', 'fecha', 'url_valoracion'] },
   cliente_voucher:               { email: _V6, wa: _V6, solo_asunto_email: true },
   // Interno
