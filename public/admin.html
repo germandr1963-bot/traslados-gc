@@ -202,7 +202,7 @@ table.tabla-precios input {
       <button class="item-menu" data-seccion="whatsapp">WhatsApp <span id="badge-wa-parado" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">parado</span></button>
       <button class="item-menu" data-seccion="extras">Extras</button>
       <button class="item-menu" data-seccion="cotizaciones">Cotizaciones <span id="badge-cotiz" style="display:none;background:#e07b5a;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;">0</span></button>
-      <button class="item-menu" data-seccion="reservas">Reservas</button>
+      <button class="item-menu" data-seccion="reservas">Reservas <span id="badge-emergencias" title="Reservas en emergencia: sin chofer a menos de 24 horas de la recogida" style="display:none;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px;font-size:0.72rem;margin-left:4px;"></span></button>
       <button class="item-menu" data-seccion="notificaciones">Notificaciones</button>
       <button class="item-menu" data-seccion="clientes">Clientes</button>
       <button class="item-menu" data-seccion="equipo">Equipo</button>
@@ -1025,6 +1025,8 @@ table.tabla-precios input {
     <div id="seccion-reservas" class="oculto">
       <h1>Reservas</h1>
       <p class="subtitulo">Solicitudes de traslado recibidas. Gestiona el estado de cada una.</p>
+      <!-- (27/11/2026) Emergencias: reservas sin chofer a menos de 24 h de la recogida (sale siempre hasta que se resuelvan) -->
+      <div id="franja-emergencias" style="display:none;margin-bottom:1rem;padding:0.75rem 1rem;border:1px solid var(--rojo-error);border-radius:6px;background:var(--rojo-error-fondo);color:var(--rojo-error);font-size:0.88rem;line-height:1.6;"></div>
       <div style="margin-bottom:1rem;"><button class="boton-costa" onclick="recargarAdmin()" style="font-size:0.85rem;">🔄 Actualizar</button></div>
 
       <!-- Fila de filtros: estado + periodo + archivo -->
@@ -1107,6 +1109,9 @@ table.tabla-precios input {
             </div>
           </div>
 
+          <!-- (27/11/2026) Emergencia: sin chofer a menos de 24 h de la recogida -->
+          <div id="emergencia-box" style="display:none;margin-bottom:0.75rem;padding:0.6rem 0.75rem;border:1px solid var(--rojo-error);border-radius:6px;background:var(--rojo-error-fondo);font-size:0.85rem;line-height:1.5;color:var(--rojo-error);"></div>
+
           <!-- (26/11/2026) Reasignación en curso: su chofer pulsó «No puedo hacer este servicio» y el sistema busca otro -->
           <div id="reasignacion-box" style="display:none;margin-bottom:0.75rem;padding:0.6rem 0.75rem;border:1px solid #e0b25a;border-radius:6px;background:#fff8e6;font-size:0.85rem;line-height:1.5;color:#2c2c2c;"></div>
 
@@ -1130,6 +1135,11 @@ table.tabla-precios input {
               </select>
               <input type="text" id="input-motivo-chofer" class="campo" style="height:32px;font-size:0.82rem;" placeholder="Detalle (opcional; obligatorio si la causa es «Otra»)">
               <p style="font-size:0.78rem;color:#888;margin:0.4rem 0 0 0;">🔄 Al guardar se avisará al chofer anterior y al nuevo (con el cartel), y al cliente (con el voucher actualizado si ya pagó). No se envía un enlace de pago nuevo. La causa no la ve el cliente.</p>
+              <!-- (27/11/2026) El chofer llama porque no puede hacerlo y todavía no hay otro: la oficina lanza la búsqueda -->
+              <div style="margin-top:0.6rem;padding-top:0.6rem;border-top:1px dashed var(--gris-borde);">
+                <button class="boton-costa" style="font-size:0.78rem;padding:0.25rem 0.6rem;" onclick="buscarChoferNuevoOficina()">🔄 Buscar chofer nuevo</button>
+                <p style="font-size:0.78rem;color:#888;margin:0.4rem 0 0 0;">Si todavía no tienes otro chofer: con la causa elegida arriba, el chofer sale de la reserva y se avisa a los demás choferes, igual que si él pulsara «⚠️ No puedo hacer este servicio».</p>
+              </div>
             </div>
           </div>
 
@@ -2367,6 +2377,9 @@ function mostrarAdmin() {
   // (15/10/2026) Estado del WhatsApp automático: marca "parado" en el menú, comprobada cada 30 s
   setTimeout(function() { cargarEstadoWhatsapp(); }, 700);
   if (!window._intervaloEstadoWa) window._intervaloEstadoWa = setInterval(cargarEstadoWhatsapp, 30000);
+  // (27/11/2026) Reservas en emergencia: franja roja de Reservas y señal del menú, cada 60 s
+  setTimeout(function() { cargarEmergencias(); }, 800);
+  if (!window._intervaloEmergencias) window._intervaloEmergencias = setInterval(cargarEmergencias, 60000);
   // (02/11/2026) N36 — Señal de traducciones pendientes en el menú, comprobada cada 60 s y al cambiar de pantalla
   setTimeout(function() { cargarPendientesTraduccion(); }, 900);
   if (!window._intervaloPendTrad) window._intervaloPendTrad = setInterval(cargarPendientesTraduccion, 60000);
@@ -11186,6 +11199,7 @@ function abrirDetalleReserva(id, sinScroll) {
       });
 
       cargarConductoresEnDetalle(r.conductor_id, r.conductor_nombre, r.reasignacion, r.id);
+      mostrarEmergenciaEnDetalle(r.emergencia);
       rellenarCamposEdicion(r);
 
       // Rellenar campos de edición
@@ -11695,6 +11709,68 @@ function cargarConductoresEnDetalle(conductorActualId, conductorNombre, reasigna
           return '<option value="' + c.id + '"' + selected + '>' + c.nombre + ' · ' + c.telefono + '</option>';
         }).join('');
     });
+}
+
+// (27/11/2026) Recuadro rojo de la reserva en emergencia (sin chofer a menos de 24 h de la recogida)
+function mostrarEmergenciaEnDetalle(em) {
+  var box = document.getElementById('emergencia-box');
+  if (!box) return;
+  if (!em) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.innerHTML = '🚨 <strong>EMERGENCIA — Reserva sin chofer.</strong> Faltan ' + em.faltan_horas + ' h para la recogida. ' +
+    'Avisos a los choferes cada hora y alerta al equipo cada hora. ' +
+    'Si nadie la acepta, se anula sola el ' + escapar(em.anula_fecha) + ' a las ' + escapar(em.anula_hora) + ' (12 h antes de la recogida).';
+  box.style.display = 'block';
+}
+
+// (27/11/2026) Franja roja de Reservas y señal del menú con las reservas en emergencia (cada 60 s)
+function cargarEmergencias() {
+  fetch('/admin/emergencias')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var lista = (d && d.emergencias) || [];
+      var badge = document.getElementById('badge-emergencias');
+      if (badge) { badge.textContent = '🚨 ' + lista.length; badge.style.display = lista.length ? 'inline' : 'none'; }
+      var franja = document.getElementById('franja-emergencias');
+      if (!franja) return;
+      if (!lista.length) { franja.style.display = 'none'; franja.innerHTML = ''; return; }
+      franja.innerHTML = '🚨 <strong>Reservas en emergencia: sin chofer a menos de 24 horas de la recogida</strong>' +
+        lista.map(function(e) {
+          return '<div>· <a href="#" style="color:var(--rojo-error);font-weight:700;" onclick="abrirDetalleReserva(' + e.id + ');return false;">' + escapar(e.numero_reserva) + '</a> — ' +
+            escapar(e.fecha) + ' a las ' + escapar(e.hora) + ' — ' + escapar(e.origen) + ' → ' + escapar(e.destino) + ' (faltan ' + e.faltan_horas + ' h)</div>';
+        }).join('');
+      franja.style.display = 'block';
+    })
+    .catch(function() {});
+}
+
+// (27/11/2026) La oficina lanza la búsqueda de chofer nuevo (el chofer llamó porque no puede hacer el servicio)
+function buscarChoferNuevoOficina() {
+  if (!reservaDetalleId) return;
+  var av = document.getElementById('aviso-chofer-detalle');
+  var causa = document.getElementById('select-causa-chofer').value;
+  var motivoInput = document.getElementById('input-motivo-chofer');
+  var detalle = motivoInput ? motivoInput.value.trim() : '';
+  av.style.display = 'block';
+  if (!causa) { av.innerHTML = '<span style="color:#e07b5a;">❌ Elige la causa del cambio.</span>'; return; }
+  if (causa === 'Otra' && !detalle) { av.innerHTML = '<span style="color:#e07b5a;">❌ Escribe el detalle de la causa.</span>'; return; }
+  if (!confirm('¿Buscar chofer nuevo?\n\nEl chofer sale de la reserva y se avisa a los demás choferes.')) return;
+  av.innerHTML = '<span style="color:#888;">Buscando chofer nuevo...</span>';
+  fetch('/admin/reservas/' + reservaDetalleId + '/buscar-chofer-nuevo', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ causa: causa + (detalle ? ' — ' + detalle : '') })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        av.innerHTML = '<span style="color:#2d7a4f;">✔ Búsqueda en marcha. Se avisa a los demás choferes.</span>';
+        abrirDetalleReserva(reservaDetalleId, true);
+        cargarReservas(true);
+        cargarEmergencias();
+      } else {
+        av.innerHTML = '<span style="color:#e07b5a;">❌ ' + escapar(d.error || 'No se pudo lanzar la búsqueda.') + '</span>';
+      }
+    })
+    .catch(function() { av.innerHTML = '<span style="color:#e07b5a;">❌ Error de conexión.</span>'; });
 }
 
 function mostrarCambiarChofer() {

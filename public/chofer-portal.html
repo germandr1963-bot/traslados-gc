@@ -506,6 +506,10 @@
                   '</select>' +
                   '<input type="text" id="detalle-liberar-' + r.id + '" maxlength="150" placeholder="Detalle (obligatorio si es «Otra»)">' +
                   '<div style="font-size:12px;color:#8a5a00;margin-top:8px;">El servicio se ofrecerá a otros choferes y el equipo recibirá un aviso.</div>' +
+                  // (27/11/2026) Faltan menos de 24 h: además de pedir el cambio, que llame (Germán, 27/11)
+                  (r.menos_24h
+                    ? '<div style="font-size:13px;font-weight:700;color:#8a2424;background:#fdecea;border:1px solid #8a2424;border-radius:6px;padding:8px 10px;margin-top:8px;">⚠️ Faltan menos de 24 horas. Además de solicitar el cambio de chofer, por favor comunícate con el Admin o con un chofer afiliado: debemos ayudar a nuestros clientes.</div>'
+                    : '') +
                   '<button class="boton-noshow" style="width:100%;margin-top:8px;" onclick="liberarServicio(' + r.id + ')">Confirmar: no puedo hacerlo</button>' +
                 '</div>'
               : '') +
