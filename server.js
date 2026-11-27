@@ -21773,28 +21773,35 @@ app.get('/api/whatsapp/reservas-15min-sin-respuesta', requierePuenteWhatsapp, as
   res.json(result.rows);
 }));
 
-// (27/11/2026) Reservas sin chofer a las que les faltan 12 horas o menos para la recogida (Germán, 27/11: a las 24 h
-// pasan a emergencia y a las 12 h se anulan solas; antes era a las 24 h de haberse hecho la reserva). Vale para las
-// nuevas (con su aviso enviado, o sin poder enviarse desde hace 15 minutos) y para las reasignaciones. Solo si la
-// recogida aún no ha pasado. El puente avisa al cliente de la reserva nueva; en la reasignación (reserva ya aceptada,
-// quizá con depósito pagado) el mensaje al cliente lo envía el servidor (aviso_cliente_servidor).
+// Reservas que llevan 24 horas desde su creación sin que ningún chofer haya
+// aceptado. El puente las usa para avisar al cliente de la cancelación.
+// (27/11/2026) La reserva NORMAL sigue exactamente como estaba (24 h desde su creación). Se SUMAN aparte las
+// REASIGNACIONES (reserva ya aceptada cuyo chofer no puede) a las que les faltan 12 horas o menos para la recogida
+// (Germán, 27/11, solo para la reasignación); su mensaje al cliente lo envía el servidor (aviso_cliente_servidor).
 app.get('/api/whatsapp/reservas-24h-sin-respuesta', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
-  const ahora = sqlAhoraNegocio();
   const result = await pool.query(
-    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.telefono_cliente, r.email_cliente, r.lang_cliente,
-            COALESCE(r.reasignacion_en_curso, FALSE) AS aviso_cliente_servidor
+    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.telefono_cliente, r.email_cliente, r.lang_cliente
      FROM reservas r
-     WHERE r.conductor_id IS NULL AND COALESCE(r.archivada, FALSE) = FALSE
+     WHERE r.estado_aviso_whatsapp IN ('enviado', 'sin_respuesta')
+       AND r.creado_en <= NOW() - INTERVAL '24 hours'
+       AND r.estado NOT IN ('cancelada', 'completada')
+       AND COALESCE(r.reasignacion_en_curso, FALSE) = FALSE
+     ORDER BY r.id ASC`
+  );
+  const ahora = sqlAhoraNegocio();
+  const reas = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.telefono_cliente, r.email_cliente, r.lang_cliente,
+            TRUE AS aviso_cliente_servidor
+     FROM reservas r
+     WHERE COALESCE(r.reasignacion_en_curso, FALSE) = TRUE AND r.conductor_id IS NULL
+       AND COALESCE(r.archivada, FALSE) = FALSE
        AND r.estado NOT IN ('cancelada', 'completada', 'no_show')
        AND r.fecha IS NOT NULL AND r.hora IS NOT NULL
        AND (r.fecha + r.hora) <= ${ahora} + INTERVAL '12 hours'
        AND (r.fecha + r.hora) > ${ahora}
-       AND (COALESCE(r.reasignacion_en_curso, FALSE) = TRUE
-            OR r.estado_aviso_whatsapp IN ('enviado', 'sin_respuesta')
-            OR (r.estado_aviso_whatsapp = 'pendiente' AND r.creado_en <= NOW() - INTERVAL '15 minutes'))
      ORDER BY r.id ASC`
   );
-  res.json(result.rows);
+  res.json(result.rows.concat(reas.rows));
 }));
 
 // El puente avisa que ya mandó el WhatsApp a los choferes de esta reserva,
@@ -21876,14 +21883,22 @@ app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asy
     `SELECT conductor_id, COALESCE(reasignacion_en_curso, FALSE) AS reasignacion, deposito_pagado, deposito_liberado,
             stripe_payment_intent_id, telefono_cliente
      FROM reservas WHERE id = $1`, [req.params.id]);
-  if (antes.rows.length && antes.rows[0].conductor_id) return res.json({ ok: true, tiene_chofer: true });
-  const reserva = await pool.query(
-    `UPDATE reservas SET estado = 'cancelada', estado_aviso_whatsapp = 'cancelada_sin_respuesta',
-       cancelada_en = NOW(), cancelada_por = 'sin_chofer', cancelada_operario = NULL, reasignacion_en_curso = FALSE
-     WHERE id = $1 AND estado NOT IN ('cancelada', 'completada', 'no_show') AND conductor_id IS NULL
-     RETURNING numero_reserva, nombre_cliente, email_cliente, lang_cliente, origen, destino, fecha, hora`,
-    [req.params.id]
-  );
+  const _esReas = !!(antes.rows.length && antes.rows[0].reasignacion);
+  if (_esReas && antes.rows[0].conductor_id) return res.json({ ok: true, tiene_chofer: true });
+  // La reserva NORMAL, exactamente como estaba; la reasignación, con sus condiciones
+  const reserva = _esReas
+    ? await pool.query(
+      `UPDATE reservas SET estado = 'cancelada', estado_aviso_whatsapp = 'cancelada_sin_respuesta',
+         cancelada_en = NOW(), cancelada_por = 'sin_chofer', cancelada_operario = NULL, reasignacion_en_curso = FALSE
+       WHERE id = $1 AND estado NOT IN ('cancelada', 'completada', 'no_show') AND conductor_id IS NULL
+       RETURNING numero_reserva, nombre_cliente, email_cliente, lang_cliente, origen, destino, fecha, hora`,
+      [req.params.id])
+    : await pool.query(
+      `UPDATE reservas SET estado = 'cancelada', estado_aviso_whatsapp = 'cancelada_sin_respuesta',
+         cancelada_en = NOW(), cancelada_por = 'sin_chofer', cancelada_operario = NULL
+       WHERE id = $1 AND estado NOT IN ('cancelada', 'completada')
+       RETURNING numero_reserva, nombre_cliente, email_cliente, lang_cliente, origen, destino, fecha, hora`,
+      [req.params.id]);
   if (!reserva.rows.length) return res.json({ ok: true, ya_cancelada: true });
   const _antes = antes.rows[0] || {};
   // (27/11/2026) Reserva ya aceptada con el depósito pagado: se devuelve al momento (como en una cancelación a tiempo).
@@ -21902,7 +21917,7 @@ app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asy
     }
     _depositoDevuelto = true;
   }
-  await anotarHistorialReserva(req.params.id, '🚫 Anulada automáticamente: sin chofer a 12 horas de la recogida' +
+  if (_esReas) await anotarHistorialReserva(req.params.id, '🚫 Anulada automáticamente: sin chofer a 12 horas de la recogida' +
     (_depositoDevuelto ? '. Depósito devuelto al cliente.' : '.'));
   // (03/11/2026) Anulada sin chofer: aviso a todos los choferes a los que se envió
   try { await avisarChoferesReservaCerrada(req.params.id, 'chofer_aviso_anulada'); }
