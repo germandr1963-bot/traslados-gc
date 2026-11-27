@@ -2963,6 +2963,12 @@ async function initSchema() {
   // (26/11/2026) «Acepto viajes de categorías inferiores» (lo marca el chofer en su portal) y segunda ronda del aviso
   await pool.query(`ALTER TABLE conductores ADD COLUMN IF NOT EXISTS acepta_inferiores BOOLEAN DEFAULT FALSE`);
   await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS segunda_ronda_en TIMESTAMP`);
+  // (27/11/2026) EMERGENCIA (Germán, 27/11): reserva sin chofer a menos de 24 h de la recogida. Cuándo empezó, última
+  // alerta al equipo, último aviso repetido a los choferes y cuándo terminó (todo queda además en el historial).
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS emergencia_inicio TIMESTAMP`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS emergencia_ultima_alerta_en TIMESTAMP`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS emergencia_ultimo_aviso_en TIMESTAMP`);
+  await pool.query(`ALTER TABLE reservas ADD COLUMN IF NOT EXISTS emergencia_fin TIMESTAMP`);
   // Mensajes de WhatsApp recibidos en el número de OpenWA (28/09/2026). Paso 1: solo se guardan.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS whatsapp_entrantes (
@@ -3981,6 +3987,22 @@ Pulsa el botón para crear una nueva contraseña:
 Se está ofreciendo por WhatsApp a los demás choferes aprobados. Revisa la reserva en el Admin.
 `,
       cuerpo_whatsapp: '' },
+    // (27/11/2026) Emergencia: reserva sin chofer a menos de 24 h de la recogida. Cada hora hasta que se resuelva:
+    // dentro del horario de oficina, email a «Reservas»; fuera de horario y festivos, email y WhatsApp a la guardia.
+    { clave: 'interno_emergencia_sin_chofer', nombre: 'Emergencia: reserva sin chofer a menos de 24 h (al equipo)', categoria: 'interno',
+      asunto_email: '🚨 EMERGENCIA — {numero_reserva} sin chofer',
+      cuerpo_email: `
+🚨 <strong>EMERGENCIA — Reserva {numero_reserva} sin chofer.</strong>
+<div class="info-box">
+  📅 <strong>Recogida:</strong> {fecha} a las {hora} (faltan {faltan_horas} h)
+  📍 <strong>Ruta:</strong> {origen} → {destino}
+  🚗 <strong>Categoría:</strong> {categoria}, {pasajeros}
+  📣 <strong>Avisados:</strong> {avisados} choferes, sin respuesta.
+</div>
+Sugerimos llamar a los choferes, localizar choferes de otra compañía o dar de alta un chofer externo.
+Esta alerta se repite cada hora hasta que se resuelva.
+`,
+      cuerpo_whatsapp: '🚨 *EMERGENCIA — Reserva {numero_reserva} sin chofer.*\n\n📅 *Recogida:* {fecha} a las {hora} (faltan {faltan_horas} h)\n📍 *Ruta:* {origen} → {destino}\n🚗 *Categoría:* {categoria}, {pasajeros}\n📣 *Avisados:* {avisados} choferes, sin respuesta.\n\nSugerimos llamar a los choferes, localizar choferes de otra compañía o dar de alta un chofer externo.\nEsta alerta se repite cada hora hasta que se resuelva.' },
     { clave: 'interno_nuevo_chofer', nombre: 'Nuevo chofer asignado (al equipo)', categoria: 'interno',
       asunto_email: '✅ {numero_reserva}: nuevo chofer asignado',
       cuerpo_email: `
@@ -4163,7 +4185,9 @@ Los WhatsApp que esperaban en la cola están saliendo.`,
     { clave: 'frase_enlace_enviado_conductor', canal: 'wa', orden: 360, contexto: 'Confirmación por WhatsApp al cliente: su mensaje se ha enviado a su conductor', es: '✅ Mensaje enviado a tu chofer.' },
     { clave: 'frase_enlace_mensaje_conductor', canal: 'wa', orden: 370, contexto: 'Cabecera del mensaje del conductor que recibe el cliente por WhatsApp. {nombre} = nombre del conductor; debajo va el mensaje traducido', es: '💬 Mensaje de tu chofer ({nombre}):' },
     { clave: 'frase_enlace_no_encontrada', canal: 'wa', orden: 355, contexto: 'Respuesta automática por WhatsApp (una vez al día) cuando no se encuentra ninguna reserva en curso de quien escribe y no ha puesto número de reserva. El ejemplo ABC123 se deja tal cual', es: 'No encontramos tu reserva en curso. Por favor, escribe tu número de reserva (lo tienes en tu voucher) seguido de tu mensaje, por ejemplo: ABC123 No encuentro a mi chofer. Este servicio funciona desde 2 horas antes hasta 2 horas después de tu viaje.' },
-    { clave: 'frase_enlace_sin_numero', canal: 'wa', orden: 350, contexto: 'Respuesta automática por WhatsApp (una vez al día) cuando el mensaje no empieza por un número de reserva. El ejemplo ABC123 se deja tal cual', es: 'Hola 👋 Para contactar con tu chofer el día del viaje, empieza tu mensaje con tu número de reserva, por ejemplo: ABC123 No encuentro a mi chofer.' }
+    { clave: 'frase_enlace_sin_numero', canal: 'wa', orden: 350, contexto: 'Respuesta automática por WhatsApp (una vez al día) cuando el mensaje no empieza por un número de reserva. El ejemplo ABC123 se deja tal cual', es: 'Hola 👋 Para contactar con tu chofer el día del viaje, empieza tu mensaje con tu número de reserva, por ejemplo: ABC123 No encuentro a mi chofer.' },
+    // (27/11/2026) Reserva aceptada y pagada que se anula sola a las 12 h de la recogida sin chofer: se devuelve el depósito
+    { clave: 'frase_anulada_deposito_liberado', canal: 'ambos', orden: 380, contexto: 'Aviso en «Reserva anulada (sin chofer disponible)» cuando el cliente ya había pagado el depósito: se le devuelve', es: 'Hemos liberado tu depósito de garantía; el importe llegará a tu tarjeta en un plazo de 5 a 10 días hábiles, según tu entidad bancaria.' },
   ];
   // ON CONFLICT DO NOTHING: nunca sobreescribe lo que se edite desde el Admin
   for (const f of frasesBase) {
@@ -12553,7 +12577,9 @@ app.get('/chofer/mis-reservas', requireChofer, asyncHandler(async (req, res) => 
             r.direccion_recogida, r.direccion_destino, r.notas_cliente, r.lang_cliente, r.idioma_viajero_otro,
             cv.nombre AS categoria_nombre,
             (SELECT COUNT(*) FROM reservas_mensajes_chofer rmc
-             WHERE rmc.reserva_id = r.id AND rmc.autor = 'admin' AND rmc.leido = FALSE) AS mensajes_nuevos
+             WHERE rmc.reserva_id = r.id AND rmc.autor = 'admin' AND rmc.leido = FALSE) AS mensajes_nuevos,
+            -- (27/11/2026) Faltan menos de 24 h: al pulsar «No puedo hacer este servicio» se le pide llamar a la oficina
+            ((r.fecha + r.hora) <= ${sqlAhoraNegocio()} + INTERVAL '24 hours') AS menos_24h
      FROM reservas r
      LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
      WHERE r.conductor_id = $1
@@ -14074,6 +14100,22 @@ app.get('/admin/reservas/:id', requireAdmin, asyncHandler(async (req, res) => {
       };
     } catch (e) { console.warn('Reasignación (ficha del Admin):', e.message); }
   }
+  // (27/11/2026) Emergencia: sin chofer a menos de 24 h de la recogida → recuadro rojo de la reserva en el Admin
+  reserva.emergencia = null;
+  try {
+    const _em = await pool.query(
+      `SELECT EXTRACT(EPOCH FROM ((r.fecha + r.hora) - ${sqlAhoraNegocio()})) / 3600 AS horas_recogida,
+              to_char((r.fecha + r.hora) - INTERVAL '12 hours', 'DD/MM/YYYY') AS anula_fecha,
+              to_char((r.fecha + r.hora) - INTERVAL '12 hours', 'HH24:MI') AS anula_hora
+         FROM reservas r WHERE r.id = $1 AND ${sqlCondicionEmergencia(false)}`, [reserva.id]);
+    if (_em.rows.length) {
+      reserva.emergencia = {
+        faltan_horas: Math.max(0, Math.floor(Number(_em.rows[0].horas_recogida) || 0)),
+        anula_fecha: _em.rows[0].anula_fecha, anula_hora: _em.rows[0].anula_hora,
+        avisados: (reserva.choferes_avisados || []).length
+      };
+    }
+  } catch (e) { console.warn('Emergencia (ficha del Admin):', e.message); }
   // (16/11/2026) Asistencia especial: detalle (mientras no se borre), consentimientos y avisos al chofer, con fecha y hora
   reserva.asistencia = null;
   try {
@@ -21286,6 +21328,21 @@ app.post('/api/whatsapp/lid-resuelto', requierePuenteWhatsapp, asyncHandler(asyn
 //  · la casilla «No aceptamos reservas del mismo día» de Modelo de negocio no cuenta (la reserva ya existe).
 // Los viajes de menos de 24 horas (urgentes) se verán en su propia parte.
 // Se envía UNA sola vez (puente.js). La usan reservas-pendientes y la reserva del Admin (recuadro «Buscando chofer nuevo»).
+// (27/11/2026) Primera ronda del aviso de una reserva NUEVA (la de siempre, sacada a una función para usarla también en
+// las repeticiones de la emergencia): su categoría, con plazas, «Disponible hoy», nunca externos.
+async function choferesPrimeraRonda(r) {
+  const ch = await pool.query(
+    `SELECT id, nombre, telefono FROM conductores
+     WHERE estado = 'aprobado' AND COALESCE(tipo, 'flota') <> 'externo' AND disponible_hoy = TRUE
+       AND telefono IS NOT NULL AND telefono <> ''
+       AND categoria_id = $1
+       AND COALESCE(plazas, 0) >= COALESCE($2, 0)
+       AND id <> COALESCE($3, 0)
+     ORDER BY nombre`, [r.categoria_id, r.num_pasajeros, r.reasignacion ? r.reasignacion_excluir_id : null]
+  );
+  return ch.rows;
+}
+
 async function choferesParaReasignacion(r) {
   const q = await pool.query(
     `SELECT c.id, c.nombre, c.telefono FROM conductores c
@@ -21294,13 +21351,15 @@ async function choferesParaReasignacion(r) {
        AND c.categoria_id = $1
        AND COALESCE(c.plazas, 0) >= COALESCE($2, 0)
        AND c.id <> COALESCE($3, 0)
+       -- (27/11/2026) Viaje de HOY: solo los que tienen «Disponible hoy» (Germán, 27/11, en la emergencia)
+       AND (c.disponible_hoy = TRUE OR (SELECT x.fecha FROM reservas x WHERE x.id = $4) IS DISTINCT FROM $5::date)
        AND NOT EXISTS (
          SELECT 1 FROM reservas_extras re JOIN extras e ON e.id = re.extra_id
          WHERE re.reserva_id = $4 AND e.depende_chofer = TRUE
            AND NOT EXISTS (SELECT 1 FROM conductor_extras ce
                            WHERE ce.conductor_id = c.id AND ce.extra_id = re.extra_id AND ce.estado IN ('gratis', 'pago')))
      ORDER BY c.nombre`,
-    [r.categoria_id, r.num_pasajeros, r.reasignacion_excluir_id, r.id]
+    [r.categoria_id, r.num_pasajeros, r.reasignacion_excluir_id, r.id, hoyCanarias()]
   );
   return q.rows;
 }
@@ -21356,15 +21415,7 @@ app.get('/api/whatsapp/reservas-pendientes', requierePuenteWhatsapp, asyncHandle
       await pool.query('UPDATE reservas SET choferes_avisados = $1 WHERE id = $2', [lista.map(function (c) { return c.id; }), r.id]);
       continue;
     }
-    const ch = await pool.query(
-      `SELECT id, nombre, telefono FROM conductores
-       WHERE estado = 'aprobado' AND COALESCE(tipo, 'flota') <> 'externo' AND disponible_hoy = TRUE
-         AND telefono IS NOT NULL AND telefono <> ''
-         AND categoria_id = $1
-         AND COALESCE(plazas, 0) >= COALESCE($2, 0)
-         AND id <> COALESCE($3, 0)
-       ORDER BY nombre`, [r.categoria_id, r.num_pasajeros, r.reasignacion ? r.reasignacion_excluir_id : null]
-    );
+    const ch = { rows: await choferesPrimeraRonda(r) };
     if (r.reasignacion) r.choferes_reasignacion = ch.rows;
     else r.choferes_aviso = ch.rows;
     // (03/11/2026) Se apunta a quién se envía, para avisarles si la reserva se cancela antes de que nadie la acepte
@@ -21438,6 +21489,247 @@ app.post('/api/whatsapp/marcar-segunda-ronda/:id', requierePuenteWhatsapp, async
   res.json({ ok: true });
 }));
 
+// ─── (27/11/2026) EMERGENCIA: reserva sin chofer a menos de 24 h de la recogida (Germán, 27/11) ─────────────────
+// · Es emergencia una reserva viva, sin chofer, cuando faltan menos de 24 h para la recogida (y la recogida no ha
+//   pasado): la reasignación (su chofer no puede hacerla) en cuanto pasa; la reserva nueva, cuando su primer aviso
+//   lleva 15 minutos sin SI (el proceso normal de los 15 minutos no cambia).
+// · A los choferes: el mismo aviso de siempre, a los mismos de una reserva nueva (su categoría con sus filtros y los
+//   superiores con «Acepto viajes de categorías inferiores»), repetido cada hora hasta que alguien diga SI. Lo envía
+//   puente.js (a los que respondieron NO no se lo vuelve a enviar).
+// · Al equipo, cada hora: dentro del horario de la oficina (Admin → Contacto → «🏢 Oficinas»), email a las personas
+//   activas del departamento «Reservas» de Equipo; fuera de horario y festivos, email y WhatsApp a las personas de
+//   guardia de la oficina. En el Admin, el recuadro rojo siempre (reserva, franja de Reservas y señal del menú).
+// · A las 12 h de la recogida sin chofer, la reserva se anula sola (reservas-24h-sin-respuesta y cancelar-sin-respuesta).
+// · Todo queda en el historial de la reserva (reservas_historial_chofer).
+function sqlAhoraNegocio() { return "(NOW() AT TIME ZONE '" + ZONA_HORARIA + "')"; }
+
+// Condición SQL (alias r) de la reserva en emergencia. paraEquipo: además, la reserva nueva solo cuando su aviso
+// lleva 15 minutos sin SI (el recuadro rojo del Admin sale desde el primer momento).
+function sqlCondicionEmergencia(paraEquipo) {
+  const ahora = sqlAhoraNegocio();
+  return `r.conductor_id IS NULL AND COALESCE(r.archivada, FALSE) = FALSE
+     AND r.estado NOT IN ('cancelada', 'completada', 'no_show')
+     AND r.fecha IS NOT NULL AND r.hora IS NOT NULL
+     AND (r.fecha + r.hora) <= ${ahora} + INTERVAL '24 hours'
+     AND (r.fecha + r.hora) > ${ahora}
+     AND (COALESCE(r.reasignacion_en_curso, FALSE) = TRUE
+          OR r.estado_aviso_whatsapp IN ('pendiente', 'enviado', 'sin_respuesta'))` +
+    (paraEquipo ? `
+     AND (COALESCE(r.reasignacion_en_curso, FALSE) = TRUE
+          OR (r.estado_aviso_whatsapp IN ('enviado', 'sin_respuesta') AND r.whatsapp_aviso_enviado_en <= NOW() - INTERVAL '15 minutes')
+          OR (r.estado_aviso_whatsapp = 'pendiente' AND r.creado_en <= NOW() - INTERVAL '15 minutes'))` : '');
+}
+
+async function anotarHistorialReserva(reservaId, motivo) {
+  try { await pool.query('INSERT INTO reservas_historial_chofer (reserva_id, conductor_id, motivo) VALUES ($1, NULL, $2)', [reservaId, motivo]); }
+  catch (e) { console.warn('Historial de la reserva:', e.message); }
+}
+
+// Choferes del aviso repetido: los mismos de una reserva nueva (o de la reasignación) y los superiores con la casilla
+async function choferesEmergencia(r) {
+  const primera = r.reasignacion ? await choferesParaReasignacion(r) : await choferesPrimeraRonda(r);
+  const superiores = await choferesSegundaRonda(Object.assign({}, r, { choferes_avisados: [] }));
+  const vistos = new Set();
+  const lista = [];
+  for (const c of primera.concat(superiores)) {
+    if (vistos.has(c.id)) continue;
+    vistos.add(c.id);
+    lista.push(c);
+  }
+  return lista;
+}
+
+// puente.js: reservas en emergencia cuyo último aviso a los choferes fue hace 1 hora o más
+app.get('/api/whatsapp/emergencia-repetir', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const result = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino, r.categoria_id, r.num_pasajeros,
+            cv.nombre AS categoria_nombre, COALESCE(r.reasignacion_en_curso, FALSE) AS reasignacion,
+            r.reasignacion_excluir_id, r.choferes_avisados
+     FROM reservas r LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+     WHERE ${sqlCondicionEmergencia(false)}
+       AND r.categoria_id IS NOT NULL
+       AND r.estado_aviso_whatsapp IN ('enviado', 'sin_respuesta')
+       AND GREATEST(r.whatsapp_aviso_enviado_en, r.segunda_ronda_en, r.emergencia_ultimo_aviso_en) <= NOW() - INTERVAL '1 hour'
+     ORDER BY r.id ASC`);
+  const salida = [];
+  for (const r of result.rows) {
+    const lista = await choferesEmergencia(r);
+    if (!lista.length) {
+      // Nadie a quien avisar: se apunta la hora para volver a mirarla dentro de una hora
+      await pool.query('UPDATE reservas SET emergencia_ultimo_aviso_en = NOW() WHERE id = $1', [r.id]);
+      await anotarHistorialReserva(r.id, '🚨 Emergencia: ningún chofer cumple para repetir el aviso.');
+      continue;
+    }
+    r.choferes_emergencia = lista;
+    salida.push(r);
+  }
+  res.json(salida);
+}));
+
+app.post('/api/whatsapp/marcar-emergencia-aviso/:id', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids.map(Number).filter(Boolean) : [];
+  await pool.query(
+    `UPDATE reservas SET emergencia_ultimo_aviso_en = NOW(),
+       choferes_avisados = (SELECT ARRAY(SELECT DISTINCT unnest(COALESCE(choferes_avisados, '{}') || $1::int[])))
+     WHERE id = $2`, [ids, req.params.id]);
+  await anotarHistorialReserva(req.params.id, '🚨 Emergencia: aviso repetido a ' + ids.length + ' ' + (ids.length === 1 ? 'chofer' : 'choferes') + '.');
+  res.json({ ok: true });
+}));
+
+// A quién va la alerta: dentro del horario de la oficina, «Reservas» (email); fuera, la guardia (email y WhatsApp)
+async function destinatariosEmergencia() {
+  let abierta = true;
+  let oficina = null;
+  try {
+    const o = await pool.query('SELECT * FROM oficinas ORDER BY orden, id LIMIT 1');
+    if (o.rows.length) {
+      oficina = o.rows[0];
+      abierta = estadoOficina(oficina, await festivosOficinaSet(oficina.id)).abierta;
+    }
+  } catch (e) { console.warn('Emergencia (oficina):', e.message); }
+  const personasDepartamento = async function (nombre) {
+    const q = await pool.query(
+      `SELECT p.nombre, p.email, p.telefono FROM equipo_personas p JOIN equipo_departamentos d ON d.id = p.departamento_id
+        WHERE LOWER(TRIM(d.nombre)) = $1 AND p.estado = 'activo' ORDER BY p.id`, [nombre]);
+    return q.rows;
+  };
+  if (abierta) {
+    let personas = await personasDepartamento('reservas');
+    let emails = personas.map(function (p) { return String(p.email || '').trim(); }).filter(Boolean);
+    if (!emails.length) emails = await obtenerEmailsNotificacion();
+    return { abierta: true, emails: emails, telefonos: [], texto: 'oficina abierta: email a Reservas' };
+  }
+  let guardia = [];
+  if (oficina && (oficina.guardia_personas || []).length) {
+    const q = await pool.query(
+      `SELECT nombre, email, telefono FROM equipo_personas WHERE id = ANY($1::int[]) AND estado = 'activo' ORDER BY id`,
+      [oficina.guardia_personas]);
+    guardia = q.rows;
+  }
+  if (!guardia.length) guardia = await personasDepartamento('guardia operativa');
+  if (!guardia.length) guardia = await personasDepartamento('reservas');
+  let emails = guardia.map(function (p) { return String(p.email || '').trim(); }).filter(Boolean);
+  if (!emails.length) emails = await obtenerEmailsNotificacion();
+  const telefonos = guardia.map(function (p) { return String(p.telefono || '').trim(); }).filter(Boolean);
+  return { abierta: false, emails: emails, telefonos: telefonos, texto: 'oficina cerrada: email y WhatsApp a la guardia' };
+}
+
+async function alertaEmergenciaEquipo(r) {
+  const vars = {
+    numero_reserva: r.numero_reserva,
+    fecha: r.fecha ? fechaCliente(r.fecha, 'es') : '—',
+    hora: r.hora ? String(r.hora).slice(0, 5) : '—',
+    faltan_horas: String(Math.max(0, Math.floor(Number(r.horas_recogida) || 0))),
+    origen: r.origen || '—',
+    destino: r.destino || '—',
+    categoria: r.categoria_nombre || '—',
+    pasajeros: r.num_pasajeros ? textoPax(r.num_pasajeros, 'es') : '—',
+    avisados: String((r.choferes_avisados || []).length)
+  };
+  const dest = await destinatariosEmergencia();
+  const p = await obtenerPlantilla('interno_emergencia_sin_chofer', vars, 'es');
+  for (const em of dest.emails) {
+    try {
+      await enviarEmail({ to: em, subject: (p && p.asunto) || ('🚨 EMERGENCIA — ' + r.numero_reserva + ' sin chofer'),
+        html: plantillaEmail((p && p.email) || ('<p>🚨 <strong>EMERGENCIA — Reserva ' + r.numero_reserva + ' sin chofer.</strong></p>')) });
+    } catch (e) { console.warn('Alerta de emergencia (email ' + em + '):', e.message); }
+  }
+  for (const tel of dest.telefonos) {
+    try {
+      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [tel, (p && p.whatsapp) || ('🚨 EMERGENCIA — Reserva ' + r.numero_reserva + ' sin chofer.')]);
+    } catch (e) { console.warn('Alerta de emergencia (WhatsApp):', e.message); }
+  }
+  await pool.query('UPDATE reservas SET emergencia_ultima_alerta_en = NOW() WHERE id = $1', [r.id]);
+  await anotarHistorialReserva(r.id, '🚨 Alerta de emergencia al equipo (' + dest.texto + ').');
+  console.log('🚨 Emergencia ' + r.numero_reserva + ': alerta al equipo (' + dest.texto + ').');
+}
+
+// Cada minuto: empieza o termina cada emergencia y manda la alerta al equipo cada hora
+let _revisandoEmergencias = false;
+async function revisarEmergencias() {
+  if (_revisandoEmergencias) return;
+  _revisandoEmergencias = true;
+  try {
+    const fin = await pool.query(
+      `UPDATE reservas r SET emergencia_fin = NOW()
+        WHERE r.emergencia_inicio IS NOT NULL AND r.emergencia_fin IS NULL
+          AND (r.conductor_id IS NOT NULL OR r.estado IN ('cancelada', 'completada', 'no_show') OR r.archivada = TRUE)
+        RETURNING r.id, r.conductor_id, r.estado`);
+    for (const f of fin.rows) {
+      await anotarHistorialReserva(f.id, f.conductor_id ? '✅ Emergencia terminada: chofer asignado.'
+        : (f.estado === 'cancelada' ? '✅ Emergencia terminada: reserva cancelada.' : '✅ Emergencia terminada.'));
+    }
+    const act = await pool.query(
+      `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino, r.num_pasajeros, r.choferes_avisados,
+              r.emergencia_inicio, r.emergencia_fin, r.emergencia_ultima_alerta_en, cv.nombre AS categoria_nombre,
+              EXTRACT(EPOCH FROM ((r.fecha + r.hora) - ${sqlAhoraNegocio()})) / 3600 AS horas_recogida
+         FROM reservas r LEFT JOIN categorias_vehiculos cv ON cv.id = r.categoria_id
+        WHERE ${sqlCondicionEmergencia(true)}
+        ORDER BY r.fecha, r.hora`);
+    for (const r of act.rows) {
+      const nueva = !r.emergencia_inicio || r.emergencia_fin;
+      if (nueva) {
+        await pool.query('UPDATE reservas SET emergencia_inicio = NOW(), emergencia_fin = NULL, emergencia_ultima_alerta_en = NULL WHERE id = $1', [r.id]);
+        await anotarHistorialReserva(r.id, '🚨 Emergencia: sin chofer a menos de 24 horas de la recogida.');
+      }
+      const ultima = (!nueva && r.emergencia_ultima_alerta_en) ? new Date(r.emergencia_ultima_alerta_en).getTime() : 0;
+      if (!ultima || Date.now() - ultima >= 60 * 60 * 1000) await alertaEmergenciaEquipo(r);
+    }
+  } catch (e) {
+    console.warn('Revisión de emergencias:', e.message);
+  } finally {
+    _revisandoEmergencias = false;
+  }
+}
+
+// Admin: reservas en emergencia (franja roja de Reservas y señal del menú)
+app.get('/admin/emergencias', requireAdmin, asyncHandler(async (req, res) => {
+  const q = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino,
+            EXTRACT(EPOCH FROM ((r.fecha + r.hora) - ${sqlAhoraNegocio()})) / 3600 AS horas_recogida
+       FROM reservas r
+      WHERE ${sqlCondicionEmergencia(false)}
+      ORDER BY r.fecha, r.hora`);
+  res.json({ emergencias: q.rows.map(function (r) {
+    return { id: r.id, numero_reserva: r.numero_reserva, fecha: r.fecha ? fechaCliente(r.fecha, 'es') : '—',
+             hora: r.hora ? String(r.hora).slice(0, 5) : '—', origen: r.origen || '—', destino: r.destino || '—',
+             faltan_horas: Math.max(0, Math.floor(Number(r.horas_recogida) || 0)) };
+  }) });
+}));
+
+// Admin: el chofer llama porque no puede hacer el servicio (y no puede entrar en su portal). La oficina lo marca y
+// pasa exactamente lo mismo que con su botón «⚠️ No puedo hacer este servicio»: sale de la reserva y empieza la búsqueda.
+app.post('/admin/reservas/:id/buscar-chofer-nuevo', requireAdmin, asyncHandler(async (req, res) => {
+  const causa = String((req.body && req.body.causa) || '').trim().slice(0, 200);
+  if (!causa) return res.status(400).json({ error: 'Indica la causa.' });
+  const check = await pool.query(
+    `SELECT r.id, r.numero_reserva, r.fecha, r.hora, r.origen, r.destino, r.conductor_id, c.nombre AS chofer_nombre
+     FROM reservas r JOIN conductores c ON c.id = r.conductor_id
+     WHERE r.id = $1 AND r.archivada = FALSE AND r.estado NOT IN ('cancelada', 'completada', 'no_show')`,
+    [req.params.id]);
+  if (!check.rows.length) return res.status(400).json({ error: 'Esta reserva no tiene chofer o ya está cerrada.' });
+  const r = check.rows[0];
+  await pool.query(
+    `UPDATE reservas SET conductor_id = NULL, reasignacion_en_curso = TRUE, reasignacion_excluir_id = $1,
+       reasignacion_inicio = NOW(), reasignacion_chofer_anterior = $2, estado_aviso_whatsapp = 'pendiente',
+       reasignacion_causa = $4, choferes_avisados = NULL, segunda_ronda_en = NULL
+     WHERE id = $3`,
+    [r.conductor_id, r.chofer_nombre, r.id, causa]);
+  await pool.query(
+    'INSERT INTO reservas_historial_chofer (reserva_id, conductor_id, motivo) VALUES ($1, $2, $3)',
+    [r.id, r.conductor_id, 'Liberado por la oficina (llamada del chofer ' + r.chofer_nombre + '). Causa: ' + causa]);
+  console.log('⚠️ ' + r.numero_reserva + ' liberado por la oficina (llamada de ' + r.chofer_nombre + ', ' + causa + '). Se ofrece a los demás choferes.');
+  await avisarEquipoPlantilla('interno_servicio_liberado', {
+    numero_reserva: r.numero_reserva,
+    fecha: r.fecha ? fechaCliente(r.fecha, 'es') : '—',
+    hora: r.hora ? String(r.hora).slice(0, 5) : '—',
+    origen: r.origen || '—', destino: r.destino || '—',
+    chofer_anterior: r.chofer_nombre, causa: causa
+  });
+  res.json({ ok: true });
+}));
+
 // Reservas que llevan 15 minutos o más avisadas a los choferes sin que nadie
 // haya aceptado todavía. El puente las usa para avisar al cliente de que
 // seguimos buscando chofer.
@@ -21454,16 +21746,25 @@ app.get('/api/whatsapp/reservas-15min-sin-respuesta', requierePuenteWhatsapp, as
   res.json(result.rows);
 }));
 
-// Reservas que llevan 24 horas desde su creación sin que ningún chofer haya
-// aceptado. El puente las usa para avisar al cliente de la cancelación.
+// (27/11/2026) Reservas sin chofer a las que les faltan 12 horas o menos para la recogida (Germán, 27/11: a las 24 h
+// pasan a emergencia y a las 12 h se anulan solas; antes era a las 24 h de haberse hecho la reserva). Vale para las
+// nuevas (con su aviso enviado, o sin poder enviarse desde hace 15 minutos) y para las reasignaciones. Solo si la
+// recogida aún no ha pasado. El puente avisa al cliente de la reserva nueva; en la reasignación (reserva ya aceptada,
+// quizá con depósito pagado) el mensaje al cliente lo envía el servidor (aviso_cliente_servidor).
 app.get('/api/whatsapp/reservas-24h-sin-respuesta', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  const ahora = sqlAhoraNegocio();
   const result = await pool.query(
-    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.telefono_cliente, r.email_cliente, r.lang_cliente
+    `SELECT r.id, r.numero_reserva, r.nombre_cliente, r.telefono_cliente, r.email_cliente, r.lang_cliente,
+            COALESCE(r.reasignacion_en_curso, FALSE) AS aviso_cliente_servidor
      FROM reservas r
-     WHERE r.estado_aviso_whatsapp IN ('enviado', 'sin_respuesta')
-       AND r.creado_en <= NOW() - INTERVAL '24 hours'
-       AND r.estado NOT IN ('cancelada', 'completada')
-       AND COALESCE(r.reasignacion_en_curso, FALSE) = FALSE
+     WHERE r.conductor_id IS NULL AND COALESCE(r.archivada, FALSE) = FALSE
+       AND r.estado NOT IN ('cancelada', 'completada', 'no_show')
+       AND r.fecha IS NOT NULL AND r.hora IS NOT NULL
+       AND (r.fecha + r.hora) <= ${ahora} + INTERVAL '12 hours'
+       AND (r.fecha + r.hora) > ${ahora}
+       AND (COALESCE(r.reasignacion_en_curso, FALSE) = TRUE
+            OR r.estado_aviso_whatsapp IN ('enviado', 'sin_respuesta')
+            OR (r.estado_aviso_whatsapp = 'pendiente' AND r.creado_en <= NOW() - INTERVAL '15 minutes'))
      ORDER BY r.id ASC`
   );
   res.json(result.rows);
@@ -21542,14 +21843,40 @@ app.post('/api/whatsapp/marcar-sin-respuesta/:id', requierePuenteWhatsapp, async
 // El puente ya avisó al cliente por WhatsApp de la cancelación (24h sin
 // respuesta). Aquí cancelamos la reserva y mandamos el email equivalente.
 app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asyncHandler(async (req, res) => {
+  // (27/11/2026) Antes de anular: ¿era una reasignación (reserva ya aceptada, quizá con el depósito pagado)? Y si en
+  // este momento ya tiene chofer (alguien dijo SI justo ahora), no se anula.
+  const antes = await pool.query(
+    `SELECT conductor_id, COALESCE(reasignacion_en_curso, FALSE) AS reasignacion, deposito_pagado, deposito_liberado,
+            stripe_payment_intent_id, telefono_cliente
+     FROM reservas WHERE id = $1`, [req.params.id]);
+  if (antes.rows.length && antes.rows[0].conductor_id) return res.json({ ok: true, tiene_chofer: true });
   const reserva = await pool.query(
     `UPDATE reservas SET estado = 'cancelada', estado_aviso_whatsapp = 'cancelada_sin_respuesta',
-       cancelada_en = NOW(), cancelada_por = 'sin_chofer', cancelada_operario = NULL
-     WHERE id = $1 AND estado NOT IN ('cancelada', 'completada')
+       cancelada_en = NOW(), cancelada_por = 'sin_chofer', cancelada_operario = NULL, reasignacion_en_curso = FALSE
+     WHERE id = $1 AND estado NOT IN ('cancelada', 'completada', 'no_show') AND conductor_id IS NULL
      RETURNING numero_reserva, nombre_cliente, email_cliente, lang_cliente, origen, destino, fecha, hora`,
     [req.params.id]
   );
   if (!reserva.rows.length) return res.json({ ok: true, ya_cancelada: true });
+  const _antes = antes.rows[0] || {};
+  // (27/11/2026) Reserva ya aceptada con el depósito pagado: se devuelve al momento (como en una cancelación a tiempo).
+  // Si Stripe falla, queda como «devolución pendiente» en el Admin.
+  let _depositoDevuelto = false;
+  if (_antes.reasignacion && _antes.deposito_pagado && !_antes.deposito_liberado) {
+    await pool.query('UPDATE reservas SET deposito_devolucion_pendiente = TRUE WHERE id = $1', [req.params.id]);
+    if (_antes.stripe_payment_intent_id) {
+      try {
+        await stripe.refunds.create({ payment_intent: _antes.stripe_payment_intent_id });
+        await pool.query('UPDATE reservas SET deposito_liberado = TRUE, deposito_devolucion_pendiente = FALSE WHERE id = $1', [req.params.id]);
+        console.log('[STRIPE] Devolución automática por anulación sin chofer (12 h): ' + reserva.rows[0].numero_reserva);
+      } catch (stripeErr) {
+        console.warn('[STRIPE] No se pudo devolver automáticamente (anulación sin chofer) ' + reserva.rows[0].numero_reserva + ':', stripeErr.message);
+      }
+    }
+    _depositoDevuelto = true;
+  }
+  await anotarHistorialReserva(req.params.id, '🚫 Anulada automáticamente: sin chofer a 12 horas de la recogida' +
+    (_depositoDevuelto ? '. Depósito devuelto al cliente.' : '.'));
   // (03/11/2026) Anulada sin chofer: aviso a todos los choferes a los que se envió
   try { await avisarChoferesReservaCerrada(req.params.id, 'chofer_aviso_anulada'); }
   catch (eAv) { console.warn('Aviso de anulación a los choferes avisados:', eAv.message); }
@@ -21567,10 +21894,21 @@ app.post('/api/whatsapp/cancelar-sin-respuesta/:id', requierePuenteWhatsapp, asy
       fecha: fechaCliente(_rAnul.fecha, lang_cliente || 'es'),
       hora: _rAnul.hora ? String(_rAnul.hora).slice(0,5) : '—'
     }, lang_cliente || 'es');
+    // (27/11/2026) Con el depósito devuelto, el mismo aviso verde que en una cancelación a tiempo, con su frase
+    const _fraseDep = _depositoDevuelto ? await obtenerFrase('frase_anulada_deposito_liberado', lang_cliente || 'es',
+      'Hemos liberado tu depósito de garantía; el importe llegará a tu tarjeta en un plazo de 5 a 10 días hábiles, según tu entidad bancaria.') : '';
+    const _avisoDep = _fraseDep
+      ? '<p style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;padding:10px 14px;font-size:13px;color:#2e7d32;">✅ ' + _fraseDep + '</p>'
+      : '';
+    // En la reasignación el WhatsApp al cliente lo envía el servidor (por la cola), con la línea del depósito si se devolvió
+    if (_antes.reasignacion && _antes.telefono_cliente && _panul && _panul.whatsapp) {
+      await pool.query('INSERT INTO whatsapp_mensajes_pendientes (telefono, texto) VALUES ($1, $2)',
+        [_antes.telefono_cliente, _panul.whatsapp.replace(/\n{3,}/g, '\n\n') + (_fraseDep ? '\n\n✅ ' + _fraseDep : '')]);
+    }
     await enviarEmail({
       to: email_cliente,
       subject: (_panul && _panul.asunto) || ('Tu reserva ' + numero_reserva + ' ha sido anulada'),
-      html: (_panul && _panul.email) ? plantillaEmail(_panul.email) : plantillaEmailSimple(
+      html: (_panul && _panul.email) ? plantillaEmail(_panul.email + _avisoDep) : plantillaEmailSimple(
         nombre_cliente,
         'Lamentamos informarte que no hemos podido confirmar un chofer disponible para tu traslado en la fecha solicitada, por lo que hemos anulado la reserva. Puedes enviarnos una nueva solicitud más adelante; con gusto intentaremos ayudarte si tenemos disponibilidad.',
         numero_reserva
@@ -21732,6 +22070,7 @@ const VARIABLES_PLANTILLAS = {
   interno_consulta_precio:       { email: ['recibida', 'origen', 'destino', 'fecha', 'pasajeros', 'email_cliente', 'idioma'], wa: null },
   interno_nuevo_chofer:          { email: ['numero_reserva', 'fecha', 'hora', 'nombre_chofer'], wa: null },
   interno_servicio_liberado:     { email: ['numero_reserva', 'origen', 'destino', 'fecha', 'hora', 'chofer_anterior', 'causa'], wa: null },
+  interno_emergencia_sin_chofer: { email: ['numero_reserva', 'fecha', 'hora', 'faltan_horas', 'origen', 'destino', 'categoria', 'pasajeros', 'avisados'], wa: ['numero_reserva', 'fecha', 'hora', 'faltan_horas', 'origen', 'destino', 'categoria', 'pasajeros', 'avisados'] },
   // (15/10/2026) Estado del WhatsApp automático
   interno_whatsapp_parado:       { email: ['hora', 'fecha', 'en_cola', 'que_hacer'], wa: null },
   interno_whatsapp_cola:         { email: ['en_cola', 'hora', 'que_hacer'], wa: null },
@@ -23619,6 +23958,9 @@ async function purgarAsistenciaTerminada() {
   } catch (e) { console.warn('Borrado de seguridad de la asistencia especial:', e.message); }
 }
 setInterval(purgarAsistenciaTerminada, 60 * 60 * 1000);
+
+// (27/11/2026) Emergencias: reservas sin chofer a menos de 24 h de la recogida (cada minuto)
+setInterval(revisarEmergencias, 60 * 1000);
 
 // ─── Arranque ─────────────────────────────────────────────────────────────────
 initSchema()
